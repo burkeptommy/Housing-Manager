@@ -297,16 +297,32 @@ function NewRequestModal({
 
     try {
       const api = getApiClient();
-      await api.createServiceRequest({
+
+      // Create the service request first
+      const request = await api.createServiceRequest({
         householdId,
         title,
         description,
         categoryId: categoryId || undefined,
         priority,
         preferredDate: preferredDate || undefined,
-        // Note: Photo upload will be implemented when S3/GCS integration is added
-        // For now, we store it locally in the browser
       });
+
+      // Upload photo if provided
+      if (photoFile) {
+        try {
+          await api.uploadFile(photoFile, {
+            householdId,
+            category: 'IMAGE',
+            description: `Photo for request: ${title}`,
+            serviceRequestId: request.id,
+          });
+        } catch (uploadErr) {
+          console.error('Photo upload failed:', uploadErr);
+          // Don't fail the whole request if photo upload fails
+        }
+      }
+
       onSuccess();
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
@@ -477,7 +493,7 @@ function NewRequestModal({
                 )}
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-                Photo will be stored locally for now. Cloud storage coming soon.
+                Supported formats: JPEG, PNG, GIF, WebP (max 10MB)
               </p>
             </div>
 

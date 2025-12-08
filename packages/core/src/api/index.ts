@@ -20,6 +20,9 @@ import type {
   ApiError,
   ManagedHousehold,
   Vendor,
+  FileUpload,
+  UploadResponse,
+  FileCategory,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -273,6 +276,77 @@ export class ApiClient {
       method: 'DELETE',
       body: JSON.stringify({ cancelAtPeriodEnd }),
     });
+  }
+
+  // ============================================================================
+  // FILE UPLOAD ENDPOINTS
+  // ============================================================================
+
+  async uploadFile(
+    file: File | Blob,
+    options: {
+      householdId: string;
+      category?: FileCategory;
+      description?: string;
+      serviceRequestId?: string;
+      taskId?: string;
+    },
+  ): Promise<UploadResponse> {
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('householdId', options.householdId);
+    if (options.category) formData.append('category', options.category);
+    if (options.description) formData.append('description', options.description);
+    if (options.serviceRequestId) formData.append('serviceRequestId', options.serviceRequestId);
+    if (options.taskId) formData.append('taskId', options.taskId);
+
+    const url = `${this.config.baseUrl}/files/upload`;
+    const token = this.config.getAccessToken?.();
+
+    const headers: HeadersInit = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    // Don't set Content-Type - browser will set it with boundary for multipart
+
+    const response = await fetch(url, {
+      method: 'POST',
+      headers,
+      body: formData,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json().catch(() => ({
+        message: 'Upload failed',
+        statusCode: response.status,
+      }));
+      throw error;
+    }
+
+    return response.json();
+  }
+
+  async getFile(id: string): Promise<FileUpload & { url: string }> {
+    return this.request(`/files/${id}`);
+  }
+
+  async getFileUrl(id: string): Promise<string> {
+    const result = await this.request<{ url: string }>(`/files/${id}/url`);
+    return result.url;
+  }
+
+  async getHouseholdFiles(householdId: string, category?: FileCategory): Promise<FileUpload[]> {
+    const query = category ? `?householdId=${householdId}&category=${category}` : `?householdId=${householdId}`;
+    return this.request(`/files${query}`);
+  }
+
+  async getServiceRequestFiles(requestId: string): Promise<(FileUpload & { url: string })[]> {
+    return this.request(`/files/request/${requestId}`);
+  }
+
+  async deleteFile(id: string): Promise<void> {
+    return this.request(`/files/${id}`, { method: 'DELETE' });
   }
 }
 

@@ -6,6 +6,7 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth';
 import { BillingModule } from './billing';
 import { DbModule } from './db';
+import { FilesModule } from './files';
 import { HealthModule } from './health/health.module';
 import { HomeProfilesModule } from './home-profiles';
 import { HouseholdsModule } from './households';
@@ -33,6 +34,7 @@ import { UsersModule } from './users';
     MessagesModule,
     NotificationsModule,
     BillingModule,
+    FilesModule,
     HealthModule,
   ],
   controllers: [AppController],

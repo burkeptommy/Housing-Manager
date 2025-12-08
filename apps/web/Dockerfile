@@ -1,0 +1,88 @@
+# Haven Web Dockerfile - Optimized for Google Cloud Run
+# Multi-stage build for minimal image size
+
+# ============================================================================
+# Stage 1: Dependencies
+# ============================================================================
+FROM node:20-alpine AS deps
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy workspace configuration
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json ./
+
+# Copy package.json files for all workspaces
+COPY apps/web/package.json ./apps/web/
+COPY packages/core/package.json ./packages/core/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/config/package.json ./packages/config/
+
+# Install dependencies
+RUN pnpm install --frozen-lockfile
+
+# ============================================================================
+# Stage 2: Builder
+# ============================================================================
+FROM node:20-alpine AS builder
+
+RUN apk add --no-cache libc6-compat
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+# Copy dependencies from deps stage
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy source code
+COPY . .
+
+# Set build-time environment variables
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+# Build the application
+WORKDIR /app/apps/web
+RUN pnpm build
+
+# ============================================================================
+# Stage 3: Production Runner
+# ============================================================================
+FROM node:20-alpine AS runner
+
+RUN apk add --no-cache libc6-compat dumb-init
+
+# Create non-root user for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+
+WORKDIR /app
+
+# Copy necessary files
+COPY --from=builder /app/apps/web/public ./public
+COPY --from=builder /app/apps/web/package.json ./
+
+# Copy standalone build output
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
+
+USER nextjs
+
+# Cloud Run requires listening on PORT env variable (default 8080)
+ENV PORT=8080
+ENV NODE_ENV=production
+ENV HOSTNAME="0.0.0.0"
+
+EXPOSE 8080
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+CMD ["node", "apps/web/server.js"]

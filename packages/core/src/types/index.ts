@@ -394,6 +394,47 @@ export interface VendorSummary {
 }
 
 // ============================================================================
+// FILE TYPES
+// ============================================================================
+
+export type FileCategory =
+  | 'DOCUMENT'
+  | 'IMAGE'
+  | 'RECEIPT'
+  | 'WARRANTY'
+  | 'MANUAL'
+  | 'CONTRACT'
+  | 'OTHER';
+
+export interface FileUpload {
+  id: string;
+  filename: string;
+  originalName: string;
+  mimeType: string;
+  size: number;
+  url?: string;
+  category: FileCategory;
+  description?: string;
+  householdId?: string;
+  serviceRequestId?: string;
+  taskId?: string;
+  createdAt: Date;
+}
+
+export interface UploadFileRequest {
+  householdId: string;
+  category?: FileCategory;
+  description?: string;
+  serviceRequestId?: string;
+  taskId?: string;
+}
+
+export interface UploadResponse {
+  success: boolean;
+  file: FileUpload;
+}
+
+// ============================================================================
 // MANAGER TYPES
 // ============================================================================
 

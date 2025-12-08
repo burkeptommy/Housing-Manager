@@ -587,7 +587,8 @@ model File {
   originalName     String       @map("original_name")
   mimeType         String       @map("mime_type")
   size             Int
-  url              String
+  url              String?                           // Public URL (if applicable)
+  gcsUri           String?      @map("gcs_uri")      // gs://bucket/path format
   category         FileCategory @default(DOCUMENT)
 
   description      String?
