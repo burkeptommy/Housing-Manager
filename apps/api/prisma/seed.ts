@@ -150,6 +150,24 @@ async function main() {
 
   console.log(`✅ Created demo user: ${demoUser.email}`);
 
+  // Create a manager user
+  const managerPassword = await bcrypt.hash('Manager123!', 12);
+  const managerUser = await prisma.user.upsert({
+    where: { email: 'manager@haven.app' },
+    update: {},
+    create: {
+      email: 'manager@haven.app',
+      passwordHash: managerPassword,
+      firstName: 'Property',
+      lastName: 'Manager',
+      role: UserRole.MANAGER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  console.log(`✅ Created manager user: ${managerUser.email}`);
+
   // Create a demo household with home profile
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
@@ -275,8 +293,9 @@ async function main() {
   console.log('🎉 Database seed completed successfully!');
   console.log('');
   console.log('Demo credentials:');
-  console.log('  Admin: admin@haven.app / Admin123!');
-  console.log('  User:  demo@haven.app / Demo123!');
+  console.log('  Admin:   admin@haven.app / Admin123!');
+  console.log('  Manager: manager@haven.app / Manager123!');
+  console.log('  User:    demo@haven.app / Demo123!');
 }
 
 main()

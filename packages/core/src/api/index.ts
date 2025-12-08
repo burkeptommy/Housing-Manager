@@ -23,6 +23,12 @@ import type {
   FileUpload,
   UploadResponse,
   FileCategory,
+  AdminUser,
+  AdminHousehold,
+  AdminDashboardStats,
+  UpdateUserRoleRequest,
+  CreateServiceCategoryRequest,
+  UpdateServiceCategoryRequest,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -347,6 +353,61 @@ export class ApiClient {
 
   async deleteFile(id: string): Promise<void> {
     return this.request(`/files/${id}`, { method: 'DELETE' });
+  }
+
+  // ============================================================================
+  // ADMIN ENDPOINTS
+  // ============================================================================
+
+  async getAdminStats(): Promise<AdminDashboardStats> {
+    return this.request('/admin/stats');
+  }
+
+  async getAdminUsers(): Promise<AdminUser[]> {
+    return this.request('/admin/users');
+  }
+
+  async getAdminUser(id: string): Promise<AdminUser> {
+    return this.request(`/admin/users/${id}`);
+  }
+
+  async updateUserRole(id: string, data: UpdateUserRoleRequest): Promise<AdminUser> {
+    return this.request(`/admin/users/${id}/role`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async toggleUserActive(id: string): Promise<AdminUser> {
+    return this.request(`/admin/users/${id}/toggle-active`, {
+      method: 'PATCH',
+    });
+  }
+
+  async getAdminHouseholds(): Promise<AdminHousehold[]> {
+    return this.request('/admin/households');
+  }
+
+  async getAdminHousehold(id: string): Promise<AdminHousehold> {
+    return this.request(`/admin/households/${id}`);
+  }
+
+  async getAdminServiceCategories(): Promise<ServiceCategory[]> {
+    return this.request('/admin/service-categories');
+  }
+
+  async createServiceCategory(data: CreateServiceCategoryRequest): Promise<ServiceCategory> {
+    return this.request('/admin/service-categories', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateServiceCategory(id: string, data: UpdateServiceCategoryRequest): Promise<ServiceCategory> {
+    return this.request(`/admin/service-categories/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   }
 }
 

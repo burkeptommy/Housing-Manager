@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 
+import { AdminModule } from './admin';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth';
@@ -36,6 +37,7 @@ import { UsersModule } from './users';
     BillingModule,
     FilesModule,
     HealthModule,
+    AdminModule,
   ],
   controllers: [AppController],
   providers: [AppService],

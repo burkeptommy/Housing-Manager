@@ -460,6 +460,63 @@ export interface ApiError {
   statusCode: number;
 }
 
+// ============================================================================
+// ADMIN TYPES
+// ============================================================================
+
+export interface AdminUser extends User {
+  emailVerified: boolean;
+  _count?: {
+    households: number;
+  };
+}
+
+export interface AdminHousehold extends Household {
+  owner?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  };
+  _count?: {
+    members: number;
+    serviceRequests: number;
+  };
+  homeProfile?: {
+    propertyType: PropertyType;
+    city: string;
+    state: string;
+  } | null;
+}
+
+export interface AdminDashboardStats {
+  totalUsers: number;
+  totalHouseholds: number;
+  totalServiceRequests: number;
+  totalVendors: number;
+  usersByRole: { role: string; count: number }[];
+  requestsByStatus: { status: string; count: number }[];
+}
+
+export interface UpdateUserRoleRequest {
+  role: UserRole;
+}
+
+export interface CreateServiceCategoryRequest {
+  name: string;
+  description?: string;
+  icon?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateServiceCategoryRequest {
+  name?: string;
+  description?: string;
+  icon?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+}
+
 // Legacy types for backwards compatibility
 export interface Home extends Household {}
 export interface ApiResponse<T> {
