@@ -122,6 +122,11 @@ enum MessageType {
   SERVICE_UPDATE
 }
 
+enum ChannelType {
+  HOUSEHOLD
+  REQUEST
+}
+
 enum FileCategory {
   DOCUMENT
   IMAGE
@@ -206,6 +211,7 @@ model Household {
   maintenancePlans MaintenancePlan[]
   invoices        Invoice[]
   files           File[]
+  messages        Message[]
 
   @@map("households")
 }
@@ -471,7 +477,12 @@ model MaintenancePlan {
 
 model Message {
   id               String      @id @default(cuid())
+
+  // Channel identification - either household or service request
+  channelType      ChannelType @map("channel_type")
+  householdId      String?     @map("household_id")
   serviceRequestId String?     @map("service_request_id")
+
   senderId         String?     @map("sender_id")
   vendorId         String?     @map("vendor_id")
 
@@ -484,11 +495,13 @@ model Message {
   updatedAt        DateTime    @updatedAt @map("updated_at")
 
   // Relations
+  household      Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
   serviceRequest ServiceRequest? @relation(fields: [serviceRequestId], references: [id], onDelete: Cascade)
   sender         User?           @relation("MessageSender", fields: [senderId], references: [id], onDelete: SetNull)
   vendor         Vendor?         @relation(fields: [vendorId], references: [id], onDelete: SetNull)
 
-  @@index([serviceRequestId, createdAt])
+  @@index([channelType, householdId, createdAt])
+  @@index([channelType, serviceRequestId, createdAt])
   @@map("messages")
 }
 

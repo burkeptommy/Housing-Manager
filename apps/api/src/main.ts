@@ -1,11 +1,15 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import * as express from 'express';
 
 import { AppModule } from './app.module';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    // Enable raw body for Stripe webhook signature verification
+    rawBody: true,
+  });
 
   // Enable CORS
   app.enableCors({
@@ -40,6 +44,8 @@ async function bootstrap() {
     .addTag('Home Profiles', 'Home profile management endpoints')
     .addTag('Service Categories', 'Service category management (Admin only)')
     .addTag('Service Requests', 'Service request management endpoints')
+    .addTag('Messages', 'Real-time messaging endpoints')
+    .addTag('Billing', 'Subscription and billing endpoints')
     .addTag('Health', 'Health check endpoints')
     .build();
 
@@ -55,6 +61,7 @@ async function bootstrap() {
 
   console.log(`🏠 Haven API is running on: http://localhost:${port}/api`);
   console.log(`📖 API Documentation: http://localhost:${port}/api/docs`);
+  console.log(`🔌 WebSocket: ws://localhost:${port}/messages`);
   console.log(`📋 Endpoints:`);
   console.log(`   Auth:`);
   console.log(`   - POST /api/auth/register - Register a new user`);
@@ -78,6 +85,13 @@ async function bootstrap() {
   console.log(`   - GET  /api/requests?householdId=... - List by household`);
   console.log(`   - GET  /api/manager/requests - Manager's assigned requests`);
   console.log(`   - PATCH /api/requests/:id - Update request`);
+  console.log(`   Messages:`);
+  console.log(`   - GET  /api/channels/:type/:id/messages - Get channel messages`);
+  console.log(`   - POST /api/channels/:type/:id/messages - Send message`);
+  console.log(`   Billing:`);
+  console.log(`   - POST /api/billing/subscribe - Create subscription`);
+  console.log(`   - GET  /api/billing/subscription - Get current subscription`);
+  console.log(`   - POST /api/billing/webhook - Stripe webhook`);
   console.log(`   Health:`);
   console.log(`   - GET  /api/health        - Health check`);
 }
