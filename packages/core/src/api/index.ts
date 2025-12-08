@@ -45,6 +45,8 @@ import type {
   CreatePaymentMethodRequest,
   SetupIntentResponse,
   VendorCategory,
+  UpcomingItemsResponse,
+  InAppNotification,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -577,6 +579,41 @@ export class ApiClient {
     return this.request('/billing/setup-intent', {
       method: 'POST',
       body: JSON.stringify({ householdId }),
+    });
+  }
+
+  // ============================================================================
+  // DASHBOARD & REMINDERS ENDPOINTS
+  // ============================================================================
+
+  async getUpcomingItems(
+    householdId: string,
+    days?: number
+  ): Promise<UpcomingItemsResponse> {
+    const params = new URLSearchParams({ householdId });
+    if (days) params.append('days', days.toString());
+    return this.request(`/dashboard/upcoming?${params.toString()}`);
+  }
+
+  async getNotifications(unreadOnly?: boolean): Promise<InAppNotification[]> {
+    const params = unreadOnly ? '?unreadOnly=true' : '';
+    return this.request(`/notifications${params}`);
+  }
+
+  async getUnreadNotificationCount(): Promise<{ count: number }> {
+    return this.request('/notifications/unread-count');
+  }
+
+  async markNotificationRead(id: string, isRead: boolean): Promise<{ success: boolean }> {
+    return this.request(`/notifications/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ isRead }),
+    });
+  }
+
+  async markAllNotificationsRead(): Promise<{ success: boolean }> {
+    return this.request('/notifications/mark-all-read', {
+      method: 'POST',
     });
   }
 }

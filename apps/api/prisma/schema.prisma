@@ -204,9 +204,9 @@ enum BillingFrequency {
 }
 
 enum PaymentResponsibility {
-  OWNER_PAYS_DIRECT        // We just track and remind
-  HAVEN_PAYS_ON_BEHALF     // We collect money and pay vendor
-  VENDOR_AUTOPAY           // Autopay is set up with vendor, we track and alert
+  OWNER_PAYS_DIRECT // We just track and remind
+  HAVEN_PAYS_ON_BEHALF // We collect money and pay vendor
+  VENDOR_AUTOPAY // Autopay is set up with vendor, we track and alert
 }
 
 enum PaymentMethodType {
@@ -239,49 +239,69 @@ enum MaintenanceTaskStatus {
   OVERDUE
 }
 
+enum ReminderType {
+  BILL_DUE
+  MAINTENANCE_TASK
+}
+
+enum ReminderStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+enum ReminderChannel {
+  EMAIL
+  PUSH
+  SMS
+  IN_APP
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
 
 model User {
-  id                String    @id @default(cuid())
-  email             String    @unique
-  passwordHash      String    @map("password_hash")
-  firstName         String    @map("first_name")
-  lastName          String    @map("last_name")
-  phone             String?
-  avatarUrl         String?   @map("avatar_url")
-  role              UserRole  @default(HOMEOWNER)
-  emailVerified     Boolean   @default(false) @map("email_verified")
-  emailVerifiedAt   DateTime? @map("email_verified_at")
-  lastLoginAt       DateTime? @map("last_login_at")
-  createdAt         DateTime  @default(now()) @map("created_at")
-  updatedAt         DateTime  @updatedAt @map("updated_at")
+  id              String    @id @default(cuid())
+  email           String    @unique
+  passwordHash    String    @map("password_hash")
+  firstName       String    @map("first_name")
+  lastName        String    @map("last_name")
+  phone           String?
+  avatarUrl       String?   @map("avatar_url")
+  role            UserRole  @default(HOMEOWNER)
+  emailVerified   Boolean   @default(false) @map("email_verified")
+  emailVerifiedAt DateTime? @map("email_verified_at")
+  lastLoginAt     DateTime? @map("last_login_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  householdMembers  HouseholdMember[]
-  ownedHouseholds   Household[]         @relation("HouseholdOwner")
-  assignedTasks     Task[]              @relation("TaskAssignee")
-  createdTasks      Task[]              @relation("TaskCreator")
-  serviceRequests   ServiceRequest[]    @relation("ServiceRequestCreator")
-  sentMessages      Message[]           @relation("MessageSender")
-  subscriptions     Subscription[]
-  files             File[]
-  refreshTokens     RefreshToken[]
+  householdMembers   HouseholdMember[]
+  ownedHouseholds    Household[]         @relation("HouseholdOwner")
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  createdTasks       Task[]              @relation("TaskCreator")
+  serviceRequests    ServiceRequest[]    @relation("ServiceRequestCreator")
+  sentMessages       Message[]           @relation("MessageSender")
+  subscriptions      Subscription[]
+  files              File[]
+  refreshTokens      RefreshToken[]
+  inAppNotifications InAppNotification[]
 
   @@map("users")
 }
 
 model RefreshToken {
-  id          String   @id @default(cuid())
-  userId      String   @map("user_id")
-  token       String   @unique
-  expiresAt   DateTime @map("expires_at")
-  isRevoked   Boolean  @default(false) @map("is_revoked")
-  userAgent   String?  @map("user_agent")
-  ipAddress   String?  @map("ip_address")
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  token     String   @unique
+  expiresAt DateTime @map("expires_at")
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  userAgent String?  @map("user_agent")
+  ipAddress String?  @map("ip_address")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -304,20 +324,21 @@ model Household {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  owner             User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members           HouseholdMember[]
-  homeProfile       HomeProfile?
-  vendors           HouseholdVendor[]
-  ownedVendors      Vendor[]          @relation("HouseholdVendors")
-  serviceRequests   ServiceRequest[]
-  tasks             Task[]
-  maintenancePlans  MaintenancePlan[]
-  invoices          Invoice[]
-  files             File[]
-  messages          Message[]
-  billAccounts      BillAccount[]
-  paymentMethods    PaymentMethod[]
-  maintenanceTasks  MaintenanceTask[]
+  owner            User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members          HouseholdMember[]
+  homeProfile      HomeProfile?
+  vendors          HouseholdVendor[]
+  ownedVendors     Vendor[]          @relation("HouseholdVendors")
+  serviceRequests  ServiceRequest[]
+  tasks            Task[]
+  maintenancePlans MaintenancePlan[]
+  invoices         Invoice[]
+  files            File[]
+  messages         Message[]
+  billAccounts     BillAccount[]
+  paymentMethods   PaymentMethod[]
+  maintenanceTasks MaintenanceTask[]
+  reminders        Reminder[]
 
   @@map("households")
 }
@@ -346,38 +367,38 @@ model HouseholdMember {
 // ============================================================================
 
 model HomeProfile {
-  id              String       @id @default(cuid())
-  householdId     String       @unique @map("household_id")
-  propertyType    PropertyType @default(SINGLE_FAMILY) @map("property_type")
+  id           String       @id @default(cuid())
+  householdId  String       @unique @map("household_id")
+  propertyType PropertyType @default(SINGLE_FAMILY) @map("property_type")
 
   // Address
-  addressLine1    String       @map("address_line_1")
-  addressLine2    String?      @map("address_line_2")
-  city            String
-  state           String
-  postalCode      String       @map("postal_code")
-  country         String       @default("US")
+  addressLine1 String  @map("address_line_1")
+  addressLine2 String? @map("address_line_2")
+  city         String
+  state        String
+  postalCode   String  @map("postal_code")
+  country      String  @default("US")
 
   // Property Details
-  squareFeet      Int?         @map("square_feet")
-  lotSize         Float?       @map("lot_size")
-  yearBuilt       Int?         @map("year_built")
-  bedrooms        Int?
-  bathrooms       Float?
-  stories         Int?
-  garageSpaces    Int?         @map("garage_spaces")
+  squareFeet   Int?   @map("square_feet")
+  lotSize      Float? @map("lot_size")
+  yearBuilt    Int?   @map("year_built")
+  bedrooms     Int?
+  bathrooms    Float?
+  stories      Int?
+  garageSpaces Int?   @map("garage_spaces")
 
   // Additional Info
-  purchaseDate    DateTime?    @map("purchase_date")
-  purchasePrice   Decimal?     @map("purchase_price") @db.Decimal(12, 2)
-  currentValue    Decimal?     @map("current_value") @db.Decimal(12, 2)
-  notes           String?
+  purchaseDate  DateTime? @map("purchase_date")
+  purchasePrice Decimal?  @map("purchase_price") @db.Decimal(12, 2)
+  currentValue  Decimal?  @map("current_value") @db.Decimal(12, 2)
+  notes         String?
 
-  createdAt       DateTime     @default(now()) @map("created_at")
-  updatedAt       DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household       Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
 
   @@map("home_profiles")
 }
@@ -397,58 +418,58 @@ model ServiceCategory {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  vendors         Vendor[]
-  serviceRequests ServiceRequest[]
+  vendors          Vendor[]
+  serviceRequests  ServiceRequest[]
   maintenancePlans MaintenancePlan[]
 
   @@map("service_categories")
 }
 
 model Vendor {
-  id                  String          @id @default(cuid())
-  householdId         String?         @map("household_id")  // If set, vendor is private to this household
-  displayName         String          @map("display_name")
-  category            VendorCategory  @default(OTHER)
-  serviceDescription  String?         @map("service_description")
-  isLocal             Boolean         @default(true) @map("is_local")
+  id                 String         @id @default(cuid())
+  householdId        String?        @map("household_id") // If set, vendor is private to this household
+  displayName        String         @map("display_name")
+  category           VendorCategory @default(OTHER)
+  serviceDescription String?        @map("service_description")
+  isLocal            Boolean        @default(true) @map("is_local")
 
   // Contact Info
-  contactName         String?         @map("contact_name")
-  email               String?
-  phone               String?
-  websiteUrl          String?         @map("website_url")
+  contactName String? @map("contact_name")
+  email       String?
+  phone       String?
+  websiteUrl  String? @map("website_url")
 
   // Address
-  addressLine1        String?         @map("address_line_1")
-  addressLine2        String?         @map("address_line_2")
-  city                String?
-  state               String?
-  postalCode          String?         @map("postal_code")
-  country             String?         @default("US")
+  addressLine1 String? @map("address_line_1")
+  addressLine2 String? @map("address_line_2")
+  city         String?
+  state        String?
+  postalCode   String? @map("postal_code")
+  country      String? @default("US")
 
   // Business Info
-  licenseNumber       String?         @map("license_number")
-  insuranceInfo       String?         @map("insurance_info")
-  rating              Float?          @db.Real
-  reviewCount         Int             @default(0) @map("review_count")
+  licenseNumber String? @map("license_number")
+  insuranceInfo String? @map("insurance_info")
+  rating        Float?  @db.Real
+  reviewCount   Int     @default(0) @map("review_count")
 
   // Legacy field - keep for backward compatibility
-  serviceCategoryId   String?         @map("service_category_id")
-  isVerified          Boolean         @default(false) @map("is_verified")
-  isActive            Boolean         @default(true) @map("is_active")
-  notes               String?
+  serviceCategoryId String? @map("service_category_id")
+  isVerified        Boolean @default(false) @map("is_verified")
+  isActive          Boolean @default(true) @map("is_active")
+  notes             String?
 
-  createdAt           DateTime        @default(now()) @map("created_at")
-  updatedAt           DateTime        @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household           Household?      @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
-  serviceCategory     ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
-  householdVendors    HouseholdVendor[]
-  serviceRequests     ServiceRequest[]
-  messages            Message[]
-  billAccounts        BillAccount[]
-  maintenanceTasks    MaintenanceTask[]
+  household        Household?        @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
+  serviceCategory  ServiceCategory?  @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  householdVendors HouseholdVendor[]
+  serviceRequests  ServiceRequest[]
+  messages         Message[]
+  billAccounts     BillAccount[]
+  maintenanceTasks MaintenanceTask[]
 
   @@index([householdId, category])
   @@map("vendors")
@@ -476,30 +497,30 @@ model HouseholdVendor {
 // ============================================================================
 
 model ServiceRequest {
-  id                String                 @id @default(cuid())
-  householdId       String                 @map("household_id")
-  serviceCategoryId String?                @map("service_category_id")
-  vendorId          String?                @map("vendor_id")
-  createdById       String                 @map("created_by_id")
+  id                String  @id @default(cuid())
+  householdId       String  @map("household_id")
+  serviceCategoryId String? @map("service_category_id")
+  vendorId          String? @map("vendor_id")
+  createdById       String  @map("created_by_id")
 
-  title             String
-  description       String
-  status            ServiceRequestStatus   @default(DRAFT)
-  priority          ServiceRequestPriority @default(MEDIUM)
+  title       String
+  description String
+  status      ServiceRequestStatus   @default(DRAFT)
+  priority    ServiceRequestPriority @default(MEDIUM)
 
   // Scheduling
-  preferredDate     DateTime?              @map("preferred_date")
-  scheduledDate     DateTime?              @map("scheduled_date")
-  completedDate     DateTime?              @map("completed_date")
+  preferredDate DateTime? @map("preferred_date")
+  scheduledDate DateTime? @map("scheduled_date")
+  completedDate DateTime? @map("completed_date")
 
   // Cost
-  estimatedCost     Decimal?               @map("estimated_cost") @db.Decimal(10, 2)
-  actualCost        Decimal?               @map("actual_cost") @db.Decimal(10, 2)
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
 
-  notes             String?
+  notes String?
 
-  createdAt         DateTime               @default(now()) @map("created_at")
-  updatedAt         DateTime               @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -519,29 +540,29 @@ model ServiceRequest {
 // ============================================================================
 
 model Task {
-  id              String         @id @default(cuid())
-  householdId     String         @map("household_id")
-  createdById     String         @map("created_by_id")
-  assigneeId      String?        @map("assignee_id")
+  id          String  @id @default(cuid())
+  householdId String  @map("household_id")
+  createdById String  @map("created_by_id")
+  assigneeId  String? @map("assignee_id")
 
-  title           String
-  description     String?
-  status          TaskStatus     @default(PENDING)
-  priority        TaskPriority   @default(MEDIUM)
+  title       String
+  description String?
+  status      TaskStatus   @default(PENDING)
+  priority    TaskPriority @default(MEDIUM)
 
   // Scheduling
-  dueDate         DateTime?      @map("due_date")
-  completedAt     DateTime?      @map("completed_at")
+  dueDate     DateTime? @map("due_date")
+  completedAt DateTime? @map("completed_at")
 
   // Recurrence
-  recurrence      TaskRecurrence @default(NONE)
-  nextOccurrence  DateTime?      @map("next_occurrence")
+  recurrence     TaskRecurrence @default(NONE)
+  nextOccurrence DateTime?      @map("next_occurrence")
 
   // Linking
-  roomName        String?        @map("room_name")
+  roomName String? @map("room_name")
 
-  createdAt       DateTime       @default(now()) @map("created_at")
-  updatedAt       DateTime       @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -559,26 +580,26 @@ model Task {
 // ============================================================================
 
 model MaintenancePlan {
-  id                String               @id @default(cuid())
-  householdId       String               @map("household_id")
-  serviceCategoryId String?              @map("service_category_id")
+  id                String  @id @default(cuid())
+  householdId       String  @map("household_id")
+  serviceCategoryId String? @map("service_category_id")
 
-  name              String
-  description       String?
-  frequency         MaintenanceFrequency
+  name        String
+  description String?
+  frequency   MaintenanceFrequency
 
   // Scheduling
-  lastCompletedAt   DateTime?            @map("last_completed_at")
-  nextDueDate       DateTime?            @map("next_due_date")
+  lastCompletedAt DateTime? @map("last_completed_at")
+  nextDueDate     DateTime? @map("next_due_date")
 
   // Cost tracking
-  estimatedCost     Decimal?             @map("estimated_cost") @db.Decimal(10, 2)
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
 
-  isActive          Boolean              @default(true) @map("is_active")
-  notes             String?
+  isActive Boolean @default(true) @map("is_active")
+  notes    String?
 
-  createdAt         DateTime             @default(now()) @map("created_at")
-  updatedAt         DateTime             @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -593,23 +614,23 @@ model MaintenancePlan {
 // ============================================================================
 
 model Message {
-  id               String      @id @default(cuid())
+  id String @id @default(cuid())
 
   // Channel identification - either household or service request
   channelType      ChannelType @map("channel_type")
   householdId      String?     @map("household_id")
   serviceRequestId String?     @map("service_request_id")
 
-  senderId         String?     @map("sender_id")
-  vendorId         String?     @map("vendor_id")
+  senderId String? @map("sender_id")
+  vendorId String? @map("vendor_id")
 
-  content          String
-  messageType      MessageType @default(TEXT) @map("message_type")
-  isRead           Boolean     @default(false) @map("is_read")
-  readAt           DateTime?   @map("read_at")
+  content     String
+  messageType MessageType @default(TEXT) @map("message_type")
+  isRead      Boolean     @default(false) @map("is_read")
+  readAt      DateTime?   @map("read_at")
 
-  createdAt        DateTime    @default(now()) @map("created_at")
-  updatedAt        DateTime    @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   household      Household?      @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -627,25 +648,25 @@ model Message {
 // ============================================================================
 
 model Subscription {
-  id                  String             @id @default(cuid())
-  userId              String             @map("user_id")
+  id     String @id @default(cuid())
+  userId String @map("user_id")
 
-  tier                SubscriptionTier   @default(FREE)
-  status              SubscriptionStatus @default(ACTIVE)
+  tier   SubscriptionTier   @default(FREE)
+  status SubscriptionStatus @default(ACTIVE)
 
   // Billing Period
-  currentPeriodStart  DateTime           @map("current_period_start")
-  currentPeriodEnd    DateTime           @map("current_period_end")
+  currentPeriodStart DateTime @map("current_period_start")
+  currentPeriodEnd   DateTime @map("current_period_end")
 
   // Payment
-  stripeCustomerId    String?            @map("stripe_customer_id")
-  stripeSubscriptionId String?           @map("stripe_subscription_id")
+  stripeCustomerId     String? @map("stripe_customer_id")
+  stripeSubscriptionId String? @map("stripe_subscription_id")
 
-  cancelledAt         DateTime?          @map("cancelled_at")
-  cancelAtPeriodEnd   Boolean            @default(false) @map("cancel_at_period_end")
+  cancelledAt       DateTime? @map("cancelled_at")
+  cancelAtPeriodEnd Boolean   @default(false) @map("cancel_at_period_end")
 
-  createdAt           DateTime           @default(now()) @map("created_at")
-  updatedAt           DateTime           @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -655,30 +676,30 @@ model Subscription {
 }
 
 model Invoice {
-  id            String        @id @default(cuid())
-  householdId   String        @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
 
   invoiceNumber String        @unique @map("invoice_number")
   status        InvoiceStatus @default(DRAFT)
 
   // Amounts
-  subtotal      Decimal       @db.Decimal(10, 2)
-  tax           Decimal       @default(0) @db.Decimal(10, 2)
-  total         Decimal       @db.Decimal(10, 2)
+  subtotal Decimal @db.Decimal(10, 2)
+  tax      Decimal @default(0) @db.Decimal(10, 2)
+  total    Decimal @db.Decimal(10, 2)
 
   // Dates
-  issuedAt      DateTime?     @map("issued_at")
-  dueDate       DateTime?     @map("due_date")
-  paidAt        DateTime?     @map("paid_at")
+  issuedAt DateTime? @map("issued_at")
+  dueDate  DateTime? @map("due_date")
+  paidAt   DateTime? @map("paid_at")
 
   // Payment
-  paymentMethod String?       @map("payment_method")
-  paymentRef    String?       @map("payment_ref")
+  paymentMethod String? @map("payment_method")
+  paymentRef    String? @map("payment_ref")
 
-  notes         String?
+  notes String?
 
-  createdAt     DateTime      @default(now()) @map("created_at")
-  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -693,25 +714,25 @@ model Invoice {
 // ============================================================================
 
 model File {
-  id               String       @id @default(cuid())
-  userId           String?      @map("user_id")
-  householdId      String?      @map("household_id")
-  serviceRequestId String?      @map("service_request_id")
-  taskId           String?      @map("task_id")
-  invoiceId        String?      @map("invoice_id")
+  id               String  @id @default(cuid())
+  userId           String? @map("user_id")
+  householdId      String? @map("household_id")
+  serviceRequestId String? @map("service_request_id")
+  taskId           String? @map("task_id")
+  invoiceId        String? @map("invoice_id")
 
-  filename         String
-  originalName     String       @map("original_name")
-  mimeType         String       @map("mime_type")
-  size             Int
-  url              String?                           // Public URL (if applicable)
-  gcsUri           String?      @map("gcs_uri")      // gs://bucket/path format
-  category         FileCategory @default(DOCUMENT)
+  filename     String
+  originalName String       @map("original_name")
+  mimeType     String       @map("mime_type")
+  size         Int
+  url          String? // Public URL (if applicable)
+  gcsUri       String?      @map("gcs_uri") // gs://bucket/path format
+  category     FileCategory @default(DOCUMENT)
 
-  description      String?
+  description String?
 
-  createdAt        DateTime     @default(now()) @map("created_at")
-  updatedAt        DateTime     @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
   user           User?           @relation(fields: [userId], references: [id], onDelete: SetNull)
@@ -729,28 +750,28 @@ model File {
 // ============================================================================
 
 model PaymentMethod {
-  id                    String            @id @default(cuid())
-  householdId           String            @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
 
-  stripeCustomerId      String            @map("stripe_customer_id")
-  stripePaymentMethodId String            @map("stripe_payment_method_id")
+  stripeCustomerId      String @map("stripe_customer_id")
+  stripePaymentMethodId String @map("stripe_payment_method_id")
 
-  label                 String            // e.g. "Chase Checking", "Amex Blue"
-  type                  PaymentMethodType @default(CARD)
-  last4                 String
-  expMonth              Int?              @map("exp_month")  // For cards only
-  expYear               Int?              @map("exp_year")   // For cards only
-  bankName              String?           @map("bank_name")  // For bank accounts
+  label    String // e.g. "Chase Checking", "Amex Blue"
+  type     PaymentMethodType @default(CARD)
+  last4    String
+  expMonth Int?              @map("exp_month") // For cards only
+  expYear  Int?              @map("exp_year") // For cards only
+  bankName String?           @map("bank_name") // For bank accounts
 
-  isDefaultForSubscription Boolean        @default(false) @map("is_default_for_subscription")
-  isActive              Boolean           @default(true) @map("is_active")
+  isDefaultForSubscription Boolean @default(false) @map("is_default_for_subscription")
+  isActive                 Boolean @default(true) @map("is_active")
 
-  createdAt             DateTime          @default(now()) @map("created_at")
-  updatedAt             DateTime          @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household             Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  billAccounts          BillAccount[]
+  household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  billAccounts BillAccount[]
 
   @@index([householdId])
   @@map("payment_methods")
@@ -761,39 +782,39 @@ model PaymentMethod {
 // ============================================================================
 
 model BillAccount {
-  id                      String                @id @default(cuid())
-  householdId             String                @map("household_id")
-  vendorId                String                @map("vendor_id")
-  paymentMethodId         String?               @map("payment_method_id")
+  id              String  @id @default(cuid())
+  householdId     String  @map("household_id")
+  vendorId        String  @map("vendor_id")
+  paymentMethodId String? @map("payment_method_id")
 
-  nickname                String                // e.g. "Primary Mortgage", "Front Lawn Care"
-  category                VendorCategory        @default(OTHER)
-  accountNumber           String?               @map("account_number")
+  nickname      String // e.g. "Primary Mortgage", "Front Lawn Care"
+  category      VendorCategory @default(OTHER)
+  accountNumber String?        @map("account_number")
 
   // Billing Details
-  billingFrequency        BillingFrequency      @default(MONTHLY) @map("billing_frequency")
-  paymentResponsibility   PaymentResponsibility @default(OWNER_PAYS_DIRECT) @map("payment_responsibility")
-  typicalAmount           Decimal?              @map("typical_amount") @db.Decimal(10, 2)
-  nextDueDate             DateTime?             @map("next_due_date")
+  billingFrequency      BillingFrequency      @default(MONTHLY) @map("billing_frequency")
+  paymentResponsibility PaymentResponsibility @default(OWNER_PAYS_DIRECT) @map("payment_responsibility")
+  typicalAmount         Decimal?              @map("typical_amount") @db.Decimal(10, 2)
+  nextDueDate           DateTime?             @map("next_due_date")
 
   // Autopay Settings
-  autopayEnabled          Boolean               @default(false) @map("autopay_enabled")
+  autopayEnabled Boolean @default(false) @map("autopay_enabled")
 
   // Portal & Support
-  portalUrl               String?               @map("portal_url")
-  supportPhone            String?               @map("support_phone")
+  portalUrl    String? @map("portal_url")
+  supportPhone String? @map("support_phone")
 
-  notes                   String?
-  isActive                Boolean               @default(true) @map("is_active")
+  notes    String?
+  isActive Boolean @default(true) @map("is_active")
 
-  createdAt               DateTime              @default(now()) @map("created_at")
-  updatedAt               DateTime              @updatedAt @map("updated_at")
-  deletedAt               DateTime?             @map("deleted_at")  // Soft delete
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+  deletedAt DateTime? @map("deleted_at") // Soft delete
 
   // Relations
-  household               Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  vendor                  Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  autopayPaymentMethod    PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  household            Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor               Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  autopayPaymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
 
   @@index([householdId, category])
   @@index([householdId, nextDueDate])
@@ -805,76 +826,145 @@ model BillAccount {
 // ============================================================================
 
 model MaintenanceTemplate {
-  id                        String              @id @default(cuid())
-  slug                      String              @unique  // e.g. "hvac_tuneup", "chimney_sweep"
-  title                     String
-  description               String?
-  category                  MaintenanceCategory @default(GENERAL)
+  id          String              @id @default(cuid())
+  slug        String              @unique // e.g. "hvac_tuneup", "chimney_sweep"
+  title       String
+  description String?
+  category    MaintenanceCategory @default(GENERAL)
 
   // Recommended Schedule
-  recommendedFrequencyMonths Int?               @map("recommended_frequency_months")
-  recommendedSeasonStartMonth Int?              @map("recommended_season_start_month")  // 1-12
-  recommendedSeasonEndMonth  Int?               @map("recommended_season_end_month")    // 1-12
+  recommendedFrequencyMonths  Int? @map("recommended_frequency_months")
+  recommendedSeasonStartMonth Int? @map("recommended_season_start_month") // 1-12
+  recommendedSeasonEndMonth   Int? @map("recommended_season_end_month") // 1-12
 
   // Property conditions that trigger this template (stored as JSON)
   // e.g. { "has_septic": true, "has_pool": true, "climate_zone": "cold" }
-  propertyConditionsJson    Json?               @map("property_conditions_json")
+  propertyConditionsJson Json? @map("property_conditions_json")
 
   // Default vendor category for this type of maintenance
-  defaultVendorCategory     VendorCategory?     @map("default_vendor_category")
+  defaultVendorCategory VendorCategory? @map("default_vendor_category")
 
   // Estimated costs
-  estimatedCostMin          Decimal?            @map("estimated_cost_min") @db.Decimal(10, 2)
-  estimatedCostMax          Decimal?            @map("estimated_cost_max") @db.Decimal(10, 2)
+  estimatedCostMin Decimal? @map("estimated_cost_min") @db.Decimal(10, 2)
+  estimatedCostMax Decimal? @map("estimated_cost_max") @db.Decimal(10, 2)
 
-  isActive                  Boolean             @default(true) @map("is_active")
-  sortOrder                 Int                 @default(0) @map("sort_order")
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
 
-  createdAt                 DateTime            @default(now()) @map("created_at")
-  updatedAt                 DateTime            @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  maintenanceTasks          MaintenanceTask[]
+  maintenanceTasks MaintenanceTask[]
 
   @@map("maintenance_templates")
 }
 
 model MaintenanceTask {
-  id                    String                @id @default(cuid())
-  householdId           String                @map("household_id")
-  templateId            String?               @map("template_id")  // Nullable if custom task
-  assignedVendorId      String?               @map("assigned_vendor_id")
+  id               String  @id @default(cuid())
+  householdId      String  @map("household_id")
+  templateId       String? @map("template_id") // Nullable if custom task
+  assignedVendorId String? @map("assigned_vendor_id")
 
-  title                 String
-  description           String?
-  category              MaintenanceCategory   @default(GENERAL)
-  status                MaintenanceTaskStatus @default(PENDING)
+  title       String
+  description String?
+  category    MaintenanceCategory   @default(GENERAL)
+  status      MaintenanceTaskStatus @default(PENDING)
 
   // Scheduling
-  dueDate               DateTime?             @map("due_date")
-  scheduledDate         DateTime?             @map("scheduled_date")
-  completedAt           DateTime?             @map("completed_at")
+  dueDate       DateTime? @map("due_date")
+  scheduledDate DateTime? @map("scheduled_date")
+  completedAt   DateTime? @map("completed_at")
 
   // Cost Tracking
-  estimatedCost         Decimal?              @map("estimated_cost") @db.Decimal(10, 2)
-  actualCost            Decimal?              @map("actual_cost") @db.Decimal(10, 2)
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
 
   // Template tracking
-  createdFromTemplate   Boolean               @default(false) @map("created_from_template")
+  createdFromTemplate Boolean @default(false) @map("created_from_template")
 
-  notes                 String?
-  priority              TaskPriority          @default(MEDIUM)
+  notes    String?
+  priority TaskPriority @default(MEDIUM)
 
-  createdAt             DateTime              @default(now()) @map("created_at")
-  updatedAt             DateTime              @updatedAt @map("updated_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household             Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  template              MaintenanceTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
-  assignedVendor        Vendor?               @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
+  household      Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  template       MaintenanceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
 
   @@index([householdId, status])
   @@index([householdId, dueDate])
   @@index([householdId, category])
   @@map("maintenance_tasks")
+}
+
+// ============================================================================
+// REMINDERS & NOTIFICATIONS
+// ============================================================================
+
+model Reminder {
+  id          String       @id @default(cuid())
+  householdId String       @map("household_id")
+  type        ReminderType
+
+  // Reference to source (one of these will be set)
+  billAccountId     String? @map("bill_account_id")
+  maintenanceTaskId String? @map("maintenance_task_id")
+
+  // Scheduling
+  scheduledAt DateTime  @map("scheduled_at")
+  sentAt      DateTime? @map("sent_at")
+
+  status  ReminderStatus  @default(PENDING)
+  channel ReminderChannel @default(EMAIL)
+
+  // Notification payload (stored for retry/audit)
+  payloadJson Json? @map("payload_json")
+
+  // Error tracking
+  errorMessage String? @map("error_message")
+  retryCount   Int     @default(0) @map("retry_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([status, scheduledAt])
+  @@index([householdId, type])
+  @@index([billAccountId])
+  @@index([maintenanceTaskId])
+  @@map("reminders")
+}
+
+model InAppNotification {
+  id          String  @id @default(cuid())
+  userId      String  @map("user_id")
+  householdId String? @map("household_id")
+
+  title String
+  body  String
+
+  // Action link
+  link String?
+
+  // Source reference (optional)
+  billAccountId     String? @map("bill_account_id")
+  maintenanceTaskId String? @map("maintenance_task_id")
+  reminderId        String? @map("reminder_id")
+
+  isRead Boolean   @default(false) @map("is_read")
+  readAt DateTime? @map("read_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isRead, createdAt])
+  @@index([householdId])
+  @@map("in_app_notifications")
 }

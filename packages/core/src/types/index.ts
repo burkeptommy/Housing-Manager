@@ -919,3 +919,81 @@ export interface OnboardingState {
   selectedPlan?: SubscriptionPlan;
   paymentMethodId?: string;
 }
+
+// ============================================================================
+// REMINDERS & DASHBOARD
+// ============================================================================
+
+export type ReminderType = 'BILL_DUE' | 'MAINTENANCE_TASK';
+export type ReminderStatus = 'PENDING' | 'SENT' | 'CANCELLED' | 'FAILED';
+export type ReminderChannel = 'EMAIL' | 'PUSH' | 'SMS' | 'IN_APP';
+
+export interface Reminder {
+  id: string;
+  householdId: string;
+  type: ReminderType;
+  billAccountId?: string | null;
+  maintenanceTaskId?: string | null;
+  scheduledAt: string;
+  sentAt?: string | null;
+  status: ReminderStatus;
+  channel: ReminderChannel;
+  payloadJson?: Record<string, unknown> | null;
+  errorMessage?: string | null;
+  retryCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpcomingBill {
+  id: string;
+  nickname: string;
+  vendorName: string;
+  category: VendorCategory;
+  typicalAmount?: number;
+  nextDueDate: string;
+  daysUntilDue: number;
+  isOverdue: boolean;
+}
+
+export interface UpcomingMaintenanceTask {
+  id: string;
+  title: string;
+  description?: string;
+  category: MaintenanceCategory;
+  status: MaintenanceTaskStatus;
+  dueDate?: string;
+  scheduledDate?: string;
+  daysUntilDue: number;
+  isOverdue: boolean;
+  assignedVendorName?: string;
+  estimatedCost?: number;
+}
+
+export interface UpcomingItemsResponse {
+  upcomingBills: UpcomingBill[];
+  upcomingMaintenanceTasks: UpcomingMaintenanceTask[];
+}
+
+export interface InAppNotification {
+  id: string;
+  userId: string;
+  householdId?: string;
+  title: string;
+  body: string;
+  link?: string;
+  billAccountId?: string;
+  maintenanceTaskId?: string;
+  reminderId?: string;
+  isRead: boolean;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface CronJobResult {
+  success: boolean;
+  billRemindersScheduled: number;
+  maintenanceRemindersScheduled: number;
+  remindersProcessed: number;
+  error?: string;
+}
