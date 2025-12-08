@@ -29,6 +29,22 @@ import type {
   UpdateUserRoleRequest,
   CreateServiceCategoryRequest,
   UpdateServiceCategoryRequest,
+  HouseholdVendor,
+  CreateHouseholdVendorRequest,
+  UpdateHouseholdVendorRequest,
+  BillAccount,
+  CreateBillAccountRequest,
+  UpdateBillAccountRequest,
+  MaintenanceTemplate,
+  MaintenanceTask,
+  CreateMaintenanceTaskRequest,
+  UpdateMaintenanceTaskRequest,
+  GenerateMaintenanceTasksRequest,
+  GenerateMaintenanceTasksResponse,
+  PaymentMethod,
+  CreatePaymentMethodRequest,
+  SetupIntentResponse,
+  VendorCategory,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -407,6 +423,160 @@ export class ApiClient {
     return this.request(`/admin/service-categories/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
+    });
+  }
+
+  // ============================================================================
+  // HOUSEHOLD VENDOR ENDPOINTS
+  // ============================================================================
+
+  async getHouseholdVendors(householdId: string, category?: VendorCategory): Promise<HouseholdVendor[]> {
+    const query = category ? `?category=${category}` : '';
+    return this.request(`/households/${householdId}/vendors${query}`);
+  }
+
+  async createHouseholdVendor(householdId: string, data: CreateHouseholdVendorRequest): Promise<HouseholdVendor> {
+    return this.request(`/households/${householdId}/vendors`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateHouseholdVendor(householdId: string, vendorId: string, data: UpdateHouseholdVendorRequest): Promise<HouseholdVendor> {
+    return this.request(`/households/${householdId}/vendors/${vendorId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteHouseholdVendor(householdId: string, vendorId: string): Promise<void> {
+    return this.request(`/households/${householdId}/vendors/${vendorId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============================================================================
+  // BILL ACCOUNT ENDPOINTS
+  // ============================================================================
+
+  async getBillAccounts(
+    householdId: string,
+    options?: { category?: VendorCategory; upcomingDays?: number }
+  ): Promise<BillAccount[]> {
+    const params = new URLSearchParams({ householdId });
+    if (options?.category) params.append('category', options.category);
+    if (options?.upcomingDays) params.append('upcomingDays', options.upcomingDays.toString());
+    return this.request(`/bill-accounts?${params.toString()}`);
+  }
+
+  async createBillAccount(data: CreateBillAccountRequest): Promise<BillAccount> {
+    return this.request('/bill-accounts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateBillAccount(id: string, data: UpdateBillAccountRequest): Promise<BillAccount> {
+    return this.request(`/bill-accounts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteBillAccount(id: string): Promise<void> {
+    return this.request(`/bill-accounts/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // ============================================================================
+  // MAINTENANCE TEMPLATE ENDPOINTS
+  // ============================================================================
+
+  async getMaintenanceTemplates(): Promise<MaintenanceTemplate[]> {
+    return this.request('/maintenance-tasks/templates');
+  }
+
+  // ============================================================================
+  // MAINTENANCE TASK ENDPOINTS
+  // ============================================================================
+
+  async getMaintenanceTasks(
+    householdId: string,
+    options?: { status?: string; category?: string }
+  ): Promise<MaintenanceTask[]> {
+    const params = new URLSearchParams({ householdId });
+    if (options?.status) params.append('status', options.status);
+    if (options?.category) params.append('category', options.category);
+    return this.request(`/maintenance-tasks?${params.toString()}`);
+  }
+
+  async getMaintenanceTask(id: string): Promise<MaintenanceTask> {
+    return this.request(`/maintenance-tasks/${id}`);
+  }
+
+  async createMaintenanceTask(data: CreateMaintenanceTaskRequest): Promise<MaintenanceTask> {
+    return this.request('/maintenance-tasks', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateMaintenanceTask(id: string, data: UpdateMaintenanceTaskRequest): Promise<MaintenanceTask> {
+    return this.request(`/maintenance-tasks/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deleteMaintenanceTask(id: string): Promise<void> {
+    return this.request(`/maintenance-tasks/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async generateMaintenanceTasksFromTemplates(data: GenerateMaintenanceTasksRequest): Promise<GenerateMaintenanceTasksResponse> {
+    return this.request('/maintenance-tasks/generate-from-templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ============================================================================
+  // PAYMENT METHOD ENDPOINTS
+  // ============================================================================
+
+  async getPaymentMethods(householdId: string): Promise<PaymentMethod[]> {
+    return this.request(`/payment-methods?householdId=${householdId}`);
+  }
+
+  async createPaymentMethod(data: CreatePaymentMethodRequest): Promise<PaymentMethod> {
+    return this.request('/payment-methods', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async deletePaymentMethod(id: string): Promise<void> {
+    return this.request(`/payment-methods/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async setDefaultPaymentMethod(id: string): Promise<PaymentMethod> {
+    return this.request(`/payment-methods/${id}/set-default`, {
+      method: 'POST',
+    });
+  }
+
+  // ============================================================================
+  // STRIPE SETUP INTENT ENDPOINTS
+  // ============================================================================
+
+  async createSetupIntent(householdId: string): Promise<SetupIntentResponse> {
+    return this.request('/billing/setup-intent', {
+      method: 'POST',
+      body: JSON.stringify({ householdId }),
     });
   }
 }

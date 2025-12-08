@@ -1,140 +1,284 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
 import { useAuth } from '@/contexts/auth-context';
 import { getApiClient } from '@/lib/api';
-import type { HomeSystems, OnboardingPreferences } from '@haven/core';
+import type {
+  MaintenanceTask,
+  HouseholdVendor,
+  SubscriptionPlan,
+  PropertyFeatures,
+} from '@haven/core';
+
 import {
-  basicInfoSchema,
-  systemsSchema,
-  painPointsSchema,
-  communicationSchema,
-  propertyTypeOptions,
-  hvacTypeOptions,
-  roofTypeOptions,
-  waterHeaterTypeOptions,
-  painPointOptions,
-  communicationOptions,
-  usStates,
-  type BasicInfoData,
-  type SystemsData,
-  type PainPointsData,
-  type CommunicationData,
-} from '@/lib/validations/onboarding';
+  StepHomeBasics,
+  type HomeBasicsData,
+  StepRecurringBills,
+  type BillEntry,
+  StepMaintenance,
+  type TaskSelection,
+  StepPayment,
+  StepReview,
+} from '@/components/onboarding';
 
 const STEPS = [
-  { id: 1, name: 'Home Info', description: 'Basic property details' },
-  { id: 2, name: 'Systems', description: 'Home systems overview' },
-  { id: 3, name: 'Pain Points', description: 'What challenges you face' },
-  { id: 4, name: 'Preferences', description: 'How to reach you' },
+  { id: 1, name: 'Home Basics', description: 'Property details' },
+  { id: 2, name: 'Bills', description: 'Recurring bills' },
+  { id: 3, name: 'Maintenance', description: 'Maintenance plan' },
+  { id: 4, name: 'Plan', description: 'Subscription' },
+  { id: 5, name: 'Review', description: 'Confirm setup' },
 ];
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading, needsOnboarding, completeOnboarding, user } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, needsOnboarding, completeOnboarding, user } = useAuth();
   const [currentStep, setCurrentStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingTasks, setIsLoadingTasks] = useState(false);
   const [error, setError] = useState('');
 
-  // Store data from each step
-  const [basicInfo, setBasicInfo] = useState<BasicInfoData | null>(null);
-  const [systems, setSystems] = useState<SystemsData | null>(null);
-  const [painPoints, setPainPoints] = useState<PainPointsData | null>(null);
+  // Onboarding state
+  const [householdId, setHouseholdId] = useState<string | null>(null);
+  const [homeBasics, setHomeBasics] = useState<HomeBasicsData | null>(null);
+  const [bills, setBills] = useState<BillEntry[]>([]);
+  const [vendors, setVendors] = useState<HouseholdVendor[]>([]);
+  const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
+  const [taskSelections, setTaskSelections] = useState<TaskSelection[]>([]);
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
 
   const api = getApiClient();
 
   // Redirect if not authenticated or doesn't need onboarding
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
+    if (!authLoading && !isAuthenticated) {
       router.push('/login');
-    } else if (!isLoading && isAuthenticated && !needsOnboarding) {
+    } else if (!authLoading && isAuthenticated && !needsOnboarding) {
       router.push('/app');
     }
-  }, [isLoading, isAuthenticated, needsOnboarding, router]);
+  }, [authLoading, isAuthenticated, needsOnboarding, router]);
 
-  const handleBasicInfoSubmit = (data: BasicInfoData) => {
-    setBasicInfo(data);
-    setCurrentStep(2);
-  };
+  // Step 1: Home Basics
+  const handleHomeBasicsSubmit = useCallback(
+    async (data: HomeBasicsData) => {
+      setIsSubmitting(true);
+      setError('');
 
-  const handleSystemsSubmit = (data: SystemsData) => {
-    setSystems(data);
-    setCurrentStep(3);
-  };
+      try {
+        // Create household
+        const household = await api.createHousehold({
+          name: data.name,
+          description: `${data.propertyType} in ${data.city}, ${data.state}`,
+        });
 
-  const handlePainPointsSubmit = (data: PainPointsData) => {
-    setPainPoints(data);
-    setCurrentStep(4);
-  };
+        setHouseholdId(household.id);
 
-  const handleCommunicationSubmit = async (data: CommunicationData) => {
-    if (!basicInfo || !systems || !painPoints) return;
+        // Extract property features for notes
+        const features: PropertyFeatures = {
+          hasCentralAc: data.hasCentralAc,
+          hasGasHeat: data.hasGasHeat,
+          hasOilHeat: data.hasOilHeat,
+          hasFireplace: data.hasFireplace,
+          hasSeptic: data.hasSeptic,
+          hasWellWater: data.hasWellWater,
+          hasPool: data.hasPool,
+          hasGenerator: data.hasGenerator,
+          hasLawn: data.hasLawn,
+          hasDriveway: data.hasDriveway,
+        };
+
+        // Create home profile
+        await api.upsertHomeProfile(household.id, {
+          propertyType: data.propertyType,
+          addressLine1: data.addressLine1,
+          addressLine2: data.addressLine2,
+          city: data.city,
+          state: data.state,
+          postalCode: data.postalCode,
+          country: 'US',
+          yearBuilt: data.yearBuilt,
+          bedrooms: data.bedrooms,
+          bathrooms: data.bathrooms,
+          squareFeet: data.squareFeet,
+          notes: JSON.stringify({ features }),
+        });
+
+        setHomeBasics(data);
+        setCurrentStep(2);
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === 'object' && 'message' in err
+            ? (err as { message: string }).message
+            : 'Failed to save property details. Please try again.';
+        setError(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [api]
+  );
+
+  // Step 2: Recurring Bills
+  const handleBillsSubmit = useCallback(
+    async (billEntries: BillEntry[]) => {
+      if (!householdId) return;
+
+      setIsSubmitting(true);
+      setError('');
+
+      try {
+        const createdVendors: HouseholdVendor[] = [];
+
+        // Create vendors and bill accounts
+        for (const bill of billEntries) {
+          // Create vendor first
+          const vendor = await api.createHouseholdVendor(householdId, {
+            displayName: bill.vendorName,
+            category: bill.category,
+          });
+          createdVendors.push(vendor);
+
+          // Create bill account
+          await api.createBillAccount({
+            householdId,
+            vendorId: vendor.id,
+            nickname: bill.vendorName,
+            category: bill.category,
+            accountNumber: bill.accountNumber || undefined,
+            billingFrequency: bill.billingFrequency,
+            paymentResponsibility: bill.paymentResponsibility,
+            typicalAmount: bill.typicalAmount || undefined,
+            nextDueDate: bill.nextDueDate || undefined,
+          });
+        }
+
+        setVendors(createdVendors);
+        setBills(billEntries);
+        setCurrentStep(3);
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === 'object' && 'message' in err
+            ? (err as { message: string }).message
+            : 'Failed to save bills. Please try again.';
+        setError(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [api, householdId]
+  );
+
+  // Load maintenance tasks when entering step 3
+  useEffect(() => {
+    if (currentStep === 3 && householdId && maintenanceTasks.length === 0) {
+      setIsLoadingTasks(true);
+      api
+        .generateMaintenanceTasksFromTemplates({ householdId })
+        .then((result) => {
+          setMaintenanceTasks(result.tasks);
+        })
+        .catch((err) => {
+          console.error('Failed to generate maintenance tasks:', err);
+        })
+        .finally(() => {
+          setIsLoadingTasks(false);
+        });
+    }
+  }, [currentStep, householdId, maintenanceTasks.length, api]);
+
+  // Step 3: Maintenance
+  const handleMaintenanceSubmit = useCallback(
+    async (selections: TaskSelection[]) => {
+      if (!householdId) return;
+
+      setIsSubmitting(true);
+      setError('');
+
+      try {
+        // Update tasks based on selections
+        for (const selection of selections) {
+          if (!selection.keep) {
+            // Mark as skipped
+            await api.updateMaintenanceTask(selection.taskId, { status: 'SKIPPED' });
+          } else if (selection.vendorId || selection.dueDate) {
+            // Update with vendor/date changes
+            await api.updateMaintenanceTask(selection.taskId, {
+              assignedVendorId: selection.vendorId || null,
+              dueDate: selection.dueDate || null,
+            });
+          }
+        }
+
+        setTaskSelections(selections);
+        setCurrentStep(4);
+      } catch (err: unknown) {
+        const message =
+          err && typeof err === 'object' && 'message' in err
+            ? (err as { message: string }).message
+            : 'Failed to save maintenance preferences. Please try again.';
+        setError(message);
+      } finally {
+        setIsSubmitting(false);
+      }
+    },
+    [api, householdId]
+  );
+
+  // Step 4: Payment
+  const handlePaymentSubmit = useCallback(
+    async (data: { plan: SubscriptionPlan; paymentMethodId?: string }) => {
+      setSelectedPlan(data.plan);
+      setCurrentStep(5);
+    },
+    []
+  );
+
+  // Step 5: Final submission
+  const handleFinalSubmit = useCallback(async () => {
+    if (!householdId) return;
 
     setIsSubmitting(true);
     setError('');
 
     try {
-      // Create household
-      const household = await api.createHousehold({
-        name: basicInfo.name,
-        description: `${basicInfo.propertyType} in ${basicInfo.city}, ${basicInfo.state}`,
-      });
+      // Create subscription if plan selected
+      if (selectedPlan) {
+        try {
+          await api.createSubscription({
+            tier: selectedPlan === 'ESSENTIALS' ? 'BASIC' : 'PREMIUM',
+            paymentMethodId: 'skip_for_now', // Placeholder
+          });
+        } catch {
+          // Subscription creation might fail if no payment method - that's ok for now
+          console.warn('Subscription creation skipped - no payment method');
+        }
+      }
 
-      // Prepare extended data for notes field
-      const extendedData: { systems: HomeSystems; preferences: OnboardingPreferences } = {
-        systems: {
-          hvacType: systems.hvacType,
-          hvacAge: systems.hvacAge,
-          roofType: systems.roofType,
-          roofAge: systems.roofAge,
-          waterHeaterType: systems.waterHeaterType,
-          waterHeaterAge: systems.waterHeaterAge,
-          septicOrSewer: systems.septicOrSewer,
-          septicLastServiced: systems.septicLastServiced,
-          electricalPanelAmps: systems.electricalPanelAmps,
-          hasPool: systems.hasPool,
-          hasSprinklerSystem: systems.hasSprinklerSystem,
-          hasSecuritySystem: systems.hasSecuritySystem,
-          hasSmartHome: systems.hasSmartHome,
-        },
-        preferences: {
-          painPoints: painPoints.painPoints,
-          communicationChannels: data.communicationChannels,
-        },
-      };
-
-      // Create home profile with extended data in notes
-      await api.upsertHomeProfile(household.id, {
-        propertyType: basicInfo.propertyType,
-        addressLine1: basicInfo.addressLine1,
-        addressLine2: basicInfo.addressLine2,
-        city: basicInfo.city,
-        state: basicInfo.state,
-        postalCode: basicInfo.postalCode,
-        country: 'US',
-        yearBuilt: basicInfo.yearBuilt,
-        bedrooms: basicInfo.bedrooms,
-        bathrooms: basicInfo.bathrooms,
-        squareFeet: basicInfo.squareFeet,
-        notes: JSON.stringify(extendedData),
-      });
-
-      await completeOnboarding(household.id);
+      // Complete onboarding
+      await completeOnboarding(householdId);
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'message' in err
           ? (err as { message: string }).message
           : 'Failed to complete setup. Please try again.';
       setError(message);
-    } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [api, householdId, selectedPlan, completeOnboarding]);
 
-  if (isLoading) {
+  // Navigation
+  const goBack = useCallback(() => {
+    setCurrentStep((prev) => Math.max(1, prev - 1));
+  }, []);
+
+  const goToStep = useCallback((step: number) => {
+    setCurrentStep(step);
+  }, []);
+
+  // Count selected maintenance tasks
+  const selectedTaskCount = taskSelections.filter((s) => s.keep).length || maintenanceTasks.length;
+
+  if (authLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
@@ -168,7 +312,7 @@ export default function OnboardingPage() {
             Welcome, {user?.firstName}!
           </h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Let&apos;s set up your home profile
+            Let&apos;s set up your home
           </p>
         </div>
 
@@ -200,7 +344,7 @@ export default function OnboardingPage() {
                 </div>
                 {idx < STEPS.length - 1 && (
                   <div
-                    className={`w-12 sm:w-20 h-1 mx-2 rounded ${
+                    className={`w-8 sm:w-12 h-1 mx-1 rounded ${
                       currentStep > step.id ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'
                     }`}
                   />
@@ -210,9 +354,9 @@ export default function OnboardingPage() {
           </div>
           <div className="flex justify-between mt-2">
             {STEPS.map((step) => (
-              <div key={step.id} className="text-center" style={{ width: '80px' }}>
+              <div key={step.id} className="text-center" style={{ width: '60px' }}>
                 <p
-                  className={`text-xs font-medium ${
+                  className={`text-xs font-medium truncate ${
                     currentStep >= step.id
                       ? 'text-slate-900 dark:text-white'
                       : 'text-slate-400 dark:text-slate-500'
@@ -235,606 +379,51 @@ export default function OnboardingPage() {
         {/* Step Content */}
         <div className="card">
           {currentStep === 1 && (
-            <BasicInfoStep onSubmit={handleBasicInfoSubmit} defaultValues={basicInfo} />
+            <StepHomeBasics
+              onSubmit={handleHomeBasicsSubmit}
+              defaultValues={homeBasics}
+              isSubmitting={isSubmitting}
+            />
           )}
           {currentStep === 2 && (
-            <SystemsStep
-              onSubmit={handleSystemsSubmit}
-              onBack={() => setCurrentStep(1)}
-              defaultValues={systems}
+            <StepRecurringBills
+              onSubmit={handleBillsSubmit}
+              onBack={goBack}
+              defaultValues={bills}
+              isSubmitting={isSubmitting}
             />
           )}
           {currentStep === 3 && (
-            <PainPointsStep
-              onSubmit={handlePainPointsSubmit}
-              onBack={() => setCurrentStep(2)}
-              defaultValues={painPoints}
+            <StepMaintenance
+              tasks={maintenanceTasks}
+              vendors={vendors}
+              onSubmit={handleMaintenanceSubmit}
+              onBack={goBack}
+              isLoading={isLoadingTasks}
+              isSubmitting={isSubmitting}
             />
           )}
           {currentStep === 4 && (
-            <CommunicationStep
-              onSubmit={handleCommunicationSubmit}
-              onBack={() => setCurrentStep(3)}
+            <StepPayment
+              onSubmit={handlePaymentSubmit}
+              onBack={goBack}
+              isSubmitting={isSubmitting}
+            />
+          )}
+          {currentStep === 5 && (
+            <StepReview
+              homeBasics={homeBasics}
+              bills={bills}
+              maintenanceTaskCount={selectedTaskCount}
+              selectedPlan={selectedPlan}
+              onSubmit={handleFinalSubmit}
+              onBack={goBack}
+              onEditStep={goToStep}
               isSubmitting={isSubmitting}
             />
           )}
         </div>
       </div>
     </div>
-  );
-}
-
-// Step 1: Basic Home Info
-function BasicInfoStep({
-  onSubmit,
-  defaultValues,
-}: {
-  onSubmit: (data: BasicInfoData) => void;
-  defaultValues: BasicInfoData | null;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<BasicInfoData>({
-    resolver: zodResolver(basicInfoSchema),
-    defaultValues: defaultValues || {
-      name: '',
-      propertyType: 'SINGLE_FAMILY',
-      addressLine1: '',
-      addressLine2: '',
-      city: '',
-      state: '',
-      postalCode: '',
-    },
-  });
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-          Tell us about your home
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          We&apos;ll use this to personalize your experience
-        </p>
-      </div>
-
-      <div>
-        <label htmlFor="name" className="label block mb-1.5">
-          Home name
-        </label>
-        <input
-          {...register('name')}
-          id="name"
-          type="text"
-          className="input"
-          placeholder="e.g., Main Residence, Beach House"
-        />
-        {errors.name && <p className="text-sm text-red-500 mt-1">{errors.name.message}</p>}
-      </div>
-
-      <div>
-        <label htmlFor="propertyType" className="label block mb-1.5">
-          Property type
-        </label>
-        <select {...register('propertyType')} id="propertyType" className="input">
-          {propertyTypeOptions.map((opt) => (
-            <option key={opt.value} value={opt.value}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
-        {errors.propertyType && (
-          <p className="text-sm text-red-500 mt-1">{errors.propertyType.message}</p>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="addressLine1" className="label block mb-1.5">
-          Street address
-        </label>
-        <input
-          {...register('addressLine1')}
-          id="addressLine1"
-          type="text"
-          className="input"
-          placeholder="123 Main Street"
-        />
-        {errors.addressLine1 && (
-          <p className="text-sm text-red-500 mt-1">{errors.addressLine1.message}</p>
-        )}
-      </div>
-
-      <div>
-        <label htmlFor="addressLine2" className="label block mb-1.5">
-          Apt, suite, etc. (optional)
-        </label>
-        <input
-          {...register('addressLine2')}
-          id="addressLine2"
-          type="text"
-          className="input"
-          placeholder="Apt 4B"
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="city" className="label block mb-1.5">
-            City
-          </label>
-          <input {...register('city')} id="city" type="text" className="input" placeholder="City" />
-          {errors.city && <p className="text-sm text-red-500 mt-1">{errors.city.message}</p>}
-        </div>
-        <div>
-          <label htmlFor="state" className="label block mb-1.5">
-            State
-          </label>
-          <select {...register('state')} id="state" className="input">
-            <option value="">Select state</option>
-            {usStates.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-          {errors.state && <p className="text-sm text-red-500 mt-1">{errors.state.message}</p>}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="postalCode" className="label block mb-1.5">
-            ZIP code
-          </label>
-          <input
-            {...register('postalCode')}
-            id="postalCode"
-            type="text"
-            className="input"
-            placeholder="12345"
-          />
-          {errors.postalCode && (
-            <p className="text-sm text-red-500 mt-1">{errors.postalCode.message}</p>
-          )}
-        </div>
-        <div>
-          <label htmlFor="yearBuilt" className="label block mb-1.5">
-            Year built (optional)
-          </label>
-          <input
-            {...register('yearBuilt')}
-            id="yearBuilt"
-            type="number"
-            className="input"
-            placeholder="1990"
-          />
-          {errors.yearBuilt && (
-            <p className="text-sm text-red-500 mt-1">{errors.yearBuilt.message}</p>
-          )}
-        </div>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4">
-        <div>
-          <label htmlFor="bedrooms" className="label block mb-1.5">
-            Bedrooms
-          </label>
-          <input
-            {...register('bedrooms')}
-            id="bedrooms"
-            type="number"
-            className="input"
-            placeholder="3"
-          />
-        </div>
-        <div>
-          <label htmlFor="bathrooms" className="label block mb-1.5">
-            Bathrooms
-          </label>
-          <input
-            {...register('bathrooms')}
-            id="bathrooms"
-            type="number"
-            step="0.5"
-            className="input"
-            placeholder="2"
-          />
-        </div>
-        <div>
-          <label htmlFor="squareFeet" className="label block mb-1.5">
-            Sq ft
-          </label>
-          <input
-            {...register('squareFeet')}
-            id="squareFeet"
-            type="number"
-            className="input"
-            placeholder="2000"
-          />
-        </div>
-      </div>
-
-      <div className="pt-4">
-        <button type="submit" className="btn btn-primary w-full">
-          Continue
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// Step 2: Systems Overview
-function SystemsStep({
-  onSubmit,
-  onBack,
-  defaultValues,
-}: {
-  onSubmit: (data: SystemsData) => void;
-  onBack: () => void;
-  defaultValues: SystemsData | null;
-}) {
-  const {
-    register,
-    handleSubmit,
-    watch,
-    formState: { errors },
-  } = useForm<SystemsData>({
-    resolver: zodResolver(systemsSchema),
-    defaultValues: defaultValues || {},
-  });
-
-  const septicOrSewer = watch('septicOrSewer');
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-          Home systems overview
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Help us understand your home&apos;s systems (all optional)
-        </p>
-      </div>
-
-      {/* HVAC */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="hvacType" className="label block mb-1.5">
-            HVAC type
-          </label>
-          <select {...register('hvacType')} id="hvacType" className="input">
-            <option value="">Select type</option>
-            {hvacTypeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="hvacAge" className="label block mb-1.5">
-            HVAC age (years)
-          </label>
-          <input
-            {...register('hvacAge')}
-            id="hvacAge"
-            type="number"
-            className="input"
-            placeholder="5"
-          />
-        </div>
-      </div>
-
-      {/* Roof */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="roofType" className="label block mb-1.5">
-            Roof type
-          </label>
-          <select {...register('roofType')} id="roofType" className="input">
-            <option value="">Select type</option>
-            {roofTypeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="roofAge" className="label block mb-1.5">
-            Roof age (years)
-          </label>
-          <input
-            {...register('roofAge')}
-            id="roofAge"
-            type="number"
-            className="input"
-            placeholder="10"
-          />
-        </div>
-      </div>
-
-      {/* Water Heater */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="waterHeaterType" className="label block mb-1.5">
-            Water heater type
-          </label>
-          <select {...register('waterHeaterType')} id="waterHeaterType" className="input">
-            <option value="">Select type</option>
-            {waterHeaterTypeOptions.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label htmlFor="waterHeaterAge" className="label block mb-1.5">
-            Water heater age (years)
-          </label>
-          <input
-            {...register('waterHeaterAge')}
-            id="waterHeaterAge"
-            type="number"
-            className="input"
-            placeholder="8"
-          />
-        </div>
-      </div>
-
-      {/* Septic/Sewer */}
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <label htmlFor="septicOrSewer" className="label block mb-1.5">
-            Waste system
-          </label>
-          <select {...register('septicOrSewer')} id="septicOrSewer" className="input">
-            <option value="">Select type</option>
-            <option value="sewer">Municipal sewer</option>
-            <option value="septic">Septic system</option>
-          </select>
-        </div>
-        {septicOrSewer === 'septic' && (
-          <div>
-            <label htmlFor="septicLastServiced" className="label block mb-1.5">
-              Last serviced
-            </label>
-            <input
-              {...register('septicLastServiced')}
-              id="septicLastServiced"
-              type="date"
-              className="input"
-            />
-          </div>
-        )}
-      </div>
-
-      {/* Electrical */}
-      <div className="w-1/2">
-        <label htmlFor="electricalPanelAmps" className="label block mb-1.5">
-          Electrical panel (amps)
-        </label>
-        <select {...register('electricalPanelAmps')} id="electricalPanelAmps" className="input">
-          <option value="">Select amperage</option>
-          <option value="100">100 amps</option>
-          <option value="150">150 amps</option>
-          <option value="200">200 amps</option>
-          <option value="400">400 amps</option>
-        </select>
-      </div>
-
-      {/* Features */}
-      <div>
-        <label className="label block mb-3">Home features</label>
-        <div className="grid grid-cols-2 gap-3">
-          {[
-            { name: 'hasPool', label: 'Swimming pool' },
-            { name: 'hasSprinklerSystem', label: 'Sprinkler system' },
-            { name: 'hasSecuritySystem', label: 'Security system' },
-            { name: 'hasSmartHome', label: 'Smart home devices' },
-          ].map((feature) => (
-            <label
-              key={feature.name}
-              className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800"
-            >
-              <input
-                type="checkbox"
-                {...register(feature.name as keyof SystemsData)}
-                className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600"
-              />
-              <span className="text-sm text-slate-700 dark:text-slate-300">{feature.label}</span>
-            </label>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex gap-3 pt-4">
-        <button type="button" onClick={onBack} className="btn btn-secondary flex-1">
-          Back
-        </button>
-        <button type="submit" className="btn btn-primary flex-1">
-          Continue
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// Step 3: Pain Points
-function PainPointsStep({
-  onSubmit,
-  onBack,
-  defaultValues,
-}: {
-  onSubmit: (data: PainPointsData) => void;
-  onBack: () => void;
-  defaultValues: PainPointsData | null;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<PainPointsData>({
-    resolver: zodResolver(painPointsSchema),
-    defaultValues: defaultValues || { painPoints: [] },
-  });
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-          What challenges do you face?
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Select all that apply so we can help you better
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {painPointOptions.map((option) => (
-          <label
-            key={option.value}
-            className="flex items-center gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            <input
-              type="checkbox"
-              value={option.value}
-              {...register('painPoints')}
-              className="w-5 h-5 text-blue-600 rounded border-slate-300 dark:border-slate-600"
-            />
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">
-                {option.value === 'maintenance_scheduling' && '📅'}
-                {option.value === 'finding_vendors' && '🔧'}
-                {option.value === 'tracking_bills' && '📄'}
-                {option.value === 'household_supplies' && '🧹'}
-                {option.value === 'pet_care' && '🐾'}
-                {option.value === 'vehicle_maintenance' && '🚗'}
-              </span>
-              <span className="text-slate-700 dark:text-slate-300 font-medium">{option.label}</span>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      {errors.painPoints && (
-        <p className="text-sm text-red-500">{errors.painPoints.message}</p>
-      )}
-
-      <div className="flex gap-3 pt-4">
-        <button type="button" onClick={onBack} className="btn btn-secondary flex-1">
-          Back
-        </button>
-        <button type="submit" className="btn btn-primary flex-1">
-          Continue
-        </button>
-      </div>
-    </form>
-  );
-}
-
-// Step 4: Communication Preferences
-function CommunicationStep({
-  onSubmit,
-  onBack,
-  isSubmitting,
-}: {
-  onSubmit: (data: CommunicationData) => void;
-  onBack: () => void;
-  isSubmitting: boolean;
-}) {
-  const {
-    register,
-    handleSubmit,
-    formState: { errors },
-  } = useForm<CommunicationData>({
-    resolver: zodResolver(communicationSchema),
-    defaultValues: { communicationChannels: ['app'] },
-  });
-
-  return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-      <div>
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-          How should we reach you?
-        </h2>
-        <p className="text-sm text-slate-600 dark:text-slate-400">
-          Select your preferred communication channels
-        </p>
-      </div>
-
-      <div className="space-y-3">
-        {communicationOptions.map((option) => (
-          <label
-            key={option.value}
-            className="flex items-start gap-4 p-4 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors"
-          >
-            <input
-              type="checkbox"
-              value={option.value}
-              {...register('communicationChannels')}
-              className="w-5 h-5 mt-0.5 text-blue-600 rounded border-slate-300 dark:border-slate-600"
-            />
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xl">
-                  {option.value === 'email' && '📧'}
-                  {option.value === 'sms' && '📱'}
-                  {option.value === 'app' && '🔔'}
-                </span>
-                <span className="text-slate-700 dark:text-slate-300 font-medium">
-                  {option.label}
-                </span>
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                {option.description}
-              </p>
-            </div>
-          </label>
-        ))}
-      </div>
-
-      {errors.communicationChannels && (
-        <p className="text-sm text-red-500">{errors.communicationChannels.message}</p>
-      )}
-
-      <div className="flex gap-3 pt-4">
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={isSubmitting}
-          className="btn btn-secondary flex-1"
-        >
-          Back
-        </button>
-        <button type="submit" disabled={isSubmitting} className="btn btn-primary flex-1">
-          {isSubmitting ? (
-            <>
-              <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              Setting up...
-            </>
-          ) : (
-            'Complete Setup'
-          )}
-        </button>
-      </div>
-    </form>
   );
 }

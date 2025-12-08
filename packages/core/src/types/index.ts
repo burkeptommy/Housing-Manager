@@ -531,3 +531,391 @@ export interface PaginatedResponse<T> {
   pageSize: number;
   totalPages: number;
 }
+
+// ============================================================================
+// VENDOR CATEGORY ENUM
+// ============================================================================
+
+export type VendorCategory =
+  | 'MORTGAGE'
+  | 'HOA'
+  | 'PROPERTY_TAX'
+  | 'ELECTRIC'
+  | 'GAS'
+  | 'WATER_SEWER'
+  | 'TRASH'
+  | 'INTERNET'
+  | 'MOBILE'
+  | 'CABLE'
+  | 'HOME_INSURANCE'
+  | 'AUTO_INSURANCE'
+  | 'HEALTH_INSURANCE'
+  | 'LIFE_INSURANCE'
+  | 'PET_INSURANCE'
+  | 'CREDIT_CARD'
+  | 'STUDENT_LOAN'
+  | 'PERSONAL_LOAN'
+  | 'VEHICLE_LOAN'
+  | 'HELOC'
+  | 'STREAMING'
+  | 'GYM'
+  | 'SECURITY_MONITORING'
+  | 'PEST_CONTROL'
+  | 'LAWN_CARE'
+  | 'LANDSCAPING'
+  | 'HOME_WARRANTY'
+  | 'CLEANING'
+  | 'WINDOW_WASHING'
+  | 'GUTTER_CLEANING'
+  | 'HVAC_SERVICE'
+  | 'FILTER_SERVICE'
+  | 'CHIMNEY_SWEEP'
+  | 'SEPTIC_SERVICE'
+  | 'POOL_SERVICE'
+  | 'SNOW_REMOVAL'
+  | 'HANDYMAN'
+  | 'OTHER';
+
+export type BillingFrequency =
+  | 'WEEKLY'
+  | 'BIWEEKLY'
+  | 'MONTHLY'
+  | 'QUARTERLY'
+  | 'SEMIANNUALLY'
+  | 'ANNUAL'
+  | 'PER_VISIT'
+  | 'PER_JOB'
+  | 'OTHER';
+
+export type PaymentResponsibility =
+  | 'OWNER_PAYS_DIRECT'
+  | 'HAVEN_PAYS_ON_BEHALF'
+  | 'VENDOR_AUTOPAY';
+
+export type PaymentMethodType = 'CARD' | 'BANK_ACCOUNT';
+
+export type MaintenanceCategory =
+  | 'HVAC'
+  | 'PLUMBING'
+  | 'ROOF_GUTTER'
+  | 'CHIMNEY'
+  | 'SEPTIC'
+  | 'LANDSCAPING'
+  | 'PEST'
+  | 'POOL'
+  | 'SAFETY'
+  | 'CLEANING'
+  | 'APPLIANCES'
+  | 'EXTERIOR'
+  | 'INTERIOR'
+  | 'GENERAL';
+
+export type MaintenanceTaskStatus =
+  | 'PENDING'
+  | 'SCHEDULED'
+  | 'COMPLETED'
+  | 'SKIPPED'
+  | 'OVERDUE';
+
+// ============================================================================
+// HOUSEHOLD VENDOR TYPES
+// ============================================================================
+
+export interface HouseholdVendor {
+  id: string;
+  householdId: string;
+  displayName: string;
+  category: VendorCategory;
+  serviceDescription?: string | null;
+  isLocal: boolean;
+  phone?: string | null;
+  email?: string | null;
+  websiteUrl?: string | null;
+  notes?: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreateHouseholdVendorRequest {
+  displayName: string;
+  category: VendorCategory;
+  serviceDescription?: string;
+  isLocal?: boolean;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
+  notes?: string;
+}
+
+export interface UpdateHouseholdVendorRequest {
+  displayName?: string;
+  category?: VendorCategory;
+  serviceDescription?: string;
+  isLocal?: boolean;
+  phone?: string;
+  email?: string;
+  websiteUrl?: string;
+  notes?: string;
+}
+
+// ============================================================================
+// PAYMENT METHOD TYPES
+// ============================================================================
+
+export interface PaymentMethod {
+  id: string;
+  householdId: string;
+  stripeCustomerId: string;
+  stripePaymentMethodId: string;
+  label: string;
+  type: PaymentMethodType;
+  last4: string;
+  expMonth?: number | null;
+  expYear?: number | null;
+  bankName?: string | null;
+  isDefaultForSubscription: boolean;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface CreatePaymentMethodRequest {
+  householdId: string;
+  stripePaymentMethodId: string;
+  label: string;
+  type: PaymentMethodType;
+  last4: string;
+  expMonth?: number;
+  expYear?: number;
+  bankName?: string;
+  isDefaultForSubscription?: boolean;
+}
+
+// ============================================================================
+// BILL ACCOUNT TYPES
+// ============================================================================
+
+export interface BillAccount {
+  id: string;
+  householdId: string;
+  vendorId: string;
+  paymentMethodId?: string | null;
+  nickname: string;
+  category: VendorCategory;
+  accountNumber?: string | null;
+  billingFrequency: BillingFrequency;
+  paymentResponsibility: PaymentResponsibility;
+  typicalAmount?: number | null;
+  nextDueDate?: Date | null;
+  autopayEnabled: boolean;
+  portalUrl?: string | null;
+  supportPhone?: string | null;
+  notes?: string | null;
+  isActive: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt?: Date | null;
+  vendor?: HouseholdVendor;
+}
+
+export interface CreateBillAccountRequest {
+  householdId: string;
+  vendorId: string;
+  paymentMethodId?: string;
+  nickname: string;
+  category: VendorCategory;
+  accountNumber?: string;
+  billingFrequency?: BillingFrequency;
+  paymentResponsibility?: PaymentResponsibility;
+  typicalAmount?: number;
+  nextDueDate?: string;
+  autopayEnabled?: boolean;
+  portalUrl?: string;
+  supportPhone?: string;
+  notes?: string;
+}
+
+export interface UpdateBillAccountRequest {
+  vendorId?: string;
+  paymentMethodId?: string | null;
+  nickname?: string;
+  category?: VendorCategory;
+  accountNumber?: string;
+  billingFrequency?: BillingFrequency;
+  paymentResponsibility?: PaymentResponsibility;
+  typicalAmount?: number;
+  nextDueDate?: string;
+  autopayEnabled?: boolean;
+  portalUrl?: string;
+  supportPhone?: string;
+  notes?: string;
+}
+
+// ============================================================================
+// MAINTENANCE TEMPLATE TYPES
+// ============================================================================
+
+export interface MaintenanceTemplate {
+  id: string;
+  slug: string;
+  title: string;
+  description?: string | null;
+  category: MaintenanceCategory;
+  recommendedFrequencyMonths?: number | null;
+  recommendedSeasonStartMonth?: number | null;
+  recommendedSeasonEndMonth?: number | null;
+  propertyConditionsJson?: Record<string, unknown> | null;
+  defaultVendorCategory?: VendorCategory | null;
+  estimatedCostMin?: number | null;
+  estimatedCostMax?: number | null;
+  isActive: boolean;
+  sortOrder: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ============================================================================
+// MAINTENANCE TASK TYPES
+// ============================================================================
+
+export interface MaintenanceTask {
+  id: string;
+  householdId: string;
+  templateId?: string | null;
+  assignedVendorId?: string | null;
+  title: string;
+  description?: string | null;
+  category: MaintenanceCategory;
+  status: MaintenanceTaskStatus;
+  dueDate?: Date | null;
+  scheduledDate?: Date | null;
+  completedAt?: Date | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  createdFromTemplate: boolean;
+  notes?: string | null;
+  priority: TaskPriority;
+  createdAt: Date;
+  updatedAt: Date;
+  template?: MaintenanceTemplate | null;
+  assignedVendor?: HouseholdVendor | null;
+}
+
+export interface CreateMaintenanceTaskRequest {
+  householdId: string;
+  templateId?: string;
+  assignedVendorId?: string;
+  title: string;
+  description?: string;
+  category: MaintenanceCategory;
+  dueDate?: string;
+  scheduledDate?: string;
+  estimatedCost?: number;
+  notes?: string;
+  priority?: TaskPriority;
+}
+
+export interface UpdateMaintenanceTaskRequest {
+  assignedVendorId?: string | null;
+  title?: string;
+  description?: string;
+  category?: MaintenanceCategory;
+  status?: MaintenanceTaskStatus;
+  dueDate?: string | null;
+  scheduledDate?: string | null;
+  completedAt?: string | null;
+  estimatedCost?: number;
+  actualCost?: number;
+  notes?: string;
+  priority?: TaskPriority;
+}
+
+export interface GenerateMaintenanceTasksRequest {
+  householdId: string;
+  templateIds?: string[];
+}
+
+export interface GenerateMaintenanceTasksResponse {
+  tasks: MaintenanceTask[];
+  skippedTemplates: string[];
+}
+
+// ============================================================================
+// STRIPE TYPES
+// ============================================================================
+
+export interface CreateSetupIntentRequest {
+  householdId: string;
+}
+
+export interface SetupIntentResponse {
+  clientSecret: string;
+  customerId: string;
+}
+
+// ============================================================================
+// SUBSCRIPTION PLAN TYPES
+// ============================================================================
+
+export type SubscriptionPlan = 'ESSENTIALS' | 'PREMIUM';
+
+export interface SubscriptionPlanDetails {
+  id: SubscriptionPlan;
+  name: string;
+  price: number;
+  features: string[];
+}
+
+export const SUBSCRIPTION_PLANS: Record<SubscriptionPlan, SubscriptionPlanDetails> = {
+  ESSENTIALS: {
+    id: 'ESSENTIALS',
+    name: 'Essentials',
+    price: 9.99,
+    features: [
+      'Maintenance reminders',
+      'Bill tracking',
+      'Vendor directory',
+      'Basic support',
+    ],
+  },
+  PREMIUM: {
+    id: 'PREMIUM',
+    name: 'Premium',
+    price: 24.99,
+    features: [
+      'Everything in Essentials',
+      'Bill pay on your behalf',
+      'Priority support',
+      'Concierge service',
+      'Document storage',
+    ],
+  },
+};
+
+// ============================================================================
+// ONBOARDING STATE TYPES
+// ============================================================================
+
+export interface PropertyFeatures {
+  hasCentralAc: boolean;
+  hasGasHeat: boolean;
+  hasOilHeat: boolean;
+  hasFireplace: boolean;
+  hasSeptic: boolean;
+  hasWellWater: boolean;
+  hasPool: boolean;
+  hasGenerator: boolean;
+  hasLawn: boolean;
+  hasDriveway: boolean;
+}
+
+export interface OnboardingState {
+  step: number;
+  householdId?: string;
+  propertyFeatures?: PropertyFeatures;
+  vendors: HouseholdVendor[];
+  billAccounts: BillAccount[];
+  maintenanceTasks: MaintenanceTask[];
+  selectedPlan?: SubscriptionPlan;
+  paymentMethodId?: string;
+}
