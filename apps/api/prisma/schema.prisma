@@ -258,6 +258,22 @@ enum ReminderChannel {
   IN_APP
 }
 
+// Vendor payout method for Stripe Connect and other disbursements
+enum PayoutMethod {
+  STRIPE_CONNECT // Vendor has Stripe Connect account
+  CHECK // Haven mails a check
+  MANUAL // Manual transfer or other arrangement
+}
+
+// Status of household consolidated invoices
+enum HouseholdInvoiceStatus {
+  PENDING // Created, awaiting payment
+  PROCESSING // Payment in progress
+  PAID // Successfully charged
+  FAILED // Payment failed
+  CANCELLED // Invoice cancelled
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
@@ -323,22 +339,30 @@ model Household {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Stripe Integration - Haven is a Stripe platform; each household is a customer
+  stripeCustomerId String? @unique @map("stripe_customer_id")
+
+  // Consolidated Billing Settings
+  // Day of month (1-28) when consolidated invoice is generated
+  consolidatedBillingDay Int? @map("consolidated_billing_day")
+
   // Relations
-  owner            User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members          HouseholdMember[]
-  homeProfile      HomeProfile?
-  vendors          HouseholdVendor[]
-  ownedVendors     Vendor[]          @relation("HouseholdVendors")
-  serviceRequests  ServiceRequest[]
-  tasks            Task[]
-  maintenancePlans MaintenancePlan[]
-  invoices         Invoice[]
-  files            File[]
-  messages         Message[]
-  billAccounts     BillAccount[]
-  paymentMethods   PaymentMethod[]
-  maintenanceTasks MaintenanceTask[]
-  reminders        Reminder[]
+  owner             User               @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members           HouseholdMember[]
+  homeProfile       HomeProfile?
+  vendors           HouseholdVendor[]
+  ownedVendors      Vendor[]           @relation("HouseholdVendors")
+  serviceRequests   ServiceRequest[]
+  tasks             Task[]
+  maintenancePlans  MaintenancePlan[]
+  invoices          Invoice[]
+  householdInvoices HouseholdInvoice[]
+  files             File[]
+  messages          Message[]
+  billAccounts      BillAccount[]
+  paymentMethods    PaymentMethod[]
+  maintenanceTasks  MaintenanceTask[]
+  reminders         Reminder[]
 
   @@map("households")
 }
@@ -463,13 +487,14 @@ model Vendor {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household        Household?        @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
-  serviceCategory  ServiceCategory?  @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
-  householdVendors HouseholdVendor[]
-  serviceRequests  ServiceRequest[]
-  messages         Message[]
-  billAccounts     BillAccount[]
-  maintenanceTasks MaintenanceTask[]
+  household           Household?           @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
+  serviceCategory     ServiceCategory?     @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  householdVendors    HouseholdVendor[]
+  serviceRequests     ServiceRequest[]
+  messages            Message[]
+  billAccounts        BillAccount[]
+  maintenanceTasks    MaintenanceTask[]
+  vendorPayoutAccount VendorPayoutAccount?
 
   @@index([householdId, category])
   @@map("vendors")
@@ -797,8 +822,17 @@ model BillAccount {
   typicalAmount         Decimal?              @map("typical_amount") @db.Decimal(10, 2)
   nextDueDate           DateTime?             @map("next_due_date")
 
-  // Autopay Settings
-  autopayEnabled Boolean @default(false) @map("autopay_enabled")
+  // Vendor Autopay Settings (when paymentResponsibility = VENDOR_AUTOPAY)
+  // This tracks if autopay is set up directly with the vendor
+  vendorAutopayEnabled Boolean @default(false) @map("vendor_autopay_enabled")
+
+  // Haven Pay-on-Behalf Settings (when paymentResponsibility = HAVEN_PAYS_ON_BEHALF)
+  // Maximum amount Haven will auto-pay without additional approval (null = no cap)
+  maxAutoPayAmount             Decimal? @map("max_auto_pay_amount") @db.Decimal(10, 2)
+  // Whether Haven should automatically pay this bill
+  havenAutoPayEnabled          Boolean  @default(true) @map("haven_auto_pay_enabled")
+  // Whether to include in the monthly consolidated invoice (vs. pay individually)
+  includeInConsolidatedInvoice Boolean  @default(true) @map("include_in_consolidated_invoice")
 
   // Portal & Support
   portalUrl    String? @map("portal_url")
@@ -812,12 +846,14 @@ model BillAccount {
   deletedAt DateTime? @map("deleted_at") // Soft delete
 
   // Relations
-  household            Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  vendor               Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  autopayPaymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  household             Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor                Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  autopayPaymentMethod  PaymentMethod?         @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+  householdInvoiceItems HouseholdInvoiceItem[]
 
   @@index([householdId, category])
   @@index([householdId, nextDueDate])
+  @@index([householdId, paymentResponsibility])
   @@map("bill_accounts")
 }
 
@@ -967,4 +1003,119 @@ model InAppNotification {
   @@index([userId, isRead, createdAt])
   @@index([householdId])
   @@map("in_app_notifications")
+}
+
+// ============================================================================
+// VENDOR PAYOUT ACCOUNTS (Stripe Connect)
+// ============================================================================
+
+model VendorPayoutAccount {
+  id       String @id @default(cuid())
+  vendorId String @unique @map("vendor_id")
+
+  // Stripe Connect account ID (for STRIPE_CONNECT payout method)
+  // This is the connected account ID (acct_xxx) in Stripe
+  stripeAccountId String? @unique @map("stripe_account_id")
+
+  // How this vendor receives payments from Haven
+  payoutMethod PayoutMethod @default(MANUAL) @map("payout_method")
+
+  // For CHECK payouts: mailing address (could be JSON or separate fields)
+  // For MANUAL: instructions or notes
+  payoutDetails Json? @map("payout_details")
+
+  // Stripe Connect onboarding status
+  // STUB: In production, track onboarding completion status
+  stripeOnboardingComplete Boolean @default(false) @map("stripe_onboarding_complete")
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@map("vendor_payout_accounts")
+}
+
+// ============================================================================
+// HOUSEHOLD CONSOLIDATED INVOICES
+// ============================================================================
+
+// Monthly consolidated invoice for households using HAVEN_PAYS_ON_BEHALF
+model HouseholdInvoice {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Invoice identification
+  invoiceNumber String @unique @map("invoice_number")
+
+  // Billing period this invoice covers
+  billingPeriodStart DateTime @map("billing_period_start")
+  billingPeriodEnd   DateTime @map("billing_period_end")
+
+  // Amounts
+  subtotal    Decimal @db.Decimal(10, 2)
+  // Platform fee (if any) - STUB for future pricing model
+  platformFee Decimal @default(0) @map("platform_fee") @db.Decimal(10, 2)
+  total       Decimal @db.Decimal(10, 2)
+
+  status HouseholdInvoiceStatus @default(PENDING)
+
+  // Stripe PaymentIntent integration
+  stripePaymentIntentId String? @map("stripe_payment_intent_id")
+  stripePaymentStatus   String? @map("stripe_payment_status") // e.g. "succeeded", "requires_action"
+
+  // Payment tracking
+  paidAt        DateTime? @map("paid_at")
+  failedAt      DateTime? @map("failed_at")
+  failureReason String?   @map("failure_reason")
+
+  // STUB: In future, link to actual vendor payouts made from this invoice
+  // payoutsCompletedAt DateTime?
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items     HouseholdInvoiceItem[]
+
+  @@index([householdId, status])
+  @@index([billingPeriodStart, billingPeriodEnd])
+  @@map("household_invoices")
+}
+
+// Line items on a consolidated invoice (one per BillAccount included)
+model HouseholdInvoiceItem {
+  id                 String @id @default(cuid())
+  householdInvoiceId String @map("household_invoice_id")
+  billAccountId      String @map("bill_account_id")
+
+  // Description (e.g. "Lawn Care - GreenScape Landscaping")
+  description String
+
+  // Amount for this line item (from typicalAmount or actual invoice)
+  amount Decimal @db.Decimal(10, 2)
+
+  // STUB: In future, link to actual vendor invoice/bill document
+  // vendorInvoiceId String?
+  // vendorInvoiceUrl String?
+
+  // STUB: Track payout status per line item
+  // payoutStatus String? // "pending", "sent", "completed"
+  // payoutId String? // Reference to payout record
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  householdInvoice HouseholdInvoice @relation(fields: [householdInvoiceId], references: [id], onDelete: Cascade)
+  billAccount      BillAccount      @relation(fields: [billAccountId], references: [id], onDelete: Cascade)
+
+  @@index([householdInvoiceId])
+  @@index([billAccountId])
+  @@map("household_invoice_items")
 }
