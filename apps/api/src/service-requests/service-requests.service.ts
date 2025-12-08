@@ -201,13 +201,13 @@ export class ServiceRequestsService {
         throw new ForbiddenException('You do not have access to this request');
       }
 
-      // Only managers and admins can update status, assign vendors, or schedule
+      // Only owners and admins can update status, assign vendors, or schedule
       if (
         (dto.status || dto.vendorId || dto.scheduledDate) &&
-        membership.role !== 'MANAGER'
+        membership.role !== 'OWNER'
       ) {
         throw new ForbiddenException(
-          'Only managers can update status, assign vendors, or schedule',
+          'Only household owners can update status, assign vendors, or schedule',
         );
       }
     }

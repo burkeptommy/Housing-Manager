@@ -32,6 +32,32 @@ haven-home-manager/
 └── tsconfig.json
 ```
 
+## Quick Start
+
+```bash
+# 1. Install dependencies
+pnpm install
+
+# 2. Start PostgreSQL
+docker-compose up -d postgres
+
+# 3. Configure environment
+cp apps/api/.env.example apps/api/.env
+
+# 4. Run migrations and seed demo data
+cd apps/api && pnpm prisma:migrate:dev && pnpm prisma:seed && cd ../..
+
+# 5. Build shared packages
+pnpm -r --filter "@haven/core" --filter "@haven/ui" build
+
+# 6. Start all apps (in separate terminals)
+pnpm dev:api    # Backend at http://localhost:4000
+pnpm dev:web    # Web app at http://localhost:3000
+pnpm dev:mobile # Mobile with Expo
+
+# Login with: demo@haven.app / Demo123!
+```
+
 ## Prerequisites
 
 - Node.js 20+
@@ -108,16 +134,21 @@ cd apps/api
 pnpm prisma:migrate:dev
 ```
 
-Seed the database with initial data:
+Seed the database with demo data:
 
 ```bash
 cd apps/api
 pnpm prisma:seed
 ```
 
-This creates:
-- Service categories (Cleaning, Plumbing, Landscaping, etc.)
-- Demo users (see below)
+This creates a complete demo environment:
+- **14 maintenance templates** for seasonal home care
+- **Demo users** with different roles (see credentials below)
+- **Demo household** ("The Johnson Residence") with full property details
+- **13 vendors** covering all home service categories
+- **11 bill accounts** with realistic frequencies and amounts
+- **17 maintenance tasks** across 12 months
+- **Sample service requests** and subscription data
 
 ### 4. Build Shared Packages
 
@@ -173,6 +204,28 @@ After running the seed script, these demo accounts are available:
 | Admin | admin@haven.app | Admin123! |
 | Manager | manager@haven.app | Manager123! |
 | Homeowner | demo@haven.app | Demo123! |
+
+### Demo Household Details
+
+The homeowner account (`demo@haven.app`) comes with a pre-configured household:
+
+**Property: The Johnson Residence**
+- Single family home, 2,800 sq ft, built 2015
+- 3 bedrooms, 2.5 bathrooms
+- Features: Pool, septic system, chimney, sprinkler system, lawn
+
+**Vendors (13 configured):**
+- Mortgage: First National Bank ($2,450/mo)
+- Utilities: PowerGrid Electric, Metro Gas, CityWater, TrashAway
+- Services: FastNet Internet, GreenLawn Care, BugGuard Pest Control
+- Seasonal: SnowClear, Chimney Masters, Septic Solutions, AquaPool
+
+**Bill Accounts** with realistic amounts and billing frequencies
+
+**Maintenance Tasks** for 12 months covering:
+- HVAC filter changes, gutter cleaning, smoke detector testing
+- Seasonal tasks: lawn aeration, pool winterization, chimney inspection
+- Appliance maintenance: water heater flush, refrigerator coils
 
 ## Running Tests
 

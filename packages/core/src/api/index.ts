@@ -106,10 +106,10 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
+      const error = await response.json().catch(() => ({
         message: 'An error occurred',
         statusCode: response.status,
-      }));
+      })) as ApiError;
       throw error;
     }
 
@@ -118,7 +118,7 @@ export class ApiClient {
       return undefined as T;
     }
 
-    return response.json();
+    return response.json() as Promise<T>;
   }
 
   private async tryRefreshToken(): Promise<boolean> {
@@ -345,14 +345,14 @@ export class ApiClient {
     });
 
     if (!response.ok) {
-      const error: ApiError = await response.json().catch(() => ({
+      const error = await response.json().catch(() => ({
         message: 'Upload failed',
         statusCode: response.status,
-      }));
+      })) as ApiError;
       throw error;
     }
 
-    return response.json();
+    return response.json() as Promise<UploadResponse>;
   }
 
   async getFile(id: string): Promise<FileUpload & { url: string }> {

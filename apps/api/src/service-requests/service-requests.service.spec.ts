@@ -286,7 +286,7 @@ describe('ServiceRequestsService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('should allow manager to update status', async () => {
+    it('should allow owner to update status', async () => {
       const statusUpdateDto: UpdateServiceRequestDto = {
         status: 'IN_PROGRESS',
       };
@@ -294,14 +294,14 @@ describe('ServiceRequestsService', () => {
       mockPrismaService.serviceRequest.findUnique.mockResolvedValue(mockServiceRequest);
       mockPrismaService.householdMember.findUnique.mockResolvedValue({
         ...mockMembership,
-        role: HouseholdRole.MANAGER,
+        role: HouseholdRole.OWNER,
       });
       mockPrismaService.serviceRequest.update.mockResolvedValue({
         ...mockServiceRequest,
         status: 'IN_PROGRESS',
       });
 
-      const result = await service.update('request-123', statusUpdateDto, mockManagerUser);
+      const result = await service.update('request-123', statusUpdateDto, mockUser);
 
       expect(result.status).toBe('IN_PROGRESS');
     });
@@ -314,7 +314,7 @@ describe('ServiceRequestsService', () => {
       mockPrismaService.serviceRequest.findUnique.mockResolvedValue(mockServiceRequest);
       mockPrismaService.householdMember.findUnique.mockResolvedValue({
         ...mockMembership,
-        role: HouseholdRole.MANAGER,
+        role: HouseholdRole.OWNER,
       });
       mockPrismaService.serviceRequest.update.mockResolvedValue({
         ...mockServiceRequest,
@@ -322,7 +322,7 @@ describe('ServiceRequestsService', () => {
         completedDate: new Date(),
       });
 
-      await service.update('request-123', completeDto, mockManagerUser);
+      await service.update('request-123', completeDto, mockUser);
 
       expect(mockPrismaService.serviceRequest.update).toHaveBeenCalledWith(
         expect.objectContaining({
