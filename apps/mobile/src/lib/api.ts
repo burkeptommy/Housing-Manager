@@ -1,6 +1,13 @@
 import * as SecureStore from 'expo-secure-store';
 import { ApiClient, type ApiClientConfig } from '@haven/core';
 
+// Expo environment variable type declaration
+declare const process: {
+  env: {
+    EXPO_PUBLIC_API_URL?: string;
+  };
+};
+
 const ACCESS_TOKEN_KEY = 'haven_access_token';
 const REFRESH_TOKEN_KEY = 'haven_refresh_token';
 

@@ -86,7 +86,7 @@ export default function HomeProfilePage() {
         bedrooms: data.bedrooms,
         bathrooms: data.bathrooms,
         squareFeet: data.squareFeet,
-        notes: homeProfile?.notes,
+        notes: homeProfile?.notes ?? undefined,
       });
 
       setHomeProfile(updatedProfile);

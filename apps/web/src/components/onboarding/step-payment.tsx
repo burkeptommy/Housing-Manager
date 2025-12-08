@@ -16,9 +16,12 @@ export function StepPayment({
   onSubmit,
   onBack,
   isSubmitting,
-  stripeClientSecret,
-  onSetupStripe,
+  stripeClientSecret: _stripeClientSecret,
+  onSetupStripe: _onSetupStripe,
 }: StepPaymentProps) {
+  // Note: stripeClientSecret and onSetupStripe reserved for future Stripe integration
+  void _stripeClientSecret;
+  void _onSetupStripe;
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan>('ESSENTIALS');
   const [paymentSetup, setPaymentSetup] = useState(false);
   const [cardDetails, setCardDetails] = useState({

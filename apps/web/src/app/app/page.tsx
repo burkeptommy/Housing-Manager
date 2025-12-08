@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { useDashboard, useRequestHavenHandle } from '@/hooks/use-dashboard';
-import type { UpcomingBill, UpcomingMaintenanceTask, TodayTask, VendorCategory, MaintenanceCategory } from '@haven/core';
+import type { UpcomingBill, UpcomingMaintenanceTask, TodayTask } from '@haven/core';
 
 // Category icon mapping
 const CATEGORY_ICONS: Record<string, string> = {

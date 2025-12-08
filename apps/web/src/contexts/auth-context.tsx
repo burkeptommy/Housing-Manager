@@ -13,7 +13,6 @@ import type {
   User,
   Household,
   HouseholdDetail,
-  HomeProfile,
   RegisterRequest,
   LoginRequest,
 } from '@haven/core';
@@ -60,7 +59,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       const savedId = localStorage.getItem(CURRENT_HOUSEHOLD_KEY);
-      let selectedId = householdList[0].id;
+      const firstHousehold = householdList[0];
+      if (!firstHousehold) return;
+      let selectedId = firstHousehold.id;
 
       if (savedId) {
         const found = householdList.find((h) => h.id === savedId);

@@ -264,11 +264,11 @@ export default function OnboardingMaintenanceScreen() {
                             <View style={styles.frequencyBadge}>
                               <Text style={styles.frequencyText}>{frequencyLabel}</Text>
                             </View>
-                            {task.template?.estimatedCostMin !== null &&
-                              task.template?.estimatedCostMax !== null && (
+                            {task.template?.estimatedCostMin != null &&
+                              task.template?.estimatedCostMax != null && (
                                 <Text style={styles.costText}>
-                                  Est. ${task.template.estimatedCostMin} - $
-                                  {task.template.estimatedCostMax}
+                                  Est. ${task.template?.estimatedCostMin} - $
+                                  {task.template?.estimatedCostMax}
                                 </Text>
                               )}
                           </View>

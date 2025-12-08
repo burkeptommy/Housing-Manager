@@ -220,11 +220,12 @@ interface RequestDetailModalProps {
 function RequestDetailModal({
   request,
   vendors,
-  categories,
+  categories: _categories,
   onClose,
   onUpdate,
   isUpdating,
 }: RequestDetailModalProps) {
+  void _categories; // Reserved for future category filtering
   const [vendorId, setVendorId] = useState(request.vendorId || '');
   const [scheduledDate, setScheduledDate] = useState(
     request.scheduledDate

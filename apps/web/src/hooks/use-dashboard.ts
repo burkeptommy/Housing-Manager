@@ -92,8 +92,8 @@ export function useRequestHavenHandle() {
     }) => {
       return api.updateBillAccount(billId, {
         paymentResponsibility: 'HAVEN_PAYS_ON_BEHALF',
-        havenAutoPayEnabled: true,
-        maxAutoPayAmount,
+        autopayEnabled: true,
+        typicalAmount: maxAutoPayAmount,
       });
     },
     onSuccess: () => {

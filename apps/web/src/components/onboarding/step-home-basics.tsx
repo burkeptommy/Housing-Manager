@@ -65,7 +65,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<HomeBasicsData>({
+  } = useForm({
     resolver: zodResolver(homeBasicsSchema),
     defaultValues: {
       name: '',
@@ -90,7 +90,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
   });
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+    <form onSubmit={handleSubmit((data) => onSubmit(data as HomeBasicsData))} className="space-y-6">
       <div>
         <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
           Tell us about your home
