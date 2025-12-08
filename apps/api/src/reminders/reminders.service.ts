@@ -8,6 +8,10 @@ import {
   UpcomingBillDto,
   UpcomingMaintenanceTaskDto,
   CronJobResultDto,
+  DashboardResponseDto,
+  DashboardSummaryDto,
+  NextUpItemDto,
+  TodayTaskDto,
 } from './dto';
 
 @Injectable()
@@ -431,11 +435,13 @@ export class RemindersService {
         id: bill.id,
         nickname: bill.nickname,
         vendorName: bill.vendor.displayName,
+        vendorId: bill.vendorId,
         category: bill.category,
         typicalAmount: bill.typicalAmount?.toNumber(),
         nextDueDate: dueDate,
         daysUntilDue,
         isOverdue: daysUntilDue < 0,
+        paymentResponsibility: bill.paymentResponsibility,
       };
     });
   }
@@ -477,10 +483,204 @@ export class RemindersService {
         scheduledDate: task.scheduledDate ?? undefined,
         daysUntilDue,
         isOverdue: daysUntilDue < 0,
+        assignedVendorId: task.assignedVendorId ?? undefined,
         assignedVendorName: task.assignedVendor?.displayName,
         estimatedCost: task.estimatedCost?.toNumber(),
       };
     });
+  }
+
+  /**
+   * Get full dashboard data for homeowner
+   * Returns summary stats, next up item, today's tasks, and upcoming items
+   */
+  async getDashboardData(householdId: string): Promise<DashboardResponseDto> {
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+    // Fetch all data in parallel
+    const [
+      upcomingBills,
+      upcomingMaintenanceTasks,
+      billsThisMonth,
+      tasksScheduledThisMonth,
+      tasksCompletedThisMonth,
+      todayBills,
+      todayTasks,
+    ] = await Promise.all([
+      // Upcoming bills (next 30 days)
+      this.getUpcomingBills(householdId, 30),
+      // Upcoming maintenance tasks (next 30 days)
+      this.getUpcomingMaintenanceTasks(householdId, 30),
+      // Bills managed this month (active bill accounts with due dates this month)
+      this.prisma.billAccount.count({
+        where: {
+          householdId,
+          isActive: true,
+          deletedAt: null,
+          nextDueDate: {
+            gte: startOfMonth,
+            lte: endOfMonth,
+          },
+        },
+      }),
+      // Tasks scheduled this month
+      this.prisma.maintenanceTask.count({
+        where: {
+          householdId,
+          createdAt: {
+            gte: startOfMonth,
+            lte: endOfMonth,
+          },
+        },
+      }),
+      // Tasks completed this month
+      this.prisma.maintenanceTask.count({
+        where: {
+          householdId,
+          status: 'COMPLETED',
+          completedAt: {
+            gte: startOfMonth,
+            lte: endOfMonth,
+          },
+        },
+      }),
+      // Today's bills
+      this.prisma.billAccount.findMany({
+        where: {
+          householdId,
+          isActive: true,
+          deletedAt: null,
+          nextDueDate: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        include: { vendor: true },
+      }),
+      // Today's maintenance tasks
+      this.prisma.maintenanceTask.findMany({
+        where: {
+          householdId,
+          status: { in: ['PENDING', 'SCHEDULED'] },
+          OR: [
+            {
+              dueDate: {
+                gte: startOfDay,
+                lte: endOfDay,
+              },
+            },
+            {
+              scheduledDate: {
+                gte: startOfDay,
+                lte: endOfDay,
+              },
+            },
+          ],
+        },
+        include: { assignedVendor: true },
+      }),
+    ]);
+
+    // Determine "Next Up" - the most imminent item
+    let nextUp: NextUpItemDto | undefined;
+    const allUpcoming: Array<{
+      type: 'bill' | 'maintenance';
+      id: string;
+      title: string;
+      category: string;
+      vendorName?: string;
+      amount?: number;
+      daysUntilDue: number;
+      dueDate: Date;
+    }> = [];
+
+    // Add bills to the combined list
+    for (const bill of upcomingBills) {
+      if (!bill.isOverdue) {
+        allUpcoming.push({
+          type: 'bill',
+          id: bill.id,
+          title: bill.nickname,
+          category: bill.category,
+          vendorName: bill.vendorName,
+          amount: bill.typicalAmount,
+          daysUntilDue: bill.daysUntilDue,
+          dueDate: bill.nextDueDate,
+        });
+      }
+    }
+
+    // Add maintenance tasks to the combined list
+    for (const task of upcomingMaintenanceTasks) {
+      if (!task.isOverdue && task.dueDate) {
+        allUpcoming.push({
+          type: 'maintenance',
+          id: task.id,
+          title: task.title,
+          category: task.category,
+          vendorName: task.assignedVendorName,
+          amount: task.estimatedCost,
+          daysUntilDue: task.daysUntilDue,
+          dueDate: new Date(task.dueDate),
+        });
+      }
+    }
+
+    // Sort by days until due and pick the first
+    allUpcoming.sort((a, b) => a.daysUntilDue - b.daysUntilDue);
+    if (allUpcoming.length > 0) {
+      nextUp = allUpcoming[0];
+    }
+
+    // Build today's tasks list
+    const todaysTasks: TodayTaskDto[] = [];
+
+    for (const bill of todayBills) {
+      todaysTasks.push({
+        type: 'bill',
+        id: bill.id,
+        title: bill.nickname,
+        category: bill.category,
+        vendorName: bill.vendor?.displayName,
+        amount: bill.typicalAmount?.toNumber(),
+      });
+    }
+
+    for (const task of todayTasks) {
+      todaysTasks.push({
+        type: 'maintenance',
+        id: task.id,
+        title: task.title,
+        category: task.category,
+        vendorName: task.assignedVendor?.displayName,
+        estimatedCost: task.estimatedCost?.toNumber(),
+        scheduledTime: task.scheduledDate
+          ? new Date(task.scheduledDate).toLocaleTimeString('en-US', {
+              hour: 'numeric',
+              minute: '2-digit',
+            })
+          : undefined,
+      });
+    }
+
+    // Build summary
+    const summary: DashboardSummaryDto = {
+      billsManagedThisMonth: billsThisMonth,
+      tasksScheduledThisMonth: tasksScheduledThisMonth,
+      tasksCompletedThisMonth: tasksCompletedThisMonth,
+      nextUp,
+      todaysTasks,
+    };
+
+    return {
+      summary,
+      upcomingBills,
+      upcomingMaintenanceTasks,
+    };
   }
 
   /**

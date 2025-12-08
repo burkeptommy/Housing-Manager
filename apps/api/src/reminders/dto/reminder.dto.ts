@@ -114,6 +114,9 @@ export class UpcomingBillDto {
   vendorName: string;
 
   @ApiProperty()
+  vendorId: string;
+
+  @ApiProperty()
   category: string;
 
   @ApiPropertyOptional()
@@ -127,6 +130,9 @@ export class UpcomingBillDto {
 
   @ApiProperty({ description: 'Is the bill overdue' })
   isOverdue: boolean;
+
+  @ApiProperty({ description: 'Payment responsibility' })
+  paymentResponsibility: string;
 }
 
 export class UpcomingMaintenanceTaskDto {
@@ -158,6 +164,9 @@ export class UpcomingMaintenanceTaskDto {
   isOverdue: boolean;
 
   @ApiPropertyOptional()
+  assignedVendorId?: string;
+
+  @ApiPropertyOptional()
   assignedVendorName?: string;
 
   @ApiPropertyOptional()
@@ -165,6 +174,87 @@ export class UpcomingMaintenanceTaskDto {
 }
 
 export class UpcomingItemsResponseDto {
+  @ApiProperty({ type: [UpcomingBillDto] })
+  upcomingBills: UpcomingBillDto[];
+
+  @ApiProperty({ type: [UpcomingMaintenanceTaskDto] })
+  upcomingMaintenanceTasks: UpcomingMaintenanceTaskDto[];
+}
+
+// Next up item - the most imminent bill or task
+export class NextUpItemDto {
+  @ApiProperty({ enum: ['bill', 'maintenance'] })
+  type: 'bill' | 'maintenance';
+
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiProperty()
+  category: string;
+
+  @ApiPropertyOptional()
+  vendorName?: string;
+
+  @ApiPropertyOptional()
+  amount?: number;
+
+  @ApiProperty()
+  daysUntilDue: number;
+
+  @ApiProperty()
+  dueDate: Date;
+}
+
+// Today's tasks
+export class TodayTaskDto {
+  @ApiProperty({ enum: ['bill', 'maintenance'] })
+  type: 'bill' | 'maintenance';
+
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiProperty()
+  category: string;
+
+  @ApiPropertyOptional()
+  vendorName?: string;
+
+  @ApiPropertyOptional()
+  amount?: number;
+
+  @ApiPropertyOptional()
+  scheduledTime?: string;
+}
+
+// Dashboard summary stats
+export class DashboardSummaryDto {
+  @ApiProperty({ description: 'Number of bills managed this month' })
+  billsManagedThisMonth: number;
+
+  @ApiProperty({ description: 'Number of tasks scheduled this month' })
+  tasksScheduledThisMonth: number;
+
+  @ApiProperty({ description: 'Number of tasks completed this month' })
+  tasksCompletedThisMonth: number;
+
+  @ApiPropertyOptional({ description: 'The next major upcoming item' })
+  nextUp?: NextUpItemDto;
+
+  @ApiProperty({ type: [TodayTaskDto], description: 'Tasks and appointments for today' })
+  todaysTasks: TodayTaskDto[];
+}
+
+// Full dashboard response
+export class DashboardResponseDto {
+  @ApiProperty({ type: DashboardSummaryDto })
+  summary: DashboardSummaryDto;
+
   @ApiProperty({ type: [UpcomingBillDto] })
   upcomingBills: UpcomingBillDto[];
 

@@ -50,6 +50,7 @@ import type {
   HouseholdInvoice,
   HouseholdInvoiceListItem,
   BillingSummary,
+  DashboardResponse,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -588,6 +589,10 @@ export class ApiClient {
   // ============================================================================
   // DASHBOARD & REMINDERS ENDPOINTS
   // ============================================================================
+
+  async getDashboard(householdId: string): Promise<DashboardResponse> {
+    return this.request(`/dashboard?householdId=${householdId}`);
+  }
 
   async getUpcomingItems(
     householdId: string,

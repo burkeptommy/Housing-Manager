@@ -949,11 +949,13 @@ export interface UpcomingBill {
   id: string;
   nickname: string;
   vendorName: string;
+  vendorId: string;
   category: VendorCategory;
   typicalAmount?: number;
   nextDueDate: string;
   daysUntilDue: number;
   isOverdue: boolean;
+  paymentResponsibility: PaymentResponsibility;
 }
 
 export interface UpcomingMaintenanceTask {
@@ -966,11 +968,49 @@ export interface UpcomingMaintenanceTask {
   scheduledDate?: string;
   daysUntilDue: number;
   isOverdue: boolean;
+  assignedVendorId?: string;
   assignedVendorName?: string;
   estimatedCost?: number;
 }
 
 export interface UpcomingItemsResponse {
+  upcomingBills: UpcomingBill[];
+  upcomingMaintenanceTasks: UpcomingMaintenanceTask[];
+}
+
+// Dashboard types
+export interface NextUpItem {
+  type: 'bill' | 'maintenance';
+  id: string;
+  title: string;
+  category: string;
+  vendorName?: string;
+  amount?: number;
+  daysUntilDue: number;
+  dueDate: string;
+}
+
+export interface TodayTask {
+  type: 'bill' | 'maintenance';
+  id: string;
+  title: string;
+  category: string;
+  vendorName?: string;
+  amount?: number;
+  estimatedCost?: number;
+  scheduledTime?: string;
+}
+
+export interface DashboardSummary {
+  billsManagedThisMonth: number;
+  tasksScheduledThisMonth: number;
+  tasksCompletedThisMonth: number;
+  nextUp?: NextUpItem;
+  todaysTasks: TodayTask[];
+}
+
+export interface DashboardResponse {
+  summary: DashboardSummary;
   upcomingBills: UpcomingBill[];
   upcomingMaintenanceTasks: UpcomingMaintenanceTask[];
 }

@@ -22,6 +22,7 @@ import {
   InAppNotificationDto,
   MarkNotificationReadDto,
   CronJobResultDto,
+  DashboardResponseDto,
 } from './dto';
 
 @ApiTags('Dashboard')
@@ -78,6 +79,25 @@ export class RemindersController {
       upcomingBills,
       upcomingMaintenanceTasks,
     };
+  }
+
+  /**
+   * Get full dashboard data including summary, next up, today's tasks, and upcoming items
+   */
+  @Get('dashboard')
+  @UseGuards(JwtAuthGuard, HouseholdMemberGuard)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Get full dashboard data',
+    description:
+      'Returns summary stats, next up item, today\'s tasks, upcoming bills, and maintenance tasks',
+  })
+  @ApiQuery({ name: 'householdId', required: true })
+  @ApiResponse({ status: 200, type: DashboardResponseDto })
+  async getDashboard(
+    @Query('householdId') householdId: string,
+  ): Promise<DashboardResponseDto> {
+    return this.remindersService.getDashboardData(householdId);
   }
 
   /**
