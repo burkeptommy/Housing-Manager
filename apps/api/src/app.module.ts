@@ -6,7 +6,11 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth';
 import { DbModule } from './db';
 import { HealthModule } from './health/health.module';
+import { HomeProfilesModule } from './home-profiles';
+import { HouseholdsModule } from './households';
 import { PrismaModule } from './prisma';
+import { ServiceCategoriesModule } from './service-categories';
+import { ServiceRequestsModule } from './service-requests';
 import { UsersModule } from './users';
 
 @Module({
@@ -19,6 +23,10 @@ import { UsersModule } from './users';
     DbModule,
     AuthModule,
     UsersModule,
+    HouseholdsModule,
+    HomeProfilesModule,
+    ServiceCategoriesModule,
+    ServiceRequestsModule,
     HealthModule,
   ],
   controllers: [AppController],
