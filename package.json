@@ -1,0 +1,33 @@
+{
+  "name": "haven-home-manager",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Haven Home Manager - SaaS home management platform",
+  "scripts": {
+    "dev:web": "pnpm --filter @haven/web dev",
+    "dev:api": "pnpm --filter @haven/api dev",
+    "dev:mobile": "pnpm --filter @haven/mobile start",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @haven/web build",
+    "build:api": "pnpm --filter @haven/api build",
+    "lint": "pnpm -r lint",
+    "lint:fix": "pnpm -r lint:fix",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "test": "pnpm -r test",
+    "test:web": "pnpm --filter @haven/web test",
+    "test:api": "pnpm --filter @haven/api test",
+    "clean": "pnpm -r clean && rm -rf node_modules",
+    "typecheck": "pnpm -r typecheck"
+  },
+  "devDependencies": {
+    "@haven/config": "workspace:*",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "packageManager": "pnpm@9.14.4",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}
