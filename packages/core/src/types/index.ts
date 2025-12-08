@@ -299,6 +299,71 @@ export interface CreateSubscriptionRequest {
 }
 
 // ============================================================================
+// ONBOARDING TYPES
+// ============================================================================
+
+export type PainPoint =
+  | 'maintenance_scheduling'
+  | 'finding_vendors'
+  | 'tracking_bills'
+  | 'household_supplies'
+  | 'pet_care'
+  | 'vehicle_maintenance';
+
+export type CommunicationChannel = 'sms' | 'email' | 'app';
+
+export interface HomeSystems {
+  hvacType?: string;
+  hvacAge?: number;
+  roofType?: string;
+  roofAge?: number;
+  waterHeaterType?: string;
+  waterHeaterAge?: number;
+  septicOrSewer?: 'septic' | 'sewer';
+  septicLastServiced?: string;
+  electricalPanelAmps?: number;
+  hasPool?: boolean;
+  hasSprinklerSystem?: boolean;
+  hasSecuritySystem?: boolean;
+  hasSmartHome?: boolean;
+}
+
+export interface OnboardingPreferences {
+  painPoints: PainPoint[];
+  communicationChannels: CommunicationChannel[];
+}
+
+export interface OnboardingData {
+  // Step 1: Basic home info
+  name: string;
+  propertyType: PropertyType;
+  addressLine1: string;
+  addressLine2?: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  yearBuilt?: number;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFeet?: number;
+
+  // Step 2: Systems overview
+  systems: HomeSystems;
+
+  // Step 3: Pain points
+  painPoints: PainPoint[];
+
+  // Step 4: Communication preferences
+  communicationChannels: CommunicationChannel[];
+}
+
+// Extended home profile that includes systems and preferences (stored in notes as JSON)
+export interface ExtendedHomeProfile extends HomeProfile {
+  systems?: HomeSystems;
+  preferences?: OnboardingPreferences;
+}
+
+// ============================================================================
 // API RESPONSE TYPES
 // ============================================================================
 

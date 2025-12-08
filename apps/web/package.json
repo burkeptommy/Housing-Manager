@@ -18,9 +18,12 @@
   "dependencies": {
     "@haven/core": "workspace:*",
     "@haven/ui": "workspace:*",
+    "@hookform/resolvers": "^5.2.2",
     "next": "^15.1.0",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "react-hook-form": "^7.68.0",
+    "zod": "^3.24.1"
   },
   "devDependencies": {
     "@haven/config": "workspace:*",

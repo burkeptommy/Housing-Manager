@@ -7,14 +7,16 @@ import { Sidebar } from '@/components/sidebar';
 import { TopBar } from '@/components/top-bar';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       router.push('/login');
+    } else if (!isLoading && isAuthenticated && needsOnboarding) {
+      router.push('/onboarding');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isLoading, isAuthenticated, needsOnboarding, router]);
 
   if (isLoading) {
     return (
@@ -27,7 +29,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  if (!isAuthenticated || needsOnboarding) {
     return null;
   }
 
