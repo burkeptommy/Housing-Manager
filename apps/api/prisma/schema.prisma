@@ -137,6 +137,108 @@ enum FileCategory {
   OTHER
 }
 
+// Vendor Categories - comprehensive list for bills and services
+enum VendorCategory {
+  // Housing & Mortgage
+  MORTGAGE
+  HOA
+  PROPERTY_TAX
+
+  // Utilities
+  ELECTRIC
+  GAS
+  WATER_SEWER
+  TRASH
+  INTERNET
+  MOBILE
+  CABLE
+
+  // Insurance
+  HOME_INSURANCE
+  AUTO_INSURANCE
+  HEALTH_INSURANCE
+  LIFE_INSURANCE
+  PET_INSURANCE
+
+  // Loans & Credit
+  CREDIT_CARD
+  STUDENT_LOAN
+  PERSONAL_LOAN
+  VEHICLE_LOAN
+  HELOC
+
+  // Subscriptions & Services
+  STREAMING
+  GYM
+  SECURITY_MONITORING
+  PEST_CONTROL
+  LAWN_CARE
+  LANDSCAPING
+  HOME_WARRANTY
+
+  // Home Services
+  CLEANING
+  WINDOW_WASHING
+  GUTTER_CLEANING
+  HVAC_SERVICE
+  FILTER_SERVICE
+  CHIMNEY_SWEEP
+  SEPTIC_SERVICE
+  POOL_SERVICE
+  SNOW_REMOVAL
+  HANDYMAN
+
+  OTHER
+}
+
+enum BillingFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  QUARTERLY
+  SEMIANNUALLY
+  ANNUAL
+  PER_VISIT
+  PER_JOB
+  OTHER
+}
+
+enum PaymentResponsibility {
+  OWNER_PAYS_DIRECT        // We just track and remind
+  HAVEN_PAYS_ON_BEHALF     // We collect money and pay vendor
+  VENDOR_AUTOPAY           // Autopay is set up with vendor, we track and alert
+}
+
+enum PaymentMethodType {
+  CARD
+  BANK_ACCOUNT
+}
+
+enum MaintenanceCategory {
+  HVAC
+  PLUMBING
+  ROOF_GUTTER
+  CHIMNEY
+  SEPTIC
+  LANDSCAPING
+  PEST
+  POOL
+  SAFETY
+  CLEANING
+  APPLIANCES
+  EXTERIOR
+  INTERIOR
+  GENERAL
+}
+
+enum MaintenanceTaskStatus {
+  PENDING
+  SCHEDULED
+  COMPLETED
+  SKIPPED
+  OVERDUE
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
@@ -202,16 +304,20 @@ model Household {
   updatedAt   DateTime @updatedAt @map("updated_at")
 
   // Relations
-  owner           User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members         HouseholdMember[]
-  homeProfile     HomeProfile?
-  vendors         HouseholdVendor[]
-  serviceRequests ServiceRequest[]
-  tasks           Task[]
-  maintenancePlans MaintenancePlan[]
-  invoices        Invoice[]
-  files           File[]
-  messages        Message[]
+  owner             User              @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members           HouseholdMember[]
+  homeProfile       HomeProfile?
+  vendors           HouseholdVendor[]
+  ownedVendors      Vendor[]          @relation("HouseholdVendors")
+  serviceRequests   ServiceRequest[]
+  tasks             Task[]
+  maintenancePlans  MaintenancePlan[]
+  invoices          Invoice[]
+  files             File[]
+  messages          Message[]
+  billAccounts      BillAccount[]
+  paymentMethods    PaymentMethod[]
+  maintenanceTasks  MaintenanceTask[]
 
   @@map("households")
 }
@@ -299,41 +405,52 @@ model ServiceCategory {
 }
 
 model Vendor {
-  id                String   @id @default(cuid())
-  name              String
-  description       String?
-  contactName       String?  @map("contact_name")
-  email             String?
-  phone             String?
-  website           String?
+  id                  String          @id @default(cuid())
+  householdId         String?         @map("household_id")  // If set, vendor is private to this household
+  displayName         String          @map("display_name")
+  category            VendorCategory  @default(OTHER)
+  serviceDescription  String?         @map("service_description")
+  isLocal             Boolean         @default(true) @map("is_local")
+
+  // Contact Info
+  contactName         String?         @map("contact_name")
+  email               String?
+  phone               String?
+  websiteUrl          String?         @map("website_url")
 
   // Address
-  addressLine1      String?  @map("address_line_1")
-  addressLine2      String?  @map("address_line_2")
-  city              String?
-  state             String?
-  postalCode        String?  @map("postal_code")
-  country           String?  @default("US")
+  addressLine1        String?         @map("address_line_1")
+  addressLine2        String?         @map("address_line_2")
+  city                String?
+  state               String?
+  postalCode          String?         @map("postal_code")
+  country             String?         @default("US")
 
   // Business Info
-  licenseNumber     String?  @map("license_number")
-  insuranceInfo     String?  @map("insurance_info")
-  rating            Float?   @db.Real
-  reviewCount       Int      @default(0) @map("review_count")
+  licenseNumber       String?         @map("license_number")
+  insuranceInfo       String?         @map("insurance_info")
+  rating              Float?          @db.Real
+  reviewCount         Int             @default(0) @map("review_count")
 
-  serviceCategoryId String?  @map("service_category_id")
-  isVerified        Boolean  @default(false) @map("is_verified")
-  isActive          Boolean  @default(true) @map("is_active")
+  // Legacy field - keep for backward compatibility
+  serviceCategoryId   String?         @map("service_category_id")
+  isVerified          Boolean         @default(false) @map("is_verified")
+  isActive            Boolean         @default(true) @map("is_active")
+  notes               String?
 
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
+  createdAt           DateTime        @default(now()) @map("created_at")
+  updatedAt           DateTime        @updatedAt @map("updated_at")
 
   // Relations
-  serviceCategory   ServiceCategory?  @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
-  householdVendors  HouseholdVendor[]
-  serviceRequests   ServiceRequest[]
-  messages          Message[]
+  household           Household?      @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
+  serviceCategory     ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
+  householdVendors    HouseholdVendor[]
+  serviceRequests     ServiceRequest[]
+  messages            Message[]
+  billAccounts        BillAccount[]
+  maintenanceTasks    MaintenanceTask[]
 
+  @@index([householdId, category])
   @@map("vendors")
 }
 
@@ -605,4 +722,159 @@ model File {
 
   @@index([householdId, category])
   @@map("files")
+}
+
+// ============================================================================
+// PAYMENT METHODS
+// ============================================================================
+
+model PaymentMethod {
+  id                    String            @id @default(cuid())
+  householdId           String            @map("household_id")
+
+  stripeCustomerId      String            @map("stripe_customer_id")
+  stripePaymentMethodId String            @map("stripe_payment_method_id")
+
+  label                 String            // e.g. "Chase Checking", "Amex Blue"
+  type                  PaymentMethodType @default(CARD)
+  last4                 String
+  expMonth              Int?              @map("exp_month")  // For cards only
+  expYear               Int?              @map("exp_year")   // For cards only
+  bankName              String?           @map("bank_name")  // For bank accounts
+
+  isDefaultForSubscription Boolean        @default(false) @map("is_default_for_subscription")
+  isActive              Boolean           @default(true) @map("is_active")
+
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  household             Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  billAccounts          BillAccount[]
+
+  @@index([householdId])
+  @@map("payment_methods")
+}
+
+// ============================================================================
+// BILL ACCOUNTS
+// ============================================================================
+
+model BillAccount {
+  id                      String                @id @default(cuid())
+  householdId             String                @map("household_id")
+  vendorId                String                @map("vendor_id")
+  paymentMethodId         String?               @map("payment_method_id")
+
+  nickname                String                // e.g. "Primary Mortgage", "Front Lawn Care"
+  category                VendorCategory        @default(OTHER)
+  accountNumber           String?               @map("account_number")
+
+  // Billing Details
+  billingFrequency        BillingFrequency      @default(MONTHLY) @map("billing_frequency")
+  paymentResponsibility   PaymentResponsibility @default(OWNER_PAYS_DIRECT) @map("payment_responsibility")
+  typicalAmount           Decimal?              @map("typical_amount") @db.Decimal(10, 2)
+  nextDueDate             DateTime?             @map("next_due_date")
+
+  // Autopay Settings
+  autopayEnabled          Boolean               @default(false) @map("autopay_enabled")
+
+  // Portal & Support
+  portalUrl               String?               @map("portal_url")
+  supportPhone            String?               @map("support_phone")
+
+  notes                   String?
+  isActive                Boolean               @default(true) @map("is_active")
+
+  createdAt               DateTime              @default(now()) @map("created_at")
+  updatedAt               DateTime              @updatedAt @map("updated_at")
+  deletedAt               DateTime?             @map("deleted_at")  // Soft delete
+
+  // Relations
+  household               Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor                  Vendor                @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  autopayPaymentMethod    PaymentMethod?        @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, category])
+  @@index([householdId, nextDueDate])
+  @@map("bill_accounts")
+}
+
+// ============================================================================
+// MAINTENANCE TEMPLATES & TASKS
+// ============================================================================
+
+model MaintenanceTemplate {
+  id                        String              @id @default(cuid())
+  slug                      String              @unique  // e.g. "hvac_tuneup", "chimney_sweep"
+  title                     String
+  description               String?
+  category                  MaintenanceCategory @default(GENERAL)
+
+  // Recommended Schedule
+  recommendedFrequencyMonths Int?               @map("recommended_frequency_months")
+  recommendedSeasonStartMonth Int?              @map("recommended_season_start_month")  // 1-12
+  recommendedSeasonEndMonth  Int?               @map("recommended_season_end_month")    // 1-12
+
+  // Property conditions that trigger this template (stored as JSON)
+  // e.g. { "has_septic": true, "has_pool": true, "climate_zone": "cold" }
+  propertyConditionsJson    Json?               @map("property_conditions_json")
+
+  // Default vendor category for this type of maintenance
+  defaultVendorCategory     VendorCategory?     @map("default_vendor_category")
+
+  // Estimated costs
+  estimatedCostMin          Decimal?            @map("estimated_cost_min") @db.Decimal(10, 2)
+  estimatedCostMax          Decimal?            @map("estimated_cost_max") @db.Decimal(10, 2)
+
+  isActive                  Boolean             @default(true) @map("is_active")
+  sortOrder                 Int                 @default(0) @map("sort_order")
+
+  createdAt                 DateTime            @default(now()) @map("created_at")
+  updatedAt                 DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  maintenanceTasks          MaintenanceTask[]
+
+  @@map("maintenance_templates")
+}
+
+model MaintenanceTask {
+  id                    String                @id @default(cuid())
+  householdId           String                @map("household_id")
+  templateId            String?               @map("template_id")  // Nullable if custom task
+  assignedVendorId      String?               @map("assigned_vendor_id")
+
+  title                 String
+  description           String?
+  category              MaintenanceCategory   @default(GENERAL)
+  status                MaintenanceTaskStatus @default(PENDING)
+
+  // Scheduling
+  dueDate               DateTime?             @map("due_date")
+  scheduledDate         DateTime?             @map("scheduled_date")
+  completedAt           DateTime?             @map("completed_at")
+
+  // Cost Tracking
+  estimatedCost         Decimal?              @map("estimated_cost") @db.Decimal(10, 2)
+  actualCost            Decimal?              @map("actual_cost") @db.Decimal(10, 2)
+
+  // Template tracking
+  createdFromTemplate   Boolean               @default(false) @map("created_from_template")
+
+  notes                 String?
+  priority              TaskPriority          @default(MEDIUM)
+
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  household             Household             @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  template              MaintenanceTemplate?  @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  assignedVendor        Vendor?               @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, status])
+  @@index([householdId, dueDate])
+  @@index([householdId, category])
+  @@map("maintenance_tasks")
 }

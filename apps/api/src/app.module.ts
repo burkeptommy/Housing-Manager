@@ -17,6 +17,9 @@ import { PrismaModule } from './prisma';
 import { ServiceCategoriesModule } from './service-categories';
 import { ServiceRequestsModule } from './service-requests';
 import { UsersModule } from './users';
+import { HouseholdVendorsModule } from './household-vendors';
+import { BillAccountsModule } from './bill-accounts';
+import { MaintenanceTasksModule } from './maintenance-tasks';
 
 @Module({
   imports: [
@@ -38,6 +41,9 @@ import { UsersModule } from './users';
     FilesModule,
     HealthModule,
     AdminModule,
+    HouseholdVendorsModule,
+    BillAccountsModule,
+    MaintenanceTasksModule,
   ],
   controllers: [AppController],
   providers: [AppService],
