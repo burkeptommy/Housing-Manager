@@ -47,6 +47,9 @@ import type {
   VendorCategory,
   UpcomingItemsResponse,
   InAppNotification,
+  HouseholdInvoice,
+  HouseholdInvoiceListItem,
+  BillingSummary,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -614,6 +617,42 @@ export class ApiClient {
   async markAllNotificationsRead(): Promise<{ success: boolean }> {
     return this.request('/notifications/mark-all-read', {
       method: 'POST',
+    });
+  }
+
+  // ============================================================================
+  // HOUSEHOLD INVOICE & BILLING ENDPOINTS
+  // ============================================================================
+
+  async getHouseholdInvoices(householdId: string): Promise<HouseholdInvoiceListItem[]> {
+    return this.request(`/invoices?householdId=${householdId}`);
+  }
+
+  async getHouseholdInvoice(invoiceId: string, householdId: string): Promise<HouseholdInvoice> {
+    return this.request(`/invoices/${invoiceId}?householdId=${householdId}`);
+  }
+
+  async getBillingSummary(householdId: string): Promise<BillingSummary> {
+    return this.request(`/billing/summary?householdId=${householdId}`);
+  }
+
+  async setupHouseholdStripe(
+    householdId: string,
+    paymentMethodId: string
+  ): Promise<{ stripeCustomerId: string }> {
+    return this.request(`/billing/setup-stripe?householdId=${householdId}`, {
+      method: 'POST',
+      body: JSON.stringify({ paymentMethodId }),
+    });
+  }
+
+  async updateBillingPreferences(
+    householdId: string,
+    preferences: { consolidatedBillingDay?: number }
+  ): Promise<{ success: boolean }> {
+    return this.request(`/billing/preferences?householdId=${householdId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(preferences),
     });
   }
 }

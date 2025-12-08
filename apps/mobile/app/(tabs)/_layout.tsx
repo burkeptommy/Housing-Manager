@@ -47,6 +47,18 @@ function SettingsIcon({ focused }: { focused: boolean }) {
   );
 }
 
+function BillingIcon({ focused }: { focused: boolean }) {
+  return (
+    <View style={styles.iconContainer}>
+      <View style={[styles.billingIcon, focused && styles.iconActive]}>
+        <View style={styles.billingCard} />
+        <View style={styles.billingLine1} />
+        <View style={styles.billingLine2} />
+      </View>
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   return (
     <Tabs
@@ -94,6 +106,13 @@ export default function TabsLayout() {
         options={{
           title: 'Chat',
           tabBarIcon: ({ focused }) => <ChatIcon focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="billing"
+        options={{
+          title: 'Billing',
+          tabBarIcon: ({ focused }) => <BillingIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -190,6 +209,35 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 3,
     borderColor: colors.slate[400],
+  },
+  // Billing icon styles
+  billingIcon: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billingCard: {
+    width: 18,
+    height: 12,
+    backgroundColor: colors.slate[400],
+    borderRadius: 2,
+  },
+  billingLine1: {
+    position: 'absolute',
+    top: 10,
+    width: 10,
+    height: 2,
+    backgroundColor: colors.white,
+    borderRadius: 1,
+  },
+  billingLine2: {
+    position: 'absolute',
+    top: 14,
+    width: 6,
+    height: 2,
+    backgroundColor: colors.white,
+    borderRadius: 1,
   },
   iconActive: {},
 });

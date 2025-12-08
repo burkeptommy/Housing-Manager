@@ -997,3 +997,104 @@ export interface CronJobResult {
   remindersProcessed: number;
   error?: string;
 }
+
+// ============================================================================
+// VENDOR PAYOUT TYPES (Stripe Connect)
+// ============================================================================
+
+export type PayoutMethod = 'STRIPE_CONNECT' | 'CHECK' | 'MANUAL';
+
+export interface VendorPayoutAccount {
+  id: string;
+  vendorId: string;
+  stripeAccountId?: string | null;
+  payoutMethod: PayoutMethod;
+  payoutDetails?: Record<string, unknown> | null;
+  stripeOnboardingComplete: boolean;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ============================================================================
+// HOUSEHOLD INVOICE TYPES (Consolidated Billing)
+// ============================================================================
+
+export type HouseholdInvoiceStatus =
+  | 'PENDING'
+  | 'PROCESSING'
+  | 'PAID'
+  | 'FAILED'
+  | 'CANCELLED';
+
+export interface HouseholdInvoiceItem {
+  id: string;
+  billAccountId: string;
+  description: string;
+  amount: number;
+  billNickname?: string;
+  vendorName?: string;
+  category?: string;
+}
+
+export interface HouseholdInvoice {
+  id: string;
+  householdId: string;
+  invoiceNumber: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  subtotal: number;
+  platformFee: number;
+  total: number;
+  status: HouseholdInvoiceStatus;
+  stripePaymentIntentId?: string;
+  stripePaymentStatus?: string;
+  paidAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  items: HouseholdInvoiceItem[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HouseholdInvoiceListItem {
+  id: string;
+  invoiceNumber: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  total: number;
+  status: HouseholdInvoiceStatus;
+  itemCount: number;
+  createdAt: string;
+}
+
+export interface BillingSummary {
+  subscriptionTier: string;
+  subscriptionAmount: number;
+  subscriptionStatus?: string;
+  latestInvoice?: HouseholdInvoiceListItem;
+  totalBillsManaged: number;
+  monthlyBillEstimate: number;
+  billAccountsIncluded: Array<{
+    id: string;
+    nickname: string;
+    vendorName: string;
+    category: string;
+    typicalAmount: number | null;
+  }>;
+}
+
+export interface SetupHouseholdStripeRequest {
+  paymentMethodId: string;
+}
+
+export interface UpdateBillingPreferencesRequest {
+  consolidatedBillingDay?: number;
+}
+
+export interface GenerateInvoicesResult {
+  success: boolean;
+  invoicesGenerated: number;
+  householdsProcessed: number;
+  errors?: string[];
+}

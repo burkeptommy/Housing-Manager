@@ -21,6 +21,7 @@ import { HouseholdVendorsModule } from './household-vendors';
 import { BillAccountsModule } from './bill-accounts';
 import { MaintenanceTasksModule } from './maintenance-tasks';
 import { RemindersModule } from './reminders';
+import { InvoicesModule } from './invoices';
 
 @Module({
   imports: [
@@ -46,6 +47,7 @@ import { RemindersModule } from './reminders';
     BillAccountsModule,
     MaintenanceTasksModule,
     RemindersModule,
+    InvoicesModule,
   ],
   controllers: [AppController],
   providers: [AppService],
