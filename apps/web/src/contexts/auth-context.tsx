@@ -121,10 +121,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const householdData = await api.getHouseholds();
       setHouseholds(householdData);
 
-      if (householdData.length === 0) {
-        // New user or no households - go to onboarding
+      // Role-based routing
+      if (response.user.role === 'MANAGER' || response.user.role === 'ADMIN') {
+        // Managers go to manager dashboard
+        await loadCurrentHousehold(householdData);
+        router.push('/manager');
+      } else if (householdData.length === 0) {
+        // Homeowners with no households go to onboarding
         router.push('/onboarding');
       } else {
+        // Homeowners with households go to app
         await loadCurrentHousehold(householdData);
         router.push('/app');
       }

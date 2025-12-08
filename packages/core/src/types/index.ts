@@ -364,6 +364,52 @@ export interface ExtendedHomeProfile extends HomeProfile {
 }
 
 // ============================================================================
+// VENDOR TYPES
+// ============================================================================
+
+export interface Vendor {
+  id: string;
+  name: string;
+  description?: string | null;
+  contactName?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  website?: string | null;
+  serviceCategoryId?: string | null;
+  isVerified: boolean;
+  isActive: boolean;
+  rating?: number | null;
+  reviewCount: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface VendorSummary {
+  id: string;
+  name: string;
+  phone?: string | null;
+  email?: string | null;
+  categoryName?: string | null;
+  isFavorite?: boolean;
+}
+
+// ============================================================================
+// MANAGER TYPES
+// ============================================================================
+
+export interface ManagedHousehold extends Household {
+  userRole: HouseholdRole;
+  homeProfile?: {
+    id: string;
+    propertyType: PropertyType;
+    addressLine1: string;
+    city: string;
+    state: string;
+    postalCode: string;
+  } | null;
+}
+
+// ============================================================================
 // API RESPONSE TYPES
 // ============================================================================
 

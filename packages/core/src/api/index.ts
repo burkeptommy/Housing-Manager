@@ -18,6 +18,8 @@ import type {
   Subscription,
   CreateSubscriptionRequest,
   ApiError,
+  ManagedHousehold,
+  Vendor,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -218,6 +220,23 @@ export class ApiClient {
 
   async getManagerRequests(): Promise<ServiceRequestDetail[]> {
     return this.request('/manager/requests');
+  }
+
+  // Filter managed households (those where user has MANAGER role)
+  async getManagedHouseholds(): Promise<ManagedHousehold[]> {
+    return this.request('/households');
+  }
+
+  // ============================================================================
+  // VENDOR ENDPOINTS
+  // ============================================================================
+
+  async getVendors(): Promise<Vendor[]> {
+    return this.request('/vendors');
+  }
+
+  async getVendor(id: string): Promise<Vendor> {
+    return this.request(`/vendors/${id}`);
   }
 
   async createServiceRequest(data: CreateServiceRequestRequest): Promise<ServiceRequestDetail> {
