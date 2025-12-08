@@ -1,4 +1,5 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, UserRole } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
@@ -111,15 +112,37 @@ async function main() {
 
   console.log(`✅ Created ${categories.length} service categories`);
 
-  // Create a demo user (password: "password123" - in production, use proper hashing)
+  // Hash passwords
+  const demoPassword = await bcrypt.hash('Demo123!', 12);
+  const adminPassword = await bcrypt.hash('Admin123!', 12);
+
+  // Create admin user
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@haven.app' },
+    update: {},
+    create: {
+      email: 'admin@haven.app',
+      passwordHash: adminPassword,
+      firstName: 'Admin',
+      lastName: 'User',
+      role: UserRole.ADMIN,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  console.log(`✅ Created admin user: ${adminUser.email}`);
+
+  // Create a demo user
   const demoUser = await prisma.user.upsert({
     where: { email: 'demo@haven.app' },
     update: {},
     create: {
       email: 'demo@haven.app',
-      passwordHash: '$2b$10$demohashedpassword', // Replace with actual hashed password
+      passwordHash: demoPassword,
       firstName: 'Demo',
       lastName: 'User',
+      role: UserRole.HOMEOWNER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
     },
@@ -175,7 +198,7 @@ async function main() {
         description: 'Replace air filters in all HVAC units',
         status: 'PENDING',
         priority: 'MEDIUM',
-        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days from now
+        dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
         recurrence: 'MONTHLY',
       },
     }),
@@ -187,7 +210,7 @@ async function main() {
         description: 'Test all smoke and CO detectors in the house',
         status: 'PENDING',
         priority: 'HIGH',
-        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+        dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         recurrence: 'MONTHLY',
       },
     }),
@@ -199,7 +222,7 @@ async function main() {
         description: 'Remove debris from all gutters and downspouts',
         status: 'PENDING',
         priority: 'LOW',
-        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+        dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         recurrence: 'QUARTERLY',
       },
     }),
@@ -252,8 +275,8 @@ async function main() {
   console.log('🎉 Database seed completed successfully!');
   console.log('');
   console.log('Demo credentials:');
-  console.log('  Email: demo@haven.app');
-  console.log('  Password: password123 (you need to implement auth)');
+  console.log('  Admin: admin@haven.app / Admin123!');
+  console.log('  User:  demo@haven.app / Demo123!');
 }
 
 main()

@@ -16,7 +16,9 @@ datasource db {
 
 enum UserRole {
   ADMIN
-  USER
+  HOMEOWNER
+  MANAGER
+  VENDOR
 }
 
 enum HouseholdRole {
@@ -142,7 +144,7 @@ model User {
   lastName          String    @map("last_name")
   phone             String?
   avatarUrl         String?   @map("avatar_url")
-  role              UserRole  @default(USER)
+  role              UserRole  @default(HOMEOWNER)
   emailVerified     Boolean   @default(false) @map("email_verified")
   emailVerifiedAt   DateTime? @map("email_verified_at")
   lastLoginAt       DateTime? @map("last_login_at")
@@ -158,8 +160,28 @@ model User {
   sentMessages      Message[]           @relation("MessageSender")
   subscriptions     Subscription[]
   files             File[]
+  refreshTokens     RefreshToken[]
 
   @@map("users")
+}
+
+model RefreshToken {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  token       String   @unique
+  expiresAt   DateTime @map("expires_at")
+  isRevoked   Boolean  @default(false) @map("is_revoked")
+  userAgent   String?  @map("user_agent")
+  ipAddress   String?  @map("ip_address")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@map("refresh_tokens")
 }
 
 // ============================================================================
