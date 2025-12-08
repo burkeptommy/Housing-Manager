@@ -1,14 +1,37 @@
-import type { ApiError, ApiResponse, Home, PaginatedResponse, Task, User } from '../types';
-import type { CreateHomeSchema, CreateTaskSchema, CreateUserSchema, LoginSchema, UpdateTaskSchema } from '../schemas';
+import type {
+  User,
+  AuthResponse,
+  RegisterRequest,
+  LoginRequest,
+  RefreshTokenRequest,
+  Household,
+  HouseholdDetail,
+  CreateHouseholdRequest,
+  UpdateHouseholdRequest,
+  HomeProfile,
+  UpsertHomeProfileRequest,
+  ServiceCategory,
+  ServiceRequest,
+  ServiceRequestDetail,
+  CreateServiceRequestRequest,
+  UpdateServiceRequestRequest,
+  Subscription,
+  CreateSubscriptionRequest,
+  ApiError,
+} from '../types';
 
 export interface ApiClientConfig {
   baseUrl: string;
   getAccessToken?: () => string | null;
+  getRefreshToken?: () => string | null;
+  onTokenRefresh?: (tokens: { accessToken: string; refreshToken: string }) => void;
   onUnauthorized?: () => void;
 }
 
 export class ApiClient {
   private config: ApiClientConfig;
+  private isRefreshing = false;
+  private refreshPromise: Promise<boolean> | null = null;
 
   constructor(config: ApiClientConfig) {
     this.config = config;
@@ -16,10 +39,11 @@ export class ApiClient {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
-  ): Promise<ApiResponse<T>> {
+    options: RequestInit = {},
+    skipAuth = false
+  ): Promise<T> {
     const url = `${this.config.baseUrl}${endpoint}`;
-    const token = this.config.getAccessToken?.();
+    const token = skipAuth ? null : this.config.getAccessToken?.();
 
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
@@ -33,94 +57,202 @@ export class ApiClient {
     const response = await fetch(url, {
       ...options,
       headers,
+      credentials: 'include',
     });
 
-    if (response.status === 401) {
-      this.config.onUnauthorized?.();
+    // Handle 401 - try to refresh token
+    if (response.status === 401 && !skipAuth) {
+      const refreshed = await this.tryRefreshToken();
+      if (refreshed) {
+        // Retry the original request
+        return this.request<T>(endpoint, options, false);
+      } else {
+        this.config.onUnauthorized?.();
+        throw { message: 'Unauthorized', statusCode: 401 } as ApiError;
+      }
     }
 
     if (!response.ok) {
-      const error: ApiError = await response.json();
+      const error: ApiError = await response.json().catch(() => ({
+        message: 'An error occurred',
+        statusCode: response.status,
+      }));
       throw error;
+    }
+
+    // Handle empty responses (204 No Content)
+    if (response.status === 204) {
+      return undefined as T;
     }
 
     return response.json();
   }
 
-  // Auth endpoints
-  async register(data: CreateUserSchema): Promise<ApiResponse<{ user: User; token: string }>> {
+  private async tryRefreshToken(): Promise<boolean> {
+    // Prevent multiple simultaneous refresh attempts
+    if (this.isRefreshing) {
+      return this.refreshPromise || Promise.resolve(false);
+    }
+
+    const refreshToken = this.config.getRefreshToken?.();
+    if (!refreshToken) {
+      return false;
+    }
+
+    this.isRefreshing = true;
+    this.refreshPromise = (async () => {
+      try {
+        const response = await this.refreshAccessToken({ refreshToken });
+        this.config.onTokenRefresh?.({
+          accessToken: response.accessToken,
+          refreshToken: response.refreshToken,
+        });
+        return true;
+      } catch {
+        return false;
+      } finally {
+        this.isRefreshing = false;
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  // ============================================================================
+  // AUTH ENDPOINTS
+  // ============================================================================
+
+  async register(data: RegisterRequest): Promise<AuthResponse> {
     return this.request('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, true);
   }
 
-  async login(data: LoginSchema): Promise<ApiResponse<{ user: User; token: string }>> {
+  async login(data: LoginRequest): Promise<AuthResponse> {
     return this.request('/auth/login', {
       method: 'POST',
       body: JSON.stringify(data),
-    });
+    }, true);
   }
 
-  async getMe(): Promise<ApiResponse<User>> {
+  async refreshAccessToken(data: RefreshTokenRequest): Promise<AuthResponse> {
+    return this.request('/auth/refresh', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }, true);
+  }
+
+  async getMe(): Promise<User> {
     return this.request('/auth/me');
   }
 
-  // Home endpoints
-  async getHomes(page = 1, pageSize = 20): Promise<ApiResponse<PaginatedResponse<Home>>> {
-    return this.request(`/homes?page=${page}&pageSize=${pageSize}`);
+  // ============================================================================
+  // HOUSEHOLD ENDPOINTS
+  // ============================================================================
+
+  async getHouseholds(): Promise<Household[]> {
+    return this.request('/households');
   }
 
-  async getHome(id: string): Promise<ApiResponse<Home>> {
-    return this.request(`/homes/${id}`);
+  async getHousehold(id: string): Promise<HouseholdDetail> {
+    return this.request(`/households/${id}`);
   }
 
-  async createHome(data: CreateHomeSchema): Promise<ApiResponse<Home>> {
-    return this.request('/homes', {
+  async createHousehold(data: CreateHouseholdRequest): Promise<Household> {
+    return this.request('/households', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateHome(id: string, data: Partial<CreateHomeSchema>): Promise<ApiResponse<Home>> {
-    return this.request(`/homes/${id}`, {
+  async updateHousehold(id: string, data: UpdateHouseholdRequest): Promise<Household> {
+    return this.request(`/households/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deleteHome(id: string): Promise<ApiResponse<void>> {
-    return this.request(`/homes/${id}`, {
+  async deleteHousehold(id: string): Promise<void> {
+    return this.request(`/households/${id}`, {
       method: 'DELETE',
     });
   }
 
-  // Task endpoints
-  async getTasks(homeId: string, page = 1, pageSize = 20): Promise<ApiResponse<PaginatedResponse<Task>>> {
-    return this.request(`/homes/${homeId}/tasks?page=${page}&pageSize=${pageSize}`);
+  // ============================================================================
+  // HOME PROFILE ENDPOINTS
+  // ============================================================================
+
+  async getHomeProfile(householdId: string): Promise<HomeProfile | null> {
+    return this.request(`/households/${householdId}/profile`);
   }
 
-  async getTask(homeId: string, taskId: string): Promise<ApiResponse<Task>> {
-    return this.request(`/homes/${homeId}/tasks/${taskId}`);
+  async upsertHomeProfile(householdId: string, data: UpsertHomeProfileRequest): Promise<HomeProfile> {
+    return this.request(`/households/${householdId}/profile`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
-  async createTask(data: CreateTaskSchema): Promise<ApiResponse<Task>> {
-    return this.request(`/homes/${data.homeId}/tasks`, {
+  // ============================================================================
+  // SERVICE CATEGORY ENDPOINTS
+  // ============================================================================
+
+  async getServiceCategories(includeInactive = false): Promise<ServiceCategory[]> {
+    const query = includeInactive ? '?includeInactive=true' : '';
+    return this.request(`/service-categories${query}`);
+  }
+
+  // ============================================================================
+  // SERVICE REQUEST ENDPOINTS
+  // ============================================================================
+
+  async getServiceRequests(householdId: string): Promise<ServiceRequest[]> {
+    return this.request(`/requests?householdId=${householdId}`);
+  }
+
+  async getServiceRequest(id: string): Promise<ServiceRequestDetail> {
+    return this.request(`/requests/${id}`);
+  }
+
+  async getManagerRequests(): Promise<ServiceRequestDetail[]> {
+    return this.request('/manager/requests');
+  }
+
+  async createServiceRequest(data: CreateServiceRequestRequest): Promise<ServiceRequestDetail> {
+    return this.request('/requests', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async updateTask(homeId: string, taskId: string, data: UpdateTaskSchema): Promise<ApiResponse<Task>> {
-    return this.request(`/homes/${homeId}/tasks/${taskId}`, {
+  async updateServiceRequest(id: string, data: UpdateServiceRequestRequest): Promise<ServiceRequestDetail> {
+    return this.request(`/requests/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
   }
 
-  async deleteTask(homeId: string, taskId: string): Promise<ApiResponse<void>> {
-    return this.request(`/homes/${homeId}/tasks/${taskId}`, {
+  // ============================================================================
+  // SUBSCRIPTION / BILLING ENDPOINTS
+  // ============================================================================
+
+  async getSubscription(): Promise<Subscription | null> {
+    return this.request('/billing/subscription');
+  }
+
+  async createSubscription(data: CreateSubscriptionRequest): Promise<Subscription> {
+    return this.request('/billing/subscribe', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async cancelSubscription(cancelAtPeriodEnd = true): Promise<Subscription> {
+    return this.request('/billing/subscription', {
       method: 'DELETE',
+      body: JSON.stringify({ cancelAtPeriodEnd }),
     });
   }
 }
