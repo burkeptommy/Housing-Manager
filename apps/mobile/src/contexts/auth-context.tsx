@@ -35,6 +35,7 @@ interface AuthContextValue {
   selectHousehold: (household: Household) => void;
   refreshHouseholds: () => Promise<void>;
   refreshCurrentHousehold: () => Promise<void>;
+  completeOnboarding: (householdId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -188,6 +189,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [api, currentHousehold]);
 
+  const completeOnboarding = useCallback(
+    async (householdId: string) => {
+      // Refresh households to include the newly created one
+      const householdData = await api.getHouseholds();
+      setHouseholds(householdData);
+
+      // Load the household details
+      const detail = await api.getHousehold(householdId);
+      setCurrentHousehold(detail);
+
+      // Navigate to main app
+      router.replace('/(tabs)');
+    },
+    [api, router]
+  );
+
   return (
     <AuthContext.Provider
       value={{
@@ -203,6 +220,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         selectHousehold,
         refreshHouseholds,
         refreshCurrentHousehold,
+        completeOnboarding,
       }}
     >
       {children}
