@@ -38,17 +38,41 @@ WORKDIR /app
 # Install pnpm
 RUN corepack enable && corepack prepare pnpm@latest --activate
 
-# Copy dependencies from deps stage
+# Copy workspace configuration first
+COPY pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY package.json ./
+
+# Copy all package.json files
+COPY apps/web/package.json ./apps/web/
+COPY packages/core/package.json ./packages/core/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/config/package.json ./packages/config/
+
+# Copy dependencies from deps stage (all node_modules directories)
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/apps/web/node_modules ./apps/web/node_modules
+COPY --from=deps /app/packages/core/node_modules ./packages/core/node_modules
+COPY --from=deps /app/packages/ui/node_modules ./packages/ui/node_modules
+COPY --from=deps /app/packages/config/node_modules ./packages/config/node_modules
 
 # Copy source code
-COPY . .
+COPY packages/core ./packages/core
+COPY packages/ui ./packages/ui
+COPY packages/config ./packages/config
+COPY apps/web ./apps/web
 
 # Set build-time environment variables
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
-# Build the application
+# Build shared packages first
+WORKDIR /app/packages/core
+RUN pnpm build
+
+WORKDIR /app/packages/ui
+RUN pnpm build
+
+# Build the web application
 WORKDIR /app/apps/web
 RUN pnpm build
 
