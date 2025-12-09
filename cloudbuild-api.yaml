@@ -46,7 +46,7 @@ steps:
       - '--set-secrets'
       - 'JWT_SECRET=jwt-secret:latest,DATABASE_URL=db-url:latest,STRIPE_SECRET_KEY=stripe-secret-key:latest,CRON_SECRET=cron-secret:latest'
       - '--memory'
-      - '512Mi'
+      - '1Gi'
       - '--min-instances'
       - '0'
       - '--max-instances'
