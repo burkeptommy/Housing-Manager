@@ -28,11 +28,13 @@ RUN pnpm install --frozen-lockfile --prod=false
 # Copy source code
 COPY . .
 
-# Generate Prisma client
+# Build @haven/core first (it's a dependency)
+WORKDIR /app/packages/core
+RUN pnpm build
+
+# Generate Prisma client and build API
 WORKDIR /app/apps/api
 RUN npx prisma generate
-
-# Build the application
 RUN pnpm build
 
 # ============================================================================
@@ -48,11 +50,18 @@ RUN adduser --system --uid 1001 nestjs
 
 WORKDIR /app
 
-# Copy package.json for production install
-COPY --from=builder /app/apps/api/package.json ./
+# Copy package.json and modify it to remove workspace protocol
+COPY --from=builder /app/apps/api/package.json ./package.json.tmp
 
-# Install ONLY production dependencies with npm (flat structure, no symlinks)
+# Remove workspace dependencies and create clean package.json
+RUN cat package.json.tmp | sed 's/"@haven\/core": "workspace:\*",//g' | sed 's/"@haven\/config": "workspace:\*",//g' > package.json && rm package.json.tmp
+
+# Install production dependencies with npm
 RUN npm install --omit=dev --ignore-scripts
+
+# Copy and install @haven/core as a local package
+COPY --from=builder /app/packages/core/dist ./node_modules/@haven/core/dist
+COPY --from=builder /app/packages/core/package.json ./node_modules/@haven/core/
 
 # Copy Prisma schema and generate client in production
 COPY --from=builder /app/apps/api/prisma ./prisma
