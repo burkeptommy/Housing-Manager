@@ -2,9 +2,9 @@
 # Multi-stage build for minimal image size
 
 # ============================================================================
-# Stage 1: Dependencies
+# Stage 1: Dependencies & Build
 # ============================================================================
-FROM node:20-alpine AS deps
+FROM node:20-alpine AS builder
 
 RUN apk add --no-cache libc6-compat openssl
 
@@ -25,22 +25,6 @@ COPY packages/config/package.json ./packages/config/
 # Install dependencies
 RUN pnpm install --frozen-lockfile --prod=false
 
-# ============================================================================
-# Stage 2: Builder
-# ============================================================================
-FROM node:20-alpine AS builder
-
-RUN apk add --no-cache libc6-compat openssl
-
-WORKDIR /app
-
-# Install pnpm
-RUN corepack enable && corepack prepare pnpm@latest --activate
-
-# Copy dependencies from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/apps/api/node_modules ./apps/api/node_modules
-
 # Copy source code
 COPY . .
 
@@ -52,7 +36,7 @@ RUN npx prisma generate
 RUN pnpm build
 
 # ============================================================================
-# Stage 3: Production Runner
+# Stage 2: Production Runner
 # ============================================================================
 FROM node:20-alpine AS runner
 
@@ -64,13 +48,18 @@ RUN adduser --system --uid 1001 nestjs
 
 WORKDIR /app
 
+# Copy package.json for production install
+COPY --from=builder /app/apps/api/package.json ./
+
+# Install ONLY production dependencies with npm (flat structure, no symlinks)
+RUN npm install --omit=dev --ignore-scripts
+
+# Copy Prisma schema and generate client in production
+COPY --from=builder /app/apps/api/prisma ./prisma
+RUN npx prisma generate
+
 # Copy built application
 COPY --from=builder --chown=nestjs:nodejs /app/apps/api/dist ./dist
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/prisma ./prisma
-COPY --from=builder --chown=nestjs:nodejs /app/apps/api/package.json ./
-
-# Copy all node_modules (includes Prisma client)
-COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 
 USER nestjs
 
