@@ -65,3 +65,7 @@ images:
 
 # Build timeout (15 minutes)
 timeout: '900s'
+
+# Use Cloud Logging only (no GCS bucket required)
+options:
+  logging: CLOUD_LOGGING_ONLY
