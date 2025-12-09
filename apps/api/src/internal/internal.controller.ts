@@ -18,7 +18,7 @@ import {
 import { UserRole, ConversationStatus, WorkOrderStatus } from '@prisma/client';
 import { IsOptional, IsString, IsEnum, IsDateString } from 'class-validator';
 
-import { JwtAuthGuard, RolesGuard, Roles, GetUser } from '../auth';
+import { JwtAuthGuard, RolesGuard, Roles, CurrentUser } from '../auth';
 import { InternalService } from './internal.service';
 
 class ConversationFiltersDto {
@@ -105,7 +105,7 @@ export class InternalController {
   @ApiResponse({ status: 200, description: 'List of conversations' })
   async getConversations(
     @Query() filters: ConversationFiltersDto,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ) {
     return this.internalService.getConversations({
       status: filters.status,
@@ -120,7 +120,7 @@ export class InternalController {
   async assignConversation(
     @Param('id') id: string,
     @Body() dto: AssignConversationDto,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ) {
     // If no assignedToId provided, assign to self
     const assignTo =
