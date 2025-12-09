@@ -83,5 +83,5 @@ EXPOSE 8080
 # Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Run migrations and start the server
-CMD ["sh", "-c", "npx prisma migrate deploy && node dist/main"]
+# Start the server (run migrations separately via Cloud Shell)
+CMD ["node", "dist/main"]
