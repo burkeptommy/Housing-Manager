@@ -7,7 +7,12 @@ import {
   useCreateConversation,
   useSendMessage,
 } from '@/hooks/use-conversations';
-import type { Conversation, SupportMessage, ConversationStatus } from '@haven/core';
+import { useAuth } from '@/contexts/auth-context';
+import { getApiClient } from '@/lib/api';
+import type { Conversation, SupportMessage, ConversationStatus, FileAsset } from '@haven/core';
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 function formatTime(date: string): string {
   return new Date(date).toLocaleTimeString('en-US', {
@@ -175,6 +180,17 @@ function ConversationListItem({
 function MessageBubble({ message }: { message: SupportMessage }) {
   const isFromHomeowner = message.senderRole === 'HOMEOWNER';
   const isSystem = message.senderRole === 'SYSTEM';
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  // Load signed URL for file assets
+  useEffect(() => {
+    if (message.attachmentFile?.id) {
+      const api = getApiClient();
+      api.getFileAssetUrl(message.attachmentFile.id)
+        .then((res) => setImageUrl(res.url))
+        .catch(() => setImageUrl(null));
+    }
+  }, [message.attachmentFile?.id]);
 
   if (isSystem) {
     return (
@@ -185,6 +201,10 @@ function MessageBubble({ message }: { message: SupportMessage }) {
       </div>
     );
   }
+
+  const attachmentUrl = imageUrl || message.attachmentUrl;
+  const isImage = message.attachmentFile?.contentType?.startsWith('image/') ||
+    (attachmentUrl && /\.(jpg|jpeg|png|gif|webp)$/i.test(attachmentUrl));
 
   return (
     <div className={`flex ${isFromHomeowner ? 'justify-end' : 'justify-start'} mb-3`}>
@@ -201,9 +221,23 @@ function MessageBubble({ message }: { message: SupportMessage }) {
           </p>
         )}
         <p className="whitespace-pre-wrap break-words">{message.body}</p>
-        {message.attachmentUrl && (
+        {attachmentUrl && isImage && (
           <a
-            href={message.attachmentUrl}
+            href={attachmentUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block mt-2"
+          >
+            <img
+              src={attachmentUrl}
+              alt="Attachment"
+              className="max-w-full max-h-64 rounded-lg object-cover"
+            />
+          </a>
+        )}
+        {attachmentUrl && !isImage && (
+          <a
+            href={attachmentUrl}
             target="_blank"
             rel="noopener noreferrer"
             className={`text-sm underline mt-2 block ${
@@ -229,14 +263,21 @@ function MessageBubble({ message }: { message: SupportMessage }) {
 function ChatView({
   conversationId,
   onBack,
+  householdId,
 }: {
   conversationId: string;
   onBack?: () => void;
+  householdId: string;
 }) {
   const { conversation, isLoading, refetch } = useConversation(conversationId);
   const { sendMessage, isLoading: isSending } = useSendMessage();
   const [newMessage, setNewMessage] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -249,13 +290,72 @@ function ChatView({
     return () => clearInterval(interval);
   }, [refetch]);
 
+  // Clean up file preview URL
+  useEffect(() => {
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview);
+    };
+  }, [filePreview]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError('Please select an image file (JPEG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('File is too large. Maximum size is 10MB.');
+      return;
+    }
+
+    setSelectedFile(file);
+    setFilePreview(URL.createObjectURL(file));
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newMessage.trim() || isSending) return;
+    if ((!newMessage.trim() && !selectedFile) || isSending || isUploading) return;
 
-    const result = await sendMessage(conversationId, { body: newMessage.trim() });
+    let attachmentFileId: string | undefined;
+
+    // Upload file if selected
+    if (selectedFile) {
+      setIsUploading(true);
+      try {
+        const api = getApiClient();
+        const fileAsset = await api.uploadFileToGcs(selectedFile, {
+          householdId,
+          type: 'ISSUE_PHOTO',
+        });
+        attachmentFileId = fileAsset.id;
+      } catch (err: any) {
+        setUploadError(err.message || 'Failed to upload file');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    const result = await sendMessage(conversationId, {
+      body: newMessage.trim() || (selectedFile ? 'Sent a photo' : ''),
+      attachmentFileId,
+    });
     if (result) {
       setNewMessage('');
+      clearSelectedFile();
       refetch();
     }
   };
@@ -313,8 +413,55 @@ function ChatView({
 
       {/* Input */}
       {conversation.status !== 'CLOSED' && (
-        <form onSubmit={handleSend} className="p-4 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-          <div className="flex gap-2">
+        <form onSubmit={handleSend} className="border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+          {/* File Preview */}
+          {selectedFile && filePreview && (
+            <div className="px-4 pt-3">
+              <div className="relative inline-block">
+                <img
+                  src={filePreview}
+                  alt="Preview"
+                  className="max-h-24 rounded-lg object-cover"
+                />
+                <button
+                  type="button"
+                  onClick={clearSelectedFile}
+                  className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          )}
+          {/* Upload Error */}
+          {uploadError && (
+            <div className="px-4 pt-2">
+              <p className="text-sm text-red-500">{uploadError}</p>
+            </div>
+          )}
+          <div className="flex gap-2 p-4">
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept={ALLOWED_IMAGE_TYPES.join(',')}
+              onChange={handleFileSelect}
+              className="hidden"
+            />
+            {/* Attach button */}
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading || isSending}
+              className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50"
+              title="Attach photo"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </button>
             <textarea
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
@@ -330,10 +477,10 @@ function ChatView({
             />
             <button
               type="submit"
-              disabled={!newMessage.trim() || isSending}
+              disabled={(!newMessage.trim() && !selectedFile) || isSending || isUploading}
               className="btn btn-primary px-4"
             >
-              {isSending ? (
+              {isSending || isUploading ? (
                 <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -350,9 +497,11 @@ function ChatView({
 
 // Main Support Page
 export default function SupportPage() {
+  const { householdInfo } = useAuth();
   const { conversations, isLoading, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
+  const householdId = householdInfo?.householdId || '';
 
   // Select first conversation on load if on desktop
   useEffect(() => {
@@ -430,6 +579,7 @@ export default function SupportPage() {
             <ChatView
               conversationId={selectedId}
               onBack={() => setSelectedId(null)}
+              householdId={householdId}
             />
           ) : (
             <div className="flex-1 flex items-center justify-center text-slate-500 dark:text-slate-400">

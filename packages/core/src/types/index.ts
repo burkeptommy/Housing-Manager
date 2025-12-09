@@ -1174,6 +1174,7 @@ export interface SupportMessage {
   senderRole: SenderRole;
   body: string;
   attachmentUrl?: string | null;
+  attachmentFileId?: string | null;
   createdAt: string;
   // Included in responses
   sender?: {
@@ -1182,6 +1183,7 @@ export interface SupportMessage {
     lastName: string | null;
     email: string;
   } | null;
+  attachmentFile?: FileAsset | null;
 }
 
 export interface HomeManagerAssignment {
@@ -1208,6 +1210,7 @@ export interface CreateConversationRequest {
 export interface SendMessageRequest {
   body: string;
   attachmentUrl?: string;
+  attachmentFileId?: string;
 }
 
 export interface ConversationListQuery {
@@ -1296,6 +1299,7 @@ export interface WorkOrderNote {
   workOrderId: string;
   authorUserId: string;
   body: string;
+  attachmentFileId?: string | null;
   createdAt: string;
   author?: {
     id: string;
@@ -1303,6 +1307,7 @@ export interface WorkOrderNote {
     lastName: string | null;
     email: string;
   };
+  attachmentFile?: FileAsset | null;
 }
 
 export interface CreateWorkOrderRequest {
@@ -1328,6 +1333,7 @@ export interface UpdateWorkOrderRequest {
 
 export interface CreateWorkOrderNoteRequest {
   body: string;
+  attachmentFileId?: string;
 }
 
 export interface WorkOrderListQuery {
@@ -1461,4 +1467,48 @@ export interface InternalWorkOrderFilters {
   status?: WorkOrderStatus | 'all';
   dateFrom?: string;
   dateTo?: string;
+}
+
+// ============================================================================
+// FILE ASSET / UPLOAD TYPES
+// ============================================================================
+
+export type FileAssetType = 'ISSUE_PHOTO' | 'RECEIPT' | 'DOCUMENT' | 'OTHER';
+export type FileAssetStatus = 'PENDING' | 'UPLOADED' | 'FAILED';
+
+export interface FileAsset {
+  id: string;
+  householdId: string;
+  uploaderUserId: string;
+  type: FileAssetType;
+  status: FileAssetStatus;
+  gcsPath: string;
+  url?: string | null;
+  filename: string;
+  contentType: string;
+  size?: number | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SignUploadRequest {
+  filename: string;
+  contentType: string;
+  type?: FileAssetType;
+  householdId: string;
+}
+
+export interface SignUploadResponse {
+  fileAssetId: string;
+  signedUrl: string;
+  gcsPath: string;
+  expiresAt: string;
+}
+
+export interface CompleteUploadRequest {
+  fileAssetId: string;
+}
+
+export interface CompleteUploadResponse {
+  fileAsset: FileAsset;
 }

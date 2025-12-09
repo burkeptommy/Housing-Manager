@@ -64,6 +64,11 @@ import type {
   InternalConversationFilters,
   InternalWorkOrderFilters,
   ConversationStatus,
+  FileAsset,
+  FileAssetType,
+  SignUploadRequest,
+  SignUploadResponse,
+  CompleteUploadResponse,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -793,6 +798,98 @@ export class ApiClient {
   async getInternalUpcomingAppointments(days?: number): Promise<InternalWorkOrder[]> {
     const params = days ? `?days=${days}` : '';
     return this.request(`/internal/appointments${params}`);
+  }
+
+  // ============================================================================
+  // GCS FILE UPLOAD ENDPOINTS (Signed URL Flow)
+  // ============================================================================
+
+  /**
+   * Get a signed URL for uploading a file to GCS
+   */
+  async signUpload(data: SignUploadRequest): Promise<SignUploadResponse> {
+    return this.request('/uploads/sign', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Mark a file upload as complete after uploading to GCS
+   */
+  async completeUpload(fileAssetId: string): Promise<CompleteUploadResponse> {
+    return this.request('/uploads/complete', {
+      method: 'POST',
+      body: JSON.stringify({ fileAssetId }),
+    });
+  }
+
+  /**
+   * Get a file asset by ID
+   */
+  async getFileAsset(id: string): Promise<FileAsset> {
+    return this.request(`/uploads/${id}`);
+  }
+
+  /**
+   * Get a signed read URL for a file asset
+   */
+  async getFileAssetUrl(id: string): Promise<{ url: string; expiresAt: string }> {
+    return this.request(`/uploads/${id}/url`);
+  }
+
+  /**
+   * Delete a file asset
+   */
+  async deleteFileAsset(id: string): Promise<void> {
+    return this.request(`/uploads/${id}`, { method: 'DELETE' });
+  }
+
+  /**
+   * Upload a file using the signed URL flow
+   * This is a convenience method that handles the full upload flow:
+   * 1. Get signed URL from backend
+   * 2. Upload file directly to GCS
+   * 3. Mark upload as complete
+   */
+  async uploadFileToGcs(
+    file: File | Blob,
+    options: {
+      householdId: string;
+      type?: FileAssetType;
+      filename?: string;
+    }
+  ): Promise<FileAsset> {
+    const filename = options.filename || (file instanceof File ? file.name : 'upload');
+    const contentType = file.type || 'application/octet-stream';
+
+    // 1. Get signed URL
+    const signResponse = await this.signUpload({
+      filename,
+      contentType,
+      type: options.type,
+      householdId: options.householdId,
+    });
+
+    // 2. Upload directly to GCS
+    const uploadResponse = await fetch(signResponse.signedUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': contentType,
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      throw {
+        message: 'Failed to upload file to storage',
+        statusCode: uploadResponse.status,
+      } as ApiError;
+    }
+
+    // 3. Mark upload as complete
+    const completeResponse = await this.completeUpload(signResponse.fileAssetId);
+    return completeResponse.fileAsset;
   }
 }
 

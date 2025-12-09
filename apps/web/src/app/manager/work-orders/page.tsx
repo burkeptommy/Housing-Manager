@@ -1,8 +1,11 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getApiClient } from '@/lib/api';
-import type { WorkOrder, WorkOrderStatus, UpdateWorkOrderRequest } from '@haven/core';
+import type { WorkOrder, WorkOrderStatus, UpdateWorkOrderRequest, FileAsset } from '@haven/core';
+
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const STATUS_OPTIONS: WorkOrderStatus[] = ['DRAFT', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 
@@ -257,6 +260,57 @@ export default function ManagerWorkOrdersPage() {
   );
 }
 
+// Note Item Component with attachment display
+function NoteItem({ note }: { note: { id: string; body: string; createdAt: string; author?: { firstName: string | null; lastName: string | null }; attachmentFile?: { id: string; contentType: string } | null } }) {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  // Load signed URL for file assets
+  useEffect(() => {
+    if (note.attachmentFile?.id) {
+      const api = getApiClient();
+      api.getFileAssetUrl(note.attachmentFile.id)
+        .then((res) => setImageUrl(res.url))
+        .catch(() => setImageUrl(null));
+    }
+  }, [note.attachmentFile?.id]);
+
+  const isImage = note.attachmentFile?.contentType?.startsWith('image/');
+
+  return (
+    <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
+      <p className="text-sm text-slate-600 dark:text-slate-300">{note.body}</p>
+      {imageUrl && isImage && (
+        <a
+          href={imageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block mt-2"
+        >
+          <img
+            src={imageUrl}
+            alt="Attachment"
+            className="max-w-full max-h-48 rounded-lg object-cover"
+          />
+        </a>
+      )}
+      {imageUrl && !isImage && (
+        <a
+          href={imageUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-sm text-emerald-600 dark:text-emerald-400 underline mt-2 block"
+        >
+          View attachment
+        </a>
+      )}
+      <p className="text-xs text-slate-400 mt-1">
+        {note.author?.firstName} {note.author?.lastName} &mdash;{' '}
+        {new Date(note.createdAt).toLocaleString()}
+      </p>
+    </div>
+  );
+}
+
 // Work Order Management Modal
 function WorkOrderManageModal({
   order,
@@ -284,6 +338,48 @@ function WorkOrderManageModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // File upload state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Clean up file preview URL
+  useEffect(() => {
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview);
+    };
+  }, [filePreview]);
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadError(null);
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setUploadError('Please select an image file (JPEG, PNG, GIF, or WebP)');
+      return;
+    }
+
+    if (file.size > MAX_FILE_SIZE) {
+      setUploadError('File is too large. Maximum size is 10MB.');
+      return;
+    }
+
+    setSelectedFile(file);
+    setFilePreview(URL.createObjectURL(file));
+  };
+
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setFilePreview(null);
+    setUploadError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -301,9 +397,32 @@ function WorkOrderManageModal({
 
       await api.updateInternalWorkOrder(order.id, updates);
 
-      // Add note if provided
-      if (note.trim()) {
-        await api.addWorkOrderNote(order.id, { body: note.trim() });
+      // Add note if provided (with optional file attachment)
+      if (note.trim() || selectedFile) {
+        let attachmentFileId: string | undefined;
+
+        // Upload file if selected
+        if (selectedFile && order.household?.id) {
+          setIsUploading(true);
+          try {
+            const fileAsset = await api.uploadFileToGcs(selectedFile, {
+              householdId: order.household.id,
+              type: 'ISSUE_PHOTO',
+            });
+            attachmentFileId = fileAsset.id;
+          } catch (err: any) {
+            setUploadError(err.message || 'Failed to upload file');
+            setIsSubmitting(false);
+            setIsUploading(false);
+            return;
+          }
+          setIsUploading(false);
+        }
+
+        await api.addWorkOrderNote(order.id, {
+          body: note.trim() || (selectedFile ? 'Added a photo' : ''),
+          attachmentFileId,
+        });
       }
 
       onUpdate();
@@ -494,13 +613,60 @@ function WorkOrderManageModal({
               <label htmlFor="note" className="label block mb-1.5">
                 Add Internal Note
               </label>
-              <textarea
-                id="note"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                className="input min-h-[80px]"
-                placeholder="Add a note about this work order..."
-              />
+              {/* File Preview */}
+              {selectedFile && filePreview && (
+                <div className="mb-2">
+                  <div className="relative inline-block">
+                    <img
+                      src={filePreview}
+                      alt="Preview"
+                      className="max-h-24 rounded-lg object-cover"
+                    />
+                    <button
+                      type="button"
+                      onClick={clearSelectedFile}
+                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              )}
+              {/* Upload Error */}
+              {uploadError && (
+                <p className="text-sm text-red-500 mb-2">{uploadError}</p>
+              )}
+              <div className="flex gap-2">
+                {/* Hidden file input */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={ALLOWED_IMAGE_TYPES.join(',')}
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                {/* Attach button */}
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isUploading || isSubmitting}
+                  className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 border border-slate-200 dark:border-slate-600"
+                  title="Attach photo"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </button>
+                <textarea
+                  id="note"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  className="input min-h-[80px] flex-1"
+                  placeholder="Add a note about this work order..."
+                />
+              </div>
             </div>
 
             {/* Existing Notes */}
@@ -509,13 +675,7 @@ function WorkOrderManageModal({
                 <h4 className="font-medium text-slate-900 dark:text-white mb-3">Notes</h4>
                 <div className="space-y-2">
                   {order.notes.map((n) => (
-                    <div key={n.id} className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                      <p className="text-sm text-slate-600 dark:text-slate-300">{n.body}</p>
-                      <p className="text-xs text-slate-400 mt-1">
-                        {n.author?.firstName} {n.author?.lastName} &mdash;{' '}
-                        {new Date(n.createdAt).toLocaleString()}
-                      </p>
-                    </div>
+                    <NoteItem key={n.id} note={n} />
                   ))}
                 </div>
               </div>

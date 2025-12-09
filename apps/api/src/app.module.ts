@@ -25,6 +25,7 @@ import { BillAccountsModule } from './bill-accounts';
 import { MaintenanceTasksModule } from './maintenance-tasks';
 import { RemindersModule } from './reminders';
 import { InvoicesModule } from './invoices';
+import { UploadsModule } from './uploads';
 
 @Module({
   imports: [
@@ -54,6 +55,7 @@ import { InvoicesModule } from './invoices';
     ConversationsModule,
     WorkOrdersModule,
     InternalModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

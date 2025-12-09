@@ -11,16 +11,20 @@ import {
   ActivityIndicator,
   Modal,
   RefreshControl,
+  Image,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/contexts/auth-context';
+import { getApiClient } from '../../src/lib/api';
 import {
   useConversations,
   useConversation,
   createConversation,
   sendMessage,
 } from '../../src/hooks/use-conversations';
-import type { Conversation, SupportMessage, SenderRole } from '@haven/core';
+import type { Conversation, SupportMessage, SenderRole, FileAsset } from '@haven/core';
 import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
 
 // Format time helper
@@ -134,6 +138,17 @@ function MessageBubble({
 }) {
   const senderName = getSenderName(message);
   const isSystem = message.senderRole === 'SYSTEM';
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+
+  // Load signed URL for file assets
+  useEffect(() => {
+    if (message.attachmentFile?.id) {
+      const api = getApiClient();
+      api.getFileAssetUrl(message.attachmentFile.id)
+        .then((res) => setImageUrl(res.url))
+        .catch(() => setImageUrl(null));
+    }
+  }, [message.attachmentFile?.id]);
 
   if (isSystem) {
     return (
@@ -143,6 +158,8 @@ function MessageBubble({
       </View>
     );
   }
+
+  const hasImage = imageUrl && message.attachmentFile?.contentType?.startsWith('image/');
 
   return (
     <View
@@ -172,6 +189,13 @@ function MessageBubble({
         ]}
       >
         {!isOwn && <Text style={styles.senderName}>{senderName}</Text>}
+        {hasImage && (
+          <Image
+            source={{ uri: imageUrl }}
+            style={styles.messageImage}
+            resizeMode="cover"
+          />
+        )}
         <Text
           style={[
             styles.messageText,
@@ -198,14 +222,18 @@ function ChatView({
   conversationId,
   onBack,
   userId,
+  householdId,
 }: {
   conversationId: string;
   onBack: () => void;
   userId: string;
+  householdId: string;
 }) {
   const { conversation, isLoading, refetch } = useConversation(conversationId);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<ImagePicker.ImagePickerAsset | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const flatListRef = useRef<FlatList>(null);
 
   // Poll for new messages
@@ -225,15 +253,69 @@ function ChatView({
     }
   }, [conversation?.messages?.length]);
 
+  const pickImage = async () => {
+    // Request permission
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert(
+        'Permission needed',
+        'Please grant camera roll permissions to attach photos.'
+      );
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+    });
+
+    if (!result.canceled && result.assets[0]) {
+      setSelectedImage(result.assets[0]);
+    }
+  };
+
   const handleSend = async () => {
-    if (!newMessage.trim() || isSending) return;
+    if ((!newMessage.trim() && !selectedImage) || isSending || isUploading) return;
 
     setIsSending(true);
-    const result = await sendMessage(conversationId, { body: newMessage.trim() });
+    let attachmentFileId: string | undefined;
+
+    // Upload image if selected
+    if (selectedImage) {
+      setIsUploading(true);
+      try {
+        const api = getApiClient();
+        // Convert URI to blob for upload
+        const response = await fetch(selectedImage.uri);
+        const blob = await response.blob();
+        const fileName = selectedImage.fileName || `photo_${Date.now()}.jpg`;
+        const mimeType = selectedImage.mimeType || 'image/jpeg';
+
+        const fileAsset = await api.uploadFileToGcs(blob, {
+          householdId,
+          type: 'ISSUE_PHOTO',
+          filename: fileName,
+        });
+        attachmentFileId = fileAsset.id;
+      } catch (err: any) {
+        Alert.alert('Upload failed', err.message || 'Failed to upload image');
+        setIsSending(false);
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
+
+    const result = await sendMessage(conversationId, {
+      body: newMessage.trim() || (selectedImage ? 'Sent a photo' : ''),
+      attachmentFileId,
+    });
     setIsSending(false);
 
     if (result) {
       setNewMessage('');
+      setSelectedImage(null);
       refetch();
     }
   };
@@ -290,7 +372,30 @@ function ChatView({
       {/* Composer */}
       {conversation?.status !== 'CLOSED' && (
         <View style={styles.composerContainer}>
+          {/* Image Preview */}
+          {selectedImage && (
+            <View style={styles.imagePreviewContainer}>
+              <Image
+                source={{ uri: selectedImage.uri }}
+                style={styles.imagePreview}
+                resizeMode="cover"
+              />
+              <TouchableOpacity
+                style={styles.removeImageButton}
+                onPress={() => setSelectedImage(null)}
+              >
+                <Text style={styles.removeImageText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+          )}
           <View style={styles.composer}>
+            <TouchableOpacity
+              style={styles.attachButton}
+              onPress={pickImage}
+              disabled={isUploading || isSending}
+            >
+              <Text style={styles.attachIcon}>📷</Text>
+            </TouchableOpacity>
             <TextInput
               style={styles.input}
               placeholder="Type a message..."
@@ -303,12 +408,12 @@ function ChatView({
             <TouchableOpacity
               style={[
                 styles.sendButton,
-                (!newMessage.trim() || isSending) && styles.sendButtonDisabled,
+                ((!newMessage.trim() && !selectedImage) || isSending || isUploading) && styles.sendButtonDisabled,
               ]}
               onPress={handleSend}
-              disabled={!newMessage.trim() || isSending}
+              disabled={(!newMessage.trim() && !selectedImage) || isSending || isUploading}
             >
-              {isSending ? (
+              {isSending || isUploading ? (
                 <ActivityIndicator size="small" color={colors.white} />
               ) : (
                 <Text style={styles.sendIcon}>➤</Text>
@@ -446,7 +551,7 @@ export default function ChatScreen() {
   }
 
   // Show chat view if a conversation is selected
-  if (selectedConversationId && user) {
+  if (selectedConversationId && user && currentHousehold) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <KeyboardAvoidingView
@@ -461,6 +566,7 @@ export default function ChatScreen() {
               refetch();
             }}
             userId={user.id}
+            householdId={currentHousehold.id}
           />
         </KeyboardAvoidingView>
       </SafeAreaView>
@@ -877,6 +983,46 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 18,
     marginLeft: 2,
+  },
+  attachButton: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attachIcon: {
+    fontSize: 22,
+  },
+  imagePreviewContainer: {
+    marginBottom: spacing[2],
+    position: 'relative',
+  },
+  imagePreview: {
+    width: 80,
+    height: 80,
+    borderRadius: borderRadius.lg,
+  },
+  removeImageButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.red[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeImageText: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: typography.fontWeights.bold,
+  },
+  messageImage: {
+    width: 200,
+    height: 150,
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing[2],
   },
 
   // Closed Banner

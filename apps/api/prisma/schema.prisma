@@ -316,6 +316,21 @@ enum WorkOrderStatus {
   CANCELLED
 }
 
+// File asset type for uploaded files
+enum FileAssetType {
+  ISSUE_PHOTO
+  RECEIPT
+  DOCUMENT
+  OTHER
+}
+
+// File asset upload status
+enum FileAssetStatus {
+  PENDING   // Signed URL generated, awaiting upload
+  UPLOADED  // Upload completed
+  FAILED    // Upload failed or expired
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
@@ -360,6 +375,9 @@ model User {
   // Work order relations
   createdWorkOrders WorkOrder[]     @relation("WorkOrderCreator")
   workOrderNotes    WorkOrderNote[] @relation("WorkOrderNoteAuthor")
+
+  // File asset relations
+  uploadedFileAssets FileAsset[] @relation("FileAssetUploader")
 
   @@map("users")
 }
@@ -426,6 +444,7 @@ model Household {
   reminders         Reminder[]
   conversations     Conversation[]
   workOrders        WorkOrder[]
+  fileAssets        FileAsset[]
 
   @@map("households")
 }
@@ -860,6 +879,42 @@ model File {
 }
 
 // ============================================================================
+// FILE ASSETS (GCS-backed uploads)
+// ============================================================================
+
+model FileAsset {
+  id             String          @id @default(cuid())
+  householdId    String          @map("household_id")
+  uploaderUserId String          @map("uploader_user_id")
+  type           FileAssetType   @default(OTHER)
+  status         FileAssetStatus @default(PENDING)
+
+  // GCS storage info
+  gcsPath      String  @map("gcs_path") // e.g. "uploads/household-123/abc123.jpg"
+  url          String? // Public or signed URL (updated after upload)
+  filename     String  // Original filename
+  contentType  String  @map("content_type") // MIME type
+  size         Int?    // File size in bytes (updated after upload)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  uploader  User      @relation("FileAssetUploader", fields: [uploaderUserId], references: [id], onDelete: Cascade)
+
+  // Back-references (one FileAsset can only be attached to one entity)
+  supportMessages   SupportMessage[]
+  workOrderNotes    WorkOrderNote[]
+  maintenanceTasks  MaintenanceTask[]
+
+  @@index([householdId, type])
+  @@index([uploaderUserId])
+  @@index([status])
+  @@map("file_assets")
+}
+
+// ============================================================================
 // PAYMENT METHODS
 // ============================================================================
 
@@ -990,6 +1045,7 @@ model MaintenanceTask {
   householdId      String  @map("household_id")
   templateId       String? @map("template_id") // Nullable if custom task
   assignedVendorId String? @map("assigned_vendor_id")
+  attachmentFileId String? @map("attachment_file_id")
 
   title       String
   description String?
@@ -1018,11 +1074,13 @@ model MaintenanceTask {
   household      Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
   template       MaintenanceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
+  attachmentFile FileAsset?           @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
 
   @@index([householdId, status])
   @@index([householdId, dueDate])
   @@index([householdId, category])
+  @@index([attachmentFileId])
   @@map("maintenance_tasks")
 }
 
@@ -1252,15 +1310,18 @@ model SupportMessage {
   body           String
 
   // Optional attachment (image or file)
-  attachmentUrl String? @map("attachment_url")
+  attachmentUrl    String? @map("attachment_url")
+  attachmentFileId String? @map("attachment_file_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User?        @relation("SupportMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User?        @relation("SupportMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+  attachmentFile FileAsset?   @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
 
   @@index([conversationId, createdAt])
+  @@index([attachmentFileId])
   @@map("support_messages")
 }
 
@@ -1331,17 +1392,20 @@ model WorkOrder {
 
 // Internal notes on work orders
 model WorkOrderNote {
-  id           String @id @default(cuid())
-  workOrderId  String @map("work_order_id")
-  authorUserId String @map("author_user_id")
-  body         String
+  id               String  @id @default(cuid())
+  workOrderId      String  @map("work_order_id")
+  authorUserId     String  @map("author_user_id")
+  body             String
+  attachmentFileId String? @map("attachment_file_id")
 
   createdAt DateTime @default(now()) @map("created_at")
 
   // Relations
-  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  author    User      @relation("WorkOrderNoteAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  workOrder      WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author         User       @relation("WorkOrderNoteAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+  attachmentFile FileAsset? @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
 
   @@index([workOrderId, createdAt])
+  @@index([attachmentFileId])
   @@map("work_order_notes")
 }
