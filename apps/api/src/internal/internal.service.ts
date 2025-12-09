@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ConversationStatus, WorkOrderStatus } from '@prisma/client';
 
-import { DbService } from '../db';
+import { PrismaService } from '../prisma';
 
 @Injectable()
 export class InternalService {
-  constructor(private db: DbService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Get dashboard stats for internal console
@@ -24,32 +24,32 @@ export class InternalService {
       todaysAppointments,
     ] = await Promise.all([
       // Active households (with active subscription)
-      this.db.household.count({
+      this.prisma.household.count({
         where: {
           subscriptionStatus: 'ACTIVE',
         },
       }),
       // Open conversations
-      this.db.supportConversation.count({
+      this.prisma.supportConversation.count({
         where: {
           status: { in: ['OPEN', 'PENDING'] },
         },
       }),
       // Unassigned conversations
-      this.db.supportConversation.count({
+      this.prisma.supportConversation.count({
         where: {
           status: { in: ['OPEN', 'PENDING'] },
           assignedToId: null,
         },
       }),
       // Open work orders
-      this.db.workOrder.count({
+      this.prisma.workOrder.count({
         where: {
           status: { in: ['DRAFT', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS'] },
         },
       }),
       // Appointments scheduled for today
-      this.db.workOrder.count({
+      this.prisma.workOrder.count({
         where: {
           scheduledStart: {
             gte: today,
@@ -72,7 +72,7 @@ export class InternalService {
    * Get all households with details for internal view
    */
   async getHouseholds() {
-    return this.db.household.findMany({
+    return this.prisma.household.findMany({
       select: {
         id: true,
         name: true,
@@ -120,7 +120,7 @@ export class InternalService {
    * Get household detail for internal view
    */
   async getHouseholdById(id: string) {
-    const household = await this.db.household.findUnique({
+    const household = await this.prisma.household.findUnique({
       where: { id },
       include: {
         owner: {
@@ -215,7 +215,7 @@ export class InternalService {
       where.status = { in: ['OPEN', 'PENDING'] };
     }
 
-    return this.db.supportConversation.findMany({
+    return this.prisma.supportConversation.findMany({
       where,
       include: {
         household: {
@@ -255,7 +255,7 @@ export class InternalService {
     conversationId: string,
     assignedToId: string | null,
   ) {
-    return this.db.supportConversation.update({
+    return this.prisma.supportConversation.update({
       where: { id: conversationId },
       data: { assignedToId },
     });
@@ -268,7 +268,7 @@ export class InternalService {
     conversationId: string,
     status: ConversationStatus,
   ) {
-    return this.db.supportConversation.update({
+    return this.prisma.supportConversation.update({
       where: { id: conversationId },
       data: {
         status,
@@ -301,7 +301,7 @@ export class InternalService {
       }
     }
 
-    return this.db.workOrder.findMany({
+    return this.prisma.workOrder.findMany({
       where,
       include: {
         household: {
@@ -356,7 +356,7 @@ export class InternalService {
     const endDate = new Date(startDate);
     endDate.setDate(endDate.getDate() + days);
 
-    return this.db.workOrder.findMany({
+    return this.prisma.workOrder.findMany({
       where: {
         scheduledStart: {
           gte: startDate,
