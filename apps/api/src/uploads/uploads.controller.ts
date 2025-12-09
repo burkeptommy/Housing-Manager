@@ -15,7 +15,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard, GetUser } from '../auth';
+import { JwtAuthGuard, CurrentUser } from '../auth';
 import { UploadsService } from './uploads.service';
 import {
   SignUploadDto,
@@ -43,7 +43,7 @@ export class UploadsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async signUpload(
     @Body() dto: SignUploadDto,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<SignUploadResponseDto> {
     return this.uploadsService.signUpload(
       {
@@ -69,7 +69,7 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async completeUpload(
     @Body() dto: CompleteUploadDto,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<CompleteUploadResponseDto> {
     return this.uploadsService.completeUpload(
       dto.fileAssetId,
@@ -91,7 +91,7 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async getFileAsset(
     @Param('id') id: string,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<FileAssetResponseDto> {
     const asset = await this.uploadsService.getFileAsset(id, userId);
     return {
@@ -122,7 +122,7 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async getSignedReadUrl(
     @Param('id') id: string,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<{ url: string }> {
     const url = await this.uploadsService.getSignedReadUrl(id, userId);
     return { url };
@@ -137,7 +137,7 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async deleteFileAsset(
     @Param('id') id: string,
-    @GetUser('id') userId: string,
+    @CurrentUser('id') userId: string,
   ): Promise<{ success: boolean }> {
     await this.uploadsService.deleteFileAsset(id, userId);
     return { success: true };
