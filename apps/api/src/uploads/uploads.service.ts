@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { FileAssetType, FileAssetStatus } from '@prisma/client';
 
-import { DbService } from '../db';
+import { PrismaService } from '../prisma';
 import { GcsStorageService } from './gcs-storage.service';
 
 export interface SignUploadRequest {
@@ -26,7 +26,7 @@ export interface SignUploadResponse {
 @Injectable()
 export class UploadsService {
   constructor(
-    private readonly db: DbService,
+    private readonly prisma: PrismaService,
     private readonly gcsStorage: GcsStorageService,
   ) {}
 
@@ -68,7 +68,7 @@ export class UploadsService {
     );
 
     // Create pending FileAsset
-    const fileAsset = await this.db.fileAsset.create({
+    const fileAsset = await this.prisma.fileAsset.create({
       data: {
         householdId: data.householdId,
         uploaderUserId: userId,
@@ -97,7 +97,7 @@ export class UploadsService {
     userId: string,
     finalUrl?: string,
   ): Promise<{ id: string; url: string; status: FileAssetStatus }> {
-    const fileAsset = await this.db.fileAsset.findUnique({
+    const fileAsset = await this.prisma.fileAsset.findUnique({
       where: { id: fileAssetId },
     });
 
@@ -119,7 +119,7 @@ export class UploadsService {
     const exists = await this.gcsStorage.fileExists(fileAsset.gcsPath);
     if (!exists) {
       // Mark as failed
-      await this.db.fileAsset.update({
+      await this.prisma.fileAsset.update({
         where: { id: fileAssetId },
         data: { status: FileAssetStatus.FAILED },
       });
@@ -132,7 +132,7 @@ export class UploadsService {
     const metadata = await this.gcsStorage.getFileMetadata(fileAsset.gcsPath);
 
     // Update FileAsset to uploaded status
-    const updated = await this.db.fileAsset.update({
+    const updated = await this.prisma.fileAsset.update({
       where: { id: fileAssetId },
       data: {
         status: FileAssetStatus.UPLOADED,
@@ -152,7 +152,7 @@ export class UploadsService {
    * Get a FileAsset by ID
    */
   async getFileAsset(fileAssetId: string, userId: string) {
-    const fileAsset = await this.db.fileAsset.findUnique({
+    const fileAsset = await this.prisma.fileAsset.findUnique({
       where: { id: fileAssetId },
       include: {
         household: {
@@ -171,7 +171,7 @@ export class UploadsService {
     }
 
     // Check access: uploader, household member, manager, or admin
-    const user = await this.db.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { role: true },
     });
@@ -210,7 +210,7 @@ export class UploadsService {
     const fileAsset = await this.getFileAsset(fileAssetId, userId);
 
     // Only uploader or staff can delete
-    const user = await this.db.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: { role: true },
     });
@@ -226,7 +226,7 @@ export class UploadsService {
     await this.gcsStorage.deleteFile(fileAsset.gcsPath);
 
     // Delete from database
-    await this.db.fileAsset.delete({
+    await this.prisma.fileAsset.delete({
       where: { id: fileAssetId },
     });
   }

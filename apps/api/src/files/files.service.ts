@@ -7,7 +7,7 @@ import {
 } from '@nestjs/common';
 import { FileCategory } from '@prisma/client';
 
-import { DbService } from '../db';
+import { PrismaService } from '../prisma';
 import { JwtPayload } from '../auth';
 
 import { StorageService } from './storage.service';
@@ -30,8 +30,8 @@ export class FilesService {
   private readonly logger = new Logger(FilesService.name);
 
   constructor(
-    private db: DbService,
-    private storageService: StorageService,
+    private readonly prisma: PrismaService,
+    private readonly storageService: StorageService,
   ) {}
 
   /**
@@ -69,7 +69,7 @@ export class FilesService {
 
     // If service request ID provided, verify it belongs to household
     if (dto.serviceRequestId) {
-      const request = await this.db.serviceRequest.findFirst({
+      const request = await this.prisma.serviceRequest.findFirst({
         where: {
           id: dto.serviceRequestId,
           householdId: dto.householdId,
@@ -82,7 +82,7 @@ export class FilesService {
 
     // If task ID provided, verify it belongs to household
     if (dto.taskId) {
-      const task = await this.db.task.findFirst({
+      const task = await this.prisma.task.findFirst({
         where: {
           id: dto.taskId,
           householdId: dto.householdId,
@@ -105,7 +105,7 @@ export class FilesService {
     });
 
     // Store metadata in database
-    const fileRecord = await this.db.file.create({
+    const fileRecord = await this.prisma.file.create({
       data: {
         filename: uploadResult.filename,
         originalName: file.originalname,
@@ -130,7 +130,7 @@ export class FilesService {
    * Get file by ID with signed URL
    */
   async getFile(id: string, user: JwtPayload): Promise<FileWithUrlDto> {
-    const file = await this.db.file.findUnique({
+    const file = await this.prisma.file.findUnique({
       where: { id },
     });
 
@@ -175,7 +175,7 @@ export class FilesService {
   ): Promise<FileDto[]> {
     await this.verifyHouseholdAccess(householdId, user);
 
-    const files = await this.db.file.findMany({
+    const files = await this.prisma.file.findMany({
       where: {
         householdId,
         ...(category && { category }),
@@ -193,7 +193,7 @@ export class FilesService {
     serviceRequestId: string,
     user: JwtPayload,
   ): Promise<FileWithUrlDto[]> {
-    const request = await this.db.serviceRequest.findUnique({
+    const request = await this.prisma.serviceRequest.findUnique({
       where: { id: serviceRequestId },
     });
 
@@ -203,7 +203,7 @@ export class FilesService {
 
     await this.verifyHouseholdAccess(request.householdId, user);
 
-    const files = await this.db.file.findMany({
+    const files = await this.prisma.file.findMany({
       where: { serviceRequestId },
       orderBy: { createdAt: 'desc' },
     });
@@ -229,7 +229,7 @@ export class FilesService {
    * Delete a file
    */
   async deleteFile(id: string, user: JwtPayload): Promise<void> {
-    const file = await this.db.file.findUnique({
+    const file = await this.prisma.file.findUnique({
       where: { id },
     });
 
@@ -250,7 +250,7 @@ export class FilesService {
     }
 
     // Delete from database
-    await this.db.file.delete({
+    await this.prisma.file.delete({
       where: { id },
     });
 
@@ -269,7 +269,7 @@ export class FilesService {
       return;
     }
 
-    const membership = await this.db.householdMember.findFirst({
+    const membership = await this.prisma.householdMember.findFirst({
       where: {
         householdId,
         userId: user.sub,

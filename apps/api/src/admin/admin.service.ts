@@ -1,17 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 
-import { DbService } from '../db';
+import { PrismaService } from '../prisma';
 
 @Injectable()
 export class AdminService {
-  constructor(private db: DbService) {}
+  constructor(private readonly prisma: PrismaService) {}
 
   /**
    * Get all users with optional role filter
    */
   async getUsers(role?: UserRole) {
-    return this.db.user.findMany({
+    return this.prisma.user.findMany({
       where: role ? { role } : undefined,
       select: {
         id: true,
@@ -40,7 +40,7 @@ export class AdminService {
    * Get user by ID with details
    */
   async getUserById(id: string) {
-    const user = await this.db.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id },
       select: {
         id: true,
@@ -87,7 +87,7 @@ export class AdminService {
    * Update user role
    */
   async updateUserRole(id: string, role: UserRole) {
-    return this.db.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { role },
       select: {
@@ -104,12 +104,12 @@ export class AdminService {
    * Toggle user active status
    */
   async toggleUserActive(id: string) {
-    const user = await this.db.user.findUnique({ where: { id } });
+    const user = await this.prisma.user.findUnique({ where: { id } });
     if (!user) {
       throw new NotFoundException('User not found');
     }
 
-    return this.db.user.update({
+    return this.prisma.user.update({
       where: { id },
       data: { isActive: !user.isActive },
       select: {
@@ -124,7 +124,7 @@ export class AdminService {
    * Get all households
    */
   async getHouseholds() {
-    return this.db.household.findMany({
+    return this.prisma.household.findMany({
       select: {
         id: true,
         name: true,
@@ -165,7 +165,7 @@ export class AdminService {
    * Get household by ID with details
    */
   async getHouseholdById(id: string) {
-    const household = await this.db.household.findUnique({
+    const household = await this.prisma.household.findUnique({
       where: { id },
       include: {
         owner: {
@@ -210,7 +210,7 @@ export class AdminService {
    * Get all service categories
    */
   async getServiceCategories() {
-    return this.db.serviceCategory.findMany({
+    return this.prisma.serviceCategory.findMany({
       orderBy: { sortOrder: 'asc' },
       select: {
         id: true,
@@ -239,7 +239,7 @@ export class AdminService {
     icon?: string;
     sortOrder?: number;
   }) {
-    return this.db.serviceCategory.create({
+    return this.prisma.serviceCategory.create({
       data: {
         name: data.name,
         description: data.description,
@@ -263,7 +263,7 @@ export class AdminService {
       isActive?: boolean;
     },
   ) {
-    return this.db.serviceCategory.update({
+    return this.prisma.serviceCategory.update({
       where: { id },
       data,
     });
@@ -281,14 +281,14 @@ export class AdminService {
       pendingRequests,
       completedRequests,
     ] = await Promise.all([
-      this.db.user.count(),
-      this.db.user.count({ where: { isActive: true } }),
-      this.db.household.count(),
-      this.db.serviceRequest.count(),
-      this.db.serviceRequest.count({
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { isActive: true } }),
+      this.prisma.household.count(),
+      this.prisma.serviceRequest.count(),
+      this.prisma.serviceRequest.count({
         where: { status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS'] } },
       }),
-      this.db.serviceRequest.count({ where: { status: 'COMPLETED' } }),
+      this.prisma.serviceRequest.count({ where: { status: 'COMPLETED' } }),
     ]);
 
     return {
