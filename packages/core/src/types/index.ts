@@ -1138,3 +1138,97 @@ export interface GenerateInvoicesResult {
   householdsProcessed: number;
   errors?: string[];
 }
+
+// ============================================================================
+// SUPPORT CHAT TYPES
+// ============================================================================
+
+export type ConversationStatus = 'OPEN' | 'PENDING' | 'CLOSED';
+export type SenderRole = 'HOMEOWNER' | 'HOME_MANAGER' | 'SYSTEM';
+
+export interface Conversation {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  subject?: string | null;
+  status: ConversationStatus;
+  homeownerUnreadCount: number;
+  homeManagerUnreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+  // Included in responses
+  lastMessage?: SupportMessage;
+  createdBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+  assignments?: HomeManagerAssignment[];
+}
+
+export interface SupportMessage {
+  id: string;
+  conversationId: string;
+  senderUserId?: string | null;
+  senderRole: SenderRole;
+  body: string;
+  attachmentUrl?: string | null;
+  createdAt: string;
+  // Included in responses
+  sender?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  } | null;
+}
+
+export interface HomeManagerAssignment {
+  id: string;
+  conversationId: string;
+  homeManagerUserId: string;
+  assignedAt: string;
+  assignedByUserId?: string | null;
+  // Included in responses
+  homeManager?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+}
+
+export interface CreateConversationRequest {
+  subject?: string;
+  body: string;
+  attachmentUrl?: string;
+}
+
+export interface SendMessageRequest {
+  body: string;
+  attachmentUrl?: string;
+}
+
+export interface ConversationListQuery {
+  status?: ConversationStatus;
+  updatedSince?: string;
+}
+
+export interface ConversationDetail extends Conversation {
+  messages: SupportMessage[];
+  household?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface AssignConversationRequest {
+  homeManagerUserId: string;
+}
+
+export interface InternalConversationListQuery {
+  status?: ConversationStatus;
+  assignedToMe?: boolean;
+  unassigned?: boolean;
+}

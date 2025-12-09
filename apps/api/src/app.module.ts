@@ -6,6 +6,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth';
 import { BillingModule } from './billing';
+import { ConversationsModule } from './conversations';
 import { DbModule } from './db';
 import { FilesModule } from './files';
 import { HealthModule } from './health/health.module';
@@ -48,6 +49,7 @@ import { InvoicesModule } from './invoices';
     MaintenanceTasksModule,
     RemindersModule,
     InvoicesModule,
+    ConversationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

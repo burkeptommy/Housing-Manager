@@ -383,18 +383,15 @@ export default function DashboardPage() {
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Report a problem</span>
           </Link>
 
-          <button
-            onClick={() => {
-              // TODO: Implement share functionality
-              alert('Share house profile feature coming soon!');
-            }}
+          <Link
+            href="/app/support"
             className="flex flex-col items-center gap-2 p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
           >
             <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-2xl">
-              🔗
+              💬
             </div>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Share house profile</span>
-          </button>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Need help?</span>
+          </Link>
         </div>
       </div>
     </div>

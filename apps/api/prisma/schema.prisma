@@ -291,6 +291,20 @@ enum HouseholdInvoiceStatus {
   CANCELLED // Invoice cancelled
 }
 
+// Support conversation status
+enum ConversationStatus {
+  OPEN
+  PENDING
+  CLOSED
+}
+
+// Sender role in support conversations
+enum SenderRole {
+  HOMEOWNER
+  HOME_MANAGER
+  SYSTEM
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
@@ -325,6 +339,12 @@ model User {
   files               File[]
   refreshTokens       RefreshToken[]
   inAppNotifications  InAppNotification[]
+
+  // Support chat relations
+  createdConversations    Conversation[]          @relation("ConversationCreator")
+  supportMessages         SupportMessage[]        @relation("SupportMessageSender")
+  homeManagerAssignments  HomeManagerAssignment[] @relation("AssignedHomeManager")
+  madeAssignments         HomeManagerAssignment[] @relation("AssignmentMadeBy")
 
   @@map("users")
 }
@@ -389,6 +409,7 @@ model Household {
   paymentMethods    PaymentMethod[]
   maintenanceTasks  MaintenanceTask[]
   reminders         Reminder[]
+  conversations     Conversation[]
 
   @@map("households")
 }
@@ -1169,4 +1190,73 @@ model HouseholdInvoiceItem {
   @@index([householdInvoiceId])
   @@index([billAccountId])
   @@map("household_invoice_items")
+}
+
+// ============================================================================
+// SUPPORT CHAT
+// ============================================================================
+
+// Support conversation between homeowner and home manager
+model Conversation {
+  id              String             @id @default(cuid())
+  householdId     String             @map("household_id")
+  createdByUserId String             @map("created_by_user_id")
+  subject         String? // Optional short description like "Leaking sink"
+  status          ConversationStatus @default(OPEN)
+
+  // Unread tracking
+  homeownerUnreadCount   Int @default(0) @map("homeowner_unread_count")
+  homeManagerUnreadCount Int @default(0) @map("home_manager_unread_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household    Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy    User                    @relation("ConversationCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  messages     SupportMessage[]
+  assignments  HomeManagerAssignment[]
+
+  @@index([householdId, status])
+  @@index([status, updatedAt])
+  @@map("conversations")
+}
+
+// Message within a support conversation
+model SupportMessage {
+  id             String     @id @default(cuid())
+  conversationId String     @map("conversation_id")
+  senderUserId   String?    @map("sender_user_id") // Nullable for system messages
+  senderRole     SenderRole @map("sender_role")
+  body           String
+
+  // Optional attachment (image or file)
+  attachmentUrl String? @map("attachment_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation("SupportMessageSender", fields: [senderUserId], references: [id], onDelete: SetNull)
+
+  @@index([conversationId, createdAt])
+  @@map("support_messages")
+}
+
+// Assignment of home manager to a conversation
+model HomeManagerAssignment {
+  id                   String   @id @default(cuid())
+  conversationId       String   @map("conversation_id")
+  homeManagerUserId    String   @map("home_manager_user_id")
+  assignedAt           DateTime @default(now()) @map("assigned_at")
+  assignedByUserId     String?  @map("assigned_by_user_id") // Who made the assignment
+
+  // Relations
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  homeManager  User         @relation("AssignedHomeManager", fields: [homeManagerUserId], references: [id], onDelete: Cascade)
+  assignedBy   User?        @relation("AssignmentMadeBy", fields: [assignedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, homeManagerUserId])
+  @@index([homeManagerUserId])
+  @@map("home_manager_assignments")
 }
