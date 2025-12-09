@@ -1232,3 +1232,111 @@ export interface InternalConversationListQuery {
   assignedToMe?: boolean;
   unassigned?: boolean;
 }
+
+// ============================================================================
+// WORK ORDER TYPES
+// ============================================================================
+
+export type WorkOrderStatus =
+  | 'DRAFT'
+  | 'REQUESTED'
+  | 'SCHEDULED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export interface WorkOrder {
+  id: string;
+  householdId: string;
+  maintenanceTaskId?: string | null;
+  vendorId?: string | null;
+  createdByUserId: string;
+  title: string;
+  description?: string | null;
+  status: WorkOrderStatus;
+  preferredDate?: string | null;
+  preferredTimeWindowStart?: string | null;
+  preferredTimeWindowEnd?: string | null;
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Included in responses
+  household?: {
+    id: string;
+    name: string;
+  };
+  maintenanceTask?: {
+    id: string;
+    title: string;
+    category: string;
+    status: string;
+  } | null;
+  vendor?: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+    email?: string | null;
+    category: string;
+  } | null;
+  createdBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+  notes?: WorkOrderNote[];
+}
+
+export interface WorkOrderNote {
+  id: string;
+  workOrderId: string;
+  authorUserId: string;
+  body: string;
+  createdAt: string;
+  author?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+}
+
+export interface CreateWorkOrderRequest {
+  title: string;
+  description?: string;
+  maintenanceTaskId?: string;
+  vendorId?: string;
+  preferredDate?: string;
+  preferredTimeWindowStart?: string;
+  preferredTimeWindowEnd?: string;
+}
+
+export interface UpdateWorkOrderRequest {
+  title?: string;
+  description?: string;
+  vendorId?: string;
+  status?: WorkOrderStatus;
+  scheduledStart?: string;
+  scheduledEnd?: string;
+  estimatedCost?: number;
+  actualCost?: number;
+}
+
+export interface CreateWorkOrderNoteRequest {
+  body: string;
+}
+
+export interface WorkOrderListQuery {
+  status?: WorkOrderStatus;
+  includeCompleted?: boolean;
+}
+
+export interface InternalWorkOrderListQuery {
+  status?: WorkOrderStatus;
+  unassigned?: boolean;
+  upcoming?: boolean;
+}

@@ -259,6 +259,7 @@ enum MaintenanceTaskStatus {
 enum ReminderType {
   BILL_DUE
   MAINTENANCE_TASK
+  WORK_ORDER
 }
 
 enum ReminderStatus {
@@ -305,6 +306,16 @@ enum SenderRole {
   SYSTEM
 }
 
+// Work order status
+enum WorkOrderStatus {
+  DRAFT
+  REQUESTED
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 // ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
@@ -345,6 +356,10 @@ model User {
   supportMessages         SupportMessage[]        @relation("SupportMessageSender")
   homeManagerAssignments  HomeManagerAssignment[] @relation("AssignedHomeManager")
   madeAssignments         HomeManagerAssignment[] @relation("AssignmentMadeBy")
+
+  // Work order relations
+  createdWorkOrders WorkOrder[]     @relation("WorkOrderCreator")
+  workOrderNotes    WorkOrderNote[] @relation("WorkOrderNoteAuthor")
 
   @@map("users")
 }
@@ -410,6 +425,7 @@ model Household {
   maintenanceTasks  MaintenanceTask[]
   reminders         Reminder[]
   conversations     Conversation[]
+  workOrders        WorkOrder[]
 
   @@map("households")
 }
@@ -567,6 +583,7 @@ model Vendor {
   billAccounts        BillAccount[]
   maintenanceTasks    MaintenanceTask[]
   vendorPayoutAccount VendorPayoutAccount?
+  workOrders          WorkOrder[]
 
   @@index([householdId, category])
   @@map("vendors")
@@ -1001,6 +1018,7 @@ model MaintenanceTask {
   household      Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
   template       MaintenanceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
+  workOrders     WorkOrder[]
 
   @@index([householdId, status])
   @@index([householdId, dueDate])
@@ -1020,6 +1038,7 @@ model Reminder {
   // Reference to source (one of these will be set)
   billAccountId     String? @map("bill_account_id")
   maintenanceTaskId String? @map("maintenance_task_id")
+  workOrderId       String? @map("work_order_id")
 
   // Scheduling
   scheduledAt DateTime  @map("scheduled_at")
@@ -1045,6 +1064,7 @@ model Reminder {
   @@index([householdId, type])
   @@index([billAccountId])
   @@index([maintenanceTaskId])
+  @@index([workOrderId])
   @@map("reminders")
 }
 
@@ -1062,6 +1082,7 @@ model InAppNotification {
   // Source reference (optional)
   billAccountId     String? @map("bill_account_id")
   maintenanceTaskId String? @map("maintenance_task_id")
+  workOrderId       String? @map("work_order_id")
   reminderId        String? @map("reminder_id")
 
   isRead Boolean   @default(false) @map("is_read")
@@ -1259,4 +1280,68 @@ model HomeManagerAssignment {
   @@unique([conversationId, homeManagerUserId])
   @@index([homeManagerUserId])
   @@map("home_manager_assignments")
+}
+
+// ============================================================================
+// WORK ORDERS / APPOINTMENTS
+// ============================================================================
+
+// Work order for coordinating vendor visits
+model WorkOrder {
+  id                String @id @default(cuid())
+  householdId       String @map("household_id")
+  maintenanceTaskId String? @map("maintenance_task_id") // Optional link to maintenance task
+  vendorId          String? @map("vendor_id") // Can be TBD initially
+  createdByUserId   String @map("created_by_user_id")
+
+  title       String // e.g. "Fix leaking kitchen sink"
+  description String?
+  status      WorkOrderStatus @default(DRAFT)
+
+  // Preferred scheduling (homeowner's preference)
+  preferredDate           DateTime? @map("preferred_date")
+  preferredTimeWindowStart String?   @map("preferred_time_window_start") // e.g. "09:00"
+  preferredTimeWindowEnd   String?   @map("preferred_time_window_end") // e.g. "12:00"
+
+  // Actual scheduled time (set by home manager)
+  scheduledStart DateTime? @map("scheduled_start")
+  scheduledEnd   DateTime? @map("scheduled_end")
+
+  // Cost tracking
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
+
+  completedAt DateTime? @map("completed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  maintenanceTask MaintenanceTask? @relation(fields: [maintenanceTaskId], references: [id], onDelete: SetNull)
+  vendor          Vendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  createdBy       User             @relation("WorkOrderCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  notes           WorkOrderNote[]
+
+  @@index([householdId, status])
+  @@index([status, scheduledStart])
+  @@index([vendorId, status])
+  @@map("work_orders")
+}
+
+// Internal notes on work orders
+model WorkOrderNote {
+  id           String @id @default(cuid())
+  workOrderId  String @map("work_order_id")
+  authorUserId String @map("author_user_id")
+  body         String
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  author    User      @relation("WorkOrderNoteAuthor", fields: [authorUserId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId, createdAt])
+  @@map("work_order_notes")
 }

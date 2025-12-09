@@ -51,6 +51,12 @@ import type {
   HouseholdInvoiceListItem,
   BillingSummary,
   DashboardResponse,
+  WorkOrder,
+  CreateWorkOrderRequest,
+  UpdateWorkOrderRequest,
+  WorkOrderStatus,
+  CreateWorkOrderNoteRequest,
+  WorkOrderNote,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -658,6 +664,66 @@ export class ApiClient {
     return this.request(`/billing/preferences?householdId=${householdId}`, {
       method: 'PATCH',
       body: JSON.stringify(preferences),
+    });
+  }
+
+  // ============================================================================
+  // WORK ORDER ENDPOINTS
+  // ============================================================================
+
+  async getWorkOrders(
+    householdId: string,
+    options?: { status?: WorkOrderStatus; includeCompleted?: boolean }
+  ): Promise<WorkOrder[]> {
+    const params = new URLSearchParams({ householdId });
+    if (options?.status) params.append('status', options.status);
+    if (options?.includeCompleted !== undefined)
+      params.append('includeCompleted', options.includeCompleted.toString());
+    return this.request(`/work-orders?${params.toString()}`);
+  }
+
+  async getWorkOrder(id: string): Promise<WorkOrder> {
+    return this.request(`/work-orders/${id}`);
+  }
+
+  async createWorkOrder(householdId: string, data: CreateWorkOrderRequest): Promise<WorkOrder> {
+    return this.request(`/work-orders?householdId=${householdId}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async updateWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<WorkOrder> {
+    return this.request(`/work-orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // Internal work order endpoints (for managers)
+  async getInternalWorkOrders(
+    options?: { status?: WorkOrderStatus; unassigned?: boolean; upcoming?: boolean }
+  ): Promise<WorkOrder[]> {
+    const params = new URLSearchParams();
+    if (options?.status) params.append('status', options.status);
+    if (options?.unassigned !== undefined)
+      params.append('unassigned', options.unassigned.toString());
+    if (options?.upcoming !== undefined) params.append('upcoming', options.upcoming.toString());
+    const query = params.toString();
+    return this.request(`/internal/work-orders${query ? `?${query}` : ''}`);
+  }
+
+  async updateInternalWorkOrder(id: string, data: UpdateWorkOrderRequest): Promise<WorkOrder> {
+    return this.request(`/internal/work-orders/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async addWorkOrderNote(workOrderId: string, data: CreateWorkOrderNoteRequest): Promise<WorkOrderNote> {
+    return this.request(`/internal/work-orders/${workOrderId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data),
     });
   }
 }

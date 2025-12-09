@@ -1,8 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import { useDashboard, useRequestHavenHandle } from '@/hooks/use-dashboard';
+import { getApiClient } from '@/lib/api';
 import type { UpcomingBill, UpcomingMaintenanceTask, TodayTask } from '@haven/core';
 
 // Category icon mapping
@@ -89,15 +92,38 @@ function getDaysUntilLabel(days: number): string {
 }
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { user, currentHousehold } = useAuth();
   const { data: dashboard, isLoading, error } = useDashboard(currentHousehold?.id);
   const requestHavenHandle = useRequestHavenHandle();
+  const [creatingWorkOrder, setCreatingWorkOrder] = useState<string | null>(null);
 
   const handleAskHavenToHandle = async (billId: string) => {
     try {
       await requestHavenHandle.mutateAsync({ billId });
     } catch (err) {
       console.error('Failed to request Haven to handle bill:', err);
+    }
+  };
+
+  const handleRequestVendorVisit = async (task: UpcomingMaintenanceTask) => {
+    if (!currentHousehold) return;
+
+    setCreatingWorkOrder(task.id);
+    try {
+      const api = getApiClient();
+      await api.createWorkOrder(currentHousehold.id, {
+        title: task.title,
+        description: task.description,
+        maintenanceTaskId: task.id,
+        vendorId: task.assignedVendorId || undefined,
+        preferredDate: task.dueDate || undefined,
+      });
+      // Navigate to work orders page to see the new order
+      router.push('/app/work-orders');
+    } catch (err) {
+      console.error('Failed to create work order:', err);
+      setCreatingWorkOrder(null);
     }
   };
 
@@ -325,7 +351,7 @@ export default function DashboardPage() {
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
+                    <div className="text-right flex flex-col items-end gap-2">
                       {task.estimatedCost !== undefined && (
                         <p className="font-semibold text-slate-900 dark:text-white">
                           {formatCurrency(task.estimatedCost)}
@@ -338,6 +364,18 @@ export default function DashboardPage() {
                       }`}>
                         {task.status}
                       </span>
+                      {task.status !== 'SCHEDULED' && (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRequestVendorVisit(task);
+                          }}
+                          disabled={creatingWorkOrder === task.id}
+                          className="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium disabled:opacity-50"
+                        >
+                          {creatingWorkOrder === task.id ? 'Creating...' : 'Request vendor visit'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -374,13 +412,13 @@ export default function DashboardPage() {
           </Link>
 
           <Link
-            href="/app/requests/new"
+            href="/app/work-orders"
             className="flex flex-col items-center gap-2 p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
           >
-            <div className="w-12 h-12 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center text-2xl">
-              🚨
+            <div className="w-12 h-12 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center text-2xl">
+              🏠
             </div>
-            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Report a problem</span>
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Request vendor visit</span>
           </Link>
 
           <Link

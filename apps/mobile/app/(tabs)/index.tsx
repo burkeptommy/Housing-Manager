@@ -7,9 +7,10 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/auth-context';
 import { getApiClient } from '../../src/lib/api';
 import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
@@ -104,12 +105,38 @@ function getDaysUntilLabel(days: number): string {
 }
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { user, currentHousehold, refreshCurrentHousehold } = useAuth();
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [creatingWorkOrder, setCreatingWorkOrder] = useState<string | null>(null);
 
   const api = getApiClient();
+
+  const handleRequestVendorVisit = async (task: UpcomingMaintenanceTask) => {
+    if (!currentHousehold) return;
+
+    setCreatingWorkOrder(task.id);
+    try {
+      await api.createWorkOrder(currentHousehold.id, {
+        title: task.title,
+        description: task.description,
+        maintenanceTaskId: task.id,
+        vendorId: task.assignedVendorId || undefined,
+        preferredDate: task.dueDate || undefined,
+      });
+      Alert.alert('Success', 'Work order created', [
+        { text: 'View Orders', onPress: () => router.push('/work-orders') },
+        { text: 'OK', style: 'cancel' },
+      ]);
+      fetchData();
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to create work order');
+    } finally {
+      setCreatingWorkOrder(null);
+    }
+  };
 
   const fetchData = useCallback(async () => {
     if (!currentHousehold) return;
@@ -305,6 +332,19 @@ export default function HomeScreen() {
                       {task.status}
                     </Text>
                   </View>
+                  {task.status !== 'SCHEDULED' && (
+                    <TouchableOpacity
+                      onPress={() => handleRequestVendorVisit(task)}
+                      disabled={creatingWorkOrder === task.id}
+                      style={styles.requestVisitButton}
+                    >
+                      {creatingWorkOrder === task.id ? (
+                        <ActivityIndicator size="small" color={colors.primary[600]} />
+                      ) : (
+                        <Text style={styles.requestVisitText}>Request visit</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             ))
@@ -331,20 +371,22 @@ export default function HomeScreen() {
                 <Text style={styles.actionLabel}>Add a task</Text>
               </TouchableOpacity>
             </Link>
-            <Link href="/(tabs)/new-request" asChild>
+            <Link href="/work-orders" asChild>
               <TouchableOpacity style={styles.actionCard}>
-                <View style={[styles.actionIcon, styles.redActionIcon]}>
-                  <Text style={styles.actionEmoji}>🚨</Text>
+                <View style={[styles.actionIcon, styles.orangeActionIcon]}>
+                  <Text style={styles.actionEmoji}>🏠</Text>
                 </View>
-                <Text style={styles.actionLabel}>Report issue</Text>
+                <Text style={styles.actionLabel}>Vendor visits</Text>
               </TouchableOpacity>
             </Link>
-            <TouchableOpacity style={styles.actionCard}>
-              <View style={[styles.actionIcon, styles.greenActionIcon]}>
-                <Text style={styles.actionEmoji}>🔗</Text>
-              </View>
-              <Text style={styles.actionLabel}>Share profile</Text>
-            </TouchableOpacity>
+            <Link href="/(tabs)/chat" asChild>
+              <TouchableOpacity style={styles.actionCard}>
+                <View style={[styles.actionIcon, styles.greenActionIcon]}>
+                  <Text style={styles.actionEmoji}>💬</Text>
+                </View>
+                <Text style={styles.actionLabel}>Chat</Text>
+              </TouchableOpacity>
+            </Link>
           </View>
         </View>
       </ScrollView>
@@ -634,6 +676,9 @@ const styles = StyleSheet.create({
   blueActionIcon: {
     backgroundColor: colors.primary[100],
   },
+  orangeActionIcon: {
+    backgroundColor: '#FFF7ED',
+  },
   purpleActionIcon: {
     backgroundColor: colors.accent[100],
   },
@@ -648,5 +693,14 @@ const styles = StyleSheet.create({
     color: colors.slate[700],
     fontWeight: typography.fontWeights.medium,
     textAlign: 'center',
+  },
+  requestVisitButton: {
+    marginTop: spacing[2],
+    paddingVertical: spacing[1],
+  },
+  requestVisitText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.primary[600],
+    fontWeight: typography.fontWeights.medium,
   },
 });
