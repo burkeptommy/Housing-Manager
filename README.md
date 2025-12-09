@@ -205,6 +205,18 @@ After running the seed script, these demo accounts are available:
 | Manager | manager@haven.app | Manager123! |
 | Homeowner | demo@haven.app | Demo123! |
 
+### Stripe Test Cards
+
+For testing payments and subscriptions in development:
+
+| Card Number | Description |
+|-------------|-------------|
+| `4242 4242 4242 4242` | Successful payment |
+| `4000 0000 0000 3220` | 3D Secure authentication required |
+| `4000 0000 0000 9995` | Payment declined |
+
+Use any future expiry date (e.g., 12/34) and any 3-digit CVC.
+
 ### Demo Household Details
 
 The homeowner account (`demo@haven.app`) comes with a pre-configured household:

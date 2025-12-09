@@ -330,6 +330,71 @@ images:
 1. Ensure service account can sign URLs (needs `iam.serviceAccounts.signBlob` permission)
 2. Check token/key expiration settings
 
+## Cloud Scheduler (Cron Jobs)
+
+Haven uses Cloud Scheduler to run periodic tasks like payment reminders and maintenance notifications.
+
+### Set up Cron Secret
+
+```bash
+# Generate and store cron secret
+CRON_SECRET=$(openssl rand -hex 32)
+echo -n "${CRON_SECRET}" | gcloud secrets create cron-secret --data-file=-
+
+# Update Cloud Run service with the secret
+gcloud run services update haven-api \
+  --set-secrets="CRON_SECRET=cron-secret:latest" \
+  --region=${REGION}
+```
+
+### Create Cloud Scheduler Job
+
+```bash
+# Get the API URL
+API_URL=$(gcloud run services describe haven-api --region=${REGION} --format='value(status.url)')
+
+# Create a service account for Cloud Scheduler
+gcloud iam service-accounts create haven-scheduler \
+  --display-name="Haven Cloud Scheduler"
+
+# Grant invoker role (for authenticated requests)
+gcloud run services add-iam-policy-binding haven-api \
+  --region=${REGION} \
+  --member="serviceAccount:haven-scheduler@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --role="roles/run.invoker"
+
+# Create the scheduler job (runs daily at 8 AM)
+gcloud scheduler jobs create http haven-reminder-cron \
+  --location=${REGION} \
+  --schedule="0 8 * * *" \
+  --uri="${API_URL}/api/internal/cron/run-reminder-jobs" \
+  --http-method=POST \
+  --headers="x-cron-secret=${CRON_SECRET},Content-Type=application/json" \
+  --oidc-service-account-email="haven-scheduler@${PROJECT_ID}.iam.gserviceaccount.com" \
+  --time-zone="America/New_York" \
+  --description="Runs Haven reminder jobs daily"
+```
+
+### Available Cron Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/internal/cron/run-reminder-jobs` | POST | Processes payment reminders and maintenance notifications |
+
+All cron endpoints require the `x-cron-secret` header matching the `CRON_SECRET` environment variable.
+
+### Testing Cron Jobs Manually
+
+```bash
+# Get the cron secret
+CRON_SECRET=$(gcloud secrets versions access latest --secret=cron-secret)
+
+# Trigger the job manually
+curl -X POST "${API_URL}/api/internal/cron/run-reminder-jobs" \
+  -H "x-cron-secret: ${CRON_SECRET}" \
+  -H "Content-Type: application/json"
+```
+
 ## Cost Optimization
 
 - Use Cloud Run minimum instances = 0 for dev/staging
