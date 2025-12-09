@@ -8,6 +8,7 @@ import { AuthModule } from './auth';
 import { BillingModule } from './billing';
 import { ConversationsModule } from './conversations';
 import { DbModule } from './db';
+import { InternalModule } from './internal';
 import { WorkOrdersModule } from './work-orders';
 import { FilesModule } from './files';
 import { HealthModule } from './health/health.module';
@@ -52,6 +53,7 @@ import { InvoicesModule } from './invoices';
     InvoicesModule,
     ConversationsModule,
     WorkOrdersModule,
+    InternalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

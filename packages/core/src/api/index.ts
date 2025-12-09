@@ -57,6 +57,13 @@ import type {
   WorkOrderStatus,
   CreateWorkOrderNoteRequest,
   WorkOrderNote,
+  InternalDashboardStats,
+  InternalHousehold,
+  InternalConversation,
+  InternalWorkOrder,
+  InternalConversationFilters,
+  InternalWorkOrderFilters,
+  ConversationStatus,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -725,6 +732,67 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(data),
     });
+  }
+
+  // ============================================================================
+  // INTERNAL DASHBOARD ENDPOINTS
+  // ============================================================================
+
+  async getInternalStats(): Promise<InternalDashboardStats> {
+    return this.request('/internal/stats');
+  }
+
+  async getInternalHouseholds(): Promise<InternalHousehold[]> {
+    return this.request('/internal/households');
+  }
+
+  async getInternalHousehold(id: string): Promise<InternalHousehold> {
+    return this.request(`/internal/households/${id}`);
+  }
+
+  async getInternalConversations(
+    filters?: InternalConversationFilters
+  ): Promise<InternalConversation[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    const query = params.toString();
+    return this.request(`/internal/conversations${query ? `?${query}` : ''}`);
+  }
+
+  async assignInternalConversation(
+    conversationId: string,
+    assignedToId?: string | null
+  ): Promise<void> {
+    return this.request(`/internal/conversations/${conversationId}/assign`, {
+      method: 'PATCH',
+      body: JSON.stringify({ assignedToId }),
+    });
+  }
+
+  async updateInternalConversationStatus(
+    conversationId: string,
+    status: ConversationStatus
+  ): Promise<void> {
+    return this.request(`/internal/conversations/${conversationId}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  async getInternalWorkOrdersQueue(
+    filters?: InternalWorkOrderFilters
+  ): Promise<InternalWorkOrder[]> {
+    const params = new URLSearchParams();
+    if (filters?.status) params.append('status', filters.status);
+    if (filters?.dateFrom) params.append('dateFrom', filters.dateFrom);
+    if (filters?.dateTo) params.append('dateTo', filters.dateTo);
+    const query = params.toString();
+    return this.request(`/internal/work-orders${query ? `?${query}` : ''}`);
+  }
+
+  async getInternalUpcomingAppointments(days?: number): Promise<InternalWorkOrder[]> {
+    const params = days ? `?days=${days}` : '';
+    return this.request(`/internal/appointments${params}`);
   }
 }
 

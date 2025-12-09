@@ -1340,3 +1340,125 @@ export interface InternalWorkOrderListQuery {
   unassigned?: boolean;
   upcoming?: boolean;
 }
+
+// ============================================================================
+// INTERNAL DASHBOARD TYPES
+// ============================================================================
+
+export interface InternalDashboardStats {
+  activeHouseholds: number;
+  openConversations: number;
+  unassignedConversations: number;
+  openWorkOrders: number;
+  todaysAppointments: number;
+}
+
+export interface InternalHousehold {
+  id: string;
+  name: string;
+  description?: string | null;
+  subscriptionPlan: string;
+  subscriptionStatus: string;
+  createdAt: string;
+  updatedAt: string;
+  owner: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    phone?: string | null;
+  };
+  homeProfile?: {
+    id: string;
+    propertyType: string;
+    addressLine1?: string | null;
+    addressLine2?: string | null;
+    city?: string | null;
+    state?: string | null;
+    postalCode?: string | null;
+  } | null;
+  _count: {
+    members: number;
+    serviceRequests: number;
+    tasks: number;
+    billAccounts: number;
+    conversations: number;
+    workOrders: number;
+  };
+}
+
+export interface InternalConversation {
+  id: string;
+  subject?: string | null;
+  status: ConversationStatus;
+  homeownerUnreadCount: number;
+  homeManagerUnreadCount: number;
+  createdAt: string;
+  updatedAt: string;
+  household: {
+    id: string;
+    name: string;
+    owner: {
+      firstName: string | null;
+      lastName: string | null;
+      email: string;
+    };
+  };
+  assignedTo?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+  _count: {
+    messages: number;
+  };
+}
+
+export interface InternalWorkOrder {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: WorkOrderStatus;
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
+  estimatedCost?: number | null;
+  actualCost?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  household: {
+    id: string;
+    name: string;
+    homeProfile?: {
+      addressLine1?: string | null;
+      city?: string | null;
+      state?: string | null;
+    } | null;
+  };
+  vendor?: {
+    id: string;
+    name: string;
+    phone?: string | null;
+  } | null;
+  maintenanceTask?: {
+    id: string;
+    name: string;
+  } | null;
+  createdBy: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+  };
+  _count: {
+    notes: number;
+  };
+}
+
+export interface InternalConversationFilters {
+  status?: 'all' | 'unassigned' | 'assigned' | 'closed';
+}
+
+export interface InternalWorkOrderFilters {
+  status?: WorkOrderStatus | 'all';
+  dateFrom?: string;
+  dateTo?: string;
+}
