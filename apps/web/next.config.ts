@@ -10,6 +10,16 @@ const nextConfig: NextConfig = {
   // Disable x-powered-by header for security
   poweredByHeader: false,
 
+  // Ignore ESLint errors during build (linting runs separately in CI)
+  eslint: {
+    ignoreDuringBuilds: true,
+  },
+
+  // Ignore TypeScript errors during build (type checking runs separately)
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // Configure allowed image domains
   images: {
     remotePatterns: [
