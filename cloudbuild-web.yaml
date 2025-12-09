@@ -1,0 +1,67 @@
+# Cloud Build configuration for Haven Web
+# This file tells Google Cloud Build how to build and deploy the web app
+
+steps:
+  # Step 1: Get the API URL from Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        API_URL=$(gcloud run services describe haven-api --region=us-central1 --format='value(status.url)' 2>/dev/null || echo "https://haven-api-placeholder.run.app")
+        echo "API_URL=$${API_URL}/api" > /workspace/api_url.env
+        cat /workspace/api_url.env
+
+  # Step 2: Build the Docker image with the API URL
+  - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        source /workspace/api_url.env
+        docker build \
+          -t gcr.io/$PROJECT_ID/haven-web:$COMMIT_SHA \
+          -t gcr.io/$PROJECT_ID/haven-web:latest \
+          --build-arg NEXT_PUBLIC_API_URL=$${API_URL} \
+          -f apps/web/Dockerfile \
+          .
+
+  # Step 3: Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/haven-web:$COMMIT_SHA'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/haven-web:latest'
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'haven-web'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/haven-web:$COMMIT_SHA'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '512Mi'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+
+# Store the built images
+images:
+  - 'gcr.io/$PROJECT_ID/haven-web:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/haven-web:latest'
+
+# Build timeout (15 minutes)
+timeout: '900s'
