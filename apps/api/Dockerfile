@@ -42,7 +42,8 @@ RUN pnpm build
 # ============================================================================
 FROM node:20-alpine AS runner
 
-RUN apk add --no-cache libc6-compat openssl dumb-init
+# Install runtime deps + build tools for native modules (bcrypt)
+RUN apk add --no-cache libc6-compat openssl dumb-init python3 make g++
 
 # Create non-root user for security
 RUN addgroup --system --gid 1001 nodejs
@@ -56,8 +57,8 @@ COPY --from=builder /app/apps/api/package.json ./package.json.tmp
 # Remove workspace dependencies and create clean package.json
 RUN cat package.json.tmp | sed 's/"@haven\/core": "workspace:\*",//g' | sed 's/"@haven\/config": "workspace:\*",//g' > package.json && rm package.json.tmp
 
-# Install production dependencies with npm
-RUN npm install --omit=dev --ignore-scripts
+# Install production dependencies with npm (allow scripts for native modules like bcrypt)
+RUN npm install --omit=dev
 
 # Copy and install @haven/core as a local package
 COPY --from=builder /app/packages/core/dist ./node_modules/@haven/core/dist
