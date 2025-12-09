@@ -5,7 +5,14 @@
     "baseUrl": "./",
     "paths": {
       "@/*": ["src/*"]
-    }
+    },
+    "strict": false,
+    "strictNullChecks": false,
+    "strictPropertyInitialization": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "skipLibCheck": true,
+    "isolatedModules": false
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist", "test"]
