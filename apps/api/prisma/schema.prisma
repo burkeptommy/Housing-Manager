@@ -25,12 +25,29 @@ enum HouseholdRole {
   OWNER
   MEMBER
   GUEST
+  HOME_MANAGER // Professional property manager
+  ADMIN        // Internal Haven admin
 }
 
 enum HouseholdMemberStatus {
   PENDING
   ACTIVE
   INACTIVE
+}
+
+// Household subscription plans
+enum HouseholdSubscriptionPlan {
+  FREE
+  ESSENTIALS
+  PREMIUM
+}
+
+// Household subscription status
+enum HouseholdSubscriptionStatus {
+  INACTIVE
+  ACTIVE
+  PAST_DUE
+  CANCELED
 }
 
 enum PropertyType {
@@ -280,10 +297,12 @@ enum HouseholdInvoiceStatus {
 
 model User {
   id              String    @id @default(cuid())
+  firebaseUid     String?   @unique @map("firebase_uid") // Firebase Auth UID
   email           String    @unique
-  passwordHash    String    @map("password_hash")
-  firstName       String    @map("first_name")
-  lastName        String    @map("last_name")
+  passwordHash    String?   @map("password_hash") // Optional for Firebase-only auth
+  firstName       String?   @map("first_name")
+  lastName        String?   @map("last_name")
+  displayName     String?   @map("display_name") // From Firebase or derived
   phone           String?
   avatarUrl       String?   @map("avatar_url")
   role            UserRole  @default(HOMEOWNER)
@@ -294,16 +313,18 @@ model User {
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
-  householdMembers   HouseholdMember[]
-  ownedHouseholds    Household[]         @relation("HouseholdOwner")
-  assignedTasks      Task[]              @relation("TaskAssignee")
-  createdTasks       Task[]              @relation("TaskCreator")
-  serviceRequests    ServiceRequest[]    @relation("ServiceRequestCreator")
-  sentMessages       Message[]           @relation("MessageSender")
-  subscriptions      Subscription[]
-  files              File[]
-  refreshTokens      RefreshToken[]
-  inAppNotifications InAppNotification[]
+  householdMembers    HouseholdMember[]   @relation("MemberUser")
+  invitedMembers      HouseholdMember[]   @relation("InvitedByUser")
+  sentInvites         HouseholdInvite[]
+  ownedHouseholds     Household[]         @relation("HouseholdOwner")
+  assignedTasks       Task[]              @relation("TaskAssignee")
+  createdTasks        Task[]              @relation("TaskCreator")
+  serviceRequests     ServiceRequest[]    @relation("ServiceRequestCreator")
+  sentMessages        Message[]           @relation("MessageSender")
+  subscriptions       Subscription[]
+  files               File[]
+  refreshTokens       RefreshToken[]
+  inAppNotifications  InAppNotification[]
 
   @@map("users")
 }
@@ -333,7 +354,7 @@ model RefreshToken {
 
 model Household {
   id          String   @id @default(cuid())
-  name        String
+  name        String   // e.g. "The Burke family"
   description String?
   ownerId     String   @map("owner_id")
   createdAt   DateTime @default(now()) @map("created_at")
@@ -342,13 +363,18 @@ model Household {
   // Stripe Integration - Haven is a Stripe platform; each household is a customer
   stripeCustomerId String? @unique @map("stripe_customer_id")
 
-  // Consolidated Billing Settings
+  // Subscription
+  subscriptionPlan   HouseholdSubscriptionPlan   @default(FREE) @map("subscription_plan")
+  subscriptionStatus HouseholdSubscriptionStatus @default(INACTIVE) @map("subscription_status")
+
+  // Billing Settings
   // Day of month (1-28) when consolidated invoice is generated
-  consolidatedBillingDay Int? @map("consolidated_billing_day")
+  billingCycleDay Int @default(1) @map("billing_cycle_day")
 
   // Relations
   owner             User               @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members           HouseholdMember[]
+  invites           HouseholdInvite[]
   homeProfile       HomeProfile?
   vendors           HouseholdVendor[]
   ownedVendors      Vendor[]           @relation("HouseholdVendors")
@@ -368,22 +394,47 @@ model Household {
 }
 
 model HouseholdMember {
-  id          String                @id @default(cuid())
-  householdId String                @map("household_id")
-  userId      String                @map("user_id")
-  role        HouseholdRole         @default(MEMBER)
-  status      HouseholdMemberStatus @default(PENDING)
-  invitedAt   DateTime              @default(now()) @map("invited_at")
-  joinedAt    DateTime?             @map("joined_at")
-  createdAt   DateTime              @default(now()) @map("created_at")
-  updatedAt   DateTime              @updatedAt @map("updated_at")
+  id              String                @id @default(cuid())
+  householdId     String                @map("household_id")
+  userId          String                @map("user_id")
+  role            HouseholdRole         @default(MEMBER)
+  status          HouseholdMemberStatus @default(PENDING)
+  invitedByUserId String?               @map("invited_by_user_id")
+  invitedAt       DateTime              @default(now()) @map("invited_at")
+  acceptedAt      DateTime?             @map("accepted_at")
+  joinedAt        DateTime?             @map("joined_at")
+  createdAt       DateTime              @default(now()) @map("created_at")
+  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  // Relations
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user        User      @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy   User?     @relation("InvitedByUser", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+
+  @@unique([householdId, userId])
+  @@index([userId])
+  @@map("household_members")
+}
+
+// Invitation tokens for inviting users to households
+model HouseholdInvite {
+  id          String    @id @default(cuid())
+  householdId String    @map("household_id")
+  email       String    // Email address of invitee
+  token       String    @unique // Secure random token for invite link
+  role        HouseholdRole @default(MEMBER)
+  invitedById String    @map("invited_by_id")
+  expiresAt   DateTime  @map("expires_at")
+  acceptedAt  DateTime? @map("accepted_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
 
   // Relations
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation(fields: [invitedById], references: [id], onDelete: Cascade)
 
-  @@unique([householdId, userId])
-  @@map("household_members")
+  @@index([email])
+  @@index([token])
+  @@map("household_invites")
 }
 
 // ============================================================================

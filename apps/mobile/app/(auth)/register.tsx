@@ -43,12 +43,8 @@ export default function RegisterScreen() {
 
     setIsLoading(true);
     try {
-      await register({
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim(),
-        password,
-      });
+      const displayName = `${firstName.trim()} ${lastName.trim()}`;
+      await register(email.trim(), password, displayName);
     } catch (error: any) {
       Alert.alert('Registration Failed', error.message || 'Unable to create account');
     } finally {

@@ -9,28 +9,69 @@ import {
   type ReactNode,
 } from 'react';
 import { useRouter } from 'next/navigation';
-import type {
-  User,
-  Household,
-  HouseholdDetail,
-  RegisterRequest,
-  LoginRequest,
-} from '@haven/core';
-import { getApiClient, setTokens, clearTokens, getAccessToken } from '@/lib/api';
+import type { User, Household, HouseholdDetail } from '@haven/core';
+import { getApiClient, setFirebaseToken, clearTokens } from '@/lib/api';
+import {
+  signIn as firebaseSignIn,
+  signUp as firebaseSignUp,
+  signOut as firebaseSignOut,
+  onAuthChange,
+  getIdToken,
+  type FirebaseUser,
+} from '@/lib/firebase';
+
+// Extended user info including household data from /api/me
+interface UserInfo {
+  id: string;
+  email: string;
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  avatarUrl: string | null;
+  role: string;
+  emailVerified: boolean;
+  createdAt: Date;
+}
+
+interface HouseholdInfo {
+  id: string;
+  name: string;
+  description: string | null;
+  subscriptionPlan: string;
+  subscriptionStatus: string;
+  billingCycleDay: number;
+  role: string;
+  hasProperty: boolean;
+  propertyAddress?: string;
+}
+
+interface MeResponse {
+  user: UserInfo;
+  household: HouseholdInfo | null;
+  memberships: Array<{
+    householdId: string;
+    householdName: string;
+    role: string;
+    status: string;
+  }>;
+}
 
 interface AuthContextValue {
   user: User | null;
+  firebaseUser: FirebaseUser | null;
   households: Household[];
   currentHousehold: HouseholdDetail | null;
+  householdInfo: HouseholdInfo | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
-  login: (data: LoginRequest) => Promise<void>;
-  register: (data: RegisterRequest) => Promise<void>;
-  logout: () => void;
+  login: (email: string, password: string) => Promise<void>;
+  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  logout: () => Promise<void>;
   selectHousehold: (household: Household) => void;
   refreshHouseholds: () => Promise<void>;
   refreshCurrentHousehold: () => Promise<void>;
+  refreshMe: () => Promise<void>;
   completeOnboarding: (householdId: string) => Promise<void>;
 }
 
@@ -40,17 +81,53 @@ const CURRENT_HOUSEHOLD_KEY = 'haven_current_household';
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
+  const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [householdInfo, setHouseholdInfo] = useState<HouseholdInfo | null>(null);
   const [households, setHouseholds] = useState<Household[]>([]);
   const [currentHousehold, setCurrentHousehold] = useState<HouseholdDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   const api = getApiClient();
 
   // Check if user needs onboarding (no households)
-  const needsOnboarding = !!user && households.length === 0;
+  const needsOnboarding = !!user && !householdInfo;
 
-  // Load current household from storage and fetch detail
+  // Fetch user profile and household data from /api/me
+  const fetchMe = useCallback(async (): Promise<MeResponse | null> => {
+    try {
+      // Get fresh Firebase token
+      const token = await getIdToken(true);
+      if (!token) return null;
+
+      // Update API client with token
+      setFirebaseToken(token);
+
+      // Call /api/me endpoint
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api'}/me`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        console.error('Failed to fetch /api/me:', response.status);
+        return null;
+      }
+
+      return response.json();
+    } catch (error) {
+      console.error('Error fetching /api/me:', error);
+      return null;
+    }
+  }, []);
+
+  // Load current household detail
   const loadCurrentHousehold = useCallback(
     async (householdList: Household[]) => {
       if (householdList.length === 0) {
@@ -76,7 +153,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const detail = await api.getHousehold(selectedId);
         setCurrentHousehold(detail);
       } catch {
-        // Fallback to basic household info
         const basic = householdList.find((h) => h.id === selectedId);
         if (basic) {
           setCurrentHousehold({ ...basic, members: [] });
@@ -86,76 +162,89 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [api]
   );
 
-  // Initialize auth state
+  // Handle Firebase auth state changes
   useEffect(() => {
-    const initAuth = async () => {
-      const token = getAccessToken();
-      if (!token) {
-        setIsLoading(false);
-        return;
-      }
+    const unsubscribe = onAuthChange(async (fbUser) => {
+      setFirebaseUser(fbUser);
 
-      try {
-        const [userData, householdData] = await Promise.all([
-          api.getMe(),
-          api.getHouseholds(),
-        ]);
-        setUser(userData);
-        setHouseholds(householdData);
-        await loadCurrentHousehold(householdData);
-      } catch {
+      if (fbUser) {
+        // User is signed in - fetch profile from backend
+        const meData = await fetchMe();
+
+        if (meData) {
+          // Map MeResponse to User type for backward compatibility
+          setUser({
+            id: meData.user.id,
+            email: meData.user.email,
+            firstName: meData.user.firstName || '',
+            lastName: meData.user.lastName || '',
+            phone: null,
+            avatarUrl: meData.user.avatarUrl,
+            role: meData.user.role as User['role'],
+            isActive: true,
+            createdAt: meData.user.createdAt,
+            updatedAt: meData.user.createdAt,
+          });
+
+          setHouseholdInfo(meData.household);
+
+          // Convert memberships to households for backward compatibility
+          const householdList: Household[] = meData.memberships.map((m) => ({
+            id: m.householdId,
+            name: m.householdName,
+            description: null,
+            ownerId: '', // Not available from memberships
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          }));
+
+          setHouseholds(householdList);
+          await loadCurrentHousehold(householdList);
+        } else {
+          // API call failed - clear state
+          setUser(null);
+          setHouseholdInfo(null);
+          setHouseholds([]);
+          setCurrentHousehold(null);
+        }
+      } else {
+        // User is signed out
+        setUser(null);
+        setHouseholdInfo(null);
+        setHouseholds([]);
+        setCurrentHousehold(null);
         clearTokens();
-      } finally {
-        setIsLoading(false);
       }
-    };
 
-    initAuth();
-  }, [api, loadCurrentHousehold]);
+      setIsLoading(false);
+      setIsInitialized(true);
+    });
+
+    return () => unsubscribe();
+  }, [fetchMe, loadCurrentHousehold]);
 
   const login = useCallback(
-    async (data: LoginRequest) => {
-      const response = await api.login(data);
-      setTokens(response.accessToken, response.refreshToken);
-      setUser(response.user);
-
-      const householdData = await api.getHouseholds();
-      setHouseholds(householdData);
-
-      // Role-based routing
-      if (response.user.role === 'MANAGER' || response.user.role === 'ADMIN') {
-        // Managers go to manager dashboard
-        await loadCurrentHousehold(householdData);
-        router.push('/manager');
-      } else if (householdData.length === 0) {
-        // Homeowners with no households go to onboarding
-        router.push('/onboarding');
-      } else {
-        // Homeowners with households go to app
-        await loadCurrentHousehold(householdData);
-        router.push('/app');
-      }
+    async (email: string, password: string) => {
+      await firebaseSignIn(email, password);
+      // Auth state change listener will handle the rest
     },
-    [api, router, loadCurrentHousehold]
+    []
   );
 
   const register = useCallback(
-    async (data: RegisterRequest) => {
-      const response = await api.register(data);
-      setTokens(response.accessToken, response.refreshToken);
-      setUser(response.user);
-      setHouseholds([]);
-      setCurrentHousehold(null);
-
-      // New registrations always go to onboarding
-      router.push('/onboarding');
+    async (email: string, password: string, displayName?: string) => {
+      await firebaseSignUp(email, password, displayName);
+      // Auth state change listener will handle the rest
+      // After registration, user will be redirected based on household status
     },
-    [api, router]
+    []
   );
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await firebaseSignOut();
     clearTokens();
     setUser(null);
+    setHouseholdInfo(null);
     setHouseholds([]);
     setCurrentHousehold(null);
     localStorage.removeItem(CURRENT_HOUSEHOLD_KEY);
@@ -176,10 +265,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const refreshHouseholds = useCallback(async () => {
-    const householdData = await api.getHouseholds();
-    setHouseholds(householdData);
-    await loadCurrentHousehold(householdData);
-  }, [api, loadCurrentHousehold]);
+    const meData = await fetchMe();
+    if (meData) {
+      setHouseholdInfo(meData.household);
+      const householdList: Household[] = meData.memberships.map((m) => ({
+        id: m.householdId,
+        name: m.householdName,
+        description: null,
+        ownerId: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      setHouseholds(householdList);
+      await loadCurrentHousehold(householdList);
+    }
+  }, [fetchMe, loadCurrentHousehold]);
 
   const refreshCurrentHousehold = useCallback(async () => {
     if (!currentHousehold) return;
@@ -191,26 +291,80 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [api, currentHousehold]);
 
+  const refreshMe = useCallback(async () => {
+    const meData = await fetchMe();
+    if (meData) {
+      setUser({
+        id: meData.user.id,
+        email: meData.user.email,
+        firstName: meData.user.firstName || '',
+        lastName: meData.user.lastName || '',
+        phone: null,
+        avatarUrl: meData.user.avatarUrl,
+        role: meData.user.role as User['role'],
+        isActive: true,
+        createdAt: meData.user.createdAt,
+        updatedAt: meData.user.createdAt,
+      });
+      setHouseholdInfo(meData.household);
+    }
+  }, [fetchMe]);
+
   const completeOnboarding = useCallback(
     async (householdId: string) => {
-      const householdData = await api.getHouseholds();
-      setHouseholds(householdData);
+      // Refresh data after onboarding
+      await refreshHouseholds();
       localStorage.setItem(CURRENT_HOUSEHOLD_KEY, householdId);
 
-      const detail = await api.getHousehold(householdId);
-      setCurrentHousehold(detail);
+      try {
+        const detail = await api.getHousehold(householdId);
+        setCurrentHousehold(detail);
+      } catch {
+        // Ignore errors
+      }
 
       router.push('/app');
     },
-    [api, router]
+    [api, router, refreshHouseholds]
   );
+
+  // Handle routing based on auth state
+  useEffect(() => {
+    if (!isInitialized || isLoading) return;
+
+    const path = window.location.pathname;
+
+    // Skip routing for public pages
+    if (path === '/login' || path === '/register' || path === '/') {
+      return;
+    }
+
+    if (!user) {
+      // Not authenticated - redirect to login
+      router.push('/login');
+      return;
+    }
+
+    // Handle role-based and onboarding routing
+    if (path.startsWith('/app') || path.startsWith('/onboarding')) {
+      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
+        router.push('/manager');
+      } else if (needsOnboarding && !path.startsWith('/onboarding')) {
+        router.push('/onboarding');
+      } else if (!needsOnboarding && path.startsWith('/onboarding')) {
+        router.push('/app');
+      }
+    }
+  }, [isInitialized, isLoading, user, needsOnboarding, router]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
+        firebaseUser,
         households,
         currentHousehold,
+        householdInfo,
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding,
@@ -220,6 +374,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         selectHousehold,
         refreshHouseholds,
         refreshCurrentHousehold,
+        refreshMe,
         completeOnboarding,
       }}
     >

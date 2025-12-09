@@ -17,7 +17,7 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
-      await login({ email, password });
+      await login(email, password);
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message

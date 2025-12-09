@@ -1,6 +1,7 @@
 import {
   Controller,
   Get,
+  Post,
   Patch,
   Delete,
   Param,
@@ -10,13 +11,126 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
+import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { UserRole } from '@prisma/client';
 
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
+import { FirebaseAuthGuard, AuthPayload, CurrentUser } from '../firebase';
 
-import { UsersService, PaginatedUsers } from './users.service';
+import {
+  UsersService,
+  PaginatedUsers,
+  MeResponse,
+  InviteUserDto,
+  AcceptInviteDto,
+} from './users.service';
 import { UserDto, AdminUpdateUserDto, UserListQueryDto } from './dto';
 
+/**
+ * Me Controller - User profile and household management
+ * Uses Firebase Auth
+ */
+@ApiTags('Me')
+@ApiBearerAuth()
+@Controller('me')
+@UseGuards(FirebaseAuthGuard)
+export class MeController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * Get current user profile and household info
+   */
+  @Get()
+  @ApiOperation({ summary: 'Get current user profile with household info' })
+  @ApiResponse({ status: 200, description: 'User profile with household info' })
+  async getMe(@CurrentUser() user: AuthPayload): Promise<MeResponse> {
+    return this.usersService.getMe(user);
+  }
+
+  /**
+   * Get pending invites for current user
+   */
+  @Get('invites')
+  @ApiOperation({ summary: 'Get pending household invites for current user' })
+  async getPendingInvites(@CurrentUser() user: AuthPayload) {
+    return this.usersService.getPendingInvites(user.email);
+  }
+
+  /**
+   * Switch to a different household
+   */
+  @Post('switch-household/:householdId')
+  @ApiOperation({ summary: 'Switch current household context' })
+  async switchHousehold(
+    @CurrentUser() user: AuthPayload,
+    @Param('householdId') householdId: string,
+  ) {
+    return this.usersService.switchHousehold(user.userId, householdId);
+  }
+}
+
+/**
+ * Household Invites Controller
+ * Uses Firebase Auth
+ */
+@ApiTags('Household Invites')
+@ApiBearerAuth()
+@Controller('household')
+@UseGuards(FirebaseAuthGuard)
+export class HouseholdInvitesController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * Invite a user to a household
+   */
+  @Post(':householdId/invite')
+  @ApiOperation({ summary: 'Invite a user to the household by email' })
+  @ApiResponse({ status: 201, description: 'Invite sent successfully' })
+  @ApiResponse({ status: 403, description: 'Not authorized to invite' })
+  @ApiResponse({ status: 409, description: 'User already invited or member' })
+  async inviteUser(
+    @CurrentUser() user: AuthPayload,
+    @Param('householdId') householdId: string,
+    @Body() dto: InviteUserDto,
+  ) {
+    return this.usersService.inviteUser(user, householdId, dto);
+  }
+
+  /**
+   * Accept a household invitation
+   */
+  @Post('accept-invite')
+  @ApiOperation({ summary: 'Accept a household invitation' })
+  @ApiResponse({ status: 200, description: 'Invite accepted successfully' })
+  @ApiResponse({ status: 400, description: 'Invalid or expired invite' })
+  async acceptInvite(
+    @CurrentUser() user: AuthPayload,
+    @Body() dto: AcceptInviteDto,
+  ) {
+    return this.usersService.acceptInvite(user, dto);
+  }
+
+  /**
+   * Create a new household (for users without one)
+   */
+  @Post('create')
+  @ApiOperation({ summary: 'Create a new household' })
+  @ApiResponse({ status: 201, description: 'Household created successfully' })
+  @ApiResponse({ status: 409, description: 'User already owns a household' })
+  async createHousehold(
+    @CurrentUser() user: AuthPayload,
+    @Body() dto: { name: string; description?: string },
+  ) {
+    return this.usersService.createHousehold(user.userId, dto);
+  }
+}
+
+/**
+ * Admin Users Controller - Existing admin functionality
+ * Uses JWT Auth (legacy)
+ */
+@ApiTags('Admin Users')
+@ApiBearerAuth()
 @Controller('users')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class UsersController {
@@ -27,6 +141,7 @@ export class UsersController {
    */
   @Get(':id')
   @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Get user by ID (Admin only)' })
   async findOne(@Param('id') id: string): Promise<UserDto> {
     return this.usersService.findById(id);
   }
@@ -36,6 +151,7 @@ export class UsersController {
    */
   @Get()
   @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'List all users with pagination (Admin only)' })
   async findAll(@Query() query: UserListQueryDto): Promise<PaginatedUsers> {
     return this.usersService.findMany(query);
   }
@@ -45,6 +161,7 @@ export class UsersController {
    */
   @Patch(':id')
   @Roles(UserRole.ADMIN)
+  @ApiOperation({ summary: 'Update user (Admin only)' })
   async update(
     @Param('id') id: string,
     @Body() dto: AdminUpdateUserDto,
@@ -58,6 +175,7 @@ export class UsersController {
   @Delete(':id')
   @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete user (Admin only)' })
   async delete(@Param('id') id: string): Promise<void> {
     return this.usersService.delete(id);
   }

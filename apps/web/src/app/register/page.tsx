@@ -31,7 +31,8 @@ export default function RegisterPage() {
     setIsSubmitting(true);
 
     try {
-      await register({ email, password, firstName, lastName });
+      const displayName = `${firstName} ${lastName}`;
+      await register(email, password, displayName);
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message

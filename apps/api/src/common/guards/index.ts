@@ -1,1 +1,7 @@
-export { HouseholdMemberGuard, HouseholdIdParam, HOUSEHOLD_ID_PARAM } from './household-member.guard';
+export {
+  HouseholdMemberGuard,
+  HouseholdIdParam,
+  HouseholdRoles,
+  HOUSEHOLD_ID_PARAM,
+  HOUSEHOLD_ROLES_KEY,
+} from './household-member.guard';

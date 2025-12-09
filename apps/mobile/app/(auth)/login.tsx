@@ -30,7 +30,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await login({ email: email.trim(), password });
+      await login(email.trim(), password);
     } catch (error: any) {
       Alert.alert('Login Failed', error.message || 'Invalid email or password');
     } finally {
