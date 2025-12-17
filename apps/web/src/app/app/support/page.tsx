@@ -9,7 +9,7 @@ import {
 } from '@/hooks/use-conversations';
 import { useAuth } from '@/contexts/auth-context';
 import { getApiClient } from '@/lib/api';
-import type { Conversation, SupportMessage, ConversationStatus, FileAsset } from '@haven/core';
+import type { Conversation, SupportMessage, ConversationStatus } from '@haven/core';
 
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -501,7 +501,7 @@ export default function SupportPage() {
   const { conversations, isLoading, refetch } = useConversations();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
-  const householdId = householdInfo?.householdId || '';
+  const householdId = householdInfo?.id || '';
 
   // Select first conversation on load if on desktop
   useEffect(() => {
