@@ -14,7 +14,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard } from '../auth';
+import { FirebaseAuthGuard } from '../firebase';
 import { HouseholdMemberGuard } from '../common';
 
 import { HomeProfilesService } from './home-profiles.service';
@@ -23,7 +23,7 @@ import { UpsertHomeProfileDto, HomeProfileDto } from './dto';
 @ApiTags('Home Profiles')
 @ApiBearerAuth()
 @Controller('households/:householdId/profile')
-@UseGuards(JwtAuthGuard, HouseholdMemberGuard)
+@UseGuards(FirebaseAuthGuard, HouseholdMemberGuard)
 export class HomeProfilesController {
   constructor(private readonly homeProfilesService: HomeProfilesService) {}
 

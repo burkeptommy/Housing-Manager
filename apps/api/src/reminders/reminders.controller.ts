@@ -13,8 +13,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../auth/decorators/current-user.decorator';
+import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
 import { HouseholdMemberGuard } from '../common/guards/household-member.guard';
 import { RemindersService } from './reminders.service';
 import {
@@ -58,7 +57,7 @@ export class RemindersController {
    * Get upcoming items for dashboard
    */
   @Get('dashboard/upcoming')
-  @UseGuards(JwtAuthGuard, HouseholdMemberGuard)
+  @UseGuards(FirebaseAuthGuard, HouseholdMemberGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get upcoming bills and maintenance tasks for dashboard' })
   @ApiQuery({ name: 'householdId', required: true })
@@ -85,7 +84,7 @@ export class RemindersController {
    * Get full dashboard data including summary, next up, today's tasks, and upcoming items
    */
   @Get('dashboard')
-  @UseGuards(JwtAuthGuard, HouseholdMemberGuard)
+  @UseGuards(FirebaseAuthGuard, HouseholdMemberGuard)
   @ApiBearerAuth()
   @ApiOperation({
     summary: 'Get full dashboard data',
@@ -104,17 +103,17 @@ export class RemindersController {
    * Get in-app notifications for current user
    */
   @Get('notifications')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get in-app notifications for current user' })
   @ApiQuery({ name: 'unreadOnly', required: false, type: Boolean })
   @ApiResponse({ status: 200, type: [InAppNotificationDto] })
   async getNotifications(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthPayload,
     @Query('unreadOnly') unreadOnly?: boolean,
   ): Promise<InAppNotificationDto[]> {
     const notifications = await this.remindersService.getInAppNotifications(
-      user.id,
+      user.userId,
       unreadOnly === true,
     );
     return notifications.map((n) => ({
@@ -134,14 +133,14 @@ export class RemindersController {
    * Get unread notification count
    */
   @Get('notifications/unread-count')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get unread notification count' })
   @ApiResponse({ status: 200, schema: { properties: { count: { type: 'number' } } } })
   async getUnreadCount(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthPayload,
   ): Promise<{ count: number }> {
-    const count = await this.remindersService.getUnreadCount(user.id);
+    const count = await this.remindersService.getUnreadCount(user.userId);
     return { count };
   }
 
@@ -149,16 +148,16 @@ export class RemindersController {
    * Mark a notification as read/unread
    */
   @Patch('notifications/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark notification as read/unread' })
   @ApiResponse({ status: 200 })
   async markNotificationRead(
     @Param('id') id: string,
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthPayload,
     @Body() dto: MarkNotificationReadDto,
   ): Promise<{ success: boolean }> {
-    await this.remindersService.markNotificationRead(id, user.id, dto.isRead);
+    await this.remindersService.markNotificationRead(id, user.userId, dto.isRead);
     return { success: true };
   }
 
@@ -166,14 +165,14 @@ export class RemindersController {
    * Mark all notifications as read
    */
   @Post('notifications/mark-all-read')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Mark all notifications as read' })
   @ApiResponse({ status: 200 })
   async markAllNotificationsRead(
-    @CurrentUser() user: { id: string },
+    @CurrentUser() user: AuthPayload,
   ): Promise<{ success: boolean }> {
-    await this.remindersService.markAllNotificationsRead(user.id);
+    await this.remindersService.markAllNotificationsRead(user.userId);
     return { success: true };
   }
 }

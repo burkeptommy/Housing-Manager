@@ -18,7 +18,7 @@ import {
   WorkOrderQueryDto,
   InternalWorkOrderQueryDto,
 } from './dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FirebaseAuthGuard } from '../firebase';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 
@@ -26,7 +26,7 @@ import { Roles } from '../auth/decorators/roles.decorator';
  * Work Orders Controller for Homeowners
  */
 @Controller('work-orders')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class WorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}
 
@@ -71,7 +71,7 @@ export class WorkOrdersController {
  * Internal Work Orders Controller for Home Managers
  */
 @Controller('internal/work-orders')
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(FirebaseAuthGuard, RolesGuard)
 @Roles('HOME_MANAGER', 'MANAGER', 'ADMIN')
 export class InternalWorkOrdersController {
   constructor(private readonly workOrdersService: WorkOrdersService) {}

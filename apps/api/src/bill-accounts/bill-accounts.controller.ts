@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { VendorCategory } from '@prisma/client';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FirebaseAuthGuard } from '../firebase';
 
 import { BillAccountsService } from './bill-accounts.service';
 import {
@@ -33,7 +33,7 @@ import {
 @ApiTags('Bill Accounts')
 @ApiBearerAuth()
 @Controller('bill-accounts')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class BillAccountsController {
   constructor(private readonly billAccountsService: BillAccountsService) {}
 
@@ -46,7 +46,7 @@ export class BillAccountsController {
     @Body() createBillAccountDto: CreateBillAccountDto,
     @Request() req: { user: { sub: string } },
   ): Promise<BillAccountResponseDto> {
-    return this.billAccountsService.create(req.user.sub, createBillAccountDto);
+    return this.billAccountsService.create(req.user.userId, createBillAccountDto);
   }
 
   @Get()
@@ -79,7 +79,7 @@ export class BillAccountsController {
     @Param('id') id: string,
     @Request() req: { user: { sub: string } },
   ): Promise<BillAccountResponseDto> {
-    return this.billAccountsService.findOne(id, req.user.sub);
+    return this.billAccountsService.findOne(id, req.user.userId);
   }
 
   @Patch(':id')
@@ -91,7 +91,7 @@ export class BillAccountsController {
     @Body() updateBillAccountDto: UpdateBillAccountDto,
     @Request() req: { user: { sub: string } },
   ): Promise<BillAccountResponseDto> {
-    return this.billAccountsService.update(id, req.user.sub, updateBillAccountDto);
+    return this.billAccountsService.update(id, req.user.userId, updateBillAccountDto);
   }
 
   @Delete(':id')
@@ -103,6 +103,6 @@ export class BillAccountsController {
     @Param('id') id: string,
     @Request() req: { user: { sub: string } },
   ): Promise<void> {
-    return this.billAccountsService.remove(id, req.user.sub);
+    return this.billAccountsService.remove(id, req.user.userId);
   }
 }

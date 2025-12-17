@@ -18,7 +18,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard, CurrentUser, JwtPayload } from '../auth';
+import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
 import { HouseholdMemberGuard } from '../common';
 
 import { HouseholdsService } from './households.service';
@@ -33,7 +33,7 @@ import {
 @ApiTags('Households')
 @ApiBearerAuth()
 @Controller('households')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class HouseholdsController {
   constructor(private readonly householdsService: HouseholdsService) {}
 
@@ -41,17 +41,17 @@ export class HouseholdsController {
   @ApiOperation({ summary: 'Create a new household' })
   @ApiResponse({ status: 201, description: 'Household created', type: HouseholdDto })
   async create(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
     @Body() dto: CreateHouseholdDto,
   ): Promise<HouseholdDto> {
-    return this.householdsService.create(user.sub, dto);
+    return this.householdsService.create(user.userId, dto);
   }
 
   @Get()
   @ApiOperation({ summary: 'List households for current user' })
   @ApiResponse({ status: 200, description: 'List of households', type: [HouseholdListItemDto] })
-  async findAll(@CurrentUser() user: JwtPayload): Promise<HouseholdListItemDto[]> {
-    return this.householdsService.findAllForUser(user.sub);
+  async findAll(@CurrentUser() user: AuthPayload): Promise<HouseholdListItemDto[]> {
+    return this.householdsService.findAllForUser(user.userId);
   }
 
   @Get(':id')
@@ -72,10 +72,10 @@ export class HouseholdsController {
   @ApiResponse({ status: 403, description: 'Only owners can update' })
   async update(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
     @Body() dto: UpdateHouseholdDto,
   ): Promise<HouseholdDto> {
-    return this.householdsService.update(id, user.sub, dto);
+    return this.householdsService.update(id, user.userId, dto);
   }
 
   @Delete(':id')
@@ -87,8 +87,8 @@ export class HouseholdsController {
   @ApiResponse({ status: 403, description: 'Only owners can delete' })
   async delete(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<void> {
-    return this.householdsService.delete(id, user.sub);
+    return this.householdsService.delete(id, user.userId);
   }
 }

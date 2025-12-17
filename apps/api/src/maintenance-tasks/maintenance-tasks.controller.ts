@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { MaintenanceCategory, MaintenanceTaskStatus } from '@prisma/client';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FirebaseAuthGuard } from '../firebase';
 
 import { MaintenanceTasksService } from './maintenance-tasks.service';
 import {
@@ -35,7 +35,7 @@ import {
 @ApiTags('Maintenance Tasks')
 @ApiBearerAuth()
 @Controller('maintenance-tasks')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class MaintenanceTasksController {
   constructor(private readonly maintenanceTasksService: MaintenanceTasksService) {}
 
@@ -48,7 +48,7 @@ export class MaintenanceTasksController {
     @Body() createTaskDto: CreateMaintenanceTaskDto,
     @Request() req: { user: { sub: string } },
   ): Promise<MaintenanceTaskResponseDto> {
-    return this.maintenanceTasksService.create(req.user.sub, createTaskDto);
+    return this.maintenanceTasksService.create(req.user.userId, createTaskDto);
   }
 
   @Post('generate-from-templates')
@@ -59,7 +59,7 @@ export class MaintenanceTasksController {
     @Body() generateDto: GenerateFromTemplatesDto,
     @Request() req: { user: { sub: string } },
   ): Promise<MaintenanceTaskResponseDto[]> {
-    return this.maintenanceTasksService.generateFromTemplates(req.user.sub, generateDto);
+    return this.maintenanceTasksService.generateFromTemplates(req.user.userId, generateDto);
   }
 
   @Get('templates')
@@ -105,7 +105,7 @@ export class MaintenanceTasksController {
     @Param('id') id: string,
     @Request() req: { user: { sub: string } },
   ): Promise<MaintenanceTaskResponseDto> {
-    return this.maintenanceTasksService.findOne(id, req.user.sub);
+    return this.maintenanceTasksService.findOne(id, req.user.userId);
   }
 
   @Patch(':id')
@@ -117,7 +117,7 @@ export class MaintenanceTasksController {
     @Body() updateTaskDto: UpdateMaintenanceTaskDto,
     @Request() req: { user: { sub: string } },
   ): Promise<MaintenanceTaskResponseDto> {
-    return this.maintenanceTasksService.update(id, req.user.sub, updateTaskDto);
+    return this.maintenanceTasksService.update(id, req.user.userId, updateTaskDto);
   }
 
   @Delete(':id')
@@ -129,6 +129,6 @@ export class MaintenanceTasksController {
     @Param('id') id: string,
     @Request() req: { user: { sub: string } },
   ): Promise<void> {
-    return this.maintenanceTasksService.remove(id, req.user.sub);
+    return this.maintenanceTasksService.remove(id, req.user.userId);
   }
 }

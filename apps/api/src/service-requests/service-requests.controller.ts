@@ -17,7 +17,7 @@ import {
   ApiQuery,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard, CurrentUser, JwtPayload } from '../auth';
+import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
 
 import { ServiceRequestsService } from './service-requests.service';
 import {
@@ -30,7 +30,7 @@ import {
 @ApiTags('Service Requests')
 @ApiBearerAuth()
 @Controller()
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class ServiceRequestsController {
   constructor(private readonly serviceRequestsService: ServiceRequestsService) {}
 
@@ -42,7 +42,7 @@ export class ServiceRequestsController {
   @ApiResponse({ status: 403, description: 'Not a household member' })
   async create(
     @Body() dto: CreateServiceRequestDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<ServiceRequestDetailDto> {
     return this.serviceRequestsService.create(dto, user);
   }
@@ -55,7 +55,7 @@ export class ServiceRequestsController {
   @ApiResponse({ status: 403, description: 'Not a household member' })
   async findByHousehold(
     @Query('householdId') householdId: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<ServiceRequestDto[]> {
     return this.serviceRequestsService.findByHousehold(householdId, user);
   }
@@ -65,7 +65,7 @@ export class ServiceRequestsController {
   @ApiResponse({ status: 200, description: 'List of requests', type: [ServiceRequestDetailDto] })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async findManagerRequests(
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<ServiceRequestDetailDto[]> {
     return this.serviceRequestsService.findManagerRequests(user);
   }
@@ -79,7 +79,7 @@ export class ServiceRequestsController {
   @ApiResponse({ status: 404, description: 'Request not found' })
   async findOne(
     @Param('id') id: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<ServiceRequestDetailDto> {
     return this.serviceRequestsService.findOne(id, user);
   }
@@ -95,7 +95,7 @@ export class ServiceRequestsController {
   async update(
     @Param('id') id: string,
     @Body() dto: UpdateServiceRequestDto,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<ServiceRequestDetailDto> {
     return this.serviceRequestsService.update(id, dto, user);
   }

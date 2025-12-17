@@ -7,7 +7,7 @@ import {
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../prisma';
-import { JwtPayload } from '../auth';
+import { AuthPayload } from '../firebase';
 
 import {
   CreateServiceRequestDto,
@@ -24,14 +24,14 @@ export class ServiceRequestsService {
 
   async create(
     dto: CreateServiceRequestDto,
-    user: JwtPayload,
+    user: AuthPayload,
   ): Promise<ServiceRequestDetailDto> {
     // Verify user has access to the household
     const membership = await this.prisma.householdMember.findUnique({
       where: {
         householdId_userId: {
           householdId: dto.householdId,
-          userId: user.sub,
+          userId: user.userId,
         },
       },
     });
@@ -56,7 +56,7 @@ export class ServiceRequestsService {
         serviceCategory: dto.categoryId
           ? { connect: { id: dto.categoryId } }
           : undefined,
-        createdBy: { connect: { id: user.sub } },
+        createdBy: { connect: { id: user.userId } },
         title: dto.title,
         description: dto.description,
         priority: dto.priority || 'MEDIUM',
@@ -77,7 +77,7 @@ export class ServiceRequestsService {
 
   async findByHousehold(
     householdId: string,
-    user: JwtPayload,
+    user: AuthPayload,
   ): Promise<ServiceRequestDto[]> {
     // Verify user has access to the household (unless admin)
     if (user.role !== 'ADMIN') {
@@ -85,7 +85,7 @@ export class ServiceRequestsService {
         where: {
           householdId_userId: {
             householdId,
-            userId: user.sub,
+            userId: user.userId,
           },
         },
       });
@@ -103,11 +103,11 @@ export class ServiceRequestsService {
     return requests.map((r) => this.mapToDto(r));
   }
 
-  async findManagerRequests(user: JwtPayload): Promise<ServiceRequestDetailDto[]> {
+  async findManagerRequests(user: AuthPayload): Promise<ServiceRequestDetailDto[]> {
     // Manager sees requests assigned to them or from households they manage
     const managedHouseholds = await this.prisma.householdMember.findMany({
       where: {
-        userId: user.sub,
+        userId: user.userId,
         role: 'MANAGER',
         status: 'ACTIVE',
       },
@@ -138,7 +138,7 @@ export class ServiceRequestsService {
     return requests.map((r) => this.mapToDetailDto(r));
   }
 
-  async findOne(id: string, user: JwtPayload): Promise<ServiceRequestDetailDto> {
+  async findOne(id: string, user: AuthPayload): Promise<ServiceRequestDetailDto> {
     const request = await this.prisma.serviceRequest.findUnique({
       where: { id },
       include: {
@@ -159,7 +159,7 @@ export class ServiceRequestsService {
         where: {
           householdId_userId: {
             householdId: request.householdId,
-            userId: user.sub,
+            userId: user.userId,
           },
         },
       });
@@ -175,7 +175,7 @@ export class ServiceRequestsService {
   async update(
     id: string,
     dto: UpdateServiceRequestDto,
-    user: JwtPayload,
+    user: AuthPayload,
   ): Promise<ServiceRequestDetailDto> {
     const existing = await this.prisma.serviceRequest.findUnique({
       where: { id },
@@ -192,7 +192,7 @@ export class ServiceRequestsService {
         where: {
           householdId_userId: {
             householdId: existing.householdId,
-            userId: user.sub,
+            userId: user.userId,
           },
         },
       });
