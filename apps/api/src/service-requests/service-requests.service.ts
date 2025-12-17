@@ -108,7 +108,7 @@ export class ServiceRequestsService {
     const managedHouseholds = await this.prisma.householdMember.findMany({
       where: {
         userId: user.userId,
-        role: 'MANAGER',
+        role: 'HOME_MANAGER',
         status: 'ACTIVE',
       },
       select: { householdId: true },
