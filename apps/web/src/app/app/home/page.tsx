@@ -20,9 +20,102 @@ import {
   type SystemsData,
 } from '@/lib/validations/onboarding';
 
+interface SystemDetail {
+  type?: string;
+  vendor?: string;
+  vendorPhone?: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  installDate?: string;
+  lastServiceDate?: string;
+  nextMaintenanceDate?: string;
+  warrantyExpires?: string;
+  notes?: string;
+  filterSize?: string;
+  filterLastChanged?: string;
+  filterNextChange?: string;
+  [key: string]: unknown;
+}
+
+interface DetailedSystems {
+  heating?: SystemDetail;
+  hvac?: SystemDetail;
+  waterHeater?: SystemDetail;
+  electrical?: SystemDetail;
+  plumbing?: SystemDetail;
+  laundry?: {
+    washer?: SystemDetail;
+    dryer?: SystemDetail;
+    ventLastCleaned?: string;
+    ventNextCleaning?: string;
+    vendor?: string;
+    vendorPhone?: string;
+  };
+  fireplace?: SystemDetail;
+  lawnCare?: SystemDetail & {
+    serviceFrequency?: string;
+    services?: string[];
+    irrigationVendor?: string;
+    irrigationPhone?: string;
+  };
+  houseCleaning?: SystemDetail & {
+    serviceFrequency?: string;
+    serviceDay?: string;
+    deepCleanSchedule?: string;
+    lastDeepClean?: string;
+    nextDeepClean?: string;
+    services?: string[];
+  };
+  pestControl?: SystemDetail & {
+    serviceFrequency?: string;
+    services?: string[];
+  };
+  security?: SystemDetail & {
+    cameras?: number;
+    doorSensors?: number;
+    motionSensors?: number;
+  };
+  roof?: SystemDetail & {
+    guttersCleaned?: string;
+    guttersNextCleaning?: string;
+  };
+  garage?: SystemDetail & {
+    openerBrand?: string;
+    openerModel?: string;
+  };
+  pool?: SystemDetail;
+}
+
+interface UpcomingMaintenance {
+  service: string;
+  date: string;
+  vendor: string;
+  time?: string;
+  notes?: string;
+}
+
+interface RecentService {
+  service: string;
+  date: string;
+  vendor: string;
+  cost?: number;
+}
+
+interface ServiceReport {
+  title: string;
+  date: string;
+  vendor: string;
+  summary: string;
+}
+
 interface ExtendedProfileData {
-  systems?: HomeSystems;
+  systems?: HomeSystems | DetailedSystems;
   preferences?: OnboardingPreferences;
+  upcomingMaintenance?: UpcomingMaintenance[];
+  recentServices?: RecentService[];
+  serviceReports?: ServiceReport[];
+  appliances?: Record<string, SystemDetail>;
 }
 
 function parseExtendedData(notes: string | null | undefined): ExtendedProfileData {
@@ -32,6 +125,11 @@ function parseExtendedData(notes: string | null | undefined): ExtendedProfileDat
   } catch {
     return {};
   }
+}
+
+function isDetailedSystems(systems: HomeSystems | DetailedSystems | undefined): systems is DetailedSystems {
+  if (!systems) return false;
+  return 'heating' in systems || 'hvac' in systems && typeof (systems as DetailedSystems).hvac === 'object';
 }
 
 export default function HomeProfilePage() {
@@ -324,70 +422,172 @@ export default function HomeProfilePage() {
         )}
       </div>
 
-      {/* Systems Card */}
-      <div className="card">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
-          {editSection !== 'systems' && (
-            <button
-              onClick={() => setEditSection('systems')}
-              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-            >
-              Edit
-            </button>
-          )}
-        </div>
+      {/* Systems Card - Detailed View */}
+      {isDetailedSystems(extendedData.systems) ? (
+        <DetailedSystemsView systems={extendedData.systems} />
+      ) : (
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
+            {editSection !== 'systems' && (
+              <button
+                onClick={() => setEditSection('systems')}
+                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+              >
+                Edit
+              </button>
+            )}
+          </div>
 
-        {editSection === 'systems' ? (
-          <SystemsEditForm
-            systems={extendedData.systems}
-            onSave={handleSaveSystems}
-            onCancel={() => setEditSection(null)}
-            isSaving={isSaving}
-          />
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <SystemItem
-              label="HVAC"
-              value={hvacTypeOptions.find((o) => o.value === extendedData.systems?.hvacType)?.label}
-              age={extendedData.systems?.hvacAge}
+          {editSection === 'systems' ? (
+            <SystemsEditForm
+              systems={extendedData.systems as HomeSystems}
+              onSave={handleSaveSystems}
+              onCancel={() => setEditSection(null)}
+              isSaving={isSaving}
             />
-            <SystemItem
-              label="Roof"
-              value={roofTypeOptions.find((o) => o.value === extendedData.systems?.roofType)?.label}
-              age={extendedData.systems?.roofAge}
-            />
-            <SystemItem
-              label="Water Heater"
-              value={waterHeaterTypeOptions.find((o) => o.value === extendedData.systems?.waterHeaterType)?.label}
-              age={extendedData.systems?.waterHeaterAge}
-            />
-            <SystemItem
-              label="Waste System"
-              value={extendedData.systems?.septicOrSewer === 'septic' ? 'Septic' : extendedData.systems?.septicOrSewer === 'sewer' ? 'Municipal Sewer' : undefined}
-            />
-            <SystemItem
-              label="Electrical Panel"
-              value={extendedData.systems?.electricalPanelAmps ? `${extendedData.systems.electricalPanelAmps} amps` : undefined}
-            />
-            <div>
-              <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Features</h3>
-              <div className="flex flex-wrap gap-2">
-                {extendedData.systems?.hasPool && <FeatureBadge label="Pool" />}
-                {extendedData.systems?.hasSprinklerSystem && <FeatureBadge label="Sprinklers" />}
-                {extendedData.systems?.hasSecuritySystem && <FeatureBadge label="Security" />}
-                {extendedData.systems?.hasSmartHome && <FeatureBadge label="Smart Home" />}
-                {!extendedData.systems?.hasPool &&
-                  !extendedData.systems?.hasSprinklerSystem &&
-                  !extendedData.systems?.hasSecuritySystem &&
-                  !extendedData.systems?.hasSmartHome && (
-                    <span className="text-slate-400 dark:text-slate-500 text-sm">None specified</span>
-                  )}
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <SystemItem
+                label="HVAC"
+                value={hvacTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.hvacType)?.label}
+                age={(extendedData.systems as HomeSystems)?.hvacAge}
+              />
+              <SystemItem
+                label="Roof"
+                value={roofTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.roofType)?.label}
+                age={(extendedData.systems as HomeSystems)?.roofAge}
+              />
+              <SystemItem
+                label="Water Heater"
+                value={waterHeaterTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.waterHeaterType)?.label}
+                age={(extendedData.systems as HomeSystems)?.waterHeaterAge}
+              />
+              <SystemItem
+                label="Waste System"
+                value={(extendedData.systems as HomeSystems)?.septicOrSewer === 'septic' ? 'Septic' : (extendedData.systems as HomeSystems)?.septicOrSewer === 'sewer' ? 'Municipal Sewer' : undefined}
+              />
+              <SystemItem
+                label="Electrical Panel"
+                value={(extendedData.systems as HomeSystems)?.electricalPanelAmps ? `${(extendedData.systems as HomeSystems).electricalPanelAmps} amps` : undefined}
+              />
+              <div>
+                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Features</h3>
+                <div className="flex flex-wrap gap-2">
+                  {(extendedData.systems as HomeSystems)?.hasPool && <FeatureBadge label="Pool" />}
+                  {(extendedData.systems as HomeSystems)?.hasSprinklerSystem && <FeatureBadge label="Sprinklers" />}
+                  {(extendedData.systems as HomeSystems)?.hasSecuritySystem && <FeatureBadge label="Security" />}
+                  {(extendedData.systems as HomeSystems)?.hasSmartHome && <FeatureBadge label="Smart Home" />}
+                  {!(extendedData.systems as HomeSystems)?.hasPool &&
+                    !(extendedData.systems as HomeSystems)?.hasSprinklerSystem &&
+                    !(extendedData.systems as HomeSystems)?.hasSecuritySystem &&
+                    !(extendedData.systems as HomeSystems)?.hasSmartHome && (
+                      <span className="text-slate-400 dark:text-slate-500 text-sm">None specified</span>
+                    )}
+                </div>
               </div>
             </div>
+          )}
+        </div>
+      )}
+
+      {/* Upcoming Maintenance */}
+      {extendedData.upcomingMaintenance && extendedData.upcomingMaintenance.length > 0 && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Upcoming Maintenance</h2>
+          <div className="space-y-3">
+            {extendedData.upcomingMaintenance.map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">{item.service}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{item.vendor}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-slate-900 dark:text-white">
+                    {new Date(item.date).toLocaleDateString()}
+                  </p>
+                  {item.time && <p className="text-xs text-slate-500 dark:text-slate-400">{item.time}</p>}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
+
+      {/* Recent Services */}
+      {extendedData.recentServices && extendedData.recentServices.length > 0 && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Recent Services</h2>
+          <div className="space-y-3">
+            {extendedData.recentServices.map((item, index) => (
+              <div key={index} className="flex items-center justify-between p-3 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <div>
+                  <p className="font-medium text-slate-900 dark:text-white">{item.service}</p>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">{item.vendor}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {new Date(item.date).toLocaleDateString()}
+                  </p>
+                  {item.cost && (
+                    <p className="text-sm font-medium text-slate-900 dark:text-white">
+                      ${item.cost.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Service Reports */}
+      {extendedData.serviceReports && extendedData.serviceReports.length > 0 && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Service Reports</h2>
+          <div className="space-y-4">
+            {extendedData.serviceReports.map((report, index) => (
+              <div key={index} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-slate-900 dark:text-white">{report.title}</h3>
+                  <span className="text-sm text-slate-500 dark:text-slate-400">
+                    {new Date(report.date).toLocaleDateString()}
+                  </span>
+                </div>
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">{report.vendor}</p>
+                <p className="text-sm text-slate-700 dark:text-slate-300">{report.summary}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Appliances */}
+      {extendedData.appliances && Object.keys(extendedData.appliances).length > 0 && (
+        <div className="card">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Appliances</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(extendedData.appliances).map(([key, appliance]) => (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <h3 className="font-medium text-slate-900 dark:text-white capitalize mb-2">{key.replace(/([A-Z])/g, ' $1').trim()}</h3>
+                <div className="space-y-1 text-sm">
+                  {appliance.brand && <p><span className="text-slate-500 dark:text-slate-400">Brand:</span> <span className="text-slate-900 dark:text-white">{appliance.brand}</span></p>}
+                  {appliance.model && <p><span className="text-slate-500 dark:text-slate-400">Model:</span> <span className="text-slate-900 dark:text-white">{appliance.model}</span></p>}
+                  {appliance.serialNumber && <p><span className="text-slate-500 dark:text-slate-400">Serial:</span> <span className="text-slate-900 dark:text-white">{appliance.serialNumber}</span></p>}
+                  {appliance.warrantyExpires && (
+                    <p>
+                      <span className="text-slate-500 dark:text-slate-400">Warranty:</span>{' '}
+                      <span className={new Date(appliance.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-500'}>
+                        {new Date(appliance.warrantyExpires).toLocaleDateString()}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Preferences Card */}
       <div className="card">
@@ -763,5 +963,299 @@ function PreferencesEditForm({
         </button>
       </div>
     </form>
+  );
+}
+
+// Detailed Systems View Component for rich system data
+function DetailedSystemsView({ systems }: { systems: DetailedSystems }) {
+  const systemCategories = [
+    { key: 'heating', label: 'Heating', icon: '🔥' },
+    { key: 'hvac', label: 'HVAC / Air Conditioning', icon: '❄️' },
+    { key: 'waterHeater', label: 'Water Heater', icon: '🚿' },
+    { key: 'electrical', label: 'Electrical', icon: '⚡' },
+    { key: 'plumbing', label: 'Plumbing', icon: '🔧' },
+    { key: 'fireplace', label: 'Fireplace', icon: '🔥' },
+    { key: 'roof', label: 'Roof', icon: '🏠' },
+    { key: 'garage', label: 'Garage', icon: '🚗' },
+    { key: 'pool', label: 'Pool', icon: '🏊' },
+  ];
+
+  const serviceCategories = [
+    { key: 'lawnCare', label: 'Lawn Care & Landscaping', icon: '🌿' },
+    { key: 'houseCleaning', label: 'House Cleaning', icon: '🧹' },
+    { key: 'pestControl', label: 'Pest Control', icon: '🐜' },
+    { key: 'security', label: 'Security System', icon: '🔒' },
+  ];
+
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Core Home Systems */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">Home Systems</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {systemCategories.map(({ key, label, icon }) => {
+            const system = systems[key as keyof DetailedSystems] as SystemDetail | undefined;
+            if (!system) return null;
+
+            return (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">{icon}</span>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{label}</h3>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  {system.type && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Type</span>
+                      <span className="text-slate-900 dark:text-white font-medium">{system.type}</span>
+                    </div>
+                  )}
+                  {system.brand && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Brand</span>
+                      <span className="text-slate-900 dark:text-white">{system.brand} {system.model || ''}</span>
+                    </div>
+                  )}
+                  {system.serialNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Serial #</span>
+                      <span className="text-slate-900 dark:text-white font-mono text-xs">{system.serialNumber}</span>
+                    </div>
+                  )}
+
+                  {/* Vendor Info */}
+                  {system.vendor && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Vendor</span>
+                        <span className="text-slate-900 dark:text-white">{system.vendor}</span>
+                      </div>
+                      {system.vendorPhone && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Phone</span>
+                          <a href={`tel:${system.vendorPhone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                            {system.vendorPhone}
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Maintenance Dates */}
+                  {(system.lastServiceDate || system.nextMaintenanceDate) && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      {system.lastServiceDate && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Last Service</span>
+                          <span className="text-slate-900 dark:text-white">{formatDate(system.lastServiceDate)}</span>
+                        </div>
+                      )}
+                      {system.nextMaintenanceDate && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Next Maintenance</span>
+                          <span className={`font-medium ${new Date(system.nextMaintenanceDate) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                            {formatDate(system.nextMaintenanceDate)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* HVAC Filter Info */}
+                  {key === 'hvac' && system.filterSize && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Filter Size</span>
+                        <span className="text-slate-900 dark:text-white">{system.filterSize}</span>
+                      </div>
+                      {system.filterNextChange && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500 dark:text-slate-400">Filter Change Due</span>
+                          <span className={`font-medium ${new Date(system.filterNextChange) < new Date() ? 'text-red-500' : 'text-slate-900 dark:text-white'}`}>
+                            {formatDate(system.filterNextChange)}
+                          </span>
+                        </div>
+                      )}
+                      <button className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                        Order replacement filter →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Warranty */}
+                  {system.warrantyExpires && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Warranty Expires</span>
+                        <span className={new Date(system.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                          {formatDate(system.warrantyExpires)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Notes */}
+                  {system.notes && (
+                    <p className="text-xs text-slate-500 dark:text-slate-400 italic pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      {system.notes}
+                    </p>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Laundry Section */}
+      {systems.laundry && (
+        <div className="card">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">🧺</span>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Laundry</h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {systems.laundry.washer && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <h3 className="font-medium text-slate-900 dark:text-white mb-2">Washer</h3>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-slate-500">Brand:</span> <span className="text-slate-900 dark:text-white">{systems.laundry.washer.brand}</span></p>
+                  <p><span className="text-slate-500">Model:</span> <span className="text-slate-900 dark:text-white">{systems.laundry.washer.model}</span></p>
+                  {systems.laundry.washer.warrantyExpires && (
+                    <p>
+                      <span className="text-slate-500">Warranty:</span>{' '}
+                      <span className={new Date(systems.laundry.washer.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-600'}>
+                        {formatDate(systems.laundry.washer.warrantyExpires)}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {systems.laundry.dryer && (
+              <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                <h3 className="font-medium text-slate-900 dark:text-white mb-2">Dryer</h3>
+                <div className="space-y-1 text-sm">
+                  <p><span className="text-slate-500">Brand:</span> <span className="text-slate-900 dark:text-white">{systems.laundry.dryer.brand}</span></p>
+                  <p><span className="text-slate-500">Model:</span> <span className="text-slate-900 dark:text-white">{systems.laundry.dryer.model}</span></p>
+                  <p><span className="text-slate-500">Type:</span> <span className="text-slate-900 dark:text-white">{systems.laundry.dryer.type}</span></p>
+                </div>
+              </div>
+            )}
+          </div>
+          {systems.laundry.ventNextCleaning && (
+            <div className="mt-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                <strong>Dryer vent cleaning due:</strong> {formatDate(systems.laundry.ventNextCleaning)}
+                {systems.laundry.vendor && ` • ${systems.laundry.vendor}`}
+                {systems.laundry.vendorPhone && (
+                  <a href={`tel:${systems.laundry.vendorPhone}`} className="ml-2 text-amber-600 hover:underline">
+                    {systems.laundry.vendorPhone}
+                  </a>
+                )}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Service Providers */}
+      <div className="card">
+        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">Service Providers</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {serviceCategories.map(({ key, label, icon }) => {
+            const service = systems[key as keyof DetailedSystems];
+            if (!service || typeof service !== 'object') return null;
+
+            const svc = service as SystemDetail & {
+              serviceFrequency?: string;
+              services?: string[];
+              serviceDay?: string;
+              cameras?: number;
+              lastService?: string;
+              nextService?: string;
+            };
+
+            return (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center gap-2 mb-3">
+                  <span className="text-xl">{icon}</span>
+                  <h3 className="font-semibold text-slate-900 dark:text-white">{label}</h3>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  {svc.vendor && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Provider</span>
+                      <span className="text-slate-900 dark:text-white font-medium">{svc.vendor}</span>
+                    </div>
+                  )}
+                  {svc.vendorPhone && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Phone</span>
+                      <a href={`tel:${svc.vendorPhone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                        {svc.vendorPhone}
+                      </a>
+                    </div>
+                  )}
+                  {svc.serviceFrequency && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Frequency</span>
+                      <span className="text-slate-900 dark:text-white">{svc.serviceFrequency}</span>
+                    </div>
+                  )}
+                  {svc.serviceDay && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Service Day</span>
+                      <span className="text-slate-900 dark:text-white">{svc.serviceDay}</span>
+                    </div>
+                  )}
+                  {svc.lastService && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Last Service</span>
+                      <span className="text-slate-900 dark:text-white">{formatDate(svc.lastService)}</span>
+                    </div>
+                  )}
+                  {svc.nextService && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Next Service</span>
+                      <span className="text-green-600 dark:text-green-400 font-medium">{formatDate(svc.nextService)}</span>
+                    </div>
+                  )}
+
+                  {/* Security specific info */}
+                  {key === 'security' && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700 space-y-1">
+                      {svc.brand && <p><span className="text-slate-500">System:</span> <span className="text-slate-900 dark:text-white">{svc.brand} {svc.model || ''}</span></p>}
+                      {svc.cameras && <p><span className="text-slate-500">Cameras:</span> <span className="text-slate-900 dark:text-white">{svc.cameras}</span></p>}
+                    </div>
+                  )}
+
+                  {/* Services list */}
+                  {svc.services && svc.services.length > 0 && (
+                    <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                      <span className="text-slate-500 dark:text-slate-400 block mb-1">Services:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {svc.services.map((s, i) => (
+                          <span key={i} className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
