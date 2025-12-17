@@ -21,7 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 
-import { JwtAuthGuard, CurrentUser, JwtPayload } from '../auth';
+import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
 import { InvoicesService } from './invoices.service';
 import {
   HouseholdInvoiceDto,
@@ -45,43 +45,43 @@ export class InvoicesController {
   // ============================================================================
 
   @Get('invoices')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'List consolidated invoices for a household' })
   @ApiResponse({ status: 200, type: [HouseholdInvoiceListItemDto] })
   async getInvoices(
     @Query('householdId') householdId: string,
-    @CurrentUser() _user: JwtPayload,
+    @CurrentUser() _user: AuthPayload,
   ): Promise<HouseholdInvoiceListItemDto[]> {
     // TODO: Verify user has access to this household
     return this.invoicesService.getInvoices(householdId);
   }
 
   @Get('invoices/:id')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get invoice details' })
   @ApiResponse({ status: 200, type: HouseholdInvoiceDto })
   async getInvoiceById(
     @Param('id') invoiceId: string,
     @Query('householdId') householdId: string,
-    @CurrentUser() _user: JwtPayload,
+    @CurrentUser() _user: AuthPayload,
   ): Promise<HouseholdInvoiceDto> {
     // TODO: Verify user has access to this household
     return this.invoicesService.getInvoiceById(invoiceId, householdId);
   }
 
   @Get('billing/summary')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Get billing summary for dashboard' })
   @ApiResponse({ status: 200, type: BillingSummaryDto })
   async getBillingSummary(
     @Query('householdId') householdId: string,
-    @CurrentUser() user: JwtPayload,
+    @CurrentUser() user: AuthPayload,
   ): Promise<BillingSummaryDto> {
     // TODO: Verify user has access to this household
-    return this.invoicesService.getBillingSummary(householdId, user.sub);
+    return this.invoicesService.getBillingSummary(householdId, user.userId);
   }
 
   // ============================================================================
@@ -89,14 +89,14 @@ export class InvoicesController {
   // ============================================================================
 
   @Post('billing/setup-stripe')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Setup Stripe customer for household billing' })
   @ApiResponse({ status: 201 })
   async setupHouseholdStripe(
     @Query('householdId') householdId: string,
     @Body() dto: SetupHouseholdStripeDto,
-    @CurrentUser() _user: JwtPayload,
+    @CurrentUser() _user: AuthPayload,
   ): Promise<{ stripeCustomerId: string }> {
     // TODO: Verify user is owner of this household
     return this.invoicesService.setupHouseholdStripe(
@@ -106,14 +106,14 @@ export class InvoicesController {
   }
 
   @Patch('billing/preferences')
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(FirebaseAuthGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: 'Update billing preferences' })
   @ApiResponse({ status: 200 })
   async updateBillingPreferences(
     @Query('householdId') householdId: string,
     @Body() dto: UpdateBillingPreferencesDto,
-    @CurrentUser() _user: JwtPayload,
+    @CurrentUser() _user: AuthPayload,
   ): Promise<{ success: boolean }> {
     // TODO: Verify user is owner of this household
     await this.invoicesService.updateBillingPreferences(

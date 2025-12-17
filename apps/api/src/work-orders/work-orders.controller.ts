@@ -47,7 +47,8 @@ export class WorkOrdersController {
    */
   @Get()
   async listWorkOrders(@Request() req, @Query() query: WorkOrderQueryDto) {
-    const householdId = req.user.householdId;
+    // Use query param householdId if provided, otherwise fall back to user's primary household
+    const householdId = query.householdId || req.user.householdId;
     if (!householdId) {
       throw new ForbiddenException('No household context');
     }

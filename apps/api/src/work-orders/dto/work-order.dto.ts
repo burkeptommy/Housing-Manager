@@ -77,6 +77,10 @@ export class CreateWorkOrderNoteDto {
 }
 
 export class WorkOrderQueryDto {
+  @IsString()
+  @IsOptional()
+  householdId?: string;
+
   @IsEnum(WorkOrderStatus)
   @IsOptional()
   status?: WorkOrderStatus;

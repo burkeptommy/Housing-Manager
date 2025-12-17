@@ -8,7 +8,6 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,7 +19,7 @@ import {
 } from '@nestjs/swagger';
 import { VendorCategory } from '@prisma/client';
 
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
 
 import { HouseholdVendorsService } from './household-vendors.service';
 import {
@@ -32,7 +31,7 @@ import {
 @ApiTags('Vendors')
 @ApiBearerAuth()
 @Controller('households/:householdId/vendors')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class HouseholdVendorsController {
   constructor(private readonly vendorsService: HouseholdVendorsService) {}
 
@@ -44,9 +43,9 @@ export class HouseholdVendorsController {
   async create(
     @Param('householdId') householdId: string,
     @Body() createVendorDto: CreateVendorDto,
-    @Request() req: { user: { sub: string } },
+    @CurrentUser() user: AuthPayload,
   ): Promise<VendorResponseDto> {
-    return this.vendorsService.create(householdId, req.user.sub, createVendorDto);
+    return this.vendorsService.create(householdId, user.userId, createVendorDto);
   }
 
   @Get()
@@ -59,9 +58,9 @@ export class HouseholdVendorsController {
     @Param('householdId') householdId: string,
     @Query('category') category?: VendorCategory,
     @Query('includeInactive') includeInactive?: string,
-    @Request() req?: { user: { sub: string } },
+    @CurrentUser() user?: AuthPayload,
   ): Promise<VendorResponseDto[]> {
-    return this.vendorsService.findAll(householdId, req!.user.sub, {
+    return this.vendorsService.findAll(householdId, user!.userId, {
       category,
       includeInactive: includeInactive === 'true',
     });
@@ -76,9 +75,9 @@ export class HouseholdVendorsController {
   async findOne(
     @Param('householdId') householdId: string,
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @CurrentUser() user: AuthPayload,
   ): Promise<VendorResponseDto> {
-    return this.vendorsService.findOne(id, householdId, req.user.sub);
+    return this.vendorsService.findOne(id, householdId, user.userId);
   }
 
   @Patch(':id')
@@ -91,9 +90,9 @@ export class HouseholdVendorsController {
     @Param('householdId') householdId: string,
     @Param('id') id: string,
     @Body() updateVendorDto: UpdateVendorDto,
-    @Request() req: { user: { sub: string } },
+    @CurrentUser() user: AuthPayload,
   ): Promise<VendorResponseDto> {
-    return this.vendorsService.update(id, householdId, req.user.sub, updateVendorDto);
+    return this.vendorsService.update(id, householdId, user.userId, updateVendorDto);
   }
 
   @Delete(':id')
@@ -105,9 +104,9 @@ export class HouseholdVendorsController {
   async remove(
     @Param('householdId') householdId: string,
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @CurrentUser() user: AuthPayload,
   ): Promise<void> {
-    return this.vendorsService.remove(id, householdId, req.user.sub);
+    return this.vendorsService.remove(id, householdId, user.userId);
   }
 }
 
@@ -115,7 +114,7 @@ export class HouseholdVendorsController {
 @ApiTags('Vendors')
 @ApiBearerAuth()
 @Controller('vendors')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class VendorsController {
   constructor(private readonly vendorsService: HouseholdVendorsService) {}
 
@@ -124,10 +123,10 @@ export class VendorsController {
   @ApiResponse({ status: 201, description: 'Vendor created', type: VendorResponseDto })
   async create(
     @Body() createVendorDto: CreateVendorDto & { householdId: string },
-    @Request() req: { user: { sub: string } },
+    @CurrentUser() user: AuthPayload,
   ): Promise<VendorResponseDto> {
     const { householdId, ...vendorData } = createVendorDto;
-    return this.vendorsService.create(householdId, req.user.sub, vendorData);
+    return this.vendorsService.create(householdId, user.userId, vendorData);
   }
 
   @Get()
@@ -140,9 +139,9 @@ export class VendorsController {
     @Query('householdId') householdId: string,
     @Query('category') category?: VendorCategory,
     @Query('includeInactive') includeInactive?: string,
-    @Request() req?: { user: { sub: string } },
+    @CurrentUser() user?: AuthPayload,
   ): Promise<VendorResponseDto[]> {
-    return this.vendorsService.findAll(householdId, req!.user.sub, {
+    return this.vendorsService.findAll(householdId, user!.userId, {
       category,
       includeInactive: includeInactive === 'true',
     });
