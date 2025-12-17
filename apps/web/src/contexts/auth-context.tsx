@@ -334,18 +334,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const path = window.location.pathname;
 
-    // Skip routing for public pages
-    if (path === '/login' || path === '/register' || path === '/') {
-      return;
-    }
-
     if (!user) {
-      // Not authenticated - redirect to login
-      router.push('/login');
+      // Not authenticated - only redirect if on protected pages
+      if (path.startsWith('/app') || path.startsWith('/onboarding') || path.startsWith('/manager') || path.startsWith('/admin')) {
+        router.push('/login');
+      }
       return;
     }
 
-    // Handle role-based and onboarding routing
+    // User is authenticated - handle redirects
+    if (path === '/login' || path === '/register') {
+      // Redirect authenticated users away from login/register
+      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
+        router.push('/manager');
+      } else if (needsOnboarding) {
+        router.push('/onboarding');
+      } else {
+        router.push('/app');
+      }
+      return;
+    }
+
+    // Handle role-based and onboarding routing for other pages
     if (path.startsWith('/app') || path.startsWith('/onboarding')) {
       if (user.role === 'MANAGER' || user.role === 'ADMIN') {
         router.push('/manager');
