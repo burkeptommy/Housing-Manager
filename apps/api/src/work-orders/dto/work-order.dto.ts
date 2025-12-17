@@ -6,6 +6,7 @@ import {
   IsEnum,
   IsBoolean,
 } from 'class-validator';
+import { Transform } from 'class-transformer';
 import { WorkOrderStatus } from '@prisma/client';
 
 export class CreateWorkOrderDto {
@@ -85,6 +86,7 @@ export class WorkOrderQueryDto {
   @IsOptional()
   status?: WorkOrderStatus;
 
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   includeCompleted?: boolean;
@@ -95,10 +97,12 @@ export class InternalWorkOrderQueryDto {
   @IsOptional()
   status?: WorkOrderStatus;
 
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   unassigned?: boolean;
 
+  @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   @IsOptional()
   upcoming?: boolean;
