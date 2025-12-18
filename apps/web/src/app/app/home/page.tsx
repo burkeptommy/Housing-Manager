@@ -56,8 +56,85 @@ interface ApplianceDetail {
   type?: string;
 }
 
+// Financial accounts - mortgages, loans, credit cards
+interface FinancialAccount {
+  id?: string;
+  type: 'MORTGAGE' | 'CAR_LOAN' | 'STUDENT_LOAN' | 'PERSONAL_LOAN' | 'HELOC' | 'CREDIT_CARD' | 'OTHER';
+  name: string;
+  lender: string;
+  accountNumber?: string;
+  paymentAmount?: number;
+  interestRate?: number;
+  dueDay?: number; // Day of month payment is due
+  autopay?: boolean;
+  balance?: number;
+  originalAmount?: number;
+  startDate?: string;
+  endDate?: string; // Payoff date
+  notes?: string;
+}
+
+// Utility accounts - electric, gas, water, internet
+interface UtilityAccount {
+  id?: string;
+  type: 'ELECTRIC' | 'GAS' | 'WATER_SEWER' | 'INTERNET' | 'CABLE' | 'PHONE' | 'TRASH' | 'OTHER';
+  provider: string;
+  accountNumber?: string;
+  serviceAddress?: string;
+  averageMonthlyBill?: number;
+  dueDay?: number;
+  autopay?: boolean;
+  customerServicePhone?: string;
+  portalUrl?: string;
+  notes?: string;
+}
+
+// Vehicle information
+interface Vehicle {
+  id?: string;
+  type: 'CAR' | 'TRUCK' | 'SUV' | 'MOTORCYCLE' | 'BOAT' | 'RV' | 'OTHER';
+  year?: number;
+  make: string;
+  model: string;
+  color?: string;
+  vin?: string;
+  licensePlate?: string;
+  registrationExpires?: string;
+  // Insurance
+  insuranceCompany?: string;
+  insurancePolicyNumber?: string;
+  insuranceExpires?: string;
+  insuranceAgent?: string;
+  insuranceAgentPhone?: string;
+  // Maintenance
+  lastOilChange?: string;
+  nextOilChangeMiles?: number;
+  currentMileage?: number;
+  preferredMechanic?: string;
+  mechanicPhone?: string;
+  notes?: string;
+}
+
+// Fuel delivery (oil/propane)
+interface FuelDelivery {
+  id?: string;
+  fuelType: 'OIL' | 'PROPANE' | 'NATURAL_GAS';
+  provider: string;
+  accountNumber?: string;
+  tankSize?: number; // gallons
+  lastFillDate?: string;
+  lastFillAmount?: number;
+  pricePerGallon?: number;
+  autoDelivery?: boolean;
+  customerServicePhone?: string;
+  emergencyPhone?: string;
+  notes?: string;
+}
+
 interface DetailedSystems {
-  heating?: SystemDetail;
+  heating?: SystemDetail & {
+    fuelType?: 'GAS' | 'OIL' | 'PROPANE' | 'ELECTRIC' | 'HEAT_PUMP' | 'GEOTHERMAL';
+  };
   hvac?: SystemDetail;
   waterHeater?: SystemDetail;
   electrical?: SystemDetail;
@@ -76,6 +153,14 @@ interface DetailedSystems {
     services?: string[];
     irrigationVendor?: string;
     irrigationPhone?: string;
+  };
+  snowRemoval?: SystemDetail & {
+    serviceFrequency?: string;
+    triggerDepth?: string; // e.g., "2 inches"
+    includesSalting?: boolean;
+    includesSidewalk?: boolean;
+    includesDriveway?: boolean;
+    services?: string[];
   };
   houseCleaning?: SystemDetail & {
     serviceFrequency?: string;
@@ -103,6 +188,16 @@ interface DetailedSystems {
     openerModel?: string;
   };
   pool?: SystemDetail;
+  septic?: SystemDetail & {
+    tankSize?: number; // gallons
+    lastPumped?: string;
+    nextPumpDue?: string;
+  };
+  well?: SystemDetail & {
+    depth?: number;
+    lastTested?: string;
+    nextTestDue?: string;
+  };
 }
 
 interface UpcomingMaintenance {
@@ -134,6 +229,10 @@ interface ExtendedProfileData {
   recentServices?: RecentService[];
   serviceReports?: ServiceReport[];
   appliances?: Record<string, ApplianceDetail>;
+  financialAccounts?: Record<string, FinancialAccount>;
+  utilities?: Record<string, UtilityAccount>;
+  vehicles?: Record<string, Vehicle>;
+  fuelDelivery?: FuelDelivery;
 }
 
 function parseExtendedData(notes: string | null | undefined): ExtendedProfileData {
@@ -161,6 +260,10 @@ export default function HomeProfilePage() {
   const [successMessage, setSuccessMessage] = useState('');
   const [showSystemsModal, setShowSystemsModal] = useState(false);
   const [showAppliancesModal, setShowAppliancesModal] = useState(false);
+  const [showFinancialModal, setShowFinancialModal] = useState(false);
+  const [showUtilitiesModal, setShowUtilitiesModal] = useState(false);
+  const [showVehiclesModal, setShowVehiclesModal] = useState(false);
+  const [showFuelModal, setShowFuelModal] = useState(false);
 
   const api = getApiClient();
 
@@ -403,10 +506,182 @@ export default function HomeProfilePage() {
     }
   };
 
+  const handleSaveFinancialAccounts = async (financialAccounts: Record<string, FinancialAccount>) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        financialAccounts,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowFinancialModal(false);
+      setSuccessMessage('Financial accounts updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveUtilities = async (utilities: Record<string, UtilityAccount>) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        utilities,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowUtilitiesModal(false);
+      setSuccessMessage('Utilities updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveVehicles = async (vehicles: Record<string, Vehicle>) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        vehicles,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowVehiclesModal(false);
+      setSuccessMessage('Vehicles updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveFuelDelivery = async (fuelDelivery: FuelDelivery) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        fuelDelivery,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowFuelModal(false);
+      setSuccessMessage('Fuel delivery info updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -472,7 +747,7 @@ export default function HomeProfilePage() {
           {editSection !== 'basic' && (
             <button
               onClick={() => setEditSection('basic')}
-              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+              className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
             >
               Edit
             </button>
@@ -528,79 +803,13 @@ export default function HomeProfilePage() {
         )}
       </div>
 
-      {/* Systems Card - Detailed View */}
-      {isDetailedSystems(extendedData.systems) ? (
-        <DetailedSystemsView
-          systems={extendedData.systems}
-          appliances={extendedData.appliances}
-          onEditSystems={() => setShowSystemsModal(true)}
-          onEditAppliances={() => setShowAppliancesModal(true)}
-        />
-      ) : (
-        <div className="card">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
-            {editSection !== 'systems' && (
-              <button
-                onClick={() => setEditSection('systems')}
-                className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
-              >
-                Edit
-              </button>
-            )}
-          </div>
-
-          {editSection === 'systems' ? (
-            <SystemsEditForm
-              systems={extendedData.systems as HomeSystems}
-              onSave={handleSaveSystems}
-              onCancel={() => setEditSection(null)}
-              isSaving={isSaving}
-            />
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              <SystemItem
-                label="HVAC"
-                value={hvacTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.hvacType)?.label}
-                age={(extendedData.systems as HomeSystems)?.hvacAge}
-              />
-              <SystemItem
-                label="Roof"
-                value={roofTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.roofType)?.label}
-                age={(extendedData.systems as HomeSystems)?.roofAge}
-              />
-              <SystemItem
-                label="Water Heater"
-                value={waterHeaterTypeOptions.find((o) => o.value === (extendedData.systems as HomeSystems)?.waterHeaterType)?.label}
-                age={(extendedData.systems as HomeSystems)?.waterHeaterAge}
-              />
-              <SystemItem
-                label="Waste System"
-                value={(extendedData.systems as HomeSystems)?.septicOrSewer === 'septic' ? 'Septic' : (extendedData.systems as HomeSystems)?.septicOrSewer === 'sewer' ? 'Municipal Sewer' : undefined}
-              />
-              <SystemItem
-                label="Electrical Panel"
-                value={(extendedData.systems as HomeSystems)?.electricalPanelAmps ? `${(extendedData.systems as HomeSystems).electricalPanelAmps} amps` : undefined}
-              />
-              <div>
-                <h3 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-2">Features</h3>
-                <div className="flex flex-wrap gap-2">
-                  {(extendedData.systems as HomeSystems)?.hasPool && <FeatureBadge label="Pool" />}
-                  {(extendedData.systems as HomeSystems)?.hasSprinklerSystem && <FeatureBadge label="Sprinklers" />}
-                  {(extendedData.systems as HomeSystems)?.hasSecuritySystem && <FeatureBadge label="Security" />}
-                  {(extendedData.systems as HomeSystems)?.hasSmartHome && <FeatureBadge label="Smart Home" />}
-                  {!(extendedData.systems as HomeSystems)?.hasPool &&
-                    !(extendedData.systems as HomeSystems)?.hasSprinklerSystem &&
-                    !(extendedData.systems as HomeSystems)?.hasSecuritySystem &&
-                    !(extendedData.systems as HomeSystems)?.hasSmartHome && (
-                      <span className="text-slate-400 dark:text-slate-500 text-sm">None specified</span>
-                    )}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
+      {/* Comprehensive Home Systems View */}
+      <ComprehensiveSystemsView
+        systems={extendedData.systems}
+        appliances={extendedData.appliances}
+        onEditSystems={() => setShowSystemsModal(true)}
+        onEditAppliances={() => setShowAppliancesModal(true)}
+      />
 
       {/* Upcoming Maintenance */}
       {extendedData.upcomingMaintenance && extendedData.upcomingMaintenance.length > 0 && (
@@ -707,7 +916,7 @@ export default function HomeProfilePage() {
           {editSection !== 'preferences' && (
             <button
               onClick={() => setEditSection('preferences')}
-              className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+              className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
             >
               Edit
             </button>
@@ -751,6 +960,284 @@ export default function HomeProfilePage() {
         )}
       </div>
 
+      {/* Financial Accounts Card */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">💳</span>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Financial Accounts</h2>
+          </div>
+          <button
+            onClick={() => setShowFinancialModal(true)}
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
+          >
+            {extendedData.financialAccounts && Object.keys(extendedData.financialAccounts).length > 0 ? 'Edit' : 'Add Accounts'}
+          </button>
+        </div>
+        {extendedData.financialAccounts && Object.keys(extendedData.financialAccounts).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(extendedData.financialAccounts).map(([key, account]) => (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">
+                    {account.type === 'MORTGAGE' ? '🏠' : account.type === 'CAR_LOAN' ? '🚗' : account.type === 'CREDIT_CARD' ? '💳' : '📄'}
+                  </span>
+                  <h3 className="font-medium text-slate-900 dark:text-white">{account.name}</h3>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Lender</span>
+                    <span className="text-slate-900 dark:text-white">{account.lender}</span>
+                  </div>
+                  {account.accountNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Account #</span>
+                      <span className="text-slate-900 dark:text-white font-mono text-xs">****{account.accountNumber.slice(-4)}</span>
+                    </div>
+                  )}
+                  {account.paymentAmount && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Payment</span>
+                      <span className="text-slate-900 dark:text-white">${account.paymentAmount.toLocaleString()}/mo</span>
+                    </div>
+                  )}
+                  {account.dueDay && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Due</span>
+                      <span className="text-slate-900 dark:text-white">{account.dueDay}th of each month</span>
+                    </div>
+                  )}
+                  {account.autopay && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                      Autopay enabled
+                    </span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+            <p>Track your mortgage, loans, and credit cards here</p>
+            <button onClick={() => setShowFinancialModal(true)} className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+              Add your first account
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Utilities Card */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">⚡</span>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Utilities</h2>
+          </div>
+          <button
+            onClick={() => setShowUtilitiesModal(true)}
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
+          >
+            {extendedData.utilities && Object.keys(extendedData.utilities).length > 0 ? 'Edit' : 'Add Utilities'}
+          </button>
+        </div>
+        {extendedData.utilities && Object.keys(extendedData.utilities).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(extendedData.utilities).map(([key, utility]) => (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-lg">
+                    {utility.type === 'ELECTRIC' ? '⚡' : utility.type === 'GAS' ? '🔥' : utility.type === 'WATER_SEWER' ? '💧' : utility.type === 'INTERNET' ? '🌐' : utility.type === 'CABLE' ? '📺' : utility.type === 'TRASH' ? '🗑️' : '📞'}
+                  </span>
+                  <h3 className="font-medium text-slate-900 dark:text-white capitalize">{utility.type.replace('_', ' ').toLowerCase()}</h3>
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Provider</span>
+                    <span className="text-slate-900 dark:text-white">{utility.provider}</span>
+                  </div>
+                  {utility.accountNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Account #</span>
+                      <span className="text-slate-900 dark:text-white font-mono text-xs">{utility.accountNumber}</span>
+                    </div>
+                  )}
+                  {utility.averageMonthlyBill && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Avg. Bill</span>
+                      <span className="text-slate-900 dark:text-white">~${utility.averageMonthlyBill}/mo</span>
+                    </div>
+                  )}
+                  {utility.customerServicePhone && (
+                    <a href={`tel:${utility.customerServicePhone}`} className="text-emerald-600 dark:text-emerald-400 hover:underline text-xs">
+                      {utility.customerServicePhone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+            <p>Track your electric, gas, water, internet, and other utilities</p>
+            <button onClick={() => setShowUtilitiesModal(true)} className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+              Add your first utility
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Vehicles Card */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🚗</span>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Vehicles</h2>
+          </div>
+          <button
+            onClick={() => setShowVehiclesModal(true)}
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
+          >
+            {extendedData.vehicles && Object.keys(extendedData.vehicles).length > 0 ? 'Edit' : 'Add Vehicles'}
+          </button>
+        </div>
+        {extendedData.vehicles && Object.keys(extendedData.vehicles).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {Object.entries(extendedData.vehicles).map(([key, vehicle]) => (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="font-medium text-slate-900 dark:text-white">
+                    {vehicle.year} {vehicle.make} {vehicle.model}
+                  </h3>
+                  {vehicle.color && <span className="text-sm text-slate-500 dark:text-slate-400">{vehicle.color}</span>}
+                </div>
+                <div className="space-y-2 text-sm">
+                  {vehicle.licensePlate && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">License Plate</span>
+                      <span className="text-slate-900 dark:text-white font-mono">{vehicle.licensePlate}</span>
+                    </div>
+                  )}
+                  {vehicle.registrationExpires && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Registration</span>
+                      <span className={new Date(vehicle.registrationExpires) < new Date() ? 'text-red-500' : 'text-slate-900 dark:text-white'}>
+                        Expires {new Date(vehicle.registrationExpires).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                  {vehicle.insuranceCompany && (
+                    <div className="pt-2 border-t border-slate-100 dark:border-slate-700">
+                      <div className="flex justify-between">
+                        <span className="text-slate-500 dark:text-slate-400">Insurance</span>
+                        <span className="text-slate-900 dark:text-white">{vehicle.insuranceCompany}</span>
+                      </div>
+                      {vehicle.insuranceExpires && (
+                        <div className="flex justify-between">
+                          <span className="text-slate-500 dark:text-slate-400">Policy Expires</span>
+                          <span className={new Date(vehicle.insuranceExpires) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                            {new Date(vehicle.insuranceExpires).toLocaleDateString()}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {vehicle.currentMileage && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Mileage</span>
+                      <span className="text-slate-900 dark:text-white">{vehicle.currentMileage.toLocaleString()} mi</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+            <p>Track your vehicles, registrations, insurance, and maintenance</p>
+            <button onClick={() => setShowVehiclesModal(true)} className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+              Add your first vehicle
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Fuel Delivery Card (Oil/Propane) */}
+      {(extendedData.fuelDelivery || (isDetailedSystems(extendedData.systems) && extendedData.systems.heating?.fuelType && ['OIL', 'PROPANE'].includes(extendedData.systems.heating.fuelType))) && (
+        <div className="card">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🛢️</span>
+              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Fuel Delivery</h2>
+            </div>
+            <button
+              onClick={() => setShowFuelModal(true)}
+              className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
+            >
+              {extendedData.fuelDelivery ? 'Edit' : 'Set Up'}
+            </button>
+          </div>
+          {extendedData.fuelDelivery ? (
+            <div className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Fuel Type</span>
+                    <span className="text-slate-900 dark:text-white capitalize">{extendedData.fuelDelivery.fuelType.toLowerCase()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Provider</span>
+                    <span className="text-slate-900 dark:text-white">{extendedData.fuelDelivery.provider}</span>
+                  </div>
+                  {extendedData.fuelDelivery.accountNumber && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Account #</span>
+                      <span className="text-slate-900 dark:text-white">{extendedData.fuelDelivery.accountNumber}</span>
+                    </div>
+                  )}
+                  {extendedData.fuelDelivery.tankSize && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Tank Size</span>
+                      <span className="text-slate-900 dark:text-white">{extendedData.fuelDelivery.tankSize} gallons</span>
+                    </div>
+                  )}
+                </div>
+                <div className="space-y-2 text-sm">
+                  {extendedData.fuelDelivery.lastFillDate && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Last Fill</span>
+                      <span className="text-slate-900 dark:text-white">{new Date(extendedData.fuelDelivery.lastFillDate).toLocaleDateString()}</span>
+                    </div>
+                  )}
+                  {extendedData.fuelDelivery.lastFillAmount && (
+                    <div className="flex justify-between">
+                      <span className="text-slate-500 dark:text-slate-400">Last Amount</span>
+                      <span className="text-slate-900 dark:text-white">{extendedData.fuelDelivery.lastFillAmount} gallons</span>
+                    </div>
+                  )}
+                  {extendedData.fuelDelivery.autoDelivery && (
+                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400">
+                      Auto-delivery enabled
+                    </span>
+                  )}
+                  {extendedData.fuelDelivery.customerServicePhone && (
+                    <a href={`tel:${extendedData.fuelDelivery.customerServicePhone}`} className="block text-emerald-600 dark:text-emerald-400 hover:underline">
+                      {extendedData.fuelDelivery.customerServicePhone}
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+              <p>Track your heating oil or propane deliveries</p>
+              <button onClick={() => setShowFuelModal(true)} className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400">
+                Set up fuel delivery tracking
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Systems Management Modal */}
       {showSystemsModal && (
         <SystemsManagementModal
@@ -767,6 +1254,46 @@ export default function HomeProfilePage() {
           appliances={extendedData.appliances || {}}
           onSave={handleSaveAppliances}
           onClose={() => setShowAppliancesModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Financial Accounts Modal */}
+      {showFinancialModal && (
+        <FinancialAccountsModal
+          accounts={extendedData.financialAccounts || {}}
+          onSave={handleSaveFinancialAccounts}
+          onClose={() => setShowFinancialModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Utilities Modal */}
+      {showUtilitiesModal && (
+        <UtilitiesModal
+          utilities={extendedData.utilities || {}}
+          onSave={handleSaveUtilities}
+          onClose={() => setShowUtilitiesModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Vehicles Modal */}
+      {showVehiclesModal && (
+        <VehiclesModal
+          vehicles={extendedData.vehicles || {}}
+          onSave={handleSaveVehicles}
+          onClose={() => setShowVehiclesModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Fuel Delivery Modal */}
+      {showFuelModal && (
+        <FuelDeliveryModal
+          fuelDelivery={extendedData.fuelDelivery}
+          onSave={handleSaveFuelDelivery}
+          onClose={() => setShowFuelModal(false)}
           isSaving={isSaving}
         />
       )}
@@ -790,9 +1317,309 @@ function SystemItem({ label, value, age }: { label: string; value?: string; age?
 
 function FeatureBadge({ label }: { label: string }) {
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
+    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
       {label}
     </span>
+  );
+}
+
+// Comprehensive Systems View - shows all home systems with full detail or prompts to add
+function ComprehensiveSystemsView({
+  systems,
+  appliances,
+  onEditSystems,
+  onEditAppliances,
+}: {
+  systems?: HomeSystems | DetailedSystems;
+  appliances?: Record<string, ApplianceDetail>;
+  onEditSystems: () => void;
+  onEditAppliances: () => void;
+}) {
+  const formatDate = (dateStr: string | undefined) => {
+    if (!dateStr) return null;
+    return new Date(dateStr).toLocaleDateString();
+  };
+
+  // Define all system categories we want to show
+  const coreSystemCategories = [
+    { key: 'heating', label: 'Heating / Furnace', icon: '🔥', description: 'Furnace, boiler, or heat pump' },
+    { key: 'hvac', label: 'Air Conditioning', icon: '❄️', description: 'Central AC, mini-splits, or window units' },
+    { key: 'waterHeater', label: 'Water Heater', icon: '🚿', description: 'Tank or tankless water heater' },
+    { key: 'electrical', label: 'Electrical Panel', icon: '⚡', description: 'Main breaker panel' },
+    { key: 'plumbing', label: 'Plumbing', icon: '🔧', description: 'Main water line and fixtures' },
+    { key: 'roof', label: 'Roof', icon: '🏠', description: 'Roof type and condition' },
+    { key: 'septic', label: 'Septic System', icon: '🚽', description: 'Septic tank and drain field' },
+    { key: 'well', label: 'Well', icon: '💧', description: 'Water well and pump' },
+    { key: 'garage', label: 'Garage Door', icon: '🚗', description: 'Garage door and opener' },
+    { key: 'fireplace', label: 'Fireplace', icon: '🪵', description: 'Wood, gas, or electric fireplace' },
+    { key: 'pool', label: 'Pool', icon: '🏊', description: 'Swimming pool and equipment' },
+  ];
+
+  const serviceCategories = [
+    { key: 'lawnCare', label: 'Lawn Care', icon: '🌿', description: 'Mowing, landscaping, irrigation' },
+    { key: 'snowRemoval', label: 'Snow Removal', icon: '❄️', description: 'Plowing and shoveling' },
+    { key: 'houseCleaning', label: 'House Cleaning', icon: '🧹', description: 'Cleaning service' },
+    { key: 'pestControl', label: 'Pest Control', icon: '🐜', description: 'Bug and rodent prevention' },
+    { key: 'security', label: 'Security System', icon: '🔒', description: 'Alarm and monitoring' },
+  ];
+
+  const applianceCategories = [
+    { key: 'refrigerator', label: 'Refrigerator', icon: '🧊' },
+    { key: 'dishwasher', label: 'Dishwasher', icon: '🍽️' },
+    { key: 'oven', label: 'Oven/Range', icon: '🍳' },
+    { key: 'microwave', label: 'Microwave', icon: '📻' },
+    { key: 'washer', label: 'Washer', icon: '🧺' },
+    { key: 'dryer', label: 'Dryer', icon: '👕' },
+    { key: 'garbageDisposal', label: 'Garbage Disposal', icon: '🗑️' },
+  ];
+
+  // Check if we have detailed systems data
+  const detailedSystems = systems && isDetailedSystems(systems) ? systems : null;
+  const basicSystems = systems && !isDetailedSystems(systems) ? systems as HomeSystems : null;
+
+  // Helper to get system data from either format
+  const getSystemData = (key: string): SystemDetail | null => {
+    if (detailedSystems && detailedSystems[key as keyof DetailedSystems]) {
+      return detailedSystems[key as keyof DetailedSystems] as SystemDetail;
+    }
+    return null;
+  };
+
+  // Convert basic system info to display format
+  const getBasicSystemInfo = (key: string): { type?: string; age?: number } | null => {
+    if (!basicSystems) return null;
+    switch (key) {
+      case 'hvac':
+      case 'heating':
+        return { type: basicSystems.hvacType, age: basicSystems.hvacAge };
+      case 'roof':
+        return { type: basicSystems.roofType, age: basicSystems.roofAge };
+      case 'waterHeater':
+        return { type: basicSystems.waterHeaterType, age: basicSystems.waterHeaterAge };
+      case 'septic':
+        return basicSystems.septicOrSewer === 'septic' ? { type: 'Septic' } : null;
+      case 'electrical':
+        return basicSystems.electricalPanelAmps ? { type: `${basicSystems.electricalPanelAmps} amps` } : null;
+      case 'pool':
+        return basicSystems.hasPool ? { type: 'Yes' } : null;
+      case 'security':
+        return basicSystems.hasSecuritySystem ? { type: 'Yes' } : null;
+      default:
+        return null;
+    }
+  };
+
+  // Render a system card with full details or prompt to add
+  const renderSystemCard = (category: { key: string; label: string; icon: string; description: string }) => {
+    const system = getSystemData(category.key);
+    const basicInfo = getBasicSystemInfo(category.key);
+    const hasData = system || basicInfo;
+
+    return (
+      <div key={category.key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">{category.icon}</span>
+            <h3 className="font-semibold text-slate-900 dark:text-white">{category.label}</h3>
+          </div>
+          <button
+            onClick={onEditSystems}
+            className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+          >
+            {hasData ? 'Edit' : 'Add'}
+          </button>
+        </div>
+
+        {system ? (
+          <div className="space-y-2 text-sm">
+            {system.brand && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Brand/Model</span>
+                <span className="text-slate-900 dark:text-white font-medium">{system.brand} {system.model || ''}</span>
+              </div>
+            )}
+            {system.type && !system.brand && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Type</span>
+                <span className="text-slate-900 dark:text-white">{system.type}</span>
+              </div>
+            )}
+            {system.serialNumber && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Serial #</span>
+                <span className="text-slate-900 dark:text-white font-mono text-xs">{system.serialNumber}</span>
+              </div>
+            )}
+            {system.installDate && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Installed</span>
+                <span className="text-slate-900 dark:text-white">{formatDate(system.installDate)}</span>
+              </div>
+            )}
+            {system.vendor && (
+              <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400">Service Vendor</span>
+                  <span className="text-slate-900 dark:text-white">{system.vendor}</span>
+                </div>
+                {system.vendorPhone && (
+                  <a href={`tel:${system.vendorPhone}`} className="text-emerald-600 dark:text-emerald-400 hover:underline text-xs">
+                    {system.vendorPhone}
+                  </a>
+                )}
+              </div>
+            )}
+            {(system.lastServiceDate || system.nextMaintenanceDate) && (
+              <div className="pt-2 mt-2 border-t border-slate-100 dark:border-slate-700">
+                {system.lastServiceDate && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Last Service</span>
+                    <span className="text-slate-900 dark:text-white">{formatDate(system.lastServiceDate)}</span>
+                  </div>
+                )}
+                {system.nextMaintenanceDate && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500 dark:text-slate-400">Next Service</span>
+                    <span className={`font-medium ${new Date(system.nextMaintenanceDate) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}`}>
+                      {formatDate(system.nextMaintenanceDate)}
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+            {system.warrantyExpires && (
+              <div className="flex justify-between pt-1">
+                <span className="text-slate-500 dark:text-slate-400">Warranty</span>
+                <span className={new Date(system.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                  {formatDate(system.warrantyExpires)}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : basicInfo ? (
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-slate-500 dark:text-slate-400">Type</span>
+              <span className="text-slate-900 dark:text-white">{basicInfo.type}</span>
+            </div>
+            {basicInfo.age && (
+              <div className="flex justify-between">
+                <span className="text-slate-500 dark:text-slate-400">Age</span>
+                <span className="text-slate-900 dark:text-white">{basicInfo.age} years</span>
+              </div>
+            )}
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+              Add brand, model, and service info →
+            </p>
+          </div>
+        ) : (
+          <p className="text-sm text-slate-400 dark:text-slate-500">
+            {category.description}
+          </p>
+        )}
+      </div>
+    );
+  };
+
+  // Render appliance card
+  const renderApplianceCard = (category: { key: string; label: string; icon: string }) => {
+    const appliance = appliances?.[category.key];
+
+    return (
+      <div key={category.key} className="p-3 border border-slate-200 dark:border-slate-700 rounded-lg hover:border-emerald-300 dark:hover:border-emerald-700 transition-colors">
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <span className="text-lg">{category.icon}</span>
+            <h4 className="font-medium text-slate-900 dark:text-white text-sm">{category.label}</h4>
+          </div>
+          <button
+            onClick={onEditAppliances}
+            className="text-xs text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+          >
+            {appliance ? 'Edit' : 'Add'}
+          </button>
+        </div>
+
+        {appliance ? (
+          <div className="space-y-1 text-xs">
+            {appliance.brand && (
+              <p className="text-slate-900 dark:text-white">{appliance.brand} {appliance.model || ''}</p>
+            )}
+            {appliance.serialNumber && (
+              <p className="text-slate-500 dark:text-slate-400 font-mono">SN: {appliance.serialNumber}</p>
+            )}
+            {appliance.warrantyExpires && (
+              <p className={new Date(appliance.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                Warranty: {formatDate(appliance.warrantyExpires)}
+              </p>
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-slate-400 dark:text-slate-500">Not added</p>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Core Home Systems */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Major systems and equipment in your home</p>
+          </div>
+          <button
+            onClick={onEditSystems}
+            className="btn btn-secondary text-sm"
+          >
+            Manage All
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {coreSystemCategories.map(renderSystemCard)}
+        </div>
+      </div>
+
+      {/* Service Providers */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Service Providers</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Your regular home service vendors</p>
+          </div>
+          <button
+            onClick={onEditSystems}
+            className="btn btn-secondary text-sm"
+          >
+            Manage All
+          </button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {serviceCategories.map(renderSystemCard)}
+        </div>
+      </div>
+
+      {/* Appliances */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Appliances</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400">Track your major appliances for warranty and service</p>
+          </div>
+          <button
+            onClick={onEditAppliances}
+            className="btn btn-secondary text-sm"
+          >
+            Manage All
+          </button>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {applianceCategories.map(renderApplianceCard)}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -1001,7 +1828,7 @@ function SystemsEditForm({
             { name: 'hasSmartHome', label: 'Smart home devices' },
           ].map((feature) => (
             <label key={feature.name} className="flex items-center gap-3 p-3 rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
-              <input type="checkbox" {...register(feature.name as keyof SystemsData)} className="w-4 h-4 text-blue-600 rounded" />
+              <input type="checkbox" {...register(feature.name as keyof SystemsData)} className="w-4 h-4 text-emerald-600 rounded" />
               <span className="text-sm text-slate-700 dark:text-slate-300">{feature.label}</span>
             </label>
           ))}
@@ -1062,7 +1889,7 @@ function PreferencesEditForm({
                 type="checkbox"
                 checked={selectedPainPoints.includes(option.value)}
                 onChange={() => togglePainPoint(option.value)}
-                className="w-4 h-4 text-blue-600 rounded"
+                className="w-4 h-4 text-emerald-600 rounded"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">{option.label}</span>
             </label>
@@ -1078,7 +1905,7 @@ function PreferencesEditForm({
                 type="checkbox"
                 checked={selectedChannels.includes(option.value)}
                 onChange={() => toggleChannel(option.value)}
-                className="w-4 h-4 text-blue-600 rounded"
+                className="w-4 h-4 text-emerald-600 rounded"
               />
               <span className="text-sm text-slate-700 dark:text-slate-300">{option.label}</span>
             </label>
@@ -1141,7 +1968,7 @@ function DetailedSystemsView({
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
           <button
             onClick={onEditSystems}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
           >
             Edit Systems
           </button>
@@ -1188,7 +2015,7 @@ function DetailedSystemsView({
                       {system.vendorPhone && (
                         <div className="flex justify-between">
                           <span className="text-slate-500 dark:text-slate-400">Phone</span>
-                          <a href={`tel:${system.vendorPhone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                          <a href={`tel:${system.vendorPhone}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                             {system.vendorPhone}
                           </a>
                         </div>
@@ -1231,7 +2058,7 @@ function DetailedSystemsView({
                           </span>
                         </div>
                       )}
-                      <button className="mt-2 text-xs text-blue-600 dark:text-blue-400 hover:underline">
+                      <button className="mt-2 text-xs text-emerald-600 dark:text-emerald-400 hover:underline">
                         Order replacement filter →
                       </button>
                     </div>
@@ -1348,7 +2175,7 @@ function DetailedSystemsView({
                   {svc.vendorPhone && (
                     <div className="flex justify-between">
                       <span className="text-slate-500 dark:text-slate-400">Phone</span>
-                      <a href={`tel:${svc.vendorPhone}`} className="text-blue-600 dark:text-blue-400 hover:underline">
+                      <a href={`tel:${svc.vendorPhone}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
                         {svc.vendorPhone}
                       </a>
                     </div>
@@ -1412,7 +2239,7 @@ function DetailedSystemsView({
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Appliances</h2>
           <button
             onClick={onEditAppliances}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 font-medium"
           >
             Edit Appliances
           </button>
@@ -1470,7 +2297,7 @@ function DetailedSystemsView({
             <p>No appliances added yet</p>
             <button
               onClick={onEditAppliances}
-              className="mt-3 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+              className="mt-3 text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
             >
               Add your first appliance
             </button>
@@ -1494,16 +2321,19 @@ function SystemsManagementModal({
   isSaving: boolean;
 }) {
   const systemTypes = [
-    { key: 'hvac', label: 'HVAC / Air Conditioning' },
-    { key: 'heating', label: 'Heating' },
+    { key: 'heating', label: 'Heating / Furnace' },
+    { key: 'hvac', label: 'Air Conditioning' },
     { key: 'waterHeater', label: 'Water Heater' },
     { key: 'electrical', label: 'Electrical Panel' },
     { key: 'plumbing', label: 'Plumbing' },
-    { key: 'fireplace', label: 'Fireplace' },
     { key: 'roof', label: 'Roof' },
-    { key: 'garage', label: 'Garage' },
+    { key: 'septic', label: 'Septic System' },
+    { key: 'well', label: 'Well' },
+    { key: 'garage', label: 'Garage Door' },
+    { key: 'fireplace', label: 'Fireplace' },
     { key: 'pool', label: 'Pool' },
     { key: 'lawnCare', label: 'Lawn Care' },
+    { key: 'snowRemoval', label: 'Snow Removal' },
     { key: 'houseCleaning', label: 'House Cleaning' },
     { key: 'pestControl', label: 'Pest Control' },
     { key: 'security', label: 'Security System' },
@@ -1595,7 +2425,7 @@ function SystemsManagementModal({
                   <button
                     type="button"
                     onClick={() => setShowAddSystem(!showAddSystem)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1637,7 +2467,7 @@ function SystemsManagementModal({
                             onClick={() => setSelectedSystem(key)}
                             className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
                               selectedSystem === key
-                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                                 : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                             }`}
                           >
@@ -1778,7 +2608,7 @@ function SystemEditPanel({
           />
           <label
             htmlFor={`image-upload-${systemKey}`}
-            className="inline-block px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            className="inline-block px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
           >
             {system.imageUrl ? 'Change Photo' : 'Upload Photo'}
           </label>
@@ -1908,7 +2738,7 @@ function AppliancesManagementModal({
                   <button
                     type="button"
                     onClick={() => setShowAddForm(!showAddForm)}
-                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
                   >
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1935,7 +2765,7 @@ function AppliancesManagementModal({
                         <button
                           type="button"
                           onClick={() => handleAddAppliance(newApplianceName.trim())}
-                          className="w-full text-left px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                          className="w-full text-left px-2 py-1.5 text-sm text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded"
                         >
                           Add &quot;{newApplianceName.trim()}&quot;
                         </button>
@@ -1970,7 +2800,7 @@ function AppliancesManagementModal({
                           onClick={() => setSelectedAppliance(key)}
                           className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
                             selectedAppliance === key
-                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                              ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
                               : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
                           }`}
                         >
@@ -2098,7 +2928,7 @@ function ApplianceEditPanel({
           />
           <label
             htmlFor={`appliance-image-${applianceKey}`}
-            className="inline-block px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+            className="inline-block px-4 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg cursor-pointer hover:bg-emerald-100 dark:hover:bg-emerald-900/30"
           >
             {appliance.imageUrl ? 'Change Photo' : 'Upload Photo'}
           </label>
@@ -2128,6 +2958,503 @@ function ApplianceEditPanel({
             )}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Financial Accounts Modal
+function FinancialAccountsModal({
+  accounts,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  accounts: Record<string, FinancialAccount>;
+  onSave: (accounts: Record<string, FinancialAccount>) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const [editingAccounts, setEditingAccounts] = useState<Record<string, FinancialAccount>>(() => ({ ...accounts }));
+  const [selectedAccount, setSelectedAccount] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const accountTypes = [
+    { value: 'MORTGAGE', label: 'Mortgage', icon: '🏠' },
+    { value: 'CAR_LOAN', label: 'Car Loan', icon: '🚗' },
+    { value: 'STUDENT_LOAN', label: 'Student Loan', icon: '🎓' },
+    { value: 'PERSONAL_LOAN', label: 'Personal Loan', icon: '💵' },
+    { value: 'HELOC', label: 'HELOC', icon: '🏦' },
+    { value: 'CREDIT_CARD', label: 'Credit Card', icon: '💳' },
+    { value: 'OTHER', label: 'Other', icon: '📄' },
+  ];
+
+  const handleAddAccount = (type: FinancialAccount['type']) => {
+    const key = `${type.toLowerCase()}_${Date.now()}`;
+    setEditingAccounts(prev => ({
+      ...prev,
+      [key]: { id: crypto.randomUUID(), type, name: accountTypes.find(t => t.value === type)?.label || type, lender: '' },
+    }));
+    setSelectedAccount(key);
+    setShowAddForm(false);
+  };
+
+  const handleRemoveAccount = (key: string) => {
+    setEditingAccounts(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setSelectedAccount(null);
+  };
+
+  const handleUpdateAccount = (key: string, field: string, value: string | number | boolean) => {
+    setEditingAccounts(prev => {
+      const existing = prev[key];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [key]: { ...existing, [field]: value } as FinancialAccount,
+      };
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(editingAccounts);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Manage Financial Accounts</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex h-[60vh]">
+              <div className="w-56 border-r border-slate-200 dark:border-slate-700 overflow-y-auto p-3">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(!showAddForm)}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 mb-3"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Account
+                </button>
+
+                {showAddForm && (
+                  <div className="mb-3 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-1">
+                    {accountTypes.map(({ value, label, icon }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handleAddAccount(value as FinancialAccount['type'])}
+                        className="w-full text-left px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded flex items-center gap-2"
+                      >
+                        <span>{icon}</span> {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                <div className="space-y-1">
+                  {Object.entries(editingAccounts).map(([key, account]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedAccount(key)}
+                      className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                        selectedAccount === key
+                          ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300'
+                          : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      {account.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedAccount && editingAccounts[selectedAccount] ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-slate-900 dark:text-white">{editingAccounts[selectedAccount].name}</h3>
+                      <button type="button" onClick={() => handleRemoveAccount(selectedAccount)} className="text-sm text-red-600 hover:text-red-700">
+                        Remove
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="label block mb-1.5">Account Name</label>
+                        <input type="text" value={editingAccounts[selectedAccount].name} onChange={(e) => handleUpdateAccount(selectedAccount, 'name', e.target.value)} className="input w-full" placeholder="e.g., Primary Mortgage" />
+                      </div>
+                      <div>
+                        <label className="label block mb-1.5">Lender</label>
+                        <input type="text" value={editingAccounts[selectedAccount].lender} onChange={(e) => handleUpdateAccount(selectedAccount, 'lender', e.target.value)} className="input w-full" placeholder="e.g., Wells Fargo" />
+                      </div>
+                      <div>
+                        <label className="label block mb-1.5">Account Number</label>
+                        <input type="text" value={editingAccounts[selectedAccount].accountNumber || ''} onChange={(e) => handleUpdateAccount(selectedAccount, 'accountNumber', e.target.value)} className="input w-full" placeholder="Account number" />
+                      </div>
+                      <div>
+                        <label className="label block mb-1.5">Monthly Payment</label>
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
+                          <input type="number" value={editingAccounts[selectedAccount].paymentAmount || ''} onChange={(e) => handleUpdateAccount(selectedAccount, 'paymentAmount', e.target.value ? parseFloat(e.target.value) : 0)} className="input w-full pl-7" placeholder="0.00" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="label block mb-1.5">Due Day of Month</label>
+                        <input type="number" min="1" max="31" value={editingAccounts[selectedAccount].dueDay || ''} onChange={(e) => handleUpdateAccount(selectedAccount, 'dueDay', e.target.value ? parseInt(e.target.value) : 0)} className="input w-full" placeholder="e.g., 15" />
+                      </div>
+                      <div>
+                        <label className="label block mb-1.5">Interest Rate (%)</label>
+                        <input type="number" step="0.01" value={editingAccounts[selectedAccount].interestRate || ''} onChange={(e) => handleUpdateAccount(selectedAccount, 'interestRate', e.target.value ? parseFloat(e.target.value) : 0)} className="input w-full" placeholder="e.g., 6.5" />
+                      </div>
+                      <div className="col-span-2">
+                        <label className="flex items-center gap-3 cursor-pointer">
+                          <input type="checkbox" checked={editingAccounts[selectedAccount].autopay || false} onChange={(e) => handleUpdateAccount(selectedAccount, 'autopay', e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" />
+                          <span className="text-sm text-slate-700 dark:text-slate-300">Autopay is enabled</span>
+                        </label>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="label block mb-1.5">Notes</label>
+                        <textarea value={editingAccounts[selectedAccount].notes || ''} onChange={(e) => handleUpdateAccount(selectedAccount, 'notes', e.target.value)} className="input w-full" rows={2} placeholder="Any notes..." />
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500">
+                    <p>Select an account or add a new one</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">{isSaving ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Utilities Modal
+function UtilitiesModal({
+  utilities,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  utilities: Record<string, UtilityAccount>;
+  onSave: (utilities: Record<string, UtilityAccount>) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const [editingUtilities, setEditingUtilities] = useState<Record<string, UtilityAccount>>(() => ({ ...utilities }));
+  const [selectedUtility, setSelectedUtility] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const utilityTypes = [
+    { value: 'ELECTRIC', label: 'Electric', icon: '⚡' },
+    { value: 'GAS', label: 'Gas', icon: '🔥' },
+    { value: 'WATER_SEWER', label: 'Water & Sewer', icon: '💧' },
+    { value: 'INTERNET', label: 'Internet', icon: '🌐' },
+    { value: 'CABLE', label: 'Cable/TV', icon: '📺' },
+    { value: 'PHONE', label: 'Phone', icon: '📞' },
+    { value: 'TRASH', label: 'Trash', icon: '🗑️' },
+    { value: 'OTHER', label: 'Other', icon: '📄' },
+  ];
+
+  const handleAddUtility = (type: UtilityAccount['type']) => {
+    const key = `${type.toLowerCase()}_${Date.now()}`;
+    setEditingUtilities(prev => ({
+      ...prev,
+      [key]: { id: crypto.randomUUID(), type, provider: '' },
+    }));
+    setSelectedUtility(key);
+    setShowAddForm(false);
+  };
+
+  const handleRemoveUtility = (key: string) => {
+    setEditingUtilities(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setSelectedUtility(null);
+  };
+
+  const handleUpdateUtility = (key: string, field: string, value: string | number | boolean) => {
+    setEditingUtilities(prev => {
+      const existing = prev[key];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [key]: { ...existing, [field]: value } as UtilityAccount,
+      };
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(editingUtilities);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Manage Utilities</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex h-[60vh]">
+              <div className="w-56 border-r border-slate-200 dark:border-slate-700 overflow-y-auto p-3">
+                <button type="button" onClick={() => setShowAddForm(!showAddForm)} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 mb-3">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add Utility
+                </button>
+                {showAddForm && (
+                  <div className="mb-3 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-1">
+                    {utilityTypes.map(({ value, label, icon }) => (
+                      <button key={value} type="button" onClick={() => handleAddUtility(value as UtilityAccount['type'])} className="w-full text-left px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded flex items-center gap-2">
+                        <span>{icon}</span> {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {Object.entries(editingUtilities).map(([key, utility]) => (
+                    <button key={key} type="button" onClick={() => setSelectedUtility(key)} className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedUtility === key ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>
+                      {utilityTypes.find(t => t.value === utility.type)?.icon} {utility.provider || utility.type}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedUtility && editingUtilities[selectedUtility] ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-slate-900 dark:text-white capitalize">{editingUtilities[selectedUtility].type.replace('_', ' ').toLowerCase()}</h3>
+                      <button type="button" onClick={() => handleRemoveUtility(selectedUtility)} className="text-sm text-red-600 hover:text-red-700">Remove</button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div><label className="label block mb-1.5">Provider</label><input type="text" value={editingUtilities[selectedUtility].provider} onChange={(e) => handleUpdateUtility(selectedUtility, 'provider', e.target.value)} className="input w-full" placeholder="e.g., Duke Energy" /></div>
+                      <div><label className="label block mb-1.5">Account Number</label><input type="text" value={editingUtilities[selectedUtility].accountNumber || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'accountNumber', e.target.value)} className="input w-full" placeholder="Account number" /></div>
+                      <div><label className="label block mb-1.5">Average Monthly Bill</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span><input type="number" value={editingUtilities[selectedUtility].averageMonthlyBill || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'averageMonthlyBill', e.target.value ? parseFloat(e.target.value) : 0)} className="input w-full pl-7" placeholder="0.00" /></div></div>
+                      <div><label className="label block mb-1.5">Due Day of Month</label><input type="number" min="1" max="31" value={editingUtilities[selectedUtility].dueDay || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'dueDay', e.target.value ? parseInt(e.target.value) : 0)} className="input w-full" placeholder="e.g., 15" /></div>
+                      <div><label className="label block mb-1.5">Customer Service Phone</label><input type="tel" value={editingUtilities[selectedUtility].customerServicePhone || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'customerServicePhone', e.target.value)} className="input w-full" placeholder="(555) 555-5555" /></div>
+                      <div><label className="label block mb-1.5">Portal URL</label><input type="url" value={editingUtilities[selectedUtility].portalUrl || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'portalUrl', e.target.value)} className="input w-full" placeholder="https://..." /></div>
+                      <div className="col-span-2"><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={editingUtilities[selectedUtility].autopay || false} onChange={(e) => handleUpdateUtility(selectedUtility, 'autopay', e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" /><span className="text-sm text-slate-700 dark:text-slate-300">Autopay is enabled</span></label></div>
+                      <div className="col-span-2"><label className="label block mb-1.5">Notes</label><textarea value={editingUtilities[selectedUtility].notes || ''} onChange={(e) => handleUpdateUtility(selectedUtility, 'notes', e.target.value)} className="input w-full" rows={2} placeholder="Any notes..." /></div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500"><p>Select a utility or add a new one</p></div>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">{isSaving ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Vehicles Modal
+function VehiclesModal({
+  vehicles,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  vehicles: Record<string, Vehicle>;
+  onSave: (vehicles: Record<string, Vehicle>) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const [editingVehicles, setEditingVehicles] = useState<Record<string, Vehicle>>(() => ({ ...vehicles }));
+  const [selectedVehicle, setSelectedVehicle] = useState<string | null>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const vehicleTypes = [
+    { value: 'CAR', label: 'Car', icon: '🚗' },
+    { value: 'TRUCK', label: 'Truck', icon: '🛻' },
+    { value: 'SUV', label: 'SUV', icon: '🚙' },
+    { value: 'MOTORCYCLE', label: 'Motorcycle', icon: '🏍️' },
+    { value: 'BOAT', label: 'Boat', icon: '🚤' },
+    { value: 'RV', label: 'RV', icon: '🚐' },
+    { value: 'OTHER', label: 'Other', icon: '🚘' },
+  ];
+
+  const handleAddVehicle = (type: Vehicle['type']) => {
+    const key = `${type.toLowerCase()}_${Date.now()}`;
+    setEditingVehicles(prev => ({ ...prev, [key]: { id: crypto.randomUUID(), type, make: '', model: '' } }));
+    setSelectedVehicle(key);
+    setShowAddForm(false);
+  };
+
+  const handleRemoveVehicle = (key: string) => {
+    setEditingVehicles(prev => { const next = { ...prev }; delete next[key]; return next; });
+    setSelectedVehicle(null);
+  };
+
+  const handleUpdateVehicle = (key: string, field: string, value: string | number | undefined) => {
+    setEditingVehicles(prev => {
+      const existing = prev[key];
+      if (!existing) return prev;
+      return { ...prev, [key]: { ...existing, [field]: value } as Vehicle };
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(editingVehicles); };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Manage Vehicles</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="flex h-[60vh]">
+              <div className="w-56 border-r border-slate-200 dark:border-slate-700 overflow-y-auto p-3">
+                <button type="button" onClick={() => setShowAddForm(!showAddForm)} className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg hover:bg-emerald-100 dark:hover:bg-emerald-900/30 mb-3">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>Add Vehicle
+                </button>
+                {showAddForm && (
+                  <div className="mb-3 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg space-y-1">
+                    {vehicleTypes.map(({ value, label, icon }) => (<button key={value} type="button" onClick={() => handleAddVehicle(value as Vehicle['type'])} className="w-full text-left px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded flex items-center gap-2"><span>{icon}</span> {label}</button>))}
+                  </div>
+                )}
+                <div className="space-y-1">
+                  {Object.entries(editingVehicles).map(([key, vehicle]) => (<button key={key} type="button" onClick={() => setSelectedVehicle(key)} className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${selectedVehicle === key ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'}`}>{vehicle.year ? `${vehicle.year} ` : ''}{vehicle.make} {vehicle.model}</button>))}
+                </div>
+              </div>
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedVehicle && editingVehicles[selectedVehicle] ? (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-slate-900 dark:text-white">{editingVehicles[selectedVehicle].year} {editingVehicles[selectedVehicle].make} {editingVehicles[selectedVehicle].model}</h3>
+                      <button type="button" onClick={() => handleRemoveVehicle(selectedVehicle)} className="text-sm text-red-600 hover:text-red-700">Remove</button>
+                    </div>
+                    <div className="space-y-4">
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2">Vehicle Info</h4>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div><label className="label block mb-1.5">Year</label><input type="number" value={editingVehicles[selectedVehicle].year || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'year', e.target.value ? parseInt(e.target.value) : undefined)} className="input w-full" placeholder="2024" /></div>
+                        <div><label className="label block mb-1.5">Make</label><input type="text" value={editingVehicles[selectedVehicle].make} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'make', e.target.value)} className="input w-full" placeholder="Toyota" /></div>
+                        <div><label className="label block mb-1.5">Model</label><input type="text" value={editingVehicles[selectedVehicle].model} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'model', e.target.value)} className="input w-full" placeholder="Camry" /></div>
+                        <div><label className="label block mb-1.5">Color</label><input type="text" value={editingVehicles[selectedVehicle].color || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'color', e.target.value)} className="input w-full" placeholder="Silver" /></div>
+                        <div><label className="label block mb-1.5">VIN</label><input type="text" value={editingVehicles[selectedVehicle].vin || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'vin', e.target.value)} className="input w-full" placeholder="Vehicle ID" /></div>
+                        <div><label className="label block mb-1.5">License Plate</label><input type="text" value={editingVehicles[selectedVehicle].licensePlate || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'licensePlate', e.target.value)} className="input w-full" placeholder="ABC-1234" /></div>
+                        <div><label className="label block mb-1.5">Registration Expires</label><input type="date" value={editingVehicles[selectedVehicle].registrationExpires || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'registrationExpires', e.target.value)} className="input w-full" /></div>
+                        <div><label className="label block mb-1.5">Current Mileage</label><input type="number" value={editingVehicles[selectedVehicle].currentMileage || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'currentMileage', e.target.value ? parseInt(e.target.value) : undefined)} className="input w-full" placeholder="50000" /></div>
+                      </div>
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2 pt-4">Insurance</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="label block mb-1.5">Insurance Company</label><input type="text" value={editingVehicles[selectedVehicle].insuranceCompany || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'insuranceCompany', e.target.value)} className="input w-full" placeholder="State Farm" /></div>
+                        <div><label className="label block mb-1.5">Policy Number</label><input type="text" value={editingVehicles[selectedVehicle].insurancePolicyNumber || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'insurancePolicyNumber', e.target.value)} className="input w-full" placeholder="Policy #" /></div>
+                        <div><label className="label block mb-1.5">Policy Expires</label><input type="date" value={editingVehicles[selectedVehicle].insuranceExpires || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'insuranceExpires', e.target.value)} className="input w-full" /></div>
+                        <div><label className="label block mb-1.5">Agent Phone</label><input type="tel" value={editingVehicles[selectedVehicle].insuranceAgentPhone || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'insuranceAgentPhone', e.target.value)} className="input w-full" placeholder="(555) 555-5555" /></div>
+                      </div>
+                      <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2 pt-4">Service</h4>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div><label className="label block mb-1.5">Preferred Mechanic</label><input type="text" value={editingVehicles[selectedVehicle].preferredMechanic || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'preferredMechanic', e.target.value)} className="input w-full" placeholder="Shop name" /></div>
+                        <div><label className="label block mb-1.5">Mechanic Phone</label><input type="tel" value={editingVehicles[selectedVehicle].mechanicPhone || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'mechanicPhone', e.target.value)} className="input w-full" placeholder="(555) 555-5555" /></div>
+                        <div><label className="label block mb-1.5">Last Oil Change</label><input type="date" value={editingVehicles[selectedVehicle].lastOilChange || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'lastOilChange', e.target.value)} className="input w-full" /></div>
+                        <div><label className="label block mb-1.5">Next Oil Change (miles)</label><input type="number" value={editingVehicles[selectedVehicle].nextOilChangeMiles || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'nextOilChangeMiles', e.target.value ? parseInt(e.target.value) : undefined)} className="input w-full" placeholder="55000" /></div>
+                      </div>
+                      <div className="pt-4"><label className="label block mb-1.5">Notes</label><textarea value={editingVehicles[selectedVehicle].notes || ''} onChange={(e) => handleUpdateVehicle(selectedVehicle, 'notes', e.target.value)} className="input w-full" rows={2} placeholder="Any notes..." /></div>
+                    </div>
+                  </div>
+                ) : (<div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500"><p>Select a vehicle or add a new one</p></div>)}
+              </div>
+            </div>
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">{isSaving ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Fuel Delivery Modal
+function FuelDeliveryModal({
+  fuelDelivery,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  fuelDelivery?: FuelDelivery;
+  onSave: (fuelDelivery: FuelDelivery) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const [editingFuel, setEditingFuel] = useState<FuelDelivery>(() => fuelDelivery || { id: crypto.randomUUID(), fuelType: 'OIL', provider: '' });
+  const handleUpdate = (field: string, value: string | number | boolean) => { setEditingFuel(prev => ({ ...prev, [field]: value })); };
+  const handleSubmit = (e: React.FormEvent) => { e.preventDefault(); onSave(editingFuel); };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-lg">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Fuel Delivery Info</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+          </div>
+          <form onSubmit={handleSubmit} className="p-4 space-y-4">
+            <div><label className="label block mb-1.5">Fuel Type</label><select value={editingFuel.fuelType} onChange={(e) => handleUpdate('fuelType', e.target.value)} className="input w-full"><option value="OIL">Heating Oil</option><option value="PROPANE">Propane</option><option value="NATURAL_GAS">Natural Gas</option></select></div>
+            <div className="grid grid-cols-2 gap-4">
+              <div><label className="label block mb-1.5">Provider</label><input type="text" value={editingFuel.provider} onChange={(e) => handleUpdate('provider', e.target.value)} className="input w-full" placeholder="e.g., Petro Home" /></div>
+              <div><label className="label block mb-1.5">Account Number</label><input type="text" value={editingFuel.accountNumber || ''} onChange={(e) => handleUpdate('accountNumber', e.target.value)} className="input w-full" placeholder="Account #" /></div>
+              <div><label className="label block mb-1.5">Tank Size (gallons)</label><input type="number" value={editingFuel.tankSize || ''} onChange={(e) => handleUpdate('tankSize', e.target.value ? parseInt(e.target.value) : 0)} className="input w-full" placeholder="275" /></div>
+              <div><label className="label block mb-1.5">Last Fill Date</label><input type="date" value={editingFuel.lastFillDate || ''} onChange={(e) => handleUpdate('lastFillDate', e.target.value)} className="input w-full" /></div>
+              <div><label className="label block mb-1.5">Last Fill Amount (gal)</label><input type="number" value={editingFuel.lastFillAmount || ''} onChange={(e) => handleUpdate('lastFillAmount', e.target.value ? parseFloat(e.target.value) : 0)} className="input w-full" placeholder="150" /></div>
+              <div><label className="label block mb-1.5">Price per Gallon</label><div className="relative"><span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span><input type="number" step="0.01" value={editingFuel.pricePerGallon || ''} onChange={(e) => handleUpdate('pricePerGallon', e.target.value ? parseFloat(e.target.value) : 0)} className="input w-full pl-7" placeholder="3.50" /></div></div>
+              <div><label className="label block mb-1.5">Customer Service</label><input type="tel" value={editingFuel.customerServicePhone || ''} onChange={(e) => handleUpdate('customerServicePhone', e.target.value)} className="input w-full" placeholder="(555) 555-5555" /></div>
+              <div><label className="label block mb-1.5">Emergency Phone</label><input type="tel" value={editingFuel.emergencyPhone || ''} onChange={(e) => handleUpdate('emergencyPhone', e.target.value)} className="input w-full" placeholder="(555) 555-5555" /></div>
+            </div>
+            <div><label className="flex items-center gap-3 cursor-pointer"><input type="checkbox" checked={editingFuel.autoDelivery || false} onChange={(e) => handleUpdate('autoDelivery', e.target.checked)} className="w-4 h-4 text-emerald-600 rounded" /><span className="text-sm text-slate-700 dark:text-slate-300">Auto-delivery is enabled</span></label></div>
+            <div><label className="label block mb-1.5">Notes</label><textarea value={editingFuel.notes || ''} onChange={(e) => handleUpdate('notes', e.target.value)} className="input w-full" rows={2} placeholder="Any notes about delivery access, tank location, etc." /></div>
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">Cancel</button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">{isSaving ? 'Saving...' : 'Save Changes'}</button>
+            </div>
+          </form>
+        </div>
       </div>
     </div>
   );
