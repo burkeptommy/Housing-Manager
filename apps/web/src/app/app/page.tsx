@@ -130,7 +130,7 @@ export default function DashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -150,11 +150,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       {/* Hero Summary Section */}
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-xl p-6 text-white">
+      <div className="bg-gradient-to-r from-emerald-600 to-indigo-700 rounded-xl p-6 text-white">
         <h1 className="text-2xl font-bold mb-2">
           Welcome back, {user?.firstName}!
         </h1>
-        <p className="text-blue-100 text-lg">
+        <p className="text-emerald-100 text-lg">
           This month: <span className="font-semibold text-white">{summary.billsManagedThisMonth} bills</span> managed,{' '}
           <span className="font-semibold text-white">{summary.tasksScheduledThisMonth} tasks</span> scheduled,{' '}
           <span className="font-semibold text-white">{summary.tasksCompletedThisMonth} tasks</span> completed
@@ -163,14 +163,14 @@ export default function DashboardPage() {
         {/* Next Up Highlight */}
         {summary.nextUp && (
           <div className="mt-4 bg-white/10 backdrop-blur-sm rounded-lg p-4">
-            <p className="text-sm text-blue-200 mb-1">Next up</p>
+            <p className="text-sm text-emerald-200 mb-1">Next up</p>
             <p className="text-xl font-semibold flex items-center gap-2">
               <span>{getCategoryIcon(summary.nextUp.category)}</span>
               <span>{summary.nextUp.title}</span>
-              <span className="text-blue-200">{getDaysUntilLabel(summary.nextUp.daysUntilDue)}</span>
+              <span className="text-emerald-200">{getDaysUntilLabel(summary.nextUp.daysUntilDue)}</span>
             </p>
             {summary.nextUp.vendorName && (
-              <p className="text-blue-200 text-sm mt-1">
+              <p className="text-emerald-200 text-sm mt-1">
                 with {summary.nextUp.vendorName}
               </p>
             )}
@@ -230,14 +230,14 @@ export default function DashboardPage() {
                 Upcoming Bills
               </h2>
               {upcomingBills.length > 0 && (
-                <span className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-blue-900/30 dark:text-blue-400">
+                <span className="bg-emerald-100 text-emerald-800 text-xs font-medium px-2 py-0.5 rounded-full dark:bg-emerald-900/30 dark:text-emerald-400">
                   {upcomingBills.length}
                 </span>
               )}
             </div>
             <Link
               href="/app/billing"
-              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium"
+              className="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium"
             >
               View all
             </Link>
@@ -280,7 +280,7 @@ export default function DashboardPage() {
                         <button
                           onClick={() => handleAskHavenToHandle(bill.id)}
                           disabled={requestHavenHandle.isPending}
-                          className="mt-2 text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium disabled:opacity-50"
+                          className="mt-2 text-xs text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium disabled:opacity-50"
                         >
                           Ask Haven to handle
                         </button>
@@ -314,7 +314,7 @@ export default function DashboardPage() {
             </div>
             <Link
               href="/app/maintenance"
-              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium"
+              className="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium"
             >
               View all
             </Link>
@@ -359,7 +359,7 @@ export default function DashboardPage() {
                       )}
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                         task.status === 'SCHEDULED'
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
                           : 'bg-slate-100 text-slate-600 dark:bg-slate-600 dark:text-slate-300'
                       }`}>
                         {task.status}
@@ -371,7 +371,7 @@ export default function DashboardPage() {
                             handleRequestVendorVisit(task);
                           }}
                           disabled={creatingWorkOrder === task.id}
-                          className="text-xs text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium disabled:opacity-50"
+                          className="text-xs text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium disabled:opacity-50"
                         >
                           {creatingWorkOrder === task.id ? 'Creating...' : 'Request vendor visit'}
                         </button>
@@ -395,7 +395,7 @@ export default function DashboardPage() {
             href="/app/bills/new"
             className="flex flex-col items-center gap-2 p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors border border-slate-200 dark:border-slate-600"
           >
-            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-2xl">
+            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-2xl">
               💰
             </div>
             <span className="text-sm font-medium text-slate-700 dark:text-slate-300 text-center">Add a new bill</span>

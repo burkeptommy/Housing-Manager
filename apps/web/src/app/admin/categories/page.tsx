@@ -232,7 +232,7 @@ export default function AdminCategoriesPage() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => handleEdit(category)}
-                        className="text-sm font-medium text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300"
+                        className="text-sm font-medium text-emerald-600 hover:text-emerald-800 dark:text-emerald-400 dark:hover:text-emerald-300"
                       >
                         Edit
                       </button>

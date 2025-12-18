@@ -7,7 +7,7 @@ import type { AdminUser, UserRole } from '@haven/core';
 const roleColors: Record<UserRole, string> = {
   ADMIN: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
   MANAGER: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  HOMEOWNER: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  HOMEOWNER: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
   VENDOR: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
 };
 

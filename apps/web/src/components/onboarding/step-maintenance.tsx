@@ -144,7 +144,7 @@ export function StepMaintenance({
         </div>
         <div className="flex items-center justify-center py-12">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
             <p className="mt-4 text-slate-600 dark:text-slate-400">Analyzing your home...</p>
           </div>
         </div>
@@ -208,7 +208,7 @@ export function StepMaintenance({
                         key={task.id}
                         className={`p-4 rounded-lg border transition-colors ${
                           selection?.keep
-                            ? 'border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-900/20'
+                            ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/20'
                             : 'border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 opacity-60'
                         }`}
                       >
@@ -217,7 +217,7 @@ export function StepMaintenance({
                             type="checkbox"
                             checked={selection?.keep || false}
                             onChange={() => toggleTask(task.id)}
-                            className="mt-1 w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600"
+                            className="mt-1 w-4 h-4 text-emerald-600 rounded border-slate-300 dark:border-slate-600"
                           />
                           <div className="flex-1 min-w-0">
                             <div className="flex items-start justify-between gap-4">
@@ -299,8 +299,8 @@ export function StepMaintenance({
       )}
 
       {/* Summary */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
+      <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+        <p className="text-sm text-emerald-800 dark:text-emerald-200">
           <strong>{selectedCount}</strong> task{selectedCount !== 1 ? 's' : ''} will be added to your maintenance schedule.
           Skipped tasks won&apos;t be tracked.
         </p>

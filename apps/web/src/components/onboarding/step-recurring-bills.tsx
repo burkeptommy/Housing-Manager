@@ -252,7 +252,7 @@ export function StepRecurringBills({
                           type="checkbox"
                           checked={isEnabled}
                           onChange={() => toggleBill(item.category)}
-                          className="w-4 h-4 text-blue-600 rounded border-slate-300 dark:border-slate-600"
+                          className="w-4 h-4 text-emerald-600 rounded border-slate-300 dark:border-slate-600"
                         />
                         <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
                           {item.label}
@@ -332,7 +332,7 @@ export function StepRecurringBills({
                                   key={option.value}
                                   className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                                     data.paymentResponsibility === option.value
-                                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
                                       : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                                   }`}
                                 >
@@ -368,8 +368,8 @@ export function StepRecurringBills({
       </div>
 
       {/* Summary */}
-      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
+      <div className="p-4 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg">
+        <p className="text-sm text-emerald-800 dark:text-emerald-200">
           <strong>{enabledBills.size}</strong> bill{enabledBills.size !== 1 ? 's' : ''} selected.
           You can always add more later from your dashboard.
         </p>

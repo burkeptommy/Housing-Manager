@@ -62,7 +62,7 @@ export default function RegisterPage() {
   if (isLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -72,7 +72,7 @@ export default function RegisterPage() {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white mb-4">
             <svg
               className="w-8 h-8"
               fill="none"
@@ -226,7 +226,7 @@ export default function RegisterPage() {
               Already have an account?{' '}
               <Link
                 href="/login"
-                className="font-medium text-blue-600 hover:text-blue-500 dark:text-blue-400"
+                className="font-medium text-emerald-600 hover:text-emerald-500 dark:text-emerald-400"
               >
                 Sign in
               </Link>

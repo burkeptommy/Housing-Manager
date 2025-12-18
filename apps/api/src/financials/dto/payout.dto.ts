@@ -3,6 +3,23 @@ import { IsArray, IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, ValidateNe
 import { Type } from 'class-transformer';
 import { TransactionPayoutMethod, TransactionStatus } from '@prisma/client';
 
+// Swagger-compatible enum definitions - use explicit enum objects to avoid circular dependency
+export enum PayoutMethodEnum {
+  CHECKBOOK_IO = 'CHECKBOOK_IO',
+  STRIPE = 'STRIPE',
+  CASH = 'CASH',
+  COMPANY_CARD = 'COMPANY_CARD',
+  BANK_TRANSFER = 'BANK_TRANSFER',
+}
+
+export enum TransactionStatusEnum {
+  PENDING = 'PENDING',
+  PAID_TO_COMPANY = 'PAID_TO_COMPANY',
+  PAID_TO_VENDOR = 'PAID_TO_VENDOR',
+  CANCELLED = 'CANCELLED',
+  REFUNDED = 'REFUNDED',
+}
+
 // ============================================================================
 // PAYOUT REQUEST DTOs
 // ============================================================================
@@ -13,7 +30,7 @@ export class PayoutItemDto {
   @IsNotEmpty()
   transactionId: string;
 
-  @ApiProperty({ description: 'Payment method to use' })
+  @ApiProperty({ description: 'Payment method to use', enum: PayoutMethodEnum })
   @IsEnum(TransactionPayoutMethod)
   payoutMethod: TransactionPayoutMethod;
 }
@@ -32,7 +49,7 @@ export class SinglePayoutDto {
   @IsNotEmpty()
   transactionId: string;
 
-  @ApiProperty({ description: 'Payment method override' })
+  @ApiProperty({ description: 'Payment method override', enum: PayoutMethodEnum })
   @IsEnum(TransactionPayoutMethod)
   @IsOptional()
   payoutMethod?: TransactionPayoutMethod;
@@ -94,7 +111,7 @@ export class VendorPayableDto {
   @ApiProperty()
   amount: number;
 
-  @ApiProperty({ enum: TransactionStatus })
+  @ApiProperty({ enum: TransactionStatusEnum })
   status: TransactionStatus;
 
   @ApiProperty()
@@ -109,10 +126,10 @@ export class VendorPayableDto {
   @ApiPropertyOptional()
   vendorEmail?: string;
 
-  @ApiProperty({ description: 'Available payout methods for this vendor' })
+  @ApiProperty({ description: 'Available payout methods for this vendor', isArray: true, enum: PayoutMethodEnum })
   availablePayoutMethods: TransactionPayoutMethod[];
 
-  @ApiProperty({ description: 'Recommended payout method' })
+  @ApiProperty({ description: 'Recommended payout method', enum: PayoutMethodEnum })
   recommendedPayoutMethod: TransactionPayoutMethod;
 }
 
@@ -127,7 +144,7 @@ export class PayoutResultItemDto {
   @ApiProperty()
   success: boolean;
 
-  @ApiProperty({ enum: TransactionPayoutMethod })
+  @ApiProperty({ enum: PayoutMethodEnum })
   payoutMethod: TransactionPayoutMethod;
 
   @ApiPropertyOptional()
@@ -182,7 +199,7 @@ export class BatchPayPreviewItemDto {
   @ApiProperty()
   amount: number;
 
-  @ApiProperty({ enum: TransactionPayoutMethod })
+  @ApiProperty({ enum: PayoutMethodEnum })
   payoutMethod: TransactionPayoutMethod;
 
   @ApiProperty()

@@ -742,6 +742,60 @@ async function main() {
   });
   console.log(`✅ Created staff user: ${managerSteve.email} (Home Manager)`);
 
+  // Create Handyman Users (Internal Staff)
+  const handymanPassword = await bcrypt.hash('Handy123!', 12);
+
+  // Handyman #1 - Carlos (assigned to Bob's properties in CA)
+  const handymanCarlos = await prisma.user.upsert({
+    where: { email: 'carlos@haven.app' },
+    update: {},
+    create: {
+      email: 'carlos@haven.app',
+      passwordHash: handymanPassword,
+      firstName: 'Carlos',
+      lastName: 'Rodriguez',
+      displayName: 'Carlos Rodriguez',
+      role: UserRole.HANDYMAN,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created handyman user: ${handymanCarlos.email}`);
+
+  // Handyman #2 - Dave (assigned to CT and IL properties)
+  const handymanDave = await prisma.user.upsert({
+    where: { email: 'dave@haven.app' },
+    update: {},
+    create: {
+      email: 'dave@haven.app',
+      passwordHash: handymanPassword,
+      firstName: 'Dave',
+      lastName: 'Wilson',
+      displayName: 'Dave Wilson',
+      role: UserRole.HANDYMAN,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created handyman user: ${handymanDave.email}`);
+
+  // Handyman #3 - Maria (floater - helps across all properties)
+  const handymanMaria = await prisma.user.upsert({
+    where: { email: 'maria@haven.app' },
+    update: {},
+    create: {
+      email: 'maria@haven.app',
+      passwordHash: handymanPassword,
+      firstName: 'Maria',
+      lastName: 'Santos',
+      displayName: 'Maria Santos',
+      role: UserRole.HANDYMAN,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created handyman user: ${handymanMaria.email}`);
+
   // Create Homeowner Bob (Client)
   const homeownerBob = await prisma.user.upsert({
     where: { email: 'bob@example.com' },
@@ -759,21 +813,41 @@ async function main() {
   });
   console.log(`✅ Created homeowner user: ${homeownerBob.email} (Client)`);
 
+  // Create Homeowner Alice (Client with 1 house, 4 family members)
+  const alicePassword = await bcrypt.hash('Alice123!', 12);
+  const homeownerAlice = await prisma.user.upsert({
+    where: { email: 'alice@example.com' },
+    update: {},
+    create: {
+      email: 'alice@example.com',
+      passwordHash: alicePassword,
+      firstName: 'Alice',
+      lastName: 'Johnson',
+      displayName: 'Alice Johnson',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created homeowner user: ${homeownerAlice.email} (Client - 1 house, 4 family members)`);
+
   // Keep the original demo user for backward compatibility
   const demoUser = homeownerBob; // Alias for existing code
 
-  // Create Bob's Villa - household with Manager Steve assigned
+  // Create Bob's Villa - household with Manager Steve and Handyman Dave assigned
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
     update: {
-      managerId: managerSteve.id, // Assign Manager Steve to this household
+      managerId: managerSteve.id,
+      assignedHandymanId: handymanDave.id, // Dave handles CT properties
     },
     create: {
       id: 'demo-household-id',
       name: "Bob's Villa",
       description: 'A beautiful single-family home managed by Haven',
       ownerId: homeownerBob.id,
-      managerId: managerSteve.id, // Manager Steve is assigned to this household
+      managerId: managerSteve.id,
+      assignedHandymanId: handymanDave.id, // Dave handles CT properties
       stripeCustomerId: 'cus_household_demo_123',
       billingCycleDay: 1,
       billingSettings: {
@@ -841,6 +915,289 @@ async function main() {
     },
   });
   console.log(`✅ Created demo household: ${demoHousehold.name}`);
+
+  // Ensure Bob's membership exists (needed if household was previously created)
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: demoHousehold.id,
+        userId: homeownerBob.id,
+      },
+    },
+    update: {
+      role: 'OWNER',
+      status: 'ACTIVE',
+    },
+    create: {
+      householdId: demoHousehold.id,
+      userId: homeownerBob.id,
+      role: 'OWNER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created household membership for Bob`);
+
+  // ============================================================================
+  // ALICE'S HOUSEHOLD - 1 house with 4 family members
+  // ============================================================================
+
+  const aliceHousehold = await prisma.household.upsert({
+    where: { id: 'alice-household-id' },
+    update: {
+      managerId: managerSteve.id,
+      assignedHandymanId: handymanDave.id, // Dave handles IL properties too
+    },
+    create: {
+      id: 'alice-household-id',
+      name: "The Johnson Family Home",
+      description: 'A cozy suburban family home with 4 family members',
+      ownerId: homeownerAlice.id,
+      managerId: managerSteve.id,
+      assignedHandymanId: handymanDave.id, // Dave handles IL properties
+      stripeCustomerId: 'cus_household_alice_123',
+      billingCycleDay: 15,
+      billingSettings: {
+        autoPayEnabled: true,
+        autoPayLimit: 300,
+        preferredPaymentDay: 15,
+        notifyBeforeDue: 5,
+      },
+      homeProfile: {
+        create: {
+          propertyType: 'SINGLE_FAMILY',
+          addressLine1: '742 Evergreen Terrace',
+          city: 'Springfield',
+          state: 'IL',
+          postalCode: '62701',
+          country: 'US',
+          squareFeet: 2200,
+          yearBuilt: 1995,
+          bedrooms: 4,
+          bathrooms: 2.5,
+          stories: 2,
+          garageSpaces: 2,
+          notes: JSON.stringify({
+            systems: {
+              hasPool: false,
+              hasHotTub: true,
+              septicOrSewer: 'sewer',
+              hasFireplace: true,
+              fireplaceType: 'gas',
+              hasSprinklerSystem: true,
+              hasSecuritySystem: true,
+              hasSmartHome: true,
+              hasSolarPanels: false,
+              hasGenerator: true,
+              hasSumpPump: true,
+              hasWellWater: false,
+              hasRadonMitigation: false,
+            },
+            features: {
+              hasDeck: true,
+              deckMaterial: 'wood',
+              hasBasement: true,
+              basementType: 'finished',
+              hasAttic: true,
+              roofType: 'asphalt shingles',
+              roofAge: 5,
+              hvacType: 'central air/forced air',
+              hvacAge: 3,
+              waterHeaterType: 'tankless',
+              waterHeaterAge: 2,
+            },
+            notes: 'Well-maintained family home with recent upgrades. Smart home features throughout.',
+          }),
+        },
+      },
+    },
+  });
+  console.log(`✅ Created Alice's household: ${aliceHousehold.name}`);
+
+  // Create Alice's membership as owner
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: aliceHousehold.id,
+        userId: homeownerAlice.id,
+      },
+    },
+    update: {
+      role: 'OWNER',
+      status: 'ACTIVE',
+    },
+    create: {
+      householdId: aliceHousehold.id,
+      userId: homeownerAlice.id,
+      role: 'OWNER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Alice (Owner)',
+    },
+  });
+
+  // Create 3 additional family members for Alice's household (each needs a User account)
+  const familyPassword = await bcrypt.hash('Family123!', 12);
+
+  // Michael (Spouse)
+  const michaelUser = await prisma.user.upsert({
+    where: { email: 'michael.johnson@example.com' },
+    update: {},
+    create: {
+      email: 'michael.johnson@example.com',
+      passwordHash: familyPassword,
+      firstName: 'Michael',
+      lastName: 'Johnson',
+      displayName: 'Michael Johnson',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: aliceHousehold.id,
+        userId: michaelUser.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: aliceHousehold.id,
+      userId: michaelUser.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Michael (Spouse)',
+      birthday: new Date('1982-03-15'),
+    },
+  });
+
+  // Emma (Daughter - 14 years old)
+  const emmaUser = await prisma.user.upsert({
+    where: { email: 'emma.johnson@example.com' },
+    update: {},
+    create: {
+      email: 'emma.johnson@example.com',
+      passwordHash: familyPassword,
+      firstName: 'Emma',
+      lastName: 'Johnson',
+      displayName: 'Emma Johnson',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: aliceHousehold.id,
+        userId: emmaUser.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: aliceHousehold.id,
+      userId: emmaUser.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Emma (Daughter)',
+      birthday: new Date('2010-06-22'),
+      permissions: ['VIEW_CALENDAR', 'VIEW_MEMBERS'], // Limited permissions for minor
+    },
+  });
+
+  // Jack (Son - 10 years old)
+  const jackUser = await prisma.user.upsert({
+    where: { email: 'jack.johnson@example.com' },
+    update: {},
+    create: {
+      email: 'jack.johnson@example.com',
+      passwordHash: familyPassword,
+      firstName: 'Jack',
+      lastName: 'Johnson',
+      displayName: 'Jack Johnson',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: aliceHousehold.id,
+        userId: jackUser.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: aliceHousehold.id,
+      userId: jackUser.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Jack (Son)',
+      birthday: new Date('2014-11-08'),
+      permissions: ['VIEW_CALENDAR'], // Very limited permissions for minor
+    },
+  });
+
+  console.log(`✅ Created 4 family members for Alice's household`);
+
+  // Create some service requests for Alice's household
+  const generalCategory = categories.find((c) => c.name === 'General Handyman');
+  const hvacCategoryAlice = categories.find((c) => c.name === 'HVAC');
+
+  await prisma.serviceRequest.createMany({
+    data: [
+      {
+        householdId: aliceHousehold.id,
+        createdById: homeownerAlice.id,
+        serviceCategoryId: generalCategory?.id,
+        title: 'Fix squeaky door in master bedroom',
+        description: 'The master bedroom door has been squeaking for a few weeks. Need to oil the hinges.',
+        status: 'SUBMITTED',
+        priority: 'LOW',
+        preferredDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+      {
+        householdId: aliceHousehold.id,
+        createdById: homeownerAlice.id,
+        serviceCategoryId: hvacCategoryAlice?.id,
+        title: 'Smart thermostat installation',
+        description: 'Want to upgrade to a Nest thermostat for better energy efficiency.',
+        status: 'ASSIGNED',
+        priority: 'MEDIUM',
+        preferredDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+        scheduledDate: new Date(Date.now() + 12 * 24 * 60 * 60 * 1000),
+      },
+    ],
+    skipDuplicates: true,
+  });
+  console.log(`✅ Created service requests for Alice's household`);
+
+  // Create a work order for Alice's household
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-alice-hot-tub' },
+    update: {},
+    create: {
+      id: 'wo-alice-hot-tub',
+      householdId: aliceHousehold.id,
+      createdByUserId: managerSteve.id,
+      title: 'Hot Tub Annual Service',
+      description: 'Annual maintenance for the backyard hot tub. Check filters, water chemistry, jets, and heater.',
+      status: WorkOrderStatus.OPEN,
+      estimatedCost: 275,
+      scheduledStart: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      scheduledEnd: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000),
+      serviceArea: 'Springfield',
+    },
+  });
+  console.log(`✅ Created work order for Alice's household`);
 
   // Create vendors for the household
   console.log('🏢 Creating vendors...');
@@ -1297,13 +1654,16 @@ async function main() {
   // Create Malibu Mansion household (for demo work orders)
   const malibuMansion = await prisma.household.upsert({
     where: { id: 'malibu-mansion-id' },
-    update: {},
+    update: {
+      assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
+    },
     create: {
       id: 'malibu-mansion-id',
       name: 'Malibu Mansion',
       description: 'Beachfront luxury estate in Malibu',
       ownerId: homeownerBob.id, // Bob owns multiple properties
       managerId: managerSteve.id,
+      assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
       stripeCustomerId: 'cus_malibu_mansion_demo',
       billingCycleDay: 1,
       homeProfile: {
@@ -1327,16 +1687,40 @@ async function main() {
   });
   console.log(`✅ Created household: ${malibuMansion.name}`);
 
+  // Ensure Bob's membership exists for Malibu Mansion
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: malibuMansion.id,
+        userId: homeownerBob.id,
+      },
+    },
+    update: {
+      role: 'OWNER',
+      status: 'ACTIVE',
+    },
+    create: {
+      householdId: malibuMansion.id,
+      userId: homeownerBob.id,
+      role: 'OWNER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+    },
+  });
+
   // Create Beverly Hills Estate household
   const beverlyHillsEstate = await prisma.household.upsert({
     where: { id: 'beverly-hills-estate-id' },
-    update: {},
+    update: {
+      assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
+    },
     create: {
       id: 'beverly-hills-estate-id',
       name: 'Beverly Hills Estate',
       description: 'Classic Mediterranean estate in Beverly Hills',
       ownerId: homeownerBob.id,
       managerId: managerSteve.id,
+      assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
       stripeCustomerId: 'cus_beverly_hills_demo',
       billingCycleDay: 1,
       homeProfile: {
@@ -1359,6 +1743,27 @@ async function main() {
     },
   });
   console.log(`✅ Created household: ${beverlyHillsEstate.name}`);
+
+  // Ensure Bob's membership exists for Beverly Hills Estate
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: beverlyHillsEstate.id,
+        userId: homeownerBob.id,
+      },
+    },
+    update: {
+      role: 'OWNER',
+      status: 'ACTIVE',
+    },
+    create: {
+      householdId: beverlyHillsEstate.id,
+      userId: homeownerBob.id,
+      role: 'OWNER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+    },
+  });
 
   // Get roofing service category
   const roofingCategory = categories.find((c) => c.name === 'Roofing');
@@ -1499,39 +1904,75 @@ async function main() {
   console.log('    Password: Manager123!');
   console.log('    Role:     Can access households assigned to them');
   console.log('');
-  console.log('  🏠 Homeowner Bob (Client):');
+  console.log('  🏠 Homeowner Bob (Client - 3 properties):');
   console.log('    Email:    bob@example.com');
   console.log('    Password: Bob123!');
-  console.log('    Role:     Can only access their own household');
+  console.log('    Properties: Bob\'s Villa (CT), Malibu Mansion (CA), Beverly Hills Estate (CA)');
+  console.log('');
+  console.log('  🏠 Homeowner Alice (Client - 1 property, 4 family members):');
+  console.log('    Email:    alice@example.com');
+  console.log('    Password: Alice123!');
+  console.log('    Properties: The Johnson Family Home (IL)');
+  console.log('    Family: Alice, Michael (spouse), Emma (daughter), Jack (son)');
   console.log('');
   console.log('  🔧 Vendor - Ace Roofing:');
   console.log('    Email:    vendor@aceroofing.example.com');
   console.log('    Password: AceRoof123!');
   console.log('    Portal:   /vendor (Vendor Portal)');
   console.log('');
+  console.log('  🛠️  Handyman Carlos (CA Properties):');
+  console.log('    Email:    carlos@haven.app');
+  console.log('    Password: Handy123!');
+  console.log('    Assigned: Malibu Mansion, Beverly Hills Estate');
+  console.log('    Portal:   /handyman');
+  console.log('');
+  console.log('  🛠️  Handyman Dave (CT/IL Properties):');
+  console.log('    Email:    dave@haven.app');
+  console.log('    Password: Handy123!');
+  console.log('    Assigned: Bob\'s Villa, The Johnson Family Home');
+  console.log('    Portal:   /handyman');
+  console.log('');
+  console.log('  🛠️  Handyman Maria (Floater):');
+  console.log('    Email:    maria@haven.app');
+  console.log('    Password: Handy123!');
+  console.log('    Assigned: Available for any property');
+  console.log('    Portal:   /handyman');
+  console.log('');
   console.log('═══════════════════════════════════════════════════');
   console.log('  HOUSEHOLD ASSIGNMENT');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
   console.log("  Bob's Villa:");
-  console.log('    Owner:   Bob Smith (bob@example.com)');
-  console.log('    Manager: Steve Manager (steve@haven.app)');
+  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Handyman: Dave Wilson (dave@haven.app)');
   console.log('  - 3 bed, 2.5 bath single family home');
   console.log('  - Features: pool, septic, chimney, lawn, snow removal');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
   console.log(`  - ${maintenanceTasks.length} maintenance tasks for 12 months`);
   console.log('');
   console.log('  Malibu Mansion:');
-  console.log('    Owner:   Bob Smith (bob@example.com)');
-  console.log('    Manager: Steve Manager (steve@haven.app)');
+  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Handyman: Carlos Rodriguez (carlos@haven.app)');
   console.log('  - 5 bed, 6 bath beachfront estate');
   console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
   console.log('');
   console.log('  Beverly Hills Estate:');
-  console.log('    Owner:   Bob Smith (bob@example.com)');
-  console.log('    Manager: Steve Manager (steve@haven.app)');
+  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Handyman: Carlos Rodriguez (carlos@haven.app)');
   console.log('  - 6 bed, 7 bath Mediterranean estate');
   console.log('  - Work Orders: 1 COMPLETED (awaiting verification), 1 IN_PROGRESS');
+  console.log('');
+  console.log('  The Johnson Family Home:');
+  console.log('    Owner:    Alice Johnson (alice@example.com)');
+  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Handyman: Dave Wilson (dave@haven.app)');
+  console.log('  - 4 bed, 2.5 bath suburban family home');
+  console.log('  - Family Members: Alice, Michael (spouse), Emma (14), Jack (10)');
+  console.log('  - Features: hot tub, gas fireplace, smart home, generator');
+  console.log('  - Work Orders: 1 OPEN (Hot Tub Service)');
   console.log('');
   console.log('═══════════════════════════════════════════════════');
   console.log('  VENDOR PORTAL DEMO');

@@ -100,7 +100,7 @@ export default function BillingPage() {
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
       PENDING: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-      PROCESSING: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+      PROCESSING: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
       PAID: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
       FAILED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
       CANCELLED: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
@@ -141,7 +141,7 @@ export default function BillingPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -173,7 +173,7 @@ export default function BillingPage() {
         </div>
         <button
           onClick={() => setShowAddAccountModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -186,8 +186,8 @@ export default function BillingPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
@@ -307,7 +307,7 @@ export default function BillingPage() {
                   )}
                   <div className="flex justify-between font-semibold text-lg pt-2">
                     <span className="text-slate-900 dark:text-white">Total</span>
-                    <span className="text-blue-600 dark:text-blue-400">{formatCurrency(latestInvoiceDetail.total)}</span>
+                    <span className="text-emerald-600 dark:text-emerald-400">{formatCurrency(latestInvoiceDetail.total)}</span>
                   </div>
                 </div>
               </div>
@@ -370,7 +370,7 @@ export default function BillingPage() {
                     </div>
                     <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2">
                       <div
-                        className="bg-blue-600 dark:bg-blue-500 h-2 rounded-full transition-all"
+                        className="bg-emerald-600 dark:bg-emerald-500 h-2 rounded-full transition-all"
                         style={{ width: `${percentage}%` }}
                       />
                     </div>
@@ -381,7 +381,7 @@ export default function BillingPage() {
               <div className="pt-3 mt-3 border-t border-slate-200 dark:border-slate-700">
                 <div className="flex justify-between font-semibold">
                   <span className="text-slate-900 dark:text-white">Total</span>
-                  <span className="text-blue-600 dark:text-blue-400">
+                  <span className="text-emerald-600 dark:text-emerald-400">
                     {formatCurrency(vendorBreakdown.reduce((sum, v) => sum + v.amount, 0))}
                   </span>
                 </div>
@@ -403,7 +403,7 @@ export default function BillingPage() {
           </h2>
           <button
             onClick={() => setShowAddAccountModal(true)}
-            className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium"
+            className="text-sm text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium"
           >
             + Add Account
           </button>
@@ -450,7 +450,7 @@ export default function BillingPage() {
             <p>No bill accounts set up yet.</p>
             <button
               onClick={() => setShowAddAccountModal(true)}
-              className="mt-2 text-blue-600 hover:text-blue-500 dark:text-blue-400 font-medium"
+              className="mt-2 text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 font-medium"
             >
               Add your first account
             </button>
@@ -472,7 +472,7 @@ export default function BillingPage() {
             {suggestions.slice(0, 6).map((suggestion) => (
               <div
                 key={suggestion.category}
-                className="p-4 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-blue-400 dark:hover:border-blue-500 transition-colors cursor-pointer"
+                className="p-4 rounded-lg border-2 border-dashed border-slate-300 dark:border-slate-600 hover:border-emerald-400 dark:hover:border-emerald-500 transition-colors cursor-pointer"
                 onClick={() => setShowAddAccountModal(true)}
               >
                 <div className="flex items-center justify-between mb-2">
@@ -480,7 +480,7 @@ export default function BillingPage() {
                   <span className="text-xs text-slate-500 dark:text-slate-400">{suggestion.avgCost}</span>
                 </div>
                 <p className="text-sm text-slate-600 dark:text-slate-400">{suggestion.description}</p>
-                <div className="mt-3 flex items-center text-blue-600 dark:text-blue-400 text-sm font-medium">
+                <div className="mt-3 flex items-center text-emerald-600 dark:text-emerald-400 text-sm font-medium">
                   <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
@@ -619,7 +619,7 @@ export default function BillingPage() {
                     // TODO: Implement add account
                     setShowAddAccountModal(false);
                   }}
-                  className="flex-1 px-4 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors"
+                  className="flex-1 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
                 >
                   Add Account
                 </button>

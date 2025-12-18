@@ -19,6 +19,7 @@ enum UserRole {
   HOMEOWNER
   MANAGER
   VENDOR
+  HANDYMAN // Internal staff for minor maintenance tasks
 }
 
 enum HouseholdRole {
@@ -26,7 +27,7 @@ enum HouseholdRole {
   MEMBER
   GUEST
   HOME_MANAGER // Professional property manager
-  ADMIN        // Internal Haven admin
+  ADMIN // Internal Haven admin
 }
 
 enum HouseholdMemberStatus {
@@ -311,30 +312,43 @@ enum WorkOrderStatus {
   DRAFT
   REQUESTED
   SCHEDULED
-  OPEN          // Available for vendors to claim
-  ASSIGNED      // Vendor has accepted the job
-  IN_PROGRESS   // Vendor checked in and working
-  COMPLETED     // Vendor finished, awaiting verification
-  VERIFIED      // Manager approved the work
+  OPEN // Available for vendors to claim
+  ASSIGNED // Vendor has accepted the job
+  IN_PROGRESS // Vendor checked in and working
+  COMPLETED // Vendor finished, awaiting verification
+  VERIFIED // Manager approved the work
   CANCELLED
+}
+
+// Work order billing type - determines if client pays or it's inclusive in subscription
+enum WorkOrderBillingType {
+  BILLABLE_TO_CLIENT // Client pays for this work
+  INCLUSIVE // Included in subscription, company absorbs cost
+}
+
+// Service category tier - determines routing and billing
+enum ServiceCategoryTier {
+  MINOR_MAINTENANCE // Small tasks: filter changes, loose hinges, etc. (Inclusive)
+  MAJOR_REPAIR // Larger repairs requiring skilled labor (Billable)
+  SPECIALIZED // Requires licensed professional (Billable, external vendor)
 }
 
 // Transaction payout method - how the company paid the vendor
 enum TransactionPayoutMethod {
-  CHECKBOOK_IO    // Checkbook.io digital check
-  STRIPE          // Stripe transfer
-  CASH            // Cash payment
-  COMPANY_CARD    // Company credit card
-  BANK_TRANSFER   // Direct bank transfer
+  CHECKBOOK_IO // Checkbook.io digital check
+  STRIPE // Stripe transfer
+  CASH // Cash payment
+  COMPANY_CARD // Company credit card
+  BANK_TRANSFER // Direct bank transfer
 }
 
 // Transaction status - lifecycle of expense reimbursement
 enum TransactionStatus {
-  PENDING           // Created but not yet paid to vendor
-  PAID_TO_VENDOR    // Company has paid the vendor
-  BILLED_TO_CLIENT  // Added to client's monthly invoice
-  SETTLED           // Client has reimbursed the company
-  CANCELLED         // Transaction cancelled
+  PENDING // Created but not yet paid to vendor
+  PAID_TO_VENDOR // Company has paid the vendor
+  BILLED_TO_CLIENT // Added to client's monthly invoice
+  SETTLED // Client has reimbursed the company
+  CANCELLED // Transaction cancelled
 }
 
 // File asset type for uploaded files
@@ -347,9 +361,221 @@ enum FileAssetType {
 
 // File asset upload status
 enum FileAssetStatus {
-  PENDING   // Signed URL generated, awaiting upload
-  UPLOADED  // Upload completed
-  FAILED    // Upload failed or expired
+  PENDING // Signed URL generated, awaiting upload
+  UPLOADED // Upload completed
+  FAILED // Upload failed or expired
+}
+
+// ============================================================================
+// SOCIAL ENGINE ENUMS
+// ============================================================================
+
+// Visibility level for project posts
+enum PostVisibility {
+  PRIVATE // Only visible to household members
+  NEIGHBORS_ONLY // Visible to users in same H3 cell
+  FRIENDS_ONLY // Visible to confirmed friends
+  PUBLIC // Visible to everyone
+}
+
+// How to display project cost
+enum CostDisplay {
+  HIDDEN // Don't show cost
+  RANGE // Show as range (e.g., "$", "$$", "$$$")
+  EXACT // Show exact amount
+}
+
+// Friendship status
+enum FriendshipStatus {
+  PENDING // Request sent, awaiting acceptance
+  ACCEPTED // Both parties confirmed
+  DECLINED // Request was declined
+  BLOCKED // One party blocked the other
+}
+
+// ============================================================================
+// PROJECT PLANNER ENUMS
+// ============================================================================
+
+// Project idea lifecycle status
+enum ProjectIdeaStatus {
+  DREAMING // Just thinking about it (Private)
+  PLANNING // Actively researching (Friends Only)
+  ACTIVE // Project underway (linked to WorkOrder)
+  COMPLETED // Project finished
+  ARCHIVED // Dismissed/abandoned
+}
+
+// Project category for templates
+enum ProjectCategory {
+  BATHROOM_REMODEL
+  KITCHEN_REMODEL
+  DECK_PATIO
+  LANDSCAPING
+  ROOF
+  WINDOWS_DOORS
+  FLOORING
+  PAINTING
+  HVAC
+  ELECTRICAL
+  PLUMBING
+  ADDITION
+  BASEMENT
+  GARAGE
+  FENCE
+  POOL
+  SOLAR
+  SMART_HOME
+  EXTERIOR_SIDING
+  OTHER
+}
+
+// Recommendation request status
+enum RecommendationRequestStatus {
+  OPEN // Accepting suggestions
+  REVIEWING // Got enough responses
+  SELECTED // User selected a vendor
+  CLOSED // Closed without selecting
+}
+
+// ============================================================================
+// FAMILY OPERATIONS ENUMS
+// ============================================================================
+
+// Family event categories
+enum FamilyEventCategory {
+  SCHOOL // School events, parent-teacher conferences
+  MEDICAL // Doctor appointments, checkups
+  SPORTS // Sports practices, games
+  SOCIAL // Parties, gatherings
+  WORK // Work-related events
+  TRAVEL // Travel-related events
+  MAINTENANCE // Home maintenance appointments
+  FINANCIAL // Bill due dates, financial meetings
+  RELIGIOUS // Religious services, events
+  BIRTHDAY // Birthdays and anniversaries
+  HOLIDAY // Holidays
+  OTHER // Other events
+}
+
+// Member permission types for granular access control
+enum MemberPermissionType {
+  VIEW_CALENDAR // Can view family calendar
+  EDIT_CALENDAR // Can add/edit calendar events
+  VIEW_BILLS // Can view bill information
+  PAY_BILLS // Can initiate bill payments
+  VIEW_MAINTENANCE // Can view maintenance requests
+  REQUEST_MAINTENANCE // Can submit maintenance requests
+  VIEW_ASSETS // Can view vehicles, pets, appliances
+  EDIT_ASSETS // Can add/edit assets
+  VIEW_MEMBERS // Can view family member profiles
+  MANAGE_MEMBERS // Can invite/remove members
+  VIEW_BUDGET // Can view household budget
+  FULL_ACCESS // All permissions (owner/admin)
+}
+
+// Vehicle types
+enum VehicleType {
+  CAR
+  SUV
+  TRUCK
+  VAN
+  MOTORCYCLE
+  BOAT
+  RV
+  ATV
+  OTHER
+}
+
+// Fuel types
+enum FuelType {
+  GASOLINE
+  DIESEL
+  ELECTRIC
+  HYBRID
+  PLUG_IN_HYBRID
+  HYDROGEN
+  OTHER
+}
+
+// Pet types
+enum PetType {
+  DOG
+  CAT
+  BIRD
+  FISH
+  REPTILE
+  SMALL_MAMMAL // Hamster, guinea pig, rabbit
+  HORSE
+  OTHER
+}
+
+// Pet size categories
+enum PetSize {
+  SMALL // Under 20 lbs
+  MEDIUM // 20-50 lbs
+  LARGE // 50-90 lbs
+  EXTRA_LARGE // Over 90 lbs
+}
+
+// Home system types for detailed tracking
+enum HomeSystemType {
+  // HVAC
+  FURNACE
+  AIR_CONDITIONER
+  HEAT_PUMP
+  BOILER
+  THERMOSTAT
+
+  // Water
+  WATER_HEATER
+  WATER_SOFTENER
+  WELL_PUMP
+  SUMP_PUMP
+
+  // Energy
+  ELECTRICAL_PANEL
+  GENERATOR
+  SOLAR_PANELS
+  BATTERY_STORAGE
+
+  // Kitchen
+  REFRIGERATOR
+  DISHWASHER
+  OVEN_RANGE
+  MICROWAVE
+  GARBAGE_DISPOSAL
+
+  // Laundry
+  WASHER
+  DRYER
+
+  // Outdoor
+  IRRIGATION_SYSTEM
+  POOL_EQUIPMENT
+  HOT_TUB
+  LAWN_MOWER
+
+  // Safety
+  SMOKE_DETECTOR
+  CO_DETECTOR
+  SECURITY_SYSTEM
+  FIRE_EXTINGUISHER
+
+  // Other
+  GARAGE_DOOR_OPENER
+  CEILING_FAN
+  FIREPLACE
+  OTHER
+}
+
+// Appliance condition status
+enum ApplianceCondition {
+  EXCELLENT
+  GOOD
+  FAIR
+  NEEDS_REPAIR
+  REPLACED
 }
 
 // ============================================================================
@@ -373,40 +599,76 @@ model User {
   createdAt       DateTime  @default(now()) @map("created_at")
   updatedAt       DateTime  @updatedAt @map("updated_at")
 
+  // Social Engine fields
+  isPublicProfile  Boolean  @default(false) @map("is_public_profile")
+  influencerBadges String[] @default([]) @map("influencer_badges") // e.g., ["top_contributor", "verified_pro"]
+  bio              String? // Short user bio for profile
+
   // Relations
-  householdMembers    HouseholdMember[]   @relation("MemberUser")
-  invitedMembers      HouseholdMember[]   @relation("InvitedByUser")
-  sentInvites         HouseholdInvite[]
-  ownedHouseholds     Household[]         @relation("HouseholdOwner")
-  managedHouseholds   Household[]         @relation("HouseholdManager")
-  assignedTasks       Task[]              @relation("TaskAssignee")
-  createdTasks        Task[]              @relation("TaskCreator")
-  serviceRequests     ServiceRequest[]    @relation("ServiceRequestCreator")
-  sentMessages        Message[]           @relation("MessageSender")
-  subscriptions       Subscription[]
-  files               File[]
-  refreshTokens       RefreshToken[]
-  inAppNotifications  InAppNotification[]
+  householdMembers   HouseholdMember[]   @relation("MemberUser")
+  invitedMembers     HouseholdMember[]   @relation("InvitedByUser")
+  sentInvites        HouseholdInvite[]
+  ownedHouseholds    Household[]         @relation("HouseholdOwner")
+  managedHouseholds  Household[]         @relation("HouseholdManager")
+  handymanHouseholds Household[]         @relation("HouseholdHandyman") // Households where user is assigned handyman
+  assignedTasks      Task[]              @relation("TaskAssignee")
+  createdTasks       Task[]              @relation("TaskCreator")
+  serviceRequests    ServiceRequest[]    @relation("ServiceRequestCreator")
+  sentMessages       Message[]           @relation("MessageSender")
+  subscriptions      Subscription[]
+  files              File[]
+  refreshTokens      RefreshToken[]
+  inAppNotifications InAppNotification[]
 
   // Support chat relations
-  createdConversations    Conversation[]          @relation("ConversationCreator")
-  supportMessages         SupportMessage[]        @relation("SupportMessageSender")
-  homeManagerAssignments  HomeManagerAssignment[] @relation("AssignedHomeManager")
-  madeAssignments         HomeManagerAssignment[] @relation("AssignmentMadeBy")
+  createdConversations   Conversation[]          @relation("ConversationCreator")
+  supportMessages        SupportMessage[]        @relation("SupportMessageSender")
+  homeManagerAssignments HomeManagerAssignment[] @relation("AssignedHomeManager")
+  madeAssignments        HomeManagerAssignment[] @relation("AssignmentMadeBy")
 
   // Work order relations
   createdWorkOrders  WorkOrder[]     @relation("WorkOrderCreator")
   verifiedWorkOrders WorkOrder[]     @relation("WorkOrderVerifier")
+  handymanWorkOrders WorkOrder[]     @relation("WorkOrderHandyman") // Work orders assigned to this handyman
   workOrderNotes     WorkOrderNote[] @relation("WorkOrderNoteAuthor")
 
   // File asset relations
   uploadedFileAssets FileAsset[] @relation("FileAssetUploader")
 
   // Financial engine relations
-  managedTransactions Transaction[] @relation("TransactionManager")
+  managedTransactions  Transaction[] @relation("TransactionManager")
+  handymanTransactions Transaction[] @relation("TransactionHandyman") // Transactions for work done as handyman
 
   // Vendor portal relation
-  vendorProfile       Vendor?       @relation("VendorUser")
+  vendorProfile Vendor? @relation("VendorUser")
+
+  // Social Engine relations
+  friendshipsInitiated Friendship[]  @relation("FriendshipRequester")
+  friendshipsReceived  Friendship[]  @relation("FriendshipAddressee")
+  following            Follow[]      @relation("FollowerUser")
+  followers            Follow[]      @relation("FollowedUser")
+  projectPosts         ProjectPost[] @relation("ProjectPostAuthor")
+  savedPosts           SavedPost[]   @relation("SavedPostUser")
+  projectLikes         ProjectLike[] @relation("ProjectLikeUser")
+  postComments         PostComment[] @relation("PostCommentAuthor")
+
+  // Project Planner relations
+  projectIdeas           ProjectIdea[]           @relation("ProjectIdeaCreator")
+  recommendationRequests RecommendationRequest[] @relation("RecommendationRequestCreator")
+  vendorSuggestions      VendorSuggestion[]      @relation("VendorSuggestionSuggestor")
+
+  // Concierge / AI Triage relations
+  inboundRequestsSent     InboundRequest[]  @relation("InboundRequestSender")
+  inboundRequestsResolved InboundRequest[]  @relation("InboundRequestResolver")
+  conciergeThreads        ConciergeThread[]
+  familyEvents            FamilyEvent[]
+
+  // Travel Concierge relations
+  tripsCreated           Trip[]              @relation("TripCreator")
+  tripsManaged           Trip[]              @relation("TripManager")
+  tripProposalsCreated   TripProposal[]      @relation("TripProposalCreator")
+  assignedProtocols      HouseProtocol[]     @relation("ProtocolAssignee")
+  protocolItemsCompleted HouseProtocolItem[] @relation("ProtocolItemCompleter")
 
   @@map("users")
 }
@@ -435,13 +697,17 @@ model RefreshToken {
 // ============================================================================
 
 model Household {
-  id          String   @id @default(cuid())
-  name        String   // e.g. "The Burke family"
-  description String?
-  ownerId     String   @map("owner_id")
-  managerId   String?  @map("manager_id") // Assigned Haven staff member (Home Manager)
-  createdAt   DateTime @default(now()) @map("created_at")
-  updatedAt   DateTime @updatedAt @map("updated_at")
+  id                 String   @id @default(cuid())
+  name               String // e.g. "The Burke family"
+  description        String?
+  ownerId            String   @map("owner_id")
+  managerId          String?  @map("manager_id") // Assigned Haven staff member (Home Manager)
+  assignedHandymanId String?  @map("assigned_handyman_id") // Assigned handyman for concierge/minor maintenance
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Social Engine - Geospatial for neighbor matching (H3 Resolution 8 = ~460m hexagons)
+  h3Index String? @map("h3_index")
 
   // Stripe Integration - Haven is a Stripe platform; each household is a customer
   stripeCustomerId String? @unique @map("stripe_customer_id")
@@ -450,15 +716,20 @@ model Household {
   subscriptionPlan   HouseholdSubscriptionPlan   @default(FREE) @map("subscription_plan")
   subscriptionStatus HouseholdSubscriptionStatus @default(INACTIVE) @map("subscription_status")
 
+  // Concierge Settings
+  conciergeEnabled Boolean @default(false) @map("concierge_enabled") // Is concierge service active?
+  monthlyVisitDay  Int?    @map("monthly_visit_day") // Day of month for scheduled maintenance visit (1-28)
+
   // Billing Settings
   // Day of month (1-28) when consolidated invoice is generated
-  billingCycleDay  Int   @default(1) @map("billing_cycle_day")
+  billingCycleDay Int   @default(1) @map("billing_cycle_day")
   // JSON for additional billing settings (auto-pay limits, preferences, etc.)
-  billingSettings  Json? @map("billing_settings")
+  billingSettings Json? @map("billing_settings")
 
   // Relations
   owner             User               @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   manager           User?              @relation("HouseholdManager", fields: [managerId], references: [id], onDelete: SetNull)
+  assignedHandyman  User?              @relation("HouseholdHandyman", fields: [assignedHandymanId], references: [id], onDelete: SetNull)
   members           HouseholdMember[]
   invites           HouseholdInvite[]
   homeProfile       HomeProfile?
@@ -483,7 +754,30 @@ model Household {
   clientBankAccounts ClientBankAccount[]
   transactions       Transaction[]
 
+  // Social Engine relations
+  projectPosts ProjectPost[]
+
+  // Project Planner relations
+  projectIdeas           ProjectIdea[]
+  recommendationRequests RecommendationRequest[]
+
+  // Concierge / AI Triage relations
+  inboundRequests  InboundRequest[]
+  conciergeThreads ConciergeThread[]
+  familyEvents     FamilyEvent[]
+
+  // Travel Concierge relations
+  trips          Trip[]
+  houseProtocols HouseProtocol[]
+
+  // Family Assets relations
+  vehicles    Vehicle[]
+  pets        Pet[]
+  homeSystems HomeSystem[]
+
   @@index([managerId])
+  @@index([assignedHandymanId])
+  @@index([h3Index])
   @@map("households")
 }
 
@@ -497,13 +791,34 @@ model HouseholdMember {
   invitedAt       DateTime              @default(now()) @map("invited_at")
   acceptedAt      DateTime?             @map("accepted_at")
   joinedAt        DateTime?             @map("joined_at")
-  createdAt       DateTime              @default(now()) @map("created_at")
-  updatedAt       DateTime              @updatedAt @map("updated_at")
+
+  // Member Profile (for concierge shopping, gift planning, etc.)
+  nickname            String? // How they're referred to in the household
+  birthday            DateTime? @db.Date
+  shirtSize           String?   @map("shirt_size") // XS, S, M, L, XL, XXL
+  pantSize            String?   @map("pant_size")
+  shoeSize            String?   @map("shoe_size")
+  dietaryRestrictions String[]  @default([]) @map("dietary_restrictions") // vegetarian, gluten-free, etc.
+  allergies           String[]  @default([]) // peanuts, shellfish, etc.
+  medicalNotes        String?   @map("medical_notes") @db.Text // Private medical info
+  favoriteColor       String?   @map("favorite_color")
+  interests           String[]  @default([]) // For gift suggestions
+  profilePhotoUrl     String?   @map("profile_photo_url")
+
+  // Granular Permissions (replaces simple role-based access)
+  permissions MemberPermissionType[] @default([VIEW_CALENDAR, VIEW_ASSETS, VIEW_MEMBERS])
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  user        User      @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
-  invitedBy   User?     @relation("InvitedByUser", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  household      Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user           User          @relation("MemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy      User?         @relation("InvitedByUser", fields: [invitedByUserId], references: [id], onDelete: SetNull)
+  assignedEvents FamilyEvent[] @relation("AssignedMember")
+
+  // Travel Concierge relation
+  travelProfile TravelProfile?
 
   @@unique([householdId, userId])
   @@index([userId])
@@ -512,15 +827,15 @@ model HouseholdMember {
 
 // Invitation tokens for inviting users to households
 model HouseholdInvite {
-  id          String    @id @default(cuid())
-  householdId String    @map("household_id")
-  email       String    // Email address of invitee
-  token       String    @unique // Secure random token for invite link
+  id          String        @id @default(cuid())
+  householdId String        @map("household_id")
+  email       String // Email address of invitee
+  token       String        @unique // Secure random token for invite link
   role        HouseholdRole @default(MEMBER)
-  invitedById String    @map("invited_by_id")
-  expiresAt   DateTime  @map("expires_at")
-  acceptedAt  DateTime? @map("accepted_at")
-  createdAt   DateTime  @default(now()) @map("created_at")
+  invitedById String        @map("invited_by_id")
+  expiresAt   DateTime      @map("expires_at")
+  acceptedAt  DateTime?     @map("accepted_at")
+  createdAt   DateTime      @default(now()) @map("created_at")
 
   // Relations
   household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
@@ -586,10 +901,17 @@ model ServiceCategory {
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // Concierge routing - determines if handyman handles or routes to vendor
+  tier               ServiceCategoryTier  @default(MAJOR_REPAIR)
+  defaultBillingType WorkOrderBillingType @default(BILLABLE_TO_CLIENT) @map("default_billing_type")
+  isHandymanEligible Boolean              @default(false) @map("is_handyman_eligible") // Can internal handyman handle this?
+  estimatedMinutes   Int?                 @map("estimated_minutes") // Estimated time for scheduling
+
   // Relations
   vendors          Vendor[]
   serviceRequests  ServiceRequest[]
   maintenancePlans MaintenancePlan[]
+  workOrders       WorkOrder[]
 
   @@map("service_categories")
 }
@@ -629,10 +951,10 @@ model Vendor {
   notes             String?
 
   // Vendor portal login (links to User with VENDOR role)
-  userId            String? @unique @map("user_id")
+  userId String? @unique @map("user_id")
 
   // Service areas for job board (e.g., ["Malibu", "Beverly Hills", "Pacific Palisades"])
-  serviceAreas      String[] @default([]) @map("service_areas")
+  serviceAreas String[] @default([]) @map("service_areas")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -649,6 +971,19 @@ model Vendor {
   vendorPayoutAccount VendorPayoutAccount?
   workOrders          WorkOrder[]
   transactions        Transaction[]
+
+  // Social Engine relations
+  projectPosts   ProjectPost[]
+  h3ServiceAreas VendorServiceArea[]
+
+  // Project Planner relations
+  vendorSuggestions VendorSuggestion[]
+
+  // Family Assets relations
+  vehicleServices       Vehicle[]              @relation("VehicleServiceVendor")
+  vehicleServiceRecords VehicleServiceRecord[] @relation("VehicleServiceVendor")
+  homeSystemsServiced   HomeSystem[]           @relation("SystemServiceVendor")
+  homeSystemServices    HomeSystemService[]    @relation("HomeSystemServiceVendor")
 
   @@index([householdId, category])
   @@index([userId])
@@ -937,11 +1272,11 @@ model FileAsset {
   status         FileAssetStatus @default(PENDING)
 
   // GCS storage info
-  gcsPath      String  @map("gcs_path") // e.g. "uploads/household-123/abc123.jpg"
-  url          String? // Public or signed URL (updated after upload)
-  filename     String  // Original filename
-  contentType  String  @map("content_type") // MIME type
-  size         Int?    // File size in bytes (updated after upload)
+  gcsPath     String  @map("gcs_path") // e.g. "uploads/household-123/abc123.jpg"
+  url         String? // Public or signed URL (updated after upload)
+  filename    String // Original filename
+  contentType String  @map("content_type") // MIME type
+  size        Int? // File size in bytes (updated after upload)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -951,9 +1286,9 @@ model FileAsset {
   uploader  User      @relation("FileAssetUploader", fields: [uploaderUserId], references: [id], onDelete: Cascade)
 
   // Back-references (one FileAsset can only be attached to one entity)
-  supportMessages    SupportMessage[]
-  workOrderNotes     WorkOrderNote[]
-  maintenanceTasks   MaintenanceTask[]
+  supportMessages     SupportMessage[]
+  workOrderNotes      WorkOrderNote[]
+  maintenanceTasks    MaintenanceTask[]
   transactionReceipts Transaction[]
 
   @@index([householdId, type])
@@ -1341,10 +1676,10 @@ model Conversation {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household    Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  createdBy    User                    @relation("ConversationCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
-  messages     SupportMessage[]
-  assignments  HomeManagerAssignment[]
+  household   Household               @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy   User                    @relation("ConversationCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  messages    SupportMessage[]
+  assignments HomeManagerAssignment[]
 
   @@index([householdId, status])
   @@index([status, updatedAt])
@@ -1377,11 +1712,11 @@ model SupportMessage {
 
 // Assignment of home manager to a conversation
 model HomeManagerAssignment {
-  id                   String   @id @default(cuid())
-  conversationId       String   @map("conversation_id")
-  homeManagerUserId    String   @map("home_manager_user_id")
-  assignedAt           DateTime @default(now()) @map("assigned_at")
-  assignedByUserId     String?  @map("assigned_by_user_id") // Who made the assignment
+  id                String   @id @default(cuid())
+  conversationId    String   @map("conversation_id")
+  homeManagerUserId String   @map("home_manager_user_id")
+  assignedAt        DateTime @default(now()) @map("assigned_at")
+  assignedByUserId  String?  @map("assigned_by_user_id") // Who made the assignment
 
   // Relations
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
@@ -1399,18 +1734,24 @@ model HomeManagerAssignment {
 
 // Work order for coordinating vendor visits
 model WorkOrder {
-  id                String @id @default(cuid())
-  householdId       String @map("household_id")
+  id                String  @id @default(cuid())
+  householdId       String  @map("household_id")
   maintenanceTaskId String? @map("maintenance_task_id") // Optional link to maintenance task
-  vendorId          String? @map("vendor_id") // Can be TBD initially
-  createdByUserId   String @map("created_by_user_id")
+  vendorId          String? @map("vendor_id") // External vendor (if applicable)
+  handymanId        String? @map("handyman_id") // Internal handyman (for concierge tasks)
+  createdByUserId   String  @map("created_by_user_id")
+  serviceCategoryId String? @map("service_category_id") // For routing logic
 
   title       String // e.g. "Fix leaking kitchen sink"
   description String?
   status      WorkOrderStatus @default(DRAFT)
 
+  // Concierge / Billing Type
+  isConciergeRequest Boolean              @default(false) @map("is_concierge_request") // True = came from concierge request flow
+  billingType        WorkOrderBillingType @default(BILLABLE_TO_CLIENT) @map("billing_type")
+
   // Preferred scheduling (homeowner's preference)
-  preferredDate           DateTime? @map("preferred_date")
+  preferredDate            DateTime? @map("preferred_date")
   preferredTimeWindowStart String?   @map("preferred_time_window_start") // e.g. "09:00"
   preferredTimeWindowEnd   String?   @map("preferred_time_window_end") // e.g. "12:00"
 
@@ -1420,23 +1761,24 @@ model WorkOrder {
 
   // Cost tracking
   estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
-  actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
+  actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2) // What client pays (if billable)
+  internalCost  Decimal? @map("internal_cost") @db.Decimal(10, 2) // Actual cost to company (handyman hours * rate)
 
-  completedAt DateTime? @map("completed_at")
-  verifiedAt  DateTime? @map("verified_at")
-  verifiedByUserId String? @map("verified_by_user_id")
+  completedAt      DateTime? @map("completed_at")
+  verifiedAt       DateTime? @map("verified_at")
+  verifiedByUserId String?   @map("verified_by_user_id")
 
   // Vendor check-in/check-out tracking
-  checkInAt       DateTime? @map("check_in_at")
-  checkInLatitude  Float?   @map("check_in_latitude")
-  checkInLongitude Float?   @map("check_in_longitude")
-  checkOutAt      DateTime? @map("check_out_at")
+  checkInAt        DateTime? @map("check_in_at")
+  checkInLatitude  Float?    @map("check_in_latitude")
+  checkInLongitude Float?    @map("check_in_longitude")
+  checkOutAt       DateTime? @map("check_out_at")
 
   // Proof of completion (photo URLs/file IDs)
-  proofImages     String[] @default([]) @map("proof_images")
+  proofImages String[] @default([]) @map("proof_images")
 
   // Service area for job board filtering (can inherit from household)
-  serviceArea     String?  @map("service_area") // e.g., "Malibu", "Beverly Hills"
+  serviceArea String? @map("service_area") // e.g., "Malibu", "Beverly Hills"
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1445,15 +1787,29 @@ model WorkOrder {
   household       Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
   maintenanceTask MaintenanceTask? @relation(fields: [maintenanceTaskId], references: [id], onDelete: SetNull)
   vendor          Vendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  handyman        User?            @relation("WorkOrderHandyman", fields: [handymanId], references: [id], onDelete: SetNull)
+  serviceCategory ServiceCategory? @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
   createdBy       User             @relation("WorkOrderCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
   verifiedBy      User?            @relation("WorkOrderVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
   notes           WorkOrderNote[]
   transactions    Transaction[]
 
+  // Social Engine relation
+  projectPosts ProjectPost[]
+
+  // Project Planner relation
+  linkedProjectIdea ProjectIdea?
+
+  // Link to inbound request that created this
+  inboundRequestId String? @unique @map("inbound_request_id")
+
   @@index([householdId, status])
   @@index([status, scheduledStart])
   @@index([vendorId, status])
+  @@index([handymanId, status])
   @@index([status, serviceArea])
+  @@index([billingType, status])
+  @@index([serviceCategoryId])
   @@map("work_orders")
 }
 
@@ -1513,17 +1869,17 @@ model ClientBankAccount {
   householdId String @map("household_id")
 
   // Stripe payment source info
-  stripePaymentMethodId String @map("stripe_payment_method_id")
+  stripePaymentMethodId String  @map("stripe_payment_method_id")
   stripeBankAccountId   String? @map("stripe_bank_account_id")
 
   // Display info
-  bankName    String  @map("bank_name")
-  accountType String  @map("account_type") // "checking" or "savings"
-  last4       String  // Last 4 digits of account number
+  bankName     String  @map("bank_name")
+  accountType  String  @map("account_type") // "checking" or "savings"
+  last4        String // Last 4 digits of account number
   routingLast4 String? @map("routing_last4") // Last 4 of routing (optional)
 
   // Verification status
-  isVerified Boolean @default(false) @map("is_verified")
+  isVerified Boolean   @default(false) @map("is_verified")
   verifiedAt DateTime? @map("verified_at")
 
   // Default payment method for this household
@@ -1542,10 +1898,11 @@ model ClientBankAccount {
 
 // Transaction - tracks expenses paid by Haven on behalf of clients
 model Transaction {
-  id          String @id @default(cuid())
-  householdId String @map("household_id")
+  id          String  @id @default(cuid())
+  householdId String  @map("household_id")
   vendorId    String? @map("vendor_id")
-  managerId   String @map("manager_id") // Haven staff who logged/approved this
+  handymanId  String? @map("handyman_id") // Internal handyman (for inclusive tasks)
+  managerId   String  @map("manager_id") // Haven staff who logged/approved this
 
   // Transaction details
   description String
@@ -1560,14 +1917,19 @@ model Transaction {
   // Reimbursement tracking
   isReimbursable Boolean @default(true) @map("is_reimbursable")
 
+  // Inclusive expense tracking (for concierge/handyman tasks)
+  isInclusiveExpense Boolean  @default(false) @map("is_inclusive_expense") // True = company absorbs cost
+  handymanHours      Decimal? @map("handyman_hours") @db.Decimal(4, 2) // Hours worked
+  handymanHourlyRate Decimal? @map("handyman_hourly_rate") @db.Decimal(8, 2) // Rate at time of work
+
   // Date tracking
-  paidAt      DateTime? @map("paid_at") // When Haven paid vendor
-  billedAt    DateTime? @map("billed_at") // When added to client invoice
-  settledAt   DateTime? @map("settled_at") // When client reimbursed Haven
+  paidAt    DateTime? @map("paid_at") // When Haven paid vendor
+  billedAt  DateTime? @map("billed_at") // When added to client invoice
+  settledAt DateTime? @map("settled_at") // When client reimbursed Haven
 
   // Receipt/documentation
-  receiptUrl      String? @map("receipt_url")
-  receiptFileId   String? @map("receipt_file_id")
+  receiptUrl    String? @map("receipt_url")
+  receiptFileId String? @map("receipt_file_id")
 
   // Optional: link to work order or maintenance task
   workOrderId       String? @map("work_order_id")
@@ -1576,7 +1938,16 @@ model Transaction {
   // Invoice tracking (when billed to client)
   householdInvoiceId String? @map("household_invoice_id")
 
+  // Due date for bill payments
+  dueDate DateTime? @map("due_date")
+
   notes String?
+
+  // Link to inbound request that created this
+  inboundRequestId String? @unique @map("inbound_request_id")
+
+  // Travel Concierge integration
+  tripId String? @map("trip_id")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1584,20 +1955,1336 @@ model Transaction {
   // Relations
   household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
   vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  handyman         User?             @relation("TransactionHandyman", fields: [handymanId], references: [id], onDelete: SetNull)
   manager          User              @relation("TransactionManager", fields: [managerId], references: [id], onDelete: Cascade)
   receiptFile      FileAsset?        @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
   workOrder        WorkOrder?        @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
   maintenanceTask  MaintenanceTask?  @relation(fields: [maintenanceTaskId], references: [id], onDelete: SetNull)
   householdInvoice HouseholdInvoice? @relation(fields: [householdInvoiceId], references: [id], onDelete: SetNull)
 
+  // Travel Concierge relations
+  trip           Trip?           @relation(fields: [tripId], references: [id], onDelete: SetNull)
+  itineraryItems ItineraryItem[]
+
   @@index([householdId, status])
   @@index([householdId, createdAt])
   @@index([managerId])
   @@index([vendorId])
+  @@index([handymanId])
   @@index([status, billedAt])
   @@index([receiptFileId])
   @@index([workOrderId])
   @@index([maintenanceTaskId])
   @@index([householdInvoiceId])
+  @@index([isInclusiveExpense, householdId])
+  @@index([tripId])
   @@map("transactions")
+}
+
+// ============================================================================
+// SOCIAL ENGINE MODELS
+// ============================================================================
+
+// Friendship - Two-way confirmed connection (User A <-> User B)
+model Friendship {
+  id          String           @id @default(cuid())
+  requesterId String           @map("requester_id")
+  addresseeId String           @map("addressee_id")
+  status      FriendshipStatus @default(PENDING)
+  createdAt   DateTime         @default(now()) @map("created_at")
+  updatedAt   DateTime         @updatedAt @map("updated_at")
+  acceptedAt  DateTime?        @map("accepted_at")
+
+  // Relations
+  requester User @relation("FriendshipRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  addressee User @relation("FriendshipAddressee", fields: [addresseeId], references: [id], onDelete: Cascade)
+
+  @@unique([requesterId, addresseeId])
+  @@index([addresseeId, status])
+  @@index([requesterId, status])
+  @@map("friendships")
+}
+
+// Follow - One-way connection (User A follows User B)
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String   @map("follower_id")
+  followingId String   @map("following_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  follower  User @relation("FollowerUser", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("FollowedUser", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+  @@index([followingId])
+  @@index([followerId])
+  @@map("follows")
+}
+
+// ProjectPost - Shared home project linked to verified work orders
+model ProjectPost {
+  id          String  @id @default(cuid())
+  authorId    String  @map("author_id")
+  householdId String  @map("household_id")
+  workOrderId String? @map("work_order_id") // Optional link to verified work
+  vendorId    String? @map("vendor_id") // Vendor attribution
+
+  title       String
+  description String?
+
+  // Before/After images (ordered array of URLs)
+  beforeImages String[] @default([]) @map("before_images")
+  afterImages  String[] @default([]) @map("after_images")
+
+  // Visibility & display settings
+  visibility  PostVisibility @default(PRIVATE)
+  costDisplay CostDisplay    @default(HIDDEN) @map("cost_display")
+
+  // Cached cost info (from work order or manually entered)
+  actualCost   Decimal? @map("actual_cost") @db.Decimal(10, 2)
+  costRangeMin Decimal? @map("cost_range_min") @db.Decimal(10, 2)
+  costRangeMax Decimal? @map("cost_range_max") @db.Decimal(10, 2)
+
+  // Project metadata
+  durationDays Int?      @map("duration_days")
+  completedAt  DateTime? @map("completed_at")
+
+  // Engagement metrics (denormalized for performance)
+  likesCount    Int @default(0) @map("likes_count")
+  savesCount    Int @default(0) @map("saves_count")
+  commentsCount Int @default(0) @map("comments_count")
+
+  // Verification badge (if linked to verified work order)
+  isVerified Boolean @default(false) @map("is_verified")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  author    User          @relation("ProjectPostAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  household Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  workOrder WorkOrder?    @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  vendor    Vendor?       @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  likes     ProjectLike[]
+  saves     SavedPost[]
+  comments  PostComment[]
+
+  // Project Planner relations
+  vendorSuggestions VendorSuggestion[]
+  linkedProjectIdea ProjectIdea?
+
+  @@index([authorId])
+  @@index([householdId])
+  @@index([vendorId])
+  @@index([visibility, createdAt])
+  @@index([isVerified])
+  @@map("project_posts")
+}
+
+// ProjectLike - Like on a project post
+model ProjectLike {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User        @relation("ProjectLikeUser", fields: [userId], references: [id], onDelete: Cascade)
+  post ProjectPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("project_likes")
+}
+
+// SavedPost - Bookmark/save a project post
+model SavedPost {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  postId    String   @map("post_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User        @relation("SavedPostUser", fields: [userId], references: [id], onDelete: Cascade)
+  post ProjectPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+  @@index([postId])
+  @@map("saved_posts")
+}
+
+// PostComment - Comment on a project post
+model PostComment {
+  id        String   @id @default(cuid())
+  postId    String   @map("post_id")
+  authorId  String   @map("author_id")
+  content   String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  post   ProjectPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author User        @relation("PostCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([postId, createdAt])
+  @@index([authorId])
+  @@map("post_comments")
+}
+
+// VendorServiceArea - Vendors can serve multiple geographic areas (H3 cells)
+model VendorServiceArea {
+  id        String   @id @default(cuid())
+  vendorId  String   @map("vendor_id")
+  h3Index   String   @map("h3_index") // H3 Resolution 8
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@unique([vendorId, h3Index])
+  @@index([h3Index])
+  @@index([vendorId])
+  @@map("vendor_service_areas")
+}
+
+// ============================================================================
+// PROJECT PLANNER MODELS
+// ============================================================================
+
+// ProjectTemplate - Standard project definitions with cost estimation data
+model ProjectTemplate {
+  id          String          @id @default(cuid())
+  slug        String          @unique // e.g., "deck_composite_medium"
+  category    ProjectCategory
+  name        String // e.g., "Medium Composite Deck"
+  description String?
+
+  // Cost estimation factors
+  baseMaterialCost  Decimal  @map("base_material_cost") @db.Decimal(10, 2)
+  laborHoursPerSqFt Decimal? @map("labor_hours_per_sq_ft") @db.Decimal(6, 3)
+  baseLaborRate     Decimal  @default(75) @map("base_labor_rate") @db.Decimal(10, 2)
+
+  // Complexity factors stored as JSON
+  // e.g., { "multi_level": 1.3, "existing_removal": 1.15, "permits_required": 1.1 }
+  complexityFactors Json? @map("complexity_factors")
+
+  // Size ranges for estimation
+  minSqFt Int? @map("min_sq_ft")
+  maxSqFt Int? @map("max_sq_ft")
+
+  // Typical duration
+  estimatedDaysMin Int? @map("estimated_days_min")
+  estimatedDaysMax Int? @map("estimated_days_max")
+
+  // Reference images for inspiration
+  inspirationImages String[] @default([]) @map("inspiration_images")
+
+  isActive  Boolean @default(true) @map("is_active")
+  sortOrder Int     @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projectIdeas ProjectIdea[]
+
+  @@index([category, isActive])
+  @@map("project_templates")
+}
+
+// RegionalCostIndex - H3-based regional cost multipliers
+model RegionalCostIndex {
+  id           String @id @default(cuid())
+  h3Index      String @map("h3_index") // H3 Resolution 5 (~8km hexagons for regional coverage)
+  h3Resolution Int    @default(5) @map("h3_resolution")
+
+  // Cost multiplier (1.0 = national average)
+  // SF Bay Area might be 1.8, rural Texas 0.85
+  multiplier Decimal @db.Decimal(4, 2)
+
+  // Labor rate multiplier (separate from materials)
+  laborMultiplier Decimal @default(1.0) @map("labor_multiplier") @db.Decimal(4, 2)
+
+  // Region metadata
+  regionName String? @map("region_name") // e.g., "San Francisco Bay Area"
+  stateCode  String? @map("state_code") // e.g., "CA"
+
+  // Effective dates for seasonal/yearly updates
+  effectiveFrom DateTime  @default(now()) @map("effective_from")
+  effectiveTo   DateTime? @map("effective_to")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([h3Index, effectiveFrom])
+  @@index([h3Index])
+  @@index([stateCode])
+  @@map("regional_cost_indexes")
+}
+
+// ProjectIdea - User's project dream/plan
+model ProjectIdea {
+  id              String  @id @default(cuid())
+  householdId     String  @map("household_id")
+  createdByUserId String  @map("created_by_user_id")
+  templateId      String? @map("template_id")
+
+  // Project details
+  title       String
+  category    ProjectCategory
+  description String?
+
+  // Project specifications (JSON)
+  // e.g., { "sqFt": 400, "material": "composite", "levels": 1 }
+  specs Json?
+
+  // "Vibe" / style preferences
+  style     String? // e.g., "modern", "traditional", "rustic"
+  vibeNotes String? @map("vibe_notes")
+
+  // Mood board images (user-uploaded or saved inspiration)
+  moodBoardImages String[] @default([]) @map("mood_board_images")
+
+  // Estimated cost range (calculated by service)
+  estimatedCostMin Decimal? @map("estimated_cost_min") @db.Decimal(10, 2)
+  estimatedCostMax Decimal? @map("estimated_cost_max") @db.Decimal(10, 2)
+
+  // Social proof data (cached from neighborhood analysis)
+  neighborProjectCount Int     @default(0) @map("neighbor_project_count")
+  socialProofNote      String? @map("social_proof_note") // "3 neighbors completed similar projects"
+
+  // Status and lifecycle
+  status ProjectIdeaStatus @default(DREAMING)
+
+  // Timeline preferences
+  targetStartDate      DateTime? @map("target_start_date")
+  targetCompletionDate DateTime? @map("target_completion_date")
+  urgency              String? // "no_rush", "this_year", "soon", "urgent"
+
+  // Links to execution
+  workOrderId   String? @unique @map("work_order_id")
+  projectPostId String? @unique @map("project_post_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Link to inbound request that created this
+  inboundRequestId String? @unique @map("inbound_request_id")
+
+  // Relations
+  household             Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy             User                   @relation("ProjectIdeaCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  template              ProjectTemplate?       @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  workOrder             WorkOrder?             @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  projectPost           ProjectPost?           @relation(fields: [projectPostId], references: [id], onDelete: SetNull)
+  recommendationRequest RecommendationRequest?
+  vendorSuggestions     VendorSuggestion[]
+
+  @@index([householdId, status])
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@map("project_ideas")
+}
+
+// RecommendationRequest - Community Ask for vendor recommendations
+model RecommendationRequest {
+  id              String @id @default(cuid())
+  projectIdeaId   String @unique @map("project_idea_id")
+  householdId     String @map("household_id")
+  createdByUserId String @map("created_by_user_id")
+
+  // Request details
+  title       String // "Looking for deck builder recommendations"
+  description String?
+  budget      String? // "under_5k", "5k_15k", "15k_30k", "30k_plus"
+  timeline    String? // "flexible", "3_months", "this_summer"
+
+  // Visibility (which neighbors can see this)
+  h3Index  String? @map("h3_index") // User's H3 cell for neighbor matching
+  isPublic Boolean @default(true) @map("is_public")
+
+  status RecommendationRequestStatus @default(OPEN)
+
+  // Engagement metrics
+  viewCount       Int @default(0) @map("view_count")
+  suggestionCount Int @default(0) @map("suggestion_count")
+
+  expiresAt DateTime? @map("expires_at")
+  closedAt  DateTime? @map("closed_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  projectIdea       ProjectIdea        @relation(fields: [projectIdeaId], references: [id], onDelete: Cascade)
+  household         Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy         User               @relation("RecommendationRequestCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  vendorSuggestions VendorSuggestion[]
+
+  @@index([h3Index, status])
+  @@index([status, createdAt])
+  @@map("recommendation_requests")
+}
+
+// VendorSuggestion - Neighbor or system vendor recommendation
+model VendorSuggestion {
+  id                      String  @id @default(cuid())
+  projectIdeaId           String? @map("project_idea_id")
+  recommendationRequestId String? @map("recommendation_request_id")
+  vendorId                String  @map("vendor_id")
+  suggestedByUserId       String? @map("suggested_by_user_id") // Null = system suggestion
+
+  // Suggestion context
+  comment String? // "They did our deck last year, great work!"
+  rating  Int? // 1-5 star recommendation
+
+  // Source tracking
+  isSystemSuggestion Boolean @default(false) @map("is_system_suggestion")
+  systemNote         String? @map("system_note") // "Used by 2 neighbors for similar projects"
+
+  // Reference to suggestor's project (if applicable)
+  referenceProjectPostId String? @map("reference_project_post_id")
+
+  // Engagement
+  isHelpful Boolean? @map("is_helpful") // User feedback
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  projectIdea           ProjectIdea?           @relation(fields: [projectIdeaId], references: [id], onDelete: Cascade)
+  recommendationRequest RecommendationRequest? @relation(fields: [recommendationRequestId], references: [id], onDelete: Cascade)
+  vendor                Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  suggestedBy           User?                  @relation("VendorSuggestionSuggestor", fields: [suggestedByUserId], references: [id], onDelete: SetNull)
+  referenceProjectPost  ProjectPost?           @relation(fields: [referenceProjectPostId], references: [id], onDelete: SetNull)
+
+  @@index([projectIdeaId])
+  @@index([recommendationRequestId])
+  @@index([vendorId])
+  @@map("vendor_suggestions")
+}
+
+// ============================================================================
+// CONCIERGE / AI TRIAGE SYSTEM
+// ============================================================================
+
+// Channel through which request was received
+enum InboundChannel {
+  EMAIL // Email to secretary@[household].haven.com
+  SMS // Text message via Twilio
+  CHAT // In-app chat with concierge
+}
+
+// AI-classified category for the request
+enum RequestCategory {
+  BILL // Financial obligation (invoice, bill)
+  FIX // Maintenance issue (repair, fix)
+  PROJECT // Renovation/improvement idea
+  CALENDAR // Event/schedule item
+  TRIP // Travel planning
+  INQUIRY // General question
+  UNKNOWN // Could not classify
+}
+
+// Status of triage processing
+enum TriageStatus {
+  RECEIVED // Just received, not yet processed
+  PROCESSING // AI is analyzing
+  PENDING_REVIEW // Needs manager review
+  AUTO_APPROVED // High-confidence, auto-approved
+  NEEDS_ATTENTION // Low-confidence or unknown category
+  RESOLVED // Action has been taken
+  REJECTED // Manager rejected
+  ERROR // Processing error
+}
+
+// Priority determined by AI
+enum TriagePriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+// ============================================================================
+// TRAVEL CONCIERGE ENUMS
+// ============================================================================
+
+enum TripStatus {
+  INQUIRY // User requested trip planning
+  PROPOSAL_SENT // Manager sent flight/hotel options
+  PENDING_SELECTION // Waiting for user to pick options
+  BOOKED // All items booked
+  ACTIVE // Trip in progress (departed)
+  COMPLETED // Trip finished
+  CANCELLED // User cancelled
+}
+
+enum ItineraryItemType {
+  FLIGHT
+  STAY
+  CAR_RENTAL
+  ACTIVITY
+  TRANSFER
+  OTHER
+}
+
+enum HouseProtocolStatus {
+  PENDING // Not yet started
+  IN_PROGRESS // Manager/Handyman working on it
+  COMPLETED // All items checked
+  VERIFIED // Homeowner confirmed
+}
+
+enum ProtocolItemStatus {
+  PENDING
+  COMPLETED
+  SKIPPED
+  BLOCKED // Can't complete (issue found)
+}
+
+enum SeatingPreference {
+  WINDOW
+  AISLE
+  MIDDLE
+  NO_PREFERENCE
+}
+
+// InboundRequest - Any incoming request from any channel
+model InboundRequest {
+  id          String  @id @default(cuid())
+  householdId String? @map("household_id") // Optional - may not be identified initially
+  userId      String? @map("user_id") // The user who sent it (if known)
+
+  // Channel info
+  channel    InboundChannel
+  externalId String?        @map("external_id") // Email message-id, SMS sid, etc.
+
+  // Sender info (normalized)
+  senderEmail String? @map("sender_email")
+  senderPhone String? @map("sender_phone")
+  senderName  String? @map("sender_name")
+
+  // Content
+  subject    String?
+  body       String  @db.Text
+  rawPayload Json?   @map("raw_payload") // Original webhook payload
+
+  // AI Classification
+  category          RequestCategory @default(UNKNOWN)
+  aiConfidence      Float?          @map("ai_confidence") // 0.0 - 1.0 confidence score
+  priority          TriagePriority  @default(MEDIUM)
+  summary           String? // Human-readable summary
+  aiReasoning       String?         @map("ai_reasoning") @db.Text // AI's classification reasoning
+  extractedEntities Json?           @map("extracted_entities") // All extracted entities as JSON
+
+  // Triage status
+  status TriageStatus @default(RECEIVED)
+
+  // Resolution info
+  resolvedAction     String?   @map("resolved_action") // PAY_BILL, CREATE_WORK_ORDER, etc.
+  resolvedEntityType String?   @map("resolved_entity_type") // Transaction, WorkOrder, etc.
+  resolvedEntityId   String?   @map("resolved_entity_id") // ID of created entity
+  resolvedAt         DateTime? @map("resolved_at")
+  resolvedByUserId   String?   @map("resolved_by_user_id")
+
+  // Manager notes
+  managerNotes String? @map("manager_notes") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household         Household?          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user              User?               @relation("InboundRequestSender", fields: [userId], references: [id], onDelete: SetNull)
+  resolvedBy        User?               @relation("InboundRequestResolver", fields: [resolvedByUserId], references: [id], onDelete: SetNull)
+  attachments       InboundAttachment[]
+  suggestions       TriageSuggestion[]
+  conciergeThread   ConciergeThread?    @relation(fields: [conciergeThreadId], references: [id])
+  conciergeThreadId String?             @map("concierge_thread_id")
+
+  @@index([householdId, status])
+  @@index([householdId, channel])
+  @@index([status, createdAt])
+  @@index([category, status])
+  @@map("inbound_requests")
+}
+
+// InboundAttachment - Files attached to inbound requests
+model InboundAttachment {
+  id               String @id @default(cuid())
+  inboundRequestId String @map("inbound_request_id")
+
+  filename    String
+  contentType String  @map("content_type")
+  sizeBytes   Int?    @map("size_bytes") // bytes
+  storageUrl  String? @map("storage_url") // GCS or S3 URL
+
+  // AI extraction results (for PDFs, images)
+  extractedText     String? @map("extracted_text") @db.Text
+  documentType      String? @map("document_type") // bill, receipt, quote, etc.
+  extractedEntities Json?   @map("extracted_entities")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  inboundRequest InboundRequest @relation(fields: [inboundRequestId], references: [id], onDelete: Cascade)
+
+  @@index([inboundRequestId])
+  @@map("inbound_attachments")
+}
+
+// TriageSuggestion - AI-generated action suggestion
+model TriageSuggestion {
+  id               String @id @default(cuid())
+  inboundRequestId String @map("inbound_request_id")
+
+  // Suggestion details
+  actionType  String // "PAY_BILL", "CREATE_WORK_ORDER", "CREATE_PROJECT", etc.
+  title       String
+  description String? @db.Text
+  confidence  Float // 0.0 - 1.0
+
+  // Pre-filled action data
+  actionData Json @map("action_data") // Data to execute the action
+
+  // Status
+  isApproved      Boolean @default(false) @map("is_approved")
+  isRejected      Boolean @default(false) @map("is_rejected")
+  rejectionReason String? @map("rejection_reason")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  inboundRequest InboundRequest @relation(fields: [inboundRequestId], references: [id], onDelete: Cascade)
+
+  @@index([inboundRequestId])
+  @@map("triage_suggestions")
+}
+
+// ConciergeThread - Persistent chat thread with AI concierge
+model ConciergeThread {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+  userId      String @map("user_id")
+
+  title    String?
+  isActive Boolean @default(true) @map("is_active")
+
+  // Context for AI
+  context Json? // Conversation context, household info, etc.
+
+  lastMessageAt DateTime? @map("last_message_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household       Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages        ConciergeMessage[]
+  inboundRequests InboundRequest[]
+
+  @@unique([householdId, userId])
+  @@index([householdId])
+  @@index([userId])
+  @@map("concierge_threads")
+}
+
+// ConciergeMessage - Individual message in chat thread
+model ConciergeMessage {
+  id       String @id @default(cuid())
+  threadId String @map("thread_id")
+
+  role    String // "user" or "assistant"
+  content String @db.Text
+
+  // If this message created an inbound request
+  createdInboundRequestId String? @map("created_inbound_request_id")
+
+  // AI metadata
+  aiModel    String? @map("ai_model")
+  tokenCount Int?    @map("token_count")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  thread ConciergeThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@map("concierge_messages")
+}
+
+// FamilyEvent - Calendar event for the household
+model FamilyEvent {
+  id              String @id @default(cuid())
+  householdId     String @map("household_id")
+  createdByUserId String @map("created_by_user_id")
+
+  title       String
+  description String?             @db.Text
+  location    String?
+  category    FamilyEventCategory @default(OTHER)
+
+  // Assignment
+  assignedToMemberId String? @map("assigned_to_member_id")
+
+  startDate DateTime  @map("start_date")
+  endDate   DateTime? @map("end_date")
+  isAllDay  Boolean   @default(false) @map("is_all_day")
+
+  // Recurrence
+  isRecurring Boolean @default(false) @map("is_recurring")
+  recurrence  String? // RRULE format
+
+  // Reminders
+  reminderMinutes Int[] @default([]) @map("reminder_minutes")
+
+  // Color coding
+  color String? // Hex color for calendar display
+
+  // External sync
+  externalCalendarId String? @map("external_calendar_id")
+  externalEventId    String? @map("external_event_id")
+
+  // Link to inbound request that created this
+  inboundRequestId String? @unique @map("inbound_request_id")
+
+  // Link to related entities
+  vehicleId   String? @map("vehicle_id")
+  petId       String? @map("pet_id")
+  workOrderId String? @map("work_order_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household  Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy  User             @relation(fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedTo HouseholdMember? @relation("AssignedMember", fields: [assignedToMemberId], references: [id], onDelete: SetNull)
+  vehicle    Vehicle?         @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  pet        Pet?             @relation(fields: [petId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, startDate])
+  @@index([category])
+  @@index([assignedToMemberId])
+  @@map("family_events")
+}
+
+// ============================================================================
+// TRAVEL CONCIERGE MODELS
+// ============================================================================
+
+// TravelProfile - Secure traveler information (linked to HouseholdMember)
+model TravelProfile {
+  id                String @id @default(cuid())
+  householdMemberId String @unique @map("household_member_id")
+
+  // Passport Info (encrypted at rest)
+  passportNumber  String?   @map("passport_number")
+  passportCountry String?   @map("passport_country") // ISO country code
+  passportExpiry  DateTime? @map("passport_expiry")
+
+  // Travel Preferences
+  tsaPreCheck       String?           @map("tsa_precheck") // Known Traveler Number
+  globalEntry       String?           @map("global_entry")
+  seatingPreference SeatingPreference @default(NO_PREFERENCE) @map("seating_preference")
+  mealPreference    String?           @map("meal_preference") // Vegetarian, Kosher, etc.
+
+  // Loyalty Programs (JSON array)
+  airlineLoyalty   Json? @map("airline_loyalty") // [{ airline: "Delta", number: "123456", tier: "Gold" }]
+  hotelLoyalty     Json? @map("hotel_loyalty")
+  carRentalLoyalty Json? @map("car_rental_loyalty")
+
+  // Emergency
+  emergencyContactName  String? @map("emergency_contact_name")
+  emergencyContactPhone String? @map("emergency_contact_phone")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  householdMember HouseholdMember @relation(fields: [householdMemberId], references: [id], onDelete: Cascade)
+
+  @@index([householdMemberId])
+  @@map("travel_profiles")
+}
+
+// Trip - Travel planning entity (enhanced for full concierge workflow)
+model Trip {
+  id              String @id @default(cuid())
+  householdId     String @map("household_id")
+  createdByUserId String @map("created_by_user_id")
+
+  // Trip Details
+  title              String // "Tokyo Family Vacation"
+  destination        String // "Tokyo, Japan"
+  destinationCountry String? @map("destination_country") // ISO country code
+  departureCity      String? @map("departure_city") // "San Francisco, CA"
+
+  // Dates
+  startDate       DateTime @map("start_date") // Departure date
+  endDate         DateTime @map("end_date") // Return date
+  isFlexibleDates Boolean  @default(false) @map("is_flexible_dates")
+
+  // Budget & Preferences
+  budgetMin   Decimal? @map("budget_min") @db.Decimal(10, 2)
+  budgetMax   Decimal? @map("budget_max") @db.Decimal(10, 2)
+  budgetNotes String?  @map("budget_notes") // "Prefer business class if under $5k"
+
+  // Travelers
+  travelerCount Int   @default(1) @map("traveler_count")
+  travelers     Json? // [{ memberId: "xxx", role: "adult" }, { memberId: "yyy", role: "child" }]
+
+  // Status
+  status TripStatus @default(INQUIRY)
+  notes  String?    @db.Text
+
+  // Internal
+  assignedManagerId String? @map("assigned_manager_id")
+
+  // Totals (calculated from itinerary items)
+  totalEstimatedCost Decimal? @map("total_estimated_cost") @db.Decimal(10, 2)
+  totalActualCost    Decimal? @map("total_actual_cost") @db.Decimal(10, 2)
+
+  // Link to inbound request that created this
+  inboundRequestId String? @unique @map("inbound_request_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household       Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  createdBy       User            @relation("TripCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  assignedManager User?           @relation("TripManager", fields: [assignedManagerId], references: [id], onDelete: SetNull)
+  proposals       TripProposal[]
+  itineraryItems  ItineraryItem[]
+  houseProtocol   HouseProtocol?
+  transactions    Transaction[]
+
+  @@index([householdId, status])
+  @@index([status, startDate])
+  @@index([assignedManagerId])
+  @@map("trips")
+}
+
+// TripProposal - Manager sends options for user selection
+model TripProposal {
+  id                 String @id @default(cuid())
+  tripId             String @map("trip_id")
+  createdByManagerId String @map("created_by_manager_id")
+
+  // Proposal Content
+  title       String // "Flight Options for Tokyo"
+  category    ItineraryItemType // FLIGHT, STAY, etc.
+  description String?           @db.Text
+
+  // Options as JSON array
+  // [{ index: 0, title: "Option A: Delta Direct", details: "...", price: 1200.00, pros: [...], cons: [...] }]
+  options Json
+
+  // User Selection
+  selectedOptionIndex Int?      @map("selected_option_index")
+  selectedAt          DateTime? @map("selected_at")
+
+  // Status
+  sentAt    DateTime? @map("sent_at") // When proposal was sent to user
+  expiresAt DateTime? @map("expires_at") // Options expire
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  trip             Trip @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  createdByManager User @relation("TripProposalCreator", fields: [createdByManagerId], references: [id], onDelete: Cascade)
+
+  @@index([tripId])
+  @@index([createdByManagerId])
+  @@map("trip_proposals")
+}
+
+// ItineraryItem - Actual booked travel assets
+model ItineraryItem {
+  id     String @id @default(cuid())
+  tripId String @map("trip_id")
+
+  // Item Details
+  type        ItineraryItemType
+  title       String // "Delta Flight DL123"
+  description String?           @db.Text
+
+  // Timing
+  startDateTime DateTime  @map("start_date_time") // Departure/Check-in
+  endDateTime   DateTime? @map("end_date_time") // Arrival/Check-out
+  timezone      String? // "America/Los_Angeles"
+
+  // Location
+  startLocation String? @map("start_location") // "SFO Terminal 2"
+  endLocation   String? @map("end_location") // "NRT Terminal 1"
+
+  // Booking Details
+  confirmationNumber String? @map("confirmation_number")
+  bookingReference   String? @map("booking_reference") // URL or reference
+  providerName       String? @map("provider_name") // "Delta Airlines", "Marriott"
+
+  // Cost (feeds into financial engine)
+  cost          Decimal @db.Decimal(10, 2)
+  currency      String  @default("USD")
+  paidByHaven   Boolean @default(true) @map("paid_by_haven")
+  transactionId String? @map("transaction_id") // Link to Transaction for reimbursement
+
+  // Documents (PDF tickets, vouchers)
+  documents Json? // [{ name: "Boarding Pass", fileAssetId: "xxx", url: "..." }]
+
+  // Display order
+  sortOrder Int @default(0) @map("sort_order")
+
+  // Notes
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  trip        Trip         @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  transaction Transaction? @relation(fields: [transactionId], references: [id], onDelete: SetNull)
+
+  @@index([tripId, startDateTime])
+  @@index([transactionId])
+  @@map("itinerary_items")
+}
+
+// HouseProtocol - Vacation mode checklist
+model HouseProtocol {
+  id          String @id @default(cuid())
+  tripId      String @unique @map("trip_id")
+  householdId String @map("household_id")
+
+  // Assignment
+  assignedToUserId String? @map("assigned_to_user_id") // Manager or Handyman
+
+  // Timing
+  scheduledDate    DateTime  @map("scheduled_date") // Usually 24h before trip start
+  completedAt      DateTime? @map("completed_at")
+  verifiedAt       DateTime? @map("verified_at")
+  verifiedByUserId String?   @map("verified_by_user_id")
+
+  // Status
+  status HouseProtocolStatus @default(PENDING)
+
+  // Notes
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  trip       Trip                @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  household  Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assignedTo User?               @relation("ProtocolAssignee", fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  items      HouseProtocolItem[]
+
+  @@index([householdId, status])
+  @@index([assignedToUserId])
+  @@index([scheduledDate])
+  @@map("house_protocols")
+}
+
+// HouseProtocolItem - Individual checklist items
+model HouseProtocolItem {
+  id         String @id @default(cuid())
+  protocolId String @map("protocol_id")
+
+  // Item Details
+  title       String // "Shut off water main"
+  description String? // "Valve is in basement near water heater"
+  category    String? // "Water", "Security", "HVAC", "Mail"
+
+  // Status
+  status            ProtocolItemStatus @default(PENDING)
+  completedAt       DateTime?          @map("completed_at")
+  completedByUserId String?            @map("completed_by_user_id")
+
+  // Proof
+  proofPhotoUrl    String? @map("proof_photo_url") // Photo of valve in OFF position
+  proofFileAssetId String? @map("proof_file_asset_id")
+  proofNotes       String? @map("proof_notes")
+
+  // Order
+  sortOrder  Int     @default(0) @map("sort_order")
+  isRequired Boolean @default(true) @map("is_required")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  protocol    HouseProtocol @relation(fields: [protocolId], references: [id], onDelete: Cascade)
+  completedBy User?         @relation("ProtocolItemCompleter", fields: [completedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([protocolId])
+  @@map("house_protocol_items")
+}
+
+// ============================================================================
+// FAMILY ASSETS - VEHICLES, PETS, HOME SYSTEMS
+// ============================================================================
+
+// Vehicle - Family garage inventory
+model Vehicle {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Basic Info
+  nickname     String? // "The Family SUV", "Mom's Car"
+  type         VehicleType @default(CAR)
+  make         String // Toyota, Ford, etc.
+  model        String // Camry, F-150, etc.
+  year         Int
+  color        String?
+  licensePlate String?     @map("license_plate")
+
+  // Identification
+  vin String? // Vehicle Identification Number
+
+  // Specs
+  fuelType          FuelType  @default(GASOLINE) @map("fuel_type")
+  currentMileage    Int?      @map("current_mileage")
+  lastMileageUpdate DateTime? @map("last_mileage_update")
+
+  // Insurance
+  insuranceProvider  String?   @map("insurance_provider")
+  insurancePolicyNum String?   @map("insurance_policy_num")
+  insuranceExpires   DateTime? @map("insurance_expires")
+  insuranceContact   String?   @map("insurance_contact")
+
+  // Registration
+  registrationExpires DateTime? @map("registration_expires")
+  inspectionExpires   DateTime? @map("inspection_expires")
+
+  // Purchase Info
+  purchaseDate  DateTime? @map("purchase_date")
+  purchasePrice Decimal?  @map("purchase_price") @db.Decimal(10, 2)
+  purchasedFrom String?   @map("purchased_from")
+
+  // Warranty
+  warrantyExpires  DateTime? @map("warranty_expires")
+  warrantyProvider String?   @map("warranty_provider")
+  warrantyDetails  String?   @map("warranty_details") @db.Text
+
+  // Maintenance Schedule (for auto-generating tasks)
+  oilChangeIntervalMiles    Int?      @default(5000) @map("oil_change_interval_miles")
+  oilChangeIntervalMonths   Int?      @default(6) @map("oil_change_interval_months")
+  lastOilChangeMileage      Int?      @map("last_oil_change_mileage")
+  lastOilChangeDate         DateTime? @map("last_oil_change_date")
+  tireRotationIntervalMiles Int?      @default(7500) @map("tire_rotation_interval_miles")
+  lastTireRotationMileage   Int?      @map("last_tire_rotation_mileage")
+  lastTireRotationDate      DateTime? @map("last_tire_rotation_date")
+
+  // Photos
+  photoUrls String[] @default([]) @map("photo_urls")
+
+  // Preferred service vendor
+  preferredServiceVendorId String? @map("preferred_service_vendor_id")
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household       Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  serviceRecords  VehicleServiceRecord[]
+  events          FamilyEvent[]
+  preferredVendor Vendor?                @relation("VehicleServiceVendor", fields: [preferredServiceVendorId], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@map("vehicles")
+}
+
+// Vehicle Service Records - Maintenance history
+model VehicleServiceRecord {
+  id        String @id @default(cuid())
+  vehicleId String @map("vehicle_id")
+
+  serviceDate      DateTime @map("service_date")
+  serviceType      String   @map("service_type") // Oil Change, Tire Rotation, Brake Service, etc.
+  description      String?  @db.Text
+  mileageAtService Int?     @map("mileage_at_service")
+
+  // Cost
+  cost       Decimal? @db.Decimal(10, 2)
+  vendorName String?  @map("vendor_name")
+  vendorId   String?  @map("vendor_id")
+
+  // Documents
+  receiptUrl String? @map("receipt_url")
+  invoiceUrl String? @map("invoice_url")
+
+  // Next service
+  nextServiceDate    DateTime? @map("next_service_date")
+  nextServiceMileage Int?      @map("next_service_mileage")
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+  vendor  Vendor? @relation("VehicleServiceVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@index([vehicleId, serviceDate])
+  @@map("vehicle_service_records")
+}
+
+// Pet - Household pets
+model Pet {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Basic Info
+  name         String
+  type         PetType   @default(DOG)
+  breed        String?
+  color        String?
+  size         PetSize?
+  weight       Decimal?  @db.Decimal(6, 2) // in pounds
+  birthday     DateTime? @db.Date
+  adoptionDate DateTime? @map("adoption_date") @db.Date
+  gender       String? // Male, Female, Unknown
+
+  // Identification
+  microchipId     String?   @map("microchip_id")
+  registrationNum String?   @map("registration_num")
+  licenseNum      String?   @map("license_num")
+  licenseExpires  DateTime? @map("license_expires")
+
+  // Health
+  isSpayedNeutered Boolean  @default(false) @map("is_spayed_neutered")
+  allergies        String[] @default([])
+  medications      String[] @default([]) // Current medications
+  specialNeeds     String?  @map("special_needs") @db.Text
+
+  // Veterinary Care
+  vetClinicName    String? @map("vet_clinic_name")
+  vetClinicPhone   String? @map("vet_clinic_phone")
+  vetClinicAddress String? @map("vet_clinic_address")
+  vetClinicEmail   String? @map("vet_clinic_email")
+  primaryVetName   String? @map("primary_vet_name")
+
+  // Insurance
+  insuranceProvider  String?   @map("insurance_provider")
+  insurancePolicyNum String?   @map("insurance_policy_num")
+  insuranceExpires   DateTime? @map("insurance_expires")
+
+  // Food & Diet
+  foodBrand       String? @map("food_brand")
+  foodType        String? @map("food_type") // Dry, Wet, Raw, etc.
+  feedingSchedule String? @map("feeding_schedule")
+  dietaryNotes    String? @map("dietary_notes") @db.Text
+
+  // Care Instructions (for pet sitters)
+  careInstructions String? @map("care_instructions") @db.Text
+  emergencyContact String? @map("emergency_contact")
+  behavioralNotes  String? @map("behavioral_notes") @db.Text
+
+  // Photos
+  photoUrls String[] @default([]) @map("photo_urls")
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household  Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vetRecords PetVetRecord[]
+  events     FamilyEvent[]
+
+  @@index([householdId])
+  @@map("pets")
+}
+
+// Pet Veterinary Records - Health history
+model PetVetRecord {
+  id    String @id @default(cuid())
+  petId String @map("pet_id")
+
+  visitDate   DateTime @map("visit_date")
+  visitType   String   @map("visit_type") // Checkup, Vaccination, Emergency, Surgery, Grooming
+  description String?  @db.Text
+  diagnosis   String?  @db.Text
+  treatment   String?  @db.Text
+  weight      Decimal? @db.Decimal(6, 2)
+
+  // Vaccinations
+  vaccinationsGiven   String[]  @default([]) @map("vaccinations_given")
+  nextVaccinationDate DateTime? @map("next_vaccination_date")
+
+  // Medications prescribed
+  prescriptions Json? // { name, dosage, frequency, startDate, endDate }
+
+  // Cost
+  cost      Decimal? @db.Decimal(10, 2)
+  vetClinic String?  @map("vet_clinic")
+  vetName   String?  @map("vet_name")
+
+  // Documents
+  documentUrls String[] @default([]) @map("document_urls")
+
+  // Follow-up
+  followUpDate  DateTime? @map("follow_up_date")
+  followUpNotes String?   @map("follow_up_notes") @db.Text
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  pet Pet @relation(fields: [petId], references: [id], onDelete: Cascade)
+
+  @@index([petId, visitDate])
+  @@map("pet_vet_records")
+}
+
+// HomeSystem - Detailed tracking of home systems & appliances
+model HomeSystem {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Identification
+  name     String // "Main Furnace", "Kitchen Refrigerator"
+  type     HomeSystemType
+  location String? // "Basement", "Kitchen", "Master Bathroom"
+
+  // Product Info
+  brand        String?
+  model        String?
+  modelNumber  String? @map("model_number")
+  serialNumber String? @map("serial_number")
+  color        String?
+
+  // Purchase/Installation
+  purchaseDate  DateTime? @map("purchase_date")
+  purchasePrice Decimal?  @map("purchase_price") @db.Decimal(10, 2)
+  purchasedFrom String?   @map("purchased_from")
+  installedDate DateTime? @map("installed_date")
+  installedBy   String?   @map("installed_by") // Vendor name
+
+  // Warranty
+  warrantyExpires         DateTime? @map("warranty_expires")
+  warrantyProvider        String?   @map("warranty_provider")
+  warrantyPhone           String?   @map("warranty_phone")
+  warrantyDetails         String?   @map("warranty_details") @db.Text
+  extendedWarranty        Boolean   @default(false) @map("extended_warranty")
+  extendedWarrantyExpires DateTime? @map("extended_warranty_expires")
+
+  // Condition
+  condition         ApplianceCondition @default(GOOD)
+  lastInspectedDate DateTime?          @map("last_inspected_date")
+
+  // Maintenance Schedule
+  maintenanceIntervalMonths Int?      @map("maintenance_interval_months")
+  lastMaintenanceDate       DateTime? @map("last_maintenance_date")
+  nextMaintenanceDate       DateTime? @map("next_maintenance_date")
+  maintenanceNotes          String?   @map("maintenance_notes") @db.Text
+
+  // Service Info (for utilities like heating oil, propane)
+  serviceProvider      String?   @map("service_provider")
+  serviceAccountNumber String?   @map("service_account_number")
+  servicePhone         String?   @map("service_phone")
+  lastServiceDate      DateTime? @map("last_service_date")
+  currentRate          Decimal?  @map("current_rate") @db.Decimal(10, 4) // e.g., $/kWh or $/gallon
+  rateUnit             String?   @map("rate_unit") // kWh, gallon, therm, etc.
+  lastBillAmount       Decimal?  @map("last_bill_amount") @db.Decimal(10, 2)
+  lastBillDate         DateTime? @map("last_bill_date")
+  averageMonthlyUsage  Decimal?  @map("average_monthly_usage") @db.Decimal(10, 2)
+  usageUnit            String?   @map("usage_unit")
+
+  // For fuel-based systems (oil, propane)
+  tankCapacity       Decimal?  @map("tank_capacity") @db.Decimal(10, 2)
+  lastFillDate       DateTime? @map("last_fill_date")
+  lastFillAmount     Decimal?  @map("last_fill_amount") @db.Decimal(10, 2)
+  estimatedRemaining Decimal?  @map("estimated_remaining") @db.Decimal(10, 2)
+
+  // Documents
+  manualUrl      String?  @map("manual_url")
+  receiptUrl     String?  @map("receipt_url")
+  warrantyDocUrl String?  @map("warranty_doc_url")
+  photoUrls      String[] @default([]) @map("photo_urls")
+
+  // Energy efficiency
+  energyRating    String?  @map("energy_rating") // ENERGY STAR, etc.
+  efficiencyScore Decimal? @map("efficiency_score") @db.Decimal(4, 2)
+
+  // Filter info (for HVAC systems)
+  filterSize                 String?   @map("filter_size")
+  filterType                 String?   @map("filter_type") // HEPA, MERV 8, etc.
+  lastFilterChange           DateTime? @map("last_filter_change")
+  filterChangeIntervalMonths Int?      @default(3) @map("filter_change_interval_months")
+
+  // Link to related vendor
+  serviceVendorId String? @map("service_vendor_id")
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household      Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  serviceVendor  Vendor?             @relation("SystemServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
+  serviceHistory HomeSystemService[]
+
+  @@index([householdId, type])
+  @@map("home_systems")
+}
+
+// HomeSystemService - Service history for home systems
+model HomeSystemService {
+  id           String @id @default(cuid())
+  homeSystemId String @map("home_system_id")
+
+  serviceDate    DateTime @map("service_date")
+  serviceType    String   @map("service_type") // Inspection, Repair, Maintenance, Replacement
+  description    String?  @db.Text
+  technicianName String?  @map("technician_name")
+
+  // Parts replaced
+  partsReplaced String[] @default([]) @map("parts_replaced")
+
+  // Cost
+  laborCost Decimal? @map("labor_cost") @db.Decimal(10, 2)
+  partsCost Decimal? @map("parts_cost") @db.Decimal(10, 2)
+  totalCost Decimal? @map("total_cost") @db.Decimal(10, 2)
+
+  // Vendor
+  vendorId   String? @map("vendor_id")
+  vendorName String? @map("vendor_name")
+
+  // Documents
+  invoiceUrl String? @map("invoice_url")
+  receiptUrl String? @map("receipt_url")
+  reportUrl  String? @map("report_url")
+
+  // Next service
+  nextServiceDate DateTime? @map("next_service_date")
+  recommendations String?   @db.Text
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  homeSystem HomeSystem @relation(fields: [homeSystemId], references: [id], onDelete: Cascade)
+  vendor     Vendor?    @relation("HomeSystemServiceVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@index([homeSystemId, serviceDate])
+  @@map("home_system_services")
 }

@@ -149,7 +149,7 @@ export function StepReview({
           <button
             type="button"
             onClick={() => onEditStep(1)}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
             Edit
           </button>
@@ -198,7 +198,7 @@ export function StepReview({
           <button
             type="button"
             onClick={() => onEditStep(2)}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
             Edit
           </button>
@@ -224,7 +224,7 @@ export function StepReview({
                     {typeBills.map((bill) => (
                       <span
                         key={bill.category}
-                        className="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-full"
+                        className="px-2 py-1 text-xs bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded-full"
                       >
                         {bill.vendorName || BILL_CATEGORY_LABELS[bill.category]}
                       </span>
@@ -258,7 +258,7 @@ export function StepReview({
           <button
             type="button"
             onClick={() => onEditStep(3)}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
             Edit
           </button>
@@ -280,7 +280,7 @@ export function StepReview({
           <button
             type="button"
             onClick={() => onEditStep(4)}
-            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
+            className="text-sm text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 dark:hover:text-emerald-300"
           >
             Edit
           </button>

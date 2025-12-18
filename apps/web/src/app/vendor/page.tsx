@@ -56,12 +56,12 @@ const mockJobs: VendorJobBoardItem[] = [
 
 const STATUS_COLORS: Record<VendorWorkOrderStatus, string> = {
   DRAFT: 'bg-slate-100 text-slate-600',
-  REQUESTED: 'bg-blue-100 text-blue-700',
+  REQUESTED: 'bg-emerald-100 text-emerald-700',
   SCHEDULED: 'bg-purple-100 text-purple-700',
   OPEN: 'bg-green-100 text-green-700',
   ASSIGNED: 'bg-yellow-100 text-yellow-700',
   IN_PROGRESS: 'bg-orange-100 text-orange-700',
-  COMPLETED: 'bg-blue-100 text-blue-700',
+  COMPLETED: 'bg-emerald-100 text-emerald-700',
   VERIFIED: 'bg-emerald-100 text-emerald-700',
   CANCELLED: 'bg-red-100 text-red-700',
 };
@@ -226,9 +226,9 @@ export default function JobBoardPage() {
         </div>
         <div className="card hidden lg:block">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
               <svg
-                className="w-6 h-6 text-blue-600 dark:text-blue-400"
+                className="w-6 h-6 text-emerald-600 dark:text-emerald-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"

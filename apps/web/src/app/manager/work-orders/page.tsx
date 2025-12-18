@@ -11,7 +11,7 @@ const STATUS_OPTIONS: WorkOrderStatus[] = ['DRAFT', 'REQUESTED', 'SCHEDULED', 'I
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400',
-  REQUESTED: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  REQUESTED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   SCHEDULED: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   IN_PROGRESS: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   COMPLETED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
@@ -140,9 +140,9 @@ export default function ManagerWorkOrdersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800">
-          <p className="text-sm text-blue-600 dark:text-blue-400 font-medium">New Requests</p>
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">{groupedOrders.requested.length}</p>
+        <div className="card bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
+          <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">New Requests</p>
+          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{groupedOrders.requested.length}</p>
         </div>
         <div className="card bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
           <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Scheduled</p>

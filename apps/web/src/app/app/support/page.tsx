@@ -148,7 +148,7 @@ function ConversationListItem({
     <button
       onClick={onClick}
       className={`w-full text-left p-4 border-b border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors ${
-        isSelected ? 'bg-blue-50 dark:bg-blue-900/20 border-l-4 border-l-blue-600' : ''
+        isSelected ? 'bg-emerald-50 dark:bg-emerald-900/20 border-l-4 border-l-emerald-600' : ''
       }`}
     >
       <div className="flex items-start justify-between mb-1">
@@ -156,7 +156,7 @@ function ConversationListItem({
           {conversation.subject || 'Support request'}
         </h3>
         {conversation.homeownerUnreadCount > 0 && (
-          <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
+          <span className="flex-shrink-0 w-5 h-5 bg-emerald-600 text-white text-xs rounded-full flex items-center justify-center">
             {conversation.homeownerUnreadCount}
           </span>
         )}
@@ -211,12 +211,12 @@ function MessageBubble({ message }: { message: SupportMessage }) {
       <div
         className={`max-w-[80%] px-4 py-2 rounded-2xl ${
           isFromHomeowner
-            ? 'bg-blue-600 text-white rounded-br-sm'
+            ? 'bg-emerald-600 text-white rounded-br-sm'
             : 'bg-slate-100 dark:bg-slate-700 text-slate-900 dark:text-white rounded-bl-sm'
         }`}
       >
         {!isFromHomeowner && message.sender && (
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+          <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 mb-1">
             {message.sender.firstName || 'Haven Support'}
           </p>
         )}
@@ -241,7 +241,7 @@ function MessageBubble({ message }: { message: SupportMessage }) {
             target="_blank"
             rel="noopener noreferrer"
             className={`text-sm underline mt-2 block ${
-              isFromHomeowner ? 'text-blue-100' : 'text-blue-600 dark:text-blue-400'
+              isFromHomeowner ? 'text-emerald-100' : 'text-emerald-600 dark:text-emerald-400'
             }`}
           >
             View attachment
@@ -249,7 +249,7 @@ function MessageBubble({ message }: { message: SupportMessage }) {
         )}
         <p
           className={`text-xs mt-1 ${
-            isFromHomeowner ? 'text-blue-200' : 'text-slate-400 dark:text-slate-500'
+            isFromHomeowner ? 'text-emerald-200' : 'text-slate-400 dark:text-slate-500'
           }`}
         >
           {formatTime(message.createdAt)}
@@ -363,7 +363,7 @@ function ChatView({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -518,7 +518,7 @@ export default function SupportPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }

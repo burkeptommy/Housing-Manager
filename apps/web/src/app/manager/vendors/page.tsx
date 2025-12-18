@@ -32,7 +32,7 @@ const categoryLabels: Record<string, string> = {
 };
 
 const categoryColors: Record<string, string> = {
-  HVAC_SERVICE: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  HVAC_SERVICE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   PLUMBING: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
   ELECTRICAL: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   PEST_CONTROL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
@@ -189,8 +189,8 @@ export default function ManagerVendorsPage() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
@@ -442,7 +442,7 @@ export default function ManagerVendorsPage() {
                     </div>
                   )}
                   {selectedVendor.isLocal && (
-                    <div className="flex items-center gap-1 text-blue-600 dark:text-blue-400">
+                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />

@@ -89,7 +89,7 @@ export default function SettingsPage() {
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${
                   activeTab === tab.id
-                    ? 'bg-blue-50 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400'
+                    ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/20 dark:text-emerald-400'
                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700/50'
                 }`}
               >
@@ -108,8 +108,8 @@ export default function SettingsPage() {
               <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Profile Information</h2>
 
               <div className="flex items-center gap-4">
-                <div className="w-20 h-20 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <span className="text-2xl font-semibold text-blue-600 dark:text-blue-400">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <span className="text-2xl font-semibold text-emerald-600 dark:text-emerald-400">
                     {user?.firstName?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
                   </span>
                 </div>
@@ -198,7 +198,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={notificationSettings[item.key as keyof typeof notificationSettings] as boolean}
                           onChange={(e) => setNotificationSettings({...notificationSettings, [item.key]: e.target.checked})}
-                          className="mt-1 w-4 h-4 text-blue-600 rounded"
+                          className="mt-1 w-4 h-4 text-emerald-600 rounded"
                         />
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">{item.label}</p>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                           type="checkbox"
                           checked={notificationSettings[item.key as keyof typeof notificationSettings] as boolean}
                           onChange={(e) => setNotificationSettings({...notificationSettings, [item.key]: e.target.checked})}
-                          className="mt-1 w-4 h-4 text-blue-600 rounded"
+                          className="mt-1 w-4 h-4 text-emerald-600 rounded"
                         />
                         <div>
                           <p className="font-medium text-slate-900 dark:text-white">{item.label}</p>
@@ -240,7 +240,7 @@ export default function SettingsPage() {
                       type="checkbox"
                       checked={notificationSettings.smsUrgentAlerts}
                       onChange={(e) => setNotificationSettings({...notificationSettings, smsUrgentAlerts: e.target.checked})}
-                      className="mt-1 w-4 h-4 text-blue-600 rounded"
+                      className="mt-1 w-4 h-4 text-emerald-600 rounded"
                     />
                     <div>
                       <p className="font-medium text-slate-900 dark:text-white">Urgent alerts only</p>
@@ -406,7 +406,7 @@ export default function SettingsPage() {
                       <input
                         type="checkbox"
                         defaultChecked={i < 3}
-                        className="mt-1 w-4 h-4 text-blue-600 rounded"
+                        className="mt-1 w-4 h-4 text-emerald-600 rounded"
                       />
                       <div>
                         <p className="font-medium text-slate-900 dark:text-white">{widget.label}</p>

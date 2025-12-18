@@ -282,7 +282,7 @@ export default function OnboardingPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
           <p className="mt-4 text-slate-600 dark:text-slate-400">Loading...</p>
         </div>
       </div>
@@ -298,7 +298,7 @@ export default function OnboardingPage() {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600 text-white mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 text-white mb-4">
             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path
                 strokeLinecap="round"
@@ -324,9 +324,9 @@ export default function OnboardingPage() {
                 <div
                   className={`flex items-center justify-center w-10 h-10 rounded-full border-2 transition-colors ${
                     currentStep > step.id
-                      ? 'bg-blue-600 border-blue-600 text-white'
+                      ? 'bg-emerald-600 border-emerald-600 text-white'
                       : currentStep === step.id
-                        ? 'border-blue-600 text-blue-600'
+                        ? 'border-emerald-600 text-emerald-600'
                         : 'border-slate-300 dark:border-slate-600 text-slate-400'
                   }`}
                 >
@@ -345,7 +345,7 @@ export default function OnboardingPage() {
                 {idx < STEPS.length - 1 && (
                   <div
                     className={`w-8 sm:w-12 h-1 mx-1 rounded ${
-                      currentStep > step.id ? 'bg-blue-600' : 'bg-slate-200 dark:bg-slate-700'
+                      currentStep > step.id ? 'bg-emerald-600' : 'bg-slate-200 dark:bg-slate-700'
                     }`}
                   />
                 )}

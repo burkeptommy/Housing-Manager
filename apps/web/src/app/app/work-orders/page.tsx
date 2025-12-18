@@ -93,7 +93,7 @@ export default function WorkOrdersPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -188,7 +188,7 @@ export default function WorkOrdersPage() {
           {filteredOrders.map((order) => (
             <div
               key={order.id}
-              className="card cursor-pointer hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+              className="card cursor-pointer hover:border-emerald-500 dark:hover:border-emerald-400 transition-colors"
               onClick={() => setSelectedOrder(order)}
             >
               <div className="flex items-start justify-between">

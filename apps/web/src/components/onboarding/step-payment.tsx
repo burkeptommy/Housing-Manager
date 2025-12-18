@@ -82,7 +82,7 @@ export function StepPayment({
               key={planId}
               className={`block p-4 rounded-lg border-2 cursor-pointer transition-all ${
                 isSelected
-                  ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                  ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
                   : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600'
               }`}
             >
@@ -102,7 +102,7 @@ export function StepPayment({
                         {plan.name}
                       </h3>
                       {planId === 'PREMIUM' && (
-                        <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 rounded-full">
+                        <span className="inline-block mt-1 px-2 py-0.5 text-xs font-medium bg-emerald-100 dark:bg-emerald-900 text-emerald-700 dark:text-emerald-300 rounded-full">
                           Recommended
                         </span>
                       )}

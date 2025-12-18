@@ -2,7 +2,7 @@
 // USER TYPES
 // ============================================================================
 
-export type UserRole = 'ADMIN' | 'HOMEOWNER' | 'MANAGER' | 'VENDOR';
+export type UserRole = 'ADMIN' | 'HOMEOWNER' | 'MANAGER' | 'VENDOR' | 'HANDYMAN';
 
 export interface User {
   id: string;
@@ -1899,4 +1899,1973 @@ export interface VerificationQueueItem {
       lastName: string;
     };
   }>;
+}
+
+// ============================================================================
+// CONCIERGE / HANDYMAN TYPES
+// ============================================================================
+
+export type WorkOrderBillingType = 'BILLABLE_TO_CLIENT' | 'INCLUSIVE';
+
+export type ServiceCategoryTier = 'MINOR_MAINTENANCE' | 'MAJOR_REPAIR' | 'SPECIALIZED';
+
+export type ConciergeTaskType =
+  | 'FILTER_CHANGE'
+  | 'LIGHT_BULB'
+  | 'LOOSE_HINGE'
+  | 'CAULKING'
+  | 'MINOR_REPAIR'
+  | 'SMOKE_DETECTOR_BATTERY'
+  | 'GENERAL_INSPECTION'
+  | 'OTHER';
+
+export interface ConciergeRequest {
+  id: string;
+  title: string;
+  description: string | null;
+  status: VendorWorkOrderStatus;
+  billingType: WorkOrderBillingType;
+  isConciergeRequest: boolean;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  handyman: {
+    id: string;
+    displayName: string | null;
+    phone: string | null;
+  } | null;
+  createdAt: string;
+}
+
+export interface CreateConciergeRequestPayload {
+  taskType: ConciergeTaskType;
+  title: string;
+  description?: string;
+  preferredDate?: string;
+  preferredTimeStart?: string;
+  preferredTimeEnd?: string;
+  notes?: string;
+  addToMonthlyVisit?: boolean;
+}
+
+export interface HandymanInfo {
+  id: string;
+  displayName: string | null;
+  firstName: string | null;
+  lastName: string | null;
+  phone: string | null;
+  email: string;
+}
+
+export interface HandymanDashboard {
+  handymanId: string;
+  handymanName: string;
+  todaysTasks: {
+    id: string;
+    title: string;
+    householdName: string;
+    scheduledStart: string | null;
+    status: string;
+    address: string | null;
+  }[];
+  upcomingTasks: {
+    id: string;
+    title: string;
+    householdName: string;
+    scheduledStart: string | null;
+    status: string;
+  }[];
+  assignedHouseholds: {
+    id: string;
+    name: string;
+    address: string | null;
+    monthlyVisitDay: number | null;
+    conciergeEnabled: boolean;
+  }[];
+  stats: {
+    completedThisMonth: number;
+    hoursThisMonth: number;
+    pendingTasks: number;
+  };
+}
+
+export interface HouseholdProfit {
+  householdId: string;
+  householdName: string;
+  subscriptionPlan: string;
+  period: {
+    startDate: string;
+    endDate: string;
+  };
+  subscriptionRevenue: number;
+  inclusiveCosts: number;
+  billableRevenue: number;
+  netProfit: number;
+  inclusiveTaskCount: number;
+  billableTaskCount: number;
+}
+
+// ============================================================================
+// SOCIAL ENGINE TYPES
+// ============================================================================
+
+export type PostVisibility = 'PRIVATE' | 'NEIGHBORS_ONLY' | 'FRIENDS_ONLY' | 'PUBLIC';
+export type CostDisplay = 'HIDDEN' | 'RANGE' | 'EXACT';
+export type FriendshipStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'BLOCKED';
+export type FeedSource = 'neighbor' | 'friend' | 'following';
+
+// ---- Friendship Types ----
+
+export interface Friendship {
+  id: string;
+  requesterId: string;
+  addresseeId: string;
+  status: FriendshipStatus;
+  createdAt: string;
+  acceptedAt?: string | null;
+  requester?: SocialUserSummary;
+  addressee?: SocialUserSummary;
+}
+
+export interface SocialUserSummary {
+  id: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+  isPublicProfile?: boolean;
+  influencerBadges?: string[];
+  bio?: string | null;
+}
+
+// ---- Follow Types ----
+
+export interface Follow {
+  id: string;
+  followerId: string;
+  followingId: string;
+  createdAt: string;
+  follower?: SocialUserSummary;
+  following?: SocialUserSummary;
+}
+
+export interface FollowCounts {
+  followers: number;
+  following: number;
+}
+
+// ---- Project Post Types ----
+
+export interface ProjectPost {
+  id: string;
+  authorId: string;
+  householdId: string;
+  workOrderId?: string | null;
+  vendorId?: string | null;
+  title: string;
+  description?: string | null;
+  beforeImages: string[];
+  afterImages: string[];
+  visibility: PostVisibility;
+  costDisplay: CostDisplay;
+  actualCost?: number | null;
+  costRangeMin?: number | null;
+  costRangeMax?: number | null;
+  durationDays?: number | null;
+  completedAt?: string | null;
+  likesCount: number;
+  savesCount: number;
+  commentsCount: number;
+  isVerified: boolean;
+  createdAt: string;
+  updatedAt: string;
+  // Included in responses
+  author?: SocialUserSummary;
+  household?: {
+    id: string;
+    name: string;
+    h3Index?: string | null;
+  };
+  vendor?: {
+    id: string;
+    displayName: string;
+    rating?: number | null;
+    category?: string;
+  } | null;
+  workOrder?: {
+    id: string;
+    title: string;
+    status: string;
+  } | null;
+  _count?: {
+    likes: number;
+    saves: number;
+    comments: number;
+  };
+  isLiked?: boolean;
+  isSaved?: boolean;
+}
+
+export interface CreateProjectPostRequest {
+  householdId: string;
+  workOrderId?: string;
+  vendorId?: string;
+  title: string;
+  description?: string;
+  beforeImages?: string[];
+  afterImages?: string[];
+  visibility?: PostVisibility;
+  costDisplay?: CostDisplay;
+  actualCost?: number;
+  costRangeMin?: number;
+  costRangeMax?: number;
+  durationDays?: number;
+  completedAt?: string;
+}
+
+export interface UpdateProjectPostRequest {
+  title?: string;
+  description?: string;
+  beforeImages?: string[];
+  afterImages?: string[];
+  visibility?: PostVisibility;
+  costDisplay?: CostDisplay;
+  actualCost?: number;
+  costRangeMin?: number;
+  costRangeMax?: number;
+  durationDays?: number;
+}
+
+// ---- Post Comment Types ----
+
+export interface PostComment {
+  id: string;
+  postId: string;
+  authorId: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+  author?: SocialUserSummary;
+}
+
+// ---- Feed Types ----
+
+export interface FeedItem {
+  post: ProjectPost;
+  source: FeedSource;
+  isAnonymized: boolean;
+  author: {
+    id: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+    isInfluencer: boolean;
+  };
+}
+
+export interface FeedResponse {
+  items: FeedItem[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface FeedQueryParams {
+  limit?: number;
+  cursor?: string;
+  source?: FeedSource;
+}
+
+// ---- Social Vendor Types ----
+
+export interface SocialVendorSignals {
+  usedByFriendsCount: number;
+  usedByNeighborsCount: number;
+  usedByInfluencersCount: number;
+  friendProjects: Array<{
+    userId: string;
+    displayName: string;
+    postId: string;
+    postTitle: string;
+  }>;
+}
+
+export interface SocialVendorResult {
+  vendor: {
+    id: string;
+    displayName: string;
+    rating?: number | null;
+    reviewCount?: number;
+    category?: string;
+    serviceCategory?: {
+      name: string;
+    };
+  };
+  socialSignals: SocialVendorSignals;
+}
+
+export interface SocialVendorSearchParams {
+  category?: string;
+  socialProof?: 'friends' | 'neighbors' | 'influencers';
+  limit?: number;
+  cursor?: string;
+}
+
+export interface VendorSocialActivity {
+  vendorId: string;
+  vendorName: string;
+  rating?: number | null;
+  reviewCount?: number;
+  friendPosts: ProjectPost[];
+  neighborPosts: ProjectPost[];
+  publicPosts: ProjectPost[];
+  totalProjects: number;
+}
+
+// ---- Social Profile Types ----
+
+export interface SocialProfile extends SocialUserSummary {
+  followers: number;
+  following: number;
+  areFriends: boolean;
+  isFollowing: boolean;
+  totalPosts: number;
+  totalValueAdded: number;
+  createdAt: string;
+}
+
+export interface UpdateSocialProfileRequest {
+  isPublicProfile?: boolean;
+  bio?: string;
+  displayName?: string;
+}
+
+export interface ProfileStats {
+  followers: number;
+  following: number;
+  totalPosts: number;
+  totalValueAdded: number;
+}
+
+// ---- Paginated Responses ----
+
+export interface ProjectPostListResponse {
+  posts: ProjectPost[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface CommentListResponse {
+  comments: PostComment[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+export interface SocialVendorSearchResponse {
+  vendors: SocialVendorResult[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+// ============================================================================
+// PROJECT PLANNER TYPES
+// ============================================================================
+
+export type ProjectIdeaStatus = 'DREAMING' | 'PLANNING' | 'ACTIVE' | 'COMPLETED' | 'ARCHIVED';
+
+export type ProjectCategory =
+  | 'BATHROOM_REMODEL'
+  | 'KITCHEN_REMODEL'
+  | 'DECK_PATIO'
+  | 'LANDSCAPING'
+  | 'ROOF'
+  | 'WINDOWS_DOORS'
+  | 'FLOORING'
+  | 'PAINTING'
+  | 'HVAC'
+  | 'ELECTRICAL'
+  | 'PLUMBING'
+  | 'ADDITION'
+  | 'BASEMENT'
+  | 'GARAGE'
+  | 'FENCE'
+  | 'POOL'
+  | 'SOLAR'
+  | 'SMART_HOME'
+  | 'EXTERIOR_SIDING'
+  | 'OTHER';
+
+export type RecommendationRequestStatus = 'OPEN' | 'REVIEWING' | 'SELECTED' | 'CLOSED';
+
+// ---- Project Template Types ----
+
+export interface ProjectTemplate {
+  id: string;
+  slug: string;
+  category: ProjectCategory;
+  name: string;
+  description?: string | null;
+  baseMaterialCost: number;
+  laborHoursPerSqFt?: number | null;
+  baseLaborRate: number;
+  complexityFactors?: Record<string, number> | null;
+  minSqFt?: number | null;
+  maxSqFt?: number | null;
+  estimatedDaysMin?: number | null;
+  estimatedDaysMax?: number | null;
+  inspirationImages: string[];
+  isActive: boolean;
+  sortOrder: number;
+}
+
+export interface ProjectCategoryOption {
+  value: ProjectCategory;
+  label: string;
+  description: string;
+}
+
+// ---- Estimation Types ----
+
+export interface ProjectSpecs {
+  sqFt: number;
+  material?: string;
+  complexity?: string[];
+}
+
+export interface CalculateEstimateRequest {
+  templateId?: string;
+  category: ProjectCategory;
+  specs: ProjectSpecs;
+}
+
+export interface CostBreakdown {
+  materials: number;
+  labor: number;
+  regionalAdjustment: number;
+  complexityAdjustment: number;
+}
+
+export interface SocialProof {
+  neighborProjectCount: number;
+  averageCost?: number;
+  note: string;
+}
+
+export interface EstimateResult {
+  estimatedMin: number;
+  estimatedMax: number;
+  breakdown: CostBreakdown;
+  regionalMultiplier: number;
+  socialProof: SocialProof;
+  templateName?: string;
+  estimatedDays?: { min: number; max: number };
+}
+
+export interface RegionalMultiplier {
+  multiplier: number;
+  laborMultiplier: number;
+  regionName?: string;
+  stateCode?: string;
+  h3Index: string;
+}
+
+// ---- Project Idea Types ----
+
+export interface ProjectIdea {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  templateId?: string | null;
+  title: string;
+  category: ProjectCategory;
+  description?: string | null;
+  specs?: Record<string, unknown> | null;
+  style?: string | null;
+  vibeNotes?: string | null;
+  moodBoardImages: string[];
+  estimatedCostMin?: number | null;
+  estimatedCostMax?: number | null;
+  neighborProjectCount: number;
+  socialProofNote?: string | null;
+  status: ProjectIdeaStatus;
+  targetStartDate?: string | null;
+  targetCompletionDate?: string | null;
+  urgency?: string | null;
+  workOrderId?: string | null;
+  projectPostId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations
+  template?: { id: string; name: string; slug: string } | null;
+  createdBy?: { id: string; displayName: string | null } | null;
+}
+
+export interface CreateProjectIdeaRequest {
+  templateId?: string;
+  title: string;
+  category: ProjectCategory;
+  description?: string;
+  specs?: Record<string, unknown>;
+  style?: string;
+  vibeNotes?: string;
+  moodBoardImages?: string[];
+  targetStartDate?: string;
+  targetCompletionDate?: string;
+  urgency?: string;
+  estimatedCostMin?: number;
+  estimatedCostMax?: number;
+  socialProofNote?: string;
+  neighborProjectCount?: number;
+}
+
+export interface UpdateProjectIdeaRequest {
+  templateId?: string;
+  title?: string;
+  category?: ProjectCategory;
+  description?: string;
+  specs?: Record<string, unknown>;
+  style?: string;
+  vibeNotes?: string;
+  moodBoardImages?: string[];
+  targetStartDate?: string;
+  targetCompletionDate?: string;
+  urgency?: string;
+  estimatedCostMin?: number;
+  estimatedCostMax?: number;
+  socialProofNote?: string;
+  neighborProjectCount?: number;
+}
+
+export interface ProjectIdeasListResponse {
+  ideas: ProjectIdea[];
+  total: number;
+}
+
+export interface ProjectPipelineStats {
+  DREAMING: number;
+  PLANNING: number;
+  ACTIVE: number;
+  COMPLETED: number;
+  ARCHIVED: number;
+}
+
+export interface ConvertToWorkOrderRequest {
+  title?: string;
+  description?: string;
+  vendorId?: string;
+}
+
+export interface ConvertToWorkOrderResponse {
+  ideaId: string;
+  workOrderId: string;
+}
+
+// ---- Recommendation Request Types ----
+
+export interface RecommendationRequest {
+  id: string;
+  projectIdeaId: string;
+  householdId: string;
+  createdByUserId: string;
+  title: string;
+  description?: string | null;
+  budget?: string | null;
+  timeline?: string | null;
+  h3Index?: string | null;
+  isPublic: boolean;
+  status: RecommendationRequestStatus;
+  viewCount: number;
+  suggestionCount: number;
+  expiresAt?: string | null;
+  closedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations
+  projectIdea?: {
+    id: string;
+    title: string;
+    category: ProjectCategory;
+    estimatedCostMin?: number | null;
+    estimatedCostMax?: number | null;
+  } | null;
+  createdBy?: { id: string; displayName: string | null } | null;
+  household?: { id: string; name: string } | null;
+}
+
+export interface CreateRecommendationRequestDto {
+  projectIdeaId: string;
+  title: string;
+  description?: string;
+  budget?: string;
+  timeline?: string;
+  isPublic?: boolean;
+  expiresAt?: string;
+}
+
+export interface RecommendationRequestListResponse {
+  requests: RecommendationRequest[];
+  total: number;
+}
+
+// ---- Vendor Suggestion Types ----
+
+export interface VendorSuggestion {
+  id: string;
+  projectIdeaId?: string | null;
+  recommendationRequestId?: string | null;
+  vendorId: string;
+  suggestedByUserId?: string | null;
+  comment?: string | null;
+  rating?: number | null;
+  isSystemSuggestion: boolean;
+  systemNote?: string | null;
+  referenceProjectPostId?: string | null;
+  isHelpful?: boolean | null;
+  createdAt: string;
+  // Relations
+  vendor?: {
+    id: string;
+    companyName: string;
+    contactName?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    specialty?: string[];
+  } | null;
+  suggestedBy?: { id: string; displayName: string | null } | null;
+  referenceProjectPost?: {
+    id: string;
+    title: string;
+    mediaUrls: string[];
+  } | null;
+}
+
+export interface SubmitVendorSuggestionRequest {
+  projectIdeaId?: string;
+  recommendationRequestId?: string;
+  vendorId: string;
+  comment?: string;
+  rating?: number;
+  referenceProjectPostId?: string;
+}
+
+// ---- Community Intelligence Types ----
+
+export interface VendorWithSocialSignals {
+  vendor: {
+    id: string;
+    companyName: string;
+    contactName?: string;
+    specialty?: string[];
+    averageRating?: number;
+  };
+  usedByNeighborsCount: number;
+  usedByFriendsCount: number;
+  friendRecommendations: Array<{
+    userId: string;
+    displayName: string;
+    projectPostId?: string;
+    projectTitle?: string;
+  }>;
+}
+
+export interface NeighborInspiration {
+  id: string;
+  title: string;
+  description?: string;
+  images: string[];
+  actualCost?: number;
+  authorDisplayName: string;
+  isNeighbor: boolean;
+  vendorName?: string;
+}
+
+// ============================================================================
+// CONCIERGE TRIAGE TYPES
+// ============================================================================
+
+export type RequestSource = 'EMAIL' | 'SMS' | 'CHAT' | 'WEB' | 'VOICE';
+
+export type RequestCategory =
+  | 'BILL_PAY'
+  | 'FIX_REQUEST'
+  | 'PROJECT_IDEA'
+  | 'CALENDAR_EVENT'
+  | 'TRIP_PLAN'
+  | 'GENERAL_INQUIRY'
+  | 'UNKNOWN';
+
+export type TriageStatus =
+  | 'RECEIVED'
+  | 'PROCESSING'
+  | 'PENDING_REVIEW'
+  | 'AUTO_APPROVED'
+  | 'NEEDS_ATTENTION'
+  | 'RESOLVED'
+  | 'REJECTED'
+  | 'ERROR';
+
+export type TriageActionType =
+  | 'PAY_BILL'
+  | 'CREATE_WORK_ORDER'
+  | 'CREATE_PROJECT'
+  | 'CREATE_EVENT'
+  | 'CREATE_TRIP'
+  | 'RESPOND_INQUIRY'
+  | 'UNKNOWN';
+
+export type RequestPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'URGENT';
+
+// ---- Triage Suggestion Types ----
+
+export interface TriageSuggestion {
+  id: string;
+  requestId: string;
+  actionType: TriageActionType;
+  actionData: Record<string, unknown>;
+  confidence: number;
+  reasoning: string;
+  isApproved: boolean;
+  createdAt: string;
+}
+
+// ---- Inbound Request Types ----
+
+export interface InboundRequest {
+  id: string;
+  source: RequestSource;
+  senderEmail?: string | null;
+  senderPhone?: string | null;
+  senderUserId?: string | null;
+  householdId?: string | null;
+  subject?: string | null;
+  body: string;
+  attachmentUrls: string[];
+  category?: RequestCategory | null;
+  priority?: RequestPriority | null;
+  status: TriageStatus;
+  summary?: string | null;
+  aiConfidence?: number | null;
+  aiReasoning?: string | null;
+  extractedEntities?: Record<string, unknown> | null;
+  resolvedAction?: string | null;
+  resolvedEntityType?: string | null;
+  resolvedEntityId?: string | null;
+  resolvedAt?: string | null;
+  resolvedByUserId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations
+  senderUser?: {
+    id: string;
+    email: string;
+    firstName: string | null;
+    lastName: string | null;
+    displayName: string | null;
+  } | null;
+  household?: {
+    id: string;
+    name: string;
+  } | null;
+  suggestions?: TriageSuggestion[];
+  resolvedBy?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+  } | null;
+}
+
+// ---- Triage List Query Types ----
+
+export interface TriageListQuery {
+  status?: TriageStatus;
+  source?: RequestSource;
+  category?: RequestCategory;
+  householdId?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// ---- Triage Stats Types ----
+
+export interface TriageStats {
+  total: number;
+  byStatus: {
+    status: TriageStatus;
+    count: number;
+  }[];
+  byCategory: {
+    category: RequestCategory;
+    count: number;
+  }[];
+  todayCount: number;
+  pendingReviewCount: number;
+  needsAttentionCount: number;
+  avgProcessingTimeSeconds: number;
+}
+
+// ---- Triage Action Types ----
+
+export interface ApproveTriageActionRequest {
+  requestId: string;
+  suggestionId: string;
+  overrideData?: Record<string, unknown>;
+}
+
+export interface RejectTriageRequest {
+  requestId: string;
+  reason: string;
+}
+
+export interface ManualClassifyRequest {
+  category: RequestCategory;
+  priority?: RequestPriority;
+  notes?: string;
+}
+
+export interface LinkToHouseholdRequest {
+  householdId: string;
+}
+
+// ---- Execution Result Types ----
+
+export interface ExecutionResult {
+  success: boolean;
+  actionType: TriageActionType;
+  entityType: string | null;
+  entityId: string | null;
+  message: string;
+  error?: string;
+}
+
+// ---- Chat Message Types ----
+
+export interface SendChatMessageRequest {
+  message: string;
+  attachmentUrls?: string[];
+}
+
+export interface ChatResponse {
+  requestId: string;
+  message: string;
+  suggestion?: {
+    actionType: TriageActionType;
+    description: string;
+    confidence: number;
+  } | null;
+}
+
+// ============================================================================
+// FAMILY OPERATIONS TYPES
+// ============================================================================
+
+// ---- Enums ----
+
+export type FamilyEventCategory =
+  | 'SCHOOL'
+  | 'MEDICAL'
+  | 'SPORTS'
+  | 'SOCIAL'
+  | 'WORK'
+  | 'TRAVEL'
+  | 'MAINTENANCE'
+  | 'FINANCIAL'
+  | 'RELIGIOUS'
+  | 'BIRTHDAY'
+  | 'HOLIDAY'
+  | 'OTHER';
+
+export type MemberPermissionType =
+  | 'VIEW_CALENDAR'
+  | 'EDIT_CALENDAR'
+  | 'VIEW_BILLS'
+  | 'PAY_BILLS'
+  | 'VIEW_MAINTENANCE'
+  | 'REQUEST_MAINTENANCE'
+  | 'VIEW_ASSETS'
+  | 'EDIT_ASSETS'
+  | 'VIEW_MEMBERS'
+  | 'MANAGE_MEMBERS'
+  | 'VIEW_BUDGET'
+  | 'FULL_ACCESS';
+
+export type VehicleType =
+  | 'CAR'
+  | 'SUV'
+  | 'TRUCK'
+  | 'VAN'
+  | 'MOTORCYCLE'
+  | 'BOAT'
+  | 'RV'
+  | 'ATV'
+  | 'OTHER';
+
+export type FuelType =
+  | 'GASOLINE'
+  | 'DIESEL'
+  | 'ELECTRIC'
+  | 'HYBRID'
+  | 'PLUG_IN_HYBRID'
+  | 'HYDROGEN'
+  | 'OTHER';
+
+export type PetType =
+  | 'DOG'
+  | 'CAT'
+  | 'BIRD'
+  | 'FISH'
+  | 'REPTILE'
+  | 'SMALL_MAMMAL'
+  | 'HORSE'
+  | 'OTHER';
+
+export type PetSize = 'SMALL' | 'MEDIUM' | 'LARGE' | 'EXTRA_LARGE';
+
+export type HomeSystemType =
+  | 'FURNACE'
+  | 'AIR_CONDITIONER'
+  | 'HEAT_PUMP'
+  | 'BOILER'
+  | 'THERMOSTAT'
+  | 'WATER_HEATER'
+  | 'WATER_SOFTENER'
+  | 'WELL_PUMP'
+  | 'SUMP_PUMP'
+  | 'ELECTRICAL_PANEL'
+  | 'GENERATOR'
+  | 'SOLAR_PANELS'
+  | 'BATTERY_STORAGE'
+  | 'REFRIGERATOR'
+  | 'DISHWASHER'
+  | 'OVEN_RANGE'
+  | 'MICROWAVE'
+  | 'GARBAGE_DISPOSAL'
+  | 'WASHER'
+  | 'DRYER'
+  | 'IRRIGATION_SYSTEM'
+  | 'POOL_EQUIPMENT'
+  | 'HOT_TUB'
+  | 'LAWN_MOWER'
+  | 'SMOKE_DETECTOR'
+  | 'CO_DETECTOR'
+  | 'SECURITY_SYSTEM'
+  | 'FIRE_EXTINGUISHER'
+  | 'GARAGE_DOOR_OPENER'
+  | 'CEILING_FAN'
+  | 'FIREPLACE'
+  | 'OTHER';
+
+export type ApplianceCondition =
+  | 'EXCELLENT'
+  | 'GOOD'
+  | 'FAIR'
+  | 'NEEDS_REPAIR'
+  | 'REPLACED';
+
+// ---- Member Profile Types ----
+
+export interface MemberProfile {
+  birthday?: string;
+  shirtSize?: string;
+  dietaryRestrictions?: string[];
+  allergies?: string[];
+  medicalNotes?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  school?: string;
+  grade?: string;
+  employer?: string;
+  workPhone?: string;
+}
+
+export interface UpdateMemberProfileRequest {
+  birthday?: string;
+  shirtSize?: string;
+  dietaryRestrictions?: string[];
+  allergies?: string[];
+  medicalNotes?: string;
+  emergencyContact?: string;
+  emergencyPhone?: string;
+  school?: string;
+  grade?: string;
+  employer?: string;
+  workPhone?: string;
+}
+
+export interface FamilyMember {
+  id: string;
+  householdId: string;
+  userId?: string | null;
+  displayName: string;
+  role: string;
+  isActive: boolean;
+  profile?: MemberProfile | null;
+  permissions: MemberPermissionType[];
+  user?: {
+    id: string;
+    email: string;
+    displayName: string | null;
+    photoUrl: string | null;
+  } | null;
+}
+
+// ---- Vehicle Types ----
+
+export interface Vehicle {
+  id: string;
+  householdId: string;
+  type: VehicleType;
+  year?: number | null;
+  make?: string | null;
+  model?: string | null;
+  trim?: string | null;
+  color?: string | null;
+  vin?: string | null;
+  licensePlate?: string | null;
+  licenseState?: string | null;
+  nickname?: string | null;
+  fuelType?: FuelType | null;
+  currentMileage?: number | null;
+  lastMileageUpdate?: string | null;
+  purchaseDate?: string | null;
+  purchasePrice?: number | null;
+  insuranceProvider?: string | null;
+  insurancePolicyNum?: string | null;
+  insuranceExpires?: string | null;
+  registrationExpires?: string | null;
+  inspectionExpires?: string | null;
+  lastOilChangeDate?: string | null;
+  lastOilChangeMileage?: number | null;
+  oilChangeIntervalMiles?: number | null;
+  oilChangeIntervalMonths?: number | null;
+  lastTireRotationDate?: string | null;
+  lastTireRotationMileage?: number | null;
+  preferredVendorId?: string | null;
+  notes?: string | null;
+  photoUrls: string[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  serviceRecords?: VehicleServiceRecord[];
+  preferredVendor?: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+  } | null;
+}
+
+export interface VehicleServiceRecord {
+  id: string;
+  vehicleId: string;
+  serviceType: string;
+  serviceDate: string;
+  mileageAtService?: number | null;
+  cost?: number | null;
+  vendorId?: string | null;
+  vendorName?: string | null;
+  notes?: string | null;
+  receiptUrl?: string | null;
+  createdAt: string;
+  vendor?: {
+    id: string;
+    displayName: string;
+  } | null;
+}
+
+export interface CreateVehicleRequest {
+  type: VehicleType;
+  year?: number;
+  make?: string;
+  model?: string;
+  trim?: string;
+  color?: string;
+  vin?: string;
+  licensePlate?: string;
+  licenseState?: string;
+  nickname?: string;
+  fuelType?: FuelType;
+  currentMileage?: number;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  insuranceProvider?: string;
+  insurancePolicyNum?: string;
+  insuranceExpires?: string;
+  registrationExpires?: string;
+  inspectionExpires?: string;
+  preferredVendorId?: string;
+  notes?: string;
+  photoUrls?: string[];
+}
+
+export interface UpdateVehicleRequest {
+  type?: VehicleType;
+  year?: number;
+  make?: string;
+  model?: string;
+  trim?: string;
+  color?: string;
+  vin?: string;
+  licensePlate?: string;
+  licenseState?: string;
+  nickname?: string;
+  fuelType?: FuelType;
+  currentMileage?: number;
+  purchaseDate?: string;
+  purchasePrice?: number;
+  insuranceProvider?: string;
+  insurancePolicyNum?: string;
+  insuranceExpires?: string;
+  registrationExpires?: string;
+  inspectionExpires?: string;
+  oilChangeIntervalMiles?: number;
+  oilChangeIntervalMonths?: number;
+  preferredVendorId?: string;
+  notes?: string;
+  photoUrls?: string[];
+}
+
+export interface CreateVehicleServiceRecordRequest {
+  serviceType: string;
+  serviceDate: string;
+  mileageAtService?: number;
+  cost?: number;
+  vendorId?: string;
+  vendorName?: string;
+  notes?: string;
+  receiptUrl?: string;
+}
+
+export interface VehicleMaintenanceAlert {
+  vehicleId: string;
+  vehicleName: string;
+  type: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+// ---- Pet Types ----
+
+export interface Pet {
+  id: string;
+  householdId: string;
+  name: string;
+  type: PetType;
+  breed?: string | null;
+  color?: string | null;
+  size?: PetSize | null;
+  weight?: number | null;
+  birthday?: string | null;
+  gender?: string | null;
+  microchipId?: string | null;
+  isSpayedNeutered?: boolean | null;
+  photoUrls: string[];
+  vetClinicName?: string | null;
+  vetClinicPhone?: string | null;
+  vetClinicAddress?: string | null;
+  vetClinicEmail?: string | null;
+  primaryVetName?: string | null;
+  insuranceProvider?: string | null;
+  insurancePolicyNum?: string | null;
+  insuranceExpires?: string | null;
+  licenseNumber?: string | null;
+  licenseExpires?: string | null;
+  allergies: string[];
+  medications: string[];
+  specialNeeds?: string | null;
+  foodBrand?: string | null;
+  foodType?: string | null;
+  feedingSchedule?: string | null;
+  dietaryNotes?: string | null;
+  careInstructions?: string | null;
+  emergencyContact?: string | null;
+  behavioralNotes?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  vetRecords?: PetVetRecord[];
+}
+
+export interface PetVetRecord {
+  id: string;
+  petId: string;
+  visitDate: string;
+  visitType: string;
+  clinicName?: string | null;
+  vetName?: string | null;
+  weight?: number | null;
+  diagnosis?: string | null;
+  treatment?: string | null;
+  prescriptions?: Record<string, unknown> | null;
+  vaccinationsGiven: string[];
+  nextVaccinationDate?: string | null;
+  notes?: string | null;
+  cost?: number | null;
+  receiptUrl?: string | null;
+  createdAt: string;
+}
+
+export interface CreatePetRequest {
+  name: string;
+  type: PetType;
+  breed?: string;
+  color?: string;
+  size?: PetSize;
+  weight?: number;
+  birthday?: string;
+  gender?: string;
+  microchipId?: string;
+  isSpayedNeutered?: boolean;
+  photoUrls?: string[];
+  vetClinicName?: string;
+  vetClinicPhone?: string;
+  vetClinicAddress?: string;
+  vetClinicEmail?: string;
+  primaryVetName?: string;
+  insuranceProvider?: string;
+  insurancePolicyNum?: string;
+  insuranceExpires?: string;
+  licenseNumber?: string;
+  licenseExpires?: string;
+  allergies?: string[];
+  medications?: string[];
+  specialNeeds?: string;
+  foodBrand?: string;
+  foodType?: string;
+  feedingSchedule?: string;
+  dietaryNotes?: string;
+  careInstructions?: string;
+  emergencyContact?: string;
+  behavioralNotes?: string;
+}
+
+export interface UpdatePetRequest {
+  name?: string;
+  type?: PetType;
+  breed?: string;
+  color?: string;
+  size?: PetSize;
+  weight?: number;
+  birthday?: string;
+  gender?: string;
+  microchipId?: string;
+  isSpayedNeutered?: boolean;
+  photoUrls?: string[];
+  vetClinicName?: string;
+  vetClinicPhone?: string;
+  vetClinicAddress?: string;
+  vetClinicEmail?: string;
+  primaryVetName?: string;
+  insuranceProvider?: string;
+  insurancePolicyNum?: string;
+  insuranceExpires?: string;
+  licenseNumber?: string;
+  licenseExpires?: string;
+  allergies?: string[];
+  medications?: string[];
+  specialNeeds?: string;
+  foodBrand?: string;
+  foodType?: string;
+  feedingSchedule?: string;
+  dietaryNotes?: string;
+  careInstructions?: string;
+  emergencyContact?: string;
+  behavioralNotes?: string;
+}
+
+export interface CreatePetVetRecordRequest {
+  visitDate: string;
+  visitType: string;
+  clinicName?: string;
+  vetName?: string;
+  weight?: number;
+  diagnosis?: string;
+  treatment?: string;
+  prescriptions?: Record<string, unknown>;
+  vaccinationsGiven?: string[];
+  nextVaccinationDate?: string;
+  notes?: string;
+  cost?: number;
+  receiptUrl?: string;
+}
+
+export interface PetPassport {
+  id: string;
+  name: string;
+  type: PetType;
+  breed?: string | null;
+  color?: string | null;
+  size?: PetSize | null;
+  weight?: number | null;
+  birthday?: string | null;
+  gender?: string | null;
+  microchipId?: string | null;
+  isSpayedNeutered?: boolean | null;
+  photoUrls: string[];
+  vetClinic: {
+    name?: string | null;
+    phone?: string | null;
+    address?: string | null;
+    email?: string | null;
+    primaryVet?: string | null;
+  };
+  insurance?: {
+    provider: string;
+    policyNumber?: string | null;
+    expires?: string | null;
+  } | null;
+  allergies: string[];
+  medications: string[];
+  specialNeeds?: string | null;
+  vaccinations: Record<string, { date: string; nextDue?: string }>;
+  diet: {
+    foodBrand?: string | null;
+    foodType?: string | null;
+    feedingSchedule?: string | null;
+    dietaryNotes?: string | null;
+  };
+  careInstructions?: string | null;
+  emergencyContact?: string | null;
+  behavioralNotes?: string | null;
+}
+
+export interface PetCareAlert {
+  petId: string;
+  petName: string;
+  type: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+// ---- Home System Types ----
+
+export interface HomeSystem {
+  id: string;
+  householdId: string;
+  systemType: HomeSystemType;
+  name?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  installDate?: string | null;
+  warrantyExpires?: string | null;
+  lastServiceDate?: string | null;
+  nextServiceDue?: string | null;
+  serviceIntervalMonths?: number | null;
+  condition?: ApplianceCondition | null;
+  location?: string | null;
+  notes?: string | null;
+  manualUrl?: string | null;
+  photoUrls: string[];
+  utilityProvider?: string | null;
+  accountNumber?: string | null;
+  monthlyServiceCost?: number | null;
+  autoPayEnabled?: boolean | null;
+  tankCapacityGallons?: number | null;
+  currentTankLevel?: number | null;
+  lastTankReading?: string | null;
+  filterSize?: string | null;
+  lastFilterChange?: string | null;
+  nextFilterChange?: string | null;
+  purchasePrice?: number | null;
+  preferredVendorId?: string | null;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+  serviceHistory?: HomeSystemService[];
+  preferredVendor?: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+  } | null;
+}
+
+export interface HomeSystemService {
+  id: string;
+  homeSystemId: string;
+  serviceType: string;
+  serviceDate: string;
+  performedBy?: string | null;
+  vendorId?: string | null;
+  cost?: number | null;
+  notes?: string | null;
+  partsReplaced?: Record<string, unknown> | null;
+  filterReplaced: boolean;
+  nextServiceDate?: string | null;
+  receiptUrl?: string | null;
+  createdAt: string;
+  vendor?: {
+    id: string;
+    displayName: string;
+  } | null;
+}
+
+export interface CreateHomeSystemRequest {
+  systemType: HomeSystemType;
+  name?: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  installDate?: string;
+  warrantyExpires?: string;
+  nextServiceDue?: string;
+  serviceIntervalMonths?: number;
+  condition?: ApplianceCondition;
+  location?: string;
+  notes?: string;
+  manualUrl?: string;
+  photoUrls?: string[];
+  utilityProvider?: string;
+  accountNumber?: string;
+  monthlyServiceCost?: number;
+  autoPayEnabled?: boolean;
+  tankCapacityGallons?: number;
+  currentTankLevel?: number;
+  filterSize?: string;
+  purchasePrice?: number;
+  preferredVendorId?: string;
+}
+
+export interface UpdateHomeSystemRequest {
+  systemType?: HomeSystemType;
+  name?: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  installDate?: string;
+  warrantyExpires?: string;
+  nextServiceDue?: string;
+  serviceIntervalMonths?: number;
+  condition?: ApplianceCondition;
+  location?: string;
+  notes?: string;
+  manualUrl?: string;
+  photoUrls?: string[];
+  utilityProvider?: string;
+  accountNumber?: string;
+  monthlyServiceCost?: number;
+  autoPayEnabled?: boolean;
+  tankCapacityGallons?: number;
+  currentTankLevel?: number;
+  filterSize?: string;
+  nextFilterChange?: string;
+  purchasePrice?: number;
+  preferredVendorId?: string;
+}
+
+export interface CreateHomeSystemServiceRequest {
+  serviceType: string;
+  serviceDate: string;
+  performedBy?: string;
+  vendorId?: string;
+  cost?: number;
+  notes?: string;
+  partsReplaced?: Record<string, unknown>;
+  filterReplaced?: boolean;
+  nextServiceDate?: string;
+  receiptUrl?: string;
+}
+
+export interface HomeSystemMaintenanceAlert {
+  systemId: string;
+  systemName: string;
+  systemType: HomeSystemType;
+  type: string;
+  message: string;
+  severity: 'low' | 'medium' | 'high';
+}
+
+export interface HomeDashboard {
+  hvac: FormattedHomeSystem[];
+  water: FormattedHomeSystem[];
+  electrical: FormattedHomeSystem[];
+  kitchen: FormattedHomeSystem[];
+  laundry: FormattedHomeSystem[];
+  outdoor: FormattedHomeSystem[];
+  safety: FormattedHomeSystem[];
+  other: FormattedHomeSystem[];
+  totalSystems: number;
+}
+
+export interface FormattedHomeSystem {
+  id: string;
+  type: HomeSystemType;
+  name?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  serialNumber?: string | null;
+  installDate?: string | null;
+  warrantyExpires?: string | null;
+  lastServiceDate?: string | null;
+  nextServiceDue?: string | null;
+  condition?: ApplianceCondition | null;
+  location?: string | null;
+  notes?: string | null;
+  utilityProvider?: string | null;
+  accountNumber?: string | null;
+  monthlyServiceCost?: number | null;
+  tankCapacity?: number | null;
+  currentTankLevel?: number | null;
+  lastTankReading?: string | null;
+  filterSize?: string | null;
+  lastFilterChange?: string | null;
+  nextFilterChange?: string | null;
+  preferredVendor?: {
+    id: string;
+    displayName: string;
+    phone?: string | null;
+  } | null;
+  lastService?: {
+    date: string;
+    type: string;
+    notes?: string | null;
+  } | null;
+}
+
+// ---- Family Event Types ----
+
+export interface FamilyEvent {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  title: string;
+  description?: string | null;
+  startDate: string;
+  endDate?: string | null;
+  isAllDay: boolean;
+  location?: string | null;
+  recurrenceRule?: string | null;
+  category: FamilyEventCategory;
+  assignedToMemberId?: string | null;
+  color?: string | null;
+  vehicleId?: string | null;
+  petId?: string | null;
+  workOrderId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  assignedToMember?: {
+    id: string;
+    displayName: string;
+  } | null;
+  vehicle?: {
+    id: string;
+    nickname?: string | null;
+    make?: string | null;
+    model?: string | null;
+  } | null;
+  pet?: {
+    id: string;
+    name: string;
+    type: PetType;
+  } | null;
+  workOrder?: {
+    id: string;
+    title: string;
+    status: string;
+  } | null;
+}
+
+export interface CreateFamilyEventRequest {
+  title: string;
+  description?: string;
+  startDate: string;
+  endDate?: string;
+  isAllDay?: boolean;
+  location?: string;
+  recurrenceRule?: string;
+  category?: FamilyEventCategory;
+  assignedToMemberId?: string;
+  color?: string;
+  vehicleId?: string;
+  petId?: string;
+  workOrderId?: string;
+}
+
+export interface UpdateFamilyEventRequest {
+  title?: string;
+  description?: string;
+  startDate?: string;
+  endDate?: string;
+  isAllDay?: boolean;
+  location?: string;
+  recurrenceRule?: string;
+  category?: FamilyEventCategory;
+  assignedToMemberId?: string;
+  color?: string;
+  vehicleId?: string;
+  petId?: string;
+  workOrderId?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  start: string;
+  end?: string;
+  allDay: boolean;
+  category: string;
+  color?: string;
+  type: 'family' | 'maintenance';
+  meta?: {
+    description?: string;
+    location?: string;
+    assignedTo?: string;
+    vehicle?: { id: string; nickname?: string | null };
+    pet?: { id: string; name: string };
+    vendor?: string;
+    status?: string;
+    workOrderId?: string;
+  };
+}
+
+export interface CalendarFeedUrlResponse {
+  url: string;
+}
+
+export interface CalendarSummary {
+  todayCount: number;
+  weekCount: number;
+  monthCount: number;
+  upcomingBirthdays: {
+    memberId: string;
+    name: string;
+    date: string;
+    daysUntil: number;
+  }[];
+}
+
+// ---- Combined Alerts ----
+
+export interface AllFamilyAlerts {
+  vehicles: VehicleMaintenanceAlert[];
+  pets: PetCareAlert[];
+  homeSystems: HomeSystemMaintenanceAlert[];
+  total: number;
+}
+
+// ============================================================================
+// TRAVEL CONCIERGE TYPES
+// ============================================================================
+
+export type TripStatus =
+  | 'INQUIRY'
+  | 'PROPOSAL_SENT'
+  | 'PENDING_SELECTION'
+  | 'BOOKED'
+  | 'ACTIVE'
+  | 'COMPLETED'
+  | 'CANCELLED';
+
+export type ItineraryItemType =
+  | 'FLIGHT'
+  | 'STAY'
+  | 'CAR_RENTAL'
+  | 'ACTIVITY'
+  | 'TRANSFER'
+  | 'OTHER';
+
+export type SeatingPreference = 'WINDOW' | 'AISLE' | 'MIDDLE' | 'NO_PREFERENCE';
+
+export type HouseProtocolStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'VERIFIED';
+
+export type ProtocolItemStatus = 'PENDING' | 'COMPLETED' | 'SKIPPED' | 'BLOCKED';
+
+// ---- Travel Profile ----
+
+export interface LoyaltyProgram {
+  provider: string;
+  number: string;
+  tier?: string;
+}
+
+export interface TravelProfile {
+  id: string;
+  householdMemberId: string;
+  passportNumber?: string | null;
+  passportCountry?: string | null;
+  passportExpiry?: string | null;
+  tsaPreCheck?: string | null;
+  globalEntry?: string | null;
+  seatingPreference: SeatingPreference;
+  mealPreference?: string | null;
+  airlineLoyalty?: LoyaltyProgram[] | null;
+  hotelLoyalty?: LoyaltyProgram[] | null;
+  carRentalLoyalty?: LoyaltyProgram[] | null;
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TravelProfileWithMember {
+  memberId: string;
+  displayName: string;
+  nickname?: string | null;
+  user?: {
+    id: string;
+    displayName?: string | null;
+    email: string;
+  };
+  travelProfile?: TravelProfile | null;
+}
+
+export interface UpdateTravelProfileRequest {
+  passportNumber?: string;
+  passportCountry?: string;
+  passportExpiry?: string;
+  tsaPreCheck?: string;
+  globalEntry?: string;
+  seatingPreference?: SeatingPreference;
+  mealPreference?: string;
+  airlineLoyalty?: LoyaltyProgram[];
+  hotelLoyalty?: LoyaltyProgram[];
+  carRentalLoyalty?: LoyaltyProgram[];
+  emergencyContactName?: string;
+  emergencyContactPhone?: string;
+}
+
+// ---- Trip ----
+
+export interface TripTraveler {
+  memberId: string;
+  role: string; // "adult", "child", "infant"
+}
+
+export interface Trip {
+  id: string;
+  householdId: string;
+  createdByUserId: string;
+  title: string;
+  destination: string;
+  destinationCountry?: string | null;
+  departureCity?: string | null;
+  startDate: string;
+  endDate: string;
+  isFlexibleDates: boolean;
+  budgetMin?: number | null;
+  budgetMax?: number | null;
+  budgetNotes?: string | null;
+  travelerCount: number;
+  travelers?: TripTraveler[] | null;
+  status: TripStatus;
+  notes?: string | null;
+  assignedManagerId?: string | null;
+  totalEstimatedCost?: number | null;
+  totalActualCost?: number | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations (when included)
+  createdBy?: { id: string; displayName?: string | null };
+  assignedManager?: { id: string; displayName?: string | null } | null;
+  household?: { id: string; name: string };
+  proposals?: TripProposal[];
+  itineraryItems?: ItineraryItem[];
+  houseProtocol?: HouseProtocol | null;
+  _count?: {
+    proposals?: number;
+    itineraryItems?: number;
+  };
+}
+
+export interface TripListItem extends Omit<Trip, 'proposals' | 'itineraryItems' | 'houseProtocol'> {
+  _count?: {
+    proposals?: number;
+    itineraryItems?: number;
+  };
+}
+
+export interface CreateTripRequest {
+  title: string;
+  destination: string;
+  destinationCountry?: string;
+  departureCity?: string;
+  startDate: string;
+  endDate: string;
+  isFlexibleDates?: boolean;
+  budgetMin?: number;
+  budgetMax?: number;
+  budgetNotes?: string;
+  travelerCount?: number;
+  travelers?: TripTraveler[];
+  notes?: string;
+}
+
+export interface UpdateTripRequest extends Partial<CreateTripRequest> {
+  status?: TripStatus;
+}
+
+// ---- Proposal ----
+
+export interface ProposalOption {
+  index: number;
+  title: string;
+  details: string;
+  price: number;
+  pros?: string[];
+  cons?: string[];
+  bookingReference?: string;
+  expiresAt?: string;
+}
+
+export interface TripProposal {
+  id: string;
+  tripId: string;
+  createdByManagerId: string;
+  title: string;
+  category: ItineraryItemType;
+  description?: string | null;
+  options: ProposalOption[];
+  selectedOptionIndex?: number | null;
+  selectedAt?: string | null;
+  sentAt?: string | null;
+  expiresAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations
+  trip?: { id: string; title: string; householdId: string };
+  createdByManager?: { id: string; displayName?: string | null };
+}
+
+export interface CreateProposalRequest {
+  title: string;
+  category: ItineraryItemType;
+  description?: string;
+  options: ProposalOption[];
+  expiresAt?: string;
+}
+
+export interface UpdateProposalRequest extends CreateProposalRequest {}
+
+export interface SelectProposalOptionRequest {
+  optionIndex: number;
+}
+
+// ---- Itinerary ----
+
+export interface ItemDocument {
+  name: string;
+  fileAssetId?: string;
+  url?: string;
+}
+
+export interface ItineraryItem {
+  id: string;
+  tripId: string;
+  type: ItineraryItemType;
+  title: string;
+  description?: string | null;
+  startDateTime: string;
+  endDateTime?: string | null;
+  timezone?: string | null;
+  startLocation?: string | null;
+  endLocation?: string | null;
+  confirmationNumber?: string | null;
+  bookingReference?: string | null;
+  providerName?: string | null;
+  cost: number;
+  currency: string;
+  paidByHaven: boolean;
+  transactionId?: string | null;
+  documents?: ItemDocument[] | null;
+  sortOrder: number;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ItineraryDay {
+  date: string;
+  dayNumber: number;
+  items: ItineraryItem[];
+}
+
+export interface CreateItineraryItemRequest {
+  type: ItineraryItemType;
+  title: string;
+  description?: string;
+  startDateTime: string;
+  endDateTime?: string;
+  timezone?: string;
+  startLocation?: string;
+  endLocation?: string;
+  confirmationNumber?: string;
+  bookingReference?: string;
+  providerName?: string;
+  cost: number;
+  currency?: string;
+  paidByHaven?: boolean;
+  documents?: ItemDocument[];
+  sortOrder?: number;
+  notes?: string;
+}
+
+export interface UpdateItineraryItemRequest extends CreateItineraryItemRequest {}
+
+export interface TripDocument extends ItemDocument {
+  itemId: string;
+  itemTitle: string;
+  itemType: ItineraryItemType;
+}
+
+// ---- House Protocol ----
+
+export interface HouseProtocolItem {
+  id: string;
+  protocolId: string;
+  title: string;
+  description?: string | null;
+  category?: string | null;
+  status: ProtocolItemStatus;
+  completedAt?: string | null;
+  completedByUserId?: string | null;
+  proofPhotoUrl?: string | null;
+  proofFileAssetId?: string | null;
+  proofNotes?: string | null;
+  sortOrder: number;
+  isRequired: boolean;
+  createdAt: string;
+  updatedAt: string;
+  completedBy?: { id: string; displayName?: string | null } | null;
+}
+
+export interface HouseProtocol {
+  id: string;
+  tripId: string;
+  householdId: string;
+  assignedToUserId?: string | null;
+  scheduledDate: string;
+  completedAt?: string | null;
+  verifiedAt?: string | null;
+  verifiedByUserId?: string | null;
+  status: HouseProtocolStatus;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Relations
+  trip?: { id: string; title: string; destination: string; startDate: string };
+  household?: { id: string; name: string };
+  assignedTo?: { id: string; displayName?: string | null } | null;
+  items?: HouseProtocolItem[];
+  _count?: {
+    items?: number;
+  };
+}
+
+export interface CompleteProtocolItemRequest {
+  proofPhotoUrl?: string;
+  proofFileAssetId?: string;
+  proofNotes?: string;
+}
+
+export interface CreateProtocolItemRequest {
+  title: string;
+  description?: string;
+  category?: string;
+  sortOrder?: number;
+  isRequired?: boolean;
+}
+
+// ---- Trip Pipeline (Manager) ----
+
+export interface TripPipeline {
+  INQUIRY: TripListItem[];
+  PROPOSAL_SENT: TripListItem[];
+  PENDING_SELECTION: TripListItem[];
+  BOOKED: TripListItem[];
+  ACTIVE: TripListItem[];
+  COMPLETED: TripListItem[];
+  CANCELLED: TripListItem[];
 }

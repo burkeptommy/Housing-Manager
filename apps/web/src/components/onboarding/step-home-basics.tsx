@@ -291,7 +291,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
               <input
                 type="checkbox"
                 {...register(feature.name)}
-                className="w-4 h-4 mt-0.5 text-blue-600 rounded border-slate-300 dark:border-slate-600"
+                className="w-4 h-4 mt-0.5 text-emerald-600 rounded border-slate-300 dark:border-slate-600"
               />
               <div>
                 <span className="text-sm font-medium text-slate-700 dark:text-slate-300">

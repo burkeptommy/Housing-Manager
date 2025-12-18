@@ -144,7 +144,7 @@ function MessageBubble({
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isOwn && (
         <div className="flex-shrink-0 mr-3">
-          <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center">
+          <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center">
             <span className="text-sm font-medium text-white">
               {senderName.charAt(0).toUpperCase()}
             </span>

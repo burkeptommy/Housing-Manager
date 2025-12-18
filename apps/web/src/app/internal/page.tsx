@@ -62,7 +62,7 @@ export default function InternalDashboardPage() {
       label: 'Open Conversations',
       value: stats?.openConversations ?? 0,
       href: '/internal/conversations',
-      color: 'bg-blue-500',
+      color: 'bg-emerald-500',
       badge: stats?.unassignedConversations ? `${stats.unassignedConversations} unassigned` : undefined,
       icon: (
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,7 +189,7 @@ export default function InternalDashboardPage() {
                   <span
                     className={`inline-block mt-1 text-xs px-2 py-0.5 rounded-full ${
                       apt.status === 'SCHEDULED'
-                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400'
+                        ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400'
                         : apt.status === 'IN_PROGRESS'
                         ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400'
                         : 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
@@ -210,8 +210,8 @@ export default function InternalDashboardPage() {
           href="/internal/conversations?status=unassigned"
           className="bg-white dark:bg-slate-800 rounded-xl p-5 border border-slate-200 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-indigo-600 transition-colors flex items-center gap-4"
         >
-          <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
-            <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="bg-emerald-100 dark:bg-emerald-900/30 p-3 rounded-lg">
+            <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
             </svg>
           </div>

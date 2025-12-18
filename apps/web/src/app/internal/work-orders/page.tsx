@@ -64,7 +64,7 @@ export default function InternalWorkOrdersPage() {
     const styles: Record<string, string> = {
       DRAFT: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300',
       REQUESTED: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
-      SCHEDULED: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+      SCHEDULED: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
       IN_PROGRESS: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400',
       COMPLETED: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
       CANCELLED: 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400',

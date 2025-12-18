@@ -29,6 +29,11 @@ import { UploadsModule } from './uploads';
 import { FinancialsModule } from './financials';
 import { SettlementModule } from './settlement';
 import { VendorPortalModule } from './vendor-portal';
+import { ConciergeModule } from './concierge';
+import { SocialModule } from './social/social.module';
+import { ProjectPlannerModule } from './project-planner/project-planner.module';
+import { FamilyModule } from './family/family.module';
+import { TravelModule } from './travel/travel.module';
 
 @Module({
   imports: [
@@ -62,6 +67,11 @@ import { VendorPortalModule } from './vendor-portal';
     FinancialsModule,
     SettlementModule,
     VendorPortalModule,
+    ConciergeModule,
+    SocialModule,
+    ProjectPlannerModule,
+    FamilyModule,
+    TravelModule,
   ],
   controllers: [AppController],
   providers: [AppService],

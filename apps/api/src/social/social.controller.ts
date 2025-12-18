@@ -236,22 +236,56 @@ export class SocialController {
 
   @Get('users/:id/profile')
   async getUserProfile(@Request() req, @Param('id') userId: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        id: true,
-        displayName: true,
-        avatarUrl: true,
-        bio: true,
-        isPublicProfile: true,
-        influencerBadges: true,
-        createdAt: true,
-      },
-    });
+    try {
+      const user = await this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          displayName: true,
+          avatarUrl: true,
+          bio: true,
+          isPublicProfile: true,
+          influencerBadges: true,
+          createdAt: true,
+        },
+      });
 
-    // If user not found, return a default profile structure instead of throwing 404
-    // This allows the profile page to display gracefully for new users
-    if (!user) {
+      // If user not found, return a default profile structure instead of throwing 404
+      // This allows the profile page to display gracefully for new users
+      if (!user) {
+        return {
+          id: userId,
+          displayName: 'User',
+          avatarUrl: null,
+          bio: null,
+          isPublicProfile: true,
+          influencerBadges: [],
+          createdAt: new Date(),
+          followersCount: 0,
+          followingCount: 0,
+          areFriends: false,
+          isFollowing: false,
+          postsCount: 0,
+          totalInvestment: 0,
+        };
+      }
+
+      const [followCounts, areFriends, isFollowing, portfolioStats] = await Promise.all([
+        this.followService.getCounts(userId).catch(() => ({ followersCount: 0, followingCount: 0 })),
+        this.friendshipService.areFriends(req.user.uid, userId).catch(() => false),
+        this.followService.isFollowing(req.user.uid, userId).catch(() => false),
+        this.projectPostService.getPortfolioStats(userId).catch(() => ({ postsCount: 0, totalInvestment: 0 })),
+      ]);
+
+      return {
+        ...user,
+        ...followCounts,
+        areFriends,
+        isFollowing,
+        ...portfolioStats,
+      };
+    } catch (error) {
+      // Return default profile on any error
       return {
         id: userId,
         displayName: 'User',
@@ -268,21 +302,6 @@ export class SocialController {
         totalInvestment: 0,
       };
     }
-
-    const [followCounts, areFriends, isFollowing, portfolioStats] = await Promise.all([
-      this.followService.getCounts(userId),
-      this.friendshipService.areFriends(req.user.uid, userId),
-      this.followService.isFollowing(req.user.uid, userId),
-      this.projectPostService.getPortfolioStats(userId),
-    ]);
-
-    return {
-      ...user,
-      ...followCounts,
-      areFriends,
-      isFollowing,
-      ...portfolioStats,
-    };
   }
 
   @Get('users/:id/portfolio')
@@ -291,7 +310,12 @@ export class SocialController {
     @Param('id') userId: string,
     @Query() query: PaginationQueryDto,
   ) {
-    return this.projectPostService.getPostsByUser(userId, req.user.uid, query.limit, query.cursor);
+    try {
+      return await this.projectPostService.getPostsByUser(userId, req.user.uid, query.limit, query.cursor);
+    } catch (error) {
+      // Return empty portfolio on error
+      return { posts: [], nextCursor: null };
+    }
   }
 
   @Patch('profile')
@@ -315,15 +339,25 @@ export class SocialController {
 
   @Get('profile/stats')
   async getProfileStats(@Request() req) {
-    const [followCounts, portfolioStats] = await Promise.all([
-      this.followService.getCounts(req.user.uid),
-      this.projectPostService.getPortfolioStats(req.user.uid),
-    ]);
+    try {
+      const [followCounts, portfolioStats] = await Promise.all([
+        this.followService.getCounts(req.user.uid).catch(() => ({ followersCount: 0, followingCount: 0 })),
+        this.projectPostService.getPortfolioStats(req.user.uid).catch(() => ({ postsCount: 0, totalInvestment: 0 })),
+      ]);
 
-    return {
-      ...followCounts,
-      ...portfolioStats,
-    };
+      return {
+        ...followCounts,
+        ...portfolioStats,
+      };
+    } catch (error) {
+      // Return default stats on error
+      return {
+        followersCount: 0,
+        followingCount: 0,
+        postsCount: 0,
+        totalInvestment: 0,
+      };
+    }
   }
 
   // ==================== Social Vendor Endpoints ====================

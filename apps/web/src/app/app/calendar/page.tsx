@@ -133,7 +133,7 @@ export default function CalendarPage() {
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
       const dayEvents = getEventsForDate(day);
-      const todayClass = isToday(day) ? 'ring-2 ring-blue-500 ring-inset' : '';
+      const todayClass = isToday(day) ? 'ring-2 ring-emerald-500 ring-inset' : '';
 
       days.push(
         <div
@@ -141,7 +141,7 @@ export default function CalendarPage() {
           onClick={() => setSelectedDate(new Date(currentDate.getFullYear(), currentDate.getMonth(), day))}
           className={`h-24 md:h-32 p-1 border-t border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todayClass}`}
         >
-          <div className={`text-sm font-medium mb-1 ${isToday(day) ? 'text-blue-600' : 'text-slate-700 dark:text-slate-300'}`}>
+          <div className={`text-sm font-medium mb-1 ${isToday(day) ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>
             {day}
           </div>
           <div className="space-y-1 overflow-hidden">
@@ -151,7 +151,7 @@ export default function CalendarPage() {
                 className={`text-xs px-1 py-0.5 rounded truncate ${
                   event.type === 'maintenance'
                     ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                    : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400'
                 }`}
               >
                 {event.title}
@@ -176,7 +176,7 @@ export default function CalendarPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
       </div>
     );
   }
@@ -220,7 +220,7 @@ export default function CalendarPage() {
               </button>
               <button
                 onClick={() => setCurrentDate(new Date())}
-                className="px-3 py-1 text-sm font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-lg"
+                className="px-3 py-1 text-sm font-medium text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg"
               >
                 Today
               </button>
@@ -263,7 +263,7 @@ export default function CalendarPage() {
               <span className="text-sm text-slate-600 dark:text-slate-400">Maintenance</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-blue-500"></div>
+              <div className="w-3 h-3 rounded bg-emerald-500"></div>
               <span className="text-sm text-slate-600 dark:text-slate-400">Bill Due</span>
             </div>
           </div>
@@ -298,7 +298,7 @@ export default function CalendarPage() {
                       className={`flex-shrink-0 text-xs px-2 py-1 rounded-full ${
                         event.type === 'maintenance'
                           ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                          : 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400'
                       }`}
                     >
                       {event.type === 'maintenance' ? 'Task' : 'Bill'}
@@ -359,7 +359,7 @@ export default function CalendarPage() {
                       className={`p-3 rounded-lg ${
                         event.type === 'maintenance'
                           ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800'
-                          : 'bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800'
+                          : 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
                       }`}
                     >
                       <div className="flex items-center justify-between">
@@ -368,7 +368,7 @@ export default function CalendarPage() {
                           className={`text-xs px-2 py-1 rounded-full ${
                             event.type === 'maintenance'
                               ? 'bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400'
-                              : 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-400'
+                              : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-400'
                           }`}
                         >
                           {event.type === 'maintenance' ? 'Maintenance' : 'Bill Due'}

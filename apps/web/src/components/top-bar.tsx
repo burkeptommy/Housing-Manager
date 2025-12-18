@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { MobileSidebar } from './mobile-sidebar';
 
 export function TopBar() {
   const { user, households, currentHousehold, selectHousehold, logout } = useAuth();
@@ -28,11 +29,7 @@ export function TopBar() {
     <header className="sticky top-0 z-40 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
         {/* Mobile menu button */}
-        <button className="lg:hidden p-2 -ml-2 text-slate-500 hover:text-slate-600 dark:text-slate-400 dark:hover:text-slate-300">
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        </button>
+        <MobileSidebar />
 
         {/* Household selector */}
         <div ref={householdRef} className="relative">
@@ -66,7 +63,7 @@ export function TopBar() {
                       }}
                       className={`w-full flex items-center gap-3 px-4 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 ${
                         currentHousehold?.id === household.id
-                          ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20'
+                          ? 'text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20'
                           : 'text-slate-700 dark:text-slate-300'
                       }`}
                     >
@@ -77,7 +74,7 @@ export function TopBar() {
                       </div>
                       <span className="truncate">{household.name}</span>
                       {currentHousehold?.id === household.id && (
-                        <svg className="w-4 h-4 ml-auto text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 ml-auto text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                       )}
@@ -90,7 +87,7 @@ export function TopBar() {
                   No households yet
                 </div>
               )}
-              <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-blue-600 dark:text-blue-400 hover:bg-slate-100 dark:hover:bg-slate-700">
+              <button className="w-full flex items-center gap-3 px-4 py-2 text-sm text-emerald-700 dark:text-emerald-400 hover:bg-slate-100 dark:hover:bg-slate-700">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
@@ -116,7 +113,7 @@ export function TopBar() {
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
               className="flex items-center gap-2 p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
             >
-              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-medium">
+              <div className="w-8 h-8 rounded-full bg-emerald-700 flex items-center justify-center text-white text-sm font-medium">
                 {user?.firstName?.[0]}{user?.lastName?.[0]}
               </div>
             </button>

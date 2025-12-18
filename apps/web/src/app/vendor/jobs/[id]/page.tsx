@@ -43,12 +43,12 @@ const mockJobDetail: VendorJobDetail = {
 
 const STATUS_COLORS: Record<VendorWorkOrderStatus, string> = {
   DRAFT: 'bg-slate-100 text-slate-600',
-  REQUESTED: 'bg-blue-100 text-blue-700',
+  REQUESTED: 'bg-emerald-100 text-emerald-700',
   SCHEDULED: 'bg-purple-100 text-purple-700',
   OPEN: 'bg-green-100 text-green-700',
   ASSIGNED: 'bg-yellow-100 text-yellow-700',
   IN_PROGRESS: 'bg-orange-100 text-orange-700',
-  COMPLETED: 'bg-blue-100 text-blue-700',
+  COMPLETED: 'bg-emerald-100 text-emerald-700',
   VERIFIED: 'bg-emerald-100 text-emerald-700',
   CANCELLED: 'bg-red-100 text-red-700',
 };
@@ -364,7 +364,7 @@ export default function JobDetailPage() {
           </div>
           <button
             onClick={openInMaps}
-            className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
+            className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium flex items-center justify-center gap-2 transition-colors"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" />

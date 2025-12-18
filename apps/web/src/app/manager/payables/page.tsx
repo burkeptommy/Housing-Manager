@@ -233,8 +233,8 @@ export default function PayablesPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="card">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
             </div>
@@ -461,12 +461,12 @@ export default function PayablesPage() {
                   {executionResult.summary && (
                     <div className="grid grid-cols-2 gap-4">
                       {executionResult.summary.checksQueued > 0 && (
-                        <div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
-                          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
+                          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                             {executionResult.summary.checksQueued}
                           </p>
-                          <p className="text-sm text-blue-700 dark:text-blue-300">Checks Queued</p>
-                          <p className="text-sm font-medium text-blue-800 dark:text-blue-200 mt-1">
+                          <p className="text-sm text-emerald-700 dark:text-emerald-300">Checks Queued</p>
+                          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200 mt-1">
                             {formatCurrency(executionResult.summary.totalCheckAmount)}
                           </p>
                         </div>
@@ -542,7 +542,7 @@ export default function PayablesPage() {
                     <div className="grid grid-cols-2 gap-4">
                       {batchPreview.checkCount > 0 && (
                         <div className="flex items-center gap-2">
-                          <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                           </svg>
                           <span className="text-sm text-slate-600 dark:text-slate-300">

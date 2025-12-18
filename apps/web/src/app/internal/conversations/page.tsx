@@ -73,7 +73,7 @@ export default function InternalConversationsPage() {
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
-      OPEN: 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400',
+      OPEN: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400',
       PENDING: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400',
       CLOSED: 'bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-300',
     };

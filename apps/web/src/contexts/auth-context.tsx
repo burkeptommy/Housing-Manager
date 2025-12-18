@@ -201,11 +201,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setHouseholds(householdList);
           await loadCurrentHousehold(householdList);
         } else {
-          // API call failed - clear state
+          // API call failed - Firebase user exists but backend user doesn't
+          // Sign out of Firebase to clear the stale session
+          console.warn('Firebase user exists but backend user not found - signing out');
+          await firebaseSignOut();
           setUser(null);
           setHouseholdInfo(null);
           setHouseholds([]);
           setCurrentHousehold(null);
+          clearTokens();
         }
       } else {
         // User is signed out

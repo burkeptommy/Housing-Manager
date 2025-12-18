@@ -52,12 +52,12 @@ const mockSchedule: VendorScheduleItem[] = [
 
 const STATUS_COLORS: Record<VendorWorkOrderStatus, string> = {
   DRAFT: 'bg-slate-100 text-slate-600 border-slate-300',
-  REQUESTED: 'bg-blue-100 text-blue-700 border-blue-300',
+  REQUESTED: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   SCHEDULED: 'bg-purple-100 text-purple-700 border-purple-300',
   OPEN: 'bg-green-100 text-green-700 border-green-300',
   ASSIGNED: 'bg-yellow-100 text-yellow-700 border-yellow-300',
   IN_PROGRESS: 'bg-orange-100 text-orange-700 border-orange-300',
-  COMPLETED: 'bg-blue-100 text-blue-700 border-blue-300',
+  COMPLETED: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   VERIFIED: 'bg-emerald-100 text-emerald-700 border-emerald-300',
   CANCELLED: 'bg-red-100 text-red-700 border-red-300',
 };
@@ -211,8 +211,8 @@ export default function SchedulePage() {
         </div>
         <div className="card">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
             </div>
