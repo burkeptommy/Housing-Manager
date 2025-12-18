@@ -62,7 +62,8 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 export default function UnifiedConciergePage() {
-  const { selectedHouseholdId, user, householdInfo } = useAuth();
+  const { user, householdInfo } = useAuth();
+  const householdId = householdInfo?.id;
   const [activeTab, setActiveTab] = useState<MainTab>('concierge');
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<ConversationDetail | null>(null);
@@ -135,7 +136,7 @@ export default function UnifiedConciergePage() {
   }, [conversations, activeTab]);
 
   const loadConversations = useCallback(async () => {
-    if (!selectedHouseholdId) {
+    if (!householdId) {
       setIsLoading(false);
       return;
     }
@@ -151,7 +152,7 @@ export default function UnifiedConciergePage() {
     } finally {
       setIsLoading(false);
     }
-  }, [selectedHouseholdId]);
+  }, [householdId]);
 
   const loadConversationDetail = useCallback(async (conversationId: string) => {
     try {
@@ -297,10 +298,10 @@ export default function UnifiedConciergePage() {
 
   const filteredConversations = getFilteredConversations();
 
-  if (!selectedHouseholdId) {
+  if (!householdId) {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-slate-600 dark:text-slate-400">Please select a household to view messages.</p>
+        <p className="text-slate-600 dark:text-slate-400">Please complete onboarding to access messages.</p>
       </div>
     );
   }
