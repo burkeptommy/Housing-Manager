@@ -26,6 +26,9 @@ import { MaintenanceTasksModule } from './maintenance-tasks';
 import { RemindersModule } from './reminders';
 import { InvoicesModule } from './invoices';
 import { UploadsModule } from './uploads';
+import { FinancialsModule } from './financials';
+import { SettlementModule } from './settlement';
+import { VendorPortalModule } from './vendor-portal';
 
 @Module({
   imports: [
@@ -56,6 +59,9 @@ import { UploadsModule } from './uploads';
     WorkOrdersModule,
     InternalModule,
     UploadsModule,
+    FinancialsModule,
+    SettlementModule,
+    VendorPortalModule,
   ],
   controllers: [AppController],
   providers: [AppService],

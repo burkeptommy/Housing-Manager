@@ -1,15 +1,30 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const router = useRouter();
+  const { login, isLoading, isAuthenticated, user, needsOnboarding } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect when user becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
+        router.push('/manager');
+      } else if (needsOnboarding) {
+        router.push('/onboarding');
+      } else {
+        router.push('/app');
+      }
+    }
+  }, [isAuthenticated, user, needsOnboarding, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -18,17 +33,18 @@ export default function LoginPage() {
 
     try {
       await login(email, password);
+      // Redirect is handled by the useEffect above when auth state updates
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
         : 'Login failed. Please try again.';
       setError(message);
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
+  // Only show loading spinner during initial auth check, not during login submission
+  if (isLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

@@ -59,6 +59,18 @@ function BillingIcon({ focused }: { focused: boolean }) {
   );
 }
 
+function WalletIcon({ focused }: { focused: boolean }) {
+  return (
+    <View style={styles.iconContainer}>
+      <View style={[styles.walletIcon, focused && styles.iconActive]}>
+        <View style={styles.walletBody} />
+        <View style={styles.walletFlap} />
+        <View style={styles.walletCoin} />
+      </View>
+    </View>
+  );
+}
+
 export default function TabsLayout() {
   return (
     <Tabs
@@ -113,6 +125,13 @@ export default function TabsLayout() {
         options={{
           title: 'Billing',
           tabBarIcon: ({ focused }) => <BillingIcon focused={focused} />,
+        }}
+      />
+      <Tabs.Screen
+        name="wallet"
+        options={{
+          title: 'Wallet',
+          tabBarIcon: ({ focused }) => <WalletIcon focused={focused} />,
         }}
       />
       <Tabs.Screen
@@ -238,6 +257,38 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: colors.white,
     borderRadius: 1,
+  },
+  // Wallet icon styles
+  walletIcon: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  walletBody: {
+    width: 16,
+    height: 12,
+    backgroundColor: colors.slate[400],
+    borderRadius: 2,
+    marginTop: 4,
+  },
+  walletFlap: {
+    position: 'absolute',
+    top: 2,
+    width: 18,
+    height: 6,
+    backgroundColor: colors.slate[400],
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  walletCoin: {
+    position: 'absolute',
+    right: 0,
+    top: 8,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.white,
   },
   iconActive: {},
 });

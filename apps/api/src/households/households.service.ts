@@ -1,7 +1,8 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { HouseholdRole } from '@prisma/client';
+import { HouseholdRole, UserRole } from '@prisma/client';
 
 import { PrismaService } from '../prisma';
+import { UserContext, buildHouseholdAccessFilter } from '../common';
 
 import {
   CreateHouseholdDto,
@@ -63,6 +64,83 @@ export class HouseholdsService {
         ? this.mapHomeProfileSummary(membership.household.homeProfile)
         : null,
     }));
+  }
+
+  /**
+   * Find all households accessible to the user based on their role:
+   * - ADMIN: All households
+   * - MANAGER: Only households they manage
+   * - HOMEOWNER: Households they own or are members of
+   */
+  async findAllByUserContext(userContext: UserContext): Promise<HouseholdListItemDto[]> {
+    const accessFilter = buildHouseholdAccessFilter(userContext);
+
+    // For MANAGER role, query households they manage directly
+    if (userContext.role === UserRole.MANAGER) {
+      const households = await this.prisma.household.findMany({
+        where: accessFilter,
+        include: {
+          homeProfile: true,
+          owner: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return households.map((household) => ({
+        ...this.mapToDto(household),
+        userRole: HouseholdRole.ADMIN, // Managers have admin-like access to their assigned households
+        homeProfile: household.homeProfile
+          ? this.mapHomeProfileSummary(household.homeProfile)
+          : null,
+      }));
+    }
+
+    // For ADMIN role, return all households
+    if (userContext.role === UserRole.ADMIN) {
+      const households = await this.prisma.household.findMany({
+        include: {
+          homeProfile: true,
+          owner: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+            },
+          },
+          manager: {
+            select: {
+              id: true,
+              email: true,
+              firstName: true,
+              lastName: true,
+              displayName: true,
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      return households.map((household) => ({
+        ...this.mapToDto(household),
+        userRole: HouseholdRole.OWNER, // Admin has full access
+        homeProfile: household.homeProfile
+          ? this.mapHomeProfileSummary(household.homeProfile)
+          : null,
+      }));
+    }
+
+    // For HOMEOWNER, use the original membership-based query
+    return this.findAllForUser(userContext.userId);
   }
 
   async findById(id: string): Promise<HouseholdDetailDto> {
@@ -131,6 +209,68 @@ export class HouseholdsService {
     });
 
     return this.mapToDto(household);
+  }
+
+  /**
+   * Update household using user context for permission checking
+   * - ADMIN: Can update any household
+   * - MANAGER: Can update households they manage
+   * - HOMEOWNER: Can update households they own
+   */
+  async updateByContext(
+    id: string,
+    userContext: UserContext,
+    dto: UpdateHouseholdDto,
+  ): Promise<HouseholdDto> {
+    const household = await this.prisma.household.findUnique({
+      where: { id },
+    });
+
+    if (!household) {
+      throw new NotFoundException(`Household with ID ${id} not found`);
+    }
+
+    // ADMIN can update any household
+    if (userContext.role === UserRole.ADMIN) {
+      const updated = await this.prisma.household.update({
+        where: { id },
+        data: {
+          ...(dto.name && { name: dto.name }),
+          ...(dto.description !== undefined && { description: dto.description }),
+        },
+      });
+      return this.mapToDto(updated);
+    }
+
+    // MANAGER can update households they manage
+    if (userContext.role === UserRole.MANAGER) {
+      if (household.managerId !== userContext.userId) {
+        throw new ForbiddenException('You are not the assigned manager of this household');
+      }
+      const updated = await this.prisma.household.update({
+        where: { id },
+        data: {
+          ...(dto.name && { name: dto.name }),
+          ...(dto.description !== undefined && { description: dto.description }),
+        },
+      });
+      return this.mapToDto(updated);
+    }
+
+    // HOMEOWNER can only update if they're the owner
+    if (household.ownerId !== userContext.userId) {
+      throw new ForbiddenException('Only the household owner can update settings');
+    }
+
+    const updated = await this.prisma.household.update({
+      where: { id },
+      data: {
+        ...(dto.name && { name: dto.name }),
+        ...(dto.description !== undefined && { description: dto.description }),
+      },
+    });
+
+    return this.mapToDto(updated);
   }
 
   async delete(id: string, userId: string): Promise<void> {

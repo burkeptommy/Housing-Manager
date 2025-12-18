@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { getApiClient } from '@/lib/api';
+import { getApiClient, getAccessToken } from '@/lib/api';
 import type { BillingSummary, HouseholdInvoice, HouseholdInvoiceListItem, BillAccount } from '@haven/core';
 
 const categoryLabels: Record<string, string> = {
@@ -30,7 +30,7 @@ const suggestedVendorCategories = [
 ];
 
 export default function BillingPage() {
-  const { currentHousehold } = useAuth();
+  const { currentHousehold, isAuthenticated } = useAuth();
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
   const [invoices, setInvoices] = useState<HouseholdInvoiceListItem[]>([]);
   const [billAccounts, setBillAccounts] = useState<BillAccount[]>([]);
@@ -42,7 +42,9 @@ export default function BillingPage() {
   const api = getApiClient();
 
   const loadData = useCallback(async () => {
-    if (!currentHousehold) {
+    // Don't fetch if not authenticated or no household or no token
+    const token = getAccessToken();
+    if (!currentHousehold || !isAuthenticated || !token) {
       setIsLoading(false);
       return;
     }
@@ -72,7 +74,7 @@ export default function BillingPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [api, currentHousehold]);
+  }, [api, currentHousehold, isAuthenticated]);
 
   useEffect(() => {
     loadData();

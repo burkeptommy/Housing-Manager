@@ -497,8 +497,8 @@ function ChatView({
 
 // Main Support Page
 export default function SupportPage() {
-  const { householdInfo } = useAuth();
-  const { conversations, isLoading, refetch } = useConversations();
+  const { householdInfo, isAuthenticated } = useAuth();
+  const { conversations, isLoading, refetch } = useConversations(undefined, isAuthenticated);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [showNewModal, setShowNewModal] = useState(false);
   const householdId = householdInfo?.id || '';

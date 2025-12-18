@@ -19,7 +19,15 @@ import {
 } from '@nestjs/swagger';
 
 import { FirebaseAuthGuard, CurrentUser, AuthPayload } from '../firebase';
-import { HouseholdMemberGuard } from '../common';
+import {
+  HouseholdMemberGuard,
+  HouseholdAccessGuard,
+  AllowOwner,
+  AllowManager,
+  HouseholdAccessParam,
+  CurrentUserContext,
+  UserContext,
+} from '../common';
 
 import { HouseholdsService } from './households.service';
 import {
@@ -48,14 +56,17 @@ export class HouseholdsController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List households for current user' })
+  @ApiOperation({ summary: 'List households accessible to current user based on role' })
   @ApiResponse({ status: 200, description: 'List of households', type: [HouseholdListItemDto] })
-  async findAll(@CurrentUser() user: AuthPayload): Promise<HouseholdListItemDto[]> {
-    return this.householdsService.findAllForUser(user.userId);
+  async findAll(@CurrentUserContext() userContext: UserContext): Promise<HouseholdListItemDto[]> {
+    return this.householdsService.findAllByUserContext(userContext);
   }
 
   @Get(':id')
-  @UseGuards(HouseholdMemberGuard)
+  @UseGuards(HouseholdAccessGuard)
+  @HouseholdAccessParam('id')
+  @AllowOwner()
+  @AllowManager()
   @ApiOperation({ summary: 'Get household details' })
   @ApiParam({ name: 'id', description: 'Household ID' })
   @ApiResponse({ status: 200, description: 'Household details', type: HouseholdDetailDto })
@@ -65,21 +76,26 @@ export class HouseholdsController {
   }
 
   @Patch(':id')
-  @UseGuards(HouseholdMemberGuard)
+  @UseGuards(HouseholdAccessGuard)
+  @HouseholdAccessParam('id')
+  @AllowOwner()
+  @AllowManager()
   @ApiOperation({ summary: 'Update household settings' })
   @ApiParam({ name: 'id', description: 'Household ID' })
   @ApiResponse({ status: 200, description: 'Household updated', type: HouseholdDto })
-  @ApiResponse({ status: 403, description: 'Only owners can update' })
+  @ApiResponse({ status: 403, description: 'Only owners or managers can update' })
   async update(
     @Param('id') id: string,
-    @CurrentUser() user: AuthPayload,
+    @CurrentUserContext() userContext: UserContext,
     @Body() dto: UpdateHouseholdDto,
   ): Promise<HouseholdDto> {
-    return this.householdsService.update(id, user.userId, dto);
+    return this.householdsService.updateByContext(id, userContext, dto);
   }
 
   @Delete(':id')
-  @UseGuards(HouseholdMemberGuard)
+  @UseGuards(HouseholdAccessGuard)
+  @HouseholdAccessParam('id')
+  @AllowOwner()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a household' })
   @ApiParam({ name: 'id', description: 'Household ID' })

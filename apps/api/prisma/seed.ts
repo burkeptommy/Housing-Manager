@@ -7,6 +7,9 @@ import {
   PaymentResponsibility,
   MaintenanceTaskStatus,
   TaskPriority,
+  TransactionPayoutMethod,
+  TransactionStatus,
+  WorkOrderStatus,
 } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 
@@ -208,42 +211,42 @@ const demoVendors = [
     category: VendorCategory.MORTGAGE,
     phone: '1-800-555-0100',
     email: 'support@firstnationalmortgage.example.com',
-    website: 'https://firstnationalmortgage.example.com',
+    websiteUrl: 'https://firstnationalmortgage.example.com',
   },
   {
     displayName: 'Regional Electric Co.',
     category: VendorCategory.ELECTRIC,
     phone: '1-800-555-0101',
     email: 'service@regionalelectric.example.com',
-    website: 'https://regionalelectric.example.com',
+    websiteUrl: 'https://regionalelectric.example.com',
   },
   {
     displayName: 'City Gas & Heating',
     category: VendorCategory.GAS,
     phone: '1-800-555-0102',
     email: 'support@citygas.example.com',
-    website: 'https://citygas.example.com',
+    websiteUrl: 'https://citygas.example.com',
   },
   {
     displayName: 'Municipal Water Authority',
     category: VendorCategory.WATER_SEWER,
     phone: '1-800-555-0103',
     email: 'billing@waterauthority.example.gov',
-    website: 'https://waterauthority.example.gov',
+    websiteUrl: 'https://waterauthority.example.gov',
   },
   {
     displayName: 'Waste Management Services',
     category: VendorCategory.TRASH,
     phone: '1-800-555-0104',
     email: 'service@wastemanagement.example.com',
-    website: 'https://wastemanagement.example.com',
+    websiteUrl: 'https://wastemanagement.example.com',
   },
   {
     displayName: 'FiberNet Internet',
     category: VendorCategory.INTERNET,
     phone: '1-800-555-0105',
     email: 'support@fibernet.example.com',
-    website: 'https://fibernet.example.com',
+    websiteUrl: 'https://fibernet.example.com',
   },
   // Service vendors
   {
@@ -251,49 +254,49 @@ const demoVendors = [
     category: VendorCategory.LAWN_CARE,
     phone: '555-0110',
     email: 'service@greenthumb.example.com',
-    website: 'https://greenthumb.example.com',
+    websiteUrl: 'https://greenthumb.example.com',
   },
   {
     displayName: 'Bug-Free Pest Control',
     category: VendorCategory.PEST_CONTROL,
     phone: '555-0111',
     email: 'schedule@bugfree.example.com',
-    website: 'https://bugfree.example.com',
+    websiteUrl: 'https://bugfree.example.com',
   },
   {
     displayName: 'Sparkle Clean Services',
     category: VendorCategory.CLEANING,
     phone: '555-0112',
     email: 'book@sparkleclean.example.com',
-    website: 'https://sparkleclean.example.com',
+    websiteUrl: 'https://sparkleclean.example.com',
   },
   {
     displayName: 'Snow Away Removal',
     category: VendorCategory.SNOW_REMOVAL,
     phone: '555-0113',
     email: 'service@snowaway.example.com',
-    website: 'https://snowaway.example.com',
+    websiteUrl: 'https://snowaway.example.com',
   },
   {
     displayName: 'Chimney Masters',
     category: VendorCategory.CHIMNEY_SWEEP,
     phone: '555-0114',
     email: 'schedule@chimneymasters.example.com',
-    website: 'https://chimneymasters.example.com',
+    websiteUrl: 'https://chimneymasters.example.com',
   },
   {
     displayName: 'Reliable Septic Services',
     category: VendorCategory.SEPTIC_SERVICE,
     phone: '555-0115',
     email: 'service@reliableseptic.example.com',
-    website: 'https://reliableseptic.example.com',
+    websiteUrl: 'https://reliableseptic.example.com',
   },
   {
     displayName: 'Crystal Clear Pool Service',
     category: VendorCategory.POOL_SERVICE,
     phone: '555-0116',
     email: 'schedule@crystalclearpool.example.com',
-    website: 'https://crystalclearpool.example.com',
+    websiteUrl: 'https://crystalclearpool.example.com',
   },
 ];
 
@@ -312,7 +315,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 2450.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 1), // 1st of month
-      autopayEnabled: true,
+      vendorAutopayEnabled: true,
       portalUrl: 'https://firstnationalmortgage.example.com/portal',
       supportPhone: '1-800-555-0100',
       notes: '30-year fixed @ 6.25%',
@@ -327,7 +330,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 185.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 15),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       portalUrl: 'https://regionalelectric.example.com/mybill',
       supportPhone: '1-800-555-0101',
     },
@@ -341,7 +344,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 95.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 20),
-      autopayEnabled: true,
+      vendorAutopayEnabled: true,
       portalUrl: 'https://citygas.example.com/account',
       supportPhone: '1-800-555-0102',
     },
@@ -355,7 +358,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 180.00,
       nextDueDate: new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 2, 1),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       portalUrl: 'https://waterauthority.example.gov/pay',
       supportPhone: '1-800-555-0103',
     },
@@ -369,7 +372,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 95.00,
       nextDueDate: new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 2, 15),
-      autopayEnabled: true,
+      vendorAutopayEnabled: true,
       portalUrl: 'https://wastemanagement.example.com/mybill',
       supportPhone: '1-800-555-0104',
     },
@@ -383,7 +386,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 79.99,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 5),
-      autopayEnabled: true,
+      vendorAutopayEnabled: true,
       portalUrl: 'https://fibernet.example.com/account',
       supportPhone: '1-800-555-0105',
       notes: '500 Mbps plan',
@@ -397,7 +400,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.HAVEN_PAYS_ON_BEHALF,
       typicalAmount: 175.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 28),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       notes: 'Weekly mowing, April-October. Includes edging and blowing.',
     },
     {
@@ -409,7 +412,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 125.00,
       nextDueDate: new Date(today.getFullYear(), Math.floor(today.getMonth() / 3) * 3 + 2, 10),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       notes: 'Quarterly treatment - interior/exterior',
     },
     {
@@ -421,7 +424,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.HAVEN_PAYS_ON_BEHALF,
       typicalAmount: 180.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), today.getDate() + 7),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       notes: 'Bi-weekly deep cleaning',
     },
     {
@@ -433,7 +436,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.OWNER_PAYS_DIRECT,
       typicalAmount: 150.00,
       nextDueDate: new Date(today.getFullYear(), 11, 1), // December
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       notes: 'November-March, per occurrence',
     },
     {
@@ -445,7 +448,7 @@ function getBillAccounts(householdId: string, vendorMap: Map<VendorCategory, str
       paymentResponsibility: PaymentResponsibility.HAVEN_PAYS_ON_BEHALF,
       typicalAmount: 225.00,
       nextDueDate: new Date(today.getFullYear(), today.getMonth(), 25),
-      autopayEnabled: false,
+      vendorAutopayEnabled: false,
       notes: 'Weekly service May-September',
     },
   ];
@@ -701,75 +704,87 @@ async function main() {
   console.log(`✅ Created ${categories.length} service categories`);
 
   // Hash passwords
-  const demoPassword = await bcrypt.hash('Demo123!', 12);
   const adminPassword = await bcrypt.hash('Admin123!', 12);
   const managerPassword = await bcrypt.hash('Manager123!', 12);
+  const homeownerPassword = await bcrypt.hash('Bob123!', 12);
 
-  // Create admin user
+  // Create Admin User (Platform Owner - You)
   const adminUser = await prisma.user.upsert({
     where: { email: 'admin@haven.app' },
     update: {},
     create: {
       email: 'admin@haven.app',
       passwordHash: adminPassword,
-      firstName: 'Admin',
-      lastName: 'User',
+      firstName: 'Platform',
+      lastName: 'Admin',
+      displayName: 'Platform Admin',
       role: UserRole.ADMIN,
       emailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
-  console.log(`✅ Created admin user: ${adminUser.email}`);
+  console.log(`✅ Created admin user: ${adminUser.email} (Platform Owner)`);
 
-  // Create manager user
-  const managerUser = await prisma.user.upsert({
-    where: { email: 'manager@haven.app' },
+  // Create Manager Steve (Haven Staff Member - Home Manager)
+  const managerSteve = await prisma.user.upsert({
+    where: { email: 'steve@haven.app' },
     update: {},
     create: {
-      email: 'manager@haven.app',
+      email: 'steve@haven.app',
       passwordHash: managerPassword,
-      firstName: 'Property',
+      firstName: 'Steve',
       lastName: 'Manager',
+      displayName: 'Manager Steve',
       role: UserRole.MANAGER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
-  console.log(`✅ Created manager user: ${managerUser.email}`);
+  console.log(`✅ Created staff user: ${managerSteve.email} (Home Manager)`);
 
-  // Create demo user with Stripe customer ID
-  const demoUser = await prisma.user.upsert({
-    where: { email: 'demo@haven.app' },
-    update: {
-      stripeCustomerId: 'cus_demo_test_123456',
-    },
+  // Create Homeowner Bob (Client)
+  const homeownerBob = await prisma.user.upsert({
+    where: { email: 'bob@example.com' },
+    update: {},
     create: {
-      email: 'demo@haven.app',
-      passwordHash: demoPassword,
-      firstName: 'Sarah',
-      lastName: 'Johnson',
+      email: 'bob@example.com',
+      passwordHash: homeownerPassword,
+      firstName: 'Bob',
+      lastName: 'Smith',
+      displayName: 'Bob Smith',
       role: UserRole.HOMEOWNER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
-      stripeCustomerId: 'cus_demo_test_123456',
     },
   });
-  console.log(`✅ Created demo user: ${demoUser.email}`);
+  console.log(`✅ Created homeowner user: ${homeownerBob.email} (Client)`);
 
-  // Create demo household with comprehensive home profile
+  // Keep the original demo user for backward compatibility
+  const demoUser = homeownerBob; // Alias for existing code
+
+  // Create Bob's Villa - household with Manager Steve assigned
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
-    update: {},
+    update: {
+      managerId: managerSteve.id, // Assign Manager Steve to this household
+    },
     create: {
       id: 'demo-household-id',
-      name: 'The Johnson Residence',
-      description: 'A beautiful single-family home in a quiet neighborhood',
-      ownerId: demoUser.id,
+      name: "Bob's Villa",
+      description: 'A beautiful single-family home managed by Haven',
+      ownerId: homeownerBob.id,
+      managerId: managerSteve.id, // Manager Steve is assigned to this household
       stripeCustomerId: 'cus_household_demo_123',
-      consolidatedBillingDay: 1,
+      billingCycleDay: 1,
+      billingSettings: {
+        autoPayEnabled: true,
+        autoPayLimit: 500, // Max auto-pay amount without approval
+        preferredPaymentDay: 1,
+        notifyBeforeDue: 3, // Days before due date to notify
+      },
       members: {
         create: {
-          userId: demoUser.id,
+          userId: homeownerBob.id,
           role: 'OWNER',
           status: 'ACTIVE',
           joinedAt: new Date(),
@@ -832,19 +847,25 @@ async function main() {
   const vendorMap = new Map<VendorCategory, string>();
 
   for (const vendorData of demoVendors) {
-    const vendor = await prisma.vendor.upsert({
+    // Check if vendor exists first
+    const existingVendor = await prisma.vendor.findFirst({
       where: {
-        householdId_displayName: {
-          householdId: demoHousehold.id,
-          displayName: vendorData.displayName,
-        },
-      },
-      update: vendorData,
-      create: {
-        ...vendorData,
         householdId: demoHousehold.id,
+        displayName: vendorData.displayName,
       },
     });
+
+    const vendor = existingVendor
+      ? await prisma.vendor.update({
+          where: { id: existingVendor.id },
+          data: vendorData,
+        })
+      : await prisma.vendor.create({
+          data: {
+            ...vendorData,
+            householdId: demoHousehold.id,
+          },
+        });
     vendorMap.set(vendorData.category, vendor.id);
   }
   console.log(`✅ Created ${demoVendors.length} vendors`);
@@ -854,16 +875,24 @@ async function main() {
   const billAccountsData = getBillAccounts(demoHousehold.id, vendorMap);
 
   for (const billData of billAccountsData) {
-    await prisma.billAccount.upsert({
+    // Check if bill account exists first
+    const existingBill = await prisma.billAccount.findFirst({
       where: {
-        householdId_nickname: {
-          householdId: billData.householdId,
-          nickname: billData.nickname,
-        },
+        householdId: billData.householdId,
+        nickname: billData.nickname,
       },
-      update: billData,
-      create: billData,
     });
+
+    if (existingBill) {
+      await prisma.billAccount.update({
+        where: { id: existingBill.id },
+        data: billData,
+      });
+    } else {
+      await prisma.billAccount.create({
+        data: billData,
+      });
+    }
   }
   console.log(`✅ Created ${billAccountsData.length} bill accounts`);
 
@@ -899,19 +928,27 @@ async function main() {
   console.log(`✅ Created ${maintenanceTasks.length} maintenance tasks`);
 
   // Create a demo subscription
-  const subscription = await prisma.subscription.upsert({
+  const existingSubscription = await prisma.subscription.findFirst({
     where: { userId: demoUser.id },
-    update: {},
-    create: {
-      userId: demoUser.id,
-      tier: 'PREMIUM',
-      status: 'ACTIVE',
-      stripeSubscriptionId: 'sub_demo_test_123456',
-      currentPeriodStart: new Date(),
-      currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-    },
   });
+
+  const subscription = existingSubscription
+    ? existingSubscription
+    : await prisma.subscription.create({
+        data: {
+          userId: demoUser.id,
+          tier: 'PREMIUM',
+          status: 'ACTIVE',
+          stripeSubscriptionId: 'sub_demo_test_123456',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
   console.log(`✅ Created demo subscription: ${subscription.tier}`);
+
+  // Get the Plumbing and HVAC service categories for service requests
+  const plumbingCategory = categories.find((c) => c.name === 'Plumbing');
+  const hvacCategory = categories.find((c) => c.name === 'HVAC');
 
   // Create some sample service requests
   console.log('📝 Creating sample service requests...');
@@ -920,9 +957,9 @@ async function main() {
       {
         householdId: demoHousehold.id,
         createdById: demoUser.id,
+        serviceCategoryId: plumbingCategory?.id,
         title: 'Leaky faucet in master bathroom',
         description: 'The hot water faucet in the master bathroom has been dripping for about a week.',
-        category: 'Plumbing',
         status: 'COMPLETED',
         priority: 'MEDIUM',
         preferredDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
@@ -931,10 +968,10 @@ async function main() {
       {
         householdId: demoHousehold.id,
         createdById: demoUser.id,
+        serviceCategoryId: hvacCategory?.id,
         title: 'Annual HVAC inspection',
         description: 'Need to schedule annual HVAC maintenance before summer.',
-        category: 'HVAC',
-        status: 'SCHEDULED',
+        status: 'ASSIGNED', // Changed from SCHEDULED which doesn't exist
         priority: 'LOW',
         preferredDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
         scheduledDate: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000),
@@ -943,33 +980,570 @@ async function main() {
   });
   console.log('✅ Created sample service requests');
 
+  // ============================================================================
+  // FINANCIAL ENGINE - THE FLOAT
+  // ============================================================================
+
+  console.log('💰 Setting up Financial Engine...');
+
+  // Create Company Wallet (singleton)
+  const companyWallet = await prisma.companyWallet.upsert({
+    where: { id: 'company-wallet-singleton' },
+    update: {
+      balance: 25000, // $25,000 operating balance
+      outstandingFloat: 550, // Pool + Locksmith + Management Fee = $550
+      monthlyCollections: 0,
+      monthlyDisbursements: 450, // Pool + Locksmith already paid
+    },
+    create: {
+      id: 'company-wallet-singleton',
+      balance: 25000,
+      outstandingFloat: 550,
+      monthlyCollections: 0,
+      monthlyDisbursements: 450,
+    },
+  });
+  console.log(`✅ Created Company Wallet (Balance: $${companyWallet.balance})`);
+
+  // Create Client Bank Account for Bob's Villa
+  const clientBankAccount = await prisma.clientBankAccount.upsert({
+    where: { id: 'demo-bank-account' },
+    update: {},
+    create: {
+      id: 'demo-bank-account',
+      householdId: demoHousehold.id,
+      stripePaymentMethodId: 'pm_demo_bank_account',
+      stripeBankAccountId: 'ba_demo_bank_account',
+      bankName: 'Chase',
+      accountType: 'checking',
+      last4: '4242',
+      routingLast4: '1234',
+      isVerified: true,
+      verifiedAt: new Date(),
+      isDefault: true,
+      isActive: true,
+    },
+  });
+  console.log(`✅ Created Client Bank Account (${clientBankAccount.bankName} ****${clientBankAccount.last4})`);
+
+  // Find pool service vendor for transactions
+  const poolVendor = await prisma.vendor.findFirst({
+    where: { householdId: demoHousehold.id, category: VendorCategory.POOL_SERVICE },
+  });
+
+  // Create demo transactions
+  console.log('📊 Creating demo transactions...');
+  const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+  const today = new Date();
+
+  const demoTransactions = [
+    // Pool Cleaning - Paid yesterday
+    {
+      id: 'tx-pool-cleaning',
+      householdId: demoHousehold.id,
+      vendorId: poolVendor?.id,
+      managerId: managerSteve.id,
+      description: 'Pool Cleaning',
+      amount: 150,
+      payoutMethod: TransactionPayoutMethod.COMPANY_CARD,
+      status: TransactionStatus.PAID_TO_VENDOR,
+      isReimbursable: true,
+      paidAt: yesterday,
+      notes: 'Monthly pool maintenance service',
+    },
+    // Emergency Locksmith - Paid today
+    {
+      id: 'tx-emergency-locksmith',
+      householdId: demoHousehold.id,
+      vendorId: null, // External vendor not in system
+      managerId: managerSteve.id,
+      description: 'Emergency Locksmith',
+      amount: 300,
+      payoutMethod: TransactionPayoutMethod.CASH,
+      status: TransactionStatus.PAID_TO_VENDOR,
+      isReimbursable: true,
+      paidAt: today,
+      notes: 'Client locked out - emergency service call',
+    },
+    // Management Fee - Accrued (pending)
+    {
+      id: 'tx-management-fee',
+      householdId: demoHousehold.id,
+      vendorId: null, // Haven internal
+      managerId: managerSteve.id,
+      description: 'Management Fee',
+      amount: 100,
+      payoutMethod: TransactionPayoutMethod.STRIPE,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Monthly home management fee - December 2025',
+    },
+  ];
+
+  for (const txData of demoTransactions) {
+    await prisma.transaction.upsert({
+      where: { id: txData.id },
+      update: txData,
+      create: txData,
+    });
+  }
+  console.log(`✅ Created ${demoTransactions.length} demo transactions`);
+  console.log('   - Pool Cleaning: $150 (Paid yesterday via Company Card)');
+  console.log('   - Emergency Locksmith: $300 (Paid today via Cash)');
+  console.log('   - Management Fee: $100 (Accrued - pending)');
+
+  // ============================================================================
+  // PAYMENT RAILS DEMO - Vendors with different payout methods
+  // ============================================================================
+
+  console.log('💳 Setting up Payment Rails demo...');
+
+  // Create "Old School Landscaping" - has physical address for check mailing (no email)
+  const oldSchoolLandscaping = await prisma.vendor.upsert({
+    where: { id: 'vendor-old-school-landscaping' },
+    update: {
+      displayName: 'Old School Landscaping LLC',
+      category: VendorCategory.LANDSCAPING,
+      phone: '555-0120',
+      email: null, // No email - they prefer physical checks
+      websiteUrl: null,
+      addressLine1: '123 Garden Way',
+      addressLine2: 'Suite 5',
+      city: 'Hartford',
+      state: 'CT',
+      postalCode: '06103',
+      notes: 'Traditional landscaping company - prefers physical check payments',
+    },
+    create: {
+      id: 'vendor-old-school-landscaping',
+      householdId: demoHousehold.id,
+      displayName: 'Old School Landscaping LLC',
+      category: VendorCategory.LANDSCAPING,
+      phone: '555-0120',
+      email: null, // No email - they prefer physical checks
+      websiteUrl: null,
+      addressLine1: '123 Garden Way',
+      addressLine2: 'Suite 5',
+      city: 'Hartford',
+      state: 'CT',
+      postalCode: '06103',
+      notes: 'Traditional landscaping company - prefers physical check payments',
+    },
+  });
+  console.log(`✅ Created vendor: ${oldSchoolLandscaping.displayName} (Check-only)`);
+
+  // Create "Tech Plumbers" - has Stripe Connect for instant payments
+  const techPlumbers = await prisma.vendor.upsert({
+    where: { id: 'vendor-tech-plumbers' },
+    update: {
+      displayName: 'Tech Plumbers Inc.',
+      category: VendorCategory.OTHER, // No specific plumbing category
+      phone: '555-0121',
+      email: 'payments@techplumbers.example.com',
+      websiteUrl: 'https://techplumbers.example.com',
+      addressLine1: '456 Pipe Street',
+      city: 'New Haven',
+      state: 'CT',
+      postalCode: '06510',
+      notes: 'Modern plumbing company - accepts Stripe payments',
+    },
+    create: {
+      id: 'vendor-tech-plumbers',
+      householdId: demoHousehold.id,
+      displayName: 'Tech Plumbers Inc.',
+      category: VendorCategory.OTHER,
+      phone: '555-0121',
+      email: 'payments@techplumbers.example.com',
+      websiteUrl: 'https://techplumbers.example.com',
+      addressLine1: '456 Pipe Street',
+      city: 'New Haven',
+      state: 'CT',
+      postalCode: '06510',
+      notes: 'Modern plumbing company - accepts Stripe payments',
+    },
+  });
+  console.log(`✅ Created vendor: ${techPlumbers.displayName} (Stripe Connect)`);
+
+  // Create Stripe Connect payout account for Tech Plumbers
+  await prisma.vendorPayoutAccount.upsert({
+    where: { vendorId: techPlumbers.id },
+    update: {
+      stripeAccountId: 'acct_demo_techplumbers123',
+      payoutMethod: 'STRIPE_CONNECT',
+      stripeOnboardingComplete: true,
+    },
+    create: {
+      vendorId: techPlumbers.id,
+      stripeAccountId: 'acct_demo_techplumbers123',
+      payoutMethod: 'STRIPE_CONNECT',
+      stripeOnboardingComplete: true,
+      notes: 'Demo Stripe Connect account for testing',
+    },
+  });
+  console.log(`✅ Created Stripe Connect account for ${techPlumbers.displayName}`);
+
+  // Create unpaid invoices (PENDING transactions) for Batch Pay demo
+  const paymentRailsTransactions = [
+    // Old School Landscaping - Fall cleanup
+    {
+      id: 'tx-landscaping-fall-cleanup',
+      householdId: demoHousehold.id,
+      vendorId: oldSchoolLandscaping.id,
+      managerId: managerSteve.id,
+      description: 'Fall Leaf Cleanup & Yard Work',
+      amount: 450,
+      payoutMethod: TransactionPayoutMethod.CHECKBOOK_IO,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Full yard cleanup - rake leaves, trim bushes, prepare for winter',
+    },
+    // Old School Landscaping - Snow plow deposit
+    {
+      id: 'tx-landscaping-snow-deposit',
+      householdId: demoHousehold.id,
+      vendorId: oldSchoolLandscaping.id,
+      managerId: managerSteve.id,
+      description: 'Winter Snow Removal - Season Deposit',
+      amount: 800,
+      payoutMethod: TransactionPayoutMethod.CHECKBOOK_IO,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Deposit for winter 2025-2026 snow removal contract',
+    },
+    // Tech Plumbers - Emergency repair
+    {
+      id: 'tx-plumber-emergency',
+      householdId: demoHousehold.id,
+      vendorId: techPlumbers.id,
+      managerId: managerSteve.id,
+      description: 'Emergency Water Heater Repair',
+      amount: 375,
+      payoutMethod: TransactionPayoutMethod.STRIPE,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Emergency call - replaced thermostat and anode rod',
+    },
+    // Tech Plumbers - Inspection
+    {
+      id: 'tx-plumber-inspection',
+      householdId: demoHousehold.id,
+      vendorId: techPlumbers.id,
+      managerId: managerSteve.id,
+      description: 'Annual Plumbing Inspection',
+      amount: 150,
+      payoutMethod: TransactionPayoutMethod.STRIPE,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Annual inspection of all plumbing systems',
+    },
+    // Chimney Masters - Check payment
+    {
+      id: 'tx-chimney-sweep',
+      householdId: demoHousehold.id,
+      vendorId: vendorMap.get(VendorCategory.CHIMNEY_SWEEP) || null,
+      managerId: managerSteve.id,
+      description: 'Annual Chimney Sweep & Inspection',
+      amount: 275,
+      payoutMethod: TransactionPayoutMethod.COMPANY_CARD,
+      status: TransactionStatus.PENDING,
+      isReimbursable: true,
+      paidAt: null,
+      notes: 'Annual chimney cleaning and safety inspection',
+    },
+  ];
+
+  for (const txData of paymentRailsTransactions) {
+    await prisma.transaction.upsert({
+      where: { id: txData.id },
+      update: txData,
+      create: txData,
+    });
+  }
+  console.log(`✅ Created ${paymentRailsTransactions.length} unpaid invoices for Batch Pay demo`);
+  console.log('   - Old School Landscaping: $450 + $800 (Check mailing)');
+  console.log('   - Tech Plumbers: $375 + $150 (Stripe Connect)');
+  console.log('   - Chimney Masters: $275 (Company Card)');
+
+  // ============================================================================
+  // VENDOR PORTAL DEMO DATA
+  // ============================================================================
+
+  console.log('');
+  console.log('🔧 Setting up Vendor Portal demo data...');
+
+  // Create Ace Roofing user account
+  const aceRoofingPassword = await bcrypt.hash('AceRoof123!', 12);
+  const aceRoofingUser = await prisma.user.upsert({
+    where: { email: 'vendor@aceroofing.example.com' },
+    update: {},
+    create: {
+      email: 'vendor@aceroofing.example.com',
+      passwordHash: aceRoofingPassword,
+      firstName: 'Mike',
+      lastName: 'Johnson',
+      displayName: 'Mike Johnson',
+      role: UserRole.HOMEOWNER, // Vendors use HOMEOWNER role but access vendor portal
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created vendor user: ${aceRoofingUser.email}`);
+
+  // Create Malibu Mansion household (for demo work orders)
+  const malibuMansion = await prisma.household.upsert({
+    where: { id: 'malibu-mansion-id' },
+    update: {},
+    create: {
+      id: 'malibu-mansion-id',
+      name: 'Malibu Mansion',
+      description: 'Beachfront luxury estate in Malibu',
+      ownerId: homeownerBob.id, // Bob owns multiple properties
+      managerId: managerSteve.id,
+      stripeCustomerId: 'cus_malibu_mansion_demo',
+      billingCycleDay: 1,
+      homeProfile: {
+        create: {
+          propertyType: 'SINGLE_FAMILY',
+          addressLine1: '27400 Pacific Coast Hwy',
+          city: 'Malibu',
+          state: 'CA',
+          postalCode: '90265',
+          country: 'US',
+          squareFeet: 6500,
+          yearBuilt: 2015,
+          bedrooms: 5,
+          bathrooms: 6,
+          stories: 2,
+          garageSpaces: 3,
+          notes: 'Malibu Mansion coordinates: 34.0259, -118.7798',
+        },
+      },
+    },
+  });
+  console.log(`✅ Created household: ${malibuMansion.name}`);
+
+  // Create Beverly Hills Estate household
+  const beverlyHillsEstate = await prisma.household.upsert({
+    where: { id: 'beverly-hills-estate-id' },
+    update: {},
+    create: {
+      id: 'beverly-hills-estate-id',
+      name: 'Beverly Hills Estate',
+      description: 'Classic Mediterranean estate in Beverly Hills',
+      ownerId: homeownerBob.id,
+      managerId: managerSteve.id,
+      stripeCustomerId: 'cus_beverly_hills_demo',
+      billingCycleDay: 1,
+      homeProfile: {
+        create: {
+          propertyType: 'SINGLE_FAMILY',
+          addressLine1: '1200 Sunset Blvd',
+          city: 'Beverly Hills',
+          state: 'CA',
+          postalCode: '90210',
+          country: 'US',
+          squareFeet: 8200,
+          yearBuilt: 1998,
+          bedrooms: 6,
+          bathrooms: 7,
+          stories: 3,
+          garageSpaces: 4,
+          notes: 'Beverly Hills Estate coordinates: 34.0901, -118.4065',
+        },
+      },
+    },
+  });
+  console.log(`✅ Created household: ${beverlyHillsEstate.name}`);
+
+  // Get roofing service category
+  const roofingCategory = categories.find((c) => c.name === 'Roofing');
+
+  // Create Ace Roofing vendor
+  const aceRoofing = await prisma.vendor.upsert({
+    where: { id: 'vendor-ace-roofing' },
+    update: {
+      userId: aceRoofingUser.id,
+      serviceAreas: ['Malibu', 'Beverly Hills', 'Pacific Palisades', 'Santa Monica'],
+    },
+    create: {
+      id: 'vendor-ace-roofing',
+      householdId: malibuMansion.id,
+      userId: aceRoofingUser.id,
+      displayName: 'Ace Roofing Co.',
+      category: VendorCategory.OTHER,
+      phone: '310-555-ROOF',
+      email: 'dispatch@aceroofing.example.com',
+      websiteUrl: 'https://aceroofing.example.com',
+      addressLine1: '15000 Sunset Blvd',
+      city: 'Pacific Palisades',
+      state: 'CA',
+      postalCode: '90272',
+      isVerified: true,
+      serviceAreas: ['Malibu', 'Beverly Hills', 'Pacific Palisades', 'Santa Monica'],
+      notes: 'Licensed roofing contractor - specializes in luxury residential properties',
+    },
+  });
+  console.log(`✅ Created vendor: ${aceRoofing.displayName}`);
+
+  // Create OPEN Work Order: "Fix Shingles" at Malibu Mansion
+  const openWorkOrder = await prisma.workOrder.upsert({
+    where: { id: 'wo-open-shingles' },
+    update: {},
+    create: {
+      id: 'wo-open-shingles',
+      householdId: malibuMansion.id,
+      createdByUserId: managerSteve.id,
+      title: 'Fix Shingles - Wind Damage',
+      description: 'Several shingles were damaged during recent Santa Ana winds. Need to inspect and replace affected shingles on the south-facing roof section. Access via ladder on the west side of the property. Property gate code: 4521. Park in the circular driveway.',
+      status: WorkOrderStatus.OPEN,
+      estimatedCost: 850,
+      scheduledStart: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+      scheduledEnd: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000), // 4 hours later
+      serviceArea: 'Malibu',
+    },
+  });
+  console.log(`✅ Created OPEN work order: ${openWorkOrder.title}`);
+
+  // Create COMPLETED Work Order awaiting Manager verification
+  const completedWorkOrder = await prisma.workOrder.upsert({
+    where: { id: 'wo-completed-gutter-repair' },
+    update: {},
+    create: {
+      id: 'wo-completed-gutter-repair',
+      householdId: beverlyHillsEstate.id,
+      createdByUserId: managerSteve.id,
+      vendorId: aceRoofing.id,
+      title: 'Gutter Repair & Cleaning',
+      description: 'Clean all gutters and repair loose section on north side of house. Replace damaged gutter guard on garage section. Found additional damage on garage gutter guard - replaced entire section. All gutters cleaned and flowing properly. Recommend full inspection in spring.',
+      status: WorkOrderStatus.COMPLETED,
+      estimatedCost: 425,
+      actualCost: 475, // Slightly over estimate due to additional repairs
+      scheduledStart: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      scheduledEnd: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 3 * 60 * 60 * 1000),
+      completedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 2.5 * 60 * 60 * 1000),
+      checkInAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000), // Checked in 15 min after start
+      checkInLatitude: 34.0901,
+      checkInLongitude: -118.4065,
+      checkOutAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 2.5 * 60 * 60 * 1000), // 2.5 hours later
+      serviceArea: 'Beverly Hills',
+      proofImages: [
+        'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=800', // Gutter after cleaning
+        'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800', // House exterior
+      ],
+    },
+  });
+  console.log(`✅ Created COMPLETED work order awaiting verification: ${completedWorkOrder.title}`);
+
+  // Create an IN_PROGRESS work order (vendor currently on-site)
+  const inProgressWorkOrder = await prisma.workOrder.upsert({
+    where: { id: 'wo-in-progress-pool' },
+    update: {},
+    create: {
+      id: 'wo-in-progress-pool',
+      householdId: beverlyHillsEstate.id,
+      createdByUserId: managerSteve.id,
+      vendorId: poolVendor?.id,
+      title: 'Pool Pump Repair',
+      description: 'Pool pump making unusual noise. May need bearing replacement or motor inspection. Pool equipment located behind the pool house.',
+      status: WorkOrderStatus.IN_PROGRESS,
+      estimatedCost: 325,
+      scheduledStart: new Date(),
+      scheduledEnd: new Date(Date.now() + 3 * 60 * 60 * 1000), // 3 hours from now
+      checkInAt: new Date(Date.now() - 45 * 60 * 1000), // Checked in 45 min ago
+      checkInLatitude: 34.0901,
+      checkInLongitude: -118.4065,
+      serviceArea: 'Beverly Hills',
+    },
+  });
+  console.log(`✅ Created IN_PROGRESS work order: ${inProgressWorkOrder.title}`);
+
+  // Create an ASSIGNED work order (vendor has accepted, not started)
+  const assignedWorkOrder = await prisma.workOrder.upsert({
+    where: { id: 'wo-assigned-hvac' },
+    update: {},
+    create: {
+      id: 'wo-assigned-hvac',
+      householdId: malibuMansion.id,
+      createdByUserId: managerSteve.id,
+      vendorId: aceRoofing.id, // Ace Roofing also does some general maintenance
+      title: 'HVAC Annual Inspection',
+      description: 'Annual maintenance and filter replacement for central HVAC system. Check all vents, inspect ductwork, and test thermostat. HVAC system is Carrier brand, installed 2019. Filters are 20x25x4.',
+      status: WorkOrderStatus.ASSIGNED,
+      estimatedCost: 450,
+      scheduledStart: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000), // Tomorrow
+      scheduledEnd: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000 + 2 * 60 * 60 * 1000), // 2 hours
+      serviceArea: 'Malibu',
+    },
+  });
+  console.log(`✅ Created ASSIGNED work order: ${assignedWorkOrder.title}`);
+
   console.log('');
   console.log('🎉 Database seed completed successfully!');
   console.log('');
   console.log('═══════════════════════════════════════════════════');
-  console.log('  DEMO CREDENTIALS');
+  console.log('  USER CREDENTIALS');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
-  console.log('  Admin User:');
+  console.log('  👑 Admin (Platform Owner):');
   console.log('    Email:    admin@haven.app');
   console.log('    Password: Admin123!');
+  console.log('    Role:     Can access ALL records');
   console.log('');
-  console.log('  Manager User:');
-  console.log('    Email:    manager@haven.app');
+  console.log('  👔 Manager Steve (Haven Staff):');
+  console.log('    Email:    steve@haven.app');
   console.log('    Password: Manager123!');
+  console.log('    Role:     Can access households assigned to them');
   console.log('');
-  console.log('  Demo Homeowner:');
-  console.log('    Email:    demo@haven.app');
-  console.log('    Password: Demo123!');
+  console.log('  🏠 Homeowner Bob (Client):');
+  console.log('    Email:    bob@example.com');
+  console.log('    Password: Bob123!');
+  console.log('    Role:     Can only access their own household');
+  console.log('');
+  console.log('  🔧 Vendor - Ace Roofing:');
+  console.log('    Email:    vendor@aceroofing.example.com');
+  console.log('    Password: AceRoof123!');
+  console.log('    Portal:   /vendor (Vendor Portal)');
   console.log('');
   console.log('═══════════════════════════════════════════════════');
+  console.log('  HOUSEHOLD ASSIGNMENT');
+  console.log('═══════════════════════════════════════════════════');
   console.log('');
-  console.log('  Demo Household: The Johnson Residence');
+  console.log("  Bob's Villa:");
+  console.log('    Owner:   Bob Smith (bob@example.com)');
+  console.log('    Manager: Steve Manager (steve@haven.app)');
   console.log('  - 3 bed, 2.5 bath single family home');
   console.log('  - Features: pool, septic, chimney, lawn, snow removal');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
   console.log(`  - ${maintenanceTasks.length} maintenance tasks for 12 months`);
-  console.log('  - Premium subscription with Stripe integration');
+  console.log('');
+  console.log('  Malibu Mansion:');
+  console.log('    Owner:   Bob Smith (bob@example.com)');
+  console.log('    Manager: Steve Manager (steve@haven.app)');
+  console.log('  - 5 bed, 6 bath beachfront estate');
+  console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
+  console.log('');
+  console.log('  Beverly Hills Estate:');
+  console.log('    Owner:   Bob Smith (bob@example.com)');
+  console.log('    Manager: Steve Manager (steve@haven.app)');
+  console.log('  - 6 bed, 7 bath Mediterranean estate');
+  console.log('  - Work Orders: 1 COMPLETED (awaiting verification), 1 IN_PROGRESS');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  VENDOR PORTAL DEMO');
+  console.log('═══════════════════════════════════════════════════');
+  console.log('');
+  console.log('  Ace Roofing Co. (vendor@aceroofing.example.com):');
+  console.log('    Service Areas: Malibu, Beverly Hills, Pacific Palisades, Santa Monica');
+  console.log('    Job Board: 1 OPEN job available to claim');
+  console.log('    Schedule: 1 ASSIGNED job (tomorrow), 1 IN_PROGRESS job');
+  console.log('');
+  console.log('  Manager Verification Queue (/manager/verification):');
+  console.log('    1 COMPLETED job awaiting verification (Gutter Repair)');
   console.log('');
 }
 

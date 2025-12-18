@@ -36,8 +36,13 @@ export default function WorkOrdersPage() {
       setWorkOrders(ordersData);
       setVendors(vendorsData);
       setMaintenanceTasks(tasksData);
-    } catch (error) {
-      console.error('Failed to load work orders:', error);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Failed to load work orders (network error):', error.message);
+      } else {
+        const err = error as { message?: string; statusCode?: number };
+        console.error('Failed to load work orders:', err?.message || 'Unknown error', err?.statusCode || '');
+      }
     } finally {
       setIsLoading(false);
     }

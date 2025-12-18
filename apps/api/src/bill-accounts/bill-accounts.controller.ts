@@ -44,7 +44,7 @@ export class BillAccountsController {
   @ApiResponse({ status: 403, description: 'Forbidden - no access to household' })
   async create(
     @Body() createBillAccountDto: CreateBillAccountDto,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<BillAccountResponseDto> {
     return this.billAccountsService.create(req.user.userId, createBillAccountDto);
   }
@@ -61,9 +61,9 @@ export class BillAccountsController {
     @Query('category') category?: VendorCategory,
     @Query('upcomingDays') upcomingDays?: string,
     @Query('includeInactive') includeInactive?: string,
-    @Request() req?: { user: { sub: string } },
+    @Request() req?: { user: { userId: string } },
   ): Promise<BillAccountResponseDto[]> {
-    return this.billAccountsService.findAll(req!.user.sub, {
+    return this.billAccountsService.findAll(req!.user.userId, {
       householdId,
       category,
       upcomingDays: upcomingDays ? parseInt(upcomingDays, 10) : undefined,
@@ -77,7 +77,7 @@ export class BillAccountsController {
   @ApiResponse({ status: 404, description: 'Bill account not found' })
   async findOne(
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<BillAccountResponseDto> {
     return this.billAccountsService.findOne(id, req.user.userId);
   }
@@ -89,7 +89,7 @@ export class BillAccountsController {
   async update(
     @Param('id') id: string,
     @Body() updateBillAccountDto: UpdateBillAccountDto,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<BillAccountResponseDto> {
     return this.billAccountsService.update(id, req.user.userId, updateBillAccountDto);
   }
@@ -101,7 +101,7 @@ export class BillAccountsController {
   @ApiResponse({ status: 404, description: 'Bill account not found' })
   async remove(
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<void> {
     return this.billAccountsService.remove(id, req.user.userId);
   }

@@ -15,6 +15,11 @@ const FIREBASE_TOKEN_KEY = 'haven_firebase_token';
 // Current Firebase token (managed by auth context)
 let currentFirebaseToken: string | null = null;
 
+// Initialize from sessionStorage on module load (handles Fast Refresh)
+if (typeof window !== 'undefined') {
+  currentFirebaseToken = sessionStorage.getItem(FIREBASE_TOKEN_KEY);
+}
+
 export function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
 
@@ -71,7 +76,14 @@ export function getApiClient(): ApiClient {
     apiClient = createApiClient({
       baseUrl: API_BASE_URL,
       getAccessToken,
-      getRefreshToken,
+      getRefreshToken: () => {
+        // Don't return refresh token when using Firebase auth
+        // This prevents the API client from trying to refresh with legacy tokens
+        if (currentFirebaseToken || sessionStorage.getItem(FIREBASE_TOKEN_KEY)) {
+          return null;
+        }
+        return getRefreshToken();
+      },
       onTokenRefresh: ({ accessToken, refreshToken }) => {
         // Only update legacy tokens - Firebase handles its own refresh
         if (!currentFirebaseToken) {
@@ -79,7 +91,11 @@ export function getApiClient(): ApiClient {
         }
       },
       onUnauthorized: () => {
-        clearTokens();
+        // Only clear tokens and trigger logout if we're not using Firebase
+        // With Firebase, a 401 might just mean we need a fresh token
+        if (!currentFirebaseToken && !sessionStorage.getItem(FIREBASE_TOKEN_KEY)) {
+          clearTokens();
+        }
         // Redirect to login will be handled by auth context
       },
     });

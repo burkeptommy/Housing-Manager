@@ -1512,3 +1512,391 @@ export interface CompleteUploadRequest {
 export interface CompleteUploadResponse {
   fileAsset: FileAsset;
 }
+
+// ============================================================================
+// FINANCIAL ENGINE TYPES (The Float)
+// ============================================================================
+
+export type TransactionPayoutMethod =
+  | 'CHECKBOOK_IO'
+  | 'STRIPE'
+  | 'CASH'
+  | 'COMPANY_CARD'
+  | 'BANK_TRANSFER';
+
+export type TransactionStatus =
+  | 'PENDING'
+  | 'PAID_TO_VENDOR'
+  | 'BILLED_TO_CLIENT'
+  | 'SETTLED'
+  | 'CANCELLED';
+
+export interface Transaction {
+  id: string;
+  householdId: string;
+  vendorId?: string | null;
+  managerId: string;
+  description: string;
+  amount: number;
+  payoutMethod: TransactionPayoutMethod;
+  status: TransactionStatus;
+  isReimbursable: boolean;
+  paidAt?: string | null;
+  billedAt?: string | null;
+  settledAt?: string | null;
+  receiptUrl?: string | null;
+  receiptFileId?: string | null;
+  workOrderId?: string | null;
+  maintenanceTaskId?: string | null;
+  householdInvoiceId?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  // Included in responses
+  vendor?: {
+    id: string;
+    displayName: string;
+    category: string;
+  } | null;
+  manager?: {
+    id: string;
+    firstName: string | null;
+    lastName: string | null;
+    email: string;
+  };
+  household?: {
+    id: string;
+    name: string;
+  };
+}
+
+export interface CreateTransactionRequest {
+  householdId: string;
+  vendorId?: string;
+  description: string;
+  amount: number;
+  payoutMethod: TransactionPayoutMethod;
+  isReimbursable?: boolean;
+  receiptUrl?: string;
+  receiptFileId?: string;
+  workOrderId?: string;
+  maintenanceTaskId?: string;
+  notes?: string;
+}
+
+export interface UpdateTransactionRequest {
+  description?: string;
+  amount?: number;
+  payoutMethod?: TransactionPayoutMethod;
+  status?: TransactionStatus;
+  isReimbursable?: boolean;
+  receiptUrl?: string;
+  receiptFileId?: string;
+  notes?: string;
+}
+
+export interface TransactionListQuery {
+  householdId?: string;
+  status?: TransactionStatus;
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface ClientBankAccount {
+  id: string;
+  householdId: string;
+  stripePaymentMethodId: string;
+  stripeBankAccountId?: string | null;
+  bankName: string;
+  accountType: string;
+  last4: string;
+  routingLast4?: string | null;
+  isVerified: boolean;
+  verifiedAt?: string | null;
+  isDefault: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface HouseholdFinancialSummary {
+  currentMonthBalance: number;
+  pendingTransactions: number;
+  settledThisMonth: number;
+  transactions: Transaction[];
+  bankAccount?: ClientBankAccount | null;
+}
+
+// ============================================================================
+// VENDOR PAYOUT / PAYABLES TYPES
+// ============================================================================
+
+export interface VendorAddressInfo {
+  name: string;
+  line1: string;
+  line2?: string;
+  city: string;
+  state: string;
+  zip: string;
+}
+
+export interface VendorPayable {
+  id: string;
+  transactionId: string;
+  vendorId: string;
+  vendorName: string;
+  householdId: string;
+  householdName: string;
+  description: string;
+  amount: number;
+  status: TransactionStatus;
+  createdAt: string;
+  vendorAddress?: VendorAddressInfo;
+  vendorStripeConnectId?: string;
+  vendorEmail?: string;
+  availablePayoutMethods: TransactionPayoutMethod[];
+  recommendedPayoutMethod: TransactionPayoutMethod;
+}
+
+export interface PayoutItem {
+  transactionId: string;
+  payoutMethod: TransactionPayoutMethod;
+}
+
+export interface ExecutePayoutRequest {
+  items: PayoutItem[];
+}
+
+export interface PayoutResultItem {
+  transactionId: string;
+  success: boolean;
+  payoutMethod: TransactionPayoutMethod;
+  referenceId?: string;
+  error?: string;
+  estimatedDelivery?: string;
+}
+
+export interface ExecutePayoutResponse {
+  success: boolean;
+  totalAmount: number;
+  totalItems: number;
+  successfulItems: number;
+  failedItems: number;
+  results: PayoutResultItem[];
+  summary?: {
+    checksQueued: number;
+    stripeTransfers: number;
+    totalCheckAmount: number;
+    totalStripeAmount: number;
+  };
+}
+
+export interface BatchPayPreviewItem {
+  transactionId: string;
+  vendorName: string;
+  amount: number;
+  payoutMethod: TransactionPayoutMethod;
+  methodLabel: string;
+}
+
+export interface BatchPayPreview {
+  items: BatchPayPreviewItem[];
+  totalAmount: number;
+  checkCount: number;
+  stripeCount: number;
+  checkTotal: number;
+  stripeTotal: number;
+}
+
+// ============================================================================
+// SETTLEMENT / MONTHLY INVOICE TYPES
+// ============================================================================
+
+export type MonthlyInvoiceStatus = 'PENDING' | 'PROCESSING' | 'PAID' | 'FAILED' | 'PAST_DUE';
+
+export interface TransactionLineItem {
+  id: string;
+  transactionId: string;
+  description: string;
+  vendorName: string | null;
+  amount: number;
+  paidAt: string | null;
+  receiptUrl?: string;
+  managerNote?: string;
+}
+
+export interface MonthlyInvoice {
+  id: string;
+  invoiceNumber: string;
+  householdId: string;
+  householdName: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  transactionsSubtotal: number;
+  managementFee: number;
+  total: number;
+  status: MonthlyInvoiceStatus;
+  stripePaymentIntentId?: string;
+  dueDate?: string;
+  paidAt?: string;
+  failedAt?: string;
+  failureReason?: string;
+  lineItems: TransactionLineItem[];
+  createdAt: string;
+}
+
+export interface MonthlyInvoiceListItem {
+  id: string;
+  invoiceNumber: string;
+  billingPeriodStart: string;
+  billingPeriodEnd: string;
+  total: number;
+  status: MonthlyInvoiceStatus;
+  itemCount: number;
+  paidAt?: string;
+  createdAt: string;
+}
+
+export interface RevenueStats {
+  pendingAmount: number;
+  collectedThisMonth: number;
+  collectedAllTime: number;
+  failedAmount: number;
+  pendingInvoices: number;
+  paidInvoicesThisMonth: number;
+  failedInvoices: number;
+  monthlyTrend: MonthlyRevenue[];
+}
+
+export interface MonthlyRevenue {
+  month: string;
+  pending: number;
+  collected: number;
+  failed: number;
+}
+
+export interface HouseholdRevenue {
+  householdId: string;
+  householdName: string;
+  pendingAmount: number;
+  collectedAmount: number;
+  failedAmount?: number;
+  lastInvoiceStatus?: string;
+  lastInvoiceDate?: string | null;
+  failedInvoiceId?: string;
+  lastPaymentDate?: string | null;
+}
+
+export interface CollectionResult {
+  success: boolean;
+  invoiceId: string;
+  paymentIntentId?: string;
+  status?: string;
+  error?: string;
+}
+
+// ============================================================================
+// VENDOR PORTAL TYPES
+// ============================================================================
+
+export type VendorWorkOrderStatus =
+  | 'DRAFT'
+  | 'REQUESTED'
+  | 'SCHEDULED'
+  | 'OPEN'
+  | 'ASSIGNED'
+  | 'IN_PROGRESS'
+  | 'COMPLETED'
+  | 'VERIFIED'
+  | 'CANCELLED';
+
+export interface VendorJobBoardItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: VendorWorkOrderStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  estimatedCost: number | null;
+  serviceArea: string | null;
+  household: {
+    id: string;
+    name: string;
+  };
+  createdAt: string;
+}
+
+export interface VendorScheduleItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: VendorWorkOrderStatus;
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
+  estimatedCost: number | null;
+  serviceArea: string | null;
+  checkInAt: string | null;
+  checkOutAt: string | null;
+  household: {
+    id: string;
+    name: string;
+    homeProfile?: {
+      address: string;
+      latitude: number | null;
+      longitude: number | null;
+    };
+  };
+}
+
+export interface VendorJobDetail extends VendorScheduleItem {
+  proofImages: string[];
+  notes: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: {
+      id: string;
+      firstName: string;
+      lastName: string;
+    };
+  }>;
+}
+
+export interface VendorProfile {
+  id: string;
+  displayName: string;
+  category: string;
+  email: string | null;
+  phone: string | null;
+  serviceAreas: string[];
+  isVerified: boolean;
+}
+
+export interface VerificationQueueItem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: VendorWorkOrderStatus;
+  completedAt: string | null;
+  proofImages: string[];
+  actualCost: number | null;
+  vendor: {
+    id: string;
+    displayName: string;
+    phone: string | null;
+    email: string | null;
+  } | null;
+  household: {
+    id: string;
+    name: string;
+  };
+  notes: Array<{
+    id: string;
+    body: string;
+    createdAt: string;
+    author: {
+      firstName: string;
+      lastName: string;
+    };
+  }>;
+}

@@ -25,12 +25,19 @@ async function authFetch(path: string, options: RequestInit = {}): Promise<Respo
 }
 
 // Fetch conversations for the current household
-export function useConversations(status?: ConversationStatus) {
+export function useConversations(status?: ConversationStatus, enabled = true) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
 
   const fetchConversations = useCallback(async () => {
+    // Don't fetch if not enabled or no auth token
+    const token = getAccessToken();
+    if (!enabled || !token) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const params = new URLSearchParams();
@@ -47,7 +54,7 @@ export function useConversations(status?: ConversationStatus) {
     } finally {
       setIsLoading(false);
     }
-  }, [status]);
+  }, [status, enabled]);
 
   useEffect(() => {
     fetchConversations();
@@ -70,6 +77,12 @@ export function useConversation(conversationId: string | null) {
   const fetchConversation = useCallback(async () => {
     if (!conversationId) {
       setConversation(null);
+      return;
+    }
+
+    // Don't fetch if no auth token
+    const token = getAccessToken();
+    if (!token) {
       return;
     }
 
@@ -181,6 +194,13 @@ export function useUnreadCount() {
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchUnreadCount = useCallback(async () => {
+    // Don't fetch if no auth token
+    const token = getAccessToken();
+    if (!token) {
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await authFetch('/conversations?status=OPEN');
       if (!response.ok) return;

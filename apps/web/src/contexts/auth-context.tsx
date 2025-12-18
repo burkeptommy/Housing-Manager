@@ -225,17 +225,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(
     async (email: string, password: string) => {
-      await firebaseSignIn(email, password);
-      // Auth state change listener will handle the rest
+      // Set loading state before Firebase auth
+      setIsLoading(true);
+
+      const fbUser = await firebaseSignIn(email, password);
+
+      // Get the token and set it immediately so API calls work
+      if (fbUser) {
+        const token = await fbUser.getIdToken();
+        setFirebaseToken(token);
+      }
+
+      // Wait for the auth state callback to complete (sets user state, households, etc.)
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Login timeout - please try again'));
+        }, 10000);
+
+        // Poll until user state is set (onAuthChange sets this after fetchMe completes)
+        const checkReady = setInterval(() => {
+          // Check sessionStorage for the token as a signal that fetchMe completed
+          const tokenSet = sessionStorage.getItem('haven_firebase_token');
+          if (tokenSet) {
+            clearInterval(checkReady);
+            clearTimeout(timeout);
+            resolve();
+          }
+        }, 50);
+      });
     },
     []
   );
 
   const register = useCallback(
     async (email: string, password: string, displayName?: string) => {
-      await firebaseSignUp(email, password, displayName);
-      // Auth state change listener will handle the rest
-      // After registration, user will be redirected based on household status
+      // Set loading state before Firebase auth
+      setIsLoading(true);
+
+      const fbUser = await firebaseSignUp(email, password, displayName);
+
+      // Get the token and set it immediately so API calls work
+      if (fbUser) {
+        const token = await fbUser.getIdToken();
+        setFirebaseToken(token);
+      }
+
+      // Wait for the auth state callback to complete
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Registration timeout - please try again'));
+        }, 10000);
+
+        const checkReady = setInterval(() => {
+          const tokenSet = sessionStorage.getItem('haven_firebase_token');
+          if (tokenSet) {
+            clearInterval(checkReady);
+            clearTimeout(timeout);
+            resolve();
+          }
+        }, 50);
+      });
     },
     []
   );

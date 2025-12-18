@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 
 import { JwtAuthGuard, RolesGuard, Roles } from '../auth';
+import { FirebaseAuthGuard } from '../firebase';
 
 import { ServiceCategoriesService } from './service-categories.service';
 import {
@@ -32,12 +33,12 @@ import {
 @ApiTags('Service Categories')
 @ApiBearerAuth()
 @Controller('service-categories')
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('ADMIN')
 export class ServiceCategoriesController {
   constructor(private readonly serviceCategoriesService: ServiceCategoriesService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Create a new service category (Admin only)' })
   @ApiResponse({ status: 201, description: 'Category created', type: ServiceCategoryDto })
   @ApiResponse({ status: 400, description: 'Invalid input' })
@@ -49,23 +50,26 @@ export class ServiceCategoriesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all service categories (Admin only)' })
+  @UseGuards(FirebaseAuthGuard)
+  @ApiOperation({ summary: 'Get all service categories' })
   @ApiQuery({
     name: 'includeInactive',
     required: false,
     type: Boolean,
-    description: 'Include inactive categories',
+    description: 'Include inactive categories (admin only)',
   })
   @ApiResponse({ status: 200, description: 'List of categories', type: [ServiceCategoryDto] })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden - Admin only' })
   async findAll(
     @Query('includeInactive') includeInactive?: string,
   ): Promise<ServiceCategoryDto[]> {
+    // Non-admin users always get only active categories
     return this.serviceCategoriesService.findAll(includeInactive === 'true');
   }
 
   @Get(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Get a service category by ID (Admin only)' })
   @ApiParam({ name: 'id', description: 'Category ID' })
   @ApiResponse({ status: 200, description: 'Category details', type: ServiceCategoryDto })
@@ -77,6 +81,8 @@ export class ServiceCategoriesController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @ApiOperation({ summary: 'Update a service category (Admin only)' })
   @ApiParam({ name: 'id', description: 'Category ID' })
   @ApiResponse({ status: 200, description: 'Category updated', type: ServiceCategoryDto })
@@ -93,6 +99,8 @@ export class ServiceCategoriesController {
   }
 
   @Delete(':id')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Delete a service category (Admin only)' })
   @ApiParam({ name: 'id', description: 'Category ID' })

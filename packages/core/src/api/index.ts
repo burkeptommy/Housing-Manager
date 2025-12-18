@@ -69,6 +69,15 @@ import type {
   SignUploadRequest,
   SignUploadResponse,
   CompleteUploadResponse,
+  VendorPayable,
+  ExecutePayoutRequest,
+  ExecutePayoutResponse,
+  BatchPayPreview,
+  MonthlyInvoice,
+  MonthlyInvoiceListItem,
+  RevenueStats,
+  HouseholdRevenue,
+  CollectionResult,
 } from '../types';
 
 export interface ApiClientConfig {
@@ -845,6 +854,45 @@ export class ApiClient {
     return this.request(`/uploads/${id}`, { method: 'DELETE' });
   }
 
+  // ============================================================================
+  // FINANCIALS / PAYOUT ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Get unpaid vendor payables (transactions pending payment)
+   */
+  async getPayables(householdId?: string): Promise<VendorPayable[]> {
+    const query = householdId ? `?householdId=${householdId}` : '';
+    return this.request(`/financials/payables${query}`);
+  }
+
+  /**
+   * Preview a batch payout before execution
+   */
+  async previewPayout(data: ExecutePayoutRequest): Promise<BatchPayPreview> {
+    return this.request('/financials/payout/preview', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Execute batch payout to vendors
+   */
+  async executePayout(data: ExecutePayoutRequest): Promise<ExecutePayoutResponse> {
+    return this.request('/financials/payout', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Get payout status for a transaction
+   */
+  async getPayoutStatus(transactionId: string): Promise<{ status: string; details?: unknown }> {
+    return this.request(`/financials/payout/${transactionId}/status`);
+  }
+
   /**
    * Upload a file using the signed URL flow
    * This is a convenience method that handles the full upload flow:
@@ -890,6 +938,66 @@ export class ApiClient {
     // 3. Mark upload as complete
     const completeResponse = await this.completeUpload(signResponse.fileAssetId);
     return completeResponse.fileAsset;
+  }
+
+  // ============================================================================
+  // SETTLEMENT / STATEMENTS ENDPOINTS
+  // ============================================================================
+
+  /**
+   * Get monthly statements (invoices) for the household
+   */
+  async getStatements(householdId?: string): Promise<MonthlyInvoiceListItem[]> {
+    const query = householdId ? `?householdId=${householdId}` : '';
+    return this.request(`/settlement/invoices${query}`);
+  }
+
+  /**
+   * Get statement details by ID
+   */
+  async getStatementById(invoiceId: string): Promise<MonthlyInvoice> {
+    return this.request(`/settlement/invoices/${invoiceId}`);
+  }
+
+  /**
+   * Get PDF URL for a statement
+   */
+  getStatementPdfUrl(invoiceId: string): string {
+    return `${this.config.baseUrl}/settlement/invoices/${invoiceId}/pdf`;
+  }
+
+  /**
+   * Get revenue statistics (manager/admin only)
+   */
+  async getRevenueStats(): Promise<RevenueStats> {
+    return this.request('/settlement/revenue/stats');
+  }
+
+  /**
+   * Get revenue breakdown by household (manager/admin only)
+   */
+  async getHouseholdRevenue(): Promise<HouseholdRevenue[]> {
+    return this.request('/settlement/revenue/households');
+  }
+
+  /**
+   * Force collect payment for an invoice (manager/admin only)
+   */
+  async forceCollectInvoice(invoiceId: string, force = true): Promise<CollectionResult> {
+    return this.request('/settlement/collect', {
+      method: 'POST',
+      body: JSON.stringify({ invoiceId, force }),
+    });
+  }
+
+  /**
+   * Generate monthly invoice for a household (admin only)
+   */
+  async generateInvoice(householdId: string): Promise<{ success: boolean; invoice?: MonthlyInvoice; error?: string }> {
+    return this.request('/settlement/invoices/generate', {
+      method: 'POST',
+      body: JSON.stringify({ householdId }),
+    });
   }
 }
 

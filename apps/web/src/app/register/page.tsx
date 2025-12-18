@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 
 export default function RegisterPage() {
-  const { register, isLoading } = useAuth();
+  const router = useRouter();
+  const { register, isLoading, isAuthenticated, user, needsOnboarding } = useAuth();
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
@@ -13,6 +15,19 @@ export default function RegisterPage() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Redirect when user becomes authenticated
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
+        router.push('/manager');
+      } else if (needsOnboarding) {
+        router.push('/onboarding');
+      } else {
+        router.push('/app');
+      }
+    }
+  }, [isAuthenticated, user, needsOnboarding, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,17 +48,18 @@ export default function RegisterPage() {
     try {
       const displayName = `${firstName} ${lastName}`;
       await register(email, password, displayName);
+      // Redirect is handled by the useEffect above when auth state updates
     } catch (err: unknown) {
       const message = err && typeof err === 'object' && 'message' in err
         ? (err as { message: string }).message
         : 'Registration failed. Please try again.';
       setError(message);
-    } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
+  // Only show loading spinner during initial auth check, not during registration
+  if (isLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

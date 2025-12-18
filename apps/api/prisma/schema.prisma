@@ -306,14 +306,35 @@ enum SenderRole {
   SYSTEM
 }
 
-// Work order status
+// Work order status - State machine: OPEN -> ASSIGNED -> IN_PROGRESS -> COMPLETED -> VERIFIED
 enum WorkOrderStatus {
   DRAFT
   REQUESTED
   SCHEDULED
-  IN_PROGRESS
-  COMPLETED
+  OPEN          // Available for vendors to claim
+  ASSIGNED      // Vendor has accepted the job
+  IN_PROGRESS   // Vendor checked in and working
+  COMPLETED     // Vendor finished, awaiting verification
+  VERIFIED      // Manager approved the work
   CANCELLED
+}
+
+// Transaction payout method - how the company paid the vendor
+enum TransactionPayoutMethod {
+  CHECKBOOK_IO    // Checkbook.io digital check
+  STRIPE          // Stripe transfer
+  CASH            // Cash payment
+  COMPANY_CARD    // Company credit card
+  BANK_TRANSFER   // Direct bank transfer
+}
+
+// Transaction status - lifecycle of expense reimbursement
+enum TransactionStatus {
+  PENDING           // Created but not yet paid to vendor
+  PAID_TO_VENDOR    // Company has paid the vendor
+  BILLED_TO_CLIENT  // Added to client's monthly invoice
+  SETTLED           // Client has reimbursed the company
+  CANCELLED         // Transaction cancelled
 }
 
 // File asset type for uploaded files
@@ -357,6 +378,7 @@ model User {
   invitedMembers      HouseholdMember[]   @relation("InvitedByUser")
   sentInvites         HouseholdInvite[]
   ownedHouseholds     Household[]         @relation("HouseholdOwner")
+  managedHouseholds   Household[]         @relation("HouseholdManager")
   assignedTasks       Task[]              @relation("TaskAssignee")
   createdTasks        Task[]              @relation("TaskCreator")
   serviceRequests     ServiceRequest[]    @relation("ServiceRequestCreator")
@@ -373,11 +395,18 @@ model User {
   madeAssignments         HomeManagerAssignment[] @relation("AssignmentMadeBy")
 
   // Work order relations
-  createdWorkOrders WorkOrder[]     @relation("WorkOrderCreator")
-  workOrderNotes    WorkOrderNote[] @relation("WorkOrderNoteAuthor")
+  createdWorkOrders  WorkOrder[]     @relation("WorkOrderCreator")
+  verifiedWorkOrders WorkOrder[]     @relation("WorkOrderVerifier")
+  workOrderNotes     WorkOrderNote[] @relation("WorkOrderNoteAuthor")
 
   // File asset relations
   uploadedFileAssets FileAsset[] @relation("FileAssetUploader")
+
+  // Financial engine relations
+  managedTransactions Transaction[] @relation("TransactionManager")
+
+  // Vendor portal relation
+  vendorProfile       Vendor?       @relation("VendorUser")
 
   @@map("users")
 }
@@ -410,6 +439,7 @@ model Household {
   name        String   // e.g. "The Burke family"
   description String?
   ownerId     String   @map("owner_id")
+  managerId   String?  @map("manager_id") // Assigned Haven staff member (Home Manager)
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
@@ -422,10 +452,13 @@ model Household {
 
   // Billing Settings
   // Day of month (1-28) when consolidated invoice is generated
-  billingCycleDay Int @default(1) @map("billing_cycle_day")
+  billingCycleDay  Int   @default(1) @map("billing_cycle_day")
+  // JSON for additional billing settings (auto-pay limits, preferences, etc.)
+  billingSettings  Json? @map("billing_settings")
 
   // Relations
   owner             User               @relation("HouseholdOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  manager           User?              @relation("HouseholdManager", fields: [managerId], references: [id], onDelete: SetNull)
   members           HouseholdMember[]
   invites           HouseholdInvite[]
   homeProfile       HomeProfile?
@@ -446,6 +479,11 @@ model Household {
   workOrders        WorkOrder[]
   fileAssets        FileAsset[]
 
+  // Financial engine relations
+  clientBankAccounts ClientBankAccount[]
+  transactions       Transaction[]
+
+  @@index([managerId])
   @@map("households")
 }
 
@@ -590,10 +628,17 @@ model Vendor {
   isActive          Boolean @default(true) @map("is_active")
   notes             String?
 
+  // Vendor portal login (links to User with VENDOR role)
+  userId            String? @unique @map("user_id")
+
+  // Service areas for job board (e.g., ["Malibu", "Beverly Hills", "Pacific Palisades"])
+  serviceAreas      String[] @default([]) @map("service_areas")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
+  user                User?                @relation("VendorUser", fields: [userId], references: [id], onDelete: SetNull)
   household           Household?           @relation("HouseholdVendors", fields: [householdId], references: [id], onDelete: Cascade)
   serviceCategory     ServiceCategory?     @relation(fields: [serviceCategoryId], references: [id], onDelete: SetNull)
   householdVendors    HouseholdVendor[]
@@ -603,8 +648,10 @@ model Vendor {
   maintenanceTasks    MaintenanceTask[]
   vendorPayoutAccount VendorPayoutAccount?
   workOrders          WorkOrder[]
+  transactions        Transaction[]
 
   @@index([householdId, category])
+  @@index([userId])
   @@map("vendors")
 }
 
@@ -904,9 +951,10 @@ model FileAsset {
   uploader  User      @relation("FileAssetUploader", fields: [uploaderUserId], references: [id], onDelete: Cascade)
 
   // Back-references (one FileAsset can only be attached to one entity)
-  supportMessages   SupportMessage[]
-  workOrderNotes    WorkOrderNote[]
-  maintenanceTasks  MaintenanceTask[]
+  supportMessages    SupportMessage[]
+  workOrderNotes     WorkOrderNote[]
+  maintenanceTasks   MaintenanceTask[]
+  transactionReceipts Transaction[]
 
   @@index([householdId, type])
   @@index([uploaderUserId])
@@ -1076,6 +1124,7 @@ model MaintenanceTask {
   assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
   attachmentFile FileAsset?           @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
+  transactions   Transaction[]
 
   @@index([householdId, status])
   @@index([householdId, dueDate])
@@ -1232,8 +1281,9 @@ model HouseholdInvoice {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  items     HouseholdInvoiceItem[]
+  household    Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  items        HouseholdInvoiceItem[]
+  transactions Transaction[]
 
   @@index([householdId, status])
   @@index([billingPeriodStart, billingPeriodEnd])
@@ -1373,6 +1423,20 @@ model WorkOrder {
   actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
 
   completedAt DateTime? @map("completed_at")
+  verifiedAt  DateTime? @map("verified_at")
+  verifiedByUserId String? @map("verified_by_user_id")
+
+  // Vendor check-in/check-out tracking
+  checkInAt       DateTime? @map("check_in_at")
+  checkInLatitude  Float?   @map("check_in_latitude")
+  checkInLongitude Float?   @map("check_in_longitude")
+  checkOutAt      DateTime? @map("check_out_at")
+
+  // Proof of completion (photo URLs/file IDs)
+  proofImages     String[] @default([]) @map("proof_images")
+
+  // Service area for job board filtering (can inherit from household)
+  serviceArea     String?  @map("service_area") // e.g., "Malibu", "Beverly Hills"
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1382,11 +1446,14 @@ model WorkOrder {
   maintenanceTask MaintenanceTask? @relation(fields: [maintenanceTaskId], references: [id], onDelete: SetNull)
   vendor          Vendor?          @relation(fields: [vendorId], references: [id], onDelete: SetNull)
   createdBy       User             @relation("WorkOrderCreator", fields: [createdByUserId], references: [id], onDelete: Cascade)
+  verifiedBy      User?            @relation("WorkOrderVerifier", fields: [verifiedByUserId], references: [id], onDelete: SetNull)
   notes           WorkOrderNote[]
+  transactions    Transaction[]
 
   @@index([householdId, status])
   @@index([status, scheduledStart])
   @@index([vendorId, status])
+  @@index([status, serviceArea])
   @@map("work_orders")
 }
 
@@ -1408,4 +1475,129 @@ model WorkOrderNote {
   @@index([workOrderId, createdAt])
   @@index([attachmentFileId])
   @@map("work_order_notes")
+}
+
+// ============================================================================
+// FINANCIAL ENGINE - THE FLOAT
+// ============================================================================
+
+// Company wallet - Singleton record tracking Haven's business cash
+// Business Model: Haven pays vendors immediately (The Float), clients reimburse monthly
+model CompanyWallet {
+  id String @id @default(cuid())
+
+  // Current available balance for paying vendors
+  balance Decimal @default(0) @db.Decimal(12, 2)
+
+  // Total amount currently "floated" (paid to vendors, awaiting client reimbursement)
+  outstandingFloat Decimal @default(0) @map("outstanding_float") @db.Decimal(12, 2)
+
+  // Total amount received from clients this month
+  monthlyCollections Decimal @default(0) @map("monthly_collections") @db.Decimal(12, 2)
+
+  // Total amount paid to vendors this month
+  monthlyDisbursements Decimal @default(0) @map("monthly_disbursements") @db.Decimal(12, 2)
+
+  // Last time the monthly counters were reset
+  lastResetAt DateTime @default(now()) @map("last_reset_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("company_wallet")
+}
+
+// Client bank account - linked to household for ACH reimbursements
+model ClientBankAccount {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Stripe payment source info
+  stripePaymentMethodId String @map("stripe_payment_method_id")
+  stripeBankAccountId   String? @map("stripe_bank_account_id")
+
+  // Display info
+  bankName    String  @map("bank_name")
+  accountType String  @map("account_type") // "checking" or "savings"
+  last4       String  // Last 4 digits of account number
+  routingLast4 String? @map("routing_last4") // Last 4 of routing (optional)
+
+  // Verification status
+  isVerified Boolean @default(false) @map("is_verified")
+  verifiedAt DateTime? @map("verified_at")
+
+  // Default payment method for this household
+  isDefault Boolean @default(false) @map("is_default")
+  isActive  Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@map("client_bank_accounts")
+}
+
+// Transaction - tracks expenses paid by Haven on behalf of clients
+model Transaction {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+  vendorId    String? @map("vendor_id")
+  managerId   String @map("manager_id") // Haven staff who logged/approved this
+
+  // Transaction details
+  description String
+  amount      Decimal @db.Decimal(10, 2)
+
+  // How Haven paid the vendor
+  payoutMethod TransactionPayoutMethod @map("payout_method")
+
+  // Transaction lifecycle
+  status TransactionStatus @default(PENDING)
+
+  // Reimbursement tracking
+  isReimbursable Boolean @default(true) @map("is_reimbursable")
+
+  // Date tracking
+  paidAt      DateTime? @map("paid_at") // When Haven paid vendor
+  billedAt    DateTime? @map("billed_at") // When added to client invoice
+  settledAt   DateTime? @map("settled_at") // When client reimbursed Haven
+
+  // Receipt/documentation
+  receiptUrl      String? @map("receipt_url")
+  receiptFileId   String? @map("receipt_file_id")
+
+  // Optional: link to work order or maintenance task
+  workOrderId       String? @map("work_order_id")
+  maintenanceTaskId String? @map("maintenance_task_id")
+
+  // Invoice tracking (when billed to client)
+  householdInvoiceId String? @map("household_invoice_id")
+
+  notes String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household        Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor           Vendor?           @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  manager          User              @relation("TransactionManager", fields: [managerId], references: [id], onDelete: Cascade)
+  receiptFile      FileAsset?        @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+  workOrder        WorkOrder?        @relation(fields: [workOrderId], references: [id], onDelete: SetNull)
+  maintenanceTask  MaintenanceTask?  @relation(fields: [maintenanceTaskId], references: [id], onDelete: SetNull)
+  householdInvoice HouseholdInvoice? @relation(fields: [householdInvoiceId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, status])
+  @@index([householdId, createdAt])
+  @@index([managerId])
+  @@index([vendorId])
+  @@index([status, billedAt])
+  @@index([receiptFileId])
+  @@index([workOrderId])
+  @@index([maintenanceTaskId])
+  @@index([householdInvoiceId])
+  @@map("transactions")
 }

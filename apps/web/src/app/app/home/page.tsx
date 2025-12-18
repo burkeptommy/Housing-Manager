@@ -21,6 +21,7 @@ import {
 } from '@/lib/validations/onboarding';
 
 interface SystemDetail {
+  id?: string;
   type?: string;
   vendor?: string;
   vendorPhone?: string;
@@ -35,7 +36,24 @@ interface SystemDetail {
   filterSize?: string;
   filterLastChanged?: string;
   filterNextChange?: string;
+  imageUrl?: string;
+  location?: string;
   [key: string]: unknown;
+}
+
+interface ApplianceDetail {
+  id?: string;
+  name?: string;
+  brand?: string;
+  model?: string;
+  serialNumber?: string;
+  installDate?: string;
+  warrantyExpires?: string;
+  lastService?: string;
+  notes?: string;
+  imageUrl?: string;
+  location?: string;
+  type?: string;
 }
 
 interface DetailedSystems {
@@ -115,7 +133,7 @@ interface ExtendedProfileData {
   upcomingMaintenance?: UpcomingMaintenance[];
   recentServices?: RecentService[];
   serviceReports?: ServiceReport[];
-  appliances?: Record<string, SystemDetail>;
+  appliances?: Record<string, ApplianceDetail>;
 }
 
 function parseExtendedData(notes: string | null | undefined): ExtendedProfileData {
@@ -141,6 +159,8 @@ export default function HomeProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showSystemsModal, setShowSystemsModal] = useState(false);
+  const [showAppliancesModal, setShowAppliancesModal] = useState(false);
 
   const api = getApiClient();
 
@@ -297,6 +317,92 @@ export default function HomeProfilePage() {
     }
   };
 
+  const handleSaveDetailedSystems = async (systems: DetailedSystems) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        systems,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowSystemsModal(false);
+      setSuccessMessage('Systems updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveAppliances = async (appliances: Record<string, ApplianceDetail>) => {
+    if (!currentHousehold || !homeProfile) return;
+
+    setIsSaving(true);
+    setError('');
+
+    try {
+      const newExtendedData = {
+        ...extendedData,
+        appliances,
+      };
+
+      const updatedProfile = await api.upsertHomeProfile(currentHousehold.id, {
+        propertyType: homeProfile.propertyType,
+        addressLine1: homeProfile.addressLine1,
+        addressLine2: homeProfile.addressLine2 || undefined,
+        city: homeProfile.city,
+        state: homeProfile.state,
+        postalCode: homeProfile.postalCode,
+        country: homeProfile.country,
+        yearBuilt: homeProfile.yearBuilt || undefined,
+        bedrooms: homeProfile.bedrooms || undefined,
+        bathrooms: homeProfile.bathrooms || undefined,
+        squareFeet: homeProfile.squareFeet || undefined,
+        notes: JSON.stringify(newExtendedData),
+      });
+
+      setHomeProfile(updatedProfile);
+      setExtendedData(newExtendedData);
+      setShowAppliancesModal(false);
+      setSuccessMessage('Appliances updated successfully');
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (err: unknown) {
+      const message =
+        err && typeof err === 'object' && 'message' in err
+          ? (err as { message: string }).message
+          : 'Failed to save. Please try again.';
+      setError(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -424,7 +530,12 @@ export default function HomeProfilePage() {
 
       {/* Systems Card - Detailed View */}
       {isDetailedSystems(extendedData.systems) ? (
-        <DetailedSystemsView systems={extendedData.systems} />
+        <DetailedSystemsView
+          systems={extendedData.systems}
+          appliances={extendedData.appliances}
+          onEditSystems={() => setShowSystemsModal(true)}
+          onEditAppliances={() => setShowAppliancesModal(true)}
+        />
       ) : (
         <div className="card">
           <div className="flex items-center justify-between mb-6">
@@ -639,6 +750,26 @@ export default function HomeProfilePage() {
           </div>
         )}
       </div>
+
+      {/* Systems Management Modal */}
+      {showSystemsModal && (
+        <SystemsManagementModal
+          systems={isDetailedSystems(extendedData.systems) ? extendedData.systems : {}}
+          onSave={handleSaveDetailedSystems}
+          onClose={() => setShowSystemsModal(false)}
+          isSaving={isSaving}
+        />
+      )}
+
+      {/* Appliances Management Modal */}
+      {showAppliancesModal && (
+        <AppliancesManagementModal
+          appliances={extendedData.appliances || {}}
+          onSave={handleSaveAppliances}
+          onClose={() => setShowAppliancesModal(false)}
+          isSaving={isSaving}
+        />
+      )}
     </div>
   );
 }
@@ -967,7 +1098,17 @@ function PreferencesEditForm({
 }
 
 // Detailed Systems View Component for rich system data
-function DetailedSystemsView({ systems }: { systems: DetailedSystems }) {
+function DetailedSystemsView({
+  systems,
+  appliances,
+  onEditSystems,
+  onEditAppliances,
+}: {
+  systems: DetailedSystems;
+  appliances?: Record<string, ApplianceDetail>;
+  onEditSystems: () => void;
+  onEditAppliances: () => void;
+}) {
   const systemCategories = [
     { key: 'heating', label: 'Heating', icon: '🔥' },
     { key: 'hvac', label: 'HVAC / Air Conditioning', icon: '❄️' },
@@ -996,7 +1137,15 @@ function DetailedSystemsView({ systems }: { systems: DetailedSystems }) {
     <div className="space-y-6">
       {/* Core Home Systems */}
       <div className="card">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-6">Home Systems</h2>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Home Systems</h2>
+          <button
+            onClick={onEditSystems}
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+          >
+            Edit Systems
+          </button>
+        </div>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {systemCategories.map(({ key, label, icon }) => {
             const system = systems[key as keyof DetailedSystems] as SystemDetail | undefined;
@@ -1255,6 +1404,730 @@ function DetailedSystemsView({ systems }: { systems: DetailedSystems }) {
             );
           })}
         </div>
+      </div>
+
+      {/* Appliances Section */}
+      <div className="card">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Appliances</h2>
+          <button
+            onClick={onEditAppliances}
+            className="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 font-medium"
+          >
+            Edit Appliances
+          </button>
+        </div>
+        {appliances && Object.keys(appliances).length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {Object.entries(appliances).map(([key, appliance]) => (
+              <div key={key} className="p-4 border border-slate-200 dark:border-slate-700 rounded-lg">
+                {appliance.imageUrl && (
+                  <img
+                    src={appliance.imageUrl}
+                    alt={appliance.name || key}
+                    className="w-full h-32 object-cover rounded-lg mb-3"
+                  />
+                )}
+                <h3 className="font-medium text-slate-900 dark:text-white mb-2">
+                  {appliance.name || key.replace(/([A-Z])/g, ' $1').trim()}
+                </h3>
+                <div className="space-y-1 text-sm">
+                  {appliance.brand && (
+                    <p>
+                      <span className="text-slate-500 dark:text-slate-400">Brand:</span>{' '}
+                      <span className="text-slate-900 dark:text-white">{appliance.brand}</span>
+                    </p>
+                  )}
+                  {appliance.model && (
+                    <p>
+                      <span className="text-slate-500 dark:text-slate-400">Model:</span>{' '}
+                      <span className="text-slate-900 dark:text-white">{appliance.model}</span>
+                    </p>
+                  )}
+                  {appliance.location && (
+                    <p>
+                      <span className="text-slate-500 dark:text-slate-400">Location:</span>{' '}
+                      <span className="text-slate-900 dark:text-white">{appliance.location}</span>
+                    </p>
+                  )}
+                  {appliance.warrantyExpires && (
+                    <p>
+                      <span className="text-slate-500 dark:text-slate-400">Warranty:</span>{' '}
+                      <span className={new Date(appliance.warrantyExpires) < new Date() ? 'text-red-500' : 'text-green-600 dark:text-green-400'}>
+                        {formatDate(appliance.warrantyExpires)}
+                      </span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-slate-400 dark:text-slate-500">
+            <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+            </svg>
+            <p>No appliances added yet</p>
+            <button
+              onClick={onEditAppliances}
+              className="mt-3 text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400"
+            >
+              Add your first appliance
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Systems Management Modal
+function SystemsManagementModal({
+  systems,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  systems: DetailedSystems;
+  onSave: (systems: DetailedSystems) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const systemTypes = [
+    { key: 'hvac', label: 'HVAC / Air Conditioning' },
+    { key: 'heating', label: 'Heating' },
+    { key: 'waterHeater', label: 'Water Heater' },
+    { key: 'electrical', label: 'Electrical Panel' },
+    { key: 'plumbing', label: 'Plumbing' },
+    { key: 'fireplace', label: 'Fireplace' },
+    { key: 'roof', label: 'Roof' },
+    { key: 'garage', label: 'Garage' },
+    { key: 'pool', label: 'Pool' },
+    { key: 'lawnCare', label: 'Lawn Care' },
+    { key: 'houseCleaning', label: 'House Cleaning' },
+    { key: 'pestControl', label: 'Pest Control' },
+    { key: 'security', label: 'Security System' },
+  ];
+
+  const [editingSystems, setEditingSystems] = useState<DetailedSystems>(() => {
+    const initial: DetailedSystems = {};
+    systemTypes.forEach(({ key }) => {
+      const systemKey = key as keyof DetailedSystems;
+      if (systems[systemKey]) {
+        (initial as Record<string, unknown>)[key] = systems[systemKey];
+      }
+    });
+    return initial;
+  });
+
+  const [selectedSystem, setSelectedSystem] = useState<string | null>(null);
+  const [showAddSystem, setShowAddSystem] = useState(false);
+
+  const handleAddSystem = (systemKey: string) => {
+    setEditingSystems(prev => ({
+      ...prev,
+      [systemKey]: { id: crypto.randomUUID() },
+    }));
+    setSelectedSystem(systemKey);
+    setShowAddSystem(false);
+  };
+
+  const handleRemoveSystem = (systemKey: string) => {
+    setEditingSystems(prev => {
+      const next = { ...prev };
+      delete (next as Record<string, unknown>)[systemKey];
+      return next;
+    });
+    setSelectedSystem(null);
+  };
+
+  const handleUpdateSystem = (systemKey: string, field: string, value: string) => {
+    setEditingSystems(prev => ({
+      ...prev,
+      [systemKey]: {
+        ...(prev[systemKey as keyof DetailedSystems] as SystemDetail || {}),
+        [field]: value,
+      },
+    }));
+  };
+
+  const handleImageUpload = async (systemKey: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      handleUpdateSystem(systemKey, 'imageUrl', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(editingSystems);
+  };
+
+  const availableSystems = systemTypes.filter(
+    ({ key }) => !editingSystems[key as keyof DetailedSystems]
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+              Manage Home Systems
+            </h2>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex h-[60vh]">
+              <div className="w-64 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
+                <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSystem(!showAddSystem)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add System
+                  </button>
+
+                  {showAddSystem && availableSystems.length > 0 && (
+                    <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2">Select system type:</p>
+                      <div className="space-y-1 max-h-48 overflow-y-auto">
+                        {availableSystems.map(({ key, label }) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => handleAddSystem(key)}
+                            className="w-full text-left px-2 py-1.5 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                          >
+                            {label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-3 pb-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Your Systems</p>
+                  {Object.keys(editingSystems).length === 0 ? (
+                    <p className="text-sm text-slate-400 dark:text-slate-500 italic">No systems added yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {Object.keys(editingSystems).map((key) => {
+                        const systemType = systemTypes.find(s => s.key === key);
+                        return (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => setSelectedSystem(key)}
+                            className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                              selectedSystem === key
+                                ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                                : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            {systemType?.label || key}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedSystem ? (
+                  <SystemEditPanel
+                    systemKey={selectedSystem}
+                    systemLabel={systemTypes.find(s => s.key === selectedSystem)?.label || selectedSystem}
+                    system={(editingSystems[selectedSystem as keyof DetailedSystems] as SystemDetail) || {}}
+                    onUpdate={(field, value) => handleUpdateSystem(selectedSystem, field, value)}
+                    onRemove={() => handleRemoveSystem(selectedSystem)}
+                    onImageUpload={(file) => handleImageUpload(selectedSystem, file)}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500">
+                    <div className="text-center">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                      </svg>
+                      <p>Select a system to edit or add a new one</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SystemEditPanel({
+  systemKey,
+  systemLabel,
+  system,
+  onUpdate,
+  onRemove,
+  onImageUpload,
+}: {
+  systemKey: string;
+  systemLabel: string;
+  system: SystemDetail;
+  onUpdate: (field: string, value: string) => void;
+  onRemove: () => void;
+  onImageUpload: (file: File) => void;
+}) {
+  const commonFields = [
+    { key: 'type', label: 'Type', type: 'text', placeholder: 'e.g., Central AC, Tankless' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'e.g., Carrier, Rheem' },
+    { key: 'model', label: 'Model', type: 'text', placeholder: 'Model number' },
+    { key: 'serialNumber', label: 'Serial Number', type: 'text', placeholder: 'Serial number' },
+    { key: 'installDate', label: 'Install Date', type: 'date' },
+    { key: 'warrantyExpires', label: 'Warranty Expires', type: 'date' },
+    { key: 'vendor', label: 'Service Vendor', type: 'text', placeholder: 'Company name' },
+    { key: 'vendorPhone', label: 'Vendor Phone', type: 'tel', placeholder: '(555) 555-5555' },
+    { key: 'lastServiceDate', label: 'Last Service Date', type: 'date' },
+    { key: 'nextMaintenanceDate', label: 'Next Maintenance Due', type: 'date' },
+    { key: 'location', label: 'Location in Home', type: 'text', placeholder: 'e.g., Basement, Garage' },
+    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Any additional notes...' },
+  ];
+
+  const hvacFields = systemKey === 'hvac' ? [
+    { key: 'filterSize', label: 'Filter Size', type: 'text', placeholder: 'e.g., 20x25x1' },
+    { key: 'filterLastChanged', label: 'Filter Last Changed', type: 'date' },
+    { key: 'filterNextChange', label: 'Filter Next Change', type: 'date' },
+  ] : [];
+
+  const allFields = [...commonFields.slice(0, 10), ...hvacFields, ...commonFields.slice(10)];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-slate-900 dark:text-white">{systemLabel}</h3>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-sm text-red-600 hover:text-red-700 dark:text-red-400"
+        >
+          Remove System
+        </button>
+      </div>
+
+      <div className="p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+        <div className="text-center">
+          {system.imageUrl ? (
+            <div className="relative inline-block">
+              <img
+                src={system.imageUrl}
+                alt={systemLabel}
+                className="max-h-48 mx-auto rounded-lg object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => onUpdate('imageUrl', '')}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <svg className="w-10 h-10 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Add a photo of this system</p>
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImageUpload(file);
+            }}
+            className="hidden"
+            id={`image-upload-${systemKey}`}
+          />
+          <label
+            htmlFor={`image-upload-${systemKey}`}
+            className="inline-block px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          >
+            {system.imageUrl ? 'Change Photo' : 'Upload Photo'}
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {allFields.map(({ key, label, type, placeholder }) => (
+          <div key={key} className={type === 'textarea' ? 'md:col-span-2' : ''}>
+            <label className="label block mb-1.5">{label}</label>
+            {type === 'textarea' ? (
+              <textarea
+                value={(system[key] as string) || ''}
+                onChange={(e) => onUpdate(key, e.target.value)}
+                placeholder={placeholder}
+                rows={3}
+                className="input w-full"
+              />
+            ) : (
+              <input
+                type={type}
+                value={(system[key] as string) || ''}
+                onChange={(e) => onUpdate(key, e.target.value)}
+                placeholder={placeholder}
+                className="input w-full"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AppliancesManagementModal({
+  appliances,
+  onSave,
+  onClose,
+  isSaving,
+}: {
+  appliances: Record<string, ApplianceDetail>;
+  onSave: (appliances: Record<string, ApplianceDetail>) => void;
+  onClose: () => void;
+  isSaving: boolean;
+}) {
+  const [editingAppliances, setEditingAppliances] = useState<Record<string, ApplianceDetail>>(() => ({ ...appliances }));
+  const [selectedAppliance, setSelectedAppliance] = useState<string | null>(null);
+  const [newApplianceName, setNewApplianceName] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+
+  const suggestedAppliances = [
+    'Refrigerator', 'Dishwasher', 'Microwave', 'Oven', 'Range',
+    'Garbage Disposal', 'Trash Compactor', 'Wine Cooler',
+    'Ice Maker', 'Coffee Maker', 'Stand Mixer', 'Food Processor',
+    'Vacuum', 'Robot Vacuum', 'Air Purifier', 'Dehumidifier',
+    'TV (Living Room)', 'TV (Bedroom)', 'Sound System', 'Gaming Console',
+    'Ceiling Fan', 'Space Heater', 'Portable AC',
+  ];
+
+  const handleAddAppliance = (name: string) => {
+    const key = name.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    setEditingAppliances(prev => ({
+      ...prev,
+      [key]: { id: crypto.randomUUID(), name },
+    }));
+    setSelectedAppliance(key);
+    setShowAddForm(false);
+    setNewApplianceName('');
+  };
+
+  const handleRemoveAppliance = (key: string) => {
+    setEditingAppliances(prev => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+    setSelectedAppliance(null);
+  };
+
+  const handleUpdateAppliance = (key: string, field: string, value: string) => {
+    setEditingAppliances(prev => ({
+      ...prev,
+      [key]: { ...prev[key], [field]: value },
+    }));
+  };
+
+  const handleImageUpload = async (key: string, file: File) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      handleUpdateAppliance(key, 'imageUrl', dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(editingAppliances);
+  };
+
+  const existingNames = Object.values(editingAppliances).map(a => a.name?.toLowerCase());
+  const availableSuggestions = suggestedAppliances.filter(
+    name => !existingNames.includes(name.toLowerCase())
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-4xl max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
+            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Manage Appliances</h2>
+            <button
+              onClick={onClose}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+
+          <form onSubmit={handleSubmit}>
+            <div className="flex h-[60vh]">
+              <div className="w-64 border-r border-slate-200 dark:border-slate-700 overflow-y-auto">
+                <div className="p-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddForm(!showAddForm)}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add Appliance
+                  </button>
+
+                  {showAddForm && (
+                    <div className="mt-2 p-2 bg-slate-50 dark:bg-slate-800 rounded-lg">
+                      <input
+                        type="text"
+                        value={newApplianceName}
+                        onChange={(e) => setNewApplianceName(e.target.value)}
+                        placeholder="Appliance name..."
+                        className="input w-full mb-2 text-sm"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newApplianceName.trim()) {
+                            e.preventDefault();
+                            handleAddAppliance(newApplianceName.trim());
+                          }
+                        }}
+                      />
+                      {newApplianceName.trim() && (
+                        <button
+                          type="button"
+                          onClick={() => handleAddAppliance(newApplianceName.trim())}
+                          className="w-full text-left px-2 py-1.5 text-sm text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded"
+                        >
+                          Add &quot;{newApplianceName.trim()}&quot;
+                        </button>
+                      )}
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-2 mb-1">Or choose from:</p>
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {availableSuggestions.slice(0, 10).map((name) => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => handleAddAppliance(name)}
+                            className="w-full text-left px-2 py-1 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="px-3 pb-3">
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 uppercase tracking-wide">Your Appliances</p>
+                  {Object.keys(editingAppliances).length === 0 ? (
+                    <p className="text-sm text-slate-400 dark:text-slate-500 italic">No appliances added yet</p>
+                  ) : (
+                    <div className="space-y-1">
+                      {Object.entries(editingAppliances).map(([key, appliance]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => setSelectedAppliance(key)}
+                          className={`w-full text-left px-3 py-2 text-sm rounded-lg transition-colors ${
+                            selectedAppliance === key
+                              ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {appliance.name || key}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                {selectedAppliance && editingAppliances[selectedAppliance] ? (
+                  <ApplianceEditPanel
+                    applianceKey={selectedAppliance}
+                    appliance={editingAppliances[selectedAppliance]}
+                    onUpdate={(field, value) => handleUpdateAppliance(selectedAppliance, field, value)}
+                    onRemove={() => handleRemoveAppliance(selectedAppliance)}
+                    onImageUpload={(file) => handleImageUpload(selectedAppliance, file)}
+                  />
+                ) : (
+                  <div className="h-full flex items-center justify-center text-slate-400 dark:text-slate-500">
+                    <div className="text-center">
+                      <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+                      </svg>
+                      <p>Select an appliance to edit or add a new one</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 dark:border-slate-700">
+              <button type="button" onClick={onClose} disabled={isSaving} className="btn btn-secondary">
+                Cancel
+              </button>
+              <button type="submit" disabled={isSaving} className="btn btn-primary">
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApplianceEditPanel({
+  applianceKey,
+  appliance,
+  onUpdate,
+  onRemove,
+  onImageUpload,
+}: {
+  applianceKey: string;
+  appliance: ApplianceDetail;
+  onUpdate: (field: string, value: string) => void;
+  onRemove: () => void;
+  onImageUpload: (file: File) => void;
+}) {
+  const fields = [
+    { key: 'name', label: 'Name', type: 'text', placeholder: 'Appliance name' },
+    { key: 'brand', label: 'Brand', type: 'text', placeholder: 'e.g., Samsung, LG' },
+    { key: 'model', label: 'Model', type: 'text', placeholder: 'Model number' },
+    { key: 'serialNumber', label: 'Serial Number', type: 'text', placeholder: 'Serial number' },
+    { key: 'installDate', label: 'Purchase/Install Date', type: 'date' },
+    { key: 'warrantyExpires', label: 'Warranty Expires', type: 'date' },
+    { key: 'lastService', label: 'Last Service Date', type: 'date' },
+    { key: 'location', label: 'Location', type: 'text', placeholder: 'e.g., Kitchen, Living Room' },
+    { key: 'notes', label: 'Notes', type: 'textarea', placeholder: 'Any additional notes...' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-medium text-slate-900 dark:text-white">
+          {appliance.name || 'Unnamed Appliance'}
+        </h3>
+        <button
+          type="button"
+          onClick={onRemove}
+          className="text-sm text-red-600 hover:text-red-700 dark:text-red-400"
+        >
+          Remove Appliance
+        </button>
+      </div>
+
+      <div className="p-4 border border-dashed border-slate-300 dark:border-slate-600 rounded-lg">
+        <div className="text-center">
+          {appliance.imageUrl ? (
+            <div className="relative inline-block">
+              <img
+                src={appliance.imageUrl}
+                alt={appliance.name || 'Appliance'}
+                className="max-h-48 mx-auto rounded-lg object-contain"
+              />
+              <button
+                type="button"
+                onClick={() => onUpdate('imageUrl', '')}
+                className="absolute top-2 right-2 p-1 bg-red-500 text-white rounded-full hover:bg-red-600"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          ) : (
+            <>
+              <svg className="w-10 h-10 mx-auto text-slate-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-2">Add a photo of this appliance</p>
+            </>
+          )}
+          <input
+            type="file"
+            accept="image/*"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onImageUpload(file);
+            }}
+            className="hidden"
+            id={`appliance-image-${applianceKey}`}
+          />
+          <label
+            htmlFor={`appliance-image-${applianceKey}`}
+            className="inline-block px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 rounded-lg cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/30"
+          >
+            {appliance.imageUrl ? 'Change Photo' : 'Upload Photo'}
+          </label>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {fields.map(({ key, label, type, placeholder }) => (
+          <div key={key} className={type === 'textarea' ? 'md:col-span-2' : ''}>
+            <label className="label block mb-1.5">{label}</label>
+            {type === 'textarea' ? (
+              <textarea
+                value={(appliance[key as keyof ApplianceDetail] as string) || ''}
+                onChange={(e) => onUpdate(key, e.target.value)}
+                placeholder={placeholder}
+                rows={3}
+                className="input w-full"
+              />
+            ) : (
+              <input
+                type={type}
+                value={(appliance[key as keyof ApplianceDetail] as string) || ''}
+                onChange={(e) => onUpdate(key, e.target.value)}
+                placeholder={placeholder}
+                className="input w-full"
+              />
+            )}
+          </div>
+        ))}
       </div>
     </div>
   );

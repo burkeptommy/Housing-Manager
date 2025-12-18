@@ -46,7 +46,7 @@ export class MaintenanceTasksController {
   @ApiResponse({ status: 403, description: 'Forbidden - no access to household' })
   async create(
     @Body() createTaskDto: CreateMaintenanceTaskDto,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<MaintenanceTaskResponseDto> {
     return this.maintenanceTasksService.create(req.user.userId, createTaskDto);
   }
@@ -57,7 +57,7 @@ export class MaintenanceTasksController {
   @ApiResponse({ status: 403, description: 'Forbidden - no access to household' })
   async generateFromTemplates(
     @Body() generateDto: GenerateFromTemplatesDto,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<MaintenanceTaskResponseDto[]> {
     return this.maintenanceTasksService.generateFromTemplates(req.user.userId, generateDto);
   }
@@ -85,9 +85,9 @@ export class MaintenanceTasksController {
     @Query('dueDateFrom') dueDateFrom?: string,
     @Query('dueDateTo') dueDateTo?: string,
     @Query('includeCompleted') includeCompleted?: string,
-    @Request() req?: { user: { sub: string } },
+    @Request() req?: { user: { userId: string } },
   ): Promise<MaintenanceTaskResponseDto[]> {
-    return this.maintenanceTasksService.findAll(req!.user.sub, {
+    return this.maintenanceTasksService.findAll(req!.user.userId, {
       householdId,
       category,
       status,
@@ -103,7 +103,7 @@ export class MaintenanceTasksController {
   @ApiResponse({ status: 404, description: 'Task not found' })
   async findOne(
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<MaintenanceTaskResponseDto> {
     return this.maintenanceTasksService.findOne(id, req.user.userId);
   }
@@ -115,7 +115,7 @@ export class MaintenanceTasksController {
   async update(
     @Param('id') id: string,
     @Body() updateTaskDto: UpdateMaintenanceTaskDto,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<MaintenanceTaskResponseDto> {
     return this.maintenanceTasksService.update(id, req.user.userId, updateTaskDto);
   }
@@ -127,7 +127,7 @@ export class MaintenanceTasksController {
   @ApiResponse({ status: 404, description: 'Task not found' })
   async remove(
     @Param('id') id: string,
-    @Request() req: { user: { sub: string } },
+    @Request() req: { user: { userId: string } },
   ): Promise<void> {
     return this.maintenanceTasksService.remove(id, req.user.userId);
   }

@@ -2,14 +2,14 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { getApiClient } from '@/lib/api';
+import { getApiClient, getAccessToken } from '@/lib/api';
 import type { ServiceRequest, ServiceCategory, ServiceRequestStatus, ServiceRequestPriority } from '@haven/core';
 
 const STATUS_OPTIONS: ServiceRequestStatus[] = ['DRAFT', 'SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PRIORITY_OPTIONS: ServiceRequestPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
 
 export default function RequestsPage() {
-  const { currentHousehold } = useAuth();
+  const { currentHousehold, isAuthenticated } = useAuth();
   const [requests, setRequests] = useState<ServiceRequest[]>([]);
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -20,7 +20,9 @@ export default function RequestsPage() {
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
 
   const loadData = useCallback(async () => {
-    if (!currentHousehold) {
+    // Don't fetch if not authenticated or no household or no token
+    const token = getAccessToken();
+    if (!currentHousehold || !isAuthenticated || !token) {
       setIsLoading(false);
       return;
     }
@@ -38,7 +40,7 @@ export default function RequestsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentHousehold]);
+  }, [currentHousehold, isAuthenticated]);
 
   useEffect(() => {
     loadData();

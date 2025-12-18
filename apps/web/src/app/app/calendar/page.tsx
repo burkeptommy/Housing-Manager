@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
-import { getApiClient } from '@/lib/api';
+import { getApiClient, getAccessToken } from '@/lib/api';
 import type { MaintenanceTask, BillAccount } from '@haven/core';
 
 interface CalendarEvent {
@@ -16,7 +16,7 @@ interface CalendarEvent {
 }
 
 export default function CalendarPage() {
-  const { currentHousehold } = useAuth();
+  const { currentHousehold, isAuthenticated } = useAuth();
   const [currentDate, setCurrentDate] = useState(new Date());
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -26,7 +26,9 @@ export default function CalendarPage() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!currentHousehold) {
+      // Don't fetch if not authenticated or no household or no token
+      const token = getAccessToken();
+      if (!currentHousehold || !isAuthenticated || !token) {
         setIsLoading(false);
         return;
       }
@@ -76,7 +78,7 @@ export default function CalendarPage() {
     };
 
     loadData();
-  }, [api, currentHousehold]);
+  }, [api, currentHousehold, isAuthenticated]);
 
   const getDaysInMonth = (date: Date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
