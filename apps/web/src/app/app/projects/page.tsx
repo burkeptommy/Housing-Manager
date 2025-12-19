@@ -78,21 +78,25 @@ export default function ProjectsPage() {
   const [showArchived, setShowArchived] = useState(false);
 
   const loadData = useCallback(async () => {
+    console.log('[Projects] loadData called, currentHousehold:', currentHousehold?.id, currentHousehold?.name);
     if (!currentHousehold) {
+      console.log('[Projects] No currentHousehold, skipping API call');
       setIsLoading(false);
       return;
     }
 
     try {
+      console.log('[Projects] Fetching project ideas and stats...');
       const api = getApiClient();
       const [ideasResponse, statsData] = await Promise.all([
         api.getProjectIdeas({ limit: 100 }),
         api.getProjectPipelineStats(),
       ]);
+      console.log('[Projects] Got ideas:', ideasResponse.ideas.length, 'stats:', JSON.stringify(statsData));
       setIdeas(ideasResponse.ideas);
       setStats(statsData);
     } catch (error) {
-      console.error('Failed to load projects:', error);
+      console.error('[Projects] Failed to load projects:', error);
     } finally {
       setIsLoading(false);
     }
@@ -102,12 +106,10 @@ export default function ProjectsPage() {
     loadData();
   }, [loadData]);
 
-  // Redirect if not authenticated
+  // Log auth state for debugging
   useEffect(() => {
-    if (!authLoading && !currentHousehold) {
-      router.push('/app');
-    }
-  }, [authLoading, currentHousehold, router]);
+    console.log('[Projects] Auth state - authLoading:', authLoading, 'currentHousehold:', currentHousehold?.id);
+  }, [authLoading, currentHousehold]);
 
   // Filter ideas
   const filteredIdeas = ideas.filter((idea) => {
