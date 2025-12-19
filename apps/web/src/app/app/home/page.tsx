@@ -1,7 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import Link from 'next/link';
+import Map, { Source, Layer, NavigationControl } from 'react-map-gl/mapbox';
+import type { MapRef } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Eye,
   EyeOff,
@@ -31,6 +34,8 @@ import {
   Layers,
   Lightbulb,
   Filter,
+  Image,
+  Satellite,
 } from 'lucide-react';
 
 // ============================================================================
@@ -117,6 +122,26 @@ const propertyData = {
   lotSize: "0.35 acres",
   zoning: "Res-A",
   imageUrl: "/home-hero.jpg",
+  // Coordinates for the property (Beverly Hills area)
+  coordinates: {
+    longitude: -118.4065,
+    latitude: 34.0696,
+  },
+  // GeoJSON polygon for property boundary (approximate lot shape)
+  propertyLine: {
+    type: 'Feature' as const,
+    properties: {},
+    geometry: {
+      type: 'Polygon' as const,
+      coordinates: [[
+        [-118.40680, 34.06980],
+        [-118.40620, 34.06980],
+        [-118.40620, 34.06940],
+        [-118.40680, 34.06940],
+        [-118.40680, 34.06980],
+      ]],
+    },
+  },
 };
 
 const vaultItems: VaultItem[] = [
@@ -463,34 +488,153 @@ function RegistrationBadge({ expiresDate }: { expiresDate: string }) {
 // SECTION COMPONENTS
 // ============================================================================
 
-// Hero Section
-function HeroSection() {
-  return (
-    <div className="relative h-64 lg:h-80 rounded-xl overflow-hidden mb-6 bg-gradient-to-br from-slate-800 to-slate-900">
-      {/* Placeholder gradient - replace with actual image */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
+// Property Line Layer Style
+const propertyLineLayerStyle = {
+  id: 'property-line',
+  type: 'line' as const,
+  paint: {
+    'line-color': '#34d399', // emerald-400
+    'line-width': 3,
+    'line-opacity': 0.9,
+  },
+};
 
-      {/* Property Stats Overlay */}
-      <div className="absolute bottom-0 left-0 right-0 p-6">
-        <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2">
+const propertyFillLayerStyle = {
+  id: 'property-fill',
+  type: 'fill' as const,
+  paint: {
+    'fill-color': '#34d399', // emerald-400
+    'fill-opacity': 0.1,
+  },
+};
+
+// Hero Section with Photo/Satellite Toggle
+function HeroSection() {
+  const [viewMode, setViewMode] = useState<'photo' | 'satellite'>('photo');
+  const mapRef = useRef<MapRef>(null);
+  const [mapLoaded, setMapLoaded] = useState(false);
+
+  // Default viewport for the property
+  const defaultViewState = {
+    longitude: propertyData.coordinates.longitude,
+    latitude: propertyData.coordinates.latitude,
+    zoom: 19,
+  };
+
+  // Reset map to center if user strays too far
+  const handleMoveEnd = useCallback(() => {
+    if (!mapRef.current) return;
+
+    const center = mapRef.current.getCenter();
+    const maxDistance = 0.002; // Approximately 200 meters
+
+    const latDiff = Math.abs(center.lat - propertyData.coordinates.latitude);
+    const lngDiff = Math.abs(center.lng - propertyData.coordinates.longitude);
+
+    if (latDiff > maxDistance || lngDiff > maxDistance) {
+      mapRef.current.flyTo({
+        center: [propertyData.coordinates.longitude, propertyData.coordinates.latitude],
+        zoom: 19,
+        duration: 1000,
+      });
+    }
+  }, []);
+
+  // GeoJSON source for property boundary
+  const propertyLineGeoJSON = {
+    type: 'FeatureCollection' as const,
+    features: [propertyData.propertyLine],
+  };
+
+  return (
+    <div className="relative h-64 lg:h-80 rounded-xl overflow-hidden mb-6">
+      {/* Photo View */}
+      {viewMode === 'photo' && (
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900">
+          {/* Placeholder gradient - replace with actual property image */}
+          {/* <img src={propertyData.imageUrl} alt={propertyData.address} className="w-full h-full object-cover" /> */}
+        </div>
+      )}
+
+      {/* Satellite Map View */}
+      {viewMode === 'satellite' && (
+        <Map
+          ref={mapRef}
+          initialViewState={defaultViewState}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/satellite-streets-v12"
+          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          onLoad={() => setMapLoaded(true)}
+          onMoveEnd={handleMoveEnd}
+          maxZoom={21}
+          minZoom={16}
+          attributionControl={false}
+        >
+          {/* Navigation Controls */}
+          <NavigationControl position="top-left" showCompass={false} />
+
+          {/* Property Line Overlay */}
+          {mapLoaded && (
+            <Source id="property-boundary" type="geojson" data={propertyLineGeoJSON}>
+              <Layer {...propertyFillLayerStyle} />
+              <Layer {...propertyLineLayerStyle} />
+            </Source>
+          )}
+        </Map>
+      )}
+
+      {/* Gradient overlay for text readability */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent pointer-events-none" />
+
+      {/* View Toggle Button */}
+      <div className="absolute bottom-24 lg:bottom-28 right-4 z-10">
+        <div className="flex bg-white/10 backdrop-blur-md rounded-lg p-1 border border-white/20">
+          <button
+            onClick={() => setViewMode('photo')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              viewMode === 'photo'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Image className="w-4 h-4" />
+            Photo
+          </button>
+          <button
+            onClick={() => setViewMode('satellite')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+              viewMode === 'satellite'
+                ? 'bg-emerald-600 text-white shadow-sm'
+                : 'text-white/80 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <Satellite className="w-4 h-4" />
+            Satellite
+          </button>
+        </div>
+      </div>
+
+      {/* Property Stats Overlay - Always visible */}
+      <div className="absolute bottom-0 left-0 right-0 p-6 pointer-events-none">
+        <h1 className="text-2xl lg:text-3xl font-bold text-white mb-2 drop-shadow-lg">
           {propertyData.address}
         </h1>
-        <p className="text-slate-300 mb-4">{propertyData.city}, {propertyData.state}</p>
+        <p className="text-slate-200 mb-4 drop-shadow">{propertyData.city}, {propertyData.state}</p>
 
-        <div className="flex flex-wrap gap-4">
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+        <div className="flex flex-wrap gap-4 pointer-events-auto">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
             <p className="text-xs text-slate-300">Year Built</p>
             <p className="font-semibold text-white">{propertyData.yearBuilt}</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
             <p className="text-xs text-slate-300">Square Feet</p>
             <p className="font-semibold text-white">{propertyData.sqft.toLocaleString()}</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
             <p className="text-xs text-slate-300">Lot Size</p>
             <p className="font-semibold text-white">{propertyData.lotSize}</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
             <p className="text-xs text-slate-300">Zoning</p>
             <p className="font-semibold text-white">{propertyData.zoning}</p>
           </div>
