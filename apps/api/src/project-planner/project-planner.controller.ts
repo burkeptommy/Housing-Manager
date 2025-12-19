@@ -80,7 +80,7 @@ export class ProjectPlannerController {
   @Post('estimate')
   @ApiOperation({ summary: 'Calculate project estimate' })
   async calculateEstimate(@Request() req, @Body() dto: CalculateEstimateDto) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.estimationService.calculateEstimate(dto, householdId);
   }
 
@@ -89,7 +89,7 @@ export class ProjectPlannerController {
   async getRegionalMultiplier(@Request() req) {
     const household = await this.prisma.household.findFirst({
       where: {
-        members: { some: { id: req.user.uid } },
+        members: { some: { userId: req.user.userId } },
       },
       select: { h3Index: true },
     });
@@ -101,28 +101,28 @@ export class ProjectPlannerController {
   @Post('ideas')
   @ApiOperation({ summary: 'Create a new project idea' })
   async createIdea(@Request() req, @Body() dto: CreateProjectIdeaDto) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
-    return this.projectIdeaService.create(req.user.uid, householdId, dto);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
+    return this.projectIdeaService.create(req.user.userId, householdId, dto);
   }
 
   @Get('ideas')
   @ApiOperation({ summary: 'List project ideas (pipeline view)' })
   async listIdeas(@Request() req, @Query() query: ListProjectIdeasQueryDto) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.list(householdId, query);
   }
 
   @Get('ideas/stats')
   @ApiOperation({ summary: 'Get pipeline stats for household' })
   async getPipelineStats(@Request() req) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.getPipelineStats(householdId);
   }
 
   @Get('ideas/:id')
   @ApiOperation({ summary: 'Get project idea details' })
   async getIdea(@Request() req, @Param('id') id: string) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.getById(id, householdId);
   }
 
@@ -133,7 +133,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: UpdateProjectIdeaDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.update(id, householdId, dto);
   }
 
@@ -144,7 +144,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: ProgressProjectIdeaDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.progressStatus(id, householdId, dto.status);
   }
 
@@ -155,14 +155,14 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: ConvertToWorkOrderDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.projectIdeaService.convertToWorkOrder(id, householdId, dto);
   }
 
   @Delete('ideas/:id')
   @ApiOperation({ summary: 'Archive project idea' })
   async archiveIdea(@Request() req, @Param('id') id: string) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     await this.projectIdeaService.archive(id, householdId);
     return { success: true };
   }
@@ -172,7 +172,7 @@ export class ProjectPlannerController {
   @Post('ideas/:id/generate-suggestions')
   @ApiOperation({ summary: 'Generate system vendor suggestions for idea' })
   async generateSuggestions(@Request() req, @Param('id') id: string) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     // Verify access
     await this.projectIdeaService.getById(id, householdId);
     return this.communityIntelligenceService.generateSystemSuggestions(id);
@@ -181,7 +181,7 @@ export class ProjectPlannerController {
   @Get('ideas/:id/suggestions')
   @ApiOperation({ summary: 'Get all suggestions for project idea' })
   async getSuggestions(@Request() req, @Param('id') id: string) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.recommendationService.getSuggestionsForIdea(id, householdId);
   }
 
@@ -192,7 +192,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Query('limit') limit?: number,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     const idea = await this.projectIdeaService.getById(id, householdId);
     return this.communityIntelligenceService.getNeighborInspiration(
       householdId,
@@ -204,9 +204,9 @@ export class ProjectPlannerController {
   @Get('vendor-signals')
   @ApiOperation({ summary: 'Get vendors with social signals' })
   async getVendorSignals(@Request() req, @Query('category') category?: string) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.communityIntelligenceService.getVendorSocialSignals(
-      req.user.uid,
+      req.user.userId,
       householdId,
       category as any,
     );
@@ -221,8 +221,8 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: Omit<CreateRecommendationRequestDto, 'projectIdeaId'>,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
-    return this.recommendationService.createRequest(req.user.uid, householdId, {
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
+    return this.recommendationService.createRequest(req.user.userId, householdId, {
       ...dto,
       projectIdeaId: id,
     });
@@ -234,14 +234,14 @@ export class ProjectPlannerController {
     @Request() req,
     @Query() query: ListRecommendationRequestsQueryDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.recommendationService.listMyRequests(householdId, query);
   }
 
   @Get('requests/nearby')
   @ApiOperation({ summary: 'Get nearby community asks from neighbors' })
   async getNearbyRequests(@Request() req) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.recommendationService.getNearbyRequests(householdId);
   }
 
@@ -252,7 +252,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: UpdateRecommendationRequestStatusDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     return this.recommendationService.updateRequestStatus(id, householdId, dto.status);
   }
 
@@ -263,7 +263,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: Omit<SubmitVendorSuggestionDto, 'recommendationRequestId'>,
   ) {
-    return this.recommendationService.submitSuggestion(req.user.uid, {
+    return this.recommendationService.submitSuggestion(req.user.userId, {
       ...dto,
       recommendationRequestId: id,
     });
@@ -276,7 +276,7 @@ export class ProjectPlannerController {
     @Param('id') id: string,
     @Body() dto: SuggestionFeedbackDto,
   ) {
-    const householdId = await this.getActiveHouseholdId(req.user.uid);
+    const householdId = await this.getActiveHouseholdId(req.user.userId);
     await this.recommendationService.submitFeedback(id, householdId, dto);
     return { success: true };
   }
