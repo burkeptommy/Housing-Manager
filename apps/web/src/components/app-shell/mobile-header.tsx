@@ -97,7 +97,7 @@ export function MobileHeader() {
           <div ref={userMenuRef} className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="w-8 h-8 rounded-full bg-slate-900 flex items-center justify-center text-white text-sm font-medium hover:opacity-90 transition-opacity"
+              className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-sm font-medium hover:bg-emerald-700 transition-colors"
             >
               {initials}
             </button>

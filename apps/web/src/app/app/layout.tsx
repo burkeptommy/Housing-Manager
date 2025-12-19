@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
-import { DesktopSidebar, MobileHeader, MobileBottomNav } from '@/components/app-shell';
+import { DesktopSidebar, MobileHeader, MobileBottomNav, ConciergeFab } from '@/components/app-shell';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
@@ -41,12 +41,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <MobileHeader />
 
       {/* Main Content */}
-      <div className="lg:pl-64">
+      <div className="lg:pl-[260px]">
         <main className="p-4 lg:p-6 pb-20 lg:pb-6">{children}</main>
       </div>
 
       {/* Mobile Bottom Navigation */}
       <MobileBottomNav />
+
+      {/* Persistent Concierge Chat */}
+      <ConciergeFab />
     </div>
   );
 }
