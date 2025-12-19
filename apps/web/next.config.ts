@@ -7,6 +7,22 @@ const nextConfig: NextConfig = {
   // Enable standalone output for Docker deployment
   output: 'standalone',
 
+  // Redirect old routes to new Messages page
+  async redirects() {
+    return [
+      {
+        source: '/app/concierge',
+        destination: '/app/messages',
+        permanent: true,
+      },
+      {
+        source: '/app/support',
+        destination: '/app/messages',
+        permanent: true,
+      },
+    ];
+  },
+
   // Prevent aggressive caching of HTML pages
   async headers() {
     return [
