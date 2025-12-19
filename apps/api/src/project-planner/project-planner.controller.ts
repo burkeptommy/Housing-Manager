@@ -108,10 +108,16 @@ export class ProjectPlannerController {
   @Get('ideas')
   @ApiOperation({ summary: 'List project ideas (pipeline view)' })
   async listIdeas(@Request() req, @Query() query: ListProjectIdeasQueryDto) {
-    console.log('[ProjectPlanner] listIdeas called, user:', JSON.stringify(req.user, null, 2));
+    // Use householdId from auth payload (set by FirebaseAuthGuard)
+    const householdId = req.user.householdId;
+    console.log('[ProjectPlanner] listIdeas called, householdId from auth:', householdId);
+
+    if (!householdId) {
+      console.error('[ProjectPlanner] No householdId in auth payload');
+      return { ideas: [], total: 0, page: 1, limit: 20 };
+    }
+
     try {
-      const householdId = await this.getActiveHouseholdId(req.user.userId);
-      console.log('[ProjectPlanner] Got householdId:', householdId);
       const result = await this.projectIdeaService.list(householdId, query);
       console.log('[ProjectPlanner] Returning ideas count:', result.ideas.length, 'total:', result.total);
       return result;
@@ -124,10 +130,16 @@ export class ProjectPlannerController {
   @Get('ideas/stats')
   @ApiOperation({ summary: 'Get pipeline stats for household' })
   async getPipelineStats(@Request() req) {
-    console.log('[ProjectPlanner] getPipelineStats called, userId:', req.user?.userId);
+    // Use householdId from auth payload (set by FirebaseAuthGuard)
+    const householdId = req.user.householdId;
+    console.log('[ProjectPlanner] getPipelineStats called, householdId from auth:', householdId);
+
+    if (!householdId) {
+      console.error('[ProjectPlanner] No householdId in auth payload for stats');
+      return { DREAMING: 0, PLANNING: 0, ACTIVE: 0, COMPLETED: 0, ARCHIVED: 0 };
+    }
+
     try {
-      const householdId = await this.getActiveHouseholdId(req.user.userId);
-      console.log('[ProjectPlanner] Stats for householdId:', householdId);
       const stats = await this.projectIdeaService.getPipelineStats(householdId);
       console.log('[ProjectPlanner] Stats result:', JSON.stringify(stats));
       return stats;
