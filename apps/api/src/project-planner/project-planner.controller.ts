@@ -108,15 +108,33 @@ export class ProjectPlannerController {
   @Get('ideas')
   @ApiOperation({ summary: 'List project ideas (pipeline view)' })
   async listIdeas(@Request() req, @Query() query: ListProjectIdeasQueryDto) {
-    const householdId = await this.getActiveHouseholdId(req.user.userId);
-    return this.projectIdeaService.list(householdId, query);
+    console.log('[ProjectPlanner] listIdeas called, user:', JSON.stringify(req.user, null, 2));
+    try {
+      const householdId = await this.getActiveHouseholdId(req.user.userId);
+      console.log('[ProjectPlanner] Got householdId:', householdId);
+      const result = await this.projectIdeaService.list(householdId, query);
+      console.log('[ProjectPlanner] Returning ideas count:', result.ideas.length, 'total:', result.total);
+      return result;
+    } catch (error) {
+      console.error('[ProjectPlanner] Error in listIdeas:', error);
+      throw error;
+    }
   }
 
   @Get('ideas/stats')
   @ApiOperation({ summary: 'Get pipeline stats for household' })
   async getPipelineStats(@Request() req) {
-    const householdId = await this.getActiveHouseholdId(req.user.userId);
-    return this.projectIdeaService.getPipelineStats(householdId);
+    console.log('[ProjectPlanner] getPipelineStats called, userId:', req.user?.userId);
+    try {
+      const householdId = await this.getActiveHouseholdId(req.user.userId);
+      console.log('[ProjectPlanner] Stats for householdId:', householdId);
+      const stats = await this.projectIdeaService.getPipelineStats(householdId);
+      console.log('[ProjectPlanner] Stats result:', JSON.stringify(stats));
+      return stats;
+    } catch (error) {
+      console.error('[ProjectPlanner] Error in getPipelineStats:', error);
+      throw error;
+    }
   }
 
   @Get('ideas/:id')
@@ -284,6 +302,7 @@ export class ProjectPlannerController {
   // ==================== Helpers ====================
 
   private async getActiveHouseholdId(userId: string): Promise<string> {
+    console.log('[ProjectPlanner] getActiveHouseholdId looking for userId:', userId);
     const membership = await this.prisma.householdMember.findFirst({
       where: {
         userId,
@@ -293,8 +312,11 @@ export class ProjectPlannerController {
       orderBy: { createdAt: 'desc' },
     });
 
+    console.log('[ProjectPlanner] Found membership:', membership);
+
     if (!membership) {
-      throw new Error('No active household found');
+      console.error('[ProjectPlanner] No active household found for userId:', userId);
+      throw new Error(`No active household found for userId: ${userId}`);
     }
 
     return membership.householdId;
