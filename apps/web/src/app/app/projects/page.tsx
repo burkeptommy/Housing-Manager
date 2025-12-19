@@ -78,14 +78,22 @@ export default function ProjectsPage() {
   const [showArchived, setShowArchived] = useState(false);
 
   const loadData = useCallback(async () => {
-    console.log('[Projects] loadData called, currentHousehold:', currentHousehold?.id, currentHousehold?.name);
+    console.log('[Projects] loadData called, authLoading:', authLoading, 'currentHousehold:', currentHousehold?.id, currentHousehold?.name);
+
+    // Wait for auth to complete before making decisions
+    if (authLoading) {
+      console.log('[Projects] Auth still loading, waiting...');
+      return;
+    }
+
     if (!currentHousehold) {
-      console.log('[Projects] No currentHousehold, skipping API call');
+      console.log('[Projects] No currentHousehold after auth completed, showing empty state');
       setIsLoading(false);
       return;
     }
 
     try {
+      setIsLoading(true);
       console.log('[Projects] Fetching project ideas and stats...');
       const api = getApiClient();
       const [ideasResponse, statsData] = await Promise.all([
@@ -100,7 +108,7 @@ export default function ProjectsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [currentHousehold]);
+  }, [authLoading, currentHousehold]);
 
   useEffect(() => {
     loadData();
