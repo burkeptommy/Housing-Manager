@@ -1,214 +1,178 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import Map, { Marker, Layer } from 'react-map-gl/mapbox';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Sun,
-  Truck,
-  ShieldCheck,
-  Home,
-  FileText,
-  Clock,
+  Cloud,
+  CloudRain,
+  Trash2,
+  AlertCircle,
   CheckCircle2,
-  Phone,
-  MessageSquare,
+  Clock,
+  ChevronRight,
   DollarSign,
   Wrench,
-  ShoppingBag,
-  Droplets,
-  Sparkles,
-  ChevronRight,
+  ShoppingCart,
+  CreditCard,
   MapPin,
-  ExternalLink,
+  Car,
+  GraduationCap,
+  Briefcase,
+  Home,
+  Users,
+  Dog,
+  MessageCircle,
+  Phone,
+  Activity,
+  Loader2,
+  Calendar,
+  ThermometerSun,
+  Droplets,
+  Wind,
+  X,
+  Plus,
+  FileText,
+  Bell,
+  Sparkles,
+  Heart,
+  Coffee,
 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
+type WeatherCondition = 'sunny' | 'cloudy' | 'rainy';
+type ApprovalType = 'financial' | 'logistics' | 'system';
+type FamilyLocationStatus = 'home' | 'work' | 'school' | 'activity' | 'away' | 'unknown';
+
 interface WeatherData {
   temp: number;
-  condition: 'sunny' | 'cloudy' | 'rainy';
-  icon: typeof Sun;
+  condition: WeatherCondition;
+  humidity: number;
+  wind: number;
 }
 
-interface StatusCard {
-  title: string;
-  icon: typeof Truck;
-  value: string;
-  subtext: string;
-  highlight?: boolean;
-  highlightColor?: string;
-}
-
-interface TimelineEvent {
+interface ActionItem {
   id: string;
-  time: string;
+  type: ApprovalType;
   title: string;
   description: string;
-  icon: typeof Truck;
-  status: 'completed' | 'in_progress' | 'upcoming';
+  amount?: number;
+  source: string;
+  urgent: boolean;
+  actionLabel: string;
+  secondaryLabel?: string;
 }
 
-interface ActivityItem {
+interface FamilyMemberStatus {
   id: string;
-  description: string;
-  timestamp: string;
-  icon: typeof DollarSign;
-  amount?: string;
-}
-
-interface Manager {
   name: string;
-  title: string;
-  photoUrl: string;
-  phone: string;
+  initials: string;
+  color: string;
+  location: FamilyLocationStatus;
+  locationLabel: string;
+  until?: string;
 }
+
+interface ManagerActivity {
+  id: string;
+  task: string;
+  status: 'researching' | 'in_progress' | 'waiting' | 'completed';
+  assignedTime: string;
+  detail?: string;
+}
+
+interface HomeHealthData {
+  score: number;
+  nextService: string;
+  nextServiceDays: number;
+  alerts: number;
+}
+
+// ============================================================================
+// WEATHER ICONS
+// ============================================================================
+
+const WEATHER_ICONS: Record<WeatherCondition, typeof Sun> = {
+  sunny: Sun,
+  cloudy: Cloud,
+  rainy: CloudRain,
+};
 
 // ============================================================================
 // MOCK DATA
 // ============================================================================
 
 const mockWeather: WeatherData = {
-  temp: 72,
+  temp: 68,
   condition: 'sunny',
-  icon: Sun,
+  humidity: 45,
+  wind: 8,
 };
 
-const mockSummary = {
-  invoicesHandled: 3,
-  repairsScheduled: 1,
-  weekLabel: 'this week',
-};
+const mockContextMessage = "Trash Day is Tomorrow.";
 
-const mockStatusCards: StatusCard[] = [
+const mockActionItems: ActionItem[] = [
   {
-    title: 'Next Service Visit',
-    icon: Truck,
-    value: 'Landscaper',
-    subtext: 'Tomorrow @ 9:00 AM',
+    id: 'action-1',
+    type: 'financial',
+    title: 'Authorize Roof Repair',
+    description: 'Ace Roofing submitted quote for shingle replacement on north side.',
+    amount: 1200,
+    source: 'Money',
+    urgent: true,
+    actionLabel: 'Approve',
+    secondaryLabel: 'Review',
   },
   {
-    title: 'Recent Visit',
-    icon: ShieldCheck,
-    value: 'Property Check',
-    subtext: 'Completed today 8:30 AM',
+    id: 'action-2',
+    type: 'logistics',
+    title: 'Nanny Contract Renewal',
+    description: 'Maria\'s annual contract expires in 7 days. Review updated terms.',
+    source: 'Family',
+    urgent: true,
+    actionLabel: 'Review Contract',
   },
   {
-    title: 'Home Mode',
-    icon: Home,
-    value: 'Family Home',
-    subtext: '4 members present',
-  },
-  {
-    title: 'Pending Approvals',
-    icon: FileText,
-    value: '1 Estimate Ready',
-    subtext: 'Deck refinishing quote',
-    highlight: true,
-    highlightColor: 'text-amber-500',
+    id: 'action-3',
+    type: 'system',
+    title: 'HVAC Service Scheduled',
+    description: 'Annual maintenance with AirFlow HVAC.',
+    source: 'Maintenance',
+    urgent: false,
+    actionLabel: 'View Details',
   },
 ];
 
-const mockTimeline: TimelineEvent[] = [
-  {
-    id: '1',
-    time: '8:30 AM',
-    title: 'Property Check',
-    description: 'Weekly walkthrough completed by Steve',
-    icon: ShieldCheck,
-    status: 'completed',
-  },
-  {
-    id: '2',
-    time: '10:00 AM',
-    title: 'Housekeeper Arrival',
-    description: 'Maria - Deep cleaning scheduled',
-    icon: Sparkles,
-    status: 'in_progress',
-  },
-  {
-    id: '3',
-    time: '2:00 PM',
-    title: 'Grocery Delivery',
-    description: 'Weekly stock-up from Whole Foods',
-    icon: ShoppingBag,
-    status: 'upcoming',
-  },
-  {
-    id: '4',
-    time: '4:00 PM',
-    title: 'Pool Maintenance',
-    description: 'AquaCare - Monthly service',
-    icon: Droplets,
-    status: 'upcoming',
-  },
+const mockFamilyStatus: FamilyMemberStatus[] = [
+  { id: 'bob', name: 'Bob', initials: 'B', color: 'bg-blue-500', location: 'work', locationLabel: 'At Work', until: '5:30 PM' },
+  { id: 'alice', name: 'Alice', initials: 'A', color: 'bg-pink-500', location: 'home', locationLabel: 'Home' },
+  { id: 'emma', name: 'Emma', initials: 'E', color: 'bg-purple-500', location: 'activity', locationLabel: 'Soccer Practice', until: '4:00 PM' },
+  { id: 'jake', name: 'Jake', initials: 'J', color: 'bg-orange-500', location: 'school', locationLabel: 'At School', until: '3:15 PM' },
+  { id: 'max', name: 'Max', initials: 'M', color: 'bg-amber-500', location: 'home', locationLabel: 'Home' },
 ];
 
-const mockActivity: ActivityItem[] = [
-  {
-    id: '1',
-    description: 'Concierge processed Electric Bill',
-    timestamp: '2 hours ago',
-    icon: DollarSign,
-    amount: '$145.00',
-  },
-  {
-    id: '2',
-    description: 'Handyman replaced HVAC Filter',
-    timestamp: 'Yesterday',
-    icon: Wrench,
-  },
-  {
-    id: '3',
-    description: 'Weekly Grocery Stock-up completed',
-    timestamp: 'Yesterday',
-    icon: ShoppingBag,
-    amount: '$287.50',
-  },
-  {
-    id: '4',
-    description: 'Concierge paid Water & Sewer',
-    timestamp: '3 days ago',
-    icon: DollarSign,
-    amount: '$78.00',
-  },
-  {
-    id: '5',
-    description: 'Lawn care service completed',
-    timestamp: '4 days ago',
-    icon: Truck,
-  },
-  {
-    id: '6',
-    description: 'Concierge renewed Home Insurance',
-    timestamp: '1 week ago',
-    icon: ShieldCheck,
-    amount: '$1,245.00',
-  },
+const mockManagerActivity: ManagerActivity[] = [
+  { id: 'ma-1', task: 'Researching Summer Camps', status: 'researching', assignedTime: '2h ago', detail: 'Found 3 STEM camps in budget' },
+  { id: 'ma-2', task: 'Booking Anniversary Dinner', status: 'completed', assignedTime: '4h ago', detail: 'La Maison, Dec 28 @ 7:15 PM' },
+  { id: 'ma-3', task: 'Getting Driveway Quotes', status: 'in_progress', assignedTime: 'Yesterday', detail: '2 of 3 quotes received' },
 ];
 
-const mockManager: Manager = {
-  name: 'Steve Martinez',
-  title: 'Your Home Manager',
-  photoUrl: '/manager-avatar.jpg',
-  phone: '(310) 555-0123',
+const mockHomeHealth: HomeHealthData = {
+  score: 94,
+  nextService: 'Gutter Cleaning',
+  nextServiceDays: 14,
+  alerts: 2,
 };
 
-// Home location for the map
-const homeLocation = {
-  lat: 34.0696,
-  lng: -118.4065,
-  address: '742 Maple Drive, Beverly Hills',
+const mockManager = {
+  name: 'Sarah Mitchell',
+  initials: 'SM',
+  currentTask: 'Researching Summer Camps',
 };
-
-// Nearby activity pins for the map
-const nearbyActivity = [
-  { id: 'a1', type: 'vendor', lat: 34.0710, lng: -118.4050, label: 'Landscaper on route' },
-  { id: 'a2', type: 'delivery', lat: 34.0685, lng: -118.4080, label: 'Grocery delivery' },
-];
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -221,360 +185,294 @@ function getGreeting(): string {
   return 'Good Evening';
 }
 
+function getLocationIcon(location: FamilyLocationStatus) {
+  switch (location) {
+    case 'work': return Briefcase;
+    case 'school': return GraduationCap;
+    case 'activity': return Activity;
+    case 'home': return Home;
+    case 'away': return Car;
+    default: return MapPin;
+  }
+}
+
+function getLocationColor(location: FamilyLocationStatus) {
+  switch (location) {
+    case 'work': return 'bg-blue-100 text-blue-700';
+    case 'school': return 'bg-amber-100 text-amber-700';
+    case 'activity': return 'bg-purple-100 text-purple-700';
+    case 'home': return 'bg-emerald-100 text-emerald-700';
+    case 'away': return 'bg-slate-100 text-slate-700';
+    default: return 'bg-slate-100 text-slate-500';
+  }
+}
+
+function getHealthColor(score: number) {
+  if (score >= 90) return 'text-emerald-600';
+  if (score >= 70) return 'text-amber-600';
+  return 'text-red-600';
+}
+
+function getHealthStrokeColor(score: number) {
+  if (score >= 90) return '#10b981';
+  if (score >= 70) return '#f59e0b';
+  return '#ef4444';
+}
+
 // ============================================================================
 // COMPONENTS
 // ============================================================================
 
-// Greeting Header with Weather
-function GreetingHeader({ userName, weather }: { userName: string; weather: WeatherData }) {
-  const WeatherIcon = weather.icon;
+// Glassmorphism Action Card
+function ActionCard({ item, onDismiss }: { item: ActionItem; onDismiss: (id: string) => void }) {
+  const getTypeIcon = () => {
+    switch (item.type) {
+      case 'financial': return DollarSign;
+      case 'logistics': return Users;
+      case 'system': return Wrench;
+    }
+  };
+
+  const getTypeBadgeColor = () => {
+    switch (item.type) {
+      case 'financial': return 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+      case 'logistics': return 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+      case 'system': return 'bg-amber-500/10 text-amber-400 border-amber-500/20';
+    }
+  };
+
+  const TypeIcon = getTypeIcon();
 
   return (
-    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-2">
-      <div>
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
-          {getGreeting()}, {userName}.
-        </h1>
+    <div className="relative backdrop-blur-xl bg-white/80 rounded-2xl border border-white/20 shadow-lg shadow-slate-900/5 p-5 hover:shadow-xl transition-shadow">
+      {/* Dismiss button */}
+      <button
+        onClick={() => onDismiss(item.id)}
+        className="absolute top-3 right-3 p-1 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600"
+      >
+        <X className="w-4 h-4" />
+      </button>
+
+      {/* Type badge */}
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${getTypeBadgeColor()}`}>
+          <TypeIcon className="w-3 h-3" />
+          {item.source}
+        </span>
+        {item.urgent && (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full">
+            <AlertCircle className="w-3 h-3" />
+            Urgent
+          </span>
+        )}
       </div>
-      <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-sm">
-        <WeatherIcon className="w-5 h-5 text-amber-500" />
-        <span className="text-lg font-semibold text-slate-900">{weather.temp}°F</span>
-        <span className="text-slate-500 capitalize">{weather.condition}</span>
+
+      {/* Content */}
+      <h3 className="font-semibold text-slate-900 mb-1">
+        {item.title}
+        {item.amount && (
+          <span className="ml-2 text-emerald-600">${item.amount.toLocaleString()}</span>
+        )}
+      </h3>
+      <p className="text-sm text-slate-600 mb-4">{item.description}</p>
+
+      {/* Actions */}
+      <div className="flex gap-2">
+        <button className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium text-sm shadow-sm">
+          {item.actionLabel}
+        </button>
+        {item.secondaryLabel && (
+          <button className="px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors font-medium text-sm">
+            {item.secondaryLabel}
+          </button>
+        )}
       </div>
     </div>
   );
 }
 
-// Executive Summary
-function ExecutiveSummary({ invoicesHandled, repairsScheduled, weekLabel }: typeof mockSummary) {
-  return (
-    <p className="text-slate-600 text-lg mb-8">
-      Your home is running smoothly. Your Concierge handled{' '}
-      <span className="font-semibold text-emerald-600">{invoicesHandled} invoices</span> and scheduled{' '}
-      <span className="font-semibold text-emerald-600">{repairsScheduled} repair</span> {weekLabel}.
-    </p>
-  );
-}
+// Health Score Gauge
+function HealthGauge({ score }: { score: number }) {
+  const radius = 45;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
 
-// Peace of Mind Status Strip
-function StatusStrip({ cards }: { cards: StatusCard[] }) {
   return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-      {cards.map((card) => {
-        const Icon = card.icon;
-        return (
-          <div
-            key={card.title}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 hover:shadow-md transition-shadow"
-          >
-            <div className="flex items-start gap-3">
-              <div className={`p-2 rounded-lg ${card.highlight ? 'bg-amber-50' : 'bg-emerald-50'}`}>
-                <Icon className={`w-5 h-5 ${card.highlight ? 'text-amber-600' : 'text-emerald-600'}`} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-500 uppercase tracking-wide mb-1">{card.title}</p>
-                <p className={`font-semibold ${card.highlight && card.highlightColor ? card.highlightColor : 'text-slate-900'}`}>
-                  {card.value}
-                </p>
-                <p className="text-xs text-slate-500 mt-0.5 truncate">{card.subtext}</p>
-              </div>
-            </div>
-          </div>
-        );
-      })}
+    <div className="relative w-28 h-28">
+      <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+        {/* Background circle */}
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth="8"
+        />
+        {/* Progress circle */}
+        <circle
+          cx="50"
+          cy="50"
+          r={radius}
+          fill="none"
+          stroke={getHealthStrokeColor(score)}
+          strokeWidth="8"
+          strokeLinecap="round"
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          className="transition-all duration-1000 ease-out"
+        />
+      </svg>
+      {/* Center text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        <span className={`text-2xl font-bold ${getHealthColor(score)}`}>{score}%</span>
+        <span className="text-xs text-slate-500">Healthy</span>
+      </div>
     </div>
   );
 }
 
-// Today's Logistics Timeline
-function LogisticsTimeline({ events }: { events: TimelineEvent[] }) {
+// Family Status Pill
+function FamilyStatusPill({ member }: { member: FamilyMemberStatus }) {
+  const LocationIcon = getLocationIcon(member.location);
+  const colorClass = getLocationColor(member.location);
+  const isPet = member.id === 'max';
+
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Today's Logistics</h2>
-        </div>
-        <Link href="/app/calendar" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
-          Full Schedule
-          <ChevronRight className="w-4 h-4" />
-        </Link>
+    <div className={`inline-flex items-center gap-2 px-3 py-2 rounded-xl ${colorClass}`}>
+      <div className={`w-8 h-8 rounded-full ${member.color} flex items-center justify-center text-white text-xs font-medium`}>
+        {isPet ? <Dog className="w-4 h-4" /> : member.initials}
       </div>
-
-      <div className="relative">
-        {/* Timeline line */}
-        <div className="absolute left-4 top-2 bottom-2 w-0.5 bg-slate-200" />
-
-        <div className="space-y-6">
-          {events.map((event) => {
-            const Icon = event.icon;
-            const isInProgress = event.status === 'in_progress';
-            const isCompleted = event.status === 'completed';
-
-            return (
-              <div key={event.id} className="flex items-start gap-4 relative">
-                {/* Timeline dot */}
-                <div
-                  className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center ${
-                    isCompleted
-                      ? 'bg-emerald-100'
-                      : isInProgress
-                        ? 'bg-emerald-500'
-                        : 'bg-slate-100'
-                  }`}
-                >
-                  {isInProgress && (
-                    <span className="absolute inset-0 rounded-full bg-emerald-500 animate-ping opacity-25" />
-                  )}
-                  {isCompleted ? (
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  ) : (
-                    <Icon className={`w-4 h-4 ${isInProgress ? 'text-white' : 'text-slate-500'}`} />
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className={`flex-1 ${isCompleted ? 'opacity-60' : ''}`}>
-                  <div className="flex items-center gap-3 mb-1">
-                    <span className={`text-sm font-medium ${isInProgress ? 'text-emerald-600' : 'text-slate-500'}`}>
-                      {event.time}
-                    </span>
-                    {isInProgress && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
-                        <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                        In Progress
-                      </span>
-                    )}
-                    {isCompleted && (
-                      <span className="text-xs text-emerald-600 font-medium">Completed</span>
-                    )}
-                  </div>
-                  <p className={`font-medium ${isCompleted ? 'text-slate-500' : 'text-slate-900'}`}>
-                    {event.title}
-                  </p>
-                  <p className="text-sm text-slate-500">{event.description}</p>
-                </div>
-              </div>
-            );
-          })}
+      <div className="text-left">
+        <div className="text-sm font-medium">{member.name}</div>
+        <div className="flex items-center gap-1 text-xs opacity-80">
+          <LocationIcon className="w-3 h-3" />
+          {member.locationLabel}
+          {member.until && <span>until {member.until}</span>}
         </div>
       </div>
     </div>
   );
 }
 
-// Recent Activity Feed (Proof of Value)
-function ActivityFeed({ activities }: { activities: ActivityItem[] }) {
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-2">
-          <Sparkles className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
-        </div>
-        <span className="text-sm text-slate-500">What your Concierge has handled</span>
-      </div>
+// Manager Activity Item
+function ManagerActivityItem({ activity }: { activity: ManagerActivity }) {
+  const getStatusIcon = () => {
+    switch (activity.status) {
+      case 'researching': return <Loader2 className="w-4 h-4 animate-spin text-blue-500" />;
+      case 'in_progress': return <Clock className="w-4 h-4 text-amber-500" />;
+      case 'waiting': return <Clock className="w-4 h-4 text-slate-400" />;
+      case 'completed': return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+    }
+  };
 
-      <div className="space-y-4">
-        {activities.map((activity) => {
-          const Icon = activity.icon;
-          return (
-            <div key={activity.id} className="flex items-start gap-3 pb-4 border-b border-slate-100 last:border-0 last:pb-0">
-              <div className="p-2 rounded-lg bg-slate-50">
-                <Icon className="w-4 h-4 text-slate-600" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-slate-800">{activity.description}</p>
-                <div className="flex items-center gap-2 mt-1">
-                  <span className="text-xs text-slate-500">{activity.timestamp}</span>
-                  {activity.amount && (
-                    <>
-                      <span className="text-slate-300">·</span>
-                      <span className="text-xs font-medium text-slate-700">{activity.amount}</span>
-                    </>
-                  )}
-                </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// Quick Actions
-function QuickActions() {
-  const actions = [
-    {
-      label: 'Request Service',
-      icon: Wrench,
-      href: '/app/requests/new',
-      color: 'bg-emerald-600 hover:bg-emerald-700 text-white',
-    },
-    {
-      label: 'Notify Arrival',
-      icon: MapPin,
-      href: '/app/notify',
-      color: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200',
-    },
-    {
-      label: 'Approve Expenses',
-      icon: FileText,
-      href: '/app/approvals',
-      color: 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200',
-    },
-  ];
-
-  return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
-      <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h2>
-      <div className="flex flex-wrap gap-3">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.label}
-              href={action.href}
-              className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium shadow-sm transition-colors ${action.color}`}
-            >
-              <Icon className="w-4 h-4" />
-              {action.label}
-            </Link>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// 3D Neighborhood Map
-function NeighborhoodMap() {
-  // 3D building layer configuration - using any to avoid complex Mapbox expression types
-  const buildingLayer = {
-    id: '3d-buildings',
-    source: 'composite',
-    'source-layer': 'building',
-    filter: ['==', 'extrude', 'true'],
-    type: 'fill-extrusion' as const,
-    minzoom: 15,
-    paint: {
-      'fill-extrusion-color': '#aaa',
-      'fill-extrusion-height': ['get', 'height'] as unknown as number,
-      'fill-extrusion-base': ['get', 'min_height'] as unknown as number,
-      'fill-extrusion-opacity': 0.6,
-    },
+  const getStatusBadge = () => {
+    switch (activity.status) {
+      case 'researching': return 'bg-blue-100 text-blue-700';
+      case 'in_progress': return 'bg-amber-100 text-amber-700';
+      case 'waiting': return 'bg-slate-100 text-slate-600';
+      case 'completed': return 'bg-emerald-100 text-emerald-700';
+    }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
-      <div className="flex items-center justify-between p-4 border-b border-slate-100">
+    <div className="flex items-start gap-3 py-3 border-b border-slate-100 last:border-0">
+      <div className="mt-0.5">{getStatusIcon()}</div>
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <MapPin className="w-5 h-5 text-emerald-600" />
-          <h2 className="text-lg font-semibold text-slate-900">Your Neighborhood</h2>
+          <span className="font-medium text-slate-800 text-sm">{activity.task}</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge()}`}>
+            {activity.status.replace('_', ' ')}
+          </span>
         </div>
-        <Link
-          href="/app/home"
-          className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
-        >
-          Home Profile
-          <ExternalLink className="w-3.5 h-3.5" />
-        </Link>
-      </div>
-      <div className="h-48 relative">
-        <Map
-          initialViewState={{
-            longitude: homeLocation.lng,
-            latitude: homeLocation.lat,
-            zoom: 16,
-            pitch: 50,
-            bearing: -17.6,
-          }}
-          style={{ width: '100%', height: '100%' }}
-          mapStyle="mapbox://styles/mapbox/streets-v12"
-          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-          attributionControl={false}
-          interactive={true}
-        >
-          {/* 3D Buildings Layer */}
-          <Layer {...buildingLayer} />
-
-          {/* Home Marker */}
-          <Marker
-            longitude={homeLocation.lng}
-            latitude={homeLocation.lat}
-            anchor="bottom"
-          >
-            <div className="relative">
-              <div className="w-10 h-10 rounded-full bg-emerald-600 border-3 border-white shadow-lg flex items-center justify-center">
-                <Home className="w-5 h-5 text-white" />
-              </div>
-              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-emerald-600" />
-            </div>
-          </Marker>
-
-          {/* Activity Markers */}
-          {nearbyActivity.map((activity) => (
-            <Marker
-              key={activity.id}
-              longitude={activity.lng}
-              latitude={activity.lat}
-              anchor="center"
-            >
-              <div className="w-6 h-6 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center animate-pulse">
-                {activity.type === 'vendor' ? (
-                  <Truck className="w-3 h-3 text-white" />
-                ) : (
-                  <ShoppingBag className="w-3 h-3 text-white" />
-                )}
-              </div>
-            </Marker>
-          ))}
-        </Map>
-      </div>
-      <div className="p-3 bg-slate-50 text-center">
-        <p className="text-sm text-slate-600">
-          <span className="font-medium text-slate-900">{homeLocation.address}</span>
-        </p>
+        {activity.detail && (
+          <p className="text-sm text-slate-500 mt-0.5">{activity.detail}</p>
+        )}
+        <span className="text-xs text-slate-400">{activity.assignedTime}</span>
       </div>
     </div>
   );
 }
 
-// Manager Contact Card
-function ManagerCard({ manager }: { manager: Manager }) {
+// Quick Action Button
+function QuickActionButton({ icon: Icon, label, href, variant = 'default' }: {
+  icon: typeof Plus;
+  label: string;
+  href: string;
+  variant?: 'default' | 'primary';
+}) {
   return (
-    <div className="bg-gradient-to-br from-slate-900 to-slate-800 rounded-xl shadow-sm p-6 text-white">
-      <div className="flex items-center gap-4 mb-4">
-        <div className="w-16 h-16 rounded-full bg-emerald-600 flex items-center justify-center text-2xl font-bold overflow-hidden">
-          {/* Placeholder avatar - replace with actual image */}
-          <span>SM</span>
-        </div>
-        <div>
-          <h3 className="text-lg font-semibold">{manager.name}</h3>
-          <p className="text-slate-400">{manager.title}</p>
-        </div>
-      </div>
+    <Link
+      href={href}
+      className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+        variant === 'primary'
+          ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/25'
+          : 'bg-white text-slate-700 hover:bg-slate-50 border border-slate-200 shadow-sm'
+      }`}
+    >
+      <Icon className="w-5 h-5" />
+      <span className="font-medium">{label}</span>
+    </Link>
+  );
+}
 
-      <p className="text-sm text-slate-300 mb-4">
-        I'm here to ensure your home runs smoothly. Reach out anytime you need assistance.
-      </p>
+// Request Modal
+function RequestModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  if (!isOpen) return null;
 
-      <div className="flex gap-3">
-        <a
-          href={`tel:${manager.phone}`}
-          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
-        >
-          <Phone className="w-4 h-4" />
-          Call
-        </a>
-        <Link
-          href="/app/messages"
-          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors"
-        >
-          <MessageSquare className="w-4 h-4" />
-          Chat
-        </Link>
+  const quickRequests = [
+    { icon: Wrench, label: 'Something needs fixing', category: 'Maintenance' },
+    { icon: Sparkles, label: 'Need cleaning service', category: 'Cleaning' },
+    { icon: ShoppingCart, label: 'Need something bought', category: 'Shopping' },
+    { icon: Calendar, label: 'Schedule an appointment', category: 'Scheduling' },
+    { icon: FileText, label: 'Research something', category: 'Research' },
+    { icon: Coffee, label: 'Something else', category: 'Other' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+        <div className="p-6 border-b border-slate-200">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold text-slate-900">I need...</h2>
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-4 space-y-2">
+          {quickRequests.map((request) => {
+            const Icon = request.icon;
+            return (
+              <button
+                key={request.category}
+                onClick={onClose}
+                className="w-full flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 transition-colors text-left"
+              >
+                <div className="p-3 bg-emerald-50 rounded-xl">
+                  <Icon className="w-6 h-6 text-emerald-600" />
+                </div>
+                <div>
+                  <div className="font-medium text-slate-900">{request.label}</div>
+                  <div className="text-sm text-slate-500">{request.category}</div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-400 ml-auto" />
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="p-4 border-t border-slate-200">
+          <input
+            type="text"
+            placeholder="Or describe what you need..."
+            className="w-full px-4 py-3 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+          />
+        </div>
       </div>
     </div>
   );
@@ -587,41 +485,239 @@ function ManagerCard({ manager }: { manager: Manager }) {
 export default function DashboardPage() {
   const { user } = useAuth();
   const userName = user?.firstName || 'there';
+  const [actionItems, setActionItems] = useState(mockActionItems);
+  const [showRequestModal, setShowRequestModal] = useState(false);
+
+  const WeatherIcon = WEATHER_ICONS[mockWeather.condition];
+
+  const dismissAction = (id: string) => {
+    setActionItems(prev => prev.filter(item => item.id !== id));
+  };
 
   return (
     <div className="pb-32 lg:pb-8">
-      {/* Greeting & Weather */}
-      <GreetingHeader userName={userName} weather={mockWeather} />
+      {/* ================================================================== */}
+      {/* MORNING BRIEFING - Hero Section */}
+      {/* ================================================================== */}
+      <div className="mb-8">
+        {/* Greeting Row */}
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl lg:text-3xl font-bold text-slate-900 tracking-tight">
+              {getGreeting()}, {userName}.
+            </h1>
+            <div className="flex items-center gap-2 mt-2 text-slate-600">
+              <Trash2 className="w-4 h-4 text-amber-500" />
+              <span>{mockContextMessage}</span>
+            </div>
+          </div>
 
-      {/* Executive Summary */}
-      <ExecutiveSummary {...mockSummary} />
-
-      {/* Peace of Mind Status Strip */}
-      <StatusStrip cards={mockStatusCards} />
-
-      {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Timeline & Activity (2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Today's Logistics */}
-          <LogisticsTimeline events={mockTimeline} />
-
-          {/* Recent Activity */}
-          <ActivityFeed activities={mockActivity} />
+          {/* Weather Card */}
+          <div className="flex items-center gap-4 px-4 py-3 bg-white rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-2">
+              <WeatherIcon className="w-8 h-8 text-amber-500" />
+              <span className="text-2xl font-bold text-slate-900">{mockWeather.temp}°F</span>
+            </div>
+            <div className="hidden sm:flex flex-col text-xs text-slate-500 border-l border-slate-200 pl-4">
+              <div className="flex items-center gap-1">
+                <Droplets className="w-3 h-3" /> {mockWeather.humidity}%
+              </div>
+              <div className="flex items-center gap-1">
+                <Wind className="w-3 h-3" /> {mockWeather.wind} mph
+              </div>
+            </div>
+          </div>
         </div>
 
-        {/* Right Column - Map, Actions & Manager (1/3 width) */}
-        <div className="space-y-6">
-          {/* Neighborhood Map */}
-          <NeighborhoodMap />
+        {/* Action Stack - Glassmorphism Cards */}
+        {actionItems.length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {actionItems.map(item => (
+              <ActionCard key={item.id} item={item} onDismiss={dismissAction} />
+            ))}
+          </div>
+        )}
 
-          {/* Quick Actions */}
-          <QuickActions />
+        {actionItems.length === 0 && (
+          <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-2xl border border-emerald-100 p-8 text-center">
+            <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">All Clear</h3>
+            <p className="text-slate-600">No pending approvals. Your home is running smoothly.</p>
+          </div>
+        )}
+      </div>
 
-          {/* Manager Card */}
-          <ManagerCard manager={mockManager} />
+      {/* ================================================================== */}
+      {/* LIVE PULSE - Real-Time Status */}
+      {/* ================================================================== */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Activity className="w-5 h-5 text-emerald-600" />
+            Live Pulse
+          </h2>
+          <Link href="/app/family" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+            Family Details
+            <ChevronRight className="w-4 h-4" />
+          </Link>
+        </div>
+
+        {/* Family Status Row */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+          <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Family Logistics</h3>
+          <div className="flex flex-wrap gap-3">
+            {mockFamilyStatus.map(member => (
+              <FamilyStatusPill key={member.id} member={member} />
+            ))}
+          </div>
+        </div>
+
+        {/* Staff Activity Feed */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide">Your Manager</h3>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center text-white text-xs font-medium">
+                {mockManager.initials}
+              </div>
+              <div className="text-sm">
+                <span className="font-medium text-slate-800">{mockManager.name}</span>
+                <span className="text-slate-500"> is currently:</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-emerald-50 rounded-lg p-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+              <span className="font-medium text-emerald-800">{mockManager.currentTask}</span>
+            </div>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {mockManagerActivity.map(activity => (
+              <ManagerActivityItem key={activity.id} activity={activity} />
+            ))}
+          </div>
+
+          <Link
+            href="/app/tasks"
+            className="block w-full mt-4 py-2 text-center text-sm text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors font-medium"
+          >
+            View All Manager Tasks
+          </Link>
         </div>
       </div>
+
+      {/* ================================================================== */}
+      {/* BOTTOM ROW - Health & Quick Actions */}
+      {/* ================================================================== */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* House Health Widget */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+              <Heart className="w-5 h-5 text-red-500" />
+              House Health
+            </h2>
+            <Link href="/app/maintenance" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1">
+              Full Report
+              <ChevronRight className="w-4 h-4" />
+            </Link>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <HealthGauge score={mockHomeHealth.score} />
+
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-3">
+                <ThermometerSun className="w-5 h-5 text-slate-400" />
+                <span className="text-slate-700">Next Service:</span>
+              </div>
+              <div className="text-lg font-semibold text-slate-900">{mockHomeHealth.nextService}</div>
+              <div className="text-sm text-slate-500">in {mockHomeHealth.nextServiceDays} days</div>
+
+              {mockHomeHealth.alerts > 0 && (
+                <div className="mt-4 flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-lg">
+                  <Bell className="w-4 h-4 text-amber-600" />
+                  <span className="text-sm text-amber-700 font-medium">
+                    {mockHomeHealth.alerts} items need attention
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h2>
+
+          <div className="space-y-3">
+            <button
+              onClick={() => setShowRequestModal(true)}
+              className="w-full flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/25"
+            >
+              <Plus className="w-5 h-5" />
+              <span className="font-medium">I need...</span>
+              <span className="text-emerald-200 text-sm ml-auto">Open request</span>
+            </button>
+
+            <QuickActionButton
+              icon={ShoppingCart}
+              label="Add to Shopping List"
+              href="/app/inventory"
+            />
+
+            <QuickActionButton
+              icon={CreditCard}
+              label="Pay a Bill"
+              href="/app/money"
+            />
+
+            <QuickActionButton
+              icon={MessageCircle}
+              label="Message Manager"
+              href="/app/messages"
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Manager Contact Footer */}
+      <div className="mt-8 bg-gradient-to-br from-slate-900 to-slate-800 rounded-2xl p-6 text-white">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-emerald-600 flex items-center justify-center text-xl font-bold">
+              SM
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">Sarah Mitchell</h3>
+              <p className="text-slate-400">Your Home Manager</p>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <a
+              href="tel:+13105550123"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-white/20 rounded-lg font-medium transition-colors"
+            >
+              <Phone className="w-4 h-4" />
+              Call
+            </a>
+            <Link
+              href="/app/messages"
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Chat
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Request Modal */}
+      <RequestModal isOpen={showRequestModal} onClose={() => setShowRequestModal(false)} />
     </div>
   );
 }
