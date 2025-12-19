@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
+import Map, { Marker, Layer } from 'react-map-gl/mapbox';
+import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Sun,
   Truck,
@@ -19,6 +21,7 @@ import {
   Sparkles,
   ChevronRight,
   MapPin,
+  ExternalLink,
 } from 'lucide-react';
 
 // ============================================================================
@@ -193,6 +196,19 @@ const mockManager: Manager = {
   photoUrl: '/manager-avatar.jpg',
   phone: '(310) 555-0123',
 };
+
+// Home location for the map
+const homeLocation = {
+  lat: 34.0696,
+  lng: -118.4065,
+  address: '742 Maple Drive, Beverly Hills',
+};
+
+// Nearby activity pins for the map
+const nearbyActivity = [
+  { id: 'a1', type: 'vendor', lat: 34.0710, lng: -118.4050, label: 'Landscaper on route' },
+  { id: 'a2', type: 'delivery', lat: 34.0685, lng: -118.4080, label: 'Grocery delivery' },
+];
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -432,6 +448,99 @@ function QuickActions() {
   );
 }
 
+// 3D Neighborhood Map
+function NeighborhoodMap() {
+  // 3D building layer configuration - using any to avoid complex Mapbox expression types
+  const buildingLayer = {
+    id: '3d-buildings',
+    source: 'composite',
+    'source-layer': 'building',
+    filter: ['==', 'extrude', 'true'],
+    type: 'fill-extrusion' as const,
+    minzoom: 15,
+    paint: {
+      'fill-extrusion-color': '#aaa',
+      'fill-extrusion-height': ['get', 'height'] as unknown as number,
+      'fill-extrusion-base': ['get', 'min_height'] as unknown as number,
+      'fill-extrusion-opacity': 0.6,
+    },
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+      <div className="flex items-center justify-between p-4 border-b border-slate-100">
+        <div className="flex items-center gap-2">
+          <MapPin className="w-5 h-5 text-emerald-600" />
+          <h2 className="text-lg font-semibold text-slate-900">Your Neighborhood</h2>
+        </div>
+        <Link
+          href="/app/home"
+          className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+        >
+          Home Profile
+          <ExternalLink className="w-3.5 h-3.5" />
+        </Link>
+      </div>
+      <div className="h-48 relative">
+        <Map
+          initialViewState={{
+            longitude: homeLocation.lng,
+            latitude: homeLocation.lat,
+            zoom: 16,
+            pitch: 50,
+            bearing: -17.6,
+          }}
+          style={{ width: '100%', height: '100%' }}
+          mapStyle="mapbox://styles/mapbox/streets-v12"
+          mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
+          attributionControl={false}
+          interactive={true}
+        >
+          {/* 3D Buildings Layer */}
+          <Layer {...buildingLayer} />
+
+          {/* Home Marker */}
+          <Marker
+            longitude={homeLocation.lng}
+            latitude={homeLocation.lat}
+            anchor="bottom"
+          >
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full bg-emerald-600 border-3 border-white shadow-lg flex items-center justify-center">
+                <Home className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-0 h-0 border-l-4 border-r-4 border-t-4 border-l-transparent border-r-transparent border-t-emerald-600" />
+            </div>
+          </Marker>
+
+          {/* Activity Markers */}
+          {nearbyActivity.map((activity) => (
+            <Marker
+              key={activity.id}
+              longitude={activity.lng}
+              latitude={activity.lat}
+              anchor="center"
+            >
+              <div className="w-6 h-6 rounded-full bg-amber-500 border-2 border-white shadow-md flex items-center justify-center animate-pulse">
+                {activity.type === 'vendor' ? (
+                  <Truck className="w-3 h-3 text-white" />
+                ) : (
+                  <ShoppingBag className="w-3 h-3 text-white" />
+                )}
+              </div>
+            </Marker>
+          ))}
+        </Map>
+      </div>
+      <div className="p-3 bg-slate-50 text-center">
+        <p className="text-sm text-slate-600">
+          <span className="font-medium text-slate-900">{homeLocation.address}</span>
+        </p>
+      </div>
+    </div>
+  );
+}
+
 // Manager Contact Card
 function ManagerCard({ manager }: { manager: Manager }) {
   return (
@@ -501,8 +610,11 @@ export default function DashboardPage() {
           <ActivityFeed activities={mockActivity} />
         </div>
 
-        {/* Right Column - Actions & Manager (1/3 width) */}
+        {/* Right Column - Map, Actions & Manager (1/3 width) */}
         <div className="space-y-6">
+          {/* Neighborhood Map */}
+          <NeighborhoodMap />
+
           {/* Quick Actions */}
           <QuickActions />
 
