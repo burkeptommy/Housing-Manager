@@ -120,7 +120,7 @@ const propertyData = {
   sqft: 4200,
   lotSize: "0.35 acres",
   zoning: "Res-A",
-  imageUrl: "/home-hero.jpg",
+  imageUrl: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1600&q=80",
 };
 
 const vaultItems: VaultItem[] = [
