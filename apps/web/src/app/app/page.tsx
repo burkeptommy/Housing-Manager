@@ -569,7 +569,7 @@ function ManagerCard({ manager }: { manager: Manager }) {
           Call
         </a>
         <Link
-          href="/app/concierge"
+          href="/app/messages"
           className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg font-medium transition-colors"
         >
           <MessageSquare className="w-4 h-4" />
