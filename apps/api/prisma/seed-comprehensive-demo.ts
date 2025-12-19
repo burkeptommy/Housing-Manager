@@ -582,6 +582,11 @@ async function main() {
   // ============================================================================
   console.log('\n🏗️ Adding demo projects...');
 
+  // Clear existing project ideas for this household
+  await prisma.projectIdea.deleteMany({
+    where: { householdId: bobHousehold.id },
+  });
+
   // First, get or create a manager
   const manager = await prisma.user.findFirst({
     where: { email: 'steve@haven.app' },
