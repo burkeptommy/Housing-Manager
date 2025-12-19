@@ -22,6 +22,7 @@ import {
   PostVisibility,
   HouseholdInvoiceStatus,
   FamilyEventCategory,
+  FriendshipStatus,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -842,6 +843,57 @@ async function main() {
     }
 
     console.log('✅ Created 10 social posts');
+
+    // ============================================================================
+    // 4b. SOCIAL CONNECTIONS (Friendships & Follows)
+    // ============================================================================
+    console.log('\n👥 Adding social connections...');
+
+    // Clear existing connections
+    await prisma.friendship.deleteMany({
+      where: {
+        OR: [
+          { requesterId: bob.id },
+          { addresseeId: bob.id },
+        ],
+      },
+    });
+    await prisma.follow.deleteMany({
+      where: {
+        OR: [
+          { followerId: bob.id },
+          { followingId: bob.id },
+        ],
+      },
+    });
+
+    // Create friendship between Bob and Alice (ACCEPTED)
+    await prisma.friendship.create({
+      data: {
+        requesterId: bob.id,
+        addresseeId: alice.id,
+        status: FriendshipStatus.ACCEPTED,
+        acceptedAt: daysAgo(90),
+      },
+    });
+
+    // Bob follows Alice
+    await prisma.follow.create({
+      data: {
+        followerId: bob.id,
+        followingId: alice.id,
+      },
+    });
+
+    // Alice follows Bob
+    await prisma.follow.create({
+      data: {
+        followerId: alice.id,
+        followingId: bob.id,
+      },
+    });
+
+    console.log('✅ Created social connections (Bob <-> Alice friendship + follows)');
   }
 
   // ============================================================================
