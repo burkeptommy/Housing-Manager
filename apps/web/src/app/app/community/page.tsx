@@ -23,16 +23,32 @@ function formatRelativeTime(dateString: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-// Format cost display
-function formatCost(post: FeedItem['post']): string | null {
+// Format cost display as $ indicators ($ through $$$$)
+function formatCostIndicator(post: FeedItem['post']): { indicator: string; label: string } | null {
   if (post.costDisplay === 'HIDDEN') return null;
-  if (post.costDisplay === 'EXACT' && post.actualCost) {
-    return `$${post.actualCost.toLocaleString()}`;
+
+  // Get the cost to evaluate
+  let cost: number | null = null;
+  if (post.actualCost) {
+    cost = post.actualCost;
+  } else if (post.costRangeMin != null && post.costRangeMax != null) {
+    cost = (post.costRangeMin + post.costRangeMax) / 2;
+  } else if (post.costRangeMax != null) {
+    cost = post.costRangeMax;
   }
-  if (post.costDisplay === 'RANGE' && post.costRangeMin != null && post.costRangeMax != null) {
-    return `$${post.costRangeMin.toLocaleString()} - $${post.costRangeMax.toLocaleString()}`;
+
+  if (cost === null) return null;
+
+  // Convert to $ indicators based on cost ranges
+  if (cost < 500) {
+    return { indicator: '$', label: 'Under $500' };
+  } else if (cost < 2000) {
+    return { indicator: '$$', label: '$500 - $2,000' };
+  } else if (cost < 10000) {
+    return { indicator: '$$$', label: '$2,000 - $10,000' };
+  } else {
+    return { indicator: '$$$$', label: 'Over $10,000' };
   }
-  return null;
 }
 
 // Source badge component
@@ -68,21 +84,70 @@ function SourceBadge({ source }: { source: FeedSource }) {
   );
 }
 
+// Vendor Tag component
+function VendorTag({
+  vendor,
+  onClick,
+}: {
+  vendor: { id: string; displayName: string; rating?: number | null; category?: string };
+  onClick?: (vendorId: string) => void;
+}) {
+  return (
+    <button
+      onClick={() => onClick?.(vendor.id)}
+      className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 text-sm font-medium hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+    >
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+      </svg>
+      <span>{vendor.displayName}</span>
+      {vendor.rating && (
+        <span className="text-amber-500 flex items-center">
+          <svg className="w-3 h-3 mr-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+          </svg>
+          {vendor.rating.toFixed(1)}
+        </span>
+      )}
+    </button>
+  );
+}
+
+// Cost Indicator component
+function CostIndicator({ indicator, label }: { indicator: string; label: string }) {
+  const colorClass = indicator.length <= 2
+    ? 'text-green-600 dark:text-green-400'
+    : indicator.length === 3
+    ? 'text-amber-600 dark:text-amber-400'
+    : 'text-red-600 dark:text-red-400';
+
+  return (
+    <span
+      className={`font-bold ${colorClass}`}
+      title={label}
+    >
+      {indicator}
+    </span>
+  );
+}
+
 // Feed Card Component
 function FeedCard({
   item,
   onLike,
   onSave,
+  onVendorClick,
 }: {
   item: FeedItem;
   onLike: (postId: string, isLiked: boolean) => void;
   onSave: (postId: string, isSaved: boolean) => void;
+  onVendorClick?: (vendorId: string) => void;
 }) {
   const { post, source, author, isAnonymized } = item;
   const [imageIndex, setImageIndex] = useState(0);
   const allImages = [...(post.beforeImages || []), ...(post.afterImages || [])];
   const hasImages = allImages.length > 0;
-  const costDisplay = formatCost(post);
+  const costInfo = formatCostIndicator(post);
 
   return (
     <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -179,21 +244,14 @@ function FeedCard({
         </div>
       )}
 
-      {/* Vendor & Cost Info */}
-      {(post.vendor || costDisplay || post.durationDays) && (
+      {/* Vendor Tag & Cost Info */}
+      {(post.vendor || costInfo || post.durationDays) && (
         <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700 flex items-center flex-wrap gap-x-4 gap-y-2 text-sm">
           {post.vendor && (
-            <div className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
-              <span className="font-medium">{post.vendor.displayName}</span>
-              {post.vendor.rating && (
-                <span className="text-amber-500">★ {post.vendor.rating.toFixed(1)}</span>
-              )}
-            </div>
+            <VendorTag vendor={post.vendor} onClick={onVendorClick} />
           )}
-          {costDisplay && (
-            <span className="text-green-600 dark:text-green-400 font-medium">
-              {costDisplay}
-            </span>
+          {costInfo && (
+            <CostIndicator indicator={costInfo.indicator} label={costInfo.label} />
           )}
           {post.durationDays && (
             <span className="text-slate-500 dark:text-slate-400">
@@ -262,11 +320,11 @@ function FeedCard({
           </svg>
           <span>{post.commentsCount || 0}</span>
         </button>
-        {post.vendor && (
-          <button className="ml-auto text-sm text-emerald-600 dark:text-emerald-400 hover:underline">
-            Contact Vendor
-          </button>
-        )}
+        <button className="ml-auto text-sm text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+          </svg>
+        </button>
       </div>
     </div>
   );
@@ -315,6 +373,24 @@ export default function CommunityPage() {
   const [feedData, setFeedData] = useState<FeedResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+
+  // Get unique vendors from feed for filter display
+  const vendors = feedData?.items
+    .filter((item) => item.post.vendor)
+    .reduce((acc, item) => {
+      const v = item.post.vendor!;
+      if (!acc.find((x) => x.id === v.id)) {
+        acc.push(v);
+      }
+      return acc;
+    }, [] as Array<{ id: string; displayName: string; rating?: number | null }>)
+    || [];
+
+  // Filter feed by selected vendor
+  const filteredItems = selectedVendorId
+    ? feedData?.items.filter((item) => item.post.vendor?.id === selectedVendorId)
+    : feedData?.items;
 
   // Fetch feed data
   const fetchFeed = async (tab: TabType) => {
@@ -438,7 +514,7 @@ export default function CommunityPage() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
+      <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
         {tabs.map((tab) => (
           <button
             key={tab.key}
@@ -455,6 +531,48 @@ export default function CommunityPage() {
         ))}
       </div>
 
+      {/* Vendor Filter */}
+      {vendors.length > 0 && (
+        <div className="mb-6">
+          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 mb-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
+            <span>Filter by vendor:</span>
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setSelectedVendorId(null)}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                selectedVendorId === null
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+              }`}
+            >
+              All Vendors
+            </button>
+            {vendors.map((vendor) => (
+              <button
+                key={vendor.id}
+                onClick={() => setSelectedVendorId(vendor.id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  selectedVendorId === vendor.id
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/50'
+                }`}
+              >
+                {vendor.displayName}
+                {vendor.rating && (
+                  <span className="ml-1 text-amber-400">
+                    {vendor.rating.toFixed(1)}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Feed Content */}
       {isLoading ? (
         <div className="flex items-center justify-center py-16">
@@ -470,19 +588,34 @@ export default function CommunityPage() {
             Try again
           </button>
         </div>
-      ) : feedData?.items.length === 0 ? (
-        <EmptyState tab={activeTab} />
+      ) : filteredItems?.length === 0 ? (
+        selectedVendorId ? (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div className="text-6xl mb-4">🔍</div>
+            <h3 className="text-lg font-medium text-slate-900 dark:text-white">No posts from this vendor</h3>
+            <p className="text-slate-500 dark:text-slate-400 mt-1">Try selecting a different vendor or view all.</p>
+            <button
+              onClick={() => setSelectedVendorId(null)}
+              className="mt-4 text-emerald-600 dark:text-emerald-400 hover:underline"
+            >
+              Show all posts
+            </button>
+          </div>
+        ) : (
+          <EmptyState tab={activeTab} />
+        )
       ) : (
         <div className="space-y-4">
-          {feedData?.items.map((item) => (
+          {filteredItems?.map((item) => (
             <FeedCard
               key={item.post.id}
               item={item}
               onLike={handleLike}
               onSave={handleSave}
+              onVendorClick={setSelectedVendorId}
             />
           ))}
-          {feedData?.hasMore && (
+          {feedData?.hasMore && !selectedVendorId && (
             <button
               onClick={() => {
                 // TODO: Load more with cursor pagination
