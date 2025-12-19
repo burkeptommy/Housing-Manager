@@ -75,9 +75,11 @@ export class FirebaseAuthGuard implements CanActivate {
     try {
       // Verify Firebase ID token
       const decodedToken = await this.firebaseApp.auth().verifyIdToken(idToken);
+      this.logger.log(`[AUTH] Token verified for email: ${decodedToken.email}, uid: ${decodedToken.uid}`);
 
       // Look up or create user
       const user = await this.findOrCreateUser(decodedToken);
+      this.logger.log(`[AUTH] User found/created: id=${user.id}, email=${user.email}, firebaseUid=${user.firebaseUid}`);
 
       // Load household memberships
       const memberships = await this.prisma.householdMember.findMany({
@@ -95,6 +97,10 @@ export class FirebaseAuthGuard implements CanActivate {
             },
           },
         },
+      });
+      this.logger.log(`[AUTH] Found ${memberships.length} memberships for userId=${user.id}`);
+      memberships.forEach((m, i) => {
+        this.logger.log(`[AUTH] Membership[${i}]: householdId=${m.householdId}, role=${m.role}, status=${m.status}, householdName=${m.household.name}`);
       });
 
       // Get primary household (first active membership or null)
@@ -139,6 +145,7 @@ export class FirebaseAuthGuard implements CanActivate {
 
   private async findOrCreateUser(decodedToken: admin.auth.DecodedIdToken) {
     const { uid, email, name, picture } = decodedToken;
+    this.logger.log(`[AUTH] findOrCreateUser called: uid=${uid}, email=${email}`);
 
     if (!email) {
       throw new UnauthorizedException('Email is required');
@@ -150,6 +157,7 @@ export class FirebaseAuthGuard implements CanActivate {
     });
 
     if (user) {
+      this.logger.log(`[AUTH] Found user by firebaseUid: id=${user.id}, email=${user.email}`);
       // Update last login
       await this.prisma.user.update({
         where: { id: user.id },
@@ -157,6 +165,7 @@ export class FirebaseAuthGuard implements CanActivate {
       });
       return user;
     }
+    this.logger.log(`[AUTH] No user found by firebaseUid=${uid}, trying email lookup`);
 
     // Try to find by email (for migrating existing users)
     user = await this.prisma.user.findUnique({
@@ -164,6 +173,7 @@ export class FirebaseAuthGuard implements CanActivate {
     });
 
     if (user) {
+      this.logger.log(`[AUTH] Found user by email: id=${user.id}, existing firebaseUid=${user.firebaseUid}`);
       // Link Firebase UID to existing user
       user = await this.prisma.user.update({
         where: { id: user.id },
@@ -175,8 +185,10 @@ export class FirebaseAuthGuard implements CanActivate {
           avatarUrl: user.avatarUrl || picture,
         },
       });
+      this.logger.log(`[AUTH] Linked firebaseUid to existing user: id=${user.id}`);
       return user;
     }
+    this.logger.log(`[AUTH] No user found by email=${email}, creating new user`);
 
     // Create new user
     this.logger.log(`Creating new user for Firebase UID: ${uid}`);
