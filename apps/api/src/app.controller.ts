@@ -20,14 +20,20 @@ export class AppController {
   @Get('me')
   @UseGuards(FirebaseAuthGuard)
   async getMe(@CurrentUser() user: AuthPayload) {
+    console.log('[/api/me] Called for userId:', user.userId, 'email:', user.email);
+    console.log('[/api/me] Memberships from auth:', JSON.stringify(user.memberships));
+
     // Get full user data
     const dbUser = await this.prisma.user.findUnique({
       where: { id: user.userId },
     });
 
     if (!dbUser) {
+      console.log('[/api/me] No dbUser found for userId:', user.userId);
       return { user: null, household: null, memberships: [] };
     }
+
+    console.log('[/api/me] Found dbUser:', dbUser.email);
 
     // Get primary household info
     const primaryMembership = user.memberships[0];
