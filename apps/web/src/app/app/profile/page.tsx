@@ -1,299 +1,969 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import { useState } from 'react';
+import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
-import { getApiClient } from '@/lib/api';
-import type { SocialProfile, ProjectPost, ProfileStats } from '@haven/core';
+import {
+  User,
+  Mail,
+  Phone,
+  Camera,
+  Edit3,
+  Check,
+  X,
+  Bell,
+  DollarSign,
+  Shield,
+  LogOut,
+  Smartphone,
+  Monitor,
+  Laptop,
+  ChevronRight,
+  ChevronDown,
+  Flame,
+  Trophy,
+  CheckCircle2,
+  AlertTriangle,
+  Users,
+  Lock,
+  Key,
+  CreditCard,
+  Wallet,
+  Globe,
+  UserX,
+  Crown,
+  Zap,
+  MessageSquare,
+  Home,
+  Calendar,
+} from 'lucide-react';
 
-// Format currency
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type SettingsTab = 'details' | 'notifications' | 'wallet' | 'security';
+type VisibilityLevel = 'public' | 'neighbors' | 'friends';
+
+interface NotificationSetting {
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  threshold?: number;
 }
 
-// Post Grid Card
-function PostGridCard({ post }: { post: ProjectPost }) {
-  const image = post.afterImages?.[0] || post.beforeImages?.[0];
+interface LinkedAccount {
+  id: string;
+  type: 'venmo' | 'zelle' | 'paypal';
+  username: string;
+  isDefault: boolean;
+}
+
+interface ActiveSession {
+  id: string;
+  device: string;
+  deviceType: 'mobile' | 'desktop' | 'tablet';
+  location: string;
+  lastActive: string;
+  isCurrent: boolean;
+}
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
+const mockUserData = {
+  id: 'u1',
+  firstName: 'Robert',
+  lastName: 'Chen',
+  displayName: 'Bob Chen',
+  email: 'bob@example.com',
+  phone: '+1 (310) 555-0123',
+  avatarUrl: null,
+  coverUrl: null,
+  role: 'admin' as const,
+  householdName: 'The Chen Family',
+  joinedDate: '2023-06-15',
+  contributionScore: 847,
+  weekStreak: 7,
+  tasksCompleted: 156,
+  projectsLed: 4,
+};
+
+const mockNotifications: Record<string, NotificationSetting[]> = {
+  financial: [
+    { id: 'f1', label: 'Bill Payment Reminders', description: 'Get notified before bills are due', enabled: true },
+    { id: 'f2', label: 'Budget Threshold Alerts', description: 'Notify when spending exceeds limit', enabled: true, threshold: 500 },
+    { id: 'f3', label: 'Expense Approvals', description: 'When a family member requests approval', enabled: true },
+  ],
+  lifestyle: [
+    { id: 'l1', label: 'Service Provider Arrivals', description: 'Nanny, tutor, or cleaner arrival alerts', enabled: true },
+    { id: 'l2', label: 'Maintenance Reminders', description: 'Scheduled maintenance coming up', enabled: false },
+    { id: 'l3', label: 'Calendar Event Reminders', description: 'Family events and appointments', enabled: true },
+  ],
+  social: [
+    { id: 's1', label: 'Post Interactions', description: 'Likes, comments on your project posts', enabled: true },
+    { id: 's2', label: 'Neighbor Replies', description: 'When neighbors respond to your posts', enabled: true },
+    { id: 's3', label: 'Community Updates', description: 'Neighborhood announcements and alerts', enabled: false },
+  ],
+  system: [
+    { id: 'y1', label: 'Critical Home Health Alerts', description: 'Security, HVAC, water leak warnings', enabled: true },
+    { id: 'y2', label: 'System Updates', description: 'App updates and new features', enabled: true },
+  ],
+};
+
+const mockLinkedAccounts: LinkedAccount[] = [
+  { id: 'la1', type: 'venmo', username: '@bobchen', isDefault: true },
+];
+
+const mockSessions: ActiveSession[] = [
+  { id: 's1', device: 'iPhone 15 Pro', deviceType: 'mobile', location: 'Beverly Hills, CA', lastActive: 'Now', isCurrent: true },
+  { id: 's2', device: 'MacBook Pro', deviceType: 'desktop', location: 'Beverly Hills, CA', lastActive: '2 hours ago', isCurrent: false },
+  { id: 's3', device: 'iPad Air', deviceType: 'tablet', location: 'Los Angeles, CA', lastActive: '3 days ago', isCurrent: false },
+];
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+// Hero Card Component
+function HeroCard({
+  user,
+  onEditAvatar,
+}: {
+  user: typeof mockUserData;
+  onEditAvatar: () => void;
+}) {
+  const isAdmin = user.role === 'admin';
 
   return (
-    <Link
-      href={`/app/community/post/${post.id}`}
-      className="group relative aspect-square bg-slate-100 dark:bg-slate-700 rounded-lg overflow-hidden"
-    >
-      {image ? (
-        <img src={image} alt={post.title} className="w-full h-full object-cover" />
-      ) : (
-        <div className="w-full h-full flex items-center justify-center text-4xl text-slate-400 dark:text-slate-500">
-          🏠
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* Cover Photo */}
+      <div className="h-32 bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-400 relative">
+        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTRtMC0xNmMwLTIuMjA5LTEuNzkxLTQtNC00cy00IDEuNzkxLTQgNCAxLjc5MSA0IDQgNCA0LTEuNzkxIDQtNG0tMTYgMTZjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTRtMTYgMTZjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTQiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30" />
+        <button className="absolute top-3 right-3 p-2 bg-black/20 hover:bg-black/30 rounded-lg transition-colors">
+          <Camera className="w-4 h-4 text-white" />
+        </button>
+      </div>
+
+      {/* Avatar & Info */}
+      <div className="px-6 pb-6">
+        <div className="flex items-end -mt-12 mb-4">
+          <div className="relative">
+            <div className="w-24 h-24 rounded-full border-4 border-white bg-slate-200 flex items-center justify-center overflow-hidden shadow-lg">
+              {user.avatarUrl ? (
+                <Image src={user.avatarUrl} alt="" fill className="object-cover" />
+              ) : (
+                <span className="text-4xl font-bold text-slate-400">
+                  {user.firstName[0]}{user.lastName[0]}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onEditAvatar}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-emerald-600 hover:bg-emerald-700 rounded-full flex items-center justify-center shadow-lg transition-colors"
+            >
+              <Camera className="w-4 h-4 text-white" />
+            </button>
+          </div>
+
+          {/* Role Badge */}
+          <div className="ml-4 mb-2">
+            {isAdmin ? (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-sm font-medium">
+                <Crown className="w-4 h-4" />
+                Head of Household
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
+                <Users className="w-4 h-4" />
+                Family Member
+              </span>
+            )}
+          </div>
         </div>
-      )}
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4 text-white">
-        <div className="flex items-center gap-1">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-          </svg>
-          <span>{post.likesCount || 0}</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-          </svg>
-          <span>{post.savesCount || 0}</span>
+
+        <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
+        <p className="text-slate-500 text-sm mt-0.5">{user.householdName}</p>
+
+        {/* Gamification Stats */}
+        <div className="grid grid-cols-2 gap-4 mt-6">
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Trophy className="w-5 h-5 text-emerald-600" />
+              </div>
+              <span className="text-sm font-medium text-slate-600">Contribution Score</span>
+            </div>
+            <p className="text-3xl font-bold text-emerald-600">{user.contributionScore}</p>
+            <p className="text-xs text-slate-500 mt-1">{user.tasksCompleted} tasks completed</p>
+          </div>
+
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Flame className="w-5 h-5 text-amber-600" />
+              </div>
+              <span className="text-sm font-medium text-slate-600">Active Streak</span>
+            </div>
+            <p className="text-3xl font-bold text-amber-600">{user.weekStreak} weeks</p>
+            <p className="text-xs text-slate-500 mt-1">Keep it going!</p>
+          </div>
         </div>
       </div>
-      {/* Verified badge */}
-      {post.isVerified && (
-        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full flex items-center gap-1">
-          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-          </svg>
-        </div>
-      )}
-    </Link>
-  );
-}
-
-// Stats Card
-function StatCard({ label, value, icon }: { label: string; value: string | number; icon: string }) {
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl p-4 text-center border border-slate-200 dark:border-slate-700">
-      <div className="text-2xl mb-1">{icon}</div>
-      <div className="text-2xl font-bold text-slate-900 dark:text-white">{value}</div>
-      <div className="text-sm text-slate-500 dark:text-slate-400">{label}</div>
     </div>
   );
 }
 
-export default function ProfilePage() {
-  const { user, isAuthenticated } = useAuth();
-  const [profile, setProfile] = useState<SocialProfile | null>(null);
-  const [stats, setStats] = useState<ProfileStats | null>(null);
-  const [posts, setPosts] = useState<ProjectPost[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'posts' | 'saved'>('posts');
-  const [isEditingBio, setIsEditingBio] = useState(false);
-  const [bio, setBio] = useState('');
+// Toggle Switch Component
+function ToggleSwitch({
+  enabled,
+  onChange,
+  disabled = false,
+}: {
+  enabled: boolean;
+  onChange: (value: boolean) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      onClick={() => !disabled && onChange(!enabled)}
+      className={`relative w-11 h-6 rounded-full transition-colors ${
+        enabled ? 'bg-emerald-600' : 'bg-slate-300'
+      } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+    >
+      <span
+        className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
+          enabled ? 'translate-x-5' : 'translate-x-0'
+        }`}
+      />
+    </button>
+  );
+}
 
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      if (!isAuthenticated || !user?.id) return;
+// Personal Details Tab
+function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    displayName: user.displayName,
+    email: user.email,
+    phone: user.phone,
+  });
+  const [showVerifyPhone, setShowVerifyPhone] = useState(false);
 
-      setIsLoading(true);
-      setError(null);
-
-      try {
-        const api = getApiClient();
-        const [profileData, statsData, portfolioData] = await Promise.all([
-          api.getSocialProfile(user.id),
-          api.getProfileStats(),
-          api.getUserPortfolio(user.id),
-        ]);
-
-        setProfile(profileData);
-        setStats(statsData);
-        setPosts(portfolioData.posts);
-        setBio(profileData.bio || '');
-      } catch (err: any) {
-        console.error('Failed to load profile:', err);
-        setError(err.message || 'Failed to load profile');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchProfileData();
-  }, [isAuthenticated, user?.id]);
-
-  const handleSaveBio = async () => {
-    try {
-      const api = getApiClient();
-      const updated = await api.updateSocialProfile({ bio });
-      setProfile((prev) => prev ? { ...prev, bio: updated.bio } : prev);
-      setIsEditingBio(false);
-    } catch (err) {
-      console.error('Failed to update bio:', err);
+  const handleSave = () => {
+    // In real app, would call API
+    setIsEditing(false);
+    if (formData.phone !== user.phone) {
+      setShowVerifyPhone(true);
     }
   };
-
-  const handleTogglePublic = async () => {
-    try {
-      const api = getApiClient();
-      await api.updateSocialProfile({ isPublicProfile: !profile?.isPublicProfile });
-      setProfile((prev) => prev ? { ...prev, isPublicProfile: !prev.isPublicProfile } : prev);
-    } catch (err) {
-      console.error('Failed to toggle public profile:', err);
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-[calc(100vh-200px)]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-red-500">{error}</p>
-      </div>
-    );
-  }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Profile Header */}
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden mb-6">
-        {/* Cover Image */}
-        <div className="h-32 bg-gradient-to-r from-emerald-500 to-purple-500" />
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-slate-900">Personal Information</h3>
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+          >
+            <Edit3 className="w-4 h-4" />
+            Edit
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsEditing(false)}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X className="w-4 h-4" />
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium bg-emerald-600 text-white hover:bg-emerald-700 rounded-lg transition-colors"
+            >
+              <Check className="w-4 h-4" />
+              Save
+            </button>
+          </div>
+        )}
+      </div>
 
-        <div className="px-6 pb-6">
-          {/* Avatar */}
-          <div className="flex items-end justify-between -mt-12 mb-4">
-            <div className="w-24 h-24 rounded-full border-4 border-white dark:border-slate-800 bg-slate-200 dark:bg-slate-700 flex items-center justify-center overflow-hidden">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" />
-              ) : (
-                <span className="text-4xl text-slate-500 dark:text-slate-400">
-                  {user?.firstName?.[0] || '?'}
+      <div className="space-y-4">
+        {/* Display Name */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Display Name</label>
+          {isEditing ? (
+            <div className="relative">
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="text"
+                value={formData.displayName}
+                onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
+              <User className="w-5 h-5 text-slate-400" />
+              <span className="text-slate-900">{user.displayName}</span>
+            </div>
+          )}
+        </div>
+
+        {/* Email */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+          {isEditing ? (
+            <div className="relative">
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
+              <Mail className="w-5 h-5 text-slate-400" />
+              <span className="text-slate-900">{user.email}</span>
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                Verified
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Phone */}
+        <div>
+          <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
+          {isEditing ? (
+            <div className="relative">
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <input
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              />
+            </div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
+              <Phone className="w-5 h-5 text-slate-400" />
+              <span className="text-slate-900">{user.phone}</span>
+              <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                <CheckCircle2 className="w-3 h-3" />
+                Verified
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Phone Verification Modal */}
+      {showVerifyPhone && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowVerifyPhone(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <h4 className="text-lg font-semibold text-slate-900 mb-2">Verify Your Phone</h4>
+            <p className="text-sm text-slate-500 mb-4">
+              We sent a 6-digit code to {formData.phone}
+            </p>
+            <div className="flex gap-2 mb-4">
+              {[...Array(6)].map((_, i) => (
+                <input
+                  key={i}
+                  type="text"
+                  maxLength={1}
+                  className="w-10 h-12 text-center text-xl font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                />
+              ))}
+            </div>
+            <button
+              onClick={() => setShowVerifyPhone(false)}
+              className="w-full px-4 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Verify
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Notifications Tab
+function NotificationsTab() {
+  const [notifications, setNotifications] = useState(mockNotifications);
+  const [billThreshold, setBillThreshold] = useState(500);
+
+  const toggleNotification = (category: string, id: string) => {
+    const categorySettings = notifications[category];
+    if (!categorySettings) return;
+    setNotifications({
+      ...notifications,
+      [category]: categorySettings.map((n) =>
+        n.id === id ? { ...n, enabled: !n.enabled } : n
+      ),
+    });
+  };
+
+  const categoryIcons: Record<string, typeof DollarSign> = {
+    financial: DollarSign,
+    lifestyle: Calendar,
+    social: MessageSquare,
+    system: Zap,
+  };
+
+  const categoryLabels: Record<string, string> = {
+    financial: 'Financial Alerts',
+    lifestyle: 'Lifestyle Reminders',
+    social: 'Social Notifications',
+    system: 'System Alerts',
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 mb-1">Notification Preferences</h3>
+        <p className="text-sm text-slate-500">Control how and when Haven notifies you</p>
+      </div>
+
+      {Object.entries(notifications).map(([category, settings]) => {
+        const Icon = categoryIcons[category] ?? DollarSign;
+        const isSystem = category === 'system';
+
+        return (
+          <div key={category} className="bg-slate-50 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 bg-slate-100">
+              <Icon className="w-5 h-5 text-slate-600" />
+              <span className="font-medium text-slate-700">{categoryLabels[category]}</span>
+              {isSystem && (
+                <span className="ml-auto text-xs text-slate-500 flex items-center gap-1">
+                  <Lock className="w-3 h-3" />
+                  Always On
                 </span>
               )}
             </div>
-            <div className="flex gap-2">
-              <button
-                onClick={handleTogglePublic}
-                className={`px-4 py-2 rounded-lg text-sm font-medium ${
-                  profile?.isPublicProfile
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400'
-                    : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
+            <div className="divide-y divide-slate-200">
+              {settings.map((setting) => (
+                <div key={setting.id} className="px-4 py-4 bg-white">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1">
+                      <p className="font-medium text-slate-900">{setting.label}</p>
+                      <p className="text-sm text-slate-500 mt-0.5">{setting.description}</p>
+                      {setting.threshold !== undefined && setting.enabled && (
+                        <div className="mt-3">
+                          <label className="text-sm text-slate-600 block mb-2">
+                            Notify when spending exceeds: <span className="font-semibold">${billThreshold}</span>
+                          </label>
+                          <input
+                            type="range"
+                            min={100}
+                            max={2000}
+                            step={100}
+                            value={billThreshold}
+                            onChange={(e) => setBillThreshold(Number(e.target.value))}
+                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                          />
+                          <div className="flex justify-between text-xs text-slate-400 mt-1">
+                            <span>$100</span>
+                            <span>$2,000</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <ToggleSwitch
+                      enabled={setting.enabled}
+                      onChange={() => toggleNotification(category, setting.id)}
+                      disabled={isSystem}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Digital Wallet Tab
+function WalletTab() {
+  const [accounts, setAccounts] = useState(mockLinkedAccounts);
+  const [, setShowAddAccount] = useState(false);
+
+  const accountIcons: Record<string, string> = {
+    venmo: '💳',
+    zelle: '🏦',
+    paypal: '💰',
+  };
+
+  const setDefault = (id: string) => {
+    setAccounts(accounts.map((a) => ({ ...a, isDefault: a.id === id })));
+  };
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 mb-1">Digital Wallet</h3>
+        <p className="text-sm text-slate-500">Manage payment methods for reimbursements and split expenses</p>
+      </div>
+
+      {/* Linked Accounts */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h4 className="font-medium text-slate-700">Linked Accounts</h4>
+          <button
+            onClick={() => setShowAddAccount(true)}
+            className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
+          >
+            + Add Account
+          </button>
+        </div>
+
+        {accounts.length > 0 ? (
+          <div className="space-y-2">
+            {accounts.map((account) => (
+              <div
+                key={account.id}
+                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200"
               >
-                {profile?.isPublicProfile ? '🌍 Public Profile' : '🔒 Private Profile'}
+                <div className="text-2xl">{accountIcons[account.type]}</div>
+                <div className="flex-1">
+                  <p className="font-medium text-slate-900 capitalize">{account.type}</p>
+                  <p className="text-sm text-slate-500">{account.username}</p>
+                </div>
+                {account.isDefault ? (
+                  <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                    Default
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setDefault(account.id)}
+                    className="text-sm text-slate-500 hover:text-slate-700"
+                  >
+                    Set as Default
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-8 bg-slate-50 rounded-xl">
+            <Wallet className="w-10 h-10 text-slate-300 mx-auto mb-2" />
+            <p className="text-slate-500">No accounts linked yet</p>
+          </div>
+        )}
+      </div>
+
+      {/* Connect Account Buttons */}
+      <div className="space-y-3">
+        <h4 className="font-medium text-slate-700">Connect a New Account</h4>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {['venmo', 'zelle', 'paypal'].map((type) => (
+            <button
+              key={type}
+              className="flex items-center justify-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+            >
+              <span className="text-xl">{accountIcons[type]}</span>
+              <span className="font-medium text-slate-700 capitalize">Connect {type}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Default Payment Method */}
+      <div className="p-4 bg-slate-50 rounded-xl">
+        <div className="flex items-center gap-3 mb-3">
+          <CreditCard className="w-5 h-5 text-slate-500" />
+          <h4 className="font-medium text-slate-700">Default Payment Method</h4>
+        </div>
+        <p className="text-sm text-slate-500 mb-3">
+          Select which account receives reimbursements from household expenses
+        </p>
+        <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+          <span className="text-xl">💳</span>
+          <div className="flex-1">
+            <p className="font-medium text-slate-900">Venmo</p>
+            <p className="text-sm text-slate-500">@bobchen</p>
+          </div>
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Security Tab
+function SecurityTab({ user }: { user: typeof mockUserData }) {
+  const [sessions, setSessions] = useState(mockSessions);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [visibility, setVisibility] = useState<VisibilityLevel>('neighbors');
+  const [, setShowChangePassword] = useState(false);
+  const [showLeaveHousehold, setShowLeaveHousehold] = useState(false);
+
+  const deviceIcons: Record<string, typeof Smartphone> = {
+    mobile: Smartphone,
+    desktop: Monitor,
+    tablet: Laptop,
+  };
+
+  const getDeviceIcon = (type: string) => deviceIcons[type] ?? Smartphone;
+
+  const logOutSession = (id: string) => {
+    setSessions(sessions.filter((s) => s.id !== id));
+  };
+
+  const logOutAll = () => {
+    setSessions(sessions.filter((s) => s.isCurrent));
+  };
+
+  const isAdmin = user.role === 'admin';
+
+  return (
+    <div className="space-y-8">
+      {/* Social Privacy */}
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 mb-1">Social Privacy</h3>
+        <p className="text-sm text-slate-500 mb-4">Control who can see your project posts</p>
+
+        <div className="space-y-2">
+          {[
+            { value: 'public', label: 'Public', description: 'Anyone can see your posts', icon: Globe },
+            { value: 'neighbors', label: 'Neighbors Only', description: 'Only verified neighbors can see', icon: Home },
+            { value: 'friends', label: 'Friends Only', description: 'Only people you follow', icon: Users },
+          ].map((option) => (
+            <button
+              key={option.value}
+              onClick={() => setVisibility(option.value as VisibilityLevel)}
+              className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${
+                visibility === option.value
+                  ? 'border-emerald-500 bg-emerald-50'
+                  : 'border-slate-200 bg-white hover:bg-slate-50'
+              }`}
+            >
+              <option.icon className={`w-5 h-5 ${visibility === option.value ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <div className="flex-1 text-left">
+                <p className={`font-medium ${visibility === option.value ? 'text-emerald-900' : 'text-slate-900'}`}>
+                  {option.label}
+                </p>
+                <p className="text-sm text-slate-500">{option.description}</p>
+              </div>
+              {visibility === option.value && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Security Settings */}
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">Security</h3>
+
+        <div className="space-y-3">
+          {/* Change Password */}
+          <button
+            onClick={() => setShowChangePassword(true)}
+            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+          >
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <Key className="w-5 h-5 text-slate-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-medium text-slate-900">Change Password</p>
+              <p className="text-sm text-slate-500">Update your account password</p>
+            </div>
+            <ChevronRight className="w-5 h-5 text-slate-400" />
+          </button>
+
+          {/* Two-Factor Auth */}
+          <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200">
+            <div className="p-2 bg-slate-100 rounded-lg">
+              <Shield className="w-5 h-5 text-slate-600" />
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-slate-900">Two-Factor Authentication</p>
+              <p className="text-sm text-slate-500">Add an extra layer of security</p>
+            </div>
+            <ToggleSwitch enabled={twoFactorEnabled} onChange={setTwoFactorEnabled} />
+          </div>
+        </div>
+      </div>
+
+      {/* Active Sessions */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-slate-900">Active Sessions</h3>
+          {sessions.length > 1 && (
+            <button
+              onClick={logOutAll}
+              className="text-sm font-medium text-red-600 hover:text-red-700"
+            >
+              Log Out All
+            </button>
+          )}
+        </div>
+
+        <div className="space-y-2">
+          {sessions.map((session) => {
+            const DeviceIcon = getDeviceIcon(session.deviceType);
+            return (
+              <div
+                key={session.id}
+                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200"
+              >
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <DeviceIcon className="w-5 h-5 text-slate-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-slate-900">{session.device}</p>
+                    {session.isCurrent && (
+                      <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+                        Current
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    {session.location} • {session.lastActive}
+                  </p>
+                </div>
+                {!session.isCurrent && (
+                  <button
+                    onClick={() => logOutSession(session.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                  >
+                    <LogOut className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="border-t border-slate-200 pt-8">
+        <h3 className="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>
+
+        <div className="space-y-3">
+          {isAdmin && (
+            <button className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors">
+              <div className="p-2 bg-amber-100 rounded-lg">
+                <Crown className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1 text-left">
+                <p className="font-medium text-slate-900">Transfer Admin Rights</p>
+                <p className="text-sm text-slate-500">Give Head of Household role to another adult</p>
+              </div>
+              <ChevronRight className="w-5 h-5 text-slate-400" />
+            </button>
+          )}
+
+          <button
+            onClick={() => setShowLeaveHousehold(true)}
+            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-red-200 hover:bg-red-50 transition-colors"
+          >
+            <div className="p-2 bg-red-100 rounded-lg">
+              <UserX className="w-5 h-5 text-red-600" />
+            </div>
+            <div className="flex-1 text-left">
+              <p className="font-medium text-red-700">Leave Household</p>
+              <p className="text-sm text-red-500">Remove yourself from {user.householdName}</p>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Leave Household Modal */}
+      {showLeaveHousehold && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowLeaveHousehold(false)} />
+          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-red-100 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-red-600" />
+              </div>
+              <h4 className="text-lg font-semibold text-slate-900">Leave Household?</h4>
+            </div>
+            <p className="text-sm text-slate-600 mb-6">
+              You will lose access to all household data, shared projects, and billing history. This action cannot be undone.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowLeaveHousehold(false)}
+                className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button className="flex-1 px-4 py-2.5 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors">
+                Leave Household
               </button>
             </div>
           </div>
-
-          {/* Name & Bio */}
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              {user ? `${user.firstName} ${user.lastName}` : 'Anonymous'}
-              {profile?.influencerBadges?.length ? (
-                <span className="text-sm bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded">
-                  ⭐ Influencer
-                </span>
-              ) : null}
-            </h1>
-            {isEditingBio ? (
-              <div className="mt-2 flex gap-2">
-                <input
-                  type="text"
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  className="flex-1 input"
-                  placeholder="Tell others about yourself..."
-                />
-                <button onClick={handleSaveBio} className="btn btn-primary">Save</button>
-                <button onClick={() => setIsEditingBio(false)} className="btn btn-secondary">Cancel</button>
-              </div>
-            ) : (
-              <p
-                className="text-slate-500 dark:text-slate-400 mt-1 cursor-pointer hover:text-slate-700 dark:hover:text-slate-200"
-                onClick={() => setIsEditingBio(true)}
-              >
-                {profile?.bio || 'Click to add a bio...'}
-              </p>
-            )}
-          </div>
-
-          {/* Follow Stats */}
-          <div className="flex gap-6 text-sm">
-            <button className="hover:underline">
-              <span className="font-bold text-slate-900 dark:text-white">{stats?.followers || 0}</span>{' '}
-              <span className="text-slate-500 dark:text-slate-400">followers</span>
-            </button>
-            <button className="hover:underline">
-              <span className="font-bold text-slate-900 dark:text-white">{stats?.following || 0}</span>{' '}
-              <span className="text-slate-500 dark:text-slate-400">following</span>
-            </button>
-          </div>
         </div>
-      </div>
+      )}
+    </div>
+  );
+}
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Projects" value={stats?.totalPosts || 0} icon="📸" />
-        <StatCard label="Followers" value={stats?.followers || 0} icon="👥" />
-        <StatCard label="Following" value={stats?.following || 0} icon="➡️" />
-        <StatCard
-          label="Value Added"
-          value={stats?.totalValueAdded ? formatCurrency(stats.totalValueAdded) : '$0'}
-          icon="💰"
+// Mobile Accordion Item
+function MobileAccordionItem({
+  title,
+  icon: Icon,
+  isOpen,
+  onToggle,
+  children,
+}: {
+  title: string;
+  icon: typeof User;
+  isOpen: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-3 p-4 text-left"
+      >
+        <div className="p-2 bg-slate-100 rounded-lg">
+          <Icon className="w-5 h-5 text-slate-600" />
+        </div>
+        <span className="flex-1 font-medium text-slate-900">{title}</span>
+        <ChevronDown
+          className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
+      </button>
+      {isOpen && <div className="px-4 pb-4 border-t border-slate-100 pt-4">{children}</div>}
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
+
+export default function ProfilePage() {
+  const { user: authUser } = useAuth();
+  const [activeTab, setActiveTab] = useState<SettingsTab>('details');
+  const [mobileAccordion, setMobileAccordion] = useState<SettingsTab | null>('details');
+
+  // Use mock data merged with auth user
+  const user = {
+    ...mockUserData,
+    firstName: authUser?.firstName || mockUserData.firstName,
+    lastName: authUser?.lastName || mockUserData.lastName,
+    displayName: authUser ? `${authUser.firstName} ${authUser.lastName}` : mockUserData.displayName,
+    email: authUser?.email || mockUserData.email,
+  };
+
+  const tabs = [
+    { id: 'details' as const, label: 'Details', icon: User },
+    { id: 'notifications' as const, label: 'Notifications', icon: Bell },
+    { id: 'wallet' as const, label: 'Wallet', icon: Wallet },
+    { id: 'security' as const, label: 'Security', icon: Shield },
+  ];
+
+  return (
+    <div className="pb-32 lg:pb-8">
+      {/* Header */}
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">My Profile</h1>
+        <p className="text-slate-500 mt-1">Manage your personal settings and preferences</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex border-b border-slate-200 dark:border-slate-700 mb-6">
-        <button
-          onClick={() => setActiveTab('posts')}
-          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'posts'
-              ? 'border-emerald-600 text-emerald-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-          }`}
-        >
-          My Projects
-        </button>
-        <button
-          onClick={() => setActiveTab('saved')}
-          className={`px-6 py-3 text-sm font-medium border-b-2 transition-colors ${
-            activeTab === 'saved'
-              ? 'border-emerald-600 text-emerald-600'
-              : 'border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400'
-          }`}
-        >
-          Saved
-        </button>
-      </div>
-
-      {/* Content */}
-      {activeTab === 'posts' && (
-        posts.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">📸</div>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white">No projects yet</h3>
-            <p className="text-slate-500 dark:text-slate-400 mt-1">
-              Share your first home project to build your portfolio
-            </p>
-            <Link href="/app/work-orders" className="btn btn-primary mt-4">
-              Create a Project Post
-            </Link>
+      {/* Desktop Layout */}
+      <div className="hidden lg:grid lg:grid-cols-3 gap-6">
+        {/* Left Column - Hero Card (Sticky) */}
+        <div className="lg:col-span-1">
+          <div className="sticky top-6">
+            <HeroCard user={user} onEditAvatar={() => console.log('Edit avatar')} />
           </div>
-        ) : (
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            {posts.map((post) => (
-              <PostGridCard key={post.id} post={post} />
-            ))}
-          </div>
-        )
-      )}
-
-      {activeTab === 'saved' && (
-        <div className="text-center py-16">
-          <div className="text-6xl mb-4">🔖</div>
-          <h3 className="text-lg font-medium text-slate-900 dark:text-white">Saved posts</h3>
-          <p className="text-slate-500 dark:text-slate-400 mt-1">
-            Posts you save will appear here for inspiration
-          </p>
         </div>
-      )}
+
+        {/* Right Column - Tabbed Interface */}
+        <div className="lg:col-span-2">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            {/* Tab Navigation */}
+            <div className="flex border-b border-slate-200">
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                    activeTab === tab.id
+                      ? 'border-emerald-600 text-emerald-600'
+                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <tab.icon className="w-4 h-4" />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === 'details' && <PersonalDetailsTab user={user} />}
+              {activeTab === 'notifications' && <NotificationsTab />}
+              {activeTab === 'wallet' && <WalletTab />}
+              {activeTab === 'security' && <SecurityTab user={user} />}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile Layout */}
+      <div className="lg:hidden space-y-4">
+        {/* Hero Card */}
+        <HeroCard user={user} onEditAvatar={() => console.log('Edit avatar')} />
+
+        {/* Accordion Sections */}
+        <div className="space-y-3">
+          <MobileAccordionItem
+            title="Personal Details"
+            icon={User}
+            isOpen={mobileAccordion === 'details'}
+            onToggle={() => setMobileAccordion(mobileAccordion === 'details' ? null : 'details')}
+          >
+            <PersonalDetailsTab user={user} />
+          </MobileAccordionItem>
+
+          <MobileAccordionItem
+            title="Notifications"
+            icon={Bell}
+            isOpen={mobileAccordion === 'notifications'}
+            onToggle={() => setMobileAccordion(mobileAccordion === 'notifications' ? null : 'notifications')}
+          >
+            <NotificationsTab />
+          </MobileAccordionItem>
+
+          <MobileAccordionItem
+            title="Digital Wallet"
+            icon={Wallet}
+            isOpen={mobileAccordion === 'wallet'}
+            onToggle={() => setMobileAccordion(mobileAccordion === 'wallet' ? null : 'wallet')}
+          >
+            <WalletTab />
+          </MobileAccordionItem>
+
+          <MobileAccordionItem
+            title="Privacy & Security"
+            icon={Shield}
+            isOpen={mobileAccordion === 'security'}
+            onToggle={() => setMobileAccordion(mobileAccordion === 'security' ? null : 'security')}
+          >
+            <SecurityTab user={user} />
+          </MobileAccordionItem>
+        </div>
+      </div>
     </div>
   );
 }
