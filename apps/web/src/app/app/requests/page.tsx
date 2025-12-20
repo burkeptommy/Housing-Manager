@@ -1,8 +1,17 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { getDemoImage } from '@/lib/imageUtils';
+import { getApiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import type {
+  ServiceRequest,
+  ServiceRequestDetail,
+  ServiceRequestStatus,
+  ServiceRequestPriority,
+  CreateServiceRequestRequest,
+} from '@haven/core';
 import {
   Plus,
   X,
@@ -36,6 +45,7 @@ import {
   Receipt,
   HelpCircle,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
 
 // ============================================================================
@@ -106,6 +116,15 @@ interface CategoryOption {
   subcategories: string[];
 }
 
+interface FormData {
+  category: RequestCategory;
+  subcategory: string;
+  title: string;
+  description: string;
+  priority: RequestPriority;
+  allowEntry: boolean;
+}
+
 // ============================================================================
 // MOCK DATA
 // ============================================================================
@@ -152,7 +171,7 @@ const priorityOptions: { id: RequestPriority; label: string; description: string
   { id: 'emergency', label: 'Emergency', description: 'Stop everything', color: 'bg-red-100 text-red-600' },
 ];
 
-const mockTickets: RequestTicket[] = [
+const MOCK_TICKETS: RequestTicket[] = [
   {
     id: '1',
     ticketNumber: 'REQ-001',
@@ -329,6 +348,167 @@ const subcategoryIcons: Record<string, typeof Wrench> = {
 };
 
 // ============================================================================
+// DATA MAPPING FUNCTIONS
+// ============================================================================
+
+function mapApiStatusToUI(apiStatus: ServiceRequestStatus): RequestStatus {
+  switch (apiStatus) {
+    case 'DRAFT':
+    case 'SUBMITTED':
+      return 'received';
+    case 'ASSIGNED':
+      return 'scheduled';
+    case 'IN_PROGRESS':
+      return 'in_progress';
+    case 'COMPLETED':
+      return 'resolved';
+    case 'CANCELLED':
+      return 'resolved';
+    default:
+      return 'received';
+  }
+}
+
+function mapUIPriorityToApi(uiPriority: RequestPriority): ServiceRequestPriority {
+  switch (uiPriority) {
+    case 'low':
+      return 'LOW';
+    case 'medium':
+      return 'MEDIUM';
+    case 'high':
+      return 'HIGH';
+    case 'emergency':
+      return 'URGENT';
+    default:
+      return 'MEDIUM';
+  }
+}
+
+function mapApiPriorityToUI(apiPriority: ServiceRequestPriority): RequestPriority {
+  switch (apiPriority) {
+    case 'LOW':
+      return 'low';
+    case 'MEDIUM':
+      return 'medium';
+    case 'HIGH':
+      return 'high';
+    case 'URGENT':
+      return 'emergency';
+    default:
+      return 'medium';
+  }
+}
+
+function mapCategoryNameToUI(categoryName?: string): RequestCategory {
+  if (!categoryName) return 'repair';
+  const lower = categoryName.toLowerCase();
+  if (lower.includes('repair') || lower.includes('maintenance') || lower.includes('plumbing') || lower.includes('electrical') || lower.includes('hvac')) {
+    return 'repair';
+  }
+  if (lower.includes('service') || lower.includes('cleaning') || lower.includes('landscape')) {
+    return 'service';
+  }
+  if (lower.includes('concierge') || lower.includes('errand') || lower.includes('booking')) {
+    return 'concierge';
+  }
+  if (lower.includes('admin') || lower.includes('bill') || lower.includes('document') || lower.includes('insurance')) {
+    return 'admin';
+  }
+  return 'repair';
+}
+
+function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): RequestTicket {
+  const detail = apiReq as ServiceRequestDetail;
+  const createdAtStr = typeof apiReq.createdAt === 'string' ? apiReq.createdAt : new Date(apiReq.createdAt).toISOString();
+  const updatedAtStr = typeof apiReq.updatedAt === 'string' ? apiReq.updatedAt : new Date(apiReq.updatedAt).toISOString();
+
+  // Generate a readable ticket number from the ID
+  const ticketNumber = `REQ-${apiReq.id.substring(0, 6).toUpperCase()}`;
+
+  // Determine category and subcategory from the service category
+  const categoryName = detail.serviceCategory?.name || '';
+  const category = mapCategoryNameToUI(categoryName);
+  const subcategory = categoryName || 'Other';
+
+  // Calculate resolution time if completed
+  let resolutionTime: string | undefined;
+  let resolvedAt: string | undefined;
+  if (apiReq.completedDate) {
+    resolvedAt = typeof apiReq.completedDate === 'string' ? apiReq.completedDate : new Date(apiReq.completedDate).toISOString();
+    const created = new Date(apiReq.createdAt);
+    const completed = new Date(apiReq.completedDate);
+    const diffMs = completed.getTime() - created.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays > 0) {
+      resolutionTime = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
+    } else {
+      resolutionTime = `${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
+    }
+  }
+
+  // Construct basic timeline from createdAt
+  const timeline: TimelineEvent[] = [
+    {
+      id: 't-created',
+      type: 'created',
+      description: 'Request submitted',
+      timestamp: createdAtStr,
+      actor: detail.createdBy ? `${detail.createdBy.firstName} ${detail.createdBy.lastName}` : undefined,
+    },
+  ];
+
+  // Add assigned event if vendor exists
+  if (detail.vendor) {
+    timeline.push({
+      id: 't-assigned',
+      type: 'assigned',
+      description: `Assigned to ${detail.vendor.companyName}`,
+      timestamp: updatedAtStr,
+    });
+  }
+
+  // Add completed event if resolved
+  if (resolvedAt) {
+    timeline.push({
+      id: 't-completed',
+      type: 'completed',
+      description: 'Work completed',
+      timestamp: resolvedAt,
+    });
+  }
+
+  return {
+    id: apiReq.id,
+    ticketNumber,
+    title: apiReq.title,
+    description: apiReq.description,
+    category,
+    subcategory,
+    priority: mapApiPriorityToUI(apiReq.priority),
+    status: mapApiStatusToUI(apiReq.status),
+    createdAt: createdAtStr,
+    updatedAt: updatedAtStr,
+    resolvedAt,
+    resolutionTime,
+    vendor: detail.vendor ? {
+      id: detail.vendor.id,
+      name: detail.vendor.companyName,
+      avatar: getDemoImage('vendor-portrait', 100, 100, detail.vendor.id),
+      phone: '', // API doesn't return phone yet
+    } : undefined,
+    mediaUrls: [],
+    allowEntry: true,
+    quote: apiReq.estimatedCost ? {
+      amount: apiReq.estimatedCost,
+      approved: apiReq.status === 'IN_PROGRESS' || apiReq.status === 'COMPLETED',
+    } : undefined,
+    timeline,
+    messages: [], // Messages loaded separately
+  };
+}
+
+// ============================================================================
 // COMPONENTS
 // ============================================================================
 
@@ -372,10 +552,12 @@ function RequestForm({
   category,
   onBack,
   onSubmit,
+  isSubmitting,
 }: {
   category: RequestCategory;
   onBack: () => void;
-  onSubmit: () => void;
+  onSubmit: (data: FormData) => void;
+  isSubmitting: boolean;
 }) {
   const categoryInfo = categoryOptions.find((c) => c.id === category)!;
   const [subcategory, setSubcategory] = useState('');
@@ -398,6 +580,18 @@ function RequestForm({
     setShowEmergencyWarning(false);
   };
 
+  const handleSubmit = () => {
+    if (!title.trim()) return;
+    onSubmit({
+      category,
+      subcategory: subcategory || 'Other',
+      title,
+      description,
+      priority,
+      allowEntry,
+    });
+  };
+
   const suggestedTitles: Record<string, string[]> = {
     'Plumbing': ['Leaking faucet', 'Clogged drain', 'Running toilet', 'Water heater issue'],
     'Electrical': ['Light not working', 'Outlet not working', 'Circuit breaker tripping', 'Smoke detector beeping'],
@@ -413,6 +607,7 @@ function RequestForm({
         <button
           onClick={onBack}
           className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          disabled={isSubmitting}
         >
           <ArrowLeft className="w-5 h-5 text-slate-600" />
         </button>
@@ -433,6 +628,7 @@ function RequestForm({
             <button
               key={sub}
               onClick={() => setSubcategory(sub)}
+              disabled={isSubmitting}
               className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                 subcategory === sub
                   ? 'bg-emerald-600 text-white'
@@ -453,7 +649,8 @@ function RequestForm({
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="Brief description of your request"
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+          disabled={isSubmitting}
+          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500"
         />
         {subcategory && suggestedTitles[subcategory] && (
           <div className="flex flex-wrap gap-2 mt-2">
@@ -461,7 +658,8 @@ function RequestForm({
               <button
                 key={suggestion}
                 onClick={() => setTitle(suggestion)}
-                className="px-2 py-1 text-xs bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100"
+                disabled={isSubmitting}
+                className="px-2 py-1 text-xs bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-50"
               >
                 {suggestion}
               </button>
@@ -478,7 +676,8 @@ function RequestForm({
           onChange={(e) => setDescription(e.target.value)}
           placeholder="Provide more details about what you need..."
           rows={3}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
+          disabled={isSubmitting}
+          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none disabled:bg-slate-50 disabled:text-slate-500"
         />
       </div>
 
@@ -490,11 +689,12 @@ function RequestForm({
             <button
               key={option.id}
               onClick={() => handlePriorityChange(option.id)}
+              disabled={isSubmitting}
               className={`p-3 rounded-lg border text-center transition-all ${
                 priority === option.id
                   ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
                   : 'border-slate-200 hover:border-slate-300'
-              }`}
+              } disabled:opacity-50`}
             >
               <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-1 ${option.color}`}>
                 {option.label}
@@ -509,11 +709,17 @@ function RequestForm({
       <div>
         <label className="block text-sm font-medium text-slate-700 mb-2">Add Media</label>
         <div className="flex gap-3">
-          <button className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+          <button
+            disabled={isSubmitting}
+            className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+          >
             <Camera className="w-5 h-5 text-slate-400" />
             <span className="text-sm text-slate-600">Photo</span>
           </button>
-          <button className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+          <button
+            disabled={isSubmitting}
+            className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors disabled:opacity-50"
+          >
             <Video className="w-5 h-5 text-slate-400" />
             <span className="text-sm text-slate-600">Video</span>
           </button>
@@ -529,9 +735,10 @@ function RequestForm({
           </div>
           <button
             onClick={() => setAllowEntry(!allowEntry)}
+            disabled={isSubmitting}
             className={`relative w-12 h-6 rounded-full transition-colors ${
               allowEntry ? 'bg-emerald-600' : 'bg-slate-300'
-            }`}
+            } disabled:opacity-50`}
           >
             <span
               className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
@@ -544,10 +751,18 @@ function RequestForm({
 
       {/* Submit */}
       <button
-        onClick={onSubmit}
-        className="w-full py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+        onClick={handleSubmit}
+        disabled={isSubmitting || !title.trim()}
+        className="w-full py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
       >
-        Submit Request
+        {isSubmitting ? (
+          <>
+            <Loader2 className="w-5 h-5 animate-spin" />
+            Submitting...
+          </>
+        ) : (
+          'Submit Request'
+        )}
       </button>
 
       {/* Emergency Warning Modal */}
@@ -598,21 +813,49 @@ function RequestForm({
 function NewRequestModal({
   onClose,
   onSuccess,
+  householdId,
 }: {
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (ticket: RequestTicket) => void;
+  householdId: string;
 }) {
   const [step, setStep] = useState<'category' | 'form'>('category');
   const [selectedCategory, setSelectedCategory] = useState<RequestCategory | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleCategorySelect = (category: RequestCategory) => {
     setSelectedCategory(category);
     setStep('form');
   };
 
-  const handleSubmit = () => {
-    // In real app, would call API
-    onSuccess();
+  const handleSubmit = async (formData: FormData) => {
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const api = getApiClient();
+      const payload: CreateServiceRequestRequest = {
+        householdId,
+        title: formData.title,
+        description: formData.description || formData.title,
+        priority: mapUIPriorityToApi(formData.priority),
+      };
+
+      const result = await api.createServiceRequest(payload);
+      const newTicket = mapApiRequestToTicket(result);
+
+      // Override some fields from form data since API might not have category mapping yet
+      newTicket.category = formData.category;
+      newTicket.subcategory = formData.subcategory;
+      newTicket.allowEntry = formData.allowEntry;
+
+      onSuccess(newTicket);
+    } catch (err) {
+      console.error('Failed to create request:', err);
+      setError('Failed to submit request. Please try again.');
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -624,11 +867,19 @@ function NewRequestModal({
           <h2 className="text-lg font-semibold text-slate-900">New Request</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            disabled={isSubmitting}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5 text-slate-500" />
           </button>
         </div>
+
+        {/* Error */}
+        {error && (
+          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
@@ -640,6 +891,7 @@ function NewRequestModal({
               category={selectedCategory}
               onBack={() => setStep('category')}
               onSubmit={handleSubmit}
+              isSubmitting={isSubmitting}
             />
           )}
         </div>
@@ -767,16 +1019,41 @@ function TicketDetail({
   ticket,
   onClose,
   onRate,
+  onMessageSent,
 }: {
   ticket: RequestTicket;
   onClose: () => void;
   onRate: (rating: number) => void;
+  onMessageSent?: (message: ChatMessage) => void;
 }) {
   const [message, setMessage] = useState('');
+  const [isSending, setIsSending] = useState(false);
   const [showRating, setShowRating] = useState(ticket.status === 'resolved' && !ticket.rating);
   const [selectedRating, setSelectedRating] = useState(0);
+  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(ticket.messages);
   const categoryInfo = categoryOptions.find((c) => c.id === ticket.category)!;
   const SubIcon = subcategoryIcons[ticket.subcategory] ?? HelpCircle;
+
+  // Check if this is a real (non-mock) ticket ID
+  const isRealTicket = ticket.id.length > 6; // Mock IDs are '1', '2', etc.
+
+  // Fetch messages for real tickets
+  useEffect(() => {
+    if (!isRealTicket) return;
+
+    const loadMessages = async () => {
+      try {
+        // TODO: Implement message fetching when API is available
+        // const api = getApiClient();
+        // const messages = await api.getServiceRequestMessages(ticket.id);
+        // setLocalMessages(messages.map(mapApiMessageToChat));
+      } catch (err) {
+        console.error('Failed to load messages:', err);
+      }
+    };
+
+    loadMessages();
+  }, [ticket.id, isRealTicket]);
 
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
@@ -788,10 +1065,37 @@ function TicketDetail({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const handleSendMessage = () => {
+  const handleSendMessage = async () => {
     if (!message.trim()) return;
-    // In real app, would send via API
+
+    // Optimistically add message to local state
+    const optimisticMessage: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      senderId: 'current-user',
+      senderName: 'You',
+      senderRole: 'user',
+      content: message.trim(),
+      timestamp: new Date().toISOString(),
+    };
+
+    setLocalMessages(prev => [...prev, optimisticMessage]);
     setMessage('');
+    setIsSending(true);
+
+    if (isRealTicket) {
+      try {
+        // TODO: Implement message sending when API is available
+        // const api = getApiClient();
+        // await api.createServiceRequestMessage(ticket.id, { body: message });
+        onMessageSent?.(optimisticMessage);
+      } catch (err) {
+        console.error('Failed to send message:', err);
+        // Remove optimistic message on failure
+        setLocalMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
+      }
+    }
+
+    setIsSending(false);
   };
 
   const handleSubmitRating = () => {
@@ -862,12 +1166,14 @@ function TicketDetail({
                 <p className="font-medium text-slate-900">{ticket.vendor.name}</p>
                 <p className="text-sm text-slate-500">Assigned Vendor</p>
               </div>
-              <a
-                href={`tel:${ticket.vendor.phone}`}
-                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
-              >
-                <Phone className="w-5 h-5" />
-              </a>
+              {ticket.vendor.phone && (
+                <a
+                  href={`tel:${ticket.vendor.phone}`}
+                  className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
+                >
+                  <Phone className="w-5 h-5" />
+                </a>
+              )}
             </div>
           )}
 
@@ -972,14 +1278,14 @@ function TicketDetail({
         </div>
 
         {/* Messages */}
-        {ticket.messages.length > 0 && (
+        {localMessages.length > 0 && (
           <div className="p-6 bg-white border-t border-slate-200">
             <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <MessageSquare className="w-5 h-5 text-slate-500" />
               Conversation
             </h3>
             <div className="space-y-4">
-              {ticket.messages.map((msg) => {
+              {localMessages.map((msg) => {
                 const isUser = msg.senderRole === 'user';
                 return (
                   <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
@@ -1045,14 +1351,16 @@ function TicketDetail({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              disabled={isSending}
+              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-slate-50"
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
             />
             <button
               onClick={handleSendMessage}
-              className="p-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              disabled={isSending || !message.trim()}
+              className="p-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
             >
-              <Send className="w-5 h-5" />
+              {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
             </button>
           </div>
         </div>
@@ -1088,19 +1396,50 @@ function EmptyState({ onNewRequest }: { onNewRequest: () => void }) {
 // ============================================================================
 
 export default function RequestsPage() {
-  const [tickets, setTickets] = useState(mockTickets);
+  const { currentHousehold } = useAuth();
+  const [tickets, setTickets] = useState<RequestTicket[]>(MOCK_TICKETS);
   const [showModal, setShowModal] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>('active');
   const [displayMode, setDisplayMode] = useState<DisplayMode>('list');
   const [selectedTicket, setSelectedTicket] = useState<RequestTicket | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Load service requests from API with hybrid fallback
+  const loadRequests = useCallback(async () => {
+    if (!currentHousehold?.id) return;
+
+    setIsLoading(true);
+    try {
+      const api = getApiClient();
+      const requests = await api.getServiceRequests(currentHousehold.id);
+
+      if (requests && requests.length > 0) {
+        // Map API requests to UI tickets
+        const mappedTickets = requests.map(mapApiRequestToTicket);
+        setTickets(mappedTickets);
+      }
+      // If empty or error, keep MOCK_TICKETS (already the default)
+    } catch (err) {
+      console.error('Failed to load requests:', err);
+      // Keep MOCK_TICKETS as fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentHousehold?.id]);
+
+  // Fetch data on mount
+  useEffect(() => {
+    loadRequests();
+  }, [loadRequests]);
 
   const activeTickets = tickets.filter((t) => t.status !== 'resolved');
   const historyTickets = tickets.filter((t) => t.status === 'resolved');
   const displayedTickets = viewMode === 'active' ? activeTickets : historyTickets;
 
-  const handleNewRequest = () => {
+  const handleNewRequestSuccess = (newTicket: RequestTicket) => {
+    setTickets(prev => [newTicket, ...prev]);
     setShowModal(false);
-    // In real app, would add the new ticket
+    setSelectedTicket(newTicket);
   };
 
   const handleRate = (ticketId: string, rating: number) => {
@@ -1231,12 +1570,19 @@ export default function RequestsPage() {
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex items-center justify-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+        </div>
+      )}
+
       {/* Content */}
-      {displayedTickets.length === 0 ? (
+      {!isLoading && displayedTickets.length === 0 ? (
         <div className="bg-white rounded-xl shadow-sm border border-slate-200">
           <EmptyState onNewRequest={() => setShowModal(true)} />
         </div>
-      ) : (
+      ) : !isLoading && (
         <div className="lg:grid lg:grid-cols-5 lg:gap-6">
           {/* Ticket List */}
           <div className={`lg:col-span-2 space-y-3 ${selectedTicket ? 'hidden lg:block' : ''}`}>
@@ -1281,10 +1627,11 @@ export default function RequestsPage() {
       </button>
 
       {/* New Request Modal */}
-      {showModal && (
+      {showModal && currentHousehold && (
         <NewRequestModal
           onClose={() => setShowModal(false)}
-          onSuccess={handleNewRequest}
+          onSuccess={handleNewRequestSuccess}
+          householdId={currentHousehold.id}
         />
       )}
     </div>
