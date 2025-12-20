@@ -1272,12 +1272,12 @@ export default function RequestsPage() {
         </div>
       )}
 
-      {/* Mobile FAB */}
+      {/* Mobile FAB - positioned above the global chat FAB */}
       <button
         onClick={() => setShowModal(true)}
-        className="lg:hidden fixed bottom-24 right-6 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 flex items-center justify-center z-30"
+        className="lg:hidden fixed bottom-36 right-4 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 flex items-center justify-center z-40"
       >
-        <Plus className="w-6 h-6" />
+        <Plus className="w-5 h-5" />
       </button>
 
       {/* New Request Modal */}

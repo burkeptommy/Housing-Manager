@@ -148,10 +148,10 @@ export function ConciergeFab() {
         </div>
       )}
 
-      {/* FAB Button - positioned above mobile nav */}
+      {/* FAB Button - positioned above mobile nav, serves as the base FAB */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 p-4 rounded-full shadow-lg transition-all z-50 ${
+        className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 w-14 h-14 rounded-full shadow-lg transition-all z-50 flex items-center justify-center ${
           isOpen
             ? 'bg-slate-900 hover:bg-slate-800'
             : 'bg-emerald-600 hover:bg-emerald-700'

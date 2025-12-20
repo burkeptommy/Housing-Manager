@@ -1031,14 +1031,14 @@ function ProjectDetailView({
   );
 }
 
-// Mobile Quick Capture FAB
+// Mobile Quick Capture FAB - positioned above the global chat FAB
 function QuickCaptureFAB({ mode }: { mode: ViewMode }) {
   return (
-    <button className="lg:hidden fixed bottom-24 right-6 w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors z-40">
+    <button className="lg:hidden fixed bottom-36 right-4 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors z-40">
       {mode === 'wishlist' ? (
-        <Camera className="w-6 h-6" />
+        <Camera className="w-5 h-5" />
       ) : (
-        <Plus className="w-6 h-6" />
+        <Plus className="w-5 h-5" />
       )}
     </button>
   );
