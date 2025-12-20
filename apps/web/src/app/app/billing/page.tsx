@@ -2,64 +2,39 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Wallet,
-  Plus,
-  CreditCard,
-  RefreshCw,
-  Settings,
+  CreditCard as CreditCardIcon,
   CheckCircle2,
   XCircle,
   Clock,
   AlertTriangle,
+  Zap,
+  Wrench,
+  Sparkles,
+  Home,
+  ShieldCheck,
+  ChevronRight,
   Receipt,
-  Eye,
   Download,
   Search,
-  ChevronRight,
-  Shield,
-  Lock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Users,
-  Zap,
-  ShieldCheck,
-  Home,
-  Wrench,
-  FileText,
-  MoreVertical,
+  MoreHorizontal,
   X,
   Check,
   AlertCircle,
-  Building,
-  Sparkles,
+  ArrowDownRight,
+  Banknote,
+  Building2,
+  FileText,
+  Eye,
+  RefreshCw,
 } from 'lucide-react';
+import { CreditCard } from '@/components/credit-card';
 
-// Types
-type TransactionStatus = 'completed' | 'pending' | 'failed' | 'disputed';
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type TransactionStatus = 'completed' | 'pending' | 'failed' | 'requires_approval';
 type TransactionCategory = 'utilities' | 'maintenance' | 'services' | 'projects' | 'insurance' | 'other';
-
-interface PaymentMethod {
-  id: string;
-  type: 'card' | 'bank';
-  last4: string;
-  brand?: string;
-  bankName?: string;
-  isDefault: boolean;
-  expiresAt?: string;
-}
-
-interface PendingApproval {
-  id: string;
-  vendor: string;
-  vendorLogo?: string;
-  description: string;
-  amount: number;
-  category: TransactionCategory;
-  requestedAt: Date;
-  dueDate?: Date;
-  managerNote?: string;
-  urgency: 'low' | 'medium' | 'high';
-}
 
 interface Transaction {
   id: string;
@@ -71,1124 +46,952 @@ interface Transaction {
   status: TransactionStatus;
   date: Date;
   receiptUrl?: string;
-  paymentMethod?: string;
   reference?: string;
+  urgency?: 'low' | 'medium' | 'high';
+  managerNote?: string;
+  autoApproved?: boolean;
 }
 
 interface SpendingCategory {
   category: TransactionCategory;
   label: string;
   amount: number;
-  budget: number;
   icon: typeof Zap;
   color: string;
 }
 
-interface FamilyMember {
-  id: string;
-  name: string;
-  avatar?: string;
-  initials: string;
-  owedAmount: number;
-  paidAmount: number;
-}
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 
-// Mock Data
-const mockPaymentMethods: PaymentMethod[] = [
-  { id: '1', type: 'card', last4: '4242', brand: 'Visa', isDefault: true, expiresAt: '12/26' },
-  { id: '2', type: 'bank', last4: '9876', bankName: 'Chase', isDefault: false },
-];
+const MONTHLY_LIMIT = 5000;
 
-const mockPendingApprovals: PendingApproval[] = [
-  {
-    id: '1',
-    vendor: 'Ace Roofing Co.',
-    description: 'Roof inspection and minor repairs',
-    amount: 850,
-    category: 'maintenance',
-    requestedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-    managerNote: 'Recommended - found loose shingles during last inspection',
-    urgency: 'high',
-  },
-  {
-    id: '2',
-    vendor: 'Green Thumb Landscaping',
-    description: 'Monthly lawn care - December',
-    amount: 175,
-    category: 'services',
-    requestedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-    urgency: 'low',
-  },
-  {
-    id: '3',
-    vendor: 'City Water Services',
-    description: 'Q4 Water/Sewer bill',
-    amount: 245.50,
-    category: 'utilities',
-    requestedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-    dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    urgency: 'medium',
-  },
-];
+const generateMockTransactions = (): Transaction[] => {
+  const now = new Date();
+  const thisMonth = now.getMonth();
+  const thisYear = now.getFullYear();
 
-const mockTransactions: Transaction[] = [
-  {
-    id: '1',
-    vendor: 'Power & Light Co.',
-    description: 'Electric bill - November',
-    amount: 187.43,
-    category: 'utilities',
-    status: 'completed',
-    date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    receiptUrl: '/receipts/power-nov.pdf',
-    paymentMethod: 'Visa •••• 4242',
-    reference: 'PWR-2024-1128',
-  },
-  {
-    id: '2',
-    vendor: 'SafeHome Insurance',
-    description: 'Monthly premium',
-    amount: 312.00,
-    category: 'insurance',
-    status: 'completed',
-    date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000),
-    receiptUrl: '/receipts/insurance-dec.pdf',
-    paymentMethod: 'Bank •••• 9876',
-    reference: 'INS-2024-DEC',
-  },
-  {
-    id: '3',
-    vendor: 'HandyPro Services',
-    description: 'Garbage disposal replacement',
-    amount: 425.00,
-    category: 'maintenance',
-    status: 'completed',
-    date: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000),
-    receiptUrl: '/receipts/handypro-disposal.pdf',
-    paymentMethod: 'Visa •••• 4242',
-    reference: 'HP-87234',
-  },
-  {
-    id: '4',
-    vendor: 'Xfinity Internet',
-    description: 'Monthly internet service',
-    amount: 89.99,
-    category: 'utilities',
-    status: 'completed',
-    date: new Date(Date.now() - 12 * 24 * 60 * 60 * 1000),
-    paymentMethod: 'Visa •••• 4242',
-  },
-  {
-    id: '5',
-    vendor: 'Clean Sweep Pest Control',
-    description: 'Quarterly pest treatment',
-    amount: 149.00,
-    category: 'services',
-    status: 'pending',
-    date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: '6',
-    vendor: 'Premium HVAC',
-    description: 'Furnace tune-up',
-    amount: 189.00,
-    category: 'maintenance',
-    status: 'failed',
-    date: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000),
-    paymentMethod: 'Visa •••• 4242',
-  },
-  {
-    id: '7',
-    vendor: 'City Gas Company',
-    description: 'Natural gas - November',
-    amount: 78.22,
-    category: 'utilities',
-    status: 'completed',
-    date: new Date(Date.now() - 15 * 24 * 60 * 60 * 1000),
-    receiptUrl: '/receipts/gas-nov.pdf',
-    paymentMethod: 'Bank •••• 9876',
-  },
-  {
-    id: '8',
-    vendor: 'Tile Pro Installations',
-    description: 'Kitchen backsplash deposit',
-    amount: 800.00,
-    category: 'projects',
-    status: 'disputed',
-    date: new Date(Date.now() - 20 * 24 * 60 * 60 * 1000),
-    paymentMethod: 'Visa •••• 4242',
-    reference: 'TP-2024-4521',
-  },
-];
-
-const mockSpendingCategories: SpendingCategory[] = [
-  { category: 'utilities', label: 'Utilities', amount: 355.64, budget: 400, icon: Zap, color: 'amber' },
-  { category: 'maintenance', label: 'Maintenance', amount: 614.00, budget: 500, icon: Wrench, color: 'blue' },
-  { category: 'services', label: 'Services', amount: 324.00, budget: 400, icon: Sparkles, color: 'purple' },
-  { category: 'insurance', label: 'Insurance', amount: 312.00, budget: 350, icon: ShieldCheck, color: 'green' },
-  { category: 'projects', label: 'Projects', amount: 800.00, budget: 1000, icon: Home, color: 'rose' },
-];
-
-const mockFamilyMembers: FamilyMember[] = [
-  { id: '1', name: 'Bob Homeowner', initials: 'BH', owedAmount: 0, paidAmount: 1856.42 },
-  { id: '2', name: 'Alice Homeowner', initials: 'AH', owedAmount: 425.00, paidAmount: 312.00 },
-];
-
-// Category config
-const categoryConfig: Record<TransactionCategory, { icon: typeof Zap; color: string; label: string }> = {
-  utilities: { icon: Zap, color: 'amber', label: 'Utilities' },
-  maintenance: { icon: Wrench, color: 'blue', label: 'Maintenance' },
-  services: { icon: Sparkles, color: 'purple', label: 'Services' },
-  projects: { icon: Home, color: 'rose', label: 'Projects' },
-  insurance: { icon: ShieldCheck, color: 'green', label: 'Insurance' },
-  other: { icon: FileText, color: 'slate', label: 'Other' },
+  return [
+    // Requires Approval - High amount
+    {
+      id: 'tx-1',
+      vendor: 'Emergency Plumbing Co.',
+      description: 'Emergency pipe burst repair - Kitchen',
+      amount: 450,
+      category: 'maintenance',
+      status: 'requires_approval',
+      date: new Date(thisYear, thisMonth, now.getDate(), 14, 30),
+      urgency: 'high',
+      managerNote: 'Urgent - Water damage prevention. Vendor is on-site waiting for approval.',
+    },
+    {
+      id: 'tx-2',
+      vendor: 'Ace Roofing Co.',
+      description: 'Roof inspection and shingle replacement',
+      amount: 875,
+      category: 'maintenance',
+      status: 'requires_approval',
+      date: new Date(thisYear, thisMonth, now.getDate() - 1, 10, 0),
+      urgency: 'medium',
+      managerNote: 'Recommended after last storm. 3 quotes obtained - this is the best value.',
+    },
+    {
+      id: 'tx-3',
+      vendor: 'Smart Home Solutions',
+      description: 'Nest thermostat installation',
+      amount: 325,
+      category: 'projects',
+      status: 'requires_approval',
+      date: new Date(thisYear, thisMonth, now.getDate() - 2, 16, 45),
+      urgency: 'low',
+      managerNote: 'Energy savings project. Expected ROI within 18 months.',
+    },
+    // Auto-approved (recurring/low amount)
+    {
+      id: 'tx-4',
+      vendor: 'Power & Light Co.',
+      description: 'Electric bill - December',
+      amount: 187.43,
+      category: 'utilities',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 3),
+      autoApproved: true,
+      receiptUrl: '/receipts/power-dec.pdf',
+      reference: 'PWR-2024-1201',
+    },
+    {
+      id: 'tx-5',
+      vendor: 'City Water Authority',
+      description: 'Water & sewer - December',
+      amount: 94.50,
+      category: 'utilities',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 5),
+      autoApproved: true,
+      reference: 'WTR-2024-DEC',
+    },
+    {
+      id: 'tx-6',
+      vendor: 'Green Thumb Landscaping',
+      description: 'Monthly lawn maintenance',
+      amount: 175,
+      category: 'services',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 7),
+      autoApproved: true,
+      reference: 'GTL-2024-12',
+    },
+    {
+      id: 'tx-7',
+      vendor: 'SafeHome Insurance',
+      description: 'Monthly premium - Homeowners',
+      amount: 312,
+      category: 'insurance',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 10),
+      autoApproved: true,
+      reference: 'INS-2024-DEC',
+    },
+    {
+      id: 'tx-8',
+      vendor: 'CleanPro Services',
+      description: 'Bi-weekly house cleaning',
+      amount: 180,
+      category: 'services',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 12),
+      autoApproved: true,
+    },
+    {
+      id: 'tx-9',
+      vendor: 'HandyPro Services',
+      description: 'Garbage disposal replacement',
+      amount: 195,
+      category: 'maintenance',
+      status: 'completed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 14),
+      receiptUrl: '/receipts/handypro.pdf',
+      reference: 'HP-87234',
+    },
+    // Pending transaction
+    {
+      id: 'tx-10',
+      vendor: 'Pool Masters',
+      description: 'Weekly pool service',
+      amount: 85,
+      category: 'services',
+      status: 'pending',
+      date: new Date(thisYear, thisMonth, now.getDate() - 1),
+    },
+    // Failed transaction
+    {
+      id: 'tx-11',
+      vendor: 'Gas Company',
+      description: 'Natural gas - December',
+      amount: 78.50,
+      category: 'utilities',
+      status: 'failed',
+      date: new Date(thisYear, thisMonth, now.getDate() - 4),
+    },
+  ];
 };
 
-export default function MoneyPage() {
-  // State
-  const [walletBalance] = useState(2847.50);
-  const [monthlyBudget] = useState(3500);
-  const [autoRefillEnabled, setAutoRefillEnabled] = useState(true);
-  const [autoRefillThreshold] = useState(500);
-  const [paymentMethods] = useState<PaymentMethod[]>(mockPaymentMethods);
-  const [pendingApprovals, setPendingApprovals] = useState<PendingApproval[]>(mockPendingApprovals);
-  const [transactions] = useState<Transaction[]>(mockTransactions);
-  const [spendingCategories] = useState<SpendingCategory[]>(mockSpendingCategories);
-  const [familyMembers] = useState<FamilyMember[]>(mockFamilyMembers);
+// ============================================================================
+// HELPERS
+// ============================================================================
 
-  // UI State
-  const [showAddFundsModal, setShowAddFundsModal] = useState(false);
-  const [showManageCardsModal, setShowManageCardsModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState<Transaction | null>(null);
-  const [showApprovalDetail, setShowApprovalDetail] = useState<PendingApproval | null>(null);
-  const [transactionFilter, setTransactionFilter] = useState<TransactionCategory | 'all'>('all');
-  const [transactionSearch, setTransactionSearch] = useState('');
-  const [expandedTransaction, setExpandedTransaction] = useState<string | null>(null);
+const formatCurrency = (amount: number) => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+};
 
-  // Computed values
-  const totalSpent = useMemo(() => {
-    return spendingCategories.reduce((sum, cat) => sum + cat.amount, 0);
-  }, [spendingCategories]);
+const formatDate = (date: Date) => {
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
 
-  const budgetPercentage = useMemo(() => {
-    return Math.min((totalSpent / monthlyBudget) * 100, 100);
-  }, [totalSpent, monthlyBudget]);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  if (diffDays < 7) return `${diffDays} days ago`;
 
-  const filteredTransactions = useMemo(() => {
-    let filtered = transactions;
-    if (transactionFilter !== 'all') {
-      filtered = filtered.filter(t => t.category === transactionFilter);
-    }
-    if (transactionSearch) {
-      const search = transactionSearch.toLowerCase();
-      filtered = filtered.filter(t =>
-        t.vendor.toLowerCase().includes(search) ||
-        t.description.toLowerCase().includes(search)
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+};
+
+const getCategoryIcon = (category: TransactionCategory) => {
+  switch (category) {
+    case 'utilities':
+      return Zap;
+    case 'maintenance':
+      return Wrench;
+    case 'services':
+      return Sparkles;
+    case 'projects':
+      return Home;
+    case 'insurance':
+      return ShieldCheck;
+    default:
+      return CreditCardIcon;
+  }
+};
+
+const getCategoryColor = (category: TransactionCategory) => {
+  switch (category) {
+    case 'utilities':
+      return { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'text-amber-600' };
+    case 'maintenance':
+      return { bg: 'bg-blue-100', text: 'text-blue-700', icon: 'text-blue-600' };
+    case 'services':
+      return { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'text-purple-600' };
+    case 'projects':
+      return { bg: 'bg-rose-100', text: 'text-rose-700', icon: 'text-rose-600' };
+    case 'insurance':
+      return { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: 'text-emerald-600' };
+    default:
+      return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'text-slate-600' };
+  }
+};
+
+const getStatusBadge = (status: TransactionStatus) => {
+  switch (status) {
+    case 'completed':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700">
+          <CheckCircle2 className="w-3 h-3" />
+          Paid
+        </span>
       );
+    case 'pending':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+          <Clock className="w-3 h-3" />
+          Processing
+        </span>
+      );
+    case 'failed':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">
+          <XCircle className="w-3 h-3" />
+          Failed
+        </span>
+      );
+    case 'requires_approval':
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-700">
+          <AlertTriangle className="w-3 h-3" />
+          Needs Approval
+        </span>
+      );
+    default:
+      return null;
+  }
+};
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+function SpendPowerGauge({ spent, limit }: { spent: number; limit: number }) {
+  const remaining = Math.max(0, limit - spent);
+  const percentUsed = Math.min(100, (spent / limit) * 100);
+
+  // Color based on utilization
+  const getColor = () => {
+    if (percentUsed >= 90) return { stroke: 'stroke-red-500', text: 'text-red-600', bg: 'bg-red-500' };
+    if (percentUsed >= 75) return { stroke: 'stroke-amber-500', text: 'text-amber-600', bg: 'bg-amber-500' };
+    return { stroke: 'stroke-emerald-500', text: 'text-emerald-600', bg: 'bg-emerald-500' };
+  };
+
+  const color = getColor();
+  const circumference = 2 * Math.PI * 54;
+  const strokeDashoffset = circumference - (percentUsed / 100) * circumference;
+
+  return (
+    <div className="flex items-center gap-8">
+      {/* Circular Gauge */}
+      <div className="relative w-36 h-36">
+        <svg className="w-full h-full -rotate-90" viewBox="0 0 120 120">
+          {/* Background circle */}
+          <circle
+            cx="60"
+            cy="60"
+            r="54"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="8"
+            className="text-slate-200"
+          />
+          {/* Progress circle */}
+          <circle
+            cx="60"
+            cy="60"
+            r="54"
+            fill="none"
+            strokeWidth="8"
+            strokeLinecap="round"
+            className={color.stroke}
+            style={{
+              strokeDasharray: circumference,
+              strokeDashoffset,
+              transition: 'stroke-dashoffset 0.5s ease-in-out',
+            }}
+          />
+        </svg>
+        {/* Center content */}
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-2xl font-bold ${color.text}`}>{Math.round(percentUsed)}%</span>
+          <span className="text-xs text-slate-500">Used</span>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="space-y-4">
+        <div>
+          <div className="text-sm text-slate-500 mb-1">Monthly Limit</div>
+          <div className="text-2xl font-bold text-slate-900">{formatCurrency(limit)}</div>
+        </div>
+        <div className="flex gap-6">
+          <div>
+            <div className="text-sm text-slate-500 mb-0.5">Spent</div>
+            <div className="text-lg font-semibold text-slate-700">{formatCurrency(spent)}</div>
+          </div>
+          <div>
+            <div className="text-sm text-slate-500 mb-0.5">Remaining</div>
+            <div className={`text-lg font-semibold ${color.text}`}>{formatCurrency(remaining)}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ApprovalCard({
+  transaction,
+  onApprove,
+  onDecline,
+}: {
+  transaction: Transaction;
+  onApprove: (id: string) => void;
+  onDecline: (id: string) => void;
+}) {
+  const CategoryIcon = getCategoryIcon(transaction.category);
+  const categoryColor = getCategoryColor(transaction.category);
+
+  const getUrgencyBadge = () => {
+    if (!transaction.urgency) return null;
+    switch (transaction.urgency) {
+      case 'high':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700 border border-red-200">
+            <AlertCircle className="w-3 h-3" />
+            Urgent
+          </span>
+        );
+      case 'medium':
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
+            Normal
+          </span>
+        );
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-600">
+            Low Priority
+          </span>
+        );
     }
-    return filtered;
-  }, [transactions, transactionFilter, transactionSearch]);
-
-  const monthlyChange = useMemo(() => {
-    const lastMonthTotal = 2156.78; // Mock previous month
-    const change = ((totalSpent - lastMonthTotal) / lastMonthTotal) * 100;
-    return change;
-  }, [totalSpent]);
-
-  // Handlers
-  const handleApprove = (approval: PendingApproval) => {
-    setPendingApprovals(prev => prev.filter(a => a.id !== approval.id));
-    // In real app, would call API
-  };
-
-  const handleReject = (approval: PendingApproval) => {
-    setPendingApprovals(prev => prev.filter(a => a.id !== approval.id));
-    // In real app, would call API
-  };
-
-  // Format helpers
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const formatDateFull = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getStatusBadge = (status: TransactionStatus) => {
-    const styles: Record<TransactionStatus, { bg: string; text: string; icon: typeof CheckCircle2 }> = {
-      completed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-700', icon: Clock },
-      failed: { bg: 'bg-red-100', text: 'text-red-700', icon: XCircle },
-      disputed: { bg: 'bg-orange-100', text: 'text-orange-700', icon: AlertTriangle },
-    };
-    return styles[status];
-  };
-
-  const getUrgencyBadge = (urgency: 'low' | 'medium' | 'high') => {
-    const styles = {
-      low: 'bg-slate-100 text-slate-600',
-      medium: 'bg-yellow-100 text-yellow-700',
-      high: 'bg-red-100 text-red-700',
-    };
-    return styles[urgency];
   };
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Financial Command Center</h1>
-          <p className="text-slate-600 mt-1">Manage your house finances with confidence</p>
+    <div
+      className={`bg-white rounded-xl border-2 p-5 transition-all hover:shadow-lg ${
+        transaction.urgency === 'high' ? 'border-red-200 bg-red-50/30' : 'border-slate-200'
+      }`}
+    >
+      <div className="flex items-start justify-between mb-4">
+        <div className="flex items-start gap-3">
+          <div className={`p-2.5 rounded-xl ${categoryColor.bg}`}>
+            <CategoryIcon className={`w-5 h-5 ${categoryColor.icon}`} />
+          </div>
+          <div>
+            <div className="font-semibold text-slate-900">{transaction.vendor}</div>
+            <div className="text-sm text-slate-500">{transaction.description}</div>
+            <div className="flex items-center gap-2 mt-2">
+              {getUrgencyBadge()}
+              <span className="text-xs text-slate-400">{formatDate(transaction.date)}</span>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-2 text-sm text-slate-500">
-          <Shield className="w-4 h-4 text-emerald-600" />
-          <span>256-bit encrypted</span>
+        <div className="text-right">
+          <div className="text-xl font-bold text-slate-900">{formatCurrency(transaction.amount)}</div>
+          <div className={`text-xs font-medium ${categoryColor.text}`}>
+            {transaction.category.charAt(0).toUpperCase() + transaction.category.slice(1)}
+          </div>
         </div>
       </div>
 
-      {/* House Wallet - Hero Section */}
-      <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 text-white shadow-lg">
-        <div className="flex items-start justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <Wallet className="w-6 h-6" />
-            </div>
+      {transaction.managerNote && (
+        <div className="mb-4 p-3 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="flex items-start gap-2">
+            <FileText className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-emerald-100 text-sm font-medium">House Wallet</p>
-              <p className="text-3xl font-bold">{formatCurrency(walletBalance)}</p>
+              <div className="text-xs font-medium text-slate-500 mb-0.5">Manager Note</div>
+              <div className="text-sm text-slate-700">{transaction.managerNote}</div>
             </div>
-          </div>
-          <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Wallet Quick Actions */}
-        <div className="grid grid-cols-4 gap-3 mb-6">
-          <button
-            onClick={() => setShowAddFundsModal(true)}
-            className="flex flex-col items-center gap-1.5 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="text-xs font-medium">Add Funds</span>
-          </button>
-          <button
-            onClick={() => setAutoRefillEnabled(!autoRefillEnabled)}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl transition-colors ${
-              autoRefillEnabled ? 'bg-white/20' : 'bg-white/10 hover:bg-white/20'
-            }`}
-          >
-            <RefreshCw className={`w-5 h-5 ${autoRefillEnabled ? 'text-emerald-200' : ''}`} />
-            <span className="text-xs font-medium">Auto-Refill</span>
-          </button>
-          <button
-            onClick={() => setShowManageCardsModal(true)}
-            className="flex flex-col items-center gap-1.5 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors"
-          >
-            <CreditCard className="w-5 h-5" />
-            <span className="text-xs font-medium">Cards</span>
-          </button>
-          <button className="flex flex-col items-center gap-1.5 p-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
-            <FileText className="w-5 h-5" />
-            <span className="text-xs font-medium">Statements</span>
-          </button>
-        </div>
-
-        {/* Auto-Refill Status */}
-        {autoRefillEnabled && (
-          <div className="flex items-center gap-2 text-sm text-emerald-100 bg-white/10 rounded-lg px-3 py-2">
-            <RefreshCw className="w-4 h-4" />
-            <span>Auto-refill enabled when balance drops below {formatCurrency(autoRefillThreshold)}</span>
-          </div>
-        )}
-
-        {/* Payment Methods Preview */}
-        <div className="mt-4 flex items-center gap-3">
-          {paymentMethods.slice(0, 2).map((method) => (
-            <div key={method.id} className="flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2 text-sm">
-              {method.type === 'card' ? (
-                <CreditCard className="w-4 h-4" />
-              ) : (
-                <Building className="w-4 h-4" />
-              )}
-              <span>
-                {method.type === 'card' ? method.brand : method.bankName} •••• {method.last4}
-              </span>
-              {method.isDefault && (
-                <span className="text-xs bg-white/20 px-1.5 py-0.5 rounded">Default</span>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Approvals Inbox */}
-      {pendingApprovals.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-          <div className="p-4 border-b border-slate-200">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                  <Clock className="w-4 h-4 text-amber-600" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-slate-900">Approvals Inbox</h2>
-                  <p className="text-sm text-slate-500">{pendingApprovals.length} payments awaiting your authorization</p>
-                </div>
-              </div>
-              <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
-                Approve All
-              </button>
-            </div>
-          </div>
-
-          <div className="divide-y divide-slate-100">
-            {pendingApprovals.map((approval) => {
-              const CategoryIcon = categoryConfig[approval.category].icon;
-              return (
-                <div
-                  key={approval.id}
-                  className="p-4 hover:bg-slate-50 transition-colors cursor-pointer"
-                  onClick={() => setShowApprovalDetail(approval)}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${categoryConfig[approval.category].color}-100`}>
-                      <CategoryIcon className={`w-5 h-5 text-${categoryConfig[approval.category].color}-600`} />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="font-medium text-slate-900">{approval.vendor}</p>
-                          <p className="text-sm text-slate-500 truncate">{approval.description}</p>
-                          {approval.managerNote && (
-                            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
-                              <Sparkles className="w-3 h-3" />
-                              {approval.managerNote}
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="font-semibold text-slate-900">{formatCurrency(approval.amount)}</p>
-                          <span className={`text-xs px-2 py-0.5 rounded-full ${getUrgencyBadge(approval.urgency)}`}>
-                            {approval.urgency === 'high' ? 'Urgent' : approval.urgency === 'medium' ? 'Due Soon' : 'Normal'}
-                          </span>
-                        </div>
-                      </div>
-                      {approval.dueDate && (
-                        <p className="text-xs text-slate-400 mt-1">Due {formatDate(approval.dueDate)}</p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Quick Actions */}
-                  <div className="flex items-center gap-2 mt-3 ml-14">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleApprove(approval);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-                    >
-                      <Check className="w-4 h-4" />
-                      Approve
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleReject(approval);
-                      }}
-                      className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                      Decline
-                    </button>
-                    <button className="p-1.5 text-slate-400 hover:text-slate-600 transition-colors">
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
           </div>
         </div>
       )}
 
-      {/* Budget & Spending Analytics */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Budget Gauge */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-slate-900">Monthly Budget</h2>
-            <span className="text-sm text-slate-500">December 2024</span>
-          </div>
+      <div className="flex gap-3">
+        <button
+          onClick={() => onApprove(transaction.id)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+        >
+          <Check className="w-4 h-4" />
+          Approve
+        </button>
+        <button
+          onClick={() => onDecline(transaction.id)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 border border-slate-300 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+        >
+          <X className="w-4 h-4" />
+          Decline
+        </button>
+      </div>
+    </div>
+  );
+}
 
-          {/* Circular Gauge */}
-          <div className="flex items-center justify-center mb-6">
-            <div className="relative">
-              <svg className="w-40 h-40 transform -rotate-90">
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  stroke="#e2e8f0"
-                  strokeWidth="12"
-                  fill="none"
-                />
-                <circle
-                  cx="80"
-                  cy="80"
-                  r="70"
-                  stroke={budgetPercentage > 90 ? '#ef4444' : budgetPercentage > 75 ? '#f59e0b' : '#10b981'}
-                  strokeWidth="12"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={`${(budgetPercentage / 100) * 439.82} 439.82`}
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalSpent)}</p>
-                <p className="text-sm text-slate-500">of {formatCurrency(monthlyBudget)}</p>
-              </div>
-            </div>
-          </div>
+function TransactionRow({ transaction }: { transaction: Transaction }) {
+  const CategoryIcon = getCategoryIcon(transaction.category);
+  const categoryColor = getCategoryColor(transaction.category);
 
-          {/* Monthly Comparison */}
-          <div className="flex items-center justify-center gap-2 text-sm">
-            {monthlyChange > 0 ? (
-              <>
-                <ArrowUpRight className="w-4 h-4 text-red-500" />
-                <span className="text-red-600 font-medium">{monthlyChange.toFixed(1)}%</span>
-                <span className="text-slate-500">vs last month</span>
-              </>
-            ) : (
-              <>
-                <ArrowDownRight className="w-4 h-4 text-green-500" />
-                <span className="text-green-600 font-medium">{Math.abs(monthlyChange).toFixed(1)}%</span>
-                <span className="text-slate-500">vs last month</span>
-              </>
-            )}
-          </div>
-
-          {/* Budget Remaining */}
-          <div className="mt-4 p-3 bg-slate-50 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-600">Remaining Budget</span>
-              <span className="font-semibold text-slate-900">
-                {formatCurrency(Math.max(0, monthlyBudget - totalSpent))}
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              ~{formatCurrency((monthlyBudget - totalSpent) / 12)}/day for rest of month
-            </p>
-          </div>
-        </div>
-
-        {/* Category Breakdown */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h2 className="font-semibold text-slate-900 mb-4">Spending by Category</h2>
-
-          <div className="space-y-4">
-            {spendingCategories.map((cat) => {
-              const CategoryIcon = cat.icon;
-              const percentage = (cat.amount / cat.budget) * 100;
-              const isOver = percentage > 100;
-              return (
-                <div key={cat.category}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-${cat.color}-100`}>
-                        <CategoryIcon className={`w-4 h-4 text-${cat.color}-600`} />
-                      </div>
-                      <span className="text-sm font-medium text-slate-900">{cat.label}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-sm font-medium text-slate-900">{formatCurrency(cat.amount)}</span>
-                      <span className="text-xs text-slate-400 ml-1">/ {formatCurrency(cat.budget)}</span>
-                    </div>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        isOver ? 'bg-red-500' : `bg-${cat.color}-500`
-                      }`}
-                      style={{ width: `${Math.min(percentage, 100)}%` }}
-                    />
-                  </div>
-                  {isOver && (
-                    <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      Over budget by {formatCurrency(cat.amount - cat.budget)}
-                    </p>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+  return (
+    <div className="flex items-center gap-4 py-4 border-b border-slate-100 last:border-0 hover:bg-slate-50/50 transition-colors -mx-4 px-4">
+      <div className={`p-2.5 rounded-xl ${categoryColor.bg} flex-shrink-0`}>
+        <CategoryIcon className={`w-5 h-5 ${categoryColor.icon}`} />
       </div>
 
-      {/* Transaction Ledger */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-        <div className="p-4 border-b border-slate-200">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <h2 className="font-semibold text-slate-900">Transaction History</h2>
-            <div className="flex items-center gap-3">
-              {/* Search */}
-              <div className="relative">
-                <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Search transactions..."
-                  value={transactionSearch}
-                  onChange={(e) => setTransactionSearch(e.target.value)}
-                  className="pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent w-48"
-                />
-              </div>
-              {/* Filter */}
-              <select
-                value={transactionFilter}
-                onChange={(e) => setTransactionFilter(e.target.value as TransactionCategory | 'all')}
-                className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              >
-                <option value="all">All Categories</option>
-                {Object.entries(categoryConfig).map(([key, config]) => (
-                  <option key={key} value={key}>{config.label}</option>
-                ))}
-              </select>
-              {/* Export */}
-              <button className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
-                <Download className="w-5 h-5" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Transactions List */}
-        <div className="divide-y divide-slate-100">
-          {filteredTransactions.length > 0 ? (
-            filteredTransactions.map((transaction) => {
-              const CategoryIcon = categoryConfig[transaction.category].icon;
-              const statusStyle = getStatusBadge(transaction.status);
-              const StatusIcon = statusStyle.icon;
-              const isExpanded = expandedTransaction === transaction.id;
-
-              return (
-                <div
-                  key={transaction.id}
-                  className="hover:bg-slate-50 transition-colors"
-                >
-                  <div
-                    className="p-4 cursor-pointer"
-                    onClick={() => setExpandedTransaction(isExpanded ? null : transaction.id)}
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center bg-${categoryConfig[transaction.category].color}-100`}>
-                        <CategoryIcon className={`w-5 h-5 text-${categoryConfig[transaction.category].color}-600`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="font-medium text-slate-900">{transaction.vendor}</p>
-                          <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${statusStyle.bg} ${statusStyle.text}`}>
-                            <StatusIcon className="w-3 h-3" />
-                            {transaction.status.charAt(0).toUpperCase() + transaction.status.slice(1)}
-                          </span>
-                        </div>
-                        <p className="text-sm text-slate-500 truncate">{transaction.description}</p>
-                      </div>
-                      <div className="text-right flex-shrink-0">
-                        <p className="font-semibold text-slate-900">-{formatCurrency(transaction.amount)}</p>
-                        <p className="text-xs text-slate-400">{formatDate(transaction.date)}</p>
-                      </div>
-                      <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                    </div>
-                  </div>
-
-                  {/* Expanded Details */}
-                  {isExpanded && (
-                    <div className="px-4 pb-4">
-                      <div className="ml-14 p-4 bg-slate-50 rounded-lg space-y-3">
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <p className="text-slate-500">Date</p>
-                            <p className="font-medium text-slate-900">{formatDateFull(transaction.date)}</p>
-                          </div>
-                          <div>
-                            <p className="text-slate-500">Category</p>
-                            <p className="font-medium text-slate-900">{categoryConfig[transaction.category].label}</p>
-                          </div>
-                          {transaction.paymentMethod && (
-                            <div>
-                              <p className="text-slate-500">Payment Method</p>
-                              <p className="font-medium text-slate-900">{transaction.paymentMethod}</p>
-                            </div>
-                          )}
-                          {transaction.reference && (
-                            <div>
-                              <p className="text-slate-500">Reference</p>
-                              <p className="font-medium text-slate-900">{transaction.reference}</p>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex items-center gap-2 pt-2 border-t border-slate-200">
-                          {transaction.receiptUrl && (
-                            <button
-                              onClick={() => setShowReceiptModal(transaction)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                            >
-                              <Receipt className="w-4 h-4" />
-                              View Receipt
-                            </button>
-                          )}
-                          {transaction.status === 'completed' && (
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
-                              <CheckCircle2 className="w-4 h-4" />
-                              Verify
-                            </button>
-                          )}
-                          {(transaction.status === 'completed' || transaction.status === 'failed') && (
-                            <button className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 text-orange-600 text-sm font-medium rounded-lg hover:bg-orange-50 transition-colors">
-                              <AlertTriangle className="w-4 h-4" />
-                              Dispute
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          ) : (
-            <div className="p-8 text-center text-slate-500">
-              <Receipt className="w-12 h-12 mx-auto mb-3 text-slate-300" />
-              <p>No transactions found</p>
-              <p className="text-sm mt-1">Try adjusting your search or filter</p>
-            </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-slate-900 truncate">{transaction.vendor}</span>
+          {transaction.autoApproved && (
+            <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-100 text-slate-500 rounded">
+              Auto
+            </span>
           )}
         </div>
-
-        {/* Load More */}
-        {filteredTransactions.length > 0 && (
-          <div className="p-4 border-t border-slate-200 text-center">
-            <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
-              Load More Transactions
-            </button>
-          </div>
-        )}
+        <div className="text-sm text-slate-500 truncate">{transaction.description}</div>
       </div>
 
-      {/* Bill Splitter */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <Users className="w-5 h-5 text-purple-600" />
+      <div className="flex-shrink-0 text-right">
+        <div className="font-semibold text-slate-900">{formatCurrency(transaction.amount)}</div>
+        <div className="text-xs text-slate-400">{formatDate(transaction.date)}</div>
+      </div>
+
+      <div className="flex-shrink-0">{getStatusBadge(transaction.status)}</div>
+
+      <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400">
+        <MoreHorizontal className="w-4 h-4" />
+      </button>
+    </div>
+  );
+}
+
+function SpendingBreakdown({ categories }: { categories: SpendingCategory[] }) {
+  const total = categories.reduce((sum, cat) => sum + cat.amount, 0);
+
+  return (
+    <div className="space-y-3">
+      {categories.map((cat) => {
+        const Icon = cat.icon;
+        const percent = total > 0 ? (cat.amount / total) * 100 : 0;
+        const color = getCategoryColor(cat.category);
+
+        return (
+          <div key={cat.category} className="flex items-center gap-3">
+            <div className={`p-2 rounded-lg ${color.bg}`}>
+              <Icon className={`w-4 h-4 ${color.icon}`} />
             </div>
+            <div className="flex-1">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-sm font-medium text-slate-700">{cat.label}</span>
+                <span className="text-sm font-semibold text-slate-900">{formatCurrency(cat.amount)}</span>
+              </div>
+              <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full ${color.bg.replace('100', '500')} rounded-full transition-all duration-500`}
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ConfettiEffect({ show }: { show: boolean }) {
+  if (!show) return null;
+
+  return (
+    <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+      {[...Array(50)].map((_, i) => (
+        <div
+          key={i}
+          className="absolute animate-confetti"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: '-10px',
+            animationDelay: `${Math.random() * 0.5}s`,
+            animationDuration: `${2 + Math.random() * 2}s`,
+          }}
+        >
+          <div
+            className="w-3 h-3 rounded-sm"
+            style={{
+              backgroundColor: ['#10b981', '#f59e0b', '#3b82f6', '#ec4899', '#8b5cf6'][
+                Math.floor(Math.random() * 5)
+              ],
+              transform: `rotate(${Math.random() * 360}deg)`,
+            }}
+          />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN PAGE
+// ============================================================================
+
+export default function BillingPage() {
+  const [transactions, setTransactions] = useState<Transaction[]>(generateMockTransactions);
+  const [isCardLocked, setIsCardLocked] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [filterCategory, setFilterCategory] = useState<TransactionCategory | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  // Show toast helper
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  // Handle card lock toggle
+  const handleCardLock = (locked: boolean) => {
+    setIsCardLocked(locked);
+    showToast(
+      locked ? 'Card frozen. No new charges allowed.' : 'Card activated. Ready for charges.',
+      locked ? 'info' : 'success'
+    );
+  };
+
+  // Handle approval
+  const handleApprove = (id: string) => {
+    setTransactions((prev) =>
+      prev.map((tx) => (tx.id === id ? { ...tx, status: 'completed' as TransactionStatus } : tx))
+    );
+    setShowConfetti(true);
+    setTimeout(() => setShowConfetti(false), 2500);
+    showToast('Payment approved successfully!', 'success');
+  };
+
+  // Handle decline
+  const handleDecline = (id: string) => {
+    setTransactions((prev) => prev.filter((tx) => tx.id !== id));
+    showToast('Payment declined.', 'info');
+  };
+
+  // Computed values
+  const pendingApprovals = useMemo(
+    () => transactions.filter((tx) => tx.status === 'requires_approval'),
+    [transactions]
+  );
+
+  const recentActivity = useMemo(() => {
+    let filtered = transactions.filter((tx) => tx.status !== 'requires_approval');
+
+    if (filterCategory !== 'all') {
+      filtered = filtered.filter((tx) => tx.category === filterCategory);
+    }
+
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (tx) =>
+          tx.vendor.toLowerCase().includes(query) || tx.description.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [transactions, filterCategory, searchQuery]);
+
+  const monthlySpent = useMemo(() => {
+    const now = new Date();
+    return transactions
+      .filter(
+        (tx) =>
+          tx.status === 'completed' &&
+          tx.date.getMonth() === now.getMonth() &&
+          tx.date.getFullYear() === now.getFullYear()
+      )
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [transactions]);
+
+  const spendingByCategory = useMemo((): SpendingCategory[] => {
+    const categoryTotals: Record<TransactionCategory, number> = {
+      utilities: 0,
+      maintenance: 0,
+      services: 0,
+      projects: 0,
+      insurance: 0,
+      other: 0,
+    };
+
+    transactions
+      .filter((tx) => tx.status === 'completed')
+      .forEach((tx) => {
+        categoryTotals[tx.category] += tx.amount;
+      });
+
+    const categories: SpendingCategory[] = [
+      { category: 'utilities', label: 'Utilities', amount: categoryTotals.utilities, icon: Zap, color: 'amber' },
+      { category: 'maintenance', label: 'Maintenance', amount: categoryTotals.maintenance, icon: Wrench, color: 'blue' },
+      { category: 'services', label: 'Services', amount: categoryTotals.services, icon: Sparkles, color: 'purple' },
+      { category: 'insurance', label: 'Insurance', amount: categoryTotals.insurance, icon: ShieldCheck, color: 'emerald' },
+      { category: 'projects', label: 'Projects', amount: categoryTotals.projects, icon: Home, color: 'rose' },
+    ];
+    return categories.filter((cat) => cat.amount > 0);
+  }, [transactions]);
+
+  // Next payment date (1st of next month)
+  const nextPaymentDate = useMemo(() => {
+    const now = new Date();
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    return nextMonth.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  }, []);
+
+  const statementTotal = useMemo(() => {
+    return transactions
+      .filter((tx) => tx.status === 'completed' || tx.status === 'pending')
+      .reduce((sum, tx) => sum + tx.amount, 0);
+  }, [transactions]);
+
+  return (
+    <div className="min-h-screen bg-slate-50 pb-24 lg:pb-8">
+      <ConfettiEffect show={showConfetti} />
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-slide-down">
+          <div
+            className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
+              toast.type === 'success'
+                ? 'bg-emerald-600 text-white'
+                : toast.type === 'error'
+                  ? 'bg-red-600 text-white'
+                  : 'bg-slate-800 text-white'
+            }`}
+          >
+            {toast.type === 'success' && <CheckCircle2 className="w-5 h-5" />}
+            {toast.type === 'error' && <XCircle className="w-5 h-5" />}
+            {toast.type === 'info' && <AlertCircle className="w-5 h-5" />}
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
-              <h2 className="font-semibold text-slate-900">Bill Splitter</h2>
-              <p className="text-sm text-slate-500">Track shared expenses with family</p>
+              <h1 className="text-2xl font-bold text-slate-900">Money</h1>
+              <p className="text-slate-500 mt-1">Manage your Haven Estate Card and payments</p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-2 px-4 py-2 border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-50 transition-colors">
+                <Download className="w-4 h-4" />
+                <span className="hidden sm:inline">Export</span>
+              </button>
+              <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors">
+                <Receipt className="w-4 h-4" />
+                View Statement
+              </button>
             </div>
           </div>
-          <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
-            + Split Expense
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {familyMembers.map((member) => (
-            <div key={member.id} className="p-4 bg-slate-50 rounded-lg">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
-                  <span className="text-sm font-semibold text-emerald-700">{member.initials}</span>
-                </div>
-                <div>
-                  <p className="font-medium text-slate-900">{member.name}</p>
-                  <p className="text-xs text-slate-500">This month</p>
-                </div>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-slate-500">Paid</p>
-                  <p className="font-semibold text-green-600">{formatCurrency(member.paidAmount)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500">Owes</p>
-                  <p className={`font-semibold ${member.owedAmount > 0 ? 'text-red-600' : 'text-slate-900'}`}>
-                    {formatCurrency(member.owedAmount)}
-                  </p>
-                </div>
-              </div>
-              {member.owedAmount > 0 && (
-                <button className="w-full mt-3 px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
-                  Send Reminder
-                </button>
-              )}
-            </div>
-          ))}
         </div>
       </div>
 
-      {/* Security Footer */}
-      <div className="flex items-center justify-center gap-6 py-4 text-sm text-slate-400">
-        <div className="flex items-center gap-2">
-          <Lock className="w-4 h-4" />
-          <span>Bank-level encryption</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4" />
-          <span>PCI DSS Compliant</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <Eye className="w-4 h-4" />
-          <span>Never stores full card numbers</span>
-        </div>
-      </div>
-
-      {/* Add Funds Modal */}
-      {showAddFundsModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowAddFundsModal(false)} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Add Funds to Wallet</h3>
-                  <button
-                    onClick={() => setShowAddFundsModal(false)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Left Column - Card & Stats */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Spend Power & Card */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+              <div className="p-6 border-b border-slate-100">
+                <h2 className="text-lg font-semibold text-slate-900 mb-6">Spend Power</h2>
+                <SpendPowerGauge spent={monthlySpent} limit={MONTHLY_LIMIT} />
               </div>
 
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                    <input
-                      type="number"
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-3 py-3 text-lg font-semibold border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+              <div className="p-6 bg-slate-50/50">
+                <div className="flex flex-col lg:flex-row items-center gap-6">
+                  <div className="w-full lg:w-auto">
+                    <CreditCard
+                      cardholderName="HAVEN ESTATE"
+                      lastFour="4242"
+                      expiry="12/28"
+                      isLocked={isCardLocked}
+                      onToggleLock={handleCardLock}
                     />
                   </div>
-                </div>
 
-                {/* Quick Amounts */}
-                <div className="flex gap-2">
-                  {[500, 1000, 2000, 5000].map((amount) => (
-                    <button
-                      key={amount}
-                      className="flex-1 py-2 text-sm font-medium text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
-                    >
-                      ${amount.toLocaleString()}
-                    </button>
-                  ))}
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Payment Method</label>
-                  <div className="space-y-2">
-                    {paymentMethods.map((method) => (
-                      <label
-                        key={method.id}
-                        className="flex items-center gap-3 p-3 border border-slate-200 rounded-lg cursor-pointer hover:border-emerald-500 transition-colors"
-                      >
-                        <input
-                          type="radio"
-                          name="paymentMethod"
-                          defaultChecked={method.isDefault}
-                          className="text-emerald-600 focus:ring-emerald-500"
-                        />
-                        <div className="flex items-center gap-2 flex-1">
-                          {method.type === 'card' ? (
-                            <CreditCard className="w-5 h-5 text-slate-400" />
-                          ) : (
-                            <Building className="w-5 h-5 text-slate-400" />
-                          )}
-                          <span className="font-medium text-slate-900">
-                            {method.type === 'card' ? method.brand : method.bankName} •••• {method.last4}
-                          </span>
-                        </div>
-                        {method.isDefault && (
-                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Default</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-slate-200">
-                <button className="w-full py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors">
-                  Add Funds
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Manage Cards Modal */}
-      {showManageCardsModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowManageCardsModal(false)} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Payment Methods</h3>
-                  <button
-                    onClick={() => setShowManageCardsModal(false)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-4">
-                {paymentMethods.map((method) => (
-                  <div
-                    key={method.id}
-                    className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg"
-                  >
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      method.type === 'card' ? 'bg-blue-100' : 'bg-green-100'
-                    }`}>
-                      {method.type === 'card' ? (
-                        <CreditCard className="w-6 h-6 text-blue-600" />
-                      ) : (
-                        <Building className="w-6 h-6 text-green-600" />
-                      )}
+                  <div className="flex-1 w-full lg:w-auto space-y-4">
+                    {/* Statement Balance */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <span className="text-sm text-slate-500">Current Statement</span>
+                        <span className="text-xs text-slate-400">Due {nextPaymentDate}</span>
+                      </div>
+                      <div className="text-3xl font-bold text-slate-900 mb-4">
+                        {formatCurrency(statementTotal)}
+                      </div>
+                      <button className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-900 text-white rounded-lg font-medium hover:bg-slate-800 transition-colors">
+                        <Banknote className="w-4 h-4" />
+                        Pay Statement
+                      </button>
+                      <div className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-500">
+                        <RefreshCw className="w-3 h-3" />
+                        Auto-pay enabled for {nextPaymentDate}
+                      </div>
                     </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-slate-900">
-                        {method.type === 'card' ? method.brand : method.bankName} •••• {method.last4}
-                      </p>
-                      {method.expiresAt && (
-                        <p className="text-sm text-slate-500">Expires {method.expiresAt}</p>
-                      )}
-                    </div>
-                    {method.isDefault ? (
-                      <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded">Default</span>
-                    ) : (
-                      <button className="text-sm text-slate-500 hover:text-slate-700">Set Default</button>
-                    )}
                   </div>
-                ))}
-
-                <button className="w-full flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors">
-                  <Plus className="w-5 h-5" />
-                  <span className="font-medium">Add Payment Method</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Receipt Modal */}
-      {showReceiptModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowReceiptModal(null)} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Receipt</h3>
-                  <button
-                    onClick={() => setShowReceiptModal(null)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                {/* Receipt Content */}
-                <div className="text-center mb-6">
-                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <Receipt className="w-8 h-8 text-emerald-600" />
-                  </div>
-                  <p className="font-semibold text-slate-900">{showReceiptModal.vendor}</p>
-                  <p className="text-sm text-slate-500">{showReceiptModal.description}</p>
-                </div>
-
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Amount</span>
-                    <span className="font-medium text-slate-900">{formatCurrency(showReceiptModal.amount)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Date</span>
-                    <span className="font-medium text-slate-900">{formatDateFull(showReceiptModal.date)}</span>
-                  </div>
-                  {showReceiptModal.reference && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Reference</span>
-                      <span className="font-medium text-slate-900">{showReceiptModal.reference}</span>
-                    </div>
-                  )}
-                  {showReceiptModal.paymentMethod && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Payment Method</span>
-                      <span className="font-medium text-slate-900">{showReceiptModal.paymentMethod}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Receipt Preview Placeholder */}
-                <div className="bg-slate-100 rounded-lg p-8 text-center mb-4">
-                  <FileText className="w-12 h-12 text-slate-400 mx-auto mb-2" />
-                  <p className="text-sm text-slate-500">Receipt document preview</p>
-                </div>
-
-                <div className="flex gap-3">
-                  <button className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
-                    <Download className="w-4 h-4" />
-                    Download
-                  </button>
-                  <button className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors">
-                    <Eye className="w-4 h-4" />
-                    Full View
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      )}
 
-      {/* Approval Detail Modal */}
-      {showApprovalDetail && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowApprovalDetail(null)} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Payment Approval</h3>
-                  <button
-                    onClick={() => setShowApprovalDetail(null)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="flex items-start gap-4 mb-6">
-                  <div className={`w-14 h-14 rounded-xl flex items-center justify-center bg-${categoryConfig[showApprovalDetail.category].color}-100`}>
-                    {(() => {
-                      const CategoryIcon = categoryConfig[showApprovalDetail.category].icon;
-                      return <CategoryIcon className={`w-7 h-7 text-${categoryConfig[showApprovalDetail.category].color}-600`} />;
-                    })()}
-                  </div>
-                  <div>
-                    <p className="font-semibold text-lg text-slate-900">{showApprovalDetail.vendor}</p>
-                    <p className="text-slate-500">{showApprovalDetail.description}</p>
-                    <span className={`inline-block mt-2 text-xs px-2 py-0.5 rounded-full ${getUrgencyBadge(showApprovalDetail.urgency)}`}>
-                      {showApprovalDetail.urgency === 'high' ? 'Urgent' : showApprovalDetail.urgency === 'medium' ? 'Due Soon' : 'Normal Priority'}
+            {/* Pending Approvals */}
+            {pendingApprovals.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-semibold text-slate-900">Needs Your Approval</h2>
+                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
+                      {pendingApprovals.length}
                     </span>
                   </div>
                 </div>
 
-                <div className="bg-slate-50 rounded-lg p-4 mb-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-slate-600">Amount</span>
-                    <span className="text-2xl font-bold text-slate-900">{formatCurrency(showApprovalDetail.amount)}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {pendingApprovals.map((tx) => (
+                    <ApprovalCard
+                      key={tx.id}
+                      transaction={tx}
+                      onApprove={handleApprove}
+                      onDecline={handleDecline}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Recent Activity */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm">
+              <div className="p-6 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <h2 className="text-lg font-semibold text-slate-900">Recent Activity</h2>
+
+                  <div className="flex items-center gap-3">
+                    {/* Search */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Search..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="pl-9 pr-4 py-2 w-40 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                      />
+                    </div>
+
+                    {/* Filter */}
+                    <select
+                      value={filterCategory}
+                      onChange={(e) => setFilterCategory(e.target.value as TransactionCategory | 'all')}
+                      className="px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    >
+                      <option value="all">All Categories</option>
+                      <option value="utilities">Utilities</option>
+                      <option value="maintenance">Maintenance</option>
+                      <option value="services">Services</option>
+                      <option value="projects">Projects</option>
+                      <option value="insurance">Insurance</option>
+                    </select>
                   </div>
                 </div>
+              </div>
 
-                {showApprovalDetail.managerNote && (
-                  <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6">
-                    <div className="flex items-start gap-3">
-                      <Sparkles className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-emerald-900">Manager's Note</p>
-                        <p className="text-sm text-emerald-700 mt-1">{showApprovalDetail.managerNote}</p>
-                      </div>
-                    </div>
+              <div className="p-4">
+                {recentActivity.length === 0 ? (
+                  <div className="py-12 text-center text-slate-500">
+                    <CreditCardIcon className="w-12 h-12 mx-auto mb-3 text-slate-300" />
+                    <p>No transactions found</p>
                   </div>
+                ) : (
+                  recentActivity.map((tx) => <TransactionRow key={tx.id} transaction={tx} />)
                 )}
+              </div>
 
-                <div className="space-y-3 mb-6">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Category</span>
-                    <span className="font-medium text-slate-900">{categoryConfig[showApprovalDetail.category].label}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-slate-500">Requested</span>
-                    <span className="font-medium text-slate-900">{formatDateFull(showApprovalDetail.requestedAt)}</span>
-                  </div>
-                  {showApprovalDetail.dueDate && (
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-500">Due Date</span>
-                      <span className="font-medium text-slate-900">{formatDateFull(showApprovalDetail.dueDate)}</span>
+              {recentActivity.length > 0 && (
+                <div className="p-4 border-t border-slate-100">
+                  <button className="w-full flex items-center justify-center gap-2 px-4 py-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors font-medium">
+                    View All Transactions
+                    <ChevronRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Right Column - Sidebar */}
+          <div className="space-y-6">
+            {/* Quick Stats */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">This Month</h3>
+
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-emerald-100 rounded-lg">
+                      <ArrowDownRight className="w-4 h-4 text-emerald-600" />
                     </div>
-                  )}
+                    <span className="text-sm text-slate-600">Total Spent</span>
+                  </div>
+                  <span className="font-semibold text-slate-900">{formatCurrency(monthlySpent)}</span>
                 </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      handleApprove(showApprovalDetail);
-                      setShowApprovalDetail(null);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-600 text-white font-semibold rounded-lg hover:bg-emerald-700 transition-colors"
-                  >
-                    <Check className="w-5 h-5" />
-                    Approve Payment
-                  </button>
-                  <button
-                    onClick={() => {
-                      handleReject(showApprovalDetail);
-                      setShowApprovalDetail(null);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 py-3 border border-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
-                  >
-                    <X className="w-5 h-5" />
-                    Decline
-                  </button>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-amber-100 rounded-lg">
+                      <Clock className="w-4 h-4 text-amber-600" />
+                    </div>
+                    <span className="text-sm text-slate-600">Pending</span>
+                  </div>
+                  <span className="font-semibold text-slate-900">
+                    {formatCurrency(
+                      transactions.filter((tx) => tx.status === 'pending').reduce((sum, tx) => sum + tx.amount, 0)
+                    )}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-orange-100 rounded-lg">
+                      <AlertTriangle className="w-4 h-4 text-orange-600" />
+                    </div>
+                    <span className="text-sm text-slate-600">Awaiting Approval</span>
+                  </div>
+                  <span className="font-semibold text-slate-900">
+                    {formatCurrency(pendingApprovals.reduce((sum, tx) => sum + tx.amount, 0))}
+                  </span>
                 </div>
               </div>
             </div>
+
+            {/* Spending Breakdown */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">Spending Breakdown</h3>
+              <SpendingBreakdown categories={spendingByCategory} />
+            </div>
+
+            {/* Billing Info */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <h3 className="font-semibold text-slate-900 mb-4">Billing Account</h3>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                  <Building2 className="w-5 h-5 text-slate-400" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-slate-700">Chase Checking</div>
+                    <div className="text-xs text-slate-500">•••• 9876</div>
+                  </div>
+                  <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">
+                    Default
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Auto-pay</span>
+                  <span className="text-emerald-600 font-medium">Enabled</span>
+                </div>
+
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-slate-500">Next payment</span>
+                  <span className="text-slate-700 font-medium">{nextPaymentDate}</span>
+                </div>
+
+                <button className="w-full px-4 py-2 border border-slate-300 rounded-lg text-slate-700 text-sm font-medium hover:bg-slate-50 transition-colors">
+                  Manage Payment Methods
+                </button>
+              </div>
+            </div>
+
+            {/* Help Card */}
+            <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 text-white">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Eye className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-semibold mb-1">Haven Monitors Everything</h3>
+                  <p className="text-sm text-emerald-100">
+                    Your manager reviews all charges over $200 before they post.
+                  </p>
+                </div>
+              </div>
+              <button className="w-full px-4 py-2 bg-white text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-50 transition-colors">
+                Learn About Protections
+              </button>
+            </div>
           </div>
         </div>
-      )}
-
-      {/* Mobile FAB */}
-      <div className="fixed bottom-6 right-6 sm:hidden">
-        <button
-          onClick={() => setShowAddFundsModal(true)}
-          className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
       </div>
+
+      {/* Animations */}
+      <style jsx>{`
+        @keyframes confetti {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 1;
+          }
+          100% {
+            transform: translateY(100vh) rotate(720deg);
+            opacity: 0;
+          }
+        }
+        .animate-confetti {
+          animation: confetti 3s ease-out forwards;
+        }
+        @keyframes slide-down {
+          from {
+            transform: translateY(-100%);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-slide-down {
+          animation: slide-down 0.3s ease-out;
+        }
+      `}</style>
     </div>
   );
 }
