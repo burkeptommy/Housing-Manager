@@ -524,12 +524,12 @@ export default function TasksPage() {
 
           {/* Family Assignee Selection */}
           {newTaskAssignee === 'family' && (
-            <div className="mt-3 flex items-center gap-2">
-              <span className="text-sm text-slate-500">Assign to:</span>
-              <div className="flex gap-2">
+            <div className="mt-3">
+              <span className="text-sm text-slate-500 block mb-2 sm:inline sm:mb-0 sm:mr-2">Assign to:</span>
+              <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2 pr-4 -mr-4">
                 <button
                   onClick={() => setNewTaskAssigneeId('')}
-                  className={`px-3 py-1 rounded-full text-sm transition-colors ${
+                  className={`flex-shrink-0 px-3 py-1 rounded-full text-sm transition-colors ${
                     newTaskAssigneeId === ''
                       ? 'bg-slate-800 text-white'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -541,7 +541,7 @@ export default function TasksPage() {
                   <button
                     key={member.id}
                     onClick={() => setNewTaskAssigneeId(member.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-sm transition-colors ${
+                    className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-sm transition-colors ${
                       newTaskAssigneeId === member.id
                         ? 'bg-slate-800 text-white'
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
