@@ -45,7 +45,7 @@ const rotatingWords = [
   { word: 'Home', color: 'text-emerald-600' },
   { word: 'Finances', color: 'text-amber-500' },
   { word: 'Projects', color: 'text-orange-500' },
-  { word: 'Travel', color: 'text-sky-500' },
+  { word: 'Family', color: 'text-blue-600' },
   { word: 'Life', color: 'text-indigo-600' },
 ];
 
@@ -92,20 +92,25 @@ function HeroSection() {
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-medium text-emerald-950 leading-tight tracking-tight mb-6">
               The Operating System
               <br />
-              for Your{' '}
-              <span className="relative inline-block w-[200px] sm:w-[280px] h-[1.2em] align-bottom overflow-hidden">
-                <AnimatePresence mode="wait">
-                  <motion.span
-                    key={currentIndex}
-                    initial={{ y: 50, opacity: 0 }}
-                    animate={{ y: 0, opacity: 1 }}
-                    exit={{ y: -50, opacity: 0 }}
-                    transition={{ duration: 0.4, ease: 'easeInOut' }}
-                    className={`absolute left-0 ${rotatingWords[currentIndex]?.color ?? 'text-emerald-600'}`}
-                  >
-                    {rotatingWords[currentIndex]?.word ?? 'Home'}.
-                  </motion.span>
-                </AnimatePresence>
+              <span className="inline-flex items-baseline">
+                <span>for Your&nbsp;</span>
+                <span className="relative inline-flex overflow-hidden" style={{ minWidth: '3ch' }}>
+                  <AnimatePresence mode="wait">
+                    <motion.span
+                      key={currentIndex}
+                      initial={{ y: '100%', opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      exit={{ y: '-100%', opacity: 0 }}
+                      transition={{
+                        duration: 0.4,
+                        ease: [0.4, 0, 0.2, 1],
+                      }}
+                      className={`inline-block whitespace-nowrap ${rotatingWords[currentIndex]?.color ?? 'text-emerald-600'}`}
+                    >
+                      {rotatingWords[currentIndex]?.word ?? 'Home'}.
+                    </motion.span>
+                  </AnimatePresence>
+                </span>
               </span>
             </h1>
 
