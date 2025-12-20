@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import {
@@ -35,13 +35,29 @@ import {
   Camera,
   DoorOpen,
   Bell,
+  Wallet,
+  Flame,
+  Snowflake,
+  Gauge,
+  Power,
 } from 'lucide-react';
+import { getApiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
+import { CreditCard } from '@/components/credit-card';
+import type {
+  HomeProfile,
+  HomeSystem,
+  HomeSystemType,
+  Vehicle,
+  BillAccount,
+  BillingSummary,
+} from '@haven/core';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type TabId = 'systems' | 'spaces' | 'utilities' | 'vehicles' | 'documents';
+type TabId = 'systems' | 'spaces' | 'utilities' | 'vehicles' | 'documents' | 'wallet';
 
 interface VaultItem {
   id: string;
@@ -108,11 +124,32 @@ interface DocumentCategory {
   icon: typeof FileText;
 }
 
+interface PropertyData {
+  address: string;
+  city: string;
+  state: string;
+  yearBuilt: number;
+  sqft: number;
+  lotSize: string;
+  zoning: string;
+  imageUrl: string;
+}
+
+interface FinancialsData {
+  spendingLimit: number;
+  currentSpend: number;
+  cardName: string;
+  cardHolder: string;
+  last4: string;
+  expiry: string;
+  isLocked: boolean;
+}
+
 // ============================================================================
 // MOCK DATA
 // ============================================================================
 
-const propertyData = {
+const MOCK_PROPERTY_DATA: PropertyData = {
   address: "1247 Beverly Drive",
   city: "Beverly Hills",
   state: "CA",
@@ -123,7 +160,7 @@ const propertyData = {
   imageUrl: "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1600&q=80",
 };
 
-const vaultItems: VaultItem[] = [
+const MOCK_VAULT_ITEMS: VaultItem[] = [
   { id: 'wifi', label: 'WiFi Network', value: 'HomeNetwork_5G / Tr0ub4dor&3', icon: Wifi, masked: true },
   { id: 'alarm', label: 'Alarm Code', value: '4729', icon: Shield, masked: true },
   { id: 'safe', label: 'Safe Combination', value: '24-08-16', icon: Shield, masked: true },
@@ -133,7 +170,7 @@ const vaultItems: VaultItem[] = [
   { id: 'mailbox', label: 'Mailbox #', value: '247', icon: Mailbox, masked: false },
 ];
 
-const systemAssets: SystemAsset[] = [
+const MOCK_SYSTEMS: SystemAsset[] = [
   {
     id: 'hvac1',
     name: 'HVAC - Zone 1 (Main)',
@@ -203,7 +240,7 @@ const systemAssets: SystemAsset[] = [
   },
 ];
 
-const roomsData: RoomData[] = [
+const MOCK_ROOMS_DATA: RoomData[] = [
   {
     id: 'kitchen',
     name: 'Kitchen',
@@ -257,7 +294,7 @@ const roomsData: RoomData[] = [
   },
 ];
 
-const utilityProviders: UtilityProvider[] = [
+const MOCK_UTILITIES: UtilityProvider[] = [
   {
     id: 'electric',
     type: 'Electric',
@@ -307,7 +344,7 @@ const utilityProviders: UtilityProvider[] = [
   },
 ];
 
-const vehicles: VehicleData[] = [
+const MOCK_VEHICLES: VehicleData[] = [
   {
     id: 'car1',
     year: 2023,
@@ -340,7 +377,7 @@ const vehicles: VehicleData[] = [
   },
 ];
 
-const documentCategories: DocumentCategory[] = [
+const MOCK_DOCUMENT_CATEGORIES: DocumentCategory[] = [
   { id: 'deeds', name: 'Deeds & Title', count: 3, icon: FileText },
   { id: 'surveys', name: 'Surveys & Plats', count: 2, icon: FileText },
   { id: 'insurance', name: 'Insurance Policies', count: 5, icon: Shield },
@@ -348,6 +385,164 @@ const documentCategories: DocumentCategory[] = [
   { id: 'warranties', name: 'Warranties', count: 12, icon: FileText },
   { id: 'manuals', name: 'Manuals', count: 15, icon: FileText },
 ];
+
+const MOCK_FINANCIALS: FinancialsData = {
+  spendingLimit: 5000,
+  currentSpend: 1240,
+  cardName: 'Haven Household',
+  cardHolder: 'Burke Family',
+  last4: '4242',
+  expiry: '12/27',
+  isLocked: false,
+};
+
+// ============================================================================
+// DATA MAPPING FUNCTIONS
+// ============================================================================
+
+function getSystemIcon(systemType: HomeSystemType): typeof ThermometerSun {
+  switch (systemType) {
+    case 'FURNACE':
+    case 'BOILER':
+    case 'FIREPLACE':
+      return Flame;
+    case 'AIR_CONDITIONER':
+      return Snowflake;
+    case 'HEAT_PUMP':
+    case 'THERMOSTAT':
+      return ThermometerSun;
+    case 'WATER_HEATER':
+    case 'SUMP_PUMP':
+    case 'WELL_PUMP':
+    case 'WATER_SOFTENER':
+      return Droplets;
+    case 'ELECTRICAL_PANEL':
+    case 'GENERATOR':
+      return Zap;
+    case 'SOLAR_PANELS':
+    case 'BATTERY_STORAGE':
+      return Sun;
+    case 'POOL_EQUIPMENT':
+    case 'HOT_TUB':
+    case 'IRRIGATION_SYSTEM':
+      return Droplets;
+    case 'GARAGE_DOOR_OPENER':
+      return DoorOpen;
+    case 'SECURITY_SYSTEM':
+    case 'SMOKE_DETECTOR':
+    case 'CO_DETECTOR':
+    case 'FIRE_EXTINGUISHER':
+      return Shield;
+    case 'CEILING_FAN':
+      return Wind;
+    case 'REFRIGERATOR':
+    case 'DISHWASHER':
+    case 'OVEN_RANGE':
+    case 'MICROWAVE':
+    case 'GARBAGE_DISPOSAL':
+    case 'WASHER':
+    case 'DRYER':
+      return Power;
+    case 'LAWN_MOWER':
+      return Gauge;
+    default:
+      return ThermometerSun;
+  }
+}
+
+function mapProfileToDisplay(apiProfile: HomeProfile): PropertyData {
+  // Convert lotSize (number of sq ft or acres) to display string
+  const lotSizeDisplay = apiProfile.lotSize
+    ? apiProfile.lotSize >= 43560
+      ? `${(apiProfile.lotSize / 43560).toFixed(2)} acres`
+      : `${apiProfile.lotSize.toLocaleString()} sq ft`
+    : MOCK_PROPERTY_DATA.lotSize;
+
+  return {
+    address: apiProfile.addressLine1 || MOCK_PROPERTY_DATA.address,
+    city: apiProfile.city || MOCK_PROPERTY_DATA.city,
+    state: apiProfile.state || MOCK_PROPERTY_DATA.state,
+    yearBuilt: apiProfile.yearBuilt || MOCK_PROPERTY_DATA.yearBuilt,
+    sqft: apiProfile.squareFeet || MOCK_PROPERTY_DATA.sqft,
+    lotSize: lotSizeDisplay,
+    zoning: MOCK_PROPERTY_DATA.zoning, // zoning not in API, use mock
+    imageUrl: MOCK_PROPERTY_DATA.imageUrl, // Use mock image as fallback
+  };
+}
+
+function mapSystemToAsset(apiSystem: HomeSystem): SystemAsset {
+  return {
+    id: apiSystem.id,
+    name: apiSystem.name || apiSystem.systemType,
+    icon: getSystemIcon(apiSystem.systemType),
+    make: apiSystem.brand || 'Unknown',
+    model: apiSystem.model || 'Unknown',
+    serialNumber: apiSystem.serialNumber || 'N/A',
+    installDate: apiSystem.installDate || '',
+    warrantyExpires: apiSystem.warrantyExpires || '',
+    location: apiSystem.location || undefined,
+    notes: apiSystem.notes || undefined,
+  };
+}
+
+function mapVehicleToDisplay(apiVehicle: Vehicle): VehicleData {
+  return {
+    id: apiVehicle.id,
+    year: apiVehicle.year || new Date().getFullYear(),
+    make: apiVehicle.make || 'Unknown',
+    model: apiVehicle.model || 'Unknown',
+    color: apiVehicle.color || 'Unknown',
+    vin: apiVehicle.vin || 'N/A',
+    licensePlate: apiVehicle.licensePlate || 'N/A',
+    tireSizeFront: 'See manual', // Not in API, would need extended fields
+    tireSizeRear: 'See manual',
+    oilType: 'Consult manual', // Not in API, would need extended fields
+    insuranceCarrier: apiVehicle.insuranceProvider || 'Not on file',
+    insurancePolicy: apiVehicle.insurancePolicyNum || 'N/A',
+    registrationExpires: apiVehicle.registrationExpires || '',
+    imageUrl: apiVehicle.photoUrls?.[0] || undefined,
+  };
+}
+
+function mapBillAccountToUtility(billAccount: BillAccount): UtilityProvider | null {
+  // Only map utility-type bill accounts
+  const utilityCategories = ['UTILITY', 'ELECTRIC', 'GAS', 'WATER', 'INTERNET', 'TRASH'];
+  if (!utilityCategories.includes(billAccount.category)) {
+    return null;
+  }
+
+  const iconMap: Record<string, typeof Zap> = {
+    ELECTRIC: Zap,
+    GAS: Wind,
+    WATER: Droplets,
+    INTERNET: Wifi,
+    TRASH: Trash2,
+    UTILITY: Zap,
+  };
+
+  return {
+    id: billAccount.id,
+    type: billAccount.category,
+    icon: iconMap[billAccount.category] || Zap,
+    provider: billAccount.nickname,
+    accountNumber: billAccount.accountNumber || 'On file',
+    meterNumber: undefined,
+    supportPhone: 'See bill',
+    managedByHaven: true,
+  };
+}
+
+function mapFinancials(billingSummary: BillingSummary): FinancialsData {
+  return {
+    spendingLimit: 5000, // Default limit
+    currentSpend: billingSummary.monthlyBillEstimate || 0,
+    cardName: 'Haven Household',
+    cardHolder: 'Burke Family',
+    last4: '4242',
+    expiry: '12/27',
+    isLocked: false,
+  };
+}
 
 // ============================================================================
 // HELPER COMPONENTS
@@ -404,6 +599,7 @@ function MaskedValue({ value, masked }: { value: string; masked: boolean }) {
 }
 
 function WarrantyBadge({ expiresDate }: { expiresDate: string }) {
+  if (!expiresDate) return null;
   const expires = new Date(expiresDate);
   const today = new Date();
   const isExpired = expires < today;
@@ -432,6 +628,7 @@ function WarrantyBadge({ expiresDate }: { expiresDate: string }) {
 }
 
 function RegistrationBadge({ expiresDate }: { expiresDate: string }) {
+  if (!expiresDate) return null;
   const expires = new Date(expiresDate);
   const today = new Date();
   const daysUntil = Math.ceil((expires.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
@@ -468,17 +665,17 @@ function RegistrationBadge({ expiresDate }: { expiresDate: string }) {
 // ============================================================================
 
 // Hero Section - Cinematic Property Header
-function HeroSection() {
+function HeroSection({ property }: { property: PropertyData }) {
   return (
     <>
       {/* Desktop & Tablet Layout */}
       <div className="relative h-[300px] lg:h-[400px] rounded-xl overflow-hidden mb-6 hidden sm:block">
         {/* Property Photo Background */}
         <div className="absolute inset-0">
-          {propertyData.imageUrl ? (
+          {property.imageUrl ? (
             <Image
-              src={propertyData.imageUrl}
-              alt={propertyData.address}
+              src={property.imageUrl}
+              alt={property.address}
               fill
               className="object-cover"
               priority
@@ -505,32 +702,32 @@ function HeroSection() {
             <div>
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-2xl lg:text-3xl font-bold text-white drop-shadow-lg">
-                  {propertyData.address}
+                  {property.address}
                 </h1>
                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-emerald-500/90 backdrop-blur-sm rounded-full text-xs font-semibold text-white">
                   <Shield className="w-3 h-3" />
                   Haven Managed
                 </span>
               </div>
-              <p className="text-slate-200 mb-4 drop-shadow">{propertyData.city}, {propertyData.state}</p>
+              <p className="text-slate-200 mb-4 drop-shadow">{property.city}, {property.state}</p>
 
               {/* Property Stats */}
               <div className="flex flex-wrap gap-3">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
                   <p className="text-xs text-slate-300">Year Built</p>
-                  <p className="font-semibold text-white">{propertyData.yearBuilt}</p>
+                  <p className="font-semibold text-white">{property.yearBuilt}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
                   <p className="text-xs text-slate-300">Square Feet</p>
-                  <p className="font-semibold text-white">{propertyData.sqft.toLocaleString()}</p>
+                  <p className="font-semibold text-white">{property.sqft.toLocaleString()}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
                   <p className="text-xs text-slate-300">Lot Size</p>
-                  <p className="font-semibold text-white">{propertyData.lotSize}</p>
+                  <p className="font-semibold text-white">{property.lotSize}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
                   <p className="text-xs text-slate-300">Zoning</p>
-                  <p className="font-semibold text-white">{propertyData.zoning}</p>
+                  <p className="font-semibold text-white">{property.zoning}</p>
                 </div>
               </div>
             </div>
@@ -565,10 +762,10 @@ function HeroSection() {
         {/* Property Photo */}
         <div className="relative h-[200px] rounded-xl overflow-hidden mb-4">
           <div className="absolute inset-0">
-            {propertyData.imageUrl ? (
+            {property.imageUrl ? (
               <Image
-                src={propertyData.imageUrl}
-                alt={propertyData.address}
+                src={property.imageUrl}
+                alt={property.address}
                 fill
                 className="object-cover"
                 priority
@@ -590,11 +787,11 @@ function HeroSection() {
           <div className="absolute bottom-0 left-0 right-0 p-4">
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-xl font-bold text-white drop-shadow-lg">
-                {propertyData.address}
+                {property.address}
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-slate-200 text-sm">{propertyData.city}, {propertyData.state}</p>
+              <p className="text-slate-200 text-sm">{property.city}, {property.state}</p>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/90 backdrop-blur-sm rounded-full text-xs font-semibold text-white">
                 <Shield className="w-3 h-3" />
                 Haven Managed
@@ -607,19 +804,19 @@ function HeroSection() {
         <div className="grid grid-cols-4 gap-2 mb-4">
           <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-slate-500">Built</p>
-            <p className="font-semibold text-slate-900 text-sm">{propertyData.yearBuilt}</p>
+            <p className="font-semibold text-slate-900 text-sm">{property.yearBuilt}</p>
           </div>
           <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-slate-500">Sq Ft</p>
-            <p className="font-semibold text-slate-900 text-sm">{propertyData.sqft.toLocaleString()}</p>
+            <p className="font-semibold text-slate-900 text-sm">{property.sqft.toLocaleString()}</p>
           </div>
           <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-slate-500">Lot</p>
-            <p className="font-semibold text-slate-900 text-sm">{propertyData.lotSize}</p>
+            <p className="font-semibold text-slate-900 text-sm">{property.lotSize}</p>
           </div>
           <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
             <p className="text-xs text-slate-500">Zone</p>
-            <p className="font-semibold text-slate-900 text-sm">{propertyData.zoning}</p>
+            <p className="font-semibold text-slate-900 text-sm">{property.zoning}</p>
           </div>
         </div>
 
@@ -662,7 +859,7 @@ function VaultSection() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {vaultItems.map((item) => {
+        {MOCK_VAULT_ITEMS.map((item) => {
           const Icon = item.icon;
           return (
             <div
@@ -686,10 +883,10 @@ function VaultSection() {
 }
 
 // Systems Tab
-function SystemsTab() {
+function SystemsTab({ systems }: { systems: SystemAsset[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {systemAssets.map((asset) => {
+      {systems.map((asset) => {
         const Icon = asset.icon;
         return (
           <div
@@ -730,7 +927,7 @@ function SystemsTab() {
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wide">Install Date</p>
                 <p className="font-medium text-slate-900">
-                  {new Date(asset.installDate).toLocaleDateString()}
+                  {asset.installDate ? new Date(asset.installDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
             </div>
@@ -761,7 +958,7 @@ function SpacesTab() {
 
   return (
     <div className="space-y-4">
-      {roomsData.map((room) => {
+      {MOCK_ROOMS_DATA.map((room) => {
         const isExpanded = expandedRoom === room.id;
 
         return (
@@ -876,10 +1073,10 @@ function SpacesTab() {
 }
 
 // Utilities Tab
-function UtilitiesTab() {
+function UtilitiesTab({ utilities }: { utilities: UtilityProvider[] }) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {utilityProviders.map((utility) => {
+      {utilities.map((utility) => {
         const Icon = utility.icon;
         return (
           <div
@@ -942,7 +1139,7 @@ function UtilitiesTab() {
 }
 
 // Vehicles Tab
-function VehiclesTab() {
+function VehiclesTab({ vehicles }: { vehicles: VehicleData[] }) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {vehicles.map((vehicle) => (
@@ -1027,7 +1224,7 @@ function VehiclesTab() {
 function DocumentsTab() {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {documentCategories.map((category) => {
+      {MOCK_DOCUMENT_CATEGORIES.map((category) => {
         const Icon = category.icon;
         return (
           <Link
@@ -1055,12 +1252,229 @@ function DocumentsTab() {
   );
 }
 
+// Wallet Tab - Credit Card & Spend Power
+function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; onToggleLock: (locked: boolean) => void }) {
+  const available = financials.spendingLimit - financials.currentSpend;
+  const utilization = (financials.currentSpend / financials.spendingLimit) * 100;
+
+  // Color-coded utilization
+  const getUtilizationColor = () => {
+    if (utilization >= 90) return 'text-red-600';
+    if (utilization >= 75) return 'text-amber-600';
+    return 'text-emerald-600';
+  };
+
+  const getProgressColor = () => {
+    if (utilization >= 90) return 'stroke-red-500';
+    if (utilization >= 75) return 'stroke-amber-500';
+    return 'stroke-emerald-500';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Card & Spend Power Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Credit Card */}
+        <div className="flex justify-center lg:justify-start">
+          <CreditCard
+            cardholderName={financials.cardHolder}
+            lastFour={financials.last4}
+            expiry={financials.expiry}
+            isLocked={financials.isLocked}
+            onToggleLock={onToggleLock}
+          />
+        </div>
+
+        {/* Spend Power Summary */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-emerald-600" />
+            Spend Power
+          </h3>
+
+          <div className="flex items-center gap-6">
+            {/* Circular Progress Gauge */}
+            <div className="relative w-32 h-32 flex-shrink-0">
+              <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
+                {/* Background circle */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="8"
+                  className="text-slate-200"
+                />
+                {/* Progress circle */}
+                <circle
+                  cx="50"
+                  cy="50"
+                  r="40"
+                  fill="none"
+                  strokeWidth="8"
+                  strokeLinecap="round"
+                  strokeDasharray={`${utilization * 2.51} 251`}
+                  className={getProgressColor()}
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className={`text-2xl font-bold ${getUtilizationColor()}`}>
+                  {Math.round(utilization)}%
+                </span>
+                <span className="text-xs text-slate-500">Used</span>
+              </div>
+            </div>
+
+            {/* Stats */}
+            <div className="space-y-4 flex-1">
+              <div>
+                <p className="text-sm text-slate-500">Available</p>
+                <p className="text-2xl font-bold text-emerald-600">
+                  ${available.toLocaleString()}
+                </p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-slate-500">Monthly Limit</p>
+                  <p className="font-semibold text-slate-900">
+                    ${financials.spendingLimit.toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Current Spend</p>
+                  <p className="font-semibold text-slate-900">
+                    ${financials.currentSpend.toLocaleString()}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Quick Actions */}
+          <div className="mt-6 pt-4 border-t border-slate-200 flex gap-3">
+            <Link
+              href="/app/billing"
+              className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors text-center"
+            >
+              View Transactions
+            </Link>
+            <Link
+              href="/app/billing?tab=statements"
+              className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors text-center"
+            >
+              Pay Statement
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Card Info */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <h3 className="text-lg font-semibold text-slate-900 mb-4">Card Details</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Card Name</p>
+            <p className="font-medium text-slate-900">{financials.cardName}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Cardholder</p>
+            <p className="font-medium text-slate-900">{financials.cardHolder}</p>
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
+            <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
+              financials.isLocked
+                ? 'bg-red-100 text-red-700'
+                : 'bg-emerald-100 text-emerald-700'
+            }`}>
+              {financials.isLocked ? 'Locked' : 'Active'}
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
 
 export default function HomeProfilePage() {
+  const { currentHousehold } = useAuth();
   const [activeTab, setActiveTab] = useState<TabId>('systems');
+
+  // State initialized with mock defaults for hybrid data pattern
+  const [property, setProperty] = useState<PropertyData>(MOCK_PROPERTY_DATA);
+  const [systems, setSystems] = useState<SystemAsset[]>(MOCK_SYSTEMS);
+  const [vehicles, setVehicles] = useState<VehicleData[]>(MOCK_VEHICLES);
+  const [utilities, setUtilities] = useState<UtilityProvider[]>(MOCK_UTILITIES);
+  const [financials, setFinancials] = useState<FinancialsData>(MOCK_FINANCIALS);
+
+  // Load data from API with hybrid fallback
+  const loadDashboardData = useCallback(async () => {
+    if (!currentHousehold?.id) return;
+
+    const api = getApiClient();
+    const householdId = currentHousehold.id;
+
+    // Use Promise.allSettled for independent data streams
+    const results = await Promise.allSettled([
+      api.getHomeProfile(householdId),
+      api.getHomeSystems(),
+      api.getFamilyVehicles(),
+      api.getBillAccounts(householdId),
+      api.getBillingSummary(householdId),
+    ]);
+
+    // Process each result - only update state if fulfilled with data
+    const [profileResult, systemsResult, vehiclesResult, billAccountsResult, billingSummaryResult] = results;
+
+    // Home Profile
+    if (profileResult.status === 'fulfilled' && profileResult.value) {
+      setProperty(mapProfileToDisplay(profileResult.value));
+    }
+
+    // Home Systems
+    if (systemsResult.status === 'fulfilled' && systemsResult.value?.length > 0) {
+      setSystems(systemsResult.value.map(mapSystemToAsset));
+    }
+
+    // Vehicles
+    if (vehiclesResult.status === 'fulfilled' && vehiclesResult.value?.length > 0) {
+      setVehicles(vehiclesResult.value.map(mapVehicleToDisplay));
+    }
+
+    // Bill Accounts → Utilities
+    if (billAccountsResult.status === 'fulfilled' && billAccountsResult.value?.length > 0) {
+      const mappedUtilities = billAccountsResult.value
+        .map(mapBillAccountToUtility)
+        .filter((u): u is UtilityProvider => u !== null);
+      if (mappedUtilities.length > 0) {
+        setUtilities(mappedUtilities);
+      }
+    }
+
+    // Billing Summary → Financials
+    if (billingSummaryResult.status === 'fulfilled' && billingSummaryResult.value) {
+      setFinancials(prev => ({
+        ...prev,
+        ...mapFinancials(billingSummaryResult.value),
+      }));
+    }
+  }, [currentHousehold?.id]);
+
+  // Fetch data on mount
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
+
+  // Handle card lock toggle
+  const handleCardLockToggle = useCallback((locked: boolean) => {
+    setFinancials(prev => ({ ...prev, isLocked: locked }));
+    // TODO: Call API to persist lock state
+  }, []);
 
   const tabs: { id: TabId; label: string; icon: typeof ThermometerSun }[] = [
     { id: 'systems', label: 'Systems', icon: ThermometerSun },
@@ -1068,12 +1482,13 @@ export default function HomeProfilePage() {
     { id: 'utilities', label: 'Utilities', icon: Zap },
     { id: 'vehicles', label: 'Vehicles', icon: Car },
     { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'wallet', label: 'Wallet', icon: Wallet },
   ];
 
   return (
     <div className="pb-32 lg:pb-8">
       {/* Hero Section */}
-      <HeroSection />
+      <HeroSection property={property} />
 
       {/* The Vault */}
       <VaultSection />
@@ -1104,11 +1519,12 @@ export default function HomeProfilePage() {
 
       {/* Tab Content */}
       <div>
-        {activeTab === 'systems' && <SystemsTab />}
+        {activeTab === 'systems' && <SystemsTab systems={systems} />}
         {activeTab === 'spaces' && <SpacesTab />}
-        {activeTab === 'utilities' && <UtilitiesTab />}
-        {activeTab === 'vehicles' && <VehiclesTab />}
+        {activeTab === 'utilities' && <UtilitiesTab utilities={utilities} />}
+        {activeTab === 'vehicles' && <VehiclesTab vehicles={vehicles} />}
         {activeTab === 'documents' && <DocumentsTab />}
+        {activeTab === 'wallet' && <WalletTab financials={financials} onToggleLock={handleCardLockToggle} />}
       </div>
     </div>
   );
