@@ -28,11 +28,13 @@ import {
   CheckCircle2,
   Clock,
   Gauge,
-  Receipt,
   Filter,
   Thermometer,
   MapPin,
   Building,
+  Download,
+  Zap,
+  Droplets,
 } from 'lucide-react';
 
 // ============================================================================
@@ -48,7 +50,7 @@ const rotatingWords = [
 ];
 
 // ============================================================================
-// HERO SECTION
+// HERO SECTION - "Zero Noise" Promise
 // ============================================================================
 
 function HeroSection() {
@@ -144,123 +146,133 @@ function HeroSection() {
             </div>
           </div>
 
-          {/* Right Column - Floating UI Stack (Glassmorphism) */}
+          {/* Right Column - Floating UI Stack (3 Pillars of Freedom) */}
           <div className="relative h-[500px] lg:h-[600px] hidden lg:block">
-            {/* Center - Dashboard "Everything Systems Normal" */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[340px] bg-white rounded-2xl shadow-2xl shadow-slate-900/15 border border-slate-200 overflow-hidden z-20"
-            >
-              <div className="p-5 border-b border-slate-100">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <Home className="w-5 h-5 text-emerald-600" />
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-slate-900">House Status</p>
-                      <p className="text-xs text-slate-500">Real-time monitoring</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 rounded-full">
-                    <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                    <span className="text-xs font-semibold text-emerald-700">All Systems Normal</span>
-                  </div>
-                </div>
-              </div>
-              <div className="p-5 space-y-3">
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <Thermometer className="w-5 h-5 text-slate-500" />
-                    <span className="text-sm text-slate-700">HVAC</span>
-                  </div>
-                  <span className="text-sm font-medium text-emerald-600">72°F</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <Shield className="w-5 h-5 text-slate-500" />
-                    <span className="text-sm text-slate-700">Security</span>
-                  </div>
-                  <span className="text-sm font-medium text-emerald-600">Armed</span>
-                </div>
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-                  <div className="flex items-center gap-3">
-                    <DollarSign className="w-5 h-5 text-slate-500" />
-                    <span className="text-sm text-slate-700">Bills This Month</span>
-                  </div>
-                  <span className="text-sm font-medium text-emerald-600">All Paid</span>
-                </div>
-              </div>
-            </motion.div>
-
-            {/* Left - Money Card (Bills Consolidated) */}
+            {/* LEFT CARD - The "One Bill" Revolution */}
             <motion.div
               initial={{ opacity: 0, x: -40 }}
               animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.4, duration: 0.6 }}
-              className="absolute top-16 left-0 w-[280px] backdrop-blur-xl bg-white/90 rounded-2xl shadow-2xl shadow-slate-900/10 border border-white/50 overflow-hidden z-10"
+              transition={{ delay: 0.2, duration: 0.6 }}
+              className="absolute top-8 left-0 w-[260px] backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200 overflow-hidden z-10"
             >
               <div className="p-4">
                 <div className="flex items-center gap-2 mb-4">
                   <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
-                    <Receipt className="w-4 h-4 text-amber-600" />
+                    <DollarSign className="w-4 h-4 text-amber-600" />
                   </div>
-                  <span className="text-sm font-semibold text-slate-900">Monthly Statement</span>
+                  <span className="text-sm font-semibold text-slate-900">Consolidated Billing</span>
                 </div>
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Electric (SCE)</span>
-                    <span className="text-slate-700">$142</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Landscaping</span>
-                    <span className="text-slate-700">$280</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">Pool Service</span>
-                    <span className="text-slate-700">$150</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-slate-500">+ 2 more</span>
-                    <span className="text-slate-700">$340</span>
+
+                {/* Vendor logos collapsing into single line */}
+                <div className="space-y-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex -space-x-2">
+                      <div className="w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center border-2 border-white">
+                        <Zap className="w-3 h-3 text-blue-600" />
+                      </div>
+                      <div className="w-6 h-6 bg-cyan-100 rounded-full flex items-center justify-center border-2 border-white">
+                        <Droplets className="w-3 h-3 text-cyan-600" />
+                      </div>
+                      <div className="w-6 h-6 bg-purple-100 rounded-full flex items-center justify-center border-2 border-white">
+                        <Wifi className="w-3 h-3 text-purple-600" />
+                      </div>
+                      <div className="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center border-2 border-white">
+                        <Sparkles className="w-3 h-3 text-green-600" />
+                      </div>
+                    </div>
+                    <ArrowRight className="w-4 h-4 text-slate-400" />
+                    <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
+                      <Home className="w-4 h-4 text-white" />
+                    </div>
                   </div>
                 </div>
-                <div className="pt-3 border-t border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-semibold text-slate-900">One Payment</span>
-                    <span className="text-lg font-bold text-emerald-600">$912</span>
-                  </div>
+
+                <div className="bg-slate-50 rounded-lg p-3">
+                  <p className="text-xs text-slate-600">
+                    <span className="font-semibold text-emerald-700">6 Vendors</span> Auto-Paid.
+                    <br />
+                    <span className="font-semibold text-emerald-700">1 Monthly Statement</span> to Haven.
+                  </p>
                 </div>
               </div>
             </motion.div>
 
-            {/* Right - Chat Bubble from Manager */}
+            {/* CENTER CARD - The Manager's Action */}
+            <motion.div
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.6 }}
+              className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[320px] bg-white rounded-2xl shadow-2xl shadow-slate-900/15 border border-slate-200 overflow-hidden z-20"
+            >
+              <div className="p-5 border-b border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
+                      <span className="text-sm font-bold text-white">SM</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900">Steve, Your Manager</p>
+                      <p className="text-xs text-slate-500">Just now</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 rounded-full">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-xs font-semibold text-emerald-700">Done</span>
+                  </div>
+                </div>
+              </div>
+              <div className="p-5">
+                <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
+                  <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Thermometer className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-slate-900 mb-1">Work Completed</p>
+                    <p className="text-xs text-slate-600">
+                      Annual HVAC Service completed. Filters changed & report filed.
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-3 flex items-center gap-2 text-xs text-slate-500">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>No action needed from you</span>
+                </div>
+              </div>
+            </motion.div>
+
+            {/* RIGHT CARD - The Lifestyle Wildcard (Travel) */}
             <motion.div
               initial={{ opacity: 0, x: 40 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.6, duration: 0.6 }}
-              className="absolute bottom-20 right-0 w-[300px] backdrop-blur-xl bg-white/90 rounded-2xl shadow-2xl shadow-slate-900/10 border border-white/50 overflow-hidden z-10"
+              className="absolute bottom-16 right-0 w-[280px] backdrop-blur-xl bg-white/95 rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200 overflow-hidden z-10"
             >
               <div className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
-                    <span className="text-sm font-bold text-white">SM</span>
+                <div className="flex items-center gap-2 mb-4">
+                  <div className="w-8 h-8 bg-sky-100 rounded-lg flex items-center justify-center">
+                    <Plane className="w-4 h-4 text-sky-600" />
                   </div>
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Steve, Your Manager</p>
-                    <p className="text-xs text-slate-500">Just now</p>
+                  <span className="text-sm font-semibold text-slate-900">Travel Itinerary</span>
+                </div>
+
+                <div className="bg-gradient-to-r from-sky-50 to-indigo-50 rounded-xl p-3 mb-3">
+                  <p className="text-sm font-medium text-slate-900 mb-1">Spring Break Trip</p>
+                  <p className="text-xs text-slate-600">March 15-22, 2025 • Maui, HI</p>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs text-slate-600">Flights booked (4 travelers)</span>
                   </div>
-                </div>
-                <div className="bg-emerald-50 rounded-xl p-3 border border-emerald-100">
-                  <p className="text-sm text-slate-700">
-                    &quot;I&apos;ve handled the HVAC scheduling for you. Tech arrives Tuesday 10am. I&apos;ll be there to let them in.&quot;
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 mt-3">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                  <span className="text-xs text-emerald-600 font-medium">Confirmed & Scheduled</span>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs text-slate-600">House Sitter confirmed</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span className="text-xs text-slate-600">Pet care arranged</span>
+                  </div>
                 </div>
               </div>
             </motion.div>
@@ -296,7 +308,7 @@ function OneBillSection() {
                 &quot;Stop chasing invoices from the pool guy, the landscaper, and the tutor.&quot;
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
-                Your Manager pays every service provider, utility, and subscription from your House Wallet. You get one clean, itemized monthly statement. You verify; we pay.
+                We audit and auto-pay your recurring bills—utilities, subscriptions, staff. You don&apos;t need to approve the electric bill every month. We only notify you for the big ticket items and exceptions.
               </p>
             </div>
 
@@ -315,8 +327,8 @@ function OneBillSection() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">Approval Workflow</p>
-                  <p className="text-sm text-slate-500">You approve big expenses with one tap</p>
+                  <p className="font-medium text-slate-900">Exception-Only Approvals</p>
+                  <p className="text-sm text-slate-500">Big expenses need your OK. Routine ones don&apos;t.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -337,41 +349,54 @@ function OneBillSection() {
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-sm text-slate-500">December 2024</p>
-                  <p className="text-2xl font-bold text-slate-900">$4,847.00</p>
+                  <p className="text-sm text-slate-500 mb-1">House Wallet Balance</p>
+                  <p className="text-3xl font-bold text-slate-900">$8,420.00</p>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-full">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-700">All Paid</span>
+                  <span className="text-sm font-medium text-emerald-700">All Current</span>
                 </div>
               </div>
 
-              {/* Budget Gauge */}
+              {/* Monthly Statement Preview */}
               <div className="bg-white rounded-xl p-4 mb-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-slate-700">Monthly Budget</span>
-                  <span className="text-sm text-slate-500">$4,847 / $5,500</span>
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-sm font-semibold text-slate-900">December Statement</span>
+                  <span className="text-sm text-slate-500">$4,847 total</span>
                 </div>
-                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full w-[88%] bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-emerald-500 rounded-full" />
+                      <span className="text-slate-600">Auto-Paid (routine)</span>
+                    </div>
+                    <span className="text-slate-700 font-medium">$3,847</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-amber-500 rounded-full" />
+                      <span className="text-slate-600">You Approved</span>
+                    </div>
+                    <span className="text-slate-700 font-medium">$1,000</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Approvals List */}
+              {/* Recent Auto-Paid */}
               <div className="bg-white rounded-xl p-4">
-                <p className="text-sm font-semibold text-slate-900 mb-3">Recent Payments</p>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Auto-Paid This Month</p>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
-                        <Building className="w-4 h-4 text-blue-600" />
+                        <Zap className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">SCE Electric</p>
-                        <p className="text-xs text-slate-500">Dec 15</p>
+                        <p className="text-xs text-slate-500">Dec 15 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$187.42</span>
+                    <span className="text-sm font-medium text-slate-900">$187</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -380,10 +405,10 @@ function OneBillSection() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">Green Thumb Landscaping</p>
-                        <p className="text-xs text-slate-500">Dec 12</p>
+                        <p className="text-xs text-slate-500">Dec 12 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$340.00</span>
+                    <span className="text-sm font-medium text-slate-900">$340</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -392,10 +417,10 @@ function OneBillSection() {
                       </div>
                       <div>
                         <p className="text-sm font-medium text-slate-900">Crystal Clear Pools</p>
-                        <p className="text-xs text-slate-500">Dec 10</p>
+                        <p className="text-xs text-slate-500">Dec 10 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$175.00</span>
+                    <span className="text-sm font-medium text-slate-900">$175</span>
                   </div>
                 </div>
               </div>
@@ -558,7 +583,7 @@ function ProactiveCareSection() {
                 &quot;Home maintenance is usually reactive and expensive.&quot;
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
-                Just like a luxury apartment building, we perform monthly preventative rounds. Changing filters, checking sensors, and spotting issues so they never become emergencies.
+                Just like a luxury apartment building, we perform monthly preventative rounds. Changing filters, flushing heaters, checking sensors—so small issues never become emergencies.
               </p>
             </div>
 
@@ -608,7 +633,7 @@ function ProactiveCareSection() {
                       stroke="url(#gaugeGradient)"
                       strokeWidth="12"
                       fill="none"
-                      strokeDasharray={`${2 * Math.PI * 70 * 0.98} ${2 * Math.PI * 70}`}
+                      strokeDasharray={`${2 * Math.PI * 70 * 1.0} ${2 * Math.PI * 70}`}
                       strokeLinecap="round"
                     />
                     <defs>
@@ -619,7 +644,7 @@ function ProactiveCareSection() {
                     </defs>
                   </svg>
                   <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <span className="text-4xl font-bold text-emerald-600">98%</span>
+                    <span className="text-4xl font-bold text-emerald-600">100%</span>
                     <span className="text-sm text-slate-500">Health Score</span>
                   </div>
                 </div>
@@ -627,7 +652,7 @@ function ProactiveCareSection() {
 
               {/* Systems Status */}
               <div className="space-y-3">
-                <p className="text-sm font-semibold text-slate-900 mb-2">System Status</p>
+                <p className="text-sm font-semibold text-slate-900 mb-2">All Systems Optimal</p>
                 <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <div className="flex items-center gap-3">
                     <Gauge className="w-5 h-5 text-emerald-600" />
@@ -648,14 +673,14 @@ function ProactiveCareSection() {
                     <span className="text-sm text-emerald-600">Optimal</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between p-3 bg-amber-50 rounded-xl border border-amber-100">
+                <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <div className="flex items-center gap-3">
-                    <Filter className="w-5 h-5 text-amber-600" />
+                    <Filter className="w-5 h-5 text-emerald-600" />
                     <span className="text-sm font-medium text-slate-900">Air Filters</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <Clock className="w-4 h-4 text-amber-500" />
-                    <span className="text-sm text-amber-600">Due in 5 days</span>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-500" />
+                    <span className="text-sm text-emerald-600">Fresh</span>
                   </div>
                 </div>
               </div>
@@ -665,7 +690,7 @@ function ProactiveCareSection() {
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-xs text-slate-500">Next Handyman Visit</p>
-                    <p className="text-sm font-semibold text-slate-900">Tuesday, Dec 24 at 10am</p>
+                    <p className="text-sm font-semibold text-slate-900">Tuesday, Jan 7 at 10am</p>
                   </div>
                   <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center">
                     <Wrench className="w-5 h-5 text-emerald-600" />
@@ -681,7 +706,7 @@ function ProactiveCareSection() {
 }
 
 // ============================================================================
-// THE NETWORK (TRUST & VERIFICATION)
+// THE NETWORK (HYPER-LOCAL TRUST)
 // ============================================================================
 
 function NetworkSection() {
@@ -689,62 +714,105 @@ function NetworkSection() {
     <section id="community" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
         <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* Left - Map Visual */}
+          {/* Left - Street-Level Map Visual */}
           <div className="relative order-2 lg:order-1">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/20 bg-slate-100 h-[420px]">
-              {/* Map Background */}
-              <Image
-                src="https://images.unsplash.com/photo-1524661135-423995f22d0b?w=800&q=80"
-                alt="Neighborhood map"
-                fill
-                className="object-cover opacity-50"
-              />
-              {/* Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-slate-900/40 to-slate-900/20" />
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl shadow-slate-900/20 bg-emerald-950 h-[420px]">
+              {/* Street Map Pattern */}
+              <div className="absolute inset-0">
+                {/* Grid streets */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 400 420">
+                  {/* Horizontal streets */}
+                  <line x1="0" y1="100" x2="400" y2="100" stroke="#10b981" strokeWidth="6" opacity="0.3" />
+                  <line x1="0" y1="210" x2="400" y2="210" stroke="#10b981" strokeWidth="8" opacity="0.4" />
+                  <line x1="0" y1="320" x2="400" y2="320" stroke="#10b981" strokeWidth="6" opacity="0.3" />
+                  {/* Vertical streets */}
+                  <line x1="80" y1="0" x2="80" y2="420" stroke="#10b981" strokeWidth="4" opacity="0.25" />
+                  <line x1="200" y1="0" x2="200" y2="420" stroke="#10b981" strokeWidth="6" opacity="0.35" />
+                  <line x1="320" y1="0" x2="320" y2="420" stroke="#10b981" strokeWidth="4" opacity="0.25" />
+                  {/* House plots */}
+                  <rect x="20" y="40" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="100" y="40" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="220" y="40" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="340" y="40" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="20" y="130" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="100" y="130" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="220" y="130" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="340" y="130" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="20" y="240" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="100" y="240" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="220" y="240" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="340" y="240" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="20" y="350" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="100" y="350" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="220" y="350" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                  <rect x="340" y="350" width="40" height="40" fill="#064e3b" opacity="0.5" rx="4" />
+                </svg>
+              </div>
 
-              {/* Emerald Pins */}
-              <div className="absolute inset-0 p-8">
-                <div className="relative w-full h-full">
-                  {/* Vendor pins with labels */}
-                  <div className="absolute top-[15%] left-[25%]">
-                    <div className="relative group cursor-pointer">
-                      <div className="w-5 h-5 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse" />
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">Ace Roofing</span>
-                      </div>
+              {/* Vendor Pins with Labels */}
+              <div className="absolute inset-0 p-6">
+                {/* Your Home - Large center pin */}
+                <div className="absolute top-[48%] left-[50%] -translate-x-1/2 -translate-y-1/2">
+                  <div className="relative">
+                    <div className="w-14 h-14 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 flex items-center justify-center border-4 border-white">
+                      <Home className="w-7 h-7 text-white" />
+                    </div>
+                    <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 whitespace-nowrap">
+                      <span className="px-3 py-1.5 bg-white rounded-lg text-sm font-semibold text-slate-900 shadow-lg">Your Home</span>
                     </div>
                   </div>
-                  <div className="absolute top-[30%] left-[60%]">
-                    <div className="relative group cursor-pointer">
-                      <div className="w-5 h-5 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse" style={{ animationDelay: '0.3s' }} />
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">Green Thumb</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute top-[50%] left-[35%]">
-                    <div className="relative group cursor-pointer">
-                      <div className="w-5 h-5 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse" style={{ animationDelay: '0.6s' }} />
-                      <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <span className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">Crystal Pools</span>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="absolute top-[40%] left-[75%]">
-                    <div className="relative group cursor-pointer">
-                      <div className="w-5 h-5 bg-emerald-500 rounded-full shadow-lg shadow-emerald-500/50 animate-pulse" style={{ animationDelay: '0.9s' }} />
-                    </div>
-                  </div>
+                </div>
 
-                  {/* Your Home - Larger pin */}
-                  <div className="absolute top-[55%] left-[50%] -translate-x-1/2">
-                    <div className="relative">
-                      <div className="w-10 h-10 bg-emerald-600 rounded-full shadow-lg shadow-emerald-600/50 flex items-center justify-center border-2 border-white">
-                        <Home className="w-5 h-5 text-white" />
+                {/* Verified Plumber */}
+                <div className="absolute top-[20%] left-[22%]">
+                  <div className="relative group cursor-pointer">
+                    <div className="w-8 h-8 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50 flex items-center justify-center animate-pulse">
+                      <Wrench className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2">
+                      <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
+                        <p className="font-semibold">Verified Plumber</p>
+                        <p className="text-slate-500">Used by 3 neighbors</p>
                       </div>
-                      <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap">
-                        <span className="px-2 py-1 bg-white rounded-lg text-xs font-medium text-slate-900 shadow-lg">Your Home</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trusted Landscaper */}
+                <div className="absolute top-[32%] left-[75%]">
+                  <div className="relative group cursor-pointer">
+                    <div className="w-8 h-8 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50 flex items-center justify-center animate-pulse" style={{ animationDelay: '0.3s' }}>
+                      <Sparkles className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2">
+                      <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
+                        <p className="font-semibold">Trusted Landscaper</p>
+                        <p className="text-slate-500">5 homes on your block</p>
                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Ace Roofing */}
+                <div className="absolute top-[70%] left-[28%]">
+                  <div className="relative group cursor-pointer">
+                    <div className="w-8 h-8 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50 flex items-center justify-center animate-pulse" style={{ animationDelay: '0.6s' }}>
+                      <Building className="w-4 h-4 text-white" />
+                    </div>
+                    <div className="absolute -top-12 left-1/2 -translate-x-1/2">
+                      <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
+                        <p className="font-semibold">Ace Roofing</p>
+                        <p className="text-slate-500">4 roofs this street</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pool Service */}
+                <div className="absolute top-[68%] left-[72%]">
+                  <div className="relative group cursor-pointer">
+                    <div className="w-8 h-8 bg-emerald-400 rounded-full shadow-lg shadow-emerald-400/50 flex items-center justify-center animate-pulse" style={{ animationDelay: '0.9s' }}>
+                      <Activity className="w-4 h-4 text-white" />
                     </div>
                   </div>
                 </div>
@@ -776,7 +844,7 @@ function NetworkSection() {
           <div className="order-1 lg:order-2">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-full mb-6">
               <MapPin className="w-4 h-4 text-emerald-700" />
-              <span className="text-sm font-medium text-emerald-800">Trust & Verification</span>
+              <span className="text-sm font-medium text-emerald-800">Hyper-Local Trust</span>
             </div>
 
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-medium text-emerald-950 mb-6">
@@ -840,7 +908,7 @@ function VaultSection() {
             </h2>
 
             <p className="text-lg text-emerald-100 leading-relaxed mb-8">
-              Wi-Fi passwords, paint codes, warranty docs, and property lines. Instant access in The Vault. No more digging through junk drawers or calling the previous owner.
+              Stop guessing which filter fits or where the shut-off valve is. Access your Model Numbers, Warranty Docs, Paint Codes, and Room Dimensions instantly.
             </p>
 
             <div className="grid grid-cols-2 gap-4">
@@ -867,52 +935,80 @@ function VaultSection() {
             </div>
           </div>
 
-          {/* Right - Cinematic Home Photo with Smart Dock */}
+          {/* Right - Digital Asset Card */}
           <div className="relative">
-            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
-              <div className="relative h-[420px]">
+            <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
+              {/* Home Profile Hero */}
+              <div className="relative h-48">
                 <Image
                   src="https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80"
                   alt="Beautiful modern home"
                   fill
                   className="object-cover"
                 />
-                {/* Gradient Overlay */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent" />
-
-                {/* Content Overlay */}
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="text-xl font-bold text-white">1247 Beverly Drive</h3>
+                <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
+                <div className="absolute bottom-4 left-4">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-lg font-bold text-white">1247 Beverly Drive</h3>
                     <span className="px-2 py-0.5 bg-emerald-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
                       <Shield className="w-3 h-3" />
                       Haven Managed
                     </span>
                   </div>
-                  <p className="text-slate-300 text-sm mb-4">Beverly Hills, CA • 4,200 sq ft</p>
+                  <p className="text-slate-300 text-sm">Beverly Hills, CA • 4,200 sq ft</p>
+                </div>
+              </div>
 
-                  {/* Quick Access Dock - Glassmorphism */}
-                  <div className="flex gap-2">
-                    <div className="backdrop-blur-xl bg-white/15 rounded-xl border border-white/20 p-3 flex items-center gap-2 hover:bg-white/25 transition-colors cursor-pointer">
-                      <Wifi className="w-5 h-5 text-white" />
-                      <div>
-                        <p className="text-xs text-white/70">WiFi</p>
-                        <p className="text-sm text-white font-medium">••••••••</p>
+              {/* Digital Asset Card */}
+              <div className="p-5">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Digital Asset Card</p>
+
+                <div className="bg-slate-50 rounded-xl p-4 border border-slate-200">
+                  <div className="flex items-start gap-4">
+                    <div className="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <Thermometer className="w-8 h-8 text-slate-500" />
+                    </div>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold text-slate-900">Sub-Zero Refrigerator</p>
+                      <p className="text-xs text-slate-500 mb-2">Model: BI-36U/S/TH</p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded">Warranty: 2027</span>
+                        <span className="px-2 py-0.5 bg-slate-200 text-slate-700 text-xs font-medium rounded">Kitchen</span>
                       </div>
                     </div>
-                    <div className="backdrop-blur-xl bg-white/15 rounded-xl border border-white/20 p-3 flex items-center gap-2 hover:bg-white/25 transition-colors cursor-pointer">
-                      <Key className="w-5 h-5 text-white" />
-                      <div>
-                        <p className="text-xs text-white/70">Gate</p>
-                        <p className="text-sm text-white font-medium">#1247</p>
-                      </div>
+                  </div>
+                  <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-between">
+                    <div className="text-xs text-slate-500">
+                      <span className="font-medium text-slate-700">Installed:</span> March 2022
                     </div>
-                    <div className="backdrop-blur-xl bg-white/15 rounded-xl border border-white/20 p-3 flex items-center gap-2 hover:bg-white/25 transition-colors cursor-pointer">
-                      <Bell className="w-5 h-5 text-white" />
-                      <div>
-                        <p className="text-xs text-white/70">Alarm</p>
-                        <p className="text-sm text-white font-medium">••••</p>
-                      </div>
+                    <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-xs font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+                      <Download className="w-3.5 h-3.5" />
+                      Download Manual
+                    </button>
+                  </div>
+                </div>
+
+                {/* Quick Access */}
+                <div className="mt-4 flex gap-2">
+                  <div className="flex-1 backdrop-blur-xl bg-slate-100 rounded-xl p-3 flex items-center gap-2">
+                    <Wifi className="w-4 h-4 text-slate-600" />
+                    <div>
+                      <p className="text-xs text-slate-500">WiFi</p>
+                      <p className="text-sm text-slate-900 font-medium">••••••••</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 backdrop-blur-xl bg-slate-100 rounded-xl p-3 flex items-center gap-2">
+                    <Key className="w-4 h-4 text-slate-600" />
+                    <div>
+                      <p className="text-xs text-slate-500">Gate Code</p>
+                      <p className="text-sm text-slate-900 font-medium">#1247</p>
+                    </div>
+                  </div>
+                  <div className="flex-1 backdrop-blur-xl bg-slate-100 rounded-xl p-3 flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-slate-600" />
+                    <div>
+                      <p className="text-xs text-slate-500">Alarm</p>
+                      <p className="text-sm text-slate-900 font-medium">••••</p>
                     </div>
                   </div>
                 </div>
@@ -1100,8 +1196,8 @@ function StickyCTAFooter() {
     <div className="fixed bottom-0 left-0 right-0 z-40 bg-white/95 backdrop-blur-lg border-t border-slate-200 py-4 px-4 sm:px-6 lg:px-8 lg:hidden">
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div className="hidden sm:block">
-          <p className="text-sm font-medium text-slate-900">Experience home ownership on autopilot</p>
-          <p className="text-xs text-slate-500">Join the waitlist for your area</p>
+          <p className="text-sm font-medium text-slate-900">Join the waitlist</p>
+          <p className="text-xs text-slate-500">Experience home ownership on autopilot</p>
         </div>
         <Link
           href="/register"
