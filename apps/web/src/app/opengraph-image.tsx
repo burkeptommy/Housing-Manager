@@ -2,7 +2,7 @@ import { ImageResponse } from 'next/og';
 
 export const runtime = 'edge';
 
-export const alt = 'Haven - Welcome Home';
+export const alt = 'Haven - The Operating System for Your Home';
 export const size = {
   width: 1200,
   height: 630,
@@ -20,12 +20,12 @@ export default async function OGImage() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#0f172a',
+          backgroundColor: '#059669', // emerald-600
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Abstract architectural lines in background */}
+        {/* Subtle geometric pattern overlay for depth */}
         <svg
           style={{
             position: 'absolute',
@@ -33,87 +33,90 @@ export default async function OGImage() {
             left: 0,
             width: '100%',
             height: '100%',
-            opacity: 0.08,
           }}
           viewBox="0 0 1200 630"
           fill="none"
         >
-          {/* Architectural grid lines */}
-          <path
-            d="M0 315 L1200 315"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          <path
-            d="M600 0 L600 630"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          {/* Abstract home outline */}
-          <path
-            d="M400 450 L600 280 L800 450 L800 550 L400 550 Z"
-            stroke="#10b981"
+          {/* Grid pattern - subtle darker emerald */}
+          {/* Vertical lines */}
+          {[0, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200].map((x) => (
+            <line
+              key={`v-${x}`}
+              x1={x}
+              y1="0"
+              x2={x}
+              y2="630"
+              stroke="#047857"
+              strokeWidth="1"
+              opacity="0.15"
+            />
+          ))}
+          {/* Horizontal lines */}
+          {[0, 100, 200, 300, 400, 500, 600].map((y) => (
+            <line
+              key={`h-${y}`}
+              x1="0"
+              y1={y}
+              x2="1200"
+              y2={y}
+              stroke="#047857"
+              strokeWidth="1"
+              opacity="0.15"
+            />
+          ))}
+          {/* Diagonal accent lines for premium feel */}
+          <line
+            x1="0"
+            y1="630"
+            x2="300"
+            y2="330"
+            stroke="#047857"
             strokeWidth="2"
-            fill="none"
+            opacity="0.1"
           />
-          {/* Horizontal accent lines */}
-          <path
-            d="M100 200 L500 200"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          <path
-            d="M700 200 L1100 200"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          <path
-            d="M100 430 L350 430"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          <path
-            d="M850 430 L1100 430"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          {/* Diagonal accent */}
-          <path
-            d="M0 630 L400 230"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          <path
-            d="M1200 630 L800 230"
-            stroke="#10b981"
-            strokeWidth="1"
-          />
-          {/* Corner accents */}
-          <path
-            d="M50 50 L150 50 L150 150"
-            stroke="#10b981"
+          <line
+            x1="1200"
+            y1="630"
+            x2="900"
+            y2="330"
+            stroke="#047857"
             strokeWidth="2"
-            fill="none"
+            opacity="0.1"
+          />
+          {/* Corner accents - premium badge feel */}
+          <path
+            d="M40 40 L120 40 L120 50 L50 50 L50 120 L40 120 Z"
+            fill="#047857"
+            opacity="0.2"
           />
           <path
-            d="M1150 50 L1050 50 L1050 150"
-            stroke="#10b981"
-            strokeWidth="2"
-            fill="none"
+            d="M1160 40 L1080 40 L1080 50 L1150 50 L1150 120 L1160 120 Z"
+            fill="#047857"
+            opacity="0.2"
           />
           <path
-            d="M50 580 L150 580 L150 480"
-            stroke="#10b981"
-            strokeWidth="2"
-            fill="none"
+            d="M40 590 L120 590 L120 580 L50 580 L50 510 L40 510 Z"
+            fill="#047857"
+            opacity="0.2"
           />
           <path
-            d="M1150 580 L1050 580 L1050 480"
-            stroke="#10b981"
-            strokeWidth="2"
-            fill="none"
+            d="M1160 590 L1080 590 L1080 580 L1150 580 L1150 510 L1160 510 Z"
+            fill="#047857"
+            opacity="0.2"
           />
         </svg>
+
+        {/* Subtle radial gradient for depth */}
+        <div
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'radial-gradient(ellipse at center, transparent 0%, rgba(4, 120, 87, 0.3) 100%)',
+          }}
+        />
 
         {/* Main content */}
         <div
@@ -123,47 +126,62 @@ export default async function OGImage() {
             alignItems: 'center',
             justifyContent: 'center',
             zIndex: 10,
+            padding: '40px',
           }}
         >
-          {/* Haven wordmark */}
+          {/* Haven wordmark - large and bold */}
           <div
             style={{
-              fontSize: 120,
+              fontSize: 140,
               fontWeight: 700,
-              color: '#10b981',
+              color: '#ffffff',
               letterSpacing: '-0.02em',
-              marginBottom: 24,
+              marginBottom: 16,
               fontFamily: 'system-ui, -apple-system, sans-serif',
+              textShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
             }}
           >
             Haven
           </div>
 
-          {/* Subtext */}
+          {/* Tagline */}
           <div
             style={{
-              fontSize: 36,
-              color: '#94a3b8',
+              fontSize: 32,
+              fontWeight: 500,
+              color: '#ffffff',
+              letterSpacing: '0.02em',
+              marginBottom: 20,
+              fontFamily: 'system-ui, -apple-system, sans-serif',
+            }}
+          >
+            The Operating System for Your Home
+          </div>
+
+          {/* Decorative line separator */}
+          <div
+            style={{
+              width: 80,
+              height: 3,
+              backgroundColor: 'rgba(255, 255, 255, 0.5)',
+              borderRadius: 2,
+              marginBottom: 20,
+            }}
+          />
+
+          {/* Subtext with reduced opacity */}
+          <div
+            style={{
+              fontSize: 24,
               fontWeight: 400,
-              letterSpacing: '0.05em',
+              color: 'rgba(255, 255, 255, 0.8)',
+              letterSpacing: '0.1em',
               fontFamily: 'system-ui, -apple-system, sans-serif',
             }}
           >
             Welcome Home.
           </div>
         </div>
-
-        {/* Subtle gradient overlay at bottom */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: 0,
-            left: 0,
-            right: 0,
-            height: 120,
-            background: 'linear-gradient(to top, rgba(16, 185, 129, 0.1), transparent)',
-          }}
-        />
       </div>
     ),
     {
