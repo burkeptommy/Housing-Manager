@@ -44,7 +44,7 @@ interface CalendarEvent {
   title: string;
   startDate: Date;
   endDate?: Date;
-  startTime?: string; // HH:MM format
+  startTime?: string;
   endTime?: string;
   layer: EventLayer;
   category: EventCategory;
@@ -56,7 +56,7 @@ interface CalendarEvent {
   attendees?: string[];
   color?: string;
   icon?: string;
-  requiresAccess?: boolean; // For service events when no one home
+  requiresAccess?: boolean;
   conflict?: boolean;
 }
 
@@ -73,13 +73,8 @@ interface DayWeather {
   temp: number;
 }
 
-interface WhoIsWhere {
-  date: Date;
-  status: string;
-}
-
 // ============================================================================
-// MOCK DATA
+// MOCK DATA GENERATION
 // ============================================================================
 
 const mockFamilyMembers: FamilyMember[] = [
@@ -98,38 +93,306 @@ const getDate = (daysOffset: number, hour = 9, minute = 0) => {
   return date;
 };
 
-const mockEvents: CalendarEvent[] = [
-  // House/Service Events
-  {
-    id: 'e1',
-    title: 'Landscaping Service',
-    startDate: getDate(0, 9, 0),
-    endDate: getDate(0, 11, 0),
+// Generate comprehensive mock events for -30 to +30 days
+function generateMockEvents(): CalendarEvent[] {
+  const events: CalendarEvent[] = [];
+  let eventId = 1;
+
+  // Helper to get day of week (0 = Sunday, 6 = Saturday)
+  const getDayOfWeek = (daysOffset: number) => {
+    const d = new Date(today);
+    d.setDate(d.getDate() + daysOffset);
+    return d.getDay();
+  };
+
+  // Generate events for -30 to +30 days
+  for (let day = -30; day <= 30; day++) {
+    const dayOfWeek = getDayOfWeek(day);
+
+    // ========== RECURRING FAMILY EVENTS ==========
+
+    // Soccer Practice - Tuesday & Thursday 4pm (Emma)
+    if (dayOfWeek === 2 || dayOfWeek === 4) {
+      events.push({
+        id: `e${eventId++}`,
+        title: "Emma's Soccer Practice",
+        startDate: getDate(day, 16, 0),
+        endDate: getDate(day, 17, 30),
+        startTime: '16:00',
+        endTime: '17:30',
+        layer: 'family',
+        category: 'kids',
+        location: 'Oak Park Soccer Fields',
+        isRecurring: true,
+        recurrence: 'weekly',
+        attendees: ['Emma', 'Bob'],
+      });
+    }
+
+    // Piano Lesson - Wednesday 5pm (Jake)
+    if (dayOfWeek === 3) {
+      events.push({
+        id: `e${eventId++}`,
+        title: "Jake's Piano Lesson",
+        startDate: getDate(day, 17, 0),
+        endDate: getDate(day, 18, 0),
+        startTime: '17:00',
+        endTime: '18:00',
+        layer: 'family',
+        category: 'kids',
+        location: 'Music Academy',
+        isRecurring: true,
+        recurrence: 'weekly',
+        attendees: ['Jake', 'Alice'],
+      });
+    }
+
+    // ========== RECURRING HOUSE EVENTS ==========
+
+    // Trash Pickup - Friday 7am
+    if (dayOfWeek === 5) {
+      events.push({
+        id: `e${eventId++}`,
+        title: 'Trash & Recycling Pickup',
+        startDate: getDate(day, 7, 0),
+        endDate: getDate(day, 8, 0),
+        startTime: '07:00',
+        endTime: '08:00',
+        layer: 'house',
+        category: 'service',
+        description: 'Put bins out the night before',
+        isRecurring: true,
+        recurrence: 'weekly',
+      });
+    }
+
+    // Landscaping - Tuesday 9am
+    if (dayOfWeek === 2) {
+      events.push({
+        id: `e${eventId++}`,
+        title: 'Landscaping Service',
+        startDate: getDate(day, 9, 0),
+        endDate: getDate(day, 11, 0),
+        startTime: '09:00',
+        endTime: '11:00',
+        layer: 'house',
+        category: 'service',
+        location: 'Front & Back Yard',
+        description: 'Weekly lawn maintenance and hedge trimming',
+        isRecurring: true,
+        recurrence: 'weekly',
+        requiresAccess: true,
+      });
+    }
+
+    // Pool Service - Thursday 10am
+    if (dayOfWeek === 4) {
+      events.push({
+        id: `e${eventId++}`,
+        title: 'Pool Service',
+        startDate: getDate(day, 10, 0),
+        endDate: getDate(day, 11, 0),
+        startTime: '10:00',
+        endTime: '11:00',
+        layer: 'house',
+        category: 'service',
+        location: 'Backyard Pool',
+        isRecurring: true,
+        recurrence: 'weekly',
+      });
+    }
+
+    // Housekeeping - Every other Monday
+    if (dayOfWeek === 1 && Math.floor((day + 30) / 7) % 2 === 0) {
+      events.push({
+        id: `e${eventId++}`,
+        title: 'Housekeeping',
+        startDate: getDate(day, 9, 0),
+        endDate: getDate(day, 13, 0),
+        startTime: '09:00',
+        endTime: '13:00',
+        layer: 'house',
+        category: 'service',
+        isRecurring: true,
+        recurrence: 'biweekly',
+        requiresAccess: true,
+      });
+    }
+  }
+
+  // ========== ONE-TIME MAINTENANCE EVENTS ==========
+
+  // HVAC Service - Last week
+  events.push({
+    id: `e${eventId++}`,
+    title: 'HVAC Maintenance',
+    startDate: getDate(-5, 9, 0),
+    endDate: getDate(-5, 12, 0),
     startTime: '09:00',
+    endTime: '12:00',
+    layer: 'house',
+    category: 'service',
+    description: 'Annual AC inspection and filter replacement - Completed',
+    requiresAccess: true,
+  });
+
+  // Gutter Cleaning - Next week
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Gutter Cleaning',
+    startDate: getDate(6, 8, 0),
+    endDate: getDate(6, 11, 0),
+    startTime: '08:00',
     endTime: '11:00',
     layer: 'house',
     category: 'service',
-    location: 'Front & Back Yard',
-    description: 'Weekly lawn maintenance and hedge trimming',
-    isRecurring: true,
-    recurrence: 'weekly',
+    description: 'Seasonal gutter cleaning and inspection',
     requiresAccess: true,
-  },
-  {
-    id: 'e2',
-    title: 'Pool Service',
-    startDate: getDate(1, 10, 0),
-    endDate: getDate(1, 11, 0),
+  });
+
+  // Pest Control - In 10 days
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Pest Control Service',
+    startDate: getDate(10, 10, 0),
+    endDate: getDate(10, 11, 0),
     startTime: '10:00',
     endTime: '11:00',
     layer: 'house',
     category: 'service',
-    location: 'Backyard Pool',
-    isRecurring: true,
-    recurrence: 'weekly',
-  },
-  {
-    id: 'e3',
+    description: 'Quarterly pest inspection - interior access needed',
+    requiresAccess: true,
+    conflict: true, // Nobody home during this time
+  });
+
+  // ========== SOCIAL EVENTS ==========
+
+  // Dinner with Millers - This Friday
+  const fridayOffset = (5 - today.getDay() + 7) % 7 || 7;
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Dinner with the Millers',
+    startDate: getDate(fridayOffset, 19, 0),
+    endDate: getDate(fridayOffset, 22, 0),
+    startTime: '19:00',
+    endTime: '22:00',
+    layer: 'family',
+    category: 'social',
+    location: "Miller's House - 1234 Oak Lane",
+    description: 'Monthly dinner club gathering',
+    attendees: ['Bob', 'Alice'],
+  });
+
+  // Brunch - This Sunday
+  const sundayOffset = (7 - today.getDay()) % 7 || 7;
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Sunday Brunch',
+    startDate: getDate(sundayOffset, 11, 0),
+    endDate: getDate(sundayOffset, 13, 0),
+    startTime: '11:00',
+    endTime: '13:00',
+    layer: 'family',
+    category: 'social',
+    location: 'The Breakfast Club',
+    attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+  });
+
+  // Neighborhood BBQ - In 2 weeks
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Neighborhood Block Party',
+    startDate: getDate(14, 15, 0),
+    endDate: getDate(14, 20, 0),
+    startTime: '15:00',
+    endTime: '20:00',
+    layer: 'family',
+    category: 'social',
+    location: 'Johnson Backyard',
+    description: 'Annual summer block party',
+    attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+  });
+
+  // ========== KIDS EVENTS ==========
+
+  // Jake's Science Fair - In 4 days
+  events.push({
+    id: `e${eventId++}`,
+    title: "Jake's Science Fair",
+    startDate: getDate(4, 13, 0),
+    endDate: getDate(4, 16, 0),
+    startTime: '13:00',
+    endTime: '16:00',
+    layer: 'family',
+    category: 'kids',
+    location: 'Lincoln Elementary School',
+    attendees: ['Jake', 'Alice', 'Bob'],
+  });
+
+  // Emma's Recital - In 12 days
+  events.push({
+    id: `e${eventId++}`,
+    title: "Emma's Dance Recital",
+    startDate: getDate(12, 18, 0),
+    endDate: getDate(12, 20, 0),
+    startTime: '18:00',
+    endTime: '20:00',
+    layer: 'family',
+    category: 'kids',
+    location: 'Community Theater',
+    attendees: ['Emma', 'Bob', 'Alice', 'Jake'],
+  });
+
+  // ========== HEALTH EVENTS ==========
+
+  // Dentist - Kids - In 6 days
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Dentist - Kids',
+    startDate: getDate(6, 10, 0),
+    endDate: getDate(6, 11, 30),
+    startTime: '10:00',
+    endTime: '11:30',
+    layer: 'family',
+    category: 'health',
+    location: 'Bright Smiles Dental',
+    attendees: ['Emma', 'Jake', 'Alice'],
+  });
+
+  // Annual Physical - Bob - In 9 days
+  events.push({
+    id: `e${eventId++}`,
+    title: "Bob's Annual Physical",
+    startDate: getDate(9, 9, 0),
+    endDate: getDate(9, 10, 0),
+    startTime: '09:00',
+    endTime: '10:00',
+    layer: 'family',
+    category: 'health',
+    location: 'Dr. Smith Family Practice',
+    attendees: ['Bob'],
+  });
+
+  // ========== TRAVEL EVENTS ==========
+
+  // Family Vacation - In 3 weeks
+  events.push({
+    id: `e${eventId++}`,
+    title: 'Family Vacation - Hawaii',
+    startDate: getDate(21),
+    endDate: getDate(28),
+    layer: 'family',
+    category: 'travel',
+    location: 'Maui, Hawaii',
+    isAllDay: true,
+    attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+  });
+
+  // ========== DELIVERY EVENTS ==========
+
+  // Grocery Delivery - Today or tomorrow
+  events.push({
+    id: `e${eventId++}`,
     title: 'Amazon Fresh Delivery',
     startDate: getDate(0, 14, 0),
     endDate: getDate(0, 16, 0),
@@ -140,156 +403,40 @@ const mockEvents: CalendarEvent[] = [
     description: 'Weekly grocery delivery',
     isRecurring: true,
     recurrence: 'weekly',
-  },
-  {
-    id: 'e4',
-    title: 'HVAC Maintenance',
-    startDate: getDate(3, 9, 0),
-    endDate: getDate(3, 12, 0),
-    startTime: '09:00',
-    endTime: '12:00',
-    layer: 'house',
-    category: 'service',
-    description: 'Annual AC inspection and filter replacement',
-    requiresAccess: true,
-  },
-  {
-    id: 'e5',
-    title: 'Housekeeping',
-    startDate: getDate(2, 9, 0),
-    endDate: getDate(2, 13, 0),
-    startTime: '09:00',
-    endTime: '13:00',
-    layer: 'house',
-    category: 'service',
-    isRecurring: true,
-    recurrence: 'biweekly',
-    requiresAccess: true,
-  },
-  // Family Events
-  {
-    id: 'e6',
-    title: 'Emma\'s Soccer Practice',
-    startDate: getDate(0, 16, 0),
-    endDate: getDate(0, 17, 30),
-    startTime: '16:00',
-    endTime: '17:30',
-    layer: 'family',
-    category: 'kids',
-    location: 'Oak Park Soccer Fields',
-    isRecurring: true,
-    recurrence: 'weekly',
-    attendees: ['Emma', 'Bob'],
-  },
-  {
-    id: 'e7',
-    title: 'Jake\'s Piano Lesson',
-    startDate: getDate(1, 15, 30),
-    endDate: getDate(1, 16, 30),
-    startTime: '15:30',
-    endTime: '16:30',
-    layer: 'family',
-    category: 'kids',
-    location: 'Music Academy',
-    isRecurring: true,
-    recurrence: 'weekly',
-    attendees: ['Jake', 'Alice'],
-  },
-  {
-    id: 'e8',
-    title: 'Dinner Party',
-    startDate: getDate(5, 18, 0),
-    endDate: getDate(5, 22, 0),
-    startTime: '18:00',
-    endTime: '22:00',
-    layer: 'family',
-    category: 'social',
-    location: 'Home',
-    description: 'Hosting the Johnsons for dinner',
-    attendees: ['Bob', 'Alice'],
-  },
-  {
-    id: 'e9',
-    title: 'Family Vacation - Hawaii',
-    startDate: getDate(14),
-    endDate: getDate(21),
-    layer: 'family',
-    category: 'travel',
-    location: 'Maui, Hawaii',
-    isAllDay: true,
-    attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
-  },
-  {
-    id: 'e10',
-    title: 'Jake\'s Science Fair',
-    startDate: getDate(4, 13, 0),
-    endDate: getDate(4, 16, 0),
-    startTime: '13:00',
-    endTime: '16:00',
-    layer: 'family',
-    category: 'kids',
-    location: 'Lincoln Elementary School',
-    attendees: ['Jake', 'Alice', 'Bob'],
-  },
-  {
-    id: 'e11',
-    title: 'Dentist - Kids',
-    startDate: getDate(6, 10, 0),
-    endDate: getDate(6, 11, 30),
-    startTime: '10:00',
-    endTime: '11:30',
-    layer: 'family',
-    category: 'health',
-    location: 'Bright Smiles Dental',
-    attendees: ['Emma', 'Jake', 'Alice'],
-  },
-  {
-    id: 'e12',
-    title: 'Nanny Shift',
-    startDate: getDate(1, 8, 0),
-    endDate: getDate(1, 17, 0),
-    startTime: '08:00',
-    endTime: '17:00',
-    layer: 'family',
-    category: 'family',
-    description: 'Maria covering while parents at work',
-    isRecurring: true,
-    recurrence: 'weekly',
-  },
-  {
-    id: 'e13',
-    title: 'Pest Control Service',
-    startDate: getDate(7, 10, 0),
-    endDate: getDate(7, 11, 0),
-    startTime: '10:00',
-    endTime: '11:00',
-    layer: 'house',
-    category: 'service',
-    description: 'Quarterly pest inspection - interior access needed',
-    requiresAccess: true,
-    conflict: true, // Nobody home during this time
-  },
-];
+  });
 
-// Mock weather data for the next 14 days
-const weatherIcons: DayWeather['icon'][] = ['sun', 'sun', 'cloud', 'sun', 'rain', 'cloud', 'sun', 'sun', 'cloud', 'rain', 'sun', 'sun', 'cloud', 'sun'];
-const weatherTemps = [72, 75, 68, 70, 65, 71, 74, 76, 69, 64, 72, 73, 70, 75];
-const mockWeather: DayWeather[] = Array.from({ length: 14 }, (_, i) => ({
-  date: getDate(i),
-  icon: weatherIcons[i] ?? 'sun',
-  temp: weatherTemps[i] ?? 70,
-}));
+  // Furniture Delivery - In 3 days
+  events.push({
+    id: `e${eventId++}`,
+    title: 'New Sofa Delivery',
+    startDate: getDate(3, 10, 0),
+    endDate: getDate(3, 14, 0),
+    startTime: '10:00',
+    endTime: '14:00',
+    layer: 'house',
+    category: 'delivery',
+    description: 'Living room sectional from West Elm',
+    requiresAccess: true,
+  });
 
-// Mock "Who is Where" data
-const mockWhoIsWhere: WhoIsWhere[] = [
-  { date: getDate(0), status: 'Parents at Work • Kids at School' },
-  { date: getDate(1), status: 'Nanny at Home • Parents at Work' },
-  { date: getDate(2), status: 'Everyone Home (Saturday)' },
-  { date: getDate(3), status: 'Everyone Home (Sunday)' },
-  { date: getDate(4), status: 'Parents at Work • Kids at School' },
-  { date: getDate(5), status: 'Parents at Work • Kids at School' },
-  { date: getDate(6), status: 'Everyone Home (Saturday)' },
-];
+  return events;
+}
+
+const mockEvents = generateMockEvents();
+
+// Mock weather data for -7 to +14 days
+const generateWeather = (): DayWeather[] => {
+  const icons: DayWeather['icon'][] = ['sun', 'sun', 'cloud', 'sun', 'rain', 'cloud', 'sun', 'sun', 'cloud', 'rain', 'sun', 'sun', 'cloud', 'sun', 'sun', 'cloud', 'sun', 'rain', 'sun', 'sun', 'cloud'];
+  const temps = [72, 75, 68, 70, 65, 71, 74, 76, 69, 64, 72, 73, 70, 75, 74, 68, 71, 66, 73, 77, 72];
+
+  return Array.from({ length: 21 }, (_, i) => ({
+    date: getDate(i - 7),
+    icon: icons[i] ?? 'sun',
+    temp: temps[i] ?? 70,
+  }));
+};
+
+const mockWeather = generateWeather();
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -343,12 +490,10 @@ const getMonthDates = (baseDate: Date) => {
   const startPadding = firstDay.getDay();
   const dates: (Date | null)[] = [];
 
-  // Add padding for days before the first of month
   for (let i = 0; i < startPadding; i++) {
     dates.push(null);
   }
 
-  // Add all days of the month
   for (let day = 1; day <= lastDay.getDate(); day++) {
     dates.push(new Date(year, month, day));
   }
@@ -377,6 +522,29 @@ const getWeatherIcon = (icon: DayWeather['icon']) => {
   }
 };
 
+const getEventColor = (event: CalendarEvent) => {
+  if (event.layer === 'house') {
+    return {
+      bg: 'bg-emerald-50',
+      border: 'border-emerald-500',
+      text: 'text-emerald-700',
+      icon: 'text-emerald-600',
+    };
+  }
+  switch (event.category) {
+    case 'travel':
+      return { bg: 'bg-purple-50', border: 'border-purple-500', text: 'text-purple-700', icon: 'text-purple-600' };
+    case 'kids':
+      return { bg: 'bg-blue-50', border: 'border-blue-500', text: 'text-blue-700', icon: 'text-blue-600' };
+    case 'social':
+      return { bg: 'bg-pink-50', border: 'border-pink-500', text: 'text-pink-700', icon: 'text-pink-600' };
+    case 'health':
+      return { bg: 'bg-red-50', border: 'border-red-500', text: 'text-red-700', icon: 'text-red-600' };
+    default:
+      return { bg: 'bg-slate-50', border: 'border-slate-400', text: 'text-slate-700', icon: 'text-slate-600' };
+  }
+};
+
 // ============================================================================
 // COMPONENTS
 // ============================================================================
@@ -391,7 +559,7 @@ function FilterPills({
 }) {
   const filters: { type: FilterType; label: string; icon: typeof Filter }[] = [
     { type: 'all', label: 'All', icon: LayoutGrid },
-    { type: 'house', label: 'House Services', icon: Home },
+    { type: 'house', label: 'House', icon: Home },
     { type: 'family', label: 'Family', icon: Users },
     { type: 'kids', label: 'Kids', icon: GraduationCap },
     { type: 'travel', label: 'Travel', icon: Plane },
@@ -421,71 +589,67 @@ function FilterPills({
   );
 }
 
+// Weather Badge
+function WeatherBadge({ weather, large = false }: { weather: DayWeather; large?: boolean }) {
+  const Icon = getWeatherIcon(weather.icon);
+  if (large) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm rounded-lg">
+        <Icon className={`w-5 h-5 ${weather.icon === 'sun' ? 'text-amber-500' : weather.icon === 'rain' ? 'text-blue-500' : 'text-slate-400'}`} />
+        <span className="text-sm font-medium text-slate-700">{weather.temp}°F</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-center gap-1 text-xs text-slate-500">
+      <Icon className={`w-4 h-4 ${weather.icon === 'sun' ? 'text-amber-500' : 'text-slate-400'}`} />
+      <span>{weather.temp}°</span>
+    </div>
+  );
+}
+
 // Event Chip (for Month View)
 function EventChip({ event, compact = false }: { event: CalendarEvent; compact?: boolean }) {
-  const isHouse = event.layer === 'house';
+  const colors = getEventColor(event);
   const Icon = getCategoryIcon(event.category);
 
   if (compact) {
-    // Mobile: Just show a dot
     return (
       <div
-        className={`w-2 h-2 rounded-full ${
-          isHouse ? 'bg-emerald-500' : 'bg-blue-500'
-        } ${event.conflict ? 'ring-2 ring-red-400' : ''}`}
+        className={`w-2 h-2 rounded-full ${event.layer === 'house' ? 'bg-emerald-500' : 'bg-blue-500'} ${
+          event.conflict ? 'ring-2 ring-red-400' : ''
+        }`}
       />
     );
   }
 
   return (
     <div
-      className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium truncate ${
-        isHouse
-          ? 'bg-white border-l-2 border-emerald-500 text-slate-700'
-          : event.category === 'travel'
-          ? 'bg-purple-100 text-purple-700'
-          : event.category === 'kids'
-          ? 'bg-blue-100 text-blue-700'
-          : event.category === 'social'
-          ? 'bg-pink-100 text-pink-700'
-          : event.category === 'health'
-          ? 'bg-red-100 text-red-700'
-          : 'bg-blue-100 text-blue-700'
-      } ${event.conflict ? 'ring-1 ring-red-400' : ''}`}
+      className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium truncate ${colors.bg} border-l-2 ${colors.border} ${
+        event.conflict ? 'ring-1 ring-red-400' : ''
+      }`}
     >
-      <Icon className="w-3 h-3 flex-shrink-0" />
-      <span className="truncate">{event.title}</span>
+      <Icon className={`w-3 h-3 flex-shrink-0 ${colors.icon}`} />
+      <span className={`truncate ${colors.text}`}>{event.title}</span>
     </div>
   );
 }
 
 // Event Block (for Week View)
 function EventBlock({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
-  const isHouse = event.layer === 'house';
+  const colors = getEventColor(event);
   const Icon = getCategoryIcon(event.category);
 
   return (
     <button
       onClick={onClick}
-      className={`absolute left-1 right-1 rounded-lg p-2 text-left overflow-hidden transition-transform hover:scale-[1.02] ${
-        isHouse
-          ? 'bg-white border-l-4 border-emerald-500 shadow-sm'
-          : event.category === 'travel'
-          ? 'bg-purple-100 border-l-4 border-purple-500'
-          : event.category === 'kids'
-          ? 'bg-blue-100 border-l-4 border-blue-500'
-          : event.category === 'social'
-          ? 'bg-pink-100 border-l-4 border-pink-500'
-          : event.category === 'health'
-          ? 'bg-red-100 border-l-4 border-red-500'
-          : 'bg-blue-100 border-l-4 border-blue-500'
-      } ${event.conflict ? 'ring-2 ring-red-400' : ''}`}
+      className={`absolute left-1 right-1 rounded-lg p-2 text-left overflow-hidden transition-transform hover:scale-[1.02] ${colors.bg} border-l-4 ${colors.border} ${
+        event.conflict ? 'ring-2 ring-red-400' : ''
+      }`}
     >
       <div className="flex items-center gap-1 mb-0.5">
-        <Icon className={`w-3 h-3 ${isHouse ? 'text-emerald-600' : 'text-slate-600'}`} />
-        <span className={`text-xs font-medium truncate ${isHouse ? 'text-slate-700' : ''}`}>
-          {event.title}
-        </span>
+        <Icon className={`w-3 h-3 ${colors.icon}`} />
+        <span className={`text-xs font-medium truncate ${colors.text}`}>{event.title}</span>
       </div>
       {event.startTime && (
         <p className="text-xs text-slate-500">{formatTime(event.startTime)}</p>
@@ -500,100 +664,142 @@ function EventBlock({ event, onClick }: { event: CalendarEvent; onClick: () => v
   );
 }
 
-// Agenda Event Row
-function AgendaEventRow({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
-  const isHouse = event.layer === 'house';
-  const Icon = getCategoryIcon(event.category);
+// Mobile Agenda Time Slot
+function MobileTimeSlot({
+  hour,
+  events,
+  isCurrentHour,
+  currentMinute,
+  onEventClick,
+}: {
+  hour: number;
+  events: CalendarEvent[];
+  isCurrentHour: boolean;
+  currentMinute: number;
+  onEventClick: (event: CalendarEvent) => void;
+}) {
+  const timeLabel = hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`;
+  const hasEvents = events.length > 0;
 
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-4 p-4 rounded-xl text-left transition-colors ${
-        isHouse
-          ? 'bg-white border border-slate-200 hover:border-emerald-300'
-          : 'bg-blue-50 hover:bg-blue-100'
-      } ${event.conflict ? 'ring-2 ring-red-300' : ''}`}
-    >
-      <div
-        className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-          isHouse ? 'bg-emerald-100' : 'bg-blue-100'
-        }`}
-      >
-        <Icon className={`w-6 h-6 ${isHouse ? 'text-emerald-600' : 'text-blue-600'}`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-medium text-slate-900 truncate">{event.title}</p>
-        <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
-          {event.startTime && (
-            <span className="flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              {formatTime(event.startTime)}
-              {event.endTime && ` - ${formatTime(event.endTime)}`}
-            </span>
-          )}
-          {event.isAllDay && <span>All Day</span>}
-          {event.location && (
-            <span className="flex items-center gap-1 truncate">
-              <MapPin className="w-3.5 h-3.5" />
-              {event.location}
-            </span>
+    <div className={`relative border-b border-slate-100 ${isCurrentHour ? 'bg-red-50/30' : ''}`}>
+      {/* Current time indicator line */}
+      {isCurrentHour && (
+        <div
+          className="absolute left-0 right-0 z-10 flex items-center pointer-events-none"
+          style={{ top: `${(currentMinute / 60) * 100}%` }}
+        >
+          <div className="w-3 h-3 rounded-full bg-red-500 -ml-1.5" />
+          <div className="flex-1 h-0.5 bg-red-500" />
+        </div>
+      )}
+
+      <div className="flex min-h-[72px]">
+        {/* Time label */}
+        <div className="w-16 flex-shrink-0 py-2 px-2 text-right">
+          <span className={`text-xs font-medium ${isCurrentHour ? 'text-red-600' : 'text-slate-400'}`}>
+            {timeLabel}
+          </span>
+        </div>
+
+        {/* Events or free time */}
+        <div className="flex-1 py-2 px-2 space-y-2">
+          {hasEvents ? (
+            events.map((event) => {
+              const colors = getEventColor(event);
+              const Icon = getCategoryIcon(event.category);
+              return (
+                <button
+                  key={event.id}
+                  onClick={() => onEventClick(event)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${colors.bg} border-l-4 ${colors.border} hover:shadow-sm`}
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${event.layer === 'house' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                    <Icon className={`w-5 h-5 ${colors.icon}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium truncate ${colors.text}`}>{event.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
+                      {event.startTime && (
+                        <span>{formatTime(event.startTime)}{event.endTime && ` - ${formatTime(event.endTime)}`}</span>
+                      )}
+                      {event.location && (
+                        <span className="flex items-center gap-1 truncate">
+                          <MapPin className="w-3 h-3" />
+                          {event.location}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {event.isRecurring && <Repeat className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                  {event.conflict && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                </button>
+              );
+            })
+          ) : (
+            <div className="h-8 flex items-center">
+              <span className="text-xs text-slate-300 italic">Free time</span>
+            </div>
           )}
         </div>
       </div>
-      {event.isRecurring && (
-        <Repeat className="w-4 h-4 text-slate-400 flex-shrink-0" />
-      )}
-      {event.conflict && (
-        <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
-          <AlertTriangle className="w-3 h-3" />
-          Access
-        </div>
-      )}
-    </button>
-  );
-}
-
-// Weather Badge
-function WeatherBadge({ weather }: { weather: DayWeather }) {
-  const Icon = getWeatherIcon(weather.icon);
-  return (
-    <div className="flex items-center gap-1 text-xs text-slate-500">
-      <Icon className={`w-4 h-4 ${weather.icon === 'sun' ? 'text-amber-500' : 'text-slate-400'}`} />
-      <span>{weather.temp}°</span>
     </div>
   );
 }
 
-// Who Is Where Row
-function WhoIsWhereRow({ dates }: { dates: Date[] }) {
+// Mobile Day Selector (horizontal scroll)
+function MobileDaySelector({
+  selectedDate,
+  onDateSelect,
+}: {
+  selectedDate: Date;
+  onDateSelect: (date: Date) => void;
+}) {
+  const dates = Array.from({ length: 14 }, (_, i) => getDate(i - 3, 0, 0));
+
   return (
-    <div className="grid grid-cols-8 border-b border-slate-200 bg-slate-50">
-      <div className="py-2 px-3 text-xs text-slate-500 font-medium border-r border-slate-200">
-        Status
-      </div>
+    <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide -mx-4 px-4">
       {dates.map((date) => {
-        const whoIsWhere = mockWhoIsWhere.find((w) => isSameDay(w.date, date));
+        const isSelected = isSameDay(date, selectedDate);
+        const isTodayDate = isToday(date);
+        const weather = mockWeather.find((w) => isSameDay(w.date, date));
+        const WeatherIconComponent = weather ? getWeatherIcon(weather.icon) : null;
+
         return (
-          <div
+          <button
             key={date.toISOString()}
-            className={`py-2 px-2 text-xs text-slate-500 border-r border-slate-200 ${
-              isToday(date) ? 'bg-emerald-50/50' : ''
+            onClick={() => onDateSelect(date)}
+            className={`flex-shrink-0 w-14 py-3 rounded-xl flex flex-col items-center gap-1 transition-colors ${
+              isSelected
+                ? 'bg-emerald-600 text-white'
+                : isTodayDate
+                ? 'bg-emerald-100 text-emerald-700'
+                : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
             }`}
           >
-            <span className="line-clamp-2">{whoIsWhere?.status || '—'}</span>
-          </div>
+            <span className="text-[10px] uppercase font-medium opacity-70">
+              {date.toLocaleDateString('en-US', { weekday: 'short' })}
+            </span>
+            <span className="text-lg font-bold">{date.getDate()}</span>
+            {WeatherIconComponent && weather && (
+              <div className="flex items-center gap-0.5">
+                <WeatherIconComponent className={`w-3 h-3 ${isSelected ? 'text-white/80' : weather.icon === 'sun' ? 'text-amber-500' : 'text-slate-400'}`} />
+                <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-slate-500'}`}>{weather.temp}°</span>
+              </div>
+            )}
+          </button>
         );
       })}
     </div>
   );
 }
 
-// Now Indicator Line
+// Now Indicator Line (for Week View)
 function NowIndicator() {
   const now = new Date();
   const hours = now.getHours();
   const minutes = now.getMinutes();
-  const top = ((hours - 6) * 60 + minutes) * (64 / 60); // 64px per hour, starting at 6 AM
+  const top = ((hours - 6) * 60 + minutes) * (64 / 60);
 
   if (hours < 6 || hours > 22) return null;
 
@@ -630,10 +836,7 @@ function AddEventModal({
         <div className="p-6 border-b border-slate-200">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold text-slate-900">Add Event</h2>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
@@ -644,7 +847,6 @@ function AddEventModal({
 
         <div className="p-6">
           {!eventType ? (
-            // Type Selection
             <div className="space-y-4">
               <p className="text-sm text-slate-600 mb-4">What would you like to add?</p>
               <button
@@ -674,7 +876,6 @@ function AddEventModal({
               </Link>
             </div>
           ) : (
-            // Family Event Form
             <div className="space-y-4">
               <button
                 onClick={() => setEventType(null)}
@@ -685,9 +886,7 @@ function AddEventModal({
               </button>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Event Title
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Event Title</label>
                 <input
                   type="text"
                   placeholder="e.g., Soccer Practice"
@@ -697,18 +896,14 @@ function AddEventModal({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Start Time
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Start Time</label>
                   <input
                     type="time"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
-                    End Time
-                  </label>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">End Time</label>
                   <input
                     type="time"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
@@ -717,9 +912,7 @@ function AddEventModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Location
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Location</label>
                 <input
                   type="text"
                   placeholder="e.g., Oak Park Soccer Fields"
@@ -728,9 +921,7 @@ function AddEventModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Repeat
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Repeat</label>
                 <div className="flex flex-wrap gap-2">
                   {['Never', 'Weekly', 'Bi-Weekly', 'Monthly'].map((option) => (
                     <button
@@ -744,9 +935,7 @@ function AddEventModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
-                  Who&apos;s Attending?
-                </label>
+                <label className="block text-sm font-medium text-slate-700 mb-2">Who&apos;s Attending?</label>
                 <div className="flex flex-wrap gap-2">
                   {mockFamilyMembers.map((member) => (
                     <button
@@ -785,33 +974,26 @@ function EventDetailModal({
 }) {
   if (!event) return null;
 
-  const isHouse = event.layer === 'house';
+  const colors = getEventColor(event);
   const Icon = getCategoryIcon(event.category);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
-        <div className={`p-6 rounded-t-2xl ${isHouse ? 'bg-emerald-50' : 'bg-blue-50'}`}>
+        <div className={`p-6 rounded-t-2xl ${colors.bg}`}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center ${
-                  isHouse ? 'bg-emerald-100' : 'bg-blue-100'
-                }`}
-              >
-                <Icon className={`w-6 h-6 ${isHouse ? 'text-emerald-600' : 'text-blue-600'}`} />
+              <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${event.layer === 'house' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                <Icon className={`w-6 h-6 ${colors.icon}`} />
               </div>
               <div>
                 <h2 className="text-xl font-bold text-slate-900">{event.title}</h2>
                 <p className="text-sm text-slate-500 capitalize">
-                  {event.category} {isHouse ? '• Service' : '• Family'}
+                  {event.category} {event.layer === 'house' ? '• Service' : '• Family'}
                 </p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 hover:bg-white/50 rounded-lg transition-colors"
-            >
+            <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
@@ -872,9 +1054,7 @@ function EventDetailModal({
               <AlertTriangle className="w-5 h-5 text-red-500" />
               <div>
                 <p className="font-medium text-red-700">Access Required</p>
-                <p className="text-sm text-red-600">
-                  Nobody will be home during this service. Grant access or reschedule?
-                </p>
+                <p className="text-sm text-red-600">Nobody will be home. Grant access or reschedule?</p>
               </div>
             </div>
           )}
@@ -882,9 +1062,7 @@ function EventDetailModal({
           {event.requiresAccess && !event.conflict && (
             <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <Home className="w-5 h-5 text-amber-500" />
-              <div>
-                <p className="text-sm text-amber-700">This service requires interior access</p>
-              </div>
+              <p className="text-sm text-amber-700">This service requires interior access</p>
             </div>
           )}
         </div>
@@ -914,13 +1092,22 @@ function EventDetailModal({
 export default function CalendarPage() {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedMobileDate, setSelectedMobileDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showAddModal, setShowAddModal] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [currentTime, setCurrentTime] = useState(new Date());
   const weekViewRef = useRef<HTMLDivElement>(null);
+  const mobileAgendaRef = useRef<HTMLDivElement>(null);
 
-  // Filter events based on active filter
+  // Update current time every minute
+  useEffect(() => {
+    const interval = setInterval(() => setCurrentTime(new Date()), 60000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Filter events
   const filteredEvents = useMemo(() => {
     return mockEvents.filter((event) => {
       if (activeFilter === 'all') return true;
@@ -939,6 +1126,16 @@ export default function CalendarPage() {
         return date >= event.startDate && date <= event.endDate;
       }
       return isSameDay(event.startDate, date);
+    });
+  };
+
+  // Get events for a specific hour on a date
+  const getEventsForHour = (date: Date, hour: number) => {
+    return filteredEvents.filter((event) => {
+      if (!isSameDay(event.startDate, date)) return false;
+      if (!event.startTime) return false;
+      const eventHour = parseInt(event.startTime.split(':')[0] ?? '0', 10);
+      return eventHour === hour;
     });
   };
 
@@ -965,9 +1162,10 @@ export default function CalendarPage() {
 
   const goToToday = () => {
     setCurrentDate(new Date());
+    setSelectedMobileDate(new Date());
   };
 
-  // Scroll to current time on mount for week view
+  // Scroll to current time on mount
   useEffect(() => {
     if (viewMode === 'week' && weekViewRef.current) {
       const now = new Date();
@@ -975,6 +1173,16 @@ export default function CalendarPage() {
       weekViewRef.current.scrollTop = scrollTop;
     }
   }, [viewMode]);
+
+  // Scroll mobile agenda to current time
+  useEffect(() => {
+    if (mobileAgendaRef.current && isToday(selectedMobileDate)) {
+      const now = new Date();
+      const currentHour = now.getHours();
+      const scrollTop = Math.max(0, (currentHour - 7) * 72);
+      mobileAgendaRef.current.scrollTop = scrollTop;
+    }
+  }, [selectedMobileDate]);
 
   const weekDates = getWeekDates(currentDate);
   const monthDates = getMonthDates(currentDate);
@@ -991,7 +1199,7 @@ export default function CalendarPage() {
     return `${formatDateShort(start)} - ${formatDateShort(end)}, ${start.getFullYear()}`;
   };
 
-  // Time slots for week view (6 AM to 10 PM)
+  // Time slots for views (6 AM to 10 PM)
   const timeSlots = Array.from({ length: 17 }, (_, i) => i + 6);
 
   return (
@@ -1003,8 +1211,8 @@ export default function CalendarPage() {
           <p className="text-slate-500 mt-1">Your home and family schedule</p>
         </div>
 
-        {/* View Mode Toggle */}
-        <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+        {/* View Mode Toggle - Desktop Only */}
+        <div className="hidden md:flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
           <button
             onClick={() => setViewMode('month')}
             className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
@@ -1012,7 +1220,7 @@ export default function CalendarPage() {
             }`}
           >
             <LayoutGrid className="w-4 h-4" />
-            <span className="hidden sm:inline">Month</span>
+            Month
           </button>
           <button
             onClick={() => setViewMode('week')}
@@ -1021,7 +1229,7 @@ export default function CalendarPage() {
             }`}
           >
             <CalendarIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Week</span>
+            Week
           </button>
           <button
             onClick={() => setViewMode('agenda')}
@@ -1030,7 +1238,7 @@ export default function CalendarPage() {
             }`}
           >
             <List className="w-4 h-4" />
-            <span className="hidden sm:inline">Agenda</span>
+            Agenda
           </button>
         </div>
       </div>
@@ -1038,20 +1246,58 @@ export default function CalendarPage() {
       {/* Filter Pills */}
       <FilterPills activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
-      {/* Calendar Navigation */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+      {/* ========== MOBILE VIEW (Agenda/Schedule) ========== */}
+      <div className="md:hidden">
+        {/* Mobile Day Selector */}
+        <MobileDaySelector selectedDate={selectedMobileDate} onDateSelect={setSelectedMobileDate} />
+
+        {/* Weather Header - Sticky */}
+        <div className="sticky top-0 z-10 bg-gradient-to-b from-slate-100 to-slate-50 -mx-4 px-4 py-3 border-b border-slate-200 mt-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-900">
+                {isToday(selectedMobileDate) ? 'Today' : formatDateLong(selectedMobileDate)}
+              </p>
+              <p className="text-sm text-slate-500">
+                {getEventsForDate(selectedMobileDate).length} events scheduled
+              </p>
+            </div>
+            {(() => {
+              const weather = mockWeather.find((w) => isSameDay(w.date, selectedMobileDate));
+              return weather ? <WeatherBadge weather={weather} large /> : null;
+            })()}
+          </div>
+        </div>
+
+        {/* Mobile Schedule View */}
+        <div ref={mobileAgendaRef} className="mt-4 bg-white rounded-xl border border-slate-200 overflow-hidden max-h-[60vh] overflow-y-auto">
+          {timeSlots.map((hour) => {
+            const hourEvents = getEventsForHour(selectedMobileDate, hour);
+            const isCurrentHour = isToday(selectedMobileDate) && currentTime.getHours() === hour;
+
+            return (
+              <MobileTimeSlot
+                key={hour}
+                hour={hour}
+                events={hourEvents}
+                isCurrentHour={isCurrentHour}
+                currentMinute={currentTime.getMinutes()}
+                onEventClick={setSelectedEvent}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ========== DESKTOP VIEW (Week/Month/Agenda) ========== */}
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Calendar Navigation */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
           <div className="flex items-center gap-2">
-            <button
-              onClick={navigatePrev}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            >
+            <button onClick={navigatePrev} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <ChevronLeft className="w-5 h-5 text-slate-600" />
             </button>
-            <button
-              onClick={navigateNext}
-              className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-            >
+            <button onClick={navigateNext} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
               <ChevronRight className="w-5 h-5 text-slate-600" />
             </button>
             <h2 className="text-lg font-semibold text-slate-900 ml-2">{formatHeader()}</h2>
@@ -1070,10 +1316,7 @@ export default function CalendarPage() {
             {/* Day Headers */}
             <div className="grid grid-cols-7 border-b border-slate-200">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div
-                  key={day}
-                  className="py-3 text-center text-sm font-medium text-slate-500 border-r border-slate-200 last:border-r-0"
-                >
+                <div key={day} className="py-3 text-center text-sm font-medium text-slate-500 border-r border-slate-200 last:border-r-0">
                   {day}
                 </div>
               ))}
@@ -1083,12 +1326,7 @@ export default function CalendarPage() {
             <div className="grid grid-cols-7">
               {monthDates.map((date, index) => {
                 if (!date) {
-                  return (
-                    <div
-                      key={`empty-${index}`}
-                      className="h-24 sm:h-32 bg-slate-50 border-b border-r border-slate-200"
-                    />
-                  );
+                  return <div key={`empty-${index}`} className="h-32 bg-slate-50 border-b border-r border-slate-200" />;
                 }
 
                 const dayEvents = getEventsForDate(date);
@@ -1101,29 +1339,19 @@ export default function CalendarPage() {
                       setSelectedDate(date);
                       setShowAddModal(true);
                     }}
-                    className={`h-24 sm:h-32 p-1 sm:p-2 border-b border-r border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${
+                    className={`h-32 p-2 border-b border-r border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${
                       isTodayDate ? 'bg-emerald-50/30' : ''
                     }`}
                   >
                     <div
                       className={`text-sm font-medium mb-1 ${
-                        isTodayDate
-                          ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white'
-                          : 'text-slate-700'
+                        isTodayDate ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white' : 'text-slate-700'
                       }`}
                     >
                       {date.getDate()}
                     </div>
 
-                    {/* Mobile: Show dots */}
-                    <div className="flex gap-1 sm:hidden flex-wrap">
-                      {dayEvents.slice(0, 4).map((event) => (
-                        <EventChip key={event.id} event={event} compact />
-                      ))}
-                    </div>
-
-                    {/* Desktop: Show event chips */}
-                    <div className="hidden sm:block space-y-1">
+                    <div className="space-y-1">
                       {dayEvents.slice(0, 3).map((event) => (
                         <EventChip key={event.id} event={event} />
                       ))}
@@ -1143,17 +1371,13 @@ export default function CalendarPage() {
           <div>
             {/* Weather Row */}
             <div className="grid grid-cols-8 border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white">
-              <div className="py-2 px-3 text-xs text-slate-500 font-medium border-r border-slate-200">
-                Weather
-              </div>
+              <div className="py-2 px-3 text-xs text-slate-500 font-medium border-r border-slate-200">Weather</div>
               {weekDates.map((date) => {
                 const weather = mockWeather.find((w) => isSameDay(w.date, date));
                 return (
                   <div
                     key={date.toISOString()}
-                    className={`py-2 px-2 flex justify-center border-r border-slate-200 ${
-                      isToday(date) ? 'bg-emerald-50/50' : ''
-                    }`}
+                    className={`py-2 px-2 flex justify-center border-r border-slate-200 ${isToday(date) ? 'bg-emerald-50/50' : ''}`}
                   >
                     {weather && <WeatherBadge weather={weather} />}
                   </div>
@@ -1161,31 +1385,15 @@ export default function CalendarPage() {
               })}
             </div>
 
-            {/* Who Is Where Row */}
-            <WhoIsWhereRow dates={weekDates} />
-
             {/* Day Headers */}
             <div className="grid grid-cols-8 border-b border-slate-200">
               <div className="py-3 px-3 border-r border-slate-200" />
               {weekDates.map((date) => {
                 const isTodayDate = isToday(date);
                 return (
-                  <div
-                    key={date.toISOString()}
-                    className={`py-3 text-center border-r border-slate-200 ${
-                      isTodayDate ? 'bg-emerald-50/50' : ''
-                    }`}
-                  >
-                    <p className="text-xs text-slate-500 uppercase">
-                      {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                    </p>
-                    <p
-                      className={`text-lg font-semibold mt-0.5 ${
-                        isTodayDate ? 'text-emerald-600' : 'text-slate-900'
-                      }`}
-                    >
-                      {date.getDate()}
-                    </p>
+                  <div key={date.toISOString()} className={`py-3 text-center border-r border-slate-200 ${isTodayDate ? 'bg-emerald-50/50' : ''}`}>
+                    <p className="text-xs text-slate-500 uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+                    <p className={`text-lg font-semibold mt-0.5 ${isTodayDate ? 'text-emerald-600' : 'text-slate-900'}`}>{date.getDate()}</p>
                   </div>
                 );
               })}
@@ -1197,10 +1405,7 @@ export default function CalendarPage() {
                 {/* Time Labels */}
                 <div className="border-r border-slate-200">
                   {timeSlots.map((hour) => (
-                    <div
-                      key={hour}
-                      className="h-16 px-2 flex items-start justify-end pt-1"
-                    >
+                    <div key={hour} className="h-16 px-2 flex items-start justify-end pt-1">
                       <span className="text-xs text-slate-400">
                         {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                       </span>
@@ -1214,24 +1419,13 @@ export default function CalendarPage() {
                   const isTodayDate = isToday(date);
 
                   return (
-                    <div
-                      key={date.toISOString()}
-                      className={`relative border-r border-slate-200 ${
-                        isTodayDate ? 'bg-emerald-50/30' : ''
-                      }`}
-                    >
-                      {/* Hour Lines */}
+                    <div key={date.toISOString()} className={`relative border-r border-slate-200 ${isTodayDate ? 'bg-emerald-50/30' : ''}`}>
                       {timeSlots.map((hour) => (
-                        <div
-                          key={hour}
-                          className="h-16 border-b border-slate-100"
-                        />
+                        <div key={hour} className="h-16 border-b border-slate-100" />
                       ))}
 
-                      {/* Now Indicator */}
                       {isTodayDate && <NowIndicator />}
 
-                      {/* Events */}
                       {dayEvents.map((event) => {
                         if (!event.startTime) return null;
                         const startParts = event.startTime.split(':').map(Number);
@@ -1244,11 +1438,7 @@ export default function CalendarPage() {
                         const height = ((endHour - startHour) * 60 + (endMin - startMin)) * (64 / 60);
 
                         return (
-                          <div
-                            key={event.id}
-                            style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }}
-                            className="absolute left-0 right-0"
-                          >
+                          <div key={event.id} style={{ top: `${top}px`, height: `${Math.max(height, 24)}px` }} className="absolute left-0 right-0">
                             <EventBlock event={event} onClick={() => setSelectedEvent(event)} />
                           </div>
                         );
@@ -1277,28 +1467,60 @@ export default function CalendarPage() {
                         isToday(date) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
                       }`}
                     >
-                      <span className="text-xs uppercase">
-                        {date.toLocaleDateString('en-US', { weekday: 'short' })}
-                      </span>
+                      <span className="text-xs uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                       <span className="text-lg font-bold">{date.getDate()}</span>
                     </div>
                     <div>
                       <p className={`font-medium ${isToday(date) ? 'text-emerald-600' : 'text-slate-900'}`}>
                         {isToday(date) ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'long' })}
                       </p>
-                      <p className="text-sm text-slate-500">
-                        {date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}
-                      </p>
+                      <p className="text-sm text-slate-500">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
                     </div>
                   </div>
                   <div className="space-y-2 ml-15">
-                    {dayEvents.map((event) => (
-                      <AgendaEventRow
-                        key={event.id}
-                        event={event}
-                        onClick={() => setSelectedEvent(event)}
-                      />
-                    ))}
+                    {dayEvents.map((event) => {
+                      const colors = getEventColor(event);
+                      const Icon = getCategoryIcon(event.category);
+                      return (
+                        <button
+                          key={event.id}
+                          onClick={() => setSelectedEvent(event)}
+                          className={`w-full flex items-center gap-4 p-4 rounded-xl text-left transition-colors ${colors.bg} hover:shadow-sm ${
+                            event.conflict ? 'ring-2 ring-red-300' : ''
+                          }`}
+                        >
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${event.layer === 'house' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
+                            <Icon className={`w-6 h-6 ${colors.icon}`} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium text-slate-900 truncate">{event.title}</p>
+                            <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
+                              {event.startTime && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3.5 h-3.5" />
+                                  {formatTime(event.startTime)}
+                                  {event.endTime && ` - ${formatTime(event.endTime)}`}
+                                </span>
+                              )}
+                              {event.isAllDay && <span>All Day</span>}
+                              {event.location && (
+                                <span className="flex items-center gap-1 truncate">
+                                  <MapPin className="w-3.5 h-3.5" />
+                                  {event.location}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                          {event.isRecurring && <Repeat className="w-4 h-4 text-slate-400 flex-shrink-0" />}
+                          {event.conflict && (
+                            <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
+                              <AlertTriangle className="w-3 h-3" />
+                              Access
+                            </div>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
               );
@@ -1307,23 +1529,27 @@ export default function CalendarPage() {
         )}
       </div>
 
-      {/* Legend */}
-      <div className="flex flex-wrap items-center gap-4 px-4 py-3 bg-white rounded-xl border border-slate-200">
+      {/* Legend - Desktop Only */}
+      <div className="hidden md:flex flex-wrap items-center gap-4 px-4 py-3 bg-white rounded-xl border border-slate-200">
         <span className="text-sm font-medium text-slate-700">Legend:</span>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 border-l-2 border-emerald-500 bg-white rounded" />
+          <div className="w-4 h-4 border-l-2 border-emerald-500 bg-emerald-50 rounded" />
           <span className="text-sm text-slate-600">House/Service</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-blue-100 rounded" />
-          <span className="text-sm text-slate-600">Family</span>
+          <div className="w-4 h-4 bg-blue-50 border-l-2 border-blue-500 rounded" />
+          <span className="text-sm text-slate-600">Family/Kids</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-purple-100 rounded" />
+          <div className="w-4 h-4 bg-pink-50 border-l-2 border-pink-500 rounded" />
+          <span className="text-sm text-slate-600">Social</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-purple-50 border-l-2 border-purple-500 rounded" />
           <span className="text-sm text-slate-600">Travel</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-100 ring-1 ring-red-400 rounded" />
+          <div className="w-4 h-4 bg-red-50 ring-1 ring-red-400 rounded" />
           <span className="text-sm text-slate-600">Needs Attention</span>
         </div>
       </div>
@@ -1349,10 +1575,7 @@ export default function CalendarPage() {
         selectedDate={selectedDate}
       />
 
-      <EventDetailModal
-        event={selectedEvent}
-        onClose={() => setSelectedEvent(null)}
-      />
+      <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
     </div>
   );
 }
