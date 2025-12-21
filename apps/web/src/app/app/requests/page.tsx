@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import { getDemoImage } from '@/lib/imageUtils';
 import { getApiClient } from '@/lib/api';
@@ -46,6 +46,11 @@ import {
   HelpCircle,
   ExternalLink,
   Loader2,
+  AlertCircle,
+  Search,
+  UserCheck,
+  CalendarCheck,
+  Headphones,
 } from 'lucide-react';
 
 // ============================================================================
@@ -86,6 +91,7 @@ interface RequestTicket {
   };
   timeline: TimelineEvent[];
   messages: ChatMessage[];
+  scheduledDate?: string;
 }
 
 interface TimelineEvent {
@@ -124,6 +130,29 @@ interface FormData {
   priority: RequestPriority;
   allowEntry: boolean;
 }
+
+// Smart status state type
+interface SmartStatusState {
+  headline: string;
+  description: string;
+  stepIndex: number;
+  icon: typeof Search;
+  color: string;
+  bgColor: string;
+}
+
+// ============================================================================
+// CONSTANTS
+// ============================================================================
+
+// Housing Manager info (would come from household settings in real app)
+const HOUSING_MANAGER = {
+  id: 'steve-manager',
+  name: 'Steve',
+  title: 'Housing Manager',
+  avatar: getDemoImage('avatar-male', 100, 100, 'steve-manager'),
+  phone: '+1 (512) 555-0100',
+};
 
 // ============================================================================
 // MOCK DATA
@@ -185,23 +214,24 @@ const MOCK_TICKETS: RequestTicket[] = [
     updatedAt: '2024-12-18T14:30:00Z',
     vendor: {
       id: 'v1',
-      name: 'Mike\'s Plumbing',
+      name: "Mike's Plumbing",
       avatar: getDemoImage('vendor-portrait', 100, 100, 'mike-plumber'),
       phone: '+1 (310) 555-0111',
     },
     mediaUrls: [getDemoImage('bathroom', 400, 300, 'leak-1')],
     allowEntry: true,
+    scheduledDate: '2024-12-18T14:00:00Z',
     timeline: [
       { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-18T09:00:00Z', actor: 'Bob Chen' },
       { id: 't2', type: 'updated', description: 'Marked as high priority', timestamp: '2024-12-18T09:05:00Z', actor: 'Steve Manager' },
-      { id: 't3', type: 'assigned', description: 'Assigned to Mike\'s Plumbing', timestamp: '2024-12-18T09:30:00Z', actor: 'Steve Manager' },
-      { id: 't4', type: 'scheduled', description: 'Scheduled for today 2:00 PM', timestamp: '2024-12-18T10:00:00Z', actor: 'Mike\'s Plumbing' },
-      { id: 't5', type: 'started', description: 'Work started', timestamp: '2024-12-18T14:00:00Z', actor: 'Mike\'s Plumbing' },
+      { id: 't3', type: 'assigned', description: "Assigned to Mike's Plumbing", timestamp: '2024-12-18T09:30:00Z', actor: 'Steve Manager' },
+      { id: 't4', type: 'scheduled', description: 'Scheduled for today 2:00 PM', timestamp: '2024-12-18T10:00:00Z', actor: "Mike's Plumbing" },
+      { id: 't5', type: 'started', description: 'Work started - Mike checked in', timestamp: '2024-12-18T14:00:00Z', actor: "Mike's Plumbing" },
     ],
     messages: [
       { id: 'm1', senderId: 'u1', senderName: 'Bob Chen', senderRole: 'user', content: 'Here is a photo of the leak under the sink.', timestamp: '2024-12-18T09:02:00Z', attachments: [getDemoImage('bathroom', 400, 300, 'leak-photo')] },
-      { id: 'm2', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: 'Thanks Bob! I\'ve escalated this and Mike is on his way. He should arrive around 2 PM.', timestamp: '2024-12-18T09:35:00Z' },
-      { id: 'm3', senderId: 'v1', senderName: 'Mike\'s Plumbing', senderRole: 'vendor', content: 'On my way! I\'ll text when I arrive at the gate.', timestamp: '2024-12-18T13:45:00Z' },
+      { id: 'm2', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "Thanks Bob! I've escalated this and Mike is on his way. He should arrive around 2 PM.", timestamp: '2024-12-18T09:35:00Z' },
+      { id: 'm3', senderId: 'v1', senderName: "Mike's Plumbing", senderRole: 'vendor', content: "On my way! I'll text when I arrive at the gate.", timestamp: '2024-12-18T13:45:00Z' },
     ],
   },
   {
@@ -215,6 +245,7 @@ const MOCK_TICKETS: RequestTicket[] = [
     status: 'scheduled',
     createdAt: '2024-12-17T10:00:00Z',
     updatedAt: '2024-12-17T11:00:00Z',
+    scheduledDate: '2024-12-20T09:00:00Z',
     vendor: {
       id: 'v2',
       name: 'Sparkle Clean Co',
@@ -229,7 +260,7 @@ const MOCK_TICKETS: RequestTicket[] = [
       { id: 't3', type: 'scheduled', description: 'Scheduled for every Friday 9:00 AM', timestamp: '2024-12-17T11:00:00Z', actor: 'Sparkle Clean Co' },
     ],
     messages: [
-      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: 'I\'ve arranged Maria from Sparkle Clean to come every Friday morning. Does 9 AM work?', timestamp: '2024-12-17T10:45:00Z' },
+      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "I've arranged Maria from Sparkle Clean to come every Friday morning. Does 9 AM work?", timestamp: '2024-12-17T10:45:00Z' },
       { id: 'm2', senderId: 'u1', senderName: 'Alice Chen', senderRole: 'user', content: 'Perfect! 9 AM works great.', timestamp: '2024-12-17T10:50:00Z' },
     ],
   },
@@ -266,7 +297,7 @@ const MOCK_TICKETS: RequestTicket[] = [
     allowEntry: false,
     timeline: [
       { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-18T16:00:00Z', actor: 'Alice Chen' },
-      { id: 't2', type: 'updated', description: 'Under review', timestamp: '2024-12-18T16:30:00Z', actor: 'Steve Manager' },
+      { id: 't2', type: 'updated', description: 'Under review by Steve', timestamp: '2024-12-18T16:30:00Z', actor: 'Steve Manager' },
     ],
     messages: [
       { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: 'I can have someone pick this up tomorrow morning. Is there a ticket number?', timestamp: '2024-12-18T16:35:00Z' },
@@ -298,7 +329,7 @@ const MOCK_TICKETS: RequestTicket[] = [
       { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-10T09:00:00Z', actor: 'Bob Chen' },
       { id: 't2', type: 'assigned', description: 'Assigned to Cool Air HVAC', timestamp: '2024-12-10T10:00:00Z', actor: 'Steve Manager' },
       { id: 't3', type: 'scheduled', description: 'Scheduled for Dec 12', timestamp: '2024-12-10T11:00:00Z', actor: 'Cool Air HVAC' },
-      { id: 't4', type: 'completed', description: 'Work completed', timestamp: '2024-12-12T15:00:00Z', actor: 'Cool Air HVAC' },
+      { id: 't4', type: 'completed', description: 'Work completed successfully', timestamp: '2024-12-12T15:00:00Z', actor: 'Cool Air HVAC' },
     ],
     messages: [],
   },
@@ -323,7 +354,7 @@ const MOCK_TICKETS: RequestTicket[] = [
       { id: 't2', type: 'completed', description: 'Issue resolved', timestamp: '2024-12-06T10:00:00Z', actor: 'Steve Manager' },
     ],
     messages: [
-      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: 'I checked with the utility company - the spike was due to an estimated reading. They\'ll adjust next month. I\'ve also requested actual meter reads going forward.', timestamp: '2024-12-06T10:00:00Z' },
+      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "I checked with the utility company - the spike was due to an estimated reading. They'll adjust next month. I've also requested actual meter reads going forward.", timestamp: '2024-12-06T10:00:00Z' },
       { id: 'm2', senderId: 'u1', senderName: 'Bob Chen', senderRole: 'user', content: 'Great, thanks for looking into this!', timestamp: '2024-12-06T10:15:00Z' },
     ],
   },
@@ -348,6 +379,93 @@ const subcategoryIcons: Record<string, typeof Wrench> = {
 };
 
 // ============================================================================
+// SMART STATUS HELPER
+// ============================================================================
+
+function deriveRequestState(ticket: RequestTicket): SmartStatusState {
+  const hasVendor = !!ticket.vendor;
+
+  // Step indices: 0=Received, 1=Triage, 2=Vendor Search, 3=Scheduled, 4=Done
+  switch (ticket.status) {
+    case 'received':
+      return {
+        headline: 'Request Received',
+        description: "Your request is in our queue. We'll review it shortly.",
+        stepIndex: 0,
+        icon: AlertCircle,
+        color: 'text-blue-700',
+        bgColor: 'bg-blue-50 border-blue-200',
+      };
+
+    case 'reviewing':
+      if (!hasVendor) {
+        return {
+          headline: 'Finding Your Pro',
+          description: 'We are reaching out to our trusted network of professionals.',
+          stepIndex: 2,
+          icon: Search,
+          color: 'text-purple-700',
+          bgColor: 'bg-purple-50 border-purple-200',
+        };
+      }
+      return {
+        headline: 'Under Review',
+        description: "Your manager is reviewing this request and will update you soon.",
+        stepIndex: 1,
+        icon: Headphones,
+        color: 'text-purple-700',
+        bgColor: 'bg-purple-50 border-purple-200',
+      };
+
+    case 'scheduled':
+      return {
+        headline: 'Pro Matched & Scheduled',
+        description: hasVendor
+          ? `${ticket.vendor!.name} is confirmed and ready to help.`
+          : 'Your service has been scheduled.',
+        stepIndex: 3,
+        icon: CalendarCheck,
+        color: 'text-amber-700',
+        bgColor: 'bg-amber-50 border-amber-200',
+      };
+
+    case 'in_progress':
+      return {
+        headline: 'Service in Progress',
+        description: hasVendor
+          ? `${ticket.vendor!.name} is currently working on your request.`
+          : 'Work is underway on your request.',
+        stepIndex: 3,
+        icon: Wrench,
+        color: 'text-orange-700',
+        bgColor: 'bg-orange-50 border-orange-200',
+      };
+
+    case 'resolved':
+      return {
+        headline: 'Completed',
+        description: ticket.resolutionTime
+          ? `Resolved in ${ticket.resolutionTime}. Thank you for using Haven!`
+          : 'This request has been successfully completed.',
+        stepIndex: 4,
+        icon: CheckCircle2,
+        color: 'text-emerald-700',
+        bgColor: 'bg-emerald-50 border-emerald-200',
+      };
+
+    default:
+      return {
+        headline: 'Processing',
+        description: 'Your request is being processed.',
+        stepIndex: 1,
+        icon: Clock,
+        color: 'text-slate-700',
+        bgColor: 'bg-slate-50 border-slate-200',
+      };
+  }
+}
+
+// ============================================================================
 // DATA MAPPING FUNCTIONS
 // ============================================================================
 
@@ -361,7 +479,6 @@ function mapApiStatusToUI(apiStatus: ServiceRequestStatus): RequestStatus {
     case 'IN_PROGRESS':
       return 'in_progress';
     case 'COMPLETED':
-      return 'resolved';
     case 'CANCELLED':
       return 'resolved';
     default:
@@ -422,15 +539,11 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
   const createdAtStr = typeof apiReq.createdAt === 'string' ? apiReq.createdAt : new Date(apiReq.createdAt).toISOString();
   const updatedAtStr = typeof apiReq.updatedAt === 'string' ? apiReq.updatedAt : new Date(apiReq.updatedAt).toISOString();
 
-  // Generate a readable ticket number from the ID
   const ticketNumber = `REQ-${apiReq.id.substring(0, 6).toUpperCase()}`;
-
-  // Determine category and subcategory from the service category
   const categoryName = detail.serviceCategory?.name || '';
   const category = mapCategoryNameToUI(categoryName);
   const subcategory = categoryName || 'Other';
 
-  // Calculate resolution time if completed
   let resolutionTime: string | undefined;
   let resolvedAt: string | undefined;
   if (apiReq.completedDate) {
@@ -447,7 +560,6 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
     }
   }
 
-  // Construct basic timeline from createdAt
   const timeline: TimelineEvent[] = [
     {
       id: 't-created',
@@ -458,7 +570,6 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
     },
   ];
 
-  // Add assigned event if vendor exists
   if (detail.vendor) {
     timeline.push({
       id: 't-assigned',
@@ -468,7 +579,6 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
     });
   }
 
-  // Add completed event if resolved
   if (resolvedAt) {
     timeline.push({
       id: 't-completed',
@@ -495,7 +605,7 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
       id: detail.vendor.id,
       name: detail.vendor.companyName,
       avatar: getDemoImage('vendor-portrait', 100, 100, detail.vendor.id),
-      phone: '', // API doesn't return phone yet
+      phone: '',
     } : undefined,
     mediaUrls: [],
     allowEntry: true,
@@ -504,13 +614,239 @@ function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): R
       approved: apiReq.status === 'IN_PROGRESS' || apiReq.status === 'COMPLETED',
     } : undefined,
     timeline,
-    messages: [], // Messages loaded separately
+    messages: [],
   };
+}
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function getTimeAgo(dateStr: string): string {
+  const now = new Date();
+  const date = new Date(dateStr);
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'yesterday';
+  if (diffDays < 7) return `${diffDays}d ago`;
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
+function formatDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function formatScheduledDate(dateStr: string): string {
+  const date = new Date(dateStr);
+  const today = new Date();
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+
+  if (date.toDateString() === today.toDateString()) {
+    return `Today at ${formatTime(dateStr)}`;
+  }
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return `Tomorrow at ${formatTime(dateStr)}`;
+  }
+  return `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatTime(dateStr)}`;
 }
 
 // ============================================================================
 // COMPONENTS
 // ============================================================================
+
+// Progress Stepper Component
+function ProgressStepper({ currentStep }: { currentStep: number }) {
+  const steps = [
+    { label: 'Received', icon: AlertCircle },
+    { label: 'Triage', icon: Headphones },
+    { label: 'Pro Found', icon: UserCheck },
+    { label: 'Scheduled', icon: CalendarCheck },
+    { label: 'Done', icon: CheckCircle2 },
+  ];
+
+  return (
+    <div className="flex items-center justify-between w-full">
+      {steps.map((step, index) => {
+        const isCompleted = index < currentStep;
+        const isCurrent = index === currentStep;
+        const StepIcon = step.icon;
+
+        return (
+          <div key={step.label} className="flex items-center flex-1 last:flex-none">
+            <div className="flex flex-col items-center">
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  isCompleted
+                    ? 'bg-emerald-500 text-white'
+                    : isCurrent
+                      ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-500'
+                      : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 className="w-4 h-4" />
+                ) : (
+                  <StepIcon className="w-4 h-4" />
+                )}
+              </div>
+              <span className={`text-xs mt-1 ${isCurrent ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
+                {step.label}
+              </span>
+            </div>
+            {index < steps.length - 1 && (
+              <div
+                className={`flex-1 h-0.5 mx-2 ${
+                  index < currentStep ? 'bg-emerald-500' : 'bg-slate-200'
+                }`}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// Latest Update Box
+function LatestUpdateBox({ timeline }: { timeline: TimelineEvent[] }) {
+  const latestEvent = timeline[timeline.length - 1];
+  if (!latestEvent) return null;
+
+  return (
+    <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
+      <div className="p-2 bg-blue-100 rounded-lg">
+        <Clock className="w-5 h-5 text-blue-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-blue-900">Latest Update</p>
+        <p className="text-sm text-blue-700 truncate">
+          {latestEvent.actor && <span className="font-medium">{latestEvent.actor}</span>}
+          {latestEvent.actor && ' • '}
+          {latestEvent.description}
+        </p>
+      </div>
+      <span className="text-xs text-blue-600 whitespace-nowrap">
+        {getTimeAgo(latestEvent.timestamp)}
+      </span>
+    </div>
+  );
+}
+
+// Service Team Card
+function ServiceTeamCard({
+  vendor,
+  onCallManager,
+  onMessageManager,
+  onCallVendor,
+  onMessageVendor,
+}: {
+  vendor?: RequestTicket['vendor'];
+  onCallManager: () => void;
+  onMessageManager: () => void;
+  onCallVendor?: () => void;
+  onMessageVendor?: () => void;
+}) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <div className="p-4 bg-slate-50 border-b border-slate-200">
+        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
+          <UserCheck className="w-5 h-5 text-emerald-600" />
+          Your Service Team
+        </h3>
+      </div>
+
+      <div className="divide-y divide-slate-100">
+        {/* Housing Manager */}
+        <div className="p-4">
+          <div className="flex items-center gap-4">
+            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-emerald-100 flex items-center justify-center">
+              <Headphones className="w-6 h-6 text-emerald-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-slate-900">{HOUSING_MANAGER.name}</p>
+              <p className="text-sm text-slate-500">{HOUSING_MANAGER.title}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onCallManager}
+                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+              >
+                <Phone className="w-5 h-5" />
+              </button>
+              <button
+                onClick={onMessageManager}
+                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                <MessageSquare className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Assigned Vendor */}
+        {vendor && (
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="relative w-12 h-12 rounded-full overflow-hidden">
+                <Image src={vendor.avatar} alt="" fill className="object-cover" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium text-slate-900">{vendor.name}</p>
+                <p className="text-sm text-slate-500">Assigned Vendor</p>
+              </div>
+              <div className="flex items-center gap-2">
+                {vendor.phone && onCallVendor && (
+                  <button
+                    onClick={onCallVendor}
+                    className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
+                  >
+                    <Phone className="w-5 h-5" />
+                  </button>
+                )}
+                {onMessageVendor && (
+                  <button
+                    onClick={onMessageVendor}
+                    className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
+                  >
+                    <MessageSquare className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* No vendor yet */}
+        {!vendor && (
+          <div className="p-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
+                <Search className="w-6 h-6 text-slate-400" />
+              </div>
+              <div className="flex-1">
+                <p className="text-slate-500">Vendor not yet assigned</p>
+                <p className="text-xs text-slate-400">We&apos;re finding the right pro for you</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // Category Selection Step
 function CategoryStep({
@@ -845,7 +1181,6 @@ function NewRequestModal({
       const result = await api.createServiceRequest(payload);
       const newTicket = mapApiRequestToTicket(result);
 
-      // Override some fields from form data since API might not have category mapping yet
       newTicket.category = formData.category;
       newTicket.subcategory = formData.subcategory;
       newTicket.allowEntry = formData.allowEntry;
@@ -862,7 +1197,6 @@ function NewRequestModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full max-w-lg max-h-[90vh] bg-white rounded-xl shadow-xl overflow-hidden flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
           <h2 className="text-lg font-semibold text-slate-900">New Request</h2>
           <button
@@ -874,14 +1208,12 @@ function NewRequestModal({
           </button>
         </div>
 
-        {/* Error */}
         {error && (
           <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-sm text-red-700">{error}</p>
           </div>
         )}
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {step === 'category' && (
             <CategoryStep onSelect={handleCategorySelect} />
@@ -897,25 +1229,6 @@ function NewRequestModal({
         </div>
       </div>
     </div>
-  );
-}
-
-// Status Badge
-function StatusBadge({ status }: { status: RequestStatus }) {
-  const config: Record<RequestStatus, { label: string; color: string }> = {
-    received: { label: 'Received', color: 'bg-blue-100 text-blue-700' },
-    reviewing: { label: 'Reviewing', color: 'bg-purple-100 text-purple-700' },
-    scheduled: { label: 'Scheduled', color: 'bg-amber-100 text-amber-700' },
-    in_progress: { label: 'In Progress', color: 'bg-orange-100 text-orange-700' },
-    resolved: { label: 'Resolved', color: 'bg-emerald-100 text-emerald-700' },
-  };
-
-  const { label, color } = config[status];
-
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${color}`}>
-      {label}
-    </span>
   );
 }
 
@@ -937,34 +1250,7 @@ function PriorityBadge({ priority }: { priority: RequestPriority }) {
   );
 }
 
-// Status Progress Bar
-function StatusProgress({ status }: { status: RequestStatus }) {
-  const stages: RequestStatus[] = ['received', 'reviewing', 'scheduled', 'in_progress', 'resolved'];
-  const currentIndex = stages.indexOf(status);
-
-  return (
-    <div className="flex items-center gap-1">
-      {stages.map((stage, index) => (
-        <div key={stage} className="flex items-center">
-          <div
-            className={`w-2 h-2 rounded-full ${
-              index <= currentIndex ? 'bg-emerald-500' : 'bg-slate-200'
-            }`}
-          />
-          {index < stages.length - 1 && (
-            <div
-              className={`w-6 h-0.5 ${
-                index < currentIndex ? 'bg-emerald-500' : 'bg-slate-200'
-              }`}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-// Ticket Card
+// Enhanced Ticket Card with Smart Headlines
 function TicketCard({
   ticket,
   isSelected,
@@ -976,6 +1262,9 @@ function TicketCard({
 }) {
   const categoryInfo = categoryOptions.find((c) => c.id === ticket.category)!;
   const CategoryIcon = categoryInfo.icon;
+  const smartState = deriveRequestState(ticket);
+  const StatusIcon = smartState.icon;
+  const latestEvent = ticket.timeline[ticket.timeline.length - 1];
 
   return (
     <button
@@ -996,25 +1285,39 @@ function TicketCard({
             <PriorityBadge priority={ticket.priority} />
           </div>
           <h3 className="font-medium text-slate-900 truncate">{ticket.title}</h3>
-          <div className="flex items-center gap-2 mt-2">
-            <StatusBadge status={ticket.status} />
-            {ticket.vendor && (
-              <span className="text-xs text-slate-500 flex items-center gap-1">
-                <User className="w-3 h-3" />
-                {ticket.vendor.name}
+
+          {/* Smart Status Headline */}
+          <div className={`flex items-center gap-1.5 mt-2 ${smartState.color}`}>
+            <StatusIcon className="w-4 h-4" />
+            <span className="text-sm font-medium">{smartState.headline}</span>
+          </div>
+
+          {/* Vendor if assigned */}
+          {ticket.vendor && (
+            <div className="flex items-center gap-1.5 mt-1 text-slate-500">
+              <UserCheck className="w-3.5 h-3.5" />
+              <span className="text-xs">{ticket.vendor.name}</span>
+            </div>
+          )}
+
+          {/* Last Activity Footer */}
+          {latestEvent && (
+            <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100">
+              <Clock className="w-3 h-3 text-slate-400" />
+              <span className="text-xs text-slate-400">
+                Last activity: {getTimeAgo(latestEvent.timestamp)}
               </span>
-            )}
-          </div>
-          <div className="mt-2">
-            <StatusProgress status={ticket.status} />
-          </div>
+            </div>
+          )}
         </div>
+
+        <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
       </div>
     </button>
   );
 }
 
-// Ticket Detail View
+// Enhanced Ticket Detail View - Command Center Style
 function TicketDetail({
   ticket,
   onClose,
@@ -1033,20 +1336,17 @@ function TicketDetail({
   const [localMessages, setLocalMessages] = useState<ChatMessage[]>(ticket.messages);
   const categoryInfo = categoryOptions.find((c) => c.id === ticket.category)!;
   const SubIcon = subcategoryIcons[ticket.subcategory] ?? HelpCircle;
+  const smartState = deriveRequestState(ticket);
+  const StatusIcon = smartState.icon;
 
-  // Check if this is a real (non-mock) ticket ID
-  const isRealTicket = ticket.id.length > 6; // Mock IDs are '1', '2', etc.
+  const isRealTicket = ticket.id.length > 6;
 
-  // Fetch messages for real tickets
   useEffect(() => {
     if (!isRealTicket) return;
 
     const loadMessages = async () => {
       try {
         // TODO: Implement message fetching when API is available
-        // const api = getApiClient();
-        // const messages = await api.getServiceRequestMessages(ticket.id);
-        // setLocalMessages(messages.map(mapApiMessageToChat));
       } catch (err) {
         console.error('Failed to load messages:', err);
       }
@@ -1055,20 +1355,9 @@ function TicketDetail({
     loadMessages();
   }, [ticket.id, isRealTicket]);
 
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
   const handleSendMessage = async () => {
     if (!message.trim()) return;
 
-    // Optimistically add message to local state
     const optimisticMessage: ChatMessage = {
       id: `temp-${Date.now()}`,
       senderId: 'current-user',
@@ -1085,12 +1374,9 @@ function TicketDetail({
     if (isRealTicket) {
       try {
         // TODO: Implement message sending when API is available
-        // const api = getApiClient();
-        // await api.createServiceRequestMessage(ticket.id, { body: message });
         onMessageSent?.(optimisticMessage);
       } catch (err) {
         console.error('Failed to send message:', err);
-        // Remove optimistic message on failure
         setLocalMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
       }
     }
@@ -1102,6 +1388,16 @@ function TicketDetail({
     if (selectedRating > 0) {
       onRate(selectedRating);
       setShowRating(false);
+    }
+  };
+
+  const handleCallManager = () => {
+    window.location.href = `tel:${HOUSING_MANAGER.phone}`;
+  };
+
+  const handleCallVendor = () => {
+    if (ticket.vendor?.phone) {
+      window.location.href = `tel:${ticket.vendor.phone}`;
     }
   };
 
@@ -1119,15 +1415,65 @@ function TicketDetail({
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {/* Header Section */}
-        <div className="p-6 border-b border-slate-200 bg-white lg:rounded-t-xl">
-          <div className="hidden lg:flex items-start justify-between mb-4">
-            <div>
-              <p className="text-sm text-slate-500 mb-1">{ticket.ticketNumber}</p>
-              <h2 className="text-xl font-bold text-slate-900">{ticket.title}</h2>
-            </div>
-            <StatusBadge status={ticket.status} />
+        {/* === STATUS HERO SECTION === */}
+        <div className={`p-6 ${smartState.bgColor} border-b`}>
+          {/* Desktop Title */}
+          <div className="hidden lg:block mb-4">
+            <p className="text-sm text-slate-500 mb-1">{ticket.ticketNumber}</p>
+            <h2 className="text-xl font-bold text-slate-900">{ticket.title}</h2>
           </div>
+
+          {/* Status Banner */}
+          <div className="flex items-center gap-3 mb-4">
+            <div className={`p-3 rounded-xl ${smartState.color.replace('text-', 'bg-').replace('-700', '-100')}`}>
+              <StatusIcon className={`w-6 h-6 ${smartState.color}`} />
+            </div>
+            <div>
+              <h3 className={`text-lg font-semibold ${smartState.color}`}>{smartState.headline}</h3>
+              <p className="text-sm text-slate-600">{smartState.description}</p>
+            </div>
+          </div>
+
+          {/* Scheduled Date */}
+          {ticket.scheduledDate && ticket.status !== 'resolved' && (
+            <div className="flex items-center gap-2 mb-4 p-3 bg-white/60 rounded-lg">
+              <CalendarCheck className="w-5 h-5 text-emerald-600" />
+              <span className="text-sm font-medium text-slate-700">
+                {formatScheduledDate(ticket.scheduledDate)}
+              </span>
+            </div>
+          )}
+
+          {/* Progress Stepper */}
+          <div className="bg-white/80 rounded-xl p-4">
+            <ProgressStepper currentStep={smartState.stepIndex} />
+          </div>
+        </div>
+
+        {/* === LATEST UPDATE BOX === */}
+        <div className="p-4 bg-white border-b border-slate-200">
+          <LatestUpdateBox timeline={ticket.timeline} />
+        </div>
+
+        {/* === SERVICE TEAM CARD === */}
+        <div className="p-4 bg-slate-50">
+          <ServiceTeamCard
+            vendor={ticket.vendor}
+            onCallManager={handleCallManager}
+            onMessageManager={() => {
+              setMessage(`Hi ${HOUSING_MANAGER.name}, `);
+            }}
+            onCallVendor={ticket.vendor?.phone ? handleCallVendor : undefined}
+            onMessageVendor={ticket.vendor ? () => setMessage(`Hi ${ticket.vendor!.name}, `) : undefined}
+          />
+        </div>
+
+        {/* === REQUEST DETAILS === */}
+        <div className="p-6 bg-white border-t border-slate-200">
+          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+            <FileText className="w-5 h-5 text-slate-500" />
+            Request Details
+          </h3>
 
           <div className="flex flex-wrap gap-3 mb-4">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
@@ -1155,69 +1501,48 @@ function TicketDetail({
               ))}
             </div>
           )}
-
-          {/* Vendor */}
-          {ticket.vendor && (
-            <div className="flex items-center gap-3 mt-4 p-3 bg-slate-50 rounded-lg">
-              <div className="relative w-10 h-10 rounded-full overflow-hidden">
-                <Image src={ticket.vendor.avatar} alt="" fill className="object-cover" />
-              </div>
-              <div className="flex-1">
-                <p className="font-medium text-slate-900">{ticket.vendor.name}</p>
-                <p className="text-sm text-slate-500">Assigned Vendor</p>
-              </div>
-              {ticket.vendor.phone && (
-                <a
-                  href={`tel:${ticket.vendor.phone}`}
-                  className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
-                >
-                  <Phone className="w-5 h-5" />
-                </a>
-              )}
-            </div>
-          )}
-
-          {/* Quote Approval */}
-          {ticket.quote && !ticket.quote.approved && (
-            <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-amber-900">Quote Pending Approval</p>
-                  <p className="text-2xl font-bold text-amber-700">${ticket.quote.amount.toLocaleString()}</p>
-                </div>
-                <button className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700">
-                  Approve Quote
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Resolution Summary */}
-          {ticket.status === 'resolved' && ticket.resolutionTime && (
-            <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <Zap className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="font-medium text-emerald-900">Resolved in {ticket.resolutionTime}!</p>
-                  <p className="text-sm text-emerald-700">Thanks for using Haven Concierge</p>
-                </div>
-              </div>
-              {ticket.rating && (
-                <div className="flex items-center gap-1 mt-3">
-                  <span className="text-sm text-emerald-700 mr-2">Your rating:</span>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Star
-                      key={star}
-                      className={`w-5 h-5 ${star <= ticket.rating! ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
         </div>
+
+        {/* Quote Approval */}
+        {ticket.quote && !ticket.quote.approved && (
+          <div className="p-4 bg-amber-50 border-y border-amber-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-medium text-amber-900">Quote Pending Approval</p>
+                <p className="text-2xl font-bold text-amber-700">${ticket.quote.amount.toLocaleString()}</p>
+              </div>
+              <button className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700">
+                Approve Quote
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Resolution Summary */}
+        {ticket.status === 'resolved' && ticket.resolutionTime && (
+          <div className="p-4 bg-emerald-50 border-y border-emerald-200">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-emerald-100 rounded-lg">
+                <Zap className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <p className="font-medium text-emerald-900">Resolved in {ticket.resolutionTime}!</p>
+                <p className="text-sm text-emerald-700">Thanks for using Haven Concierge</p>
+              </div>
+            </div>
+            {ticket.rating && (
+              <div className="flex items-center gap-1 mt-3">
+                <span className="text-sm text-emerald-700 mr-2">Your rating:</span>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`w-5 h-5 ${star <= ticket.rating! ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Rating Prompt */}
         {showRating && (
@@ -1414,26 +1739,23 @@ export default function RequestsPage() {
       const requests = await api.getServiceRequests(currentHousehold.id);
 
       if (requests && requests.length > 0) {
-        // Map API requests to UI tickets
         const mappedTickets = requests.map(mapApiRequestToTicket);
         setTickets(mappedTickets);
       }
-      // If empty or error, keep MOCK_TICKETS (already the default)
+      // If empty or error, keep MOCK_TICKETS
     } catch (err) {
       console.error('Failed to load requests:', err);
-      // Keep MOCK_TICKETS as fallback
     } finally {
       setIsLoading(false);
     }
   }, [currentHousehold?.id]);
 
-  // Fetch data on mount
   useEffect(() => {
     loadRequests();
   }, [loadRequests]);
 
-  const activeTickets = tickets.filter((t) => t.status !== 'resolved');
-  const historyTickets = tickets.filter((t) => t.status === 'resolved');
+  const activeTickets = useMemo(() => tickets.filter((t) => t.status !== 'resolved'), [tickets]);
+  const historyTickets = useMemo(() => tickets.filter((t) => t.status === 'resolved'), [tickets]);
   const displayedTickets = viewMode === 'active' ? activeTickets : historyTickets;
 
   const handleNewRequestSuccess = (newTicket: RequestTicket) => {
@@ -1448,21 +1770,20 @@ export default function RequestsPage() {
     ));
   };
 
-  // Stats
-  const stats = {
+  const stats = useMemo(() => ({
     active: activeTickets.length,
     pending: activeTickets.filter((t) => t.status === 'received' || t.status === 'reviewing').length,
     inProgress: activeTickets.filter((t) => t.status === 'in_progress' || t.status === 'scheduled').length,
     resolved: historyTickets.length,
-  };
+  }), [activeTickets, historyTickets]);
 
   return (
     <div className="pb-32 lg:pb-8">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Concierge Desk</h1>
-          <p className="text-slate-500 mt-1">Your personal service hub - we&apos;re here to help</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Request Command Center</h1>
+          <p className="text-slate-500 mt-1">Track, manage, and communicate on all your service requests</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -1489,11 +1810,11 @@ export default function RequestsPage() {
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-purple-100 rounded-lg">
-              <MessageSquare className="w-5 h-5 text-purple-600" />
+              <Search className="w-5 h-5 text-purple-600" />
             </div>
             <div>
               <p className="text-2xl font-bold text-slate-900">{stats.pending}</p>
-              <p className="text-sm text-slate-500">Pending</p>
+              <p className="text-sm text-slate-500">Finding Pros</p>
             </div>
           </div>
         </div>
@@ -1515,7 +1836,7 @@ export default function RequestsPage() {
             </div>
             <div>
               <p className="text-2xl font-bold text-slate-900">{stats.resolved}</p>
-              <p className="text-sm text-slate-500">Resolved</p>
+              <p className="text-sm text-slate-500">Completed</p>
             </div>
           </div>
         </div>
@@ -1618,7 +1939,7 @@ export default function RequestsPage() {
         </div>
       )}
 
-      {/* Mobile FAB - positioned above the global chat FAB */}
+      {/* Mobile FAB */}
       <button
         onClick={() => setShowModal(true)}
         className="lg:hidden fixed bottom-36 right-4 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 flex items-center justify-center z-40"
