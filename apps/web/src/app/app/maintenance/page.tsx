@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Thermometer,
   Droplets,
@@ -29,9 +29,15 @@ import {
   AirVent,
   BadgeCheck,
   ExternalLink,
+  Loader2,
 } from 'lucide-react';
+import { getApiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 type AssetHealth = 'excellent' | 'good' | 'fair' | 'needs_attention' | 'critical';
 type AlertSeverity = 'critical' | 'warning' | 'info' | 'success';
 
@@ -50,6 +56,7 @@ interface HomeAsset {
   location?: string;
   warrantyExpires?: Date;
   notes?: string;
+  serialNumber?: string;
 }
 
 interface MaintenanceAlert {
@@ -91,8 +98,11 @@ interface ServiceRecord {
   diy: boolean;
 }
 
-// Mock Data
-const mockAssets: HomeAsset[] = [
+// ============================================================================
+// MOCK DATA (Fallback for demos)
+// ============================================================================
+
+const MOCK_ASSETS: HomeAsset[] = [
   {
     id: 'hvac-main',
     name: 'Main HVAC System',
@@ -107,6 +117,7 @@ const mockAssets: HomeAsset[] = [
     health: 'needs_attention',
     location: 'Attic',
     warrantyExpires: new Date(2029, 5, 15),
+    serialNumber: 'CAR-INF26-2019-0615',
   },
   {
     id: 'water-heater',
@@ -122,6 +133,7 @@ const mockAssets: HomeAsset[] = [
     health: 'good',
     location: 'Garage',
     warrantyExpires: new Date(2026, 8, 22),
+    serialNumber: 'RHM-PP50-2020-0922',
   },
   {
     id: 'roof',
@@ -150,6 +162,7 @@ const mockAssets: HomeAsset[] = [
     nextServiceDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
     health: 'good',
     location: 'Backyard',
+    serialNumber: 'PEN-VSF-2021-0501',
   },
   {
     id: 'electrical-panel',
@@ -194,6 +207,7 @@ const mockAssets: HomeAsset[] = [
     health: 'excellent',
     location: 'Kitchen',
     warrantyExpires: new Date(2025, 6, 1),
+    serialNumber: 'SZ-BI36U-2020-0701',
   },
   {
     id: 'washer-dryer',
@@ -209,10 +223,11 @@ const mockAssets: HomeAsset[] = [
     health: 'excellent',
     location: 'Laundry Room',
     warrantyExpires: new Date(2026, 0, 20),
+    serialNumber: 'LG-WM4500-2023-0120',
   },
 ];
 
-const mockAlerts: MaintenanceAlert[] = [
+const MOCK_ALERTS: MaintenanceAlert[] = [
   {
     id: 'a1',
     assetId: 'hvac-main',
@@ -245,7 +260,7 @@ const mockAlerts: MaintenanceAlert[] = [
   },
 ];
 
-const mockVendors: TrustedVendor[] = [
+const MOCK_VENDORS: TrustedVendor[] = [
   {
     id: 'v1',
     name: 'Mike Thompson',
@@ -296,7 +311,7 @@ const mockVendors: TrustedVendor[] = [
   },
 ];
 
-const mockServiceHistory: ServiceRecord[] = [
+const MOCK_HISTORY: ServiceRecord[] = [
   {
     id: 's1',
     assetId: 'roof',
@@ -372,7 +387,168 @@ const mockServiceHistory: ServiceRecord[] = [
   },
 ];
 
-// Health config
+// ============================================================================
+// API MAPPING HELPERS
+// ============================================================================
+
+// Map asset type/category to Lucide icon
+function getAssetIcon(type?: string, category?: string): typeof Thermometer {
+  const typeOrCat = (type || category || '').toUpperCase();
+
+  if (typeOrCat.includes('HVAC') || typeOrCat.includes('AIR') || typeOrCat.includes('CLIMATE')) {
+    return AirVent;
+  }
+  if (typeOrCat.includes('PLUMBING') || typeOrCat.includes('WATER_HEATER') || typeOrCat.includes('WATER')) {
+    return Droplets;
+  }
+  if (typeOrCat.includes('HEATING') || typeOrCat.includes('FURNACE') || typeOrCat.includes('HEATER')) {
+    return Flame;
+  }
+  if (typeOrCat.includes('ELECTRICAL') || typeOrCat.includes('ELECTRIC')) {
+    return Zap;
+  }
+  if (typeOrCat.includes('ROOF') || typeOrCat.includes('STRUCTURE')) {
+    return Home;
+  }
+  if (typeOrCat.includes('POOL') || typeOrCat.includes('SPA')) {
+    return Waves;
+  }
+  if (typeOrCat.includes('REFRIGERATOR') || typeOrCat.includes('FRIDGE')) {
+    return Refrigerator;
+  }
+  if (typeOrCat.includes('WASHER') || typeOrCat.includes('DRYER') || typeOrCat.includes('LAUNDRY')) {
+    return WashingMachine;
+  }
+  if (typeOrCat.includes('APPLIANCE')) {
+    return Zap;
+  }
+
+  return Wrench; // Default
+}
+
+// Map API asset status to UI health
+function mapAssetHealth(status?: string): AssetHealth {
+  const statusUpper = (status || '').toUpperCase();
+
+  if (statusUpper.includes('CRITICAL') || statusUpper.includes('FAILED')) {
+    return 'critical';
+  }
+  if (statusUpper.includes('NEEDS_SERVICE') || statusUpper.includes('ATTENTION') || statusUpper.includes('OVERDUE')) {
+    return 'needs_attention';
+  }
+  if (statusUpper.includes('FAIR') || statusUpper.includes('AGING')) {
+    return 'fair';
+  }
+  if (statusUpper.includes('GOOD') || statusUpper.includes('OK')) {
+    return 'good';
+  }
+
+  return 'excellent'; // Default to excellent
+}
+
+// Map API asset to UI HomeAsset (used when assets API is available)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _mapApiAssetToUi(apiAsset: Record<string, unknown>): HomeAsset {
+  const installDate = apiAsset.installDate || apiAsset.purchaseDate || apiAsset.createdAt;
+  const lastServiceDate = apiAsset.lastServiceDate || apiAsset.lastMaintenance;
+  const nextServiceDate = apiAsset.nextServiceDue || apiAsset.nextMaintenanceDate;
+  const warrantyDate = apiAsset.warrantyExpires || apiAsset.warrantyEndDate;
+
+  return {
+    id: String(apiAsset.id),
+    name: String(apiAsset.name || apiAsset.displayName || 'Unknown Asset'),
+    category: String(apiAsset.category || apiAsset.type || 'General'),
+    brand: String(apiAsset.brand || apiAsset.manufacturer || 'Unknown'),
+    model: apiAsset.model ? String(apiAsset.model) : undefined,
+    icon: getAssetIcon(apiAsset.type as string, apiAsset.category as string),
+    installDate: installDate ? new Date(installDate as string) : new Date(),
+    expectedLifespan: Number(apiAsset.expectedLifespan || apiAsset.lifespan || 15),
+    lastService: lastServiceDate ? new Date(lastServiceDate as string) : undefined,
+    nextServiceDue: nextServiceDate ? new Date(nextServiceDate as string) : undefined,
+    health: mapAssetHealth(apiAsset.status as string),
+    location: apiAsset.location ? String(apiAsset.location) : undefined,
+    warrantyExpires: warrantyDate ? new Date(warrantyDate as string) : undefined,
+    notes: apiAsset.notes ? String(apiAsset.notes) : undefined,
+    serialNumber: apiAsset.serialNumber ? String(apiAsset.serialNumber) : undefined,
+  };
+}
+
+// Map API service record to UI ServiceRecord (used when service history API is available)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _mapApiServiceRecord(apiRecord: Record<string, unknown>): ServiceRecord {
+  const vendorObj = apiRecord.vendor as Record<string, unknown> | undefined;
+  const assetObj = apiRecord.asset as Record<string, unknown> | undefined;
+
+  return {
+    id: String(apiRecord.id),
+    assetId: String(apiRecord.assetId || assetObj?.id || ''),
+    assetName: String(assetObj?.name || apiRecord.assetName || 'Unknown Asset'),
+    date: new Date(apiRecord.date as string || apiRecord.serviceDate as string || apiRecord.createdAt as string),
+    vendor: vendorObj ? String(vendorObj.name || vendorObj.displayName) : (apiRecord.vendorName ? String(apiRecord.vendorName) : undefined),
+    vendorId: vendorObj ? String(vendorObj.id) : undefined,
+    serviceType: String(apiRecord.serviceType || apiRecord.type || 'Service'),
+    description: String(apiRecord.description || apiRecord.notes || ''),
+    cost: apiRecord.cost !== undefined ? Number(apiRecord.cost) : undefined,
+    invoiceUrl: apiRecord.invoiceUrl ? String(apiRecord.invoiceUrl) : undefined,
+    notes: apiRecord.notes ? String(apiRecord.notes) : undefined,
+    diy: Boolean(apiRecord.isDiy || apiRecord.diy || !vendorObj),
+  };
+}
+
+// Map API vendor to UI TrustedVendor
+function mapApiVendorToUi(apiVendor: Record<string, unknown>): TrustedVendor {
+  const name = String(apiVendor.name || apiVendor.displayName || 'Unknown');
+  const nameParts = name.split(' ').filter(Boolean);
+  const firstPart = nameParts[0] || '';
+  const lastPart = nameParts[nameParts.length - 1] || '';
+  const initials = nameParts.length >= 2 && firstPart.length > 0 && lastPart.length > 0
+    ? `${firstPart.charAt(0)}${lastPart.charAt(0)}`.toUpperCase()
+    : name.substring(0, 2).toUpperCase();
+
+  return {
+    id: String(apiVendor.id),
+    name: name,
+    company: String(apiVendor.company || apiVendor.businessName || name),
+    trade: String(apiVendor.trade || apiVendor.category || apiVendor.specialty || 'General'),
+    phone: String(apiVendor.phone || apiVendor.phoneNumber || ''),
+    email: String(apiVendor.email || ''),
+    avatar: apiVendor.avatar ? String(apiVendor.avatar) : undefined,
+    initials: initials,
+    lastVisit: apiVendor.lastVisit ? new Date(apiVendor.lastVisit as string) : undefined,
+    rating: Number(apiVendor.rating || apiVendor.averageRating || 5),
+    jobsCompleted: Number(apiVendor.jobsCompleted || apiVendor.completedJobs || 0),
+  };
+}
+
+// Map API alert to UI MaintenanceAlert (used when alerts API is available)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+function _mapApiAlertToUi(apiAlert: Record<string, unknown>): MaintenanceAlert {
+  const severity = String(apiAlert.severity || apiAlert.priority || 'info').toLowerCase();
+  let alertSeverity: AlertSeverity = 'info';
+
+  if (severity.includes('critical') || severity.includes('high') || severity.includes('urgent')) {
+    alertSeverity = 'critical';
+  } else if (severity.includes('warning') || severity.includes('medium')) {
+    alertSeverity = 'warning';
+  } else if (severity.includes('success') || severity.includes('completed') || severity.includes('resolved')) {
+    alertSeverity = 'success';
+  }
+
+  return {
+    id: String(apiAlert.id),
+    assetId: apiAlert.assetId ? String(apiAlert.assetId) : undefined,
+    assetName: String(apiAlert.assetName || (apiAlert.asset as Record<string, unknown>)?.name || 'Unknown'),
+    message: String(apiAlert.message || apiAlert.title || apiAlert.description || ''),
+    severity: alertSeverity,
+    daysOverdue: apiAlert.daysOverdue ? Number(apiAlert.daysOverdue) : undefined,
+    dueDate: apiAlert.dueDate ? new Date(apiAlert.dueDate as string) : undefined,
+  };
+}
+
+// ============================================================================
+// CONFIG
+// ============================================================================
+
 const healthConfig: Record<AssetHealth, { color: string; bgColor: string; label: string }> = {
   excellent: { color: 'text-emerald-700', bgColor: 'bg-emerald-100', label: 'Excellent' },
   good: { color: 'text-green-700', bgColor: 'bg-green-100', label: 'Good' },
@@ -388,12 +564,23 @@ const alertConfig: Record<AlertSeverity, { color: string; bgColor: string; borde
   success: { color: 'text-emerald-700', bgColor: 'bg-emerald-50', borderColor: 'border-emerald-200', icon: CheckCircle2 },
 };
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export default function MaintenancePage() {
-  // State
-  const [assets] = useState<HomeAsset[]>(mockAssets);
-  const [alerts] = useState<MaintenanceAlert[]>(mockAlerts);
-  const [vendors] = useState<TrustedVendor[]>(mockVendors);
-  const [serviceHistory] = useState<ServiceRecord[]>(mockServiceHistory);
+  const { currentHousehold } = useAuth();
+
+  // Data State - initialized with mocks for immediate display
+  const [assets, setAssets] = useState<HomeAsset[]>(MOCK_ASSETS);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [alerts, _setAlerts] = useState<MaintenanceAlert[]>(MOCK_ALERTS);
+  const [vendors, setVendors] = useState<TrustedVendor[]>(MOCK_VENDORS);
+  const [serviceHistory, setServiceHistory] = useState<ServiceRecord[]>(MOCK_HISTORY);
+
+  // Loading State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // UI State
   const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
@@ -402,6 +589,130 @@ export default function MaintenancePage() {
   const [historyFilter, setHistoryFilter] = useState<string>('all');
   const [historySearch, setHistorySearch] = useState('');
   const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
+
+  // Form State for Log Service Modal
+  const [formAssetId, setFormAssetId] = useState<string>('');
+  const [formServiceType, setFormServiceType] = useState<string>('');
+  const [formDate, setFormDate] = useState<string>(new Date().toISOString().split('T')[0] || '');
+  const [formIsDiy, setFormIsDiy] = useState<boolean>(false);
+  const [formVendorId, setFormVendorId] = useState<string>('');
+  const [formCost, setFormCost] = useState<string>('');
+  const [formNotes, setFormNotes] = useState<string>('');
+
+  // ============================================================================
+  // DATA FETCHING
+  // ============================================================================
+
+  const loadMaintenanceData = useCallback(async () => {
+    if (!currentHousehold?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const api = getApiClient();
+
+      // Fetch vendors (the only API method that exists for maintenance-related data)
+      // Assets, alerts, and service history API endpoints don't exist yet
+      // so we use mock data for those
+      const vendorsResult = await Promise.allSettled([
+        api.getHouseholdVendors(currentHousehold.id),
+      ]);
+
+      // Process vendors
+      if (vendorsResult[0].status === 'fulfilled') {
+        const vendorsData = vendorsResult[0].value;
+        if (Array.isArray(vendorsData) && vendorsData.length > 0) {
+          setVendors(vendorsData.map((v) => mapApiVendorToUi(v as unknown as Record<string, unknown>)));
+        }
+        // If empty or failed, keep MOCK_VENDORS
+      }
+
+      // Assets, alerts, and service history keep using MOCK data
+      // since those API endpoints are not yet implemented
+    } catch (error) {
+      console.error('Error loading maintenance data:', error);
+      // Keep mock data on error - dashboard never looks broken
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentHousehold?.id]);
+
+  useEffect(() => {
+    loadMaintenanceData();
+  }, [loadMaintenanceData]);
+
+  // ============================================================================
+  // SAVE SERVICE
+  // ============================================================================
+
+  const handleSaveService = async () => {
+    if (!formAssetId || !formServiceType) return;
+
+    const selectedAssetData = assets.find(a => a.id === formAssetId);
+    if (!selectedAssetData) return;
+
+    const selectedVendor = vendors.find(v => v.id === formVendorId);
+
+    // Create new service record for optimistic update
+    const newRecord: ServiceRecord = {
+      id: `temp-${Date.now()}`,
+      assetId: formAssetId,
+      assetName: selectedAssetData.name,
+      date: formDate ? new Date(formDate) : new Date(),
+      vendor: selectedVendor?.name,
+      vendorId: selectedVendor?.id,
+      serviceType: formServiceType,
+      description: formNotes || formServiceType,
+      cost: formCost ? parseFloat(formCost) : undefined,
+      diy: formIsDiy,
+    };
+
+    // Optimistic update - add to history immediately
+    setServiceHistory(prev => [newRecord, ...prev]);
+
+    // Update asset's lastService date
+    setAssets(prev => prev.map(asset =>
+      asset.id === formAssetId
+        ? { ...asset, lastService: formDate ? new Date(formDate) : new Date(), health: 'good' as AssetHealth }
+        : asset
+    ));
+
+    // Close modal and reset form
+    setShowLogServiceModal(false);
+    setSelectedAsset(null);
+    resetForm();
+
+    // API endpoint for saving service records doesn't exist yet
+    // Keep the optimistic update for demo mode
+    setIsSaving(true);
+    try {
+      // When API is ready, we would call:
+      // const api = getApiClient();
+      // const response = await api.createServiceRecord({...});
+      // For now, just simulate a short delay
+      await new Promise(resolve => setTimeout(resolve, 300));
+    } catch (error) {
+      console.error('Failed to save service record:', error);
+      // Keep optimistic update - works in demo mode
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const resetForm = () => {
+    setFormAssetId('');
+    setFormServiceType('');
+    setFormDate(new Date().toISOString().split('T')[0] || '');
+    setFormIsDiy(false);
+    setFormVendorId('');
+    setFormCost('');
+    setFormNotes('');
+  };
+
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
 
   // Calculate overall health score
   const healthScore = useMemo(() => {
@@ -520,6 +831,13 @@ export default function MaintenancePage() {
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (healthScore / 100) * circumference;
 
+  // Set form asset when modal opens with pre-selected asset
+  useEffect(() => {
+    if (selectedAsset) {
+      setFormAssetId(selectedAsset.id);
+    }
+  }, [selectedAsset]);
+
   return (
     <div className="space-y-6 pb-20">
       {/* Page Header */}
@@ -543,35 +861,43 @@ export default function MaintenancePage() {
           {/* Health Gauge */}
           <div className="flex flex-col items-center lg:items-start">
             <div className="relative">
-              <svg className="w-48 h-48 transform -rotate-90">
-                {/* Background circle */}
-                <circle
-                  cx="96"
-                  cy="96"
-                  r={radius}
-                  stroke="#e2e8f0"
-                  strokeWidth="16"
-                  fill="none"
-                />
-                {/* Progress circle */}
-                <circle
-                  cx="96"
-                  cy="96"
-                  r={radius}
-                  stroke={getHealthScoreStroke(healthScore)}
-                  strokeWidth="16"
-                  fill="none"
-                  strokeLinecap="round"
-                  strokeDasharray={circumference}
-                  strokeDashoffset={strokeDashoffset}
-                  className="transition-all duration-1000"
-                />
-              </svg>
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <Activity className={`w-6 h-6 ${getHealthScoreColor(healthScore)} mb-1`} />
-                <span className={`text-4xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}</span>
-                <span className="text-sm text-slate-500">Home Health</span>
-              </div>
+              {isLoading ? (
+                <div className="w-48 h-48 flex items-center justify-center">
+                  <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+                </div>
+              ) : (
+                <svg className="w-48 h-48 transform -rotate-90">
+                  {/* Background circle */}
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r={radius}
+                    stroke="#e2e8f0"
+                    strokeWidth="16"
+                    fill="none"
+                  />
+                  {/* Progress circle */}
+                  <circle
+                    cx="96"
+                    cy="96"
+                    r={radius}
+                    stroke={getHealthScoreStroke(healthScore)}
+                    strokeWidth="16"
+                    fill="none"
+                    strokeLinecap="round"
+                    strokeDasharray={circumference}
+                    strokeDashoffset={strokeDashoffset}
+                    className="transition-all duration-1000"
+                  />
+                </svg>
+              )}
+              {!isLoading && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center">
+                  <Activity className={`w-6 h-6 ${getHealthScoreColor(healthScore)} mb-1`} />
+                  <span className={`text-4xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}</span>
+                  <span className="text-sm text-slate-500">Home Health</span>
+                </div>
+              )}
             </div>
             <p className="text-sm text-slate-500 mt-2 text-center lg:text-left max-w-[200px]">
               {healthScore >= 90 ? 'Your home is in excellent condition!' :
@@ -892,6 +1218,7 @@ export default function MaintenancePage() {
             <div className="fixed inset-0 bg-black/50" onClick={() => {
               setShowLogServiceModal(false);
               setSelectedAsset(null);
+              resetForm();
             }} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
               <div className="p-6 border-b border-slate-200">
@@ -901,6 +1228,7 @@ export default function MaintenancePage() {
                     onClick={() => {
                       setShowLogServiceModal(false);
                       setSelectedAsset(null);
+                      resetForm();
                     }}
                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                   >
@@ -913,7 +1241,8 @@ export default function MaintenancePage() {
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Asset</label>
                   <select
-                    defaultValue={selectedAsset?.id || ''}
+                    value={formAssetId}
+                    onChange={(e) => setFormAssetId(e.target.value)}
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   >
                     <option value="">Select an asset...</option>
@@ -927,6 +1256,8 @@ export default function MaintenancePage() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
                   <input
                     type="text"
+                    value={formServiceType}
+                    onChange={(e) => setFormServiceType(e.target.value)}
                     placeholder="e.g., Filter Replacement, Annual Tune-Up"
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   />
@@ -936,31 +1267,52 @@ export default function MaintenancePage() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">Date</label>
                   <input
                     type="date"
-                    defaultValue={new Date().toISOString().split('T')[0]}
+                    value={formDate}
+                    onChange={(e) => setFormDate(e.target.value)}
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
                   />
                 </div>
 
                 <div className="flex items-center gap-4">
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="serviceBy" value="diy" className="text-emerald-600" />
+                    <input
+                      type="radio"
+                      name="serviceBy"
+                      value="diy"
+                      checked={formIsDiy}
+                      onChange={() => setFormIsDiy(true)}
+                      className="text-emerald-600"
+                    />
                     <span className="text-sm text-slate-700">DIY</span>
                   </label>
                   <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="radio" name="serviceBy" value="vendor" defaultChecked className="text-emerald-600" />
+                    <input
+                      type="radio"
+                      name="serviceBy"
+                      value="vendor"
+                      checked={!formIsDiy}
+                      onChange={() => setFormIsDiy(false)}
+                      className="text-emerald-600"
+                    />
                     <span className="text-sm text-slate-700">Professional</span>
                   </label>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Vendor (Optional)</label>
-                  <select className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600">
-                    <option value="">Select a vendor...</option>
-                    {vendors.map(vendor => (
-                      <option key={vendor.id} value={vendor.id}>{vendor.name} - {vendor.trade}</option>
-                    ))}
-                  </select>
-                </div>
+                {!formIsDiy && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-2">Vendor (Optional)</label>
+                    <select
+                      value={formVendorId}
+                      onChange={(e) => setFormVendorId(e.target.value)}
+                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
+                    >
+                      <option value="">Select a vendor...</option>
+                      {vendors.map(vendor => (
+                        <option key={vendor.id} value={vendor.id}>{vendor.name} - {vendor.trade}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-2">Cost (Optional)</label>
@@ -968,6 +1320,8 @@ export default function MaintenancePage() {
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
                     <input
                       type="number"
+                      value={formCost}
+                      onChange={(e) => setFormCost(e.target.value)}
                       placeholder="0.00"
                       className="w-full pl-7 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
                     />
@@ -978,6 +1332,8 @@ export default function MaintenancePage() {
                   <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
                   <textarea
                     rows={3}
+                    value={formNotes}
+                    onChange={(e) => setFormNotes(e.target.value)}
                     placeholder="Describe what was done..."
                     className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 resize-none"
                   />
@@ -998,18 +1354,18 @@ export default function MaintenancePage() {
                   onClick={() => {
                     setShowLogServiceModal(false);
                     setSelectedAsset(null);
+                    resetForm();
                   }}
                   className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
                 >
                   Cancel
                 </button>
                 <button
-                  onClick={() => {
-                    setShowLogServiceModal(false);
-                    setSelectedAsset(null);
-                  }}
-                  className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                  onClick={handleSaveService}
+                  disabled={!formAssetId || !formServiceType || isSaving}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
+                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
                   Save Service
                 </button>
               </div>
@@ -1080,6 +1436,12 @@ export default function MaintenancePage() {
                       <p className="font-medium text-slate-900">{formatDate(showAssetDetailModal.warrantyExpires)}</p>
                     </div>
                   )}
+                  {showAssetDetailModal.serialNumber && (
+                    <div className="p-3 bg-slate-50 rounded-lg col-span-2">
+                      <p className="text-xs text-slate-500">Serial Number</p>
+                      <p className="font-medium text-slate-900 font-mono">{showAssetDetailModal.serialNumber}</p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Service Status */}
@@ -1139,7 +1501,7 @@ export default function MaintenancePage() {
       )}
 
       {/* Mobile FAB */}
-      <div className="fixed bottom-6 right-6 sm:hidden">
+      <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 sm:hidden">
         <button
           onClick={() => setShowLogServiceModal(true)}
           className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors"
@@ -1150,3 +1512,6 @@ export default function MaintenancePage() {
     </div>
   );
 }
+
+// Export mapping functions for future use when APIs are available
+export { _mapApiAssetToUi, _mapApiServiceRecord, _mapApiAlertToUi };
