@@ -49,12 +49,9 @@ import {
   Calendar,
   CreditCard,
   Bell,
-  Sparkles,
-  Clock,
   FileText,
   Printer,
   Download,
-  Send,
   RefreshCw,
   ArrowRight,
   CheckCircle2,
@@ -195,6 +192,59 @@ interface StaffMember {
   contractEndDate?: Date;
 }
 
+interface VehicleMember {
+  id: string;
+  type: 'vehicle';
+  name: string; // Display name like "Bob's Tesla"
+  make: string;
+  model: string;
+  year: number;
+  color: string;
+  licensePlate: string;
+  vin?: string;
+  primaryDriverId?: string;
+  primaryDriverName?: string;
+  photoUrl?: string;
+
+  // Tracking
+  currentMileage: number;
+  mileageUpdatedAt?: Date;
+  annualMiles?: number;
+
+  // Registration & Insurance
+  registrationExpiry?: Date;
+  registrationState?: string;
+  insuranceProvider?: string;
+  insurancePolicyNum?: string;
+  insuranceExpiry?: Date;
+  insuranceMonthly?: number;
+
+  // Loan Info
+  hasLoan: boolean;
+  lender?: string;
+  monthlyPayment?: number;
+  loanBalance?: number;
+  loanMaturityDate?: Date;
+
+  // Service Info
+  lastOilChange?: Date;
+  oilChangeMileage?: number;
+  nextServiceDue?: Date;
+  nextServiceMileage?: number;
+  preferredServiceShop?: string;
+  serviceHistory?: VehicleServiceRecord[];
+}
+
+interface VehicleServiceRecord {
+  id: string;
+  serviceType: string;
+  date: Date;
+  mileage: number;
+  cost: number;
+  shop: string;
+  notes?: string;
+}
+
 type FamilyMember = AdultMember | ChildMember | PetMember | StaffMember;
 
 // Smart Alert Types
@@ -257,16 +307,16 @@ const MOCK_ADULTS: AdultMember[] = [
   {
     id: 'a1',
     type: 'adult',
-    name: 'Bob Miller',
-    initials: 'BM',
-    role: 'Dad / Admin',
+    name: 'Bob Smith',
+    initials: 'BS',
+    role: 'Head of Household',
     isAdmin: true,
-    email: 'bob@miller.family',
+    email: 'bob@smith.family',
     phone: '(512) 555-0101',
-    location: { status: 'work', label: 'At Work', returnTime: '6:30 PM', eventName: 'Miller Consulting' },
+    location: { status: 'work', label: 'At Work', returnTime: '6:30 PM', eventName: 'TechCorp Austin' },
     work: {
-      company: 'Miller Consulting',
-      title: 'Managing Partner',
+      company: 'TechCorp Austin',
+      title: 'VP of Engineering',
       address: '100 Congress Ave, Suite 400, Austin, TX',
     },
     clubs: [
@@ -279,17 +329,17 @@ const MOCK_ADULTS: AdultMember[] = [
   {
     id: 'a2',
     type: 'adult',
-    name: 'Alice Miller',
-    initials: 'AM',
-    role: 'Mom',
-    isAdmin: false,
-    email: 'alice@miller.family',
+    name: 'Alice Smith',
+    initials: 'AS',
+    role: 'Spouse',
+    isAdmin: true,
+    email: 'alice@smith.family',
     phone: '(512) 555-0102',
     location: { status: 'activity', label: 'At Yoga', returnTime: '11:30 AM', eventName: 'CorePower Yoga' },
     work: {
-      company: 'Self-Employed',
-      title: 'Interior Designer',
-      address: 'Home Office',
+      company: 'Austin Medical Center',
+      title: 'Pediatric Nurse Practitioner',
+      address: '1234 Medical Pkwy, Austin, TX',
     },
     clubs: [
       { name: 'Junior League of Austin', type: 'Civic', membershipId: 'JLA-2234', monthlyDues: 100 },
@@ -299,12 +349,87 @@ const MOCK_ADULTS: AdultMember[] = [
   },
 ];
 
+const MOCK_VEHICLES: VehicleMember[] = [
+  {
+    id: 'v1',
+    type: 'vehicle',
+    name: "Bob's Tesla",
+    make: 'Tesla',
+    model: 'Model Y',
+    year: 2023,
+    color: 'Midnight Silver',
+    licensePlate: 'ABC 1234',
+    vin: '5YJYGDEE9MF123456',
+    primaryDriverId: 'a1',
+    primaryDriverName: 'Bob Smith',
+    currentMileage: 24500,
+    mileageUpdatedAt: getDate(-7),
+    annualMiles: 12000,
+    registrationExpiry: getDate(45), // 45 days from now
+    registrationState: 'TX',
+    insuranceProvider: 'State Farm',
+    insurancePolicyNum: 'SF-8847291',
+    insuranceExpiry: getDate(180),
+    insuranceMonthly: 145,
+    hasLoan: true,
+    lender: 'Tesla Finance',
+    monthlyPayment: 750,
+    loanBalance: 38500,
+    loanMaturityDate: new Date(2028, 5, 15),
+    lastOilChange: undefined, // Electric - no oil changes!
+    nextServiceDue: getDate(60),
+    nextServiceMileage: 30000,
+    preferredServiceShop: 'Tesla Service Center - Austin',
+    serviceHistory: [
+      { id: 's1', serviceType: 'Tire Rotation', date: getDate(-90), mileage: 22000, cost: 75, shop: 'Tesla Service Center' },
+      { id: 's2', serviceType: 'Cabin Air Filter', date: getDate(-180), mileage: 18000, cost: 95, shop: 'Tesla Service Center' },
+    ],
+  },
+  {
+    id: 'v2',
+    type: 'vehicle',
+    name: 'Family Highlander',
+    make: 'Toyota',
+    model: 'Highlander',
+    year: 2022,
+    color: 'Pearl White',
+    licensePlate: 'XYZ 5678',
+    vin: '5TDGZRBH8NS123456',
+    primaryDriverId: 'a2',
+    primaryDriverName: 'Alice Smith',
+    currentMileage: 35200,
+    mileageUpdatedAt: getDate(-3),
+    annualMiles: 15000,
+    registrationExpiry: getDate(120),
+    registrationState: 'TX',
+    insuranceProvider: 'State Farm',
+    insurancePolicyNum: 'SF-8847292',
+    insuranceExpiry: getDate(180),
+    insuranceMonthly: 125,
+    hasLoan: true,
+    lender: 'Toyota Financial',
+    monthlyPayment: 650,
+    loanBalance: 28000,
+    loanMaturityDate: new Date(2027, 8, 1),
+    lastOilChange: getDate(-45),
+    oilChangeMileage: 32500,
+    nextServiceDue: getDate(45),
+    nextServiceMileage: 37500,
+    preferredServiceShop: 'Charles Maund Toyota',
+    serviceHistory: [
+      { id: 's3', serviceType: 'Oil Change', date: getDate(-45), mileage: 32500, cost: 85, shop: 'Charles Maund Toyota' },
+      { id: 's4', serviceType: 'Tire Rotation', date: getDate(-45), mileage: 32500, cost: 0, shop: 'Charles Maund Toyota', notes: 'Included with oil change' },
+      { id: 's5', serviceType: 'Brake Inspection', date: getDate(-90), mileage: 30000, cost: 0, shop: 'Charles Maund Toyota' },
+    ],
+  },
+];
+
 const MOCK_CHILDREN: ChildMember[] = [
   {
     id: 'c1',
     type: 'child',
-    name: 'Emma Miller',
-    initials: 'EM',
+    name: 'Emma Smith',
+    initials: 'ES',
     age: 12,
     grade: '7th Grade',
     location: { status: 'school', label: 'At School', returnTime: '3:30 PM', eventName: 'Westlake Middle School' },
@@ -330,8 +455,8 @@ const MOCK_CHILDREN: ChildMember[] = [
   {
     id: 'c2',
     type: 'child',
-    name: 'Jake Miller',
-    initials: 'JM',
+    name: 'Jake Smith',
+    initials: 'JS',
     age: 8,
     grade: '3rd Grade',
     location: { status: 'school', label: 'At School', returnTime: '3:00 PM', eventName: 'Eanes Elementary' },
@@ -445,7 +570,7 @@ const MOCK_PICKUPS: PickupEvent[] = [
     location: 'West Austin Fields',
     time: '7:00 PM',
     activity: 'Little League',
-    driver: 'Bob Miller',
+    driver: 'Bob Smith',
     driverId: 'a1',
     status: 'assigned',
   },
@@ -629,6 +754,8 @@ export default function FamilyPage() {
   const [children, setChildren] = useState<ChildMember[]>(MOCK_CHILDREN);
   const [pets, setPets] = useState<PetMember[]>(MOCK_PETS);
   const [staff, setStaff] = useState<StaffMember[]>(MOCK_STAFF);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [vehicles, _setVehicles] = useState<VehicleMember[]>(MOCK_VEHICLES);
   const [pickups, setPickups] = useState<PickupEvent[]>(MOCK_PICKUPS);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -791,11 +918,51 @@ export default function FamilyPage() {
       }
     });
 
+    // Vehicle registration expiring
+    vehicles.forEach((v) => {
+      if (v.registrationExpiry) {
+        const daysUntil = Math.ceil((v.registrationExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 60 && daysUntil >= 0) {
+          alerts.push({
+            id: `reg-${v.id}`,
+            type: 'activity',
+            priority: daysUntil <= 14 ? 'urgent' : 'soon',
+            title: `${v.name} registration expires in ${daysUntil} days`,
+            description: `${v.year} ${v.make} ${v.model} - ${v.licensePlate}`,
+            dueDate: v.registrationExpiry,
+            memberId: v.id,
+            memberName: v.name,
+            action: { label: 'Ask Sarah to Renew', handler: () => toast(`${MANAGER_NAME} will handle registration renewal`) },
+          });
+        }
+      }
+    });
+
+    // Vehicle service due
+    vehicles.forEach((v) => {
+      if (v.nextServiceDue) {
+        const daysUntil = Math.ceil((v.nextServiceDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 30 && daysUntil >= 0) {
+          alerts.push({
+            id: `service-${v.id}`,
+            type: 'appointment',
+            priority: daysUntil <= 7 ? 'urgent' : 'soon',
+            title: `${v.name} service due ${daysUntil <= 0 ? 'now' : `in ${daysUntil} days`}`,
+            description: v.nextServiceMileage ? `At ${v.nextServiceMileage.toLocaleString()} miles` : 'Schedule maintenance',
+            dueDate: v.nextServiceDue,
+            memberId: v.id,
+            memberName: v.name,
+            action: { label: 'Schedule Service', handler: () => toast(`${MANAGER_NAME} will schedule ${v.name} service`) },
+          });
+        }
+      }
+    });
+
     return alerts.sort((a, b) => {
       const priorityOrder = { urgent: 0, soon: 1, info: 2 };
       return priorityOrder[a.priority] - priorityOrder[b.priority];
     });
-  }, [children, pets, staff, toast]);
+  }, [children, pets, staff, vehicles, toast]);
 
   // Computed bill accounts from family data
   const autoBillAccounts = useMemo(() => {
@@ -923,10 +1090,6 @@ export default function FamilyPage() {
     return events;
   }, [children, staff, pets]);
 
-  const allMembers = useMemo(() => {
-    return [...adults, ...children, ...pets, ...staff];
-  }, [adults, children, pets, staff]);
-
   const monthlyLifestyleCosts = useMemo(() => {
     let total = 0;
     adults.forEach((adult) => {
@@ -938,8 +1101,22 @@ export default function FamilyPage() {
     });
     pets.forEach((pet) => { total += pet.monthlyExpenses; });
     staff.forEach((s) => { total += s.weeklyStipend * 4.33; });
+    vehicles.forEach((v) => {
+      total += v.monthlyPayment || 0;
+      total += v.insuranceMonthly || 0;
+    });
     return total;
-  }, [adults, children, pets, staff]);
+  }, [adults, children, pets, staff, vehicles]);
+
+  const vehicleMonthlyCosts = useMemo(() => {
+    let payments = 0;
+    let insurance = 0;
+    vehicles.forEach((v) => {
+      payments += v.monthlyPayment || 0;
+      insurance += v.insuranceMonthly || 0;
+    });
+    return { payments, insurance, total: payments + insurance };
+  }, [vehicles]);
 
   // ============================================================================
   // HANDLERS
@@ -1332,7 +1509,7 @@ export default function FamilyPage() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Club Memberships</p>
               <p className="font-semibold">
@@ -1352,6 +1529,10 @@ export default function FamilyPage() {
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Pet Care</p>
               <p className="font-semibold">{formatCurrency(pets.reduce((sum, p) => sum + p.monthlyExpenses, 0))}</p>
+            </div>
+            <div className="bg-white/10 rounded-lg p-3">
+              <p className="text-slate-400 text-xs">Auto (Loans + Insurance)</p>
+              <p className="font-semibold">{formatCurrency(vehicleMonthlyCosts.total)}</p>
             </div>
           </div>
         </div>
@@ -1740,6 +1921,214 @@ export default function FamilyPage() {
           })}
         </div>
       </div>
+
+      {/* Vehicles Section */}
+      {vehicles.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-4">
+            <Car className="w-5 h-5 text-slate-400" />
+            <h2 className="font-semibold text-slate-900">Vehicles</h2>
+            <span className="text-sm text-slate-500">({vehicles.length})</span>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {vehicles.map((vehicle) => {
+              const regDays = vehicle.registrationExpiry ? getDaysUntil(vehicle.registrationExpiry) : null;
+              const serviceDays = vehicle.nextServiceDue ? getDaysUntil(vehicle.nextServiceDue) : null;
+              const isElectric = vehicle.make === 'Tesla' || vehicle.model.toLowerCase().includes('electric');
+
+              return (
+                <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  {/* Vehicle Header */}
+                  <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                          isElectric ? 'bg-green-100' : 'bg-blue-100'
+                        }`}>
+                          <Car className={`w-7 h-7 ${isElectric ? 'text-green-600' : 'text-blue-600'}`} />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-900">{vehicle.name}</h3>
+                          <p className="text-sm text-slate-500">{vehicle.year} {vehicle.make} {vehicle.model}</p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-xs text-slate-400">{vehicle.color}</span>
+                            <span className="text-xs text-slate-400">•</span>
+                            <span className="text-xs font-mono text-slate-500">{vehicle.licensePlate}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => toggleCard(vehicle.id)}
+                        className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                      >
+                        {expandedCards.has(vehicle.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Alerts Row */}
+                  {((regDays !== null && regDays <= 60) || (serviceDays !== null && serviceDays <= 30)) && (
+                    <div className="px-4 py-2 bg-amber-50 border-b border-amber-100 flex flex-wrap gap-3">
+                      {regDays !== null && regDays <= 60 && (
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className={`w-4 h-4 ${regDays <= 14 ? 'text-red-600' : 'text-amber-600'}`} />
+                          <span className={`text-xs font-medium ${regDays <= 14 ? 'text-red-700' : 'text-amber-700'}`}>
+                            Registration expires in {regDays} days
+                          </span>
+                        </div>
+                      )}
+                      {serviceDays !== null && serviceDays <= 30 && (
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className={`w-4 h-4 ${serviceDays <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
+                          <span className={`text-xs font-medium ${serviceDays <= 7 ? 'text-red-700' : 'text-amber-700'}`}>
+                            Service due in {serviceDays} days
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Quick Stats */}
+                  <div className="px-4 py-3 bg-slate-50 grid grid-cols-3 gap-3 text-center border-b border-slate-100">
+                    <div>
+                      <p className="text-xs text-slate-500">Mileage</p>
+                      <p className="font-semibold text-slate-900">{vehicle.currentMileage.toLocaleString()}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Primary Driver</p>
+                      <p className="font-medium text-slate-700 text-sm">{vehicle.primaryDriverName?.split(' ')[0] || 'Unassigned'}</p>
+                    </div>
+                    {showFinancials && (
+                      <div>
+                        <p className="text-xs text-slate-500">Monthly Cost</p>
+                        <p className="font-semibold text-slate-900">
+                          {formatCurrency((vehicle.monthlyPayment || 0) + (vehicle.insuranceMonthly || 0))}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Expanded Details */}
+                  {expandedCards.has(vehicle.id) && (
+                    <div className="p-4 space-y-4">
+                      {/* Registration & Insurance */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Registration & Insurance</p>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="p-3 bg-slate-50 rounded-lg">
+                            <p className="text-xs text-slate-500">Registration</p>
+                            <p className="font-medium text-slate-900">
+                              {vehicle.registrationExpiry ? formatDate(vehicle.registrationExpiry) : 'Not set'}
+                            </p>
+                            <p className="text-xs text-slate-400">{vehicle.registrationState}</p>
+                          </div>
+                          <div className="p-3 bg-slate-50 rounded-lg">
+                            <p className="text-xs text-slate-500">Insurance</p>
+                            <p className="font-medium text-slate-900">{vehicle.insuranceProvider || 'Not set'}</p>
+                            {vehicle.insuranceMonthly && showFinancials && (
+                              <p className="text-xs text-slate-400">{formatCurrency(vehicle.insuranceMonthly)}/mo</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Loan Info */}
+                      {vehicle.hasLoan && showFinancials && (
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Loan Details</p>
+                          <div className="p-3 bg-slate-50 rounded-lg">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="text-sm text-slate-600">{vehicle.lender}</span>
+                              <span className="font-semibold text-slate-900">{formatCurrency(vehicle.monthlyPayment || 0)}/mo</span>
+                            </div>
+                            <div className="flex items-center justify-between text-xs text-slate-500">
+                              <span>Balance: {formatCurrency(vehicle.loanBalance || 0)}</span>
+                              {vehicle.loanMaturityDate && (
+                                <span>Payoff: {vehicle.loanMaturityDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Service Info */}
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Service</p>
+                        <div className="p-3 bg-slate-50 rounded-lg space-y-2">
+                          {!isElectric && vehicle.lastOilChange && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-600">Last Oil Change</span>
+                              <span className="text-slate-900">
+                                {formatDate(vehicle.lastOilChange)} ({vehicle.oilChangeMileage?.toLocaleString()} mi)
+                              </span>
+                            </div>
+                          )}
+                          {vehicle.nextServiceDue && (
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-slate-600">Next Service</span>
+                              <span className={`font-medium ${serviceDays !== null && serviceDays <= 14 ? 'text-amber-600' : 'text-slate-900'}`}>
+                                {formatDate(vehicle.nextServiceDue)}
+                                {vehicle.nextServiceMileage && ` (${vehicle.nextServiceMileage.toLocaleString()} mi)`}
+                              </span>
+                            </div>
+                          )}
+                          {vehicle.preferredServiceShop && (
+                            <div className="flex items-center justify-between text-sm pt-2 border-t border-slate-200">
+                              <span className="text-slate-500">Preferred Shop</span>
+                              <span className="text-slate-700">{vehicle.preferredServiceShop}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Recent Service History */}
+                      {vehicle.serviceHistory && vehicle.serviceHistory.length > 0 && (
+                        <div>
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Recent Service History</p>
+                          <div className="space-y-2">
+                            {vehicle.serviceHistory.slice(0, 3).map((service) => (
+                              <div key={service.id} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg text-sm">
+                                <div>
+                                  <p className="font-medium text-slate-900">{service.serviceType}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {formatDate(service.date)} • {service.mileage.toLocaleString()} mi
+                                  </p>
+                                </div>
+                                {showFinancials && service.cost > 0 && (
+                                  <span className="text-slate-600">{formatCurrency(service.cost)}</span>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Quick Actions */}
+                      <div className="flex gap-2 pt-2">
+                        <button
+                          onClick={() => toast(`${MANAGER_NAME} will schedule service for ${vehicle.name}`)}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                        >
+                          <ClipboardList className="w-4 h-4" />
+                          Schedule Service
+                        </button>
+                        <button
+                          onClick={() => toast('Opening vehicle details...')}
+                          className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-lg hover:bg-slate-200 transition-colors"
+                        >
+                          <FileText className="w-4 h-4" />
+                          View Details
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Staff Section */}
       {staff.length > 0 && (

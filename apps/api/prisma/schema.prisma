@@ -264,6 +264,7 @@ enum PaymentMethodType {
   BANK_ACCOUNT
 }
 
+
 enum MaintenanceCategory {
   HVAC
   PLUMBING
@@ -532,6 +533,8 @@ enum VehicleType {
   BOAT
   RV
   ATV
+  ELECTRIC
+  HYBRID
   OTHER
 }
 
@@ -543,6 +546,30 @@ enum FuelType {
   HYBRID
   PLUG_IN_HYBRID
   HYDROGEN
+  OTHER
+}
+
+// Vehicle service types
+enum VehicleServiceType {
+  OIL_CHANGE
+  TIRE_ROTATION
+  BRAKE_SERVICE
+  BATTERY_REPLACEMENT
+  TRANSMISSION_SERVICE
+  AIR_FILTER
+  CABIN_FILTER
+  COOLANT_FLUSH
+  SPARK_PLUGS
+  INSPECTION
+  EMISSIONS_TEST
+  ALIGNMENT
+  WIPER_BLADES
+  GENERAL_MAINTENANCE
+  REPAIR
+  RECALL
+  ACCIDENT_REPAIR
+  DETAIL
+  WASH
   OTHER
 }
 
@@ -805,6 +832,9 @@ model Household {
   // Social Engine relations
   projectPosts ProjectPost[]
 
+  // Vehicle relations
+  vehicles Vehicle[]
+
   // Project Planner relations
   projectIdeas           ProjectIdea[]
   recommendationRequests RecommendationRequest[]
@@ -819,7 +849,6 @@ model Household {
   houseProtocols HouseProtocol[]
 
   // Family Assets relations
-  vehicles    Vehicle[]
   pets        Pet[]
   homeSystems HomeSystem[]
 
@@ -853,6 +882,26 @@ model HouseholdMember {
   interests           String[]  @default([]) // For gift suggestions
   profilePhotoUrl     String?   @map("profile_photo_url")
 
+  // Work/Employment Info (for adults)
+  employer            String?   // Company name
+  jobTitle            String?   @map("job_title")
+  workAddress         String?   @map("work_address")
+  workPhone           String?   @map("work_phone")
+  workSchedule        String?   @map("work_schedule") // e.g., "Mon-Fri 9am-5pm"
+  commuteMiles        Float?    @map("commute_miles")
+
+  // Extended Health Info
+  primaryPhysician    String?   @map("primary_physician")
+  physicianPhone      String?   @map("physician_phone")
+  dentist             String?
+  dentistPhone        String?   @map("dentist_phone")
+  bloodType           String?   @map("blood_type")
+  insuranceProvider   String?   @map("insurance_provider")
+  insuranceNumber     String?   @map("insurance_number")
+
+  // Relationship (for family hierarchy)
+  relationship        String?   // HEAD_OF_HOUSEHOLD, SPOUSE, CHILD, etc.
+
   // Granular Permissions (replaces simple role-based access)
   permissions MemberPermissionType[] @default([VIEW_CALENDAR, VIEW_ASSETS, VIEW_MEMBERS])
 
@@ -867,6 +916,9 @@ model HouseholdMember {
 
   // Travel Concierge relation
   travelProfile TravelProfile?
+
+  // Vehicle relation
+  primaryVehicles Vehicle[] @relation("PrimaryDriver")
 
   @@unique([householdId, userId])
   @@index([userId])
@@ -892,6 +944,108 @@ model HouseholdInvite {
   @@index([email])
   @@index([token])
   @@map("household_invites")
+}
+
+// ============================================================================
+// VEHICLES
+// ============================================================================
+
+model Vehicle {
+  id              String      @id @default(cuid())
+  householdId     String      @map("household_id")
+
+  // Basic Info
+  name            String      // Display name (e.g., "Bob's Tesla", "Family SUV")
+  make            String      // Tesla, Toyota, Honda
+  model           String      // Model Y, Highlander, Accord
+  year            Int
+  vehicleType     VehicleType @default(SUV) @map("vehicle_type")
+  color           String?
+  vin             String?
+  licensePlate    String?     @map("license_plate")
+
+  // Ownership
+  primaryDriverId String?     @map("primary_driver_id")
+  isOwned         Boolean     @default(true) @map("is_owned") // vs leased
+  isActive        Boolean     @default(true) @map("is_active")
+
+  // Tracking
+  currentMileage  Int?        @map("current_mileage")
+  mileageUpdatedAt DateTime?  @map("mileage_updated_at")
+  annualMiles     Int?        @map("annual_miles") // Estimated annual mileage
+
+  // Registration & Insurance
+  registrationExpiry   DateTime? @map("registration_expiry")
+  registrationState    String?   @map("registration_state")
+  insuranceProvider    String?   @map("insurance_provider")
+  insurancePolicyNum   String?   @map("insurance_policy_num")
+  insuranceExpiry      DateTime? @map("insurance_expiry")
+  insuranceMonthly     Decimal?  @map("insurance_monthly") @db.Decimal(10, 2)
+
+  // Loan/Lease Info
+  hasLoan             Boolean   @default(false) @map("has_loan")
+  lender              String?
+  monthlyPayment      Decimal?  @map("monthly_payment") @db.Decimal(10, 2)
+  loanBalance         Decimal?  @map("loan_balance") @db.Decimal(12, 2)
+  loanMaturityDate    DateTime? @map("loan_maturity_date")
+
+  // Service Info
+  lastOilChange       DateTime? @map("last_oil_change")
+  oilChangeMileage    Int?      @map("oil_change_mileage")
+  nextServiceDue      DateTime? @map("next_service_due")
+  nextServiceMileage  Int?      @map("next_service_mileage")
+  preferredServiceShop String?  @map("preferred_service_shop")
+
+  // Photo
+  photoUrl            String?   @map("photo_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household     Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  primaryDriver HouseholdMember?  @relation("PrimaryDriver", fields: [primaryDriverId], references: [id], onDelete: SetNull)
+  services      VehicleService[]
+  events        FamilyEvent[]
+
+  @@index([householdId])
+  @@map("vehicles")
+}
+
+model VehicleService {
+  id          String            @id @default(cuid())
+  vehicleId   String            @map("vehicle_id")
+
+  // Service Details
+  serviceType VehicleServiceType @map("service_type")
+  description String?
+  serviceDate DateTime          @map("service_date")
+  mileageAt   Int?              @map("mileage_at")
+
+  // Cost
+  cost        Decimal?          @db.Decimal(10, 2)
+
+  // Provider
+  shopName    String?           @map("shop_name")
+  shopAddress String?           @map("shop_address")
+
+  // Next Service
+  nextServiceDate    DateTime?  @map("next_service_date")
+  nextServiceMileage Int?       @map("next_service_mileage")
+
+  // Notes & Docs
+  notes       String?           @db.Text
+  receiptUrl  String?           @map("receipt_url")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId])
+  @@index([serviceDate])
+  @@map("vehicle_services")
 }
 
 // ============================================================================
@@ -1028,8 +1182,6 @@ model Vendor {
   vendorSuggestions VendorSuggestion[]
 
   // Family Assets relations
-  vehicleServices       Vehicle[]              @relation("VehicleServiceVendor")
-  vehicleServiceRecords VehicleServiceRecord[] @relation("VehicleServiceVendor")
   homeSystemsServiced   HomeSystem[]           @relation("SystemServiceVendor")
   homeSystemServices    HomeSystemService[]    @relation("HomeSystemServiceVendor")
 
@@ -3034,117 +3186,8 @@ model HouseProtocolItem {
 }
 
 // ============================================================================
-// FAMILY ASSETS - VEHICLES, PETS, HOME SYSTEMS
+// FAMILY ASSETS - PETS, HOME SYSTEMS (Vehicles defined above)
 // ============================================================================
-
-// Vehicle - Family garage inventory
-model Vehicle {
-  id          String @id @default(cuid())
-  householdId String @map("household_id")
-
-  // Basic Info
-  nickname     String? // "The Family SUV", "Mom's Car"
-  type         VehicleType @default(CAR)
-  make         String // Toyota, Ford, etc.
-  model        String // Camry, F-150, etc.
-  year         Int
-  color        String?
-  licensePlate String?     @map("license_plate")
-
-  // Identification
-  vin String? // Vehicle Identification Number
-
-  // Specs
-  fuelType          FuelType  @default(GASOLINE) @map("fuel_type")
-  currentMileage    Int?      @map("current_mileage")
-  lastMileageUpdate DateTime? @map("last_mileage_update")
-
-  // Insurance
-  insuranceProvider  String?   @map("insurance_provider")
-  insurancePolicyNum String?   @map("insurance_policy_num")
-  insuranceExpires   DateTime? @map("insurance_expires")
-  insuranceContact   String?   @map("insurance_contact")
-
-  // Registration
-  registrationExpires DateTime? @map("registration_expires")
-  inspectionExpires   DateTime? @map("inspection_expires")
-
-  // Purchase Info
-  purchaseDate  DateTime? @map("purchase_date")
-  purchasePrice Decimal?  @map("purchase_price") @db.Decimal(10, 2)
-  purchasedFrom String?   @map("purchased_from")
-
-  // Warranty
-  warrantyExpires  DateTime? @map("warranty_expires")
-  warrantyProvider String?   @map("warranty_provider")
-  warrantyDetails  String?   @map("warranty_details") @db.Text
-
-  // Maintenance Schedule (for auto-generating tasks)
-  oilChangeIntervalMiles    Int?      @default(5000) @map("oil_change_interval_miles")
-  oilChangeIntervalMonths   Int?      @default(6) @map("oil_change_interval_months")
-  lastOilChangeMileage      Int?      @map("last_oil_change_mileage")
-  lastOilChangeDate         DateTime? @map("last_oil_change_date")
-  tireRotationIntervalMiles Int?      @default(7500) @map("tire_rotation_interval_miles")
-  lastTireRotationMileage   Int?      @map("last_tire_rotation_mileage")
-  lastTireRotationDate      DateTime? @map("last_tire_rotation_date")
-
-  // Photos
-  photoUrls String[] @default([]) @map("photo_urls")
-
-  // Preferred service vendor
-  preferredServiceVendorId String? @map("preferred_service_vendor_id")
-
-  notes    String? @db.Text
-  isActive Boolean @default(true) @map("is_active")
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  household       Household              @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  serviceRecords  VehicleServiceRecord[]
-  events          FamilyEvent[]
-  preferredVendor Vendor?                @relation("VehicleServiceVendor", fields: [preferredServiceVendorId], references: [id], onDelete: SetNull)
-
-  @@index([householdId])
-  @@map("vehicles")
-}
-
-// Vehicle Service Records - Maintenance history
-model VehicleServiceRecord {
-  id        String @id @default(cuid())
-  vehicleId String @map("vehicle_id")
-
-  serviceDate      DateTime @map("service_date")
-  serviceType      String   @map("service_type") // Oil Change, Tire Rotation, Brake Service, etc.
-  description      String?  @db.Text
-  mileageAtService Int?     @map("mileage_at_service")
-
-  // Cost
-  cost       Decimal? @db.Decimal(10, 2)
-  vendorName String?  @map("vendor_name")
-  vendorId   String?  @map("vendor_id")
-
-  // Documents
-  receiptUrl String? @map("receipt_url")
-  invoiceUrl String? @map("invoice_url")
-
-  // Next service
-  nextServiceDate    DateTime? @map("next_service_date")
-  nextServiceMileage Int?      @map("next_service_mileage")
-
-  notes String? @db.Text
-
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  // Relations
-  vehicle Vehicle @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
-  vendor  Vendor? @relation("VehicleServiceVendor", fields: [vendorId], references: [id], onDelete: SetNull)
-
-  @@index([vehicleId, serviceDate])
-  @@map("vehicle_service_records")
-}
 
 // Pet - Household pets
 model Pet {

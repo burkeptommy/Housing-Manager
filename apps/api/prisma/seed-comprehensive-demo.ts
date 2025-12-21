@@ -23,6 +23,8 @@ import {
   HouseholdInvoiceStatus,
   FamilyEventCategory,
   FriendshipStatus,
+  VehicleType,
+  VehicleServiceType,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -1426,6 +1428,183 @@ async function main() {
     });
   }
   console.log(`✅ Created concierge thread with ${conciergeMessages.length} messages`);
+
+  // ============================================================================
+  // 9. VEHICLES (2 family vehicles)
+  // ============================================================================
+  console.log('\n🚗 Adding vehicles...');
+
+  // Get Bob's household member record
+  const bobMember = await prisma.householdMember.findFirst({
+    where: { householdId: bobHousehold.id, userId: bob.id },
+  });
+
+  // Get or create Alice's household member record
+  let aliceMember = await prisma.householdMember.findFirst({
+    where: { householdId: bobHousehold.id, nickname: 'Alice' },
+  });
+
+  if (!aliceMember) {
+    // Create Alice as a household member
+    aliceMember = await prisma.householdMember.create({
+      data: {
+        householdId: bobHousehold.id,
+        nickname: 'Alice',
+        role: 'PARENT',
+        relationship: 'SPOUSE',
+        isActive: true,
+        employer: 'Austin Medical Center',
+        jobTitle: 'Pediatric Nurse Practitioner',
+        workAddress: '1234 Medical Pkwy, Austin, TX',
+        workSchedule: 'Mon-Fri 8am-4pm',
+      },
+    });
+  }
+
+  // Clear existing vehicles
+  await prisma.vehicle.deleteMany({
+    where: { householdId: bobHousehold.id },
+  });
+
+  const vehicles = [
+    {
+      householdId: bobHousehold.id,
+      name: "Bob's Tesla",
+      make: 'Tesla',
+      model: 'Model Y',
+      year: 2023,
+      vehicleType: VehicleType.ELECTRIC,
+      color: 'Midnight Silver',
+      licensePlate: 'ABC 1234',
+      vin: '5YJYGDEE9MF123456',
+      primaryDriverId: bobMember?.id,
+      isOwned: true,
+      isActive: true,
+      currentMileage: 24500,
+      mileageUpdatedAt: daysAgo(7),
+      annualMiles: 12000,
+      registrationExpiry: daysFromNow(45),
+      registrationState: 'TX',
+      insuranceProvider: 'State Farm',
+      insurancePolicyNum: 'SF-8847291',
+      insuranceExpiry: daysFromNow(180),
+      insuranceMonthly: 145,
+      hasLoan: true,
+      lender: 'Tesla Finance',
+      monthlyPayment: 750,
+      loanBalance: 38500,
+      loanMaturityDate: new Date(2028, 5, 15),
+      nextServiceDue: daysFromNow(60),
+      nextServiceMileage: 30000,
+      preferredServiceShop: 'Tesla Service Center - Austin',
+    },
+    {
+      householdId: bobHousehold.id,
+      name: 'Family Highlander',
+      make: 'Toyota',
+      model: 'Highlander',
+      year: 2022,
+      vehicleType: VehicleType.SUV,
+      color: 'Pearl White',
+      licensePlate: 'XYZ 5678',
+      vin: '5TDGZRBH8NS123456',
+      primaryDriverId: aliceMember?.id,
+      isOwned: true,
+      isActive: true,
+      currentMileage: 35200,
+      mileageUpdatedAt: daysAgo(3),
+      annualMiles: 15000,
+      registrationExpiry: daysFromNow(120),
+      registrationState: 'TX',
+      insuranceProvider: 'State Farm',
+      insurancePolicyNum: 'SF-8847292',
+      insuranceExpiry: daysFromNow(180),
+      insuranceMonthly: 125,
+      hasLoan: true,
+      lender: 'Toyota Financial',
+      monthlyPayment: 650,
+      loanBalance: 28000,
+      loanMaturityDate: new Date(2027, 8, 1),
+      lastOilChange: daysAgo(45),
+      oilChangeMileage: 32500,
+      nextServiceDue: daysFromNow(45),
+      nextServiceMileage: 37500,
+      preferredServiceShop: 'Charles Maund Toyota',
+    },
+  ];
+
+  for (const vehicle of vehicles) {
+    const createdVehicle = await prisma.vehicle.create({
+      data: vehicle,
+    });
+
+    // Add service history for Highlander
+    if (vehicle.name === 'Family Highlander') {
+      await prisma.vehicleService.createMany({
+        data: [
+          {
+            vehicleId: createdVehicle.id,
+            serviceType: VehicleServiceType.OIL_CHANGE,
+            description: 'Regular oil change with synthetic oil',
+            serviceDate: daysAgo(45),
+            mileageAt: 32500,
+            cost: 85,
+            shopName: 'Charles Maund Toyota',
+            nextServiceDate: daysFromNow(90),
+            nextServiceMileage: 37500,
+          },
+          {
+            vehicleId: createdVehicle.id,
+            serviceType: VehicleServiceType.TIRE_ROTATION,
+            description: 'Tire rotation included with oil change',
+            serviceDate: daysAgo(45),
+            mileageAt: 32500,
+            cost: 0,
+            shopName: 'Charles Maund Toyota',
+            notes: 'Included with oil change',
+          },
+          {
+            vehicleId: createdVehicle.id,
+            serviceType: VehicleServiceType.BRAKE_SERVICE,
+            description: 'Brake inspection',
+            serviceDate: daysAgo(90),
+            mileageAt: 30000,
+            cost: 0,
+            shopName: 'Charles Maund Toyota',
+            notes: 'Brake pads at 60%, good for another 20k miles',
+          },
+        ],
+      });
+    }
+
+    // Add service history for Tesla
+    if (vehicle.name === "Bob's Tesla") {
+      await prisma.vehicleService.createMany({
+        data: [
+          {
+            vehicleId: createdVehicle.id,
+            serviceType: VehicleServiceType.TIRE_ROTATION,
+            description: 'Tire rotation',
+            serviceDate: daysAgo(90),
+            mileageAt: 22000,
+            cost: 75,
+            shopName: 'Tesla Service Center',
+          },
+          {
+            vehicleId: createdVehicle.id,
+            serviceType: VehicleServiceType.CABIN_FILTER,
+            description: 'Cabin air filter replacement',
+            serviceDate: daysAgo(180),
+            mileageAt: 18000,
+            cost: 95,
+            shopName: 'Tesla Service Center',
+          },
+        ],
+      });
+    }
+  }
+
+  console.log(`✅ Created ${vehicles.length} vehicles with service history`);
 
   console.log('\n🎉 Comprehensive demo data seed complete!\n');
 }
