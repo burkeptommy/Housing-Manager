@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import { getApiClient } from '@/lib/api';
+import type { FamilyMember as ApiFamilyMember, Pet, CreatePetRequest, PetType } from '@haven/core';
 import {
   MapPin,
   Home,
@@ -42,9 +44,14 @@ import {
   Crown,
   BadgeCheck,
   UserPlus,
+  Loader2,
+  Cat,
 } from 'lucide-react';
 
-// Types
+// ============================================================================
+// TYPES
+// ============================================================================
+
 type LocationStatus = 'home' | 'away' | 'school' | 'work' | 'activity' | 'unknown';
 
 interface LocationInfo {
@@ -170,8 +177,11 @@ interface StaffMember {
 
 type FamilyMember = AdultMember | ChildMember | PetMember | StaffMember;
 
-// Mock Data
-const mockAdults: AdultMember[] = [
+// ============================================================================
+// MOCK DATA (Fallback for demo mode)
+// ============================================================================
+
+const MOCK_ADULTS: AdultMember[] = [
   {
     id: 'a1',
     type: 'adult',
@@ -217,7 +227,7 @@ const mockAdults: AdultMember[] = [
   },
 ];
 
-const mockChildren: ChildMember[] = [
+const MOCK_CHILDREN: ChildMember[] = [
   {
     id: 'c1',
     type: 'child',
@@ -272,7 +282,7 @@ const mockChildren: ChildMember[] = [
   },
 ];
 
-const mockPets: PetMember[] = [
+const MOCK_PETS: PetMember[] = [
   {
     id: 'p1',
     type: 'pet',
@@ -298,7 +308,7 @@ const mockPets: PetMember[] = [
   },
 ];
 
-const mockStaff: StaffMember[] = [
+const MOCK_STAFF: StaffMember[] = [
   {
     id: 's1',
     type: 'staff',
@@ -322,7 +332,170 @@ const mockStaff: StaffMember[] = [
   },
 ];
 
-// Location status config
+// ============================================================================
+// MAPPING FUNCTIONS
+// ============================================================================
+
+function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+function mapRoleToDisplay(role: string): string {
+  switch (role.toUpperCase()) {
+    case 'OWNER':
+    case 'ADMIN':
+      return 'Admin';
+    case 'MANAGER':
+      return 'Manager';
+    case 'MEMBER':
+      return 'Family Member';
+    case 'CHILD':
+      return 'Child';
+    case 'STAFF':
+      return 'Staff';
+    default:
+      return role;
+  }
+}
+
+function mapToAdult(apiMember: ApiFamilyMember): AdultMember {
+  const name = apiMember.displayName || apiMember.user?.displayName || 'Unknown';
+  const email = apiMember.user?.email || '';
+  // MemberProfile has emergencyPhone and workPhone, use workPhone for adults
+  const phone = apiMember.profile?.workPhone || apiMember.profile?.emergencyPhone || '';
+  const isAdmin = apiMember.role.toUpperCase() === 'OWNER' || apiMember.role.toUpperCase() === 'ADMIN';
+
+  return {
+    id: apiMember.id,
+    type: 'adult',
+    name,
+    initials: getInitials(name),
+    role: mapRoleToDisplay(apiMember.role),
+    isAdmin,
+    email,
+    phone,
+    location: { status: 'unknown', label: 'Unknown' },
+    clubs: [],
+    wellness: undefined,
+    civic: [],
+  };
+}
+
+function mapToChild(apiMember: ApiFamilyMember): ChildMember {
+  const name = apiMember.displayName || 'Unknown';
+
+  return {
+    id: apiMember.id,
+    type: 'child',
+    name,
+    initials: getInitials(name),
+    age: 0, // Would need to calculate from profile.birthday
+    grade: '',
+    location: { status: 'unknown', label: 'Unknown' },
+    school: {
+      name: 'Not set',
+      tuitionMonthly: 0,
+      address: '',
+    },
+    activities: [],
+    health: {
+      pediatrician: 'Not set',
+      pediatricianPhone: '',
+      allergies: apiMember.profile?.dietaryRestrictions || [],
+    },
+    sizes: apiMember.profile?.shirtSize
+      ? {
+          shirt: apiMember.profile.shirtSize,
+          pants: '',
+          shoe: '',
+        }
+      : undefined,
+  };
+}
+
+function mapToStaff(apiMember: ApiFamilyMember): StaffMember {
+  const name = apiMember.displayName || 'Unknown';
+
+  return {
+    id: apiMember.id,
+    type: 'staff',
+    name,
+    initials: getInitials(name),
+    role: apiMember.role || 'Staff',
+    email: apiMember.user?.email || '',
+    phone: apiMember.profile?.emergencyPhone || apiMember.profile?.workPhone || '',
+    location: { status: 'unknown', label: 'Unknown' },
+    weeklyStipend: 0,
+    schedule: [],
+    permissions: apiMember.permissions || [],
+    startDate: new Date(),
+  };
+}
+
+function mapPetTypeToSpecies(type: PetType): 'dog' | 'cat' | 'other' {
+  switch (type) {
+    case 'DOG':
+      return 'dog';
+    case 'CAT':
+      return 'cat';
+    default:
+      return 'other';
+  }
+}
+
+function calculateAgeFromBirthday(birthday?: string | null): number {
+  if (!birthday) return 0;
+  const birthDate = new Date(birthday);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const monthDiff = today.getMonth() - birthDate.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return Math.max(0, age);
+}
+
+function mapToPet(apiPet: Pet): PetMember {
+  // Get next vaccination date from vet records if available
+  const nextVaccineDate = apiPet.vetRecords
+    ?.filter((r) => r.nextVaccinationDate)
+    .sort((a, b) => new Date(a.nextVaccinationDate!).getTime() - new Date(b.nextVaccinationDate!).getTime())[0]
+    ?.nextVaccinationDate;
+
+  return {
+    id: apiPet.id,
+    type: 'pet',
+    name: apiPet.name,
+    initials: (apiPet.name?.charAt(0) ?? 'P').toUpperCase(),
+    species: mapPetTypeToSpecies(apiPet.type),
+    breed: apiPet.breed || 'Unknown',
+    age: calculateAgeFromBirthday(apiPet.birthday),
+    location: { status: 'home', label: 'At Home' },
+    vet: {
+      name: apiPet.primaryVetName || 'Not set',
+      phone: apiPet.vetClinicPhone || '',
+      clinic: apiPet.vetClinicName || '',
+    },
+    vaccinesDue: nextVaccineDate ? new Date(nextVaccineDate) : undefined,
+    microchipId: apiPet.microchipId || undefined,
+    food: {
+      brand: apiPet.foodBrand || 'Not set',
+      type: apiPet.foodType || '',
+      monthlyAmount: apiPet.feedingSchedule || '',
+    },
+    monthlyExpenses: 0, // Not available in API
+  };
+}
+
+// ============================================================================
+// LOCATION STATUS CONFIG
+// ============================================================================
+
 const locationConfig: Record<LocationStatus, { color: string; bgColor: string; icon: typeof Home }> = {
   home: { color: 'text-green-700', bgColor: 'bg-green-100', icon: Home },
   away: { color: 'text-slate-700', bgColor: 'bg-slate-100', icon: Car },
@@ -332,20 +505,203 @@ const locationConfig: Record<LocationStatus, { color: string; bgColor: string; i
   unknown: { color: 'text-slate-500', bgColor: 'bg-slate-50', icon: MapPin },
 };
 
-export default function FamilyPage() {
-  useAuth(); // Auth context for future API integration
+// ============================================================================
+// ADD MEMBER FORM TYPES
+// ============================================================================
 
-  // State
-  const [adults] = useState<AdultMember[]>(mockAdults);
-  const [children] = useState<ChildMember[]>(mockChildren);
-  const [pets] = useState<PetMember[]>(mockPets);
-  const [staff] = useState<StaffMember[]>(mockStaff);
+type AddMemberType = 'adult' | 'child' | 'pet' | 'staff';
+
+interface AddMemberFormData {
+  type: AddMemberType;
+  name: string;
+  email?: string;
+  phone?: string;
+  // Pet specific
+  petType?: PetType;
+  breed?: string;
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function FamilyPage() {
+  const { currentHousehold } = useAuth();
+
+  // Data State - initialized with mocks
+  const [adults, setAdults] = useState<AdultMember[]>(MOCK_ADULTS);
+  const [children, setChildren] = useState<ChildMember[]>(MOCK_CHILDREN);
+  const [pets, setPets] = useState<PetMember[]>(MOCK_PETS);
+  const [staff, setStaff] = useState<StaffMember[]>(MOCK_STAFF);
+  const [isLoading, setIsLoading] = useState(true);
 
   // UI State
   const [showFinancials, setShowFinancials] = useState(true);
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<FamilyMember | null>(null);
+  const [addMemberStep, setAddMemberStep] = useState<'select' | 'form'>('select');
+  const [addMemberType, setAddMemberType] = useState<AddMemberType | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // ============================================================================
+  // DATA FETCHING
+  // ============================================================================
+
+  const loadFamilyData = useCallback(async () => {
+    if (!currentHousehold?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      const api = getApiClient();
+
+      // Fetch members and pets in parallel
+      const [membersResult, petsResult] = await Promise.allSettled([
+        api.getFamilyMembers(),
+        api.getFamilyPets(),
+      ]);
+
+      // Process members
+      if (membersResult.status === 'fulfilled' && membersResult.value.length > 0) {
+        const apiMembers = membersResult.value;
+        const newAdults: AdultMember[] = [];
+        const newChildren: ChildMember[] = [];
+        const newStaff: StaffMember[] = [];
+
+        apiMembers.forEach((member) => {
+          const roleUpper = member.role.toUpperCase();
+          // Categorize by role
+          if (roleUpper === 'CHILD') {
+            newChildren.push(mapToChild(member));
+          } else if (roleUpper === 'STAFF') {
+            newStaff.push(mapToStaff(member));
+          } else {
+            // OWNER, MANAGER, MEMBER are all adults
+            newAdults.push(mapToAdult(member));
+          }
+        });
+
+        // Only update if we got data
+        if (newAdults.length > 0) setAdults(newAdults);
+        if (newChildren.length > 0) setChildren(newChildren);
+        if (newStaff.length > 0) setStaff(newStaff);
+      }
+      // If empty or error, keep MOCK data (already the default)
+
+      // Process pets
+      if (petsResult.status === 'fulfilled' && petsResult.value.length > 0) {
+        const mappedPets = petsResult.value.map(mapToPet);
+        setPets(mappedPets);
+      }
+      // If empty or error, keep MOCK_PETS
+    } catch (error) {
+      console.error('Failed to load family data:', error);
+      // Keep mock data as fallback
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentHousehold?.id]);
+
+  useEffect(() => {
+    loadFamilyData();
+  }, [loadFamilyData]);
+
+  // ============================================================================
+  // ADD MEMBER HANDLER
+  // ============================================================================
+
+  const handleAddMember = async (formData: AddMemberFormData) => {
+    if (!currentHousehold?.id) return;
+
+    setIsSubmitting(true);
+    try {
+      const api = getApiClient();
+
+      if (formData.type === 'pet') {
+        // Create pet via API
+        const petRequest: CreatePetRequest = {
+          name: formData.name,
+          type: formData.petType || 'DOG',
+          breed: formData.breed,
+        };
+
+        const newPet = await api.createPet(petRequest);
+        const mappedPet = mapToPet(newPet);
+        setPets((prev) => [...prev, mappedPet]);
+      } else {
+        // For adults/staff, we would call inviteMember API
+        // For now, do optimistic update with local data
+        const id = `temp-${Date.now()}`;
+        const name = formData.name;
+
+        if (formData.type === 'adult') {
+          const newAdult: AdultMember = {
+            id,
+            type: 'adult',
+            name,
+            initials: getInitials(name),
+            role: 'Family Member',
+            isAdmin: false,
+            email: formData.email || '',
+            phone: formData.phone || '',
+            location: { status: 'unknown', label: 'Invited' },
+            clubs: [],
+          };
+          setAdults((prev) => [...prev, newAdult]);
+        } else if (formData.type === 'child') {
+          const newChild: ChildMember = {
+            id,
+            type: 'child',
+            name,
+            initials: getInitials(name),
+            age: 0,
+            grade: '',
+            location: { status: 'unknown', label: 'Unknown' },
+            school: { name: 'Not set', tuitionMonthly: 0, address: '' },
+            activities: [],
+            health: {
+              pediatrician: 'Not set',
+              pediatricianPhone: '',
+              allergies: [],
+            },
+          };
+          setChildren((prev) => [...prev, newChild]);
+        } else if (formData.type === 'staff') {
+          const newStaffMember: StaffMember = {
+            id,
+            type: 'staff',
+            name,
+            initials: getInitials(name),
+            role: 'Staff',
+            email: formData.email || '',
+            phone: formData.phone || '',
+            location: { status: 'unknown', label: 'Invited' },
+            weeklyStipend: 0,
+            schedule: [],
+            permissions: [],
+            startDate: new Date(),
+          };
+          setStaff((prev) => [...prev, newStaffMember]);
+        }
+      }
+
+      // Reset modal state
+      setShowAddMemberModal(false);
+      setAddMemberStep('select');
+      setAddMemberType(null);
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      // Could show error toast here
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
 
   // All members for logistics dashboard
   const allMembers = useMemo(() => {
@@ -357,36 +713,39 @@ export default function FamilyPage() {
     let total = 0;
 
     // Adult club dues
-    adults.forEach(adult => {
-      adult.clubs.forEach(club => {
+    adults.forEach((adult) => {
+      adult.clubs.forEach((club) => {
         total += club.monthlyDues;
       });
     });
 
     // School tuition
-    children.forEach(child => {
+    children.forEach((child) => {
       total += child.school.tuitionMonthly;
-      child.activities.forEach(activity => {
+      child.activities.forEach((activity) => {
         total += activity.monthlyFee;
       });
     });
 
     // Pet expenses
-    pets.forEach(pet => {
+    pets.forEach((pet) => {
       total += pet.monthlyExpenses;
     });
 
     // Staff stipends
-    staff.forEach(s => {
+    staff.forEach((s) => {
       total += s.weeklyStipend * 4.33; // Monthly average
     });
 
     return total;
   }, [adults, children, pets, staff]);
 
-  // Toggle card expansion
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
+
   const toggleCard = (id: string) => {
-    setExpandedCards(prev => {
+    setExpandedCards((prev) => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
@@ -397,7 +756,10 @@ export default function FamilyPage() {
     });
   };
 
-  // Format helpers
+  // ============================================================================
+  // FORMAT HELPERS
+  // ============================================================================
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -433,6 +795,25 @@ export default function FamilyPage() {
       </div>
     );
   };
+
+  // ============================================================================
+  // LOADING STATE
+  // ============================================================================
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
+          <p className="text-slate-500">Loading family data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
 
   return (
     <div className="space-y-6 pb-20">
@@ -476,27 +857,47 @@ export default function FamilyPage() {
               >
                 {/* Avatar */}
                 <div className="relative mb-2">
-                  <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                    member.type === 'pet' ? 'bg-amber-100' :
-                    member.type === 'staff' ? 'bg-purple-100' :
-                    member.type === 'child' ? 'bg-blue-100' : 'bg-emerald-100'
-                  }`}>
+                  <div
+                    className={`w-14 h-14 rounded-full flex items-center justify-center ${
+                      member.type === 'pet'
+                        ? 'bg-amber-100'
+                        : member.type === 'staff'
+                          ? 'bg-purple-100'
+                          : member.type === 'child'
+                            ? 'bg-blue-100'
+                            : 'bg-emerald-100'
+                    }`}
+                  >
                     {member.type === 'pet' ? (
-                      <Dog className={`w-7 h-7 ${member.type === 'pet' ? 'text-amber-600' : 'text-emerald-600'}`} />
+                      (member as PetMember).species === 'cat' ? (
+                        <Cat className="w-7 h-7 text-amber-600" />
+                      ) : (
+                        <Dog className="w-7 h-7 text-amber-600" />
+                      )
                     ) : (
-                      <span className={`text-lg font-semibold ${
-                        member.type === 'staff' ? 'text-purple-600' :
-                        member.type === 'child' ? 'text-blue-600' : 'text-emerald-600'
-                      }`}>
+                      <span
+                        className={`text-lg font-semibold ${
+                          member.type === 'staff'
+                            ? 'text-purple-600'
+                            : member.type === 'child'
+                              ? 'text-blue-600'
+                              : 'text-emerald-600'
+                        }`}
+                      >
                         {member.initials}
                       </span>
                     )}
                   </div>
                   {/* Status dot */}
-                  <span className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white ${
-                    member.location.status === 'home' ? 'bg-green-500' :
-                    member.location.status === 'unknown' ? 'bg-slate-400' : 'bg-blue-500'
-                  }`} />
+                  <span
+                    className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white ${
+                      member.location.status === 'home'
+                        ? 'bg-green-500'
+                        : member.location.status === 'unknown'
+                          ? 'bg-slate-400'
+                          : 'bg-blue-500'
+                    }`}
+                  />
                 </div>
 
                 {/* Name */}
@@ -556,21 +957,21 @@ export default function FamilyPage() {
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Education & Activities</p>
               <p className="font-semibold">
-                {formatCurrency(children.reduce((sum, c) =>
-                  sum + c.school.tuitionMonthly + c.activities.reduce((s, a) => s + a.monthlyFee, 0), 0))}
+                {formatCurrency(
+                  children.reduce(
+                    (sum, c) => sum + c.school.tuitionMonthly + c.activities.reduce((s, a) => s + a.monthlyFee, 0),
+                    0
+                  )
+                )}
               </p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Childcare</p>
-              <p className="font-semibold">
-                {formatCurrency(staff.reduce((sum, s) => sum + (s.weeklyStipend * 4.33), 0))}
-              </p>
+              <p className="font-semibold">{formatCurrency(staff.reduce((sum, s) => sum + s.weeklyStipend * 4.33, 0))}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Pet Care</p>
-              <p className="font-semibold">
-                {formatCurrency(pets.reduce((sum, p) => sum + p.monthlyExpenses, 0))}
-              </p>
+              <p className="font-semibold">{formatCurrency(pets.reduce((sum, p) => sum + p.monthlyExpenses, 0))}</p>
             </div>
           </div>
         </div>
@@ -631,11 +1032,11 @@ export default function FamilyPage() {
               <div className="px-4 py-3 bg-slate-50 flex items-center gap-4">
                 <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
                   <Phone className="w-4 h-4" />
-                  {adult.phone}
+                  {adult.phone || 'No phone'}
                 </button>
                 <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
                   <Mail className="w-4 h-4" />
-                  {adult.email}
+                  {adult.email || 'No email'}
                 </button>
               </div>
 
@@ -713,7 +1114,9 @@ export default function FamilyPage() {
                   {/* Civic */}
                   {adult.civic && adult.civic.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Civic Organizations</p>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+                        Civic Organizations
+                      </p>
                       <div className="flex flex-wrap gap-2">
                         {adult.civic.map((org, idx) => (
                           <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full">
@@ -752,7 +1155,9 @@ export default function FamilyPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-900">{child.name}</h3>
-                        <p className="text-sm text-slate-500">{child.age} years old • {child.grade}</p>
+                        <p className="text-sm text-slate-500">
+                          {child.age} years old • {child.grade}
+                        </p>
                         <div className="mt-1">{renderLocationPill(child.location)}</div>
                       </div>
                     </div>
@@ -788,7 +1193,9 @@ export default function FamilyPage() {
                     </div>
                     {child.school.tuitionMonthly > 0 && showFinancials && (
                       <div className="text-right">
-                        <p className="text-sm font-medium text-slate-900">{formatCurrency(child.school.tuitionMonthly)}/mo</p>
+                        <p className="text-sm font-medium text-slate-900">
+                          {formatCurrency(child.school.tuitionMonthly)}/mo
+                        </p>
                         {tuitionDue !== null && tuitionDue <= 7 && (
                           <span className="text-xs text-red-600 font-medium">Due in {tuitionDue} days</span>
                         )}
@@ -820,9 +1227,11 @@ export default function FamilyPage() {
                           {child.activities.map((activity, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                               <div className="flex items-center gap-3">
-                                {activity.name.toLowerCase().includes('soccer') || activity.name.toLowerCase().includes('league') ? (
+                                {activity.name.toLowerCase().includes('soccer') ||
+                                activity.name.toLowerCase().includes('league') ? (
                                   <Trophy className="w-5 h-5 text-amber-500" />
-                                ) : activity.name.toLowerCase().includes('piano') || activity.name.toLowerCase().includes('music') ? (
+                                ) : activity.name.toLowerCase().includes('piano') ||
+                                  activity.name.toLowerCase().includes('music') ? (
                                   <Music className="w-5 h-5 text-purple-500" />
                                 ) : activity.name.toLowerCase().includes('art') ? (
                                   <Palette className="w-5 h-5 text-pink-500" />
@@ -832,9 +1241,7 @@ export default function FamilyPage() {
                                 <div>
                                   <p className="font-medium text-slate-900">{activity.name}</p>
                                   <p className="text-xs text-slate-500">{activity.organization}</p>
-                                  {activity.coachName && (
-                                    <p className="text-xs text-slate-400">{activity.coachName}</p>
-                                  )}
+                                  {activity.coachName && <p className="text-xs text-slate-400">{activity.coachName}</p>}
                                   <p className="text-xs text-slate-400 mt-0.5">
                                     <Timer className="w-3 h-3 inline mr-1" />
                                     {activity.schedule}
@@ -936,11 +1343,17 @@ export default function FamilyPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
-                        <Dog className="w-7 h-7 text-amber-600" />
+                        {pet.species === 'cat' ? (
+                          <Cat className="w-7 h-7 text-amber-600" />
+                        ) : (
+                          <Dog className="w-7 h-7 text-amber-600" />
+                        )}
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-900">{pet.name}</h3>
-                        <p className="text-sm text-slate-500">{pet.breed} • {pet.age} years old</p>
+                        <p className="text-sm text-slate-500">
+                          {pet.breed} • {pet.age} years old
+                        </p>
                         <div className="mt-1">{renderLocationPill(pet.location)}</div>
                       </div>
                     </div>
@@ -955,9 +1368,11 @@ export default function FamilyPage() {
 
                 {/* Vaccine Alert */}
                 {vaccinesDays !== null && vaccinesDays <= 30 && (
-                  <div className={`px-4 py-2 flex items-center gap-2 ${
-                    vaccinesDays <= 7 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'
-                  }`}>
+                  <div
+                    className={`px-4 py-2 flex items-center gap-2 ${
+                      vaccinesDays <= 7 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'
+                    }`}
+                  >
                     <AlertCircle className={`w-4 h-4 ${vaccinesDays <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
                     <span className={`text-sm font-medium ${vaccinesDays <= 7 ? 'text-red-700' : 'text-amber-700'}`}>
                       Vaccines due {pet.vaccinesDue && formatDate(pet.vaccinesDue)}
@@ -971,14 +1386,18 @@ export default function FamilyPage() {
                     <Syringe className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-sm font-medium text-slate-900">{pet.vet.name}</p>
-                      <p className="text-xs text-slate-500">{pet.vet.clinic} • {pet.vet.phone}</p>
+                      <p className="text-xs text-slate-500">
+                        {pet.vet.clinic} • {pet.vet.phone}
+                      </p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Utensils className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-sm font-medium text-slate-900">{pet.food.brand}</p>
-                      <p className="text-xs text-slate-500">{pet.food.type} • {pet.food.monthlyAmount}/mo</p>
+                      <p className="text-xs text-slate-500">
+                        {pet.food.type} • {pet.food.monthlyAmount}/mo
+                      </p>
                     </div>
                   </div>
                   {pet.microchipId && (
@@ -987,7 +1406,7 @@ export default function FamilyPage() {
                       <p className="text-sm text-slate-600">Microchip: {pet.microchipId}</p>
                     </div>
                   )}
-                  {showFinancials && (
+                  {showFinancials && pet.monthlyExpenses > 0 && (
                     <div className="pt-2 border-t border-slate-200">
                       <p className="text-xs text-slate-500">Monthly Expenses</p>
                       <p className="font-semibold text-slate-900">{formatCurrency(pet.monthlyExpenses)}</p>
@@ -1026,9 +1445,7 @@ export default function FamilyPage() {
                             {s.role}
                           </span>
                         </div>
-                        {s.agency && (
-                          <p className="text-sm text-slate-500">via {s.agency}</p>
-                        )}
+                        {s.agency && <p className="text-sm text-slate-500">via {s.agency}</p>}
                         <div className="mt-1">{renderLocationPill(s.location)}</div>
                       </div>
                     </div>
@@ -1045,7 +1462,7 @@ export default function FamilyPage() {
                 <div className="px-4 py-3 bg-slate-50 flex items-center gap-4 border-b border-slate-100">
                   <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
                     <Phone className="w-4 h-4" />
-                    {s.phone}
+                    {s.phone || 'No phone'}
                   </button>
                   <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
                     <MessageCircle className="w-4 h-4" />
@@ -1054,34 +1471,41 @@ export default function FamilyPage() {
                 </div>
 
                 {/* Schedule */}
-                <div className="p-4">
-                  <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
-                  <div className="grid grid-cols-5 gap-1">
-                    {s.schedule.map((day, idx) => (
-                      <div key={idx} className="text-center p-2 bg-purple-50 rounded-lg">
-                        <p className="text-xs font-medium text-purple-700">{day.day.slice(0, 3)}</p>
-                        <p className="text-xs text-slate-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
-                        <p className="text-xs text-slate-600">{day.hours.split(' - ')[1]}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Permissions & Compensation */}
-                <div className="px-4 pb-4 space-y-3">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">App Permissions</p>
-                    <div className="flex flex-wrap gap-2">
-                      {s.permissions.map((perm, idx) => (
-                        <span key={idx} className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
-                          <Check className="w-3 h-3 text-green-600" />
-                          {perm}
-                        </span>
+                {s.schedule.length > 0 && (
+                  <div className="p-4">
+                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
+                    <div className="grid grid-cols-5 gap-1">
+                      {s.schedule.map((day, idx) => (
+                        <div key={idx} className="text-center p-2 bg-purple-50 rounded-lg">
+                          <p className="text-xs font-medium text-purple-700">{day.day.slice(0, 3)}</p>
+                          <p className="text-xs text-slate-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
+                          <p className="text-xs text-slate-600">{day.hours.split(' - ')[1]}</p>
+                        </div>
                       ))}
                     </div>
                   </div>
+                )}
 
-                  {showFinancials && (
+                {/* Permissions & Compensation */}
+                <div className="px-4 pb-4 space-y-3">
+                  {s.permissions.length > 0 && (
+                    <div>
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">App Permissions</p>
+                      <div className="flex flex-wrap gap-2">
+                        {s.permissions.map((perm, idx) => (
+                          <span
+                            key={idx}
+                            className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full"
+                          >
+                            <Check className="w-3 h-3 text-green-600" />
+                            {perm}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {showFinancials && s.weeklyStipend > 0 && (
                     <div className="pt-3 border-t border-slate-200">
                       <div className="flex items-center justify-between">
                         <p className="text-sm text-slate-500">Weekly Stipend</p>
@@ -1103,13 +1527,23 @@ export default function FamilyPage() {
       {showAddMemberModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowAddMemberModal(false)} />
+            <div className="fixed inset-0 bg-black/50" onClick={() => {
+              setShowAddMemberModal(false);
+              setAddMemberStep('select');
+              setAddMemberType(null);
+            }} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
               <div className="p-6 border-b border-slate-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Add Family Member</h3>
+                  <h3 className="text-lg font-semibold text-slate-900">
+                    {addMemberStep === 'select' ? 'Add Family Member' : `Add ${addMemberType}`}
+                  </h3>
                   <button
-                    onClick={() => setShowAddMemberModal(false)}
+                    onClick={() => {
+                      setShowAddMemberModal(false);
+                      setAddMemberStep('select');
+                      setAddMemberType(null);
+                    }}
                     className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                   >
                     <X className="w-5 h-5 text-slate-400" />
@@ -1118,30 +1552,48 @@ export default function FamilyPage() {
               </div>
 
               <div className="p-6">
-                <p className="text-sm text-slate-500 mb-4">What type of member would you like to add?</p>
+                {addMemberStep === 'select' ? (
+                  <>
+                    <p className="text-sm text-slate-500 mb-4">What type of member would you like to add?</p>
 
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { type: 'adult', icon: User, label: 'Adult', description: 'Invite via email', color: 'emerald' },
-                    { type: 'child', icon: Baby, label: 'Child', description: 'Create profile', color: 'blue' },
-                    { type: 'pet', icon: Dog, label: 'Pet', description: 'Add pet profile', color: 'amber' },
-                    { type: 'staff', icon: BadgeCheck, label: 'Staff', description: 'Nanny, Au Pair, etc.', color: 'purple' },
-                  ].map((option) => {
-                    const Icon = option.icon;
-                    return (
-                      <button
-                        key={option.type}
-                        className={`flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl hover:border-${option.color}-500 hover:bg-${option.color}-50 transition-colors text-center`}
-                      >
-                        <div className={`w-12 h-12 bg-${option.color}-100 rounded-full flex items-center justify-center mb-2`}>
-                          <Icon className={`w-6 h-6 text-${option.color}-600`} />
-                        </div>
-                        <p className="font-medium text-slate-900">{option.label}</p>
-                        <p className="text-xs text-slate-500">{option.description}</p>
-                      </button>
-                    );
-                  })}
-                </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { type: 'adult' as AddMemberType, icon: User, label: 'Adult', description: 'Invite via email', color: 'emerald' },
+                        { type: 'child' as AddMemberType, icon: Baby, label: 'Child', description: 'Create profile', color: 'blue' },
+                        { type: 'pet' as AddMemberType, icon: Dog, label: 'Pet', description: 'Add pet profile', color: 'amber' },
+                        { type: 'staff' as AddMemberType, icon: BadgeCheck, label: 'Staff', description: 'Nanny, Au Pair, etc.', color: 'purple' },
+                      ].map((option) => {
+                        const Icon = option.icon;
+                        return (
+                          <button
+                            key={option.type}
+                            onClick={() => {
+                              setAddMemberType(option.type);
+                              setAddMemberStep('form');
+                            }}
+                            className={`flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl hover:border-${option.color}-500 hover:bg-${option.color}-50 transition-colors text-center`}
+                          >
+                            <div className={`w-12 h-12 bg-${option.color}-100 rounded-full flex items-center justify-center mb-2`}>
+                              <Icon className={`w-6 h-6 text-${option.color}-600`} />
+                            </div>
+                            <p className="font-medium text-slate-900">{option.label}</p>
+                            <p className="text-xs text-slate-500">{option.description}</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </>
+                ) : (
+                  <AddMemberForm
+                    type={addMemberType!}
+                    onSubmit={handleAddMember}
+                    onCancel={() => {
+                      setAddMemberStep('select');
+                      setAddMemberType(null);
+                    }}
+                    isSubmitting={isSubmitting}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1279,5 +1731,129 @@ export default function FamilyPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+// ============================================================================
+// ADD MEMBER FORM COMPONENT
+// ============================================================================
+
+interface AddMemberFormProps {
+  type: AddMemberType;
+  onSubmit: (data: AddMemberFormData) => void;
+  onCancel: () => void;
+  isSubmitting: boolean;
+}
+
+function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberFormProps) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [petType, setPetType] = useState<PetType>('DOG');
+  const [breed, setBreed] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({
+      type,
+      name,
+      email: email || undefined,
+      phone: phone || undefined,
+      petType: type === 'pet' ? petType : undefined,
+      breed: type === 'pet' ? breed : undefined,
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-slate-700 mb-2">Name *</label>
+        <input
+          type="text"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          required
+          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+          placeholder={type === 'pet' ? "Pet's name" : 'Full name'}
+        />
+      </div>
+
+      {type === 'pet' ? (
+        <>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
+            <select
+              value={petType}
+              onChange={(e) => setPetType(e.target.value as PetType)}
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+            >
+              <option value="DOG">Dog</option>
+              <option value="CAT">Cat</option>
+              <option value="BIRD">Bird</option>
+              <option value="FISH">Fish</option>
+              <option value="REPTILE">Reptile</option>
+              <option value="SMALL_ANIMAL">Small Animal</option>
+              <option value="OTHER">Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Breed</label>
+            <input
+              type="text"
+              value={breed}
+              onChange={(e) => setBreed(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              placeholder="e.g., Golden Retriever"
+            />
+          </div>
+        </>
+      ) : (
+        <>
+          {(type === 'adult' || type === 'staff') && (
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                placeholder="email@example.com"
+              />
+              {type === 'adult' && (
+                <p className="text-xs text-slate-500 mt-1">An invitation will be sent to this email</p>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-2">Phone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              placeholder="(555) 555-5555"
+            />
+          </div>
+        </>
+      )}
+
+      <div className="flex gap-3 pt-2">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+        >
+          Back
+        </button>
+        <button
+          type="submit"
+          disabled={!name || isSubmitting}
+          className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          {isSubmitting && <Loader2 className="w-4 h-4 animate-spin" />}
+          {type === 'pet' ? 'Add Pet' : 'Add Member'}
+        </button>
+      </div>
+    </form>
   );
 }
