@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import {
   ShoppingCart,
   Package,
@@ -42,6 +42,8 @@ import {
   Archive,
   RefreshCw,
 } from 'lucide-react';
+import { getApiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 
 // Types
 type ListType = 'groceries' | 'costco' | 'hardware' | 'party' | 'custom';
@@ -133,8 +135,8 @@ const CATEGORY_KEYWORDS: Record<string, ItemCategory> = {
   dog: 'pet', cat: 'pet', pet: 'pet', kibble: 'pet', litter: 'pet',
 };
 
-// Mock data
-const mockLists: ShoppingList[] = [
+// Mock data (fallback when API is unavailable)
+const MOCK_LISTS: ShoppingList[] = [
   {
     id: 'list-1',
     name: 'Weekly Groceries',
@@ -171,7 +173,7 @@ const mockLists: ShoppingList[] = [
   },
 ];
 
-const mockItems: ShoppingItem[] = [
+const MOCK_ITEMS: ShoppingItem[] = [
   // Weekly Groceries
   { id: 'item-1', listId: 'list-1', name: 'Organic Whole Milk', quantity: '1 Gal', category: 'dairy', checked: false, starred: true, addedAt: new Date() },
   { id: 'item-2', listId: 'list-1', name: 'Free-Range Eggs', quantity: '1 Dozen', category: 'dairy', checked: false, starred: false, addedAt: new Date() },
@@ -207,7 +209,7 @@ const mockItems: ShoppingItem[] = [
   { id: 'item-47', listId: 'list-4', name: 'Fresh Flowers', quantity: '2 Bouquets', category: 'other', checked: false, starred: false, addedAt: new Date() },
 ];
 
-const mockInventory: InventoryItem[] = [
+const MOCK_INVENTORY: InventoryItem[] = [
   { id: 'inv-1', name: 'Toilet Paper', category: 'household', currentQty: 4, targetQty: 24, unit: 'rolls', lowStock: true, location: 'Hall Closet' },
   { id: 'inv-2', name: 'Paper Towels', category: 'household', currentQty: 8, targetQty: 12, unit: 'rolls', lowStock: false, location: 'Kitchen Pantry' },
   { id: 'inv-3', name: 'AA Batteries', category: 'household', currentQty: 2, targetQty: 16, unit: 'count', lowStock: true, location: 'Utility Drawer' },
@@ -225,12 +227,84 @@ const mockInventory: InventoryItem[] = [
   { id: 'inv-15', name: 'Ziploc Bags (Gallon)', category: 'household', currentQty: 20, targetQty: 50, unit: 'bags', lowStock: false, location: 'Kitchen Drawer' },
 ];
 
+// API-to-UI Mapping Functions
+function mapApiListToUi(apiList: Record<string, unknown>): ShoppingList {
+  const listType = String(apiList.type || 'custom').toLowerCase() as ListType;
+  const iconMap: Record<string, typeof ShoppingCart> = {
+    groceries: ShoppingCart,
+    costco: Store,
+    hardware: Wrench,
+    party: Sparkles,
+    custom: ListChecks,
+  };
+
+  return {
+    id: String(apiList.id || `list-${Date.now()}`),
+    name: String(apiList.name || 'Unnamed List'),
+    type: listType,
+    icon: iconMap[listType] || ShoppingCart,
+    itemCount: Number(apiList.itemCount || (Array.isArray(apiList.items) ? apiList.items.length : 0)),
+    pendingOrder: apiList.pendingOrder
+      ? {
+          orderId: String((apiList.pendingOrder as Record<string, unknown>).orderId || ''),
+          status: String((apiList.pendingOrder as Record<string, unknown>).status || 'pending') as 'pending' | 'processing' | 'in_transit' | 'delivered',
+          vendor: String((apiList.pendingOrder as Record<string, unknown>).vendor || ''),
+          eta: (apiList.pendingOrder as Record<string, unknown>).eta
+            ? String((apiList.pendingOrder as Record<string, unknown>).eta)
+            : undefined,
+        }
+      : undefined,
+  };
+}
+
+function mapApiItemToUi(apiItem: Record<string, unknown>, listId?: string): ShoppingItem {
+  const category = String(apiItem.category || 'other').toLowerCase() as ItemCategory;
+  return {
+    id: String(apiItem.id || `item-${Date.now()}`),
+    listId: String(apiItem.listId || listId || 'list-1'),
+    name: String(apiItem.name || 'Unknown Item'),
+    quantity: String(apiItem.quantity || '1'),
+    category: Object.keys(CATEGORIES).includes(category) ? category : 'other',
+    checked: Boolean(apiItem.checked || apiItem.isChecked || false),
+    starred: Boolean(apiItem.starred || apiItem.isStarred || apiItem.priority === 'high'),
+    notes: apiItem.notes ? String(apiItem.notes) : undefined,
+    addedAt: apiItem.addedAt ? new Date(String(apiItem.addedAt)) : new Date(),
+  };
+}
+
+function mapApiInventoryToUi(apiInv: Record<string, unknown>): InventoryItem {
+  const category = String(apiInv.category || 'household').toLowerCase() as ItemCategory;
+  const currentQty = Number(apiInv.currentQty || apiInv.quantity || 0);
+  const targetQty = Number(apiInv.targetQty || apiInv.target || currentQty * 2 || 10);
+  const lowStock = apiInv.lowStock !== undefined
+    ? Boolean(apiInv.lowStock)
+    : currentQty < targetQty * 0.25;
+
+  return {
+    id: String(apiInv.id || `inv-${Date.now()}`),
+    name: String(apiInv.name || 'Unknown Item'),
+    category: Object.keys(CATEGORIES).includes(category) ? category : 'household',
+    currentQty,
+    targetQty,
+    unit: String(apiInv.unit || 'count'),
+    lastRestocked: apiInv.lastRestocked ? new Date(String(apiInv.lastRestocked)) : undefined,
+    lowStock,
+    location: apiInv.location ? String(apiInv.location) : undefined,
+  };
+}
+
+// Export mapping functions for use in other components
+export { mapApiListToUi, mapApiItemToUi, mapApiInventoryToUi };
+
 export default function InventoryPage() {
-  // State
+  // Auth context for household
+  const { currentHousehold } = useAuth();
+
+  // State - initialize with mocks (hybrid pattern)
   const [viewMode, setViewMode] = useState<ViewMode>('lists');
-  const [lists, setLists] = useState<ShoppingList[]>(mockLists);
-  const [items, setItems] = useState<ShoppingItem[]>(mockItems);
-  const [inventory, setInventory] = useState<InventoryItem[]>(mockInventory);
+  const [lists, setLists] = useState<ShoppingList[]>(MOCK_LISTS);
+  const [items, setItems] = useState<ShoppingItem[]>(MOCK_ITEMS);
+  const [inventory, setInventory] = useState<InventoryItem[]>(MOCK_INVENTORY);
   const [activeListId, setActiveListId] = useState<string>('list-1');
   const [searchQuery, setSearchQuery] = useState('');
   const [newItemInput, setNewItemInput] = useState('');
@@ -239,6 +313,8 @@ export default function InventoryPage() {
   const [editingItem, setEditingItem] = useState<ShoppingItem | null>(null);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [editingInventory, setEditingInventory] = useState<InventoryItem | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isLoading, setIsLoading] = useState(true);
 
   // Order form state
   const [orderVendor, setOrderVendor] = useState('whole_foods');
@@ -246,6 +322,87 @@ export default function InventoryPage() {
   const [deliveryDate, setDeliveryDate] = useState('');
   const [deliveryTime, setDeliveryTime] = useState('');
   const [orderNotes, setOrderNotes] = useState('');
+
+  // Refs for debounced API calls
+  const pendingCheckUpdates = useRef<Record<string, NodeJS.Timeout>>({});
+  const pendingInventoryUpdates = useRef<Record<string, NodeJS.Timeout>>({});
+  const DEBOUNCE_MS = 500;
+
+  // Hybrid Data Fetching - load from API, fallback to mocks
+  // Note: Shopping list and inventory API endpoints are planned but not yet implemented
+  // The hybrid pattern allows UI to work with mocks until APIs are available
+  const loadInventoryData = useCallback(async () => {
+    if (!currentHousehold?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Type for future API methods (not yet in ApiClient)
+      type FutureApiClient = {
+        getHouseholdShoppingLists?: (id: string) => Promise<unknown[]>;
+        getHouseholdShoppingItems?: (id: string) => Promise<unknown[]>;
+        getHouseholdInventory?: (id: string) => Promise<unknown[]>;
+      };
+
+      const api = getApiClient() as unknown as FutureApiClient;
+
+      // Fetch all data in parallel with Promise.allSettled
+      const [listsResult, itemsResult, inventoryResult] = await Promise.allSettled([
+        api.getHouseholdShoppingLists?.(currentHousehold.id) ?? Promise.resolve([]),
+        api.getHouseholdShoppingItems?.(currentHousehold.id) ?? Promise.resolve([]),
+        api.getHouseholdInventory?.(currentHousehold.id) ?? Promise.resolve([]),
+      ]);
+
+      // Process shopping lists
+      if (listsResult.status === 'fulfilled') {
+        const listsData = listsResult.value;
+        if (Array.isArray(listsData) && listsData.length > 0) {
+          setLists(listsData.map((l) => mapApiListToUi(l as unknown as Record<string, unknown>)));
+        }
+      } else {
+        console.warn('Failed to fetch shopping lists:', listsResult.reason);
+      }
+
+      // Process shopping items
+      if (itemsResult.status === 'fulfilled') {
+        const itemsData = itemsResult.value;
+        if (Array.isArray(itemsData) && itemsData.length > 0) {
+          setItems(itemsData.map((i) => mapApiItemToUi(i as unknown as Record<string, unknown>)));
+        }
+      } else {
+        console.warn('Failed to fetch shopping items:', itemsResult.reason);
+      }
+
+      // Process inventory
+      if (inventoryResult.status === 'fulfilled') {
+        const inventoryData = inventoryResult.value;
+        if (Array.isArray(inventoryData) && inventoryData.length > 0) {
+          setInventory(inventoryData.map((inv) => mapApiInventoryToUi(inv as unknown as Record<string, unknown>)));
+        }
+      } else {
+        console.warn('Failed to fetch inventory:', inventoryResult.reason);
+      }
+    } catch (error) {
+      console.error('Error loading inventory data:', error);
+      // Keep mock data on failure - already initialized with mocks
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentHousehold?.id]);
+
+  // Load data on mount and when household changes
+  useEffect(() => {
+    loadInventoryData();
+  }, [loadInventoryData]);
+
+  // Cleanup pending timeouts on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(pendingCheckUpdates.current).forEach(clearTimeout);
+      Object.values(pendingInventoryUpdates.current).forEach(clearTimeout);
+    };
+  }, []);
 
   // Active list
   const activeList = useMemo(() => lists.find(l => l.id === activeListId), [lists, activeListId]);
@@ -325,13 +482,16 @@ export default function InventoryPage() {
     });
   }, []);
 
-  // Add items from input
-  const handleAddItems = useCallback(() => {
+  // Add items from input - with NLP parsing and optimistic API sync
+  const handleAddItems = useCallback(async () => {
     if (!newItemInput.trim()) return;
 
     const parsedItems = parseItemInput(newItemInput);
+    const timestamp = Date.now();
+
+    // Create optimistic items with temporary IDs
     const newItems: ShoppingItem[] = parsedItems.map((parsed, idx) => ({
-      id: `item-new-${Date.now()}-${idx}`,
+      id: `item-temp-${timestamp}-${idx}`,
       listId: activeListId,
       name: parsed.name.charAt(0).toUpperCase() + parsed.name.slice(1),
       quantity: parsed.quantity,
@@ -341,41 +501,154 @@ export default function InventoryPage() {
       addedAt: new Date(),
     }));
 
+    // Extract temp IDs for tracking
+    const tempIds = newItems.map(item => item.id);
+
+    // Optimistic update - add to UI immediately
     setItems(prev => [...prev, ...newItems]);
     setNewItemInput('');
 
-    // Update list count
+    // Update list count optimistically
     setLists(prev => prev.map(l =>
       l.id === activeListId ? { ...l, itemCount: l.itemCount + newItems.length } : l
     ));
-  }, [newItemInput, activeListId, parseItemInput, categorizeItem]);
 
-  // Toggle item checked
+    // Sync with API in background (API endpoints not yet implemented)
+    if (currentHousehold?.id) {
+      try {
+        type FutureApiClient = {
+          createShoppingItem?: (householdId: string, item: Record<string, unknown>) => Promise<unknown>;
+        };
+        const api = getApiClient() as unknown as FutureApiClient;
+        const apiItems = await Promise.all(
+          newItems.map(item =>
+            api.createShoppingItem?.(currentHousehold.id, {
+              listId: item.listId,
+              name: item.name,
+              quantity: item.quantity,
+              category: item.category,
+            }) ?? Promise.resolve(null)
+          )
+        );
+
+        // Replace temp IDs with real IDs from API
+        setItems(prev => prev.map(item => {
+          const tempIndex = tempIds.indexOf(item.id);
+          if (tempIndex >= 0 && apiItems[tempIndex]) {
+            const apiItem = apiItems[tempIndex] as Record<string, unknown>;
+            return { ...item, id: String(apiItem.id || item.id) };
+          }
+          return item;
+        }));
+      } catch (error) {
+        console.error('Failed to sync new items to API:', error);
+        // Items remain in UI with temp IDs - will sync on next load
+      }
+    }
+  }, [newItemInput, activeListId, parseItemInput, categorizeItem, currentHousehold?.id]);
+
+  // Toggle item checked - with debounced API sync
   const toggleItemChecked = useCallback((itemId: string) => {
+    // Optimistic update - toggle immediately in UI
     setItems(prev => prev.map(item =>
       item.id === itemId ? { ...item, checked: !item.checked } : item
     ));
-  }, []);
 
-  // Toggle item starred
+    // Clear any pending timeout for this item
+    if (pendingCheckUpdates.current[itemId]) {
+      clearTimeout(pendingCheckUpdates.current[itemId]);
+    }
+
+    // Debounced API call (API endpoints not yet implemented)
+    pendingCheckUpdates.current[itemId] = setTimeout(async () => {
+      try {
+        type FutureApiClient = {
+          updateShoppingItem?: (householdId: string, itemId: string, data: Record<string, unknown>) => Promise<unknown>;
+        };
+        const api = getApiClient() as unknown as FutureApiClient;
+        const item = items.find(i => i.id === itemId);
+        if (item && currentHousehold?.id) {
+          // Call API to persist the change
+          await api.updateShoppingItem?.(currentHousehold.id, itemId, {
+            checked: !item.checked,
+          });
+        }
+      } catch (err: unknown) {
+        console.error('Failed to sync item check status:', err);
+        // Revert on failure
+        setItems(prev => prev.map(item =>
+          item.id === itemId ? { ...item, checked: !item.checked } : item
+        ));
+      } finally {
+        delete pendingCheckUpdates.current[itemId];
+      }
+    }, DEBOUNCE_MS);
+  }, [items, currentHousehold?.id]);
+
+  // Toggle item starred - with optimistic API sync
   const toggleItemStarred = useCallback((itemId: string) => {
+    // Optimistic update
     setItems(prev => prev.map(item =>
       item.id === itemId ? { ...item, starred: !item.starred } : item
     ));
-  }, []);
 
-  // Delete item
+    // Sync to API (no debounce needed for star - less frequent action)
+    // API endpoints not yet implemented
+    if (currentHousehold?.id) {
+      const item = items.find(i => i.id === itemId);
+      if (item) {
+        type FutureApiClient = {
+          updateShoppingItem?: (householdId: string, itemId: string, data: Record<string, unknown>) => Promise<unknown>;
+        };
+        const api = getApiClient() as unknown as FutureApiClient;
+        api.updateShoppingItem?.(currentHousehold.id, itemId, {
+          starred: !item.starred,
+        })?.catch((err: unknown) => {
+          console.error('Failed to sync star status:', err);
+          // Revert on failure
+          setItems(prev => prev.map(i =>
+            i.id === itemId ? { ...i, starred: !i.starred } : i
+          ));
+        });
+      }
+    }
+  }, [items, currentHousehold?.id]);
+
+  // Delete item - with optimistic API sync
   const deleteItem = useCallback((itemId: string) => {
+    // Store item for potential rollback
+    const deletedItem = items.find(i => i.id === itemId);
+
+    // Optimistic delete
     setItems(prev => prev.filter(item => item.id !== itemId));
     setLists(prev => prev.map(l =>
       l.id === activeListId ? { ...l, itemCount: Math.max(0, l.itemCount - 1) } : l
     ));
-  }, [activeListId]);
 
-  // Move item to inventory
+    // Sync to API (API endpoints not yet implemented)
+    if (currentHousehold?.id && deletedItem) {
+      type FutureApiClient = {
+        deleteShoppingItem?: (householdId: string, itemId: string) => Promise<unknown>;
+      };
+      const api = getApiClient() as unknown as FutureApiClient;
+      api.deleteShoppingItem?.(currentHousehold.id, itemId)?.catch((err: unknown) => {
+        console.error('Failed to delete item from API:', err);
+        // Revert on failure
+        if (deletedItem) {
+          setItems(prev => [...prev, deletedItem]);
+          setLists(prev => prev.map(l =>
+            l.id === activeListId ? { ...l, itemCount: l.itemCount + 1 } : l
+          ));
+        }
+      });
+    }
+  }, [activeListId, items, currentHousehold?.id]);
+
+  // Move item to inventory - with optimistic API sync
   const moveToInventory = useCallback((item: ShoppingItem) => {
+    const tempId = `inv-temp-${Date.now()}`;
     const newInventoryItem: InventoryItem = {
-      id: `inv-new-${Date.now()}`,
+      id: tempId,
       name: item.name,
       category: item.category,
       currentQty: parseInt(item.quantity) || 1,
@@ -384,14 +657,44 @@ export default function InventoryPage() {
       lowStock: false,
       location: 'To Be Assigned',
     };
+
+    // Optimistic update
     setInventory(prev => [...prev, newInventoryItem]);
     deleteItem(item.id);
-  }, [deleteItem]);
 
-  // Add inventory item to shopping list
+    // Sync to API (API endpoints not yet implemented)
+    if (currentHousehold?.id) {
+      type FutureApiClient = {
+        createInventoryItem?: (householdId: string, item: Record<string, unknown>) => Promise<unknown>;
+      };
+      const api = getApiClient() as unknown as FutureApiClient;
+      api.createInventoryItem?.(currentHousehold.id, {
+        name: newInventoryItem.name,
+        category: newInventoryItem.category,
+        currentQty: newInventoryItem.currentQty,
+        targetQty: newInventoryItem.targetQty,
+        unit: newInventoryItem.unit,
+        location: newInventoryItem.location,
+      })?.then((response: unknown) => {
+        // Replace temp ID with real ID
+        if (response) {
+          const apiItem = response as Record<string, unknown>;
+          setInventory(prev => prev.map(inv =>
+            inv.id === tempId ? { ...inv, id: String(apiItem.id || inv.id) } : inv
+          ));
+        }
+      }).catch((err: unknown) => {
+        console.error('Failed to create inventory item:', err);
+        // Keep item in UI with temp ID - will sync on next load
+      });
+    }
+  }, [deleteItem, currentHousehold?.id]);
+
+  // Add inventory item to shopping list - with optimistic API sync
   const addToShoppingList = useCallback((invItem: InventoryItem) => {
+    const tempId = `item-from-inv-${Date.now()}`;
     const newItem: ShoppingItem = {
-      id: `item-from-inv-${Date.now()}`,
+      id: tempId,
       listId: activeListId,
       name: invItem.name,
       quantity: `${invItem.targetQty - invItem.currentQty} ${invItem.unit}`,
@@ -400,20 +703,75 @@ export default function InventoryPage() {
       starred: true,
       addedAt: new Date(),
     };
+
+    // Optimistic update
     setItems(prev => [...prev, newItem]);
     setLists(prev => prev.map(l =>
       l.id === activeListId ? { ...l, itemCount: l.itemCount + 1 } : l
     ));
-  }, [activeListId]);
 
-  // Update inventory quantity
+    // Sync to API (API endpoints not yet implemented)
+    if (currentHousehold?.id) {
+      type FutureApiClient = {
+        createShoppingItem?: (householdId: string, item: Record<string, unknown>) => Promise<unknown>;
+      };
+      const api = getApiClient() as unknown as FutureApiClient;
+      api.createShoppingItem?.(currentHousehold.id, {
+        listId: newItem.listId,
+        name: newItem.name,
+        quantity: newItem.quantity,
+        category: newItem.category,
+        starred: true,
+      })?.then((response: unknown) => {
+        if (response) {
+          const apiItem = response as Record<string, unknown>;
+          setItems(prev => prev.map(item =>
+            item.id === tempId ? { ...item, id: String(apiItem.id || item.id) } : item
+          ));
+        }
+      }).catch((err: unknown) => {
+        console.error('Failed to add item to shopping list:', err);
+        // Keep item in UI with temp ID
+      });
+    }
+  }, [activeListId, currentHousehold?.id]);
+
+  // Update inventory quantity - with debounced API sync for rapid +/- clicks
   const updateInventoryQty = useCallback((invId: string, newQty: number) => {
+    // Optimistic update
     setInventory(prev => prev.map(inv => {
       if (inv.id !== invId) return inv;
       const lowStock = newQty < inv.targetQty * 0.25;
       return { ...inv, currentQty: newQty, lowStock };
     }));
-  }, []);
+
+    // Clear any pending timeout for this inventory item
+    if (pendingInventoryUpdates.current[invId]) {
+      clearTimeout(pendingInventoryUpdates.current[invId]);
+    }
+
+    // Debounced API call - waits for user to stop clicking +/-
+    // API endpoints not yet implemented
+    pendingInventoryUpdates.current[invId] = setTimeout(async () => {
+      try {
+        if (currentHousehold?.id) {
+          type FutureApiClient = {
+            updateInventoryItem?: (householdId: string, invId: string, data: Record<string, unknown>) => Promise<unknown>;
+          };
+          const api = getApiClient() as unknown as FutureApiClient;
+          await api.updateInventoryItem?.(currentHousehold.id, invId, {
+            currentQty: newQty,
+          });
+        }
+      } catch (err: unknown) {
+        console.error('Failed to sync inventory quantity:', err);
+        // Note: We don't revert here as the user has likely clicked multiple times
+        // The next load will sync the correct value from the server
+      } finally {
+        delete pendingInventoryUpdates.current[invId];
+      }
+    }, DEBOUNCE_MS);
+  }, [currentHousehold?.id]);
 
   // Submit order
   const handleSubmitOrder = useCallback(() => {
