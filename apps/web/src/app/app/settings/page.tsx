@@ -371,10 +371,16 @@ export default function SettingsPage() {
         </div>
 
         <div className="flex items-center gap-3">
-          <button className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors">
+          <button
+            onClick={() => showToast('Plan options coming soon')}
+            className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+          >
             Change Plan
           </button>
-          <button className="text-sm text-slate-500 hover:text-slate-700 transition-colors">
+          <button
+            onClick={() => showToast('Please contact support to cancel')}
+            className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+          >
             Cancel Subscription
           </button>
         </div>
@@ -436,7 +442,10 @@ export default function SettingsPage() {
                 }`}>
                   {invoice.status === 'paid' ? 'Paid' : 'Pending'}
                 </span>
-                <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors">
+                <button
+                  onClick={() => showToast('Downloading invoice...')}
+                  className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
+                >
                   <Download className="w-5 h-5" />
                 </button>
               </div>
@@ -507,11 +516,21 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center gap-2">
                   {integration.status === 'connected' && (
-                    <button className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors">
+                    <button
+                      onClick={() => showToast(`Syncing ${integration.name}...`)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
+                    >
                       <RefreshCw className="w-5 h-5" />
                     </button>
                   )}
                   <button
+                    onClick={() => {
+                      if (integration.status === 'disconnected') {
+                        showToast(`Connecting to ${integration.name}...`);
+                      } else {
+                        showToast(`Opening ${integration.name} settings`);
+                      }
+                    }}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                       integration.status === 'disconnected'
                         ? 'bg-emerald-600 text-white hover:bg-emerald-700'
@@ -527,7 +546,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Add Integration */}
-        <button className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors">
+        <button
+          onClick={() => showToast('Browse integrations coming soon!')}
+          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+        >
           <Plus className="w-5 h-5" />
           <span className="font-medium">Add Integration</span>
         </button>
@@ -567,7 +589,10 @@ export default function SettingsPage() {
           </ul>
         </div>
 
-        <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+        <button
+          onClick={() => showToast('Preparing archive... This may take a few minutes.')}
+          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+        >
           <Download className="w-5 h-5" />
           Download Full Archive
         </button>
@@ -651,7 +676,12 @@ export default function SettingsPage() {
             <p className="font-semibold text-slate-900">Steve Manager</p>
             <p className="text-sm text-emerald-700">Online - Available now</p>
           </div>
-          <button className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+          <button
+            onClick={() => {
+              window.location.href = '/app/messages';
+            }}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+          >
             <MessageCircle className="w-5 h-5" />
             Message
           </button>
@@ -664,14 +694,15 @@ export default function SettingsPage() {
 
         <div className="space-y-3">
           {[
-            { icon: BookOpen, label: 'User Guide', description: 'Learn how to use Haven' },
-            { icon: CircleHelp, label: 'FAQs', description: 'Common questions answered' },
-            { icon: MessageCircle, label: 'Contact Support', description: 'Get help from our team' },
+            { icon: BookOpen, label: 'User Guide', description: 'Learn how to use Haven', action: () => showToast('Opening User Guide...') },
+            { icon: CircleHelp, label: 'FAQs', description: 'Common questions answered', action: () => showToast('Opening FAQs...') },
+            { icon: MessageCircle, label: 'Contact Support', description: 'Get help from our team', action: () => { window.location.href = '/app/messages'; } },
           ].map((item, index) => {
             const Icon = item.icon;
             return (
               <button
                 key={index}
+                onClick={item.action}
                 className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-4">

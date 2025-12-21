@@ -576,9 +576,17 @@ function MessageBubble({ message, showSender }: { message: Message; showSender: 
 function InfoDrawer({
   conversation,
   onClose,
+  onCall,
+  onVideoCall,
+  onMuteToggle,
+  onBlock,
 }: {
   conversation: Conversation;
   onClose: () => void;
+  onCall?: () => void;
+  onVideoCall?: () => void;
+  onMuteToggle?: () => void;
+  onBlock?: () => void;
 }) {
   const participant = conversation.participants[0];
   const allImages = conversation.messages
@@ -621,13 +629,19 @@ function InfoDrawer({
         {/* Actions */}
         <div className="p-4 border-b border-slate-200">
           <div className="flex justify-center gap-4">
-            <button className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+            <button
+              onClick={onCall}
+              className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
+            >
               <div className="p-2 bg-emerald-100 rounded-full">
                 <Phone className="w-5 h-5 text-emerald-600" />
               </div>
               <span className="text-xs text-slate-600">Call</span>
             </button>
-            <button className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+            <button
+              onClick={onVideoCall}
+              className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
+            >
               <div className="p-2 bg-blue-100 rounded-full">
                 <Video className="w-5 h-5 text-blue-600" />
               </div>
@@ -717,7 +731,10 @@ function InfoDrawer({
         <div className="p-4">
           <h5 className="text-sm font-medium text-slate-900 mb-3">Privacy</h5>
           <div className="space-y-2">
-            <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 rounded-lg transition-colors">
+            <button
+              onClick={onMuteToggle}
+              className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 rounded-lg transition-colors"
+            >
               {conversation.isMuted ? (
                 <BellOff className="w-5 h-5 text-slate-500" />
               ) : (
@@ -727,7 +744,10 @@ function InfoDrawer({
                 {conversation.isMuted ? 'Unmute Notifications' : 'Mute Notifications'}
               </span>
             </button>
-            <button className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-lg transition-colors text-red-600">
+            <button
+              onClick={onBlock}
+              className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-lg transition-colors text-red-600"
+            >
               <Ban className="w-5 h-5" />
               <span className="text-sm">Block</span>
             </button>
@@ -743,12 +763,20 @@ function InfoDrawer({
 // ============================================================================
 
 export default function MessagesPage() {
-  const [conversations] = useState(mockConversations);
+  const [conversations, setConversations] = useState(mockConversations);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [showInfoDrawer, setShowInfoDrawer] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNewConvoModal, setShowNewConvoModal] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Toast helper
+  const showToast = (message: string) => {
+    setToast(message);
+    setTimeout(() => setToast(null), 3000);
+  };
 
   const [channelGroups, setChannelGroups] = useState<ChannelGroup[]>([
     { type: 'family', label: 'Family', icon: Home, isExpanded: true },
@@ -779,9 +807,112 @@ export default function MessagesPage() {
   }, [selectedConversation?.messages]);
 
   const handleSend = () => {
-    if (!messageInput.trim()) return;
-    // In real app, would send via API
+    if (!messageInput.trim() || !selectedConversation) return;
+
+    const newMessage: Message = {
+      id: `msg-${Date.now()}`,
+      sender: 'me',
+      content: messageInput.trim(),
+      timestamp: new Date().toISOString(),
+      status: 'sent',
+    };
+
+    // Optimistic update - add message to conversation
+    const updatedConversation = {
+      ...selectedConversation,
+      messages: [...selectedConversation.messages, newMessage],
+      lastActivity: new Date().toISOString(),
+    };
+
+    setConversations(prev =>
+      prev.map(c => c.id === selectedConversation.id ? updatedConversation : c)
+    );
+    setSelectedConversation(updatedConversation);
     setMessageInput('');
+
+    // Simulate message being delivered
+    setTimeout(() => {
+      setConversations(prev =>
+        prev.map(c => {
+          if (c.id === selectedConversation.id) {
+            const msgs = c.messages.map(m =>
+              m.id === newMessage.id ? { ...m, status: 'delivered' as const } : m
+            );
+            return { ...c, messages: msgs };
+          }
+          return c;
+        })
+      );
+    }, 1000);
+  };
+
+  // Handle call
+  const handleCall = (participant?: Participant) => {
+    const name = participant?.name || selectedConversation?.title || 'Contact';
+    showToast(`Calling ${name}...`);
+  };
+
+  // Handle video call
+  const handleVideoCall = (participant?: Participant) => {
+    const name = participant?.name || selectedConversation?.title || 'Contact';
+    showToast(`Starting video call with ${name}...`);
+  };
+
+  // Handle attachment
+  const handleAttachment = () => {
+    showToast('Attach files coming soon!');
+  };
+
+  // Handle camera
+  const handleCamera = () => {
+    showToast('Camera capture coming soon!');
+  };
+
+  // Handle schedule
+  const handleSchedule = () => {
+    showToast('Opening calendar to schedule...');
+    window.location.href = '/app/calendar?action=schedule';
+  };
+
+  // Handle new conversation
+  const handleNewConversation = () => {
+    setShowNewConvoModal(true);
+  };
+
+  // Handle mute toggle
+  const handleMuteToggle = () => {
+    if (!selectedConversation) return;
+    const isMuted = !selectedConversation.isMuted;
+    setConversations(prev =>
+      prev.map(c => c.id === selectedConversation.id ? { ...c, isMuted } : c)
+    );
+    setSelectedConversation(prev => prev ? { ...prev, isMuted } : null);
+    showToast(isMuted ? 'Notifications muted' : 'Notifications enabled');
+  };
+
+  // Handle block (confirm first)
+  const handleBlock = () => {
+    showToast('Block feature requires confirmation');
+  };
+
+  // Handle approve estimate
+  const handleApproveEstimate = (amount: number, vendor: string) => {
+    showToast(`Approved $${amount.toLocaleString()} estimate from ${vendor}`);
+  };
+
+  // Handle decline estimate
+  const handleDeclineEstimate = (vendor: string) => {
+    showToast(`Declined estimate from ${vendor}`);
+  };
+
+  // Handle book flight
+  const handleBookFlight = (airline: string, price: number) => {
+    showToast(`Booking ${airline} flight for $${price.toLocaleString()}...`);
+  };
+
+  // Handle book hotel
+  const handleBookHotel = (name: string, pricePerNight: number) => {
+    showToast(`Booking ${name} at $${pricePerNight}/night...`);
   };
 
   const participant = selectedConversation?.participants[0];
@@ -797,7 +928,10 @@ export default function MessagesPage() {
           <div className="p-4 border-b border-slate-200">
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-bold text-slate-900">Messages</h1>
-              <button className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700">
+              <button
+                onClick={handleNewConversation}
+                className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+              >
                 <Plus className="w-5 h-5" />
               </button>
             </div>
@@ -918,10 +1052,16 @@ export default function MessagesPage() {
                 </div>
 
                 <div className="flex items-center gap-1">
-                  <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button
+                    onClick={() => handleCall(participant)}
+                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
                     <Phone className="w-5 h-5 text-slate-600" />
                   </button>
-                  <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                  <button
+                    onClick={() => handleVideoCall(participant)}
+                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  >
                     <Video className="w-5 h-5 text-slate-600" />
                   </button>
                   <button
@@ -955,13 +1095,22 @@ export default function MessagesPage() {
               <div className="bg-white border-t border-slate-200 p-4">
                 <div className="flex items-end gap-2">
                   <div className="flex gap-1">
-                    <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button
+                      onClick={handleAttachment}
+                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
                       <Paperclip className="w-5 h-5 text-slate-500" />
                     </button>
-                    <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button
+                      onClick={handleCamera}
+                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
                       <Camera className="w-5 h-5 text-slate-500" />
                     </button>
-                    <button className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <button
+                      onClick={handleSchedule}
+                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
                       <Calendar className="w-5 h-5 text-slate-500" />
                     </button>
                   </div>
@@ -1001,7 +1150,10 @@ export default function MessagesPage() {
               <p className="text-slate-500 max-w-sm mb-6">
                 Stay connected with your home team, family, vendors, and neighbors all in one place.
               </p>
-              <button className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+              <button
+                onClick={handleNewConversation}
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+              >
                 <Plus className="w-5 h-5" />
                 Start a Conversation
               </button>
@@ -1015,10 +1167,68 @@ export default function MessagesPage() {
             <InfoDrawer
               conversation={selectedConversation}
               onClose={() => setShowInfoDrawer(false)}
+              onCall={() => handleCall(participant)}
+              onVideoCall={() => handleVideoCall(participant)}
+              onMuteToggle={handleMuteToggle}
+              onBlock={handleBlock}
             />
           </div>
         )}
       </div>
+
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50">
+          <div className="flex items-center gap-3 px-4 py-3 bg-slate-800 text-white rounded-lg shadow-lg">
+            <Check className="w-5 h-5" />
+            <span className="font-medium">{toast}</span>
+          </div>
+        </div>
+      )}
+
+      {/* New Conversation Modal */}
+      {showNewConvoModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-slate-900">New Conversation</h2>
+              <button
+                onClick={() => setShowNewConvoModal(false)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-slate-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-sm text-slate-600 mb-4">Start a conversation with your team:</p>
+                <div className="space-y-2">
+                  {Object.entries(mockParticipants).slice(0, 4).map(([key, p]) => (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        showToast(`Starting conversation with ${p.name}`);
+                        setShowNewConvoModal(false);
+                        // Would select or create conversation with this participant
+                      }}
+                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-left"
+                    >
+                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200">
+                        <Image src={p.avatar} alt="" width={40} height={40} className="object-cover" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-slate-900">{p.name}</p>
+                        {p.role && <p className="text-sm text-slate-500">{p.role}</p>}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

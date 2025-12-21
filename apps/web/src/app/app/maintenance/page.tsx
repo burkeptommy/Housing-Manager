@@ -599,6 +599,13 @@ export default function MaintenancePage() {
   const [formCost, setFormCost] = useState<string>('');
   const [formNotes, setFormNotes] = useState<string>('');
 
+  // Toast state for user feedback
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+  const showToast = (message: string, type: 'success' | 'info' = 'success') => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
   // ============================================================================
   // DATA FETCHING
   // ============================================================================
@@ -709,6 +716,67 @@ export default function MaintenancePage() {
     setFormCost('');
     setFormNotes('');
   };
+
+  // Handle alert action
+  const handleAlertAction = useCallback((alert: MaintenanceAlert) => {
+    if (alert.assetId) {
+      const asset = assets.find(a => a.id === alert.assetId);
+      if (asset) {
+        setSelectedAsset(asset);
+        setShowLogServiceModal(true);
+        showToast('Schedule service for ' + alert.assetName, 'info');
+      }
+    } else {
+      showToast('Creating service request for ' + alert.assetName, 'info');
+    }
+  }, [assets]);
+
+  // Handle add asset (placeholder)
+  const handleAddAsset = useCallback(() => {
+    showToast('Add Asset feature coming soon! For now, contact your manager.', 'info');
+  }, []);
+
+  // Handle find pros
+  const handleFindPros = useCallback(() => {
+    window.location.href = '/app/community?tab=vendors';
+  }, []);
+
+  // Handle request pro
+  const handleRequestPro = useCallback((assetName?: string) => {
+    const message = assetName ? `&subject=Service for ${assetName}` : '';
+    window.location.href = '/app/requests?action=new' + message;
+  }, []);
+
+  // Handle call vendor
+  const handleCallVendor = useCallback((vendor: TrustedVendor) => {
+    showToast('Calling ' + vendor.name + '...', 'info');
+    // In production, this would open tel: link
+    window.location.href = 'tel:' + vendor.phone.replace(/\D/g, '');
+  }, []);
+
+  // Handle message vendor
+  const handleMessageVendor = useCallback((vendor: TrustedVendor) => {
+    showToast('Opening message to ' + vendor.name, 'info');
+    window.location.href = '/app/messages?vendor=' + vendor.id;
+  }, []);
+
+  // Handle schedule vendor
+  const handleScheduleVendor = useCallback((vendor: TrustedVendor) => {
+    showToast('Scheduling with ' + vendor.name, 'info');
+    window.location.href = '/app/requests?vendor=' + vendor.id + '&action=schedule';
+  }, []);
+
+  // Handle download invoice
+  const handleDownloadInvoice = useCallback((record: ServiceRecord) => {
+    showToast('Downloading invoice for ' + record.serviceType, 'info');
+    // In production would open actual invoice URL
+  }, []);
+
+  // Handle view all history
+  const handleViewAllHistory = useCallback(() => {
+    showToast('Showing full service history', 'info');
+    // Could navigate to a dedicated history page or expand view
+  }, []);
 
   // ============================================================================
   // COMPUTED VALUES
@@ -840,6 +908,22 @@ export default function MaintenancePage() {
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Toast Notification */}
+      {toast && (
+        <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
+          <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
+            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
+          }`}>
+            {toast.type === 'success' ? (
+              <CheckCircle2 className="w-5 h-5" />
+            ) : (
+              <AlertCircle className="w-5 h-5" />
+            )}
+            <span className="font-medium">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -930,7 +1014,10 @@ export default function MaintenancePage() {
                       </span>
                     )}
                     {alert.severity !== 'success' && (
-                      <button className="text-sm font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap">
+                      <button
+                        onClick={() => handleAlertAction(alert)}
+                        className="text-sm font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap"
+                      >
                         Take Action
                       </button>
                     )}
@@ -950,7 +1037,10 @@ export default function MaintenancePage() {
             <h2 className="font-semibold text-slate-900">My Assets</h2>
             <span className="text-sm text-slate-500">({assets.length})</span>
           </div>
-          <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
+          <button
+            onClick={handleAddAsset}
+            className="text-sm text-emerald-600 font-medium hover:text-emerald-700"
+          >
             + Add Asset
           </button>
         </div>
@@ -1026,7 +1116,7 @@ export default function MaintenancePage() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          // Navigate to requests with asset pre-selected
+                          handleRequestPro(asset.name);
                         }}
                         className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
                         title="Request Pro"
@@ -1051,7 +1141,10 @@ export default function MaintenancePage() {
               <BadgeCheck className="w-5 h-5 text-emerald-600" />
               <h2 className="font-semibold text-slate-900">My Team</h2>
             </div>
-            <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1">
+            <button
+              onClick={handleFindPros}
+              className="text-sm text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1"
+            >
               Find Pros
               <ExternalLink className="w-4 h-4" />
             </button>
@@ -1081,13 +1174,25 @@ export default function MaintenancePage() {
                     )}
                   </div>
                   <div className="flex gap-1">
-                    <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors">
+                    <button
+                      onClick={() => handleCallVendor(vendor)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
+                      title="Call"
+                    >
                       <Phone className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors">
+                    <button
+                      onClick={() => handleMessageVendor(vendor)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
+                      title="Message"
+                    >
                       <MessageCircle className="w-4 h-4" />
                     </button>
-                    <button className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors">
+                    <button
+                      onClick={() => handleScheduleVendor(vendor)}
+                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
+                      title="Schedule"
+                    >
                       <RefreshCw className="w-4 h-4" />
                     </button>
                   </div>
@@ -1099,7 +1204,10 @@ export default function MaintenancePage() {
               <BadgeCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
               <p className="text-slate-600 font-medium">Build your team</p>
               <p className="text-sm text-slate-500 mt-1">Find trusted pros in the Social Directory</p>
-              <button className="mt-4 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+              <button
+                onClick={handleFindPros}
+                className="mt-4 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+              >
                 Browse Directory
               </button>
             </div>
@@ -1113,7 +1221,10 @@ export default function MaintenancePage() {
               <Clock className="w-5 h-5 text-slate-400" />
               <h2 className="font-semibold text-slate-900">Service History</h2>
             </div>
-            <button className="text-sm text-slate-500 hover:text-slate-700">
+            <button
+              onClick={handleViewAllHistory}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
               View All
             </button>
           </div>
@@ -1186,7 +1297,10 @@ export default function MaintenancePage() {
                               )}
                             </div>
                             {record.invoiceUrl && (
-                              <button className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700">
+                              <button
+                                onClick={(e) => { e.stopPropagation(); handleDownloadInvoice(record); }}
+                                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700"
+                              >
                                 <FileText className="w-3 h-3" />
                                 Invoice
                               </button>
@@ -1489,6 +1603,10 @@ export default function MaintenancePage() {
                   Log Service
                 </button>
                 <button
+                  onClick={() => {
+                    handleRequestPro(showAssetDetailModal.name);
+                    setShowAssetDetailModal(null);
+                  }}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
                 >
                   <Phone className="w-5 h-5" />

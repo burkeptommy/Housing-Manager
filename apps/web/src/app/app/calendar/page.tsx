@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import {
   ChevronLeft,
@@ -27,6 +27,17 @@ import {
   Repeat,
   Filter,
   Sparkles,
+  Bell,
+  CheckCircle2,
+  Link2,
+  RefreshCw,
+  UserCheck,
+  Info,
+  AlertCircle,
+  ExternalLink,
+  Shield,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { getDemoImage } from '@/lib/imageUtils';
 
@@ -38,6 +49,8 @@ type ViewMode = 'month' | 'week' | 'agenda';
 type EventLayer = 'house' | 'family';
 type EventCategory = 'service' | 'delivery' | 'family' | 'kids' | 'travel' | 'social' | 'health';
 type FilterType = 'all' | 'house' | 'family' | 'kids' | 'travel';
+type EventCreatorRole = 'HOMEOWNER' | 'MANAGER' | 'SYSTEM' | 'SYNCED';
+type SyncSource = 'GOOGLE' | 'APPLE' | 'OUTLOOK' | 'MANUAL';
 
 interface CalendarEvent {
   id: string;
@@ -58,6 +71,15 @@ interface CalendarEvent {
   icon?: string;
   requiresAccess?: boolean;
   conflict?: boolean;
+  // New manager-related fields
+  createdByRole?: EventCreatorRole;
+  createdByName?: string;
+  managerNote?: string;
+  requiresAction?: boolean;
+  actionDescription?: string;
+  reminderText?: string;
+  conflictReason?: string;
+  syncSource?: SyncSource;
 }
 
 interface FamilyMember {
@@ -73,6 +95,21 @@ interface DayWeather {
   temp: number;
 }
 
+interface SmartReminder {
+  id: string;
+  eventId: string;
+  message: string;
+  date: Date;
+  type: 'snack_duty' | 'permission_slip' | 'anniversary' | 'custom';
+  isAcknowledged: boolean;
+}
+
+interface DayAttention {
+  date: string;
+  issues: string[];
+  severity: 'warning' | 'critical';
+}
+
 // ============================================================================
 // MOCK DATA GENERATION
 // ============================================================================
@@ -83,6 +120,9 @@ const mockFamilyMembers: FamilyMember[] = [
   { id: 'fm3', name: 'Emma', avatar: getDemoImage('avatar-kid', 80, 80, 'emma'), role: 'child' },
   { id: 'fm4', name: 'Jake', avatar: getDemoImage('avatar-kid', 80, 80, 'jake'), role: 'child' },
 ];
+
+// Manager name for demo
+const MANAGER_NAME = 'Sarah';
 
 // Generate dates relative to today
 const today = new Date();
@@ -126,6 +166,8 @@ function generateMockEvents(): CalendarEvent[] {
         isRecurring: true,
         recurrence: 'weekly',
         attendees: ['Emma', 'Bob'],
+        createdByRole: 'SYSTEM',
+        syncSource: 'MANUAL',
       });
     }
 
@@ -144,6 +186,8 @@ function generateMockEvents(): CalendarEvent[] {
         isRecurring: true,
         recurrence: 'weekly',
         attendees: ['Jake', 'Alice'],
+        createdByRole: 'SYSTEM',
+        syncSource: 'MANUAL',
       });
     }
 
@@ -163,6 +207,7 @@ function generateMockEvents(): CalendarEvent[] {
         description: 'Put bins out the night before',
         isRecurring: true,
         recurrence: 'weekly',
+        createdByRole: 'SYSTEM',
       });
     }
 
@@ -182,6 +227,9 @@ function generateMockEvents(): CalendarEvent[] {
         isRecurring: true,
         recurrence: 'weekly',
         requiresAccess: true,
+        createdByRole: 'MANAGER',
+        createdByName: MANAGER_NAME,
+        managerNote: 'Set up by Sarah - they have gate code',
       });
     }
 
@@ -199,6 +247,8 @@ function generateMockEvents(): CalendarEvent[] {
         location: 'Backyard Pool',
         isRecurring: true,
         recurrence: 'weekly',
+        createdByRole: 'MANAGER',
+        createdByName: MANAGER_NAME,
       });
     }
 
@@ -216,27 +266,16 @@ function generateMockEvents(): CalendarEvent[] {
         isRecurring: true,
         recurrence: 'biweekly',
         requiresAccess: true,
+        createdByRole: 'MANAGER',
+        createdByName: MANAGER_NAME,
+        managerNote: 'Maria comes every other Monday. Key under mat.',
       });
     }
   }
 
-  // ========== ONE-TIME MAINTENANCE EVENTS ==========
+  // ========== MANAGER-ADDED ONE-TIME EVENTS ==========
 
-  // HVAC Service - Last week
-  events.push({
-    id: `e${eventId++}`,
-    title: 'HVAC Maintenance',
-    startDate: getDate(-5, 9, 0),
-    endDate: getDate(-5, 12, 0),
-    startTime: '09:00',
-    endTime: '12:00',
-    layer: 'house',
-    category: 'service',
-    description: 'Annual AC inspection and filter replacement - Completed',
-    requiresAccess: true,
-  });
-
-  // Gutter Cleaning - Next week
+  // Gutter Cleaning - Next week (Manager scheduled)
   events.push({
     id: `e${eventId++}`,
     title: 'Gutter Cleaning',
@@ -248,9 +287,14 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'service',
     description: 'Seasonal gutter cleaning and inspection',
     requiresAccess: true,
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'I found CleanPro - great reviews, $150. They need backyard access.',
+    requiresAction: true,
+    actionDescription: 'Confirm access code',
   });
 
-  // Pest Control - In 10 days
+  // Pest Control - Conflict detected
   events.push({
     id: `e${eventId++}`,
     title: 'Pest Control Service',
@@ -262,7 +306,28 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'service',
     description: 'Quarterly pest inspection - interior access needed',
     requiresAccess: true,
-    conflict: true, // Nobody home during this time
+    conflict: true,
+    conflictReason: "You'll be at Jake's Science Fair",
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Quarterly service - I can reschedule if this time doesn\'t work.',
+  });
+
+  // HVAC Maintenance - Manager coordinated
+  events.push({
+    id: `e${eventId++}`,
+    title: 'HVAC Annual Tune-Up',
+    startDate: getDate(8, 9, 0),
+    endDate: getDate(8, 12, 0),
+    startTime: '09:00',
+    endTime: '12:00',
+    layer: 'house',
+    category: 'service',
+    description: 'Annual AC and heating system inspection',
+    requiresAccess: true,
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Scheduled with your preferred vendor - TempMasters. $180 for full inspection.',
   });
 
   // ========== SOCIAL EVENTS ==========
@@ -281,24 +346,28 @@ function generateMockEvents(): CalendarEvent[] {
     location: "Miller's House - 1234 Oak Lane",
     description: 'Monthly dinner club gathering',
     attendees: ['Bob', 'Alice'],
+    createdByRole: 'HOMEOWNER',
   });
 
-  // Brunch - This Sunday
-  const sundayOffset = (7 - today.getDay()) % 7 || 7;
+  // Anniversary Dinner - Manager booked reservation
   events.push({
     id: `e${eventId++}`,
-    title: 'Sunday Brunch',
-    startDate: getDate(sundayOffset, 11, 0),
-    endDate: getDate(sundayOffset, 13, 0),
-    startTime: '11:00',
-    endTime: '13:00',
+    title: 'Anniversary Dinner',
+    startDate: getDate(13, 19, 0),
+    endDate: getDate(13, 22, 0),
+    startTime: '19:00',
+    endTime: '22:00',
     layer: 'family',
     category: 'social',
-    location: 'The Breakfast Club',
-    attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+    location: 'La Maison - Private Room',
+    attendees: ['Bob', 'Alice'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Booked the private room you love! Confirmation #LM2024-1203. Babysitter scheduled 6:30-11pm.',
+    reminderText: "Don't forget: your anniversary dinner is Friday!",
   });
 
-  // Neighborhood BBQ - In 2 weeks
+  // Neighborhood BBQ - Manager found it
   events.push({
     id: `e${eventId++}`,
     title: 'Neighborhood Block Party',
@@ -311,11 +380,14 @@ function generateMockEvents(): CalendarEvent[] {
     location: 'Johnson Backyard',
     description: 'Annual summer block party',
     attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Saw this on the neighborhood board - added it for you!',
   });
 
   // ========== KIDS EVENTS ==========
 
-  // Jake's Science Fair - In 4 days
+  // Jake's Science Fair
   events.push({
     id: `e${eventId++}`,
     title: "Jake's Science Fair",
@@ -327,9 +399,12 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'kids',
     location: 'Lincoln Elementary School',
     attendees: ['Jake', 'Alice', 'Bob'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Found this on the school calendar - added it for you!',
   });
 
-  // Emma's Recital - In 12 days
+  // Emma's Dance Recital
   events.push({
     id: `e${eventId++}`,
     title: "Emma's Dance Recital",
@@ -341,11 +416,31 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'kids',
     location: 'Community Theater',
     attendees: ['Emma', 'Bob', 'Alice', 'Jake'],
+    createdByRole: 'SYNCED',
+    syncSource: 'GOOGLE',
+  });
+
+  // Soccer Snacks Reminder
+  events.push({
+    id: `e${eventId++}`,
+    title: "Soccer Snacks - Your Turn!",
+    startDate: getDate(7, 15, 30),
+    endDate: getDate(7, 16, 0),
+    startTime: '15:30',
+    endTime: '16:00',
+    layer: 'family',
+    category: 'kids',
+    location: 'Oak Park Soccer Fields',
+    attendees: ['Emma'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: "It's your turn to bring snacks for Emma's team! I suggest orange slices and juice boxes.",
+    reminderText: "Emma's soccer snacks - your turn Dec 28",
   });
 
   // ========== HEALTH EVENTS ==========
 
-  // Dentist - Kids - In 6 days
+  // Dentist - Kids
   events.push({
     id: `e${eventId++}`,
     title: 'Dentist - Kids',
@@ -357,25 +452,33 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'health',
     location: 'Bright Smiles Dental',
     attendees: ['Emma', 'Jake', 'Alice'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Scheduled their 6-month checkups together. Dr. Lee is great with kids!',
   });
 
-  // Annual Physical - Bob - In 9 days
+  // Permission Slip Reminder (System)
   events.push({
     id: `e${eventId++}`,
-    title: "Bob's Annual Physical",
-    startDate: getDate(9, 9, 0),
-    endDate: getDate(9, 10, 0),
-    startTime: '09:00',
-    endTime: '10:00',
+    title: "Jake's Field Trip Permission",
+    startDate: getDate(2, 8, 0),
+    endDate: getDate(2, 9, 0),
+    startTime: '08:00',
+    endTime: '09:00',
     layer: 'family',
-    category: 'health',
-    location: 'Dr. Smith Family Practice',
-    attendees: ['Bob'],
+    category: 'kids',
+    description: 'Sign and return permission slip',
+    attendees: ['Jake'],
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    reminderText: "Jake's permission slip due tomorrow",
+    requiresAction: true,
+    actionDescription: 'Sign permission slip',
   });
 
   // ========== TRAVEL EVENTS ==========
 
-  // Family Vacation - In 3 weeks
+  // Family Vacation
   events.push({
     id: `e${eventId++}`,
     title: 'Family Vacation - Hawaii',
@@ -386,11 +489,12 @@ function generateMockEvents(): CalendarEvent[] {
     location: 'Maui, Hawaii',
     isAllDay: true,
     attendees: ['Bob', 'Alice', 'Emma', 'Jake'],
+    createdByRole: 'HOMEOWNER',
   });
 
   // ========== DELIVERY EVENTS ==========
 
-  // Grocery Delivery - Today or tomorrow
+  // Grocery Delivery - Today
   events.push({
     id: `e${eventId++}`,
     title: 'Amazon Fresh Delivery',
@@ -403,9 +507,10 @@ function generateMockEvents(): CalendarEvent[] {
     description: 'Weekly grocery delivery',
     isRecurring: true,
     recurrence: 'weekly',
+    createdByRole: 'SYSTEM',
   });
 
-  // Furniture Delivery - In 3 days
+  // Furniture Delivery
   events.push({
     id: `e${eventId++}`,
     title: 'New Sofa Delivery',
@@ -417,6 +522,11 @@ function generateMockEvents(): CalendarEvent[] {
     category: 'delivery',
     description: 'Living room sectional from West Elm',
     requiresAccess: true,
+    createdByRole: 'MANAGER',
+    createdByName: MANAGER_NAME,
+    managerNote: 'Coordinated with West Elm - they need someone 18+ to sign.',
+    requiresAction: true,
+    actionDescription: 'Ensure someone is home to sign',
   });
 
   return events;
@@ -424,7 +534,43 @@ function generateMockEvents(): CalendarEvent[] {
 
 const mockEvents = generateMockEvents();
 
-// Mock weather data for -7 to +14 days
+// Mock smart reminders
+const mockSmartReminders: SmartReminder[] = [
+  {
+    id: 'r1',
+    eventId: 'e50',
+    message: "Emma's soccer snacks - your turn Dec 28",
+    date: getDate(7),
+    type: 'snack_duty',
+    isAcknowledged: false,
+  },
+  {
+    id: 'r2',
+    eventId: 'e51',
+    message: "Jake's permission slip due tomorrow",
+    date: getDate(2),
+    type: 'permission_slip',
+    isAcknowledged: false,
+  },
+  {
+    id: 'r3',
+    eventId: 'e52',
+    message: "Don't forget: your anniversary dinner is Friday!",
+    date: getDate(12),
+    type: 'anniversary',
+    isAcknowledged: false,
+  },
+];
+
+// Days that need attention
+const mockDaysNeedingAttention: DayAttention[] = [
+  { date: getDate(10).toISOString().split('T')[0]!, issues: ['Pest control conflicts with Science Fair'], severity: 'critical' },
+  { date: getDate(6).toISOString().split('T')[0]!, issues: ['Confirm gutter cleaning access'], severity: 'warning' },
+  { date: getDate(3).toISOString().split('T')[0]!, issues: ['Be home for sofa delivery'], severity: 'warning' },
+  { date: getDate(2).toISOString().split('T')[0]!, issues: ['Sign permission slip'], severity: 'warning' },
+];
+
+// Mock weather data
 const generateWeather = (): DayWeather[] => {
   const icons: DayWeather['icon'][] = ['sun', 'sun', 'cloud', 'sun', 'rain', 'cloud', 'sun', 'sun', 'cloud', 'rain', 'sun', 'sun', 'cloud', 'sun', 'sun', 'cloud', 'sun', 'rain', 'sun', 'sun', 'cloud'];
   const temps = [72, 75, 68, 70, 65, 71, 74, 76, 69, 64, 72, 73, 70, 75, 74, 68, 71, 66, 73, 77, 72];
@@ -545,9 +691,250 @@ const getEventColor = (event: CalendarEvent) => {
   }
 };
 
+const getSyncSourceIcon = (source: SyncSource) => {
+  switch (source) {
+    case 'GOOGLE': return '🔵';
+    case 'APPLE': return '🍎';
+    case 'OUTLOOK': return '📧';
+    default: return null;
+  }
+};
+
 // ============================================================================
 // COMPONENTS
 // ============================================================================
+
+// Manager Badge
+function ManagerBadge({ name, small = false }: { name: string; small?: boolean }) {
+  if (small) {
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-700 rounded text-[10px] font-medium">
+        <UserCheck className="w-2.5 h-2.5" />
+        {name}
+      </span>
+    );
+  }
+  return (
+    <div className="inline-flex items-center gap-1.5 px-2 py-1 bg-amber-100 text-amber-700 rounded-full text-xs font-medium">
+      <UserCheck className="w-3 h-3" />
+      Added by {name}
+    </div>
+  );
+}
+
+// Synced Badge
+function SyncedBadge({ source }: { source: SyncSource }) {
+  const icon = getSyncSourceIcon(source);
+  return (
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded text-[10px] font-medium">
+      {icon} Synced
+    </span>
+  );
+}
+
+// Needs Attention Badge
+function AttentionBadge({ description, small = false }: { description?: string; small?: boolean }) {
+  if (small) {
+    return (
+      <span className="inline-flex items-center gap-0.5 px-1 py-0.5 bg-red-100 text-red-600 rounded text-[10px]">
+        <AlertCircle className="w-2.5 h-2.5" />
+      </span>
+    );
+  }
+  return (
+    <div className="flex items-center gap-2 px-3 py-2 bg-red-50 border border-red-200 rounded-lg">
+      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+      <span className="text-sm text-red-700">{description || 'Action needed'}</span>
+    </div>
+  );
+}
+
+// Smart Reminder Card
+function SmartReminderCard({
+  reminder,
+  onAcknowledge,
+}: {
+  reminder: SmartReminder;
+  onAcknowledge: (id: string) => void;
+}) {
+  const getIcon = () => {
+    switch (reminder.type) {
+      case 'snack_duty': return '🍊';
+      case 'permission_slip': return '📝';
+      case 'anniversary': return '💝';
+      default: return '🔔';
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+      <span className="text-xl">{getIcon()}</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-amber-900">{reminder.message}</p>
+        <p className="text-xs text-amber-600 mt-0.5">From Sarah</p>
+      </div>
+      <button
+        onClick={() => onAcknowledge(reminder.id)}
+        className="p-2 text-amber-600 hover:bg-amber-100 rounded-lg transition-colors"
+      >
+        <CheckCircle2 className="w-5 h-5" />
+      </button>
+    </div>
+  );
+}
+
+// Calendar Sync Panel
+function CalendarSyncPanel({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
+  const [appleConnected, setAppleConnected] = useState(true);
+
+  const icalUrl = 'webcal://app.haven.com/api/calendar/feed/abc123.ics';
+
+  const handleCopyUrl = () => {
+    navigator.clipboard.writeText(icalUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-slate-200">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+                <Link2 className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-slate-900">Calendar Sync</h2>
+                <p className="text-sm text-slate-500">Connect your calendars</p>
+              </div>
+            </div>
+            <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-slate-500" />
+            </button>
+          </div>
+        </div>
+
+        <div className="p-6 space-y-6">
+          {/* Haven as Source of Truth */}
+          <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-emerald-600 mt-0.5" />
+              <div>
+                <p className="font-medium text-emerald-800">Haven is your source of truth</p>
+                <p className="text-sm text-emerald-600 mt-1">
+                  Changes made here sync to your personal calendars. Family members see events on their phones.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Google Calendar */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-slate-900">Google Calendar</h3>
+            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                  <span className="text-2xl">🔵</span>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">Google Calendar</p>
+                  <p className="text-sm text-slate-500">
+                    {googleConnected ? 'Connected - 2 calendars synced' : 'Not connected'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setGoogleConnected(!googleConnected)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  googleConnected
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {googleConnected ? 'Disconnect' : 'Connect'}
+              </button>
+            </div>
+          </div>
+
+          {/* Apple Calendar */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-slate-900">Apple Calendar</h3>
+            <div className="flex items-center justify-between p-4 border border-slate-200 rounded-xl">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-slate-200">
+                  <span className="text-2xl">🍎</span>
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">Apple iCloud</p>
+                  <p className="text-sm text-slate-500">
+                    {appleConnected ? 'Connected - Family calendar synced' : 'Not connected'}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setAppleConnected(!appleConnected)}
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                  appleConnected
+                    ? 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    : 'bg-emerald-600 text-white hover:bg-emerald-700'
+                }`}
+              >
+                {appleConnected ? 'Disconnect' : 'Connect'}
+              </button>
+            </div>
+          </div>
+
+          {/* iCal Feed URL */}
+          <div className="space-y-3">
+            <h3 className="font-medium text-slate-900">Subscribe via URL</h3>
+            <p className="text-sm text-slate-500">
+              Use this URL to subscribe in any calendar app that supports iCal.
+            </p>
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                readOnly
+                value={icalUrl}
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 font-mono truncate"
+              />
+              <button
+                onClick={handleCopyUrl}
+                className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors"
+              >
+                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                {copied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          {/* Sync Status */}
+          <div className="p-4 bg-slate-50 rounded-xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-sm text-slate-600">
+                <RefreshCw className="w-4 h-4" />
+                Last synced 2 minutes ago
+              </div>
+              <button className="text-sm text-emerald-600 font-medium hover:text-emerald-700">
+                Sync Now
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // Filter Pills
 function FilterPills({
@@ -612,25 +999,36 @@ function WeatherBadge({ weather, large = false }: { weather: DayWeather; large?:
 function EventChip({ event, compact = false }: { event: CalendarEvent; compact?: boolean }) {
   const colors = getEventColor(event);
   const Icon = getCategoryIcon(event.category);
+  const needsAttention = event.requiresAction || event.conflict;
 
   if (compact) {
     return (
-      <div
-        className={`w-2 h-2 rounded-full ${event.layer === 'house' ? 'bg-emerald-500' : 'bg-blue-500'} ${
-          event.conflict ? 'ring-2 ring-red-400' : ''
-        }`}
-      />
+      <div className="relative">
+        <div
+          className={`w-2 h-2 rounded-full ${event.layer === 'house' ? 'bg-emerald-500' : 'bg-blue-500'} ${
+            needsAttention ? 'ring-2 ring-red-400' : ''
+          }`}
+        />
+        {event.createdByRole === 'MANAGER' && (
+          <div className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 bg-amber-400 rounded-full" />
+        )}
+      </div>
     );
   }
 
   return (
     <div
       className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-medium truncate ${colors.bg} border-l-2 ${colors.border} ${
-        event.conflict ? 'ring-1 ring-red-400' : ''
+        needsAttention ? 'ring-1 ring-red-400' : ''
       }`}
     >
       <Icon className={`w-3 h-3 flex-shrink-0 ${colors.icon}`} />
       <span className={`truncate ${colors.text}`}>{event.title}</span>
+      {event.createdByRole === 'MANAGER' && (
+        <span className="ml-auto">
+          <UserCheck className="w-3 h-3 text-amber-500" />
+        </span>
+      )}
     </div>
   );
 }
@@ -639,25 +1037,29 @@ function EventChip({ event, compact = false }: { event: CalendarEvent; compact?:
 function EventBlock({ event, onClick }: { event: CalendarEvent; onClick: () => void }) {
   const colors = getEventColor(event);
   const Icon = getCategoryIcon(event.category);
+  const needsAttention = event.requiresAction || event.conflict;
 
   return (
     <button
       onClick={onClick}
       className={`absolute left-1 right-1 rounded-lg p-2 text-left overflow-hidden transition-transform hover:scale-[1.02] ${colors.bg} border-l-4 ${colors.border} ${
-        event.conflict ? 'ring-2 ring-red-400' : ''
+        needsAttention ? 'ring-2 ring-red-400' : ''
       }`}
     >
       <div className="flex items-center gap-1 mb-0.5">
         <Icon className={`w-3 h-3 ${colors.icon}`} />
         <span className={`text-xs font-medium truncate ${colors.text}`}>{event.title}</span>
+        {event.createdByRole === 'MANAGER' && (
+          <ManagerBadge name={event.createdByName || MANAGER_NAME} small />
+        )}
       </div>
       {event.startTime && (
         <p className="text-xs text-slate-500">{formatTime(event.startTime)}</p>
       )}
-      {event.conflict && (
+      {needsAttention && (
         <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
           <AlertTriangle className="w-3 h-3" />
-          <span>Access needed</span>
+          <span>{event.conflict ? 'Conflict' : 'Action needed'}</span>
         </div>
       )}
     </button>
@@ -683,7 +1085,6 @@ function MobileTimeSlot({
 
   return (
     <div className={`relative border-b border-slate-100 ${isCurrentHour ? 'bg-red-50/30' : ''}`}>
-      {/* Current time indicator line */}
       {isCurrentHour && (
         <div
           className="absolute left-0 right-0 z-10 flex items-center pointer-events-none"
@@ -695,30 +1096,36 @@ function MobileTimeSlot({
       )}
 
       <div className="flex min-h-[72px]">
-        {/* Time label */}
         <div className="w-16 flex-shrink-0 py-2 px-2 text-right">
           <span className={`text-xs font-medium ${isCurrentHour ? 'text-red-600' : 'text-slate-400'}`}>
             {timeLabel}
           </span>
         </div>
 
-        {/* Events or free time */}
         <div className="flex-1 py-2 px-2 space-y-2">
           {hasEvents ? (
             events.map((event) => {
               const colors = getEventColor(event);
               const Icon = getCategoryIcon(event.category);
+              const needsAttention = event.requiresAction || event.conflict;
               return (
                 <button
                   key={event.id}
                   onClick={() => onEventClick(event)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${colors.bg} border-l-4 ${colors.border} hover:shadow-sm`}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl text-left transition-colors ${colors.bg} border-l-4 ${colors.border} hover:shadow-sm ${
+                    needsAttention ? 'ring-2 ring-red-300' : ''
+                  }`}
                 >
                   <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${event.layer === 'house' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
                     <Icon className={`w-5 h-5 ${colors.icon}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className={`font-medium truncate ${colors.text}`}>{event.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className={`font-medium truncate ${colors.text}`}>{event.title}</p>
+                      {event.createdByRole === 'MANAGER' && (
+                        <ManagerBadge name={event.createdByName || MANAGER_NAME} small />
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 text-xs text-slate-500 mt-0.5">
                       {event.startTime && (
                         <span>{formatTime(event.startTime)}{event.endTime && ` - ${formatTime(event.endTime)}`}</span>
@@ -732,7 +1139,7 @@ function MobileTimeSlot({
                     </div>
                   </div>
                   {event.isRecurring && <Repeat className="w-4 h-4 text-slate-400 flex-shrink-0" />}
-                  {event.conflict && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />}
+                  {needsAttention && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />}
                 </button>
               );
             })
@@ -747,15 +1154,22 @@ function MobileTimeSlot({
   );
 }
 
-// Mobile Day Selector (horizontal scroll)
+// Mobile Day Selector
 function MobileDaySelector({
   selectedDate,
   onDateSelect,
+  daysNeedingAttention,
 }: {
   selectedDate: Date;
   onDateSelect: (date: Date) => void;
+  daysNeedingAttention: DayAttention[];
 }) {
   const dates = Array.from({ length: 14 }, (_, i) => getDate(i - 3, 0, 0));
+
+  const hasAttention = useCallback((date: Date) => {
+    const dateKey = date.toISOString().split('T')[0];
+    return daysNeedingAttention.find(d => d.date === dateKey);
+  }, [daysNeedingAttention]);
 
   return (
     <div className="flex overflow-x-auto gap-2 pb-2 scrollbar-hide -mx-4 px-4">
@@ -764,19 +1178,25 @@ function MobileDaySelector({
         const isTodayDate = isToday(date);
         const weather = mockWeather.find((w) => isSameDay(w.date, date));
         const WeatherIconComponent = weather ? getWeatherIcon(weather.icon) : null;
+        const attention = hasAttention(date);
 
         return (
           <button
             key={date.toISOString()}
             onClick={() => onDateSelect(date)}
-            className={`flex-shrink-0 w-14 py-3 rounded-xl flex flex-col items-center gap-1 transition-colors ${
+            className={`relative flex-shrink-0 w-14 py-3 rounded-xl flex flex-col items-center gap-1 transition-colors ${
               isSelected
                 ? 'bg-emerald-600 text-white'
                 : isTodayDate
                 ? 'bg-emerald-100 text-emerald-700'
                 : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
-            }`}
+            } ${attention ? 'ring-2 ring-red-400' : ''}`}
           >
+            {attention && (
+              <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full flex items-center justify-center">
+                <span className="text-[8px] text-white font-bold">!</span>
+              </div>
+            )}
             <span className="text-[10px] uppercase font-medium opacity-70">
               {date.toLocaleDateString('en-US', { weekday: 'short' })}
             </span>
@@ -794,7 +1214,7 @@ function MobileDaySelector({
   );
 }
 
-// Now Indicator Line (for Week View)
+// Now Indicator Line
 function NowIndicator() {
   const now = new Date();
   const hours = now.getHours();
@@ -871,7 +1291,7 @@ function AddEventModal({
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">Request Service</p>
-                  <p className="text-sm text-slate-500">Ask your manager to schedule something</p>
+                  <p className="text-sm text-slate-500">Ask {MANAGER_NAME} to schedule something</p>
                 </div>
               </Link>
             </div>
@@ -968,9 +1388,13 @@ function AddEventModal({
 function EventDetailModal({
   event,
   onClose,
+  onResolveConflict,
+  onCompleteAction,
 }: {
   event: CalendarEvent | null;
   onClose: () => void;
+  onResolveConflict: (eventId: string) => void;
+  onCompleteAction: (eventId: string) => void;
 }) {
   if (!event) return null;
 
@@ -979,7 +1403,7 @@ function EventDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full">
+      <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
         <div className={`p-6 rounded-t-2xl ${colors.bg}`}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
@@ -997,9 +1421,56 @@ function EventDetailModal({
               <X className="w-5 h-5 text-slate-500" />
             </button>
           </div>
+
+          {/* Manager Badge */}
+          {event.createdByRole === 'MANAGER' && (
+            <div className="mt-4">
+              <ManagerBadge name={event.createdByName || MANAGER_NAME} />
+            </div>
+          )}
+
+          {/* Synced Badge */}
+          {event.createdByRole === 'SYNCED' && event.syncSource && (
+            <div className="mt-4">
+              <SyncedBadge source={event.syncSource} />
+            </div>
+          )}
         </div>
 
         <div className="p-6 space-y-4">
+          {/* Manager Note */}
+          {event.managerNote && (
+            <div className="flex gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
+              <Info className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-amber-800">Note from {event.createdByName || MANAGER_NAME}</p>
+                <p className="text-sm text-amber-700 mt-1">{event.managerNote}</p>
+              </div>
+            </div>
+          )}
+
+          {/* Conflict Warning */}
+          {event.conflict && event.conflictReason && (
+            <div className="flex items-start gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
+              <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-red-700">Scheduling Conflict</p>
+                <p className="text-sm text-red-600 mt-1">{event.conflictReason}</p>
+                <button
+                  onClick={() => onResolveConflict(event.id)}
+                  className="mt-3 text-sm font-medium text-red-700 hover:text-red-800"
+                >
+                  Reschedule this event →
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Action Required */}
+          {event.requiresAction && event.actionDescription && (
+            <AttentionBadge description={event.actionDescription} />
+          )}
+
           <div className="flex items-center gap-3 text-slate-700">
             <CalendarIcon className="w-5 h-5 text-slate-400" />
             <span>{formatDateLong(event.startDate)}</span>
@@ -1049,16 +1520,6 @@ function EventDetailModal({
             </div>
           )}
 
-          {event.conflict && (
-            <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-xl">
-              <AlertTriangle className="w-5 h-5 text-red-500" />
-              <div>
-                <p className="font-medium text-red-700">Access Required</p>
-                <p className="text-sm text-red-600">Nobody will be home. Grant access or reschedule?</p>
-              </div>
-            </div>
-          )}
-
           {event.requiresAccess && !event.conflict && (
             <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <Home className="w-5 h-5 text-amber-500" />
@@ -1068,9 +1529,21 @@ function EventDetailModal({
         </div>
 
         <div className="p-6 pt-0 flex gap-3">
+          {event.requiresAction && (
+            <button
+              onClick={() => onCompleteAction(event.id)}
+              className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              Mark Done
+            </button>
+          )}
           {event.conflict && (
-            <button className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors">
-              Grant Access
+            <button
+              onClick={() => onResolveConflict(event.id)}
+              className="flex-1 py-2.5 bg-amber-500 text-white font-medium rounded-lg hover:bg-amber-600 transition-colors"
+            >
+              Reschedule
             </button>
           )}
           <button
@@ -1095,11 +1568,21 @@ export default function CalendarPage() {
   const [selectedMobileDate, setSelectedMobileDate] = useState(new Date());
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showSyncPanel, setShowSyncPanel] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [smartReminders, setSmartReminders] = useState(mockSmartReminders);
+  const [daysNeedingAttention] = useState(mockDaysNeedingAttention);
+  const [showToast, setShowToast] = useState<string | null>(null);
   const weekViewRef = useRef<HTMLDivElement>(null);
   const mobileAgendaRef = useRef<HTMLDivElement>(null);
+
+  // Toast helper
+  const toast = useCallback((message: string) => {
+    setShowToast(message);
+    setTimeout(() => setShowToast(null), 3000);
+  }, []);
 
   // Update current time every minute
   useEffect(() => {
@@ -1120,24 +1603,48 @@ export default function CalendarPage() {
   }, [activeFilter]);
 
   // Get events for a specific date
-  const getEventsForDate = (date: Date) => {
+  const getEventsForDate = useCallback((date: Date) => {
     return filteredEvents.filter((event) => {
       if (event.isAllDay && event.endDate) {
         return date >= event.startDate && date <= event.endDate;
       }
       return isSameDay(event.startDate, date);
     });
-  };
+  }, [filteredEvents]);
 
   // Get events for a specific hour on a date
-  const getEventsForHour = (date: Date, hour: number) => {
+  const getEventsForHour = useCallback((date: Date, hour: number) => {
     return filteredEvents.filter((event) => {
       if (!isSameDay(event.startDate, date)) return false;
       if (!event.startTime) return false;
       const eventHour = parseInt(event.startTime.split(':')[0] ?? '0', 10);
       return eventHour === hour;
     });
-  };
+  }, [filteredEvents]);
+
+  // Check if date needs attention
+  const dateNeedsAttention = useCallback((date: Date) => {
+    const dateKey = date.toISOString().split('T')[0];
+    return daysNeedingAttention.find(d => d.date === dateKey);
+  }, [daysNeedingAttention]);
+
+  // Acknowledge reminder
+  const handleAcknowledgeReminder = useCallback((reminderId: string) => {
+    setSmartReminders(prev => prev.filter(r => r.id !== reminderId));
+    toast('Reminder acknowledged');
+  }, [toast]);
+
+  // Resolve conflict
+  const handleResolveConflict = useCallback((eventId: string) => {
+    setSelectedEvent(null);
+    toast('Contact Sarah to reschedule');
+  }, [toast]);
+
+  // Complete action
+  const handleCompleteAction = useCallback((eventId: string) => {
+    setSelectedEvent(null);
+    toast('Action marked as complete');
+  }, [toast]);
 
   // Navigation
   const navigatePrev = () => {
@@ -1202,6 +1709,9 @@ export default function CalendarPage() {
   // Time slots for views (6 AM to 10 PM)
   const timeSlots = Array.from({ length: 17 }, (_, i) => i + 6);
 
+  // Active reminders for today/upcoming
+  const activeReminders = smartReminders.filter(r => !r.isAcknowledged);
+
   return (
     <div className="space-y-6 pb-24 lg:pb-6">
       {/* Header */}
@@ -1211,45 +1721,78 @@ export default function CalendarPage() {
           <p className="text-slate-500 mt-1">Your home and family schedule</p>
         </div>
 
-        {/* View Mode Toggle - Desktop Only */}
-        <div className="hidden md:flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+        <div className="flex items-center gap-2">
+          {/* Sync Button */}
           <button
-            onClick={() => setViewMode('month')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'month' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
-            }`}
+            onClick={() => setShowSyncPanel(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors"
           >
-            <LayoutGrid className="w-4 h-4" />
-            Month
+            <Link2 className="w-4 h-4" />
+            <span className="hidden sm:inline">Sync</span>
           </button>
-          <button
-            onClick={() => setViewMode('week')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'week' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <CalendarIcon className="w-4 h-4" />
-            Week
-          </button>
-          <button
-            onClick={() => setViewMode('agenda')}
-            className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'agenda' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <List className="w-4 h-4" />
-            Agenda
-          </button>
+
+          {/* View Mode Toggle - Desktop Only */}
+          <div className="hidden md:flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
+            <button
+              onClick={() => setViewMode('month')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'month' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid className="w-4 h-4" />
+              Month
+            </button>
+            <button
+              onClick={() => setViewMode('week')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'week' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <CalendarIcon className="w-4 h-4" />
+              Week
+            </button>
+            <button
+              onClick={() => setViewMode('agenda')}
+              className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'agenda' ? 'bg-white shadow-sm text-slate-900' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <List className="w-4 h-4" />
+              Agenda
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Smart Reminders (from Manager) */}
+      {activeReminders.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-sm font-medium text-slate-700">
+            <Bell className="w-4 h-4 text-amber-500" />
+            Reminders from {MANAGER_NAME}
+          </div>
+          <div className="space-y-2">
+            {activeReminders.slice(0, 3).map((reminder) => (
+              <SmartReminderCard
+                key={reminder.id}
+                reminder={reminder}
+                onAcknowledge={handleAcknowledgeReminder}
+              />
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Filter Pills */}
       <FilterPills activeFilter={activeFilter} onFilterChange={setActiveFilter} />
 
-      {/* ========== MOBILE VIEW (Agenda/Schedule) ========== */}
+      {/* ========== MOBILE VIEW ========== */}
       <div className="md:hidden">
-        {/* Mobile Day Selector */}
-        <MobileDaySelector selectedDate={selectedMobileDate} onDateSelect={setSelectedMobileDate} />
+        <MobileDaySelector
+          selectedDate={selectedMobileDate}
+          onDateSelect={setSelectedMobileDate}
+          daysNeedingAttention={daysNeedingAttention}
+        />
 
         {/* Weather Header - Sticky */}
         <div className="sticky top-0 z-10 bg-gradient-to-b from-slate-100 to-slate-50 -mx-4 px-4 py-3 border-b border-slate-200 mt-4">
@@ -1267,6 +1810,18 @@ export default function CalendarPage() {
               return weather ? <WeatherBadge weather={weather} large /> : null;
             })()}
           </div>
+
+          {/* Day-level attention warning */}
+          {(() => {
+            const attention = dateNeedsAttention(selectedMobileDate);
+            if (!attention) return null;
+            return (
+              <div className="mt-3 flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                <p className="text-sm text-red-700">{attention.issues[0]}</p>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Mobile Schedule View */}
@@ -1289,7 +1844,7 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* ========== DESKTOP VIEW (Week/Month/Agenda) ========== */}
+      {/* ========== DESKTOP VIEW ========== */}
       <div className="hidden md:block bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
         {/* Calendar Navigation */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200">
@@ -1331,6 +1886,7 @@ export default function CalendarPage() {
 
                 const dayEvents = getEventsForDate(date);
                 const isTodayDate = isToday(date);
+                const attention = dateNeedsAttention(date);
 
                 return (
                   <div
@@ -1341,17 +1897,22 @@ export default function CalendarPage() {
                     }}
                     className={`h-32 p-2 border-b border-r border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors ${
                       isTodayDate ? 'bg-emerald-50/30' : ''
-                    }`}
+                    } ${attention ? 'ring-2 ring-inset ring-red-400' : ''}`}
                   >
-                    <div
-                      className={`text-sm font-medium mb-1 ${
-                        isTodayDate ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white' : 'text-slate-700'
-                      }`}
-                    >
-                      {date.getDate()}
+                    <div className="flex items-center justify-between">
+                      <div
+                        className={`text-sm font-medium ${
+                          isTodayDate ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white' : 'text-slate-700'
+                        }`}
+                      >
+                        {date.getDate()}
+                      </div>
+                      {attention && (
+                        <div className="w-2 h-2 bg-red-500 rounded-full" />
+                      )}
                     </div>
 
-                    <div className="space-y-1">
+                    <div className="space-y-1 mt-1">
                       {dayEvents.slice(0, 3).map((event) => (
                         <EventChip key={event.id} event={event} />
                       ))}
@@ -1385,15 +1946,24 @@ export default function CalendarPage() {
               })}
             </div>
 
-            {/* Day Headers */}
+            {/* Day Headers with attention indicator */}
             <div className="grid grid-cols-8 border-b border-slate-200">
               <div className="py-3 px-3 border-r border-slate-200" />
               {weekDates.map((date) => {
                 const isTodayDate = isToday(date);
+                const attention = dateNeedsAttention(date);
                 return (
-                  <div key={date.toISOString()} className={`py-3 text-center border-r border-slate-200 ${isTodayDate ? 'bg-emerald-50/50' : ''}`}>
+                  <div
+                    key={date.toISOString()}
+                    className={`py-3 text-center border-r border-slate-200 relative ${isTodayDate ? 'bg-emerald-50/50' : ''} ${
+                      attention ? 'ring-2 ring-inset ring-red-400' : ''
+                    }`}
+                  >
                     <p className="text-xs text-slate-500 uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
                     <p className={`text-lg font-semibold mt-0.5 ${isTodayDate ? 'text-emerald-600' : 'text-slate-900'}`}>{date.getDate()}</p>
+                    {attention && (
+                      <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
+                    )}
                   </div>
                 );
               })}
@@ -1459,16 +2029,21 @@ export default function CalendarPage() {
               const dayEvents = getEventsForDate(date);
               if (dayEvents.length === 0) return null;
 
+              const attention = dateNeedsAttention(date);
+
               return (
                 <div key={date.toISOString()}>
                   <div className="flex items-center gap-3 mb-3">
                     <div
-                      className={`w-12 h-12 rounded-xl flex flex-col items-center justify-center ${
+                      className={`relative w-12 h-12 rounded-xl flex flex-col items-center justify-center ${
                         isToday(date) ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-700'
-                      }`}
+                      } ${attention ? 'ring-2 ring-red-400' : ''}`}
                     >
                       <span className="text-xs uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
                       <span className="text-lg font-bold">{date.getDate()}</span>
+                      {attention && (
+                        <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
+                      )}
                     </div>
                     <div>
                       <p className={`font-medium ${isToday(date) ? 'text-emerald-600' : 'text-slate-900'}`}>
@@ -1477,23 +2052,37 @@ export default function CalendarPage() {
                       <p className="text-sm text-slate-500">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
                     </div>
                   </div>
+
+                  {attention && (
+                    <div className="mb-3 ml-15 flex items-center gap-2 p-2 bg-red-50 border border-red-200 rounded-lg">
+                      <AlertCircle className="w-4 h-4 text-red-500 flex-shrink-0" />
+                      <p className="text-sm text-red-700">{attention.issues[0]}</p>
+                    </div>
+                  )}
+
                   <div className="space-y-2 ml-15">
                     {dayEvents.map((event) => {
                       const colors = getEventColor(event);
                       const Icon = getCategoryIcon(event.category);
+                      const needsAttention = event.requiresAction || event.conflict;
                       return (
                         <button
                           key={event.id}
                           onClick={() => setSelectedEvent(event)}
                           className={`w-full flex items-center gap-4 p-4 rounded-xl text-left transition-colors ${colors.bg} hover:shadow-sm ${
-                            event.conflict ? 'ring-2 ring-red-300' : ''
+                            needsAttention ? 'ring-2 ring-red-300' : ''
                           }`}
                         >
                           <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${event.layer === 'house' ? 'bg-emerald-100' : 'bg-blue-100'}`}>
                             <Icon className={`w-6 h-6 ${colors.icon}`} />
                           </div>
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-slate-900 truncate">{event.title}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-slate-900 truncate">{event.title}</p>
+                              {event.createdByRole === 'MANAGER' && (
+                                <ManagerBadge name={event.createdByName || MANAGER_NAME} small />
+                              )}
+                            </div>
                             <div className="flex items-center gap-3 mt-1 text-sm text-slate-500">
                               {event.startTime && (
                                 <span className="flex items-center gap-1">
@@ -1512,10 +2101,10 @@ export default function CalendarPage() {
                             </div>
                           </div>
                           {event.isRecurring && <Repeat className="w-4 h-4 text-slate-400 flex-shrink-0" />}
-                          {event.conflict && (
+                          {needsAttention && (
                             <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
                               <AlertTriangle className="w-3 h-3" />
-                              Access
+                              {event.conflict ? 'Conflict' : 'Action'}
                             </div>
                           )}
                         </button>
@@ -1549,12 +2138,16 @@ export default function CalendarPage() {
           <span className="text-sm text-slate-600">Travel</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 bg-red-50 ring-1 ring-red-400 rounded" />
+          <UserCheck className="w-4 h-4 text-amber-500" />
+          <span className="text-sm text-slate-600">Added by {MANAGER_NAME}</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 bg-red-50 ring-2 ring-red-400 rounded" />
           <span className="text-sm text-slate-600">Needs Attention</span>
         </div>
       </div>
 
-      {/* Floating Action Button - positioned above the global chat FAB on mobile */}
+      {/* Floating Action Button */}
       <button
         onClick={() => {
           setSelectedDate(new Date());
@@ -1564,6 +2157,13 @@ export default function CalendarPage() {
       >
         <Plus className="w-5 h-5 lg:w-6 lg:h-6" />
       </button>
+
+      {/* Toast */}
+      {showToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
+          {showToast}
+        </div>
+      )}
 
       {/* Modals */}
       <AddEventModal
@@ -1575,7 +2175,17 @@ export default function CalendarPage() {
         selectedDate={selectedDate}
       />
 
-      <EventDetailModal event={selectedEvent} onClose={() => setSelectedEvent(null)} />
+      <EventDetailModal
+        event={selectedEvent}
+        onClose={() => setSelectedEvent(null)}
+        onResolveConflict={handleResolveConflict}
+        onCompleteAction={handleCompleteAction}
+      />
+
+      <CalendarSyncPanel
+        isOpen={showSyncPanel}
+        onClose={() => setShowSyncPanel(false)}
+      />
     </div>
   );
 }

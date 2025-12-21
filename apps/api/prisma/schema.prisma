@@ -458,6 +458,22 @@ enum FamilyEventCategory {
   OTHER // Other events
 }
 
+// Who created/added a calendar event
+enum EventCreatorRole {
+  HOMEOWNER // Added by the homeowner
+  MANAGER // Added by the home manager
+  SYSTEM // Auto-generated (recurring schedules, bill due dates)
+  SYNCED // Imported from external calendar
+}
+
+// External calendar sync sources
+enum CalendarSyncSource {
+  GOOGLE // Google Calendar
+  APPLE // Apple iCloud Calendar
+  OUTLOOK // Microsoft Outlook/365
+  MANUAL // Manually entered
+}
+
 // Member permission types for granular access control
 enum MemberPermissionType {
   VIEW_CALENDAR // Can view family calendar
@@ -2644,9 +2660,29 @@ model FamilyEvent {
   // Color coding
   color String? // Hex color for calendar display
 
-  // External sync
-  externalCalendarId String? @map("external_calendar_id")
-  externalEventId    String? @map("external_event_id")
+  // Who created this event (for "Added by Sarah" badges)
+  createdByRole EventCreatorRole @default(HOMEOWNER) @map("created_by_role")
+  managerNote   String?          @map("manager_note") // Note from manager when they add an event
+
+  // Requires homeowner attention/action
+  requiresAction     Boolean @default(false) @map("requires_action")
+  actionDescription  String? @map("action_description") // "Confirm access code" or "Approve pickup person"
+  actionCompletedAt  DateTime? @map("action_completed_at")
+
+  // Smart reminders (manager sets up)
+  reminderText    String? @map("reminder_text") // Custom reminder message like "Emma's soccer snacks - your turn"
+  reminderSentAt  DateTime? @map("reminder_sent_at")
+
+  // Conflict detection
+  hasConflict       Boolean @default(false) @map("has_conflict")
+  conflictReason    String? @map("conflict_reason") // "You'll be out of town" or "Overlaps with dentist"
+  conflictResolvedAt DateTime? @map("conflict_resolved_at")
+
+  // External calendar sync
+  syncSource         CalendarSyncSource @default(MANUAL) @map("sync_source")
+  externalCalendarId String?            @map("external_calendar_id")
+  externalEventId    String?            @map("external_event_id")
+  lastSyncedAt       DateTime?          @map("last_synced_at")
 
   // Link to inbound request that created this
   inboundRequestId String? @unique @map("inbound_request_id")
