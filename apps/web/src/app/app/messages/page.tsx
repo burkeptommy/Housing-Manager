@@ -1,11 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import Image from 'next/image';
 import { getDemoImage } from '@/lib/imageUtils';
 import {
   Search,
-  Plus,
   Phone,
   Video,
   Info,
@@ -22,7 +21,6 @@ import {
   Star,
   Download,
   FileText,
-  Image as ImageIcon,
   Users,
   Home,
   Wrench,
@@ -30,17 +28,28 @@ import {
   Building2,
   Bell,
   BellOff,
-  Ban,
   MoreVertical,
   MapPin,
+  Mail,
+  ShoppingCart,
+  HelpCircle,
+  ClipboardList,
+  CalendarPlus,
+  ListPlus,
+  Settings,
+  MessageCircle,
+  Shield,
+  Clock,
+  CheckCircle2,
 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type ChannelType = 'vip' | 'family' | 'vendors' | 'neighbors';
-type MessageSender = 'me' | 'them' | 'system';
+type ChannelType = 'team' | 'family' | 'vendors' | 'forwarded';
+type MessageSender = 'me' | 'them' | 'system' | 'manager';
+type FilterType = 'all' | 'unread' | 'needs_response' | 'manager' | 'family';
 
 interface Participant {
   id: string;
@@ -49,16 +58,24 @@ interface Participant {
   role?: string;
   isOnline?: boolean;
   responseTime?: string;
+  isManager?: boolean;
 }
 
 interface MessageAttachment {
   id: string;
-  type: 'image' | 'file' | 'action';
+  type: 'image' | 'file' | 'action' | 'forwarded_email';
   url?: string;
   name?: string;
   size?: string;
   actionType?: 'estimate' | 'calendar' | 'flight' | 'hotel';
   actionData?: Record<string, unknown>;
+  emailData?: {
+    from: string;
+    subject: string;
+    receivedAt: string;
+    handled: boolean;
+    handledMessage?: string;
+  };
 }
 
 interface Message {
@@ -70,6 +87,8 @@ interface Message {
   timestamp: string;
   status?: 'sent' | 'delivered' | 'read';
   attachments?: MessageAttachment[];
+  canConvert?: boolean; // Can be converted to request/calendar/shopping
+  convertedTo?: { type: 'request' | 'calendar' | 'shopping'; id: string };
 }
 
 interface Conversation {
@@ -82,9 +101,13 @@ interface Conversation {
   messages: Message[];
   unreadCount: number;
   isPinned?: boolean;
-  isVip?: boolean;
+  isManager?: boolean;
+  isHandyman?: boolean;
   lastActivity: string;
   isMuted?: boolean;
+  managedByManager?: boolean; // For vendor conversations
+  managerStatus?: string; // e.g., "Sarah replied", "Sarah handling"
+  needsResponse?: boolean;
 }
 
 interface ChannelGroup {
@@ -92,6 +115,7 @@ interface ChannelGroup {
   label: string;
   icon: typeof Users;
   isExpanded: boolean;
+  description?: string;
 }
 
 // ============================================================================
@@ -101,27 +125,20 @@ interface ChannelGroup {
 const mockParticipants: Record<string, Participant> = {
   manager: {
     id: 'p1',
-    name: 'Steve Harrison',
-    avatar: getDemoImage('avatar-male', 100, 100, 'steve-manager'),
-    role: 'Home Manager',
+    name: 'Sarah Harrison',
+    avatar: getDemoImage('avatar-female', 100, 100, 'sarah-manager'),
+    role: 'Your Home Manager',
     isOnline: true,
     responseTime: 'Replies in ~5m',
+    isManager: true,
   },
   handyman: {
     id: 'p2',
     name: 'Mike Rodriguez',
     avatar: getDemoImage('avatar-male', 100, 100, 'mike-handyman'),
-    role: 'Dedicated Handyman',
+    role: 'Your Handyman',
     isOnline: false,
     responseTime: 'Replies in ~1h',
-  },
-  travel: {
-    id: 'p3',
-    name: 'Sarah Chen',
-    avatar: getDemoImage('avatar-female', 100, 100, 'sarah-travel'),
-    role: 'Travel Concierge',
-    isOnline: true,
-    responseTime: 'Replies in ~15m',
   },
   alice: {
     id: 'p4',
@@ -132,77 +149,60 @@ const mockParticipants: Record<string, Participant> = {
   },
   plumber: {
     id: 'p5',
-    name: 'Mike\'s Plumbing',
+    name: "Mike's Plumbing",
     avatar: getDemoImage('vendor-portrait', 100, 100, 'mikes-plumbing'),
     role: 'Vendor',
     isOnline: false,
   },
-  neighbor: {
+  hvac: {
     id: 'p6',
-    name: 'Jennifer Walsh',
-    avatar: getDemoImage('avatar-female', 100, 100, 'jennifer-neighbor'),
-    role: 'Neighbor',
-    isOnline: true,
+    name: 'AirFlow HVAC',
+    avatar: getDemoImage('vendor-portrait', 100, 100, 'airflow-hvac'),
+    role: 'Vendor',
+    isOnline: false,
   },
 };
 
 const mockConversations: Conversation[] = [
   {
     id: 'c1',
-    channelType: 'vip',
-    title: 'Home Manager',
-    subtitle: 'Steve Harrison',
+    channelType: 'team',
+    title: 'Sarah Harrison',
+    subtitle: 'Your Home Manager',
     avatar: mockParticipants.manager!.avatar,
     participants: [mockParticipants.manager!],
     unreadCount: 2,
     isPinned: true,
-    isVip: true,
+    isManager: true,
     lastActivity: '2024-12-19T10:30:00Z',
+    needsResponse: true,
     messages: [
-      { id: 'm1', sender: 'them', senderName: 'Steve', content: 'Good morning! Just wanted to let you know the landscaping crew will be there tomorrow at 9 AM.', timestamp: '2024-12-19T09:00:00Z' },
+      { id: 'm1', sender: 'them', senderName: 'Sarah', content: 'Good morning! Just wanted to let you know the landscaping crew will be there tomorrow at 9 AM.', timestamp: '2024-12-19T09:00:00Z' },
       { id: 'm2', sender: 'me', content: 'Perfect, thanks for the heads up!', timestamp: '2024-12-19T09:05:00Z', status: 'read' },
-      { id: 'm3', sender: 'them', senderName: 'Steve', content: 'Also, I got a quote from the HVAC company for the annual service.', timestamp: '2024-12-19T10:00:00Z', attachments: [{ id: 'a1', type: 'action', actionType: 'estimate', actionData: { vendor: 'Cool Air HVAC', amount: 299, description: 'Annual HVAC maintenance and inspection', validUntil: '2024-12-26' } }] },
-      { id: 'm4', sender: 'them', senderName: 'Steve', content: 'Let me know if you want to proceed with this.', timestamp: '2024-12-19T10:30:00Z' },
+      { id: 'm3', sender: 'them', senderName: 'Sarah', content: "Also, I got a quote from the HVAC company for the annual service.", timestamp: '2024-12-19T10:00:00Z', attachments: [{ id: 'a1', type: 'action', actionType: 'estimate', actionData: { vendor: 'AirFlow HVAC', amount: 299, description: 'Annual HVAC maintenance and inspection', validUntil: '2024-12-26' } }] },
+      { id: 'm4', sender: 'them', senderName: 'Sarah', content: 'Do you want me to go ahead and schedule this?', timestamp: '2024-12-19T10:30:00Z' },
     ],
   },
   {
     id: 'c2',
-    channelType: 'vip',
-    title: 'Handyman',
-    subtitle: 'Mike Rodriguez',
+    channelType: 'team',
+    title: 'Mike Rodriguez',
+    subtitle: 'Your Handyman',
     avatar: mockParticipants.handyman!.avatar,
     participants: [mockParticipants.handyman!],
     unreadCount: 0,
     isPinned: true,
-    isVip: true,
+    isHandyman: true,
     lastActivity: '2024-12-18T16:00:00Z',
     messages: [
       { id: 'm1', sender: 'me', content: 'Hi Mike, the kitchen faucet is still dripping after your visit.', timestamp: '2024-12-18T14:00:00Z', status: 'read' },
-      { id: 'm2', sender: 'them', senderName: 'Mike', content: 'I\'ll swing by tomorrow morning to take another look. The washer might need a full replacement.', timestamp: '2024-12-18T14:30:00Z' },
-      { id: 'm3', sender: 'me', content: 'Sounds good, I\'ll be home until noon.', timestamp: '2024-12-18T14:35:00Z', status: 'read' },
-      { id: 'm4', sender: 'them', senderName: 'Mike', content: 'Great, I\'ll be there around 9. See you then!', timestamp: '2024-12-18T16:00:00Z' },
+      { id: 'm2', sender: 'them', senderName: 'Mike', content: "I'll swing by tomorrow morning to take another look. The washer might need a full replacement.", timestamp: '2024-12-18T14:30:00Z' },
+      { id: 'm3', sender: 'me', content: "Sounds good, I'll be home until noon.", timestamp: '2024-12-18T14:35:00Z', status: 'read' },
+      { id: 'm4', sender: 'them', senderName: 'Mike', content: "Great, I'll be there around 9. See you then!", timestamp: '2024-12-18T16:00:00Z' },
     ],
   },
   {
     id: 'c3',
-    channelType: 'vip',
-    title: 'Travel Concierge',
-    subtitle: 'Sarah Chen',
-    avatar: mockParticipants.travel!.avatar,
-    participants: [mockParticipants.travel!],
-    unreadCount: 1,
-    isPinned: true,
-    isVip: true,
-    lastActivity: '2024-12-19T11:00:00Z',
-    messages: [
-      { id: 'm1', sender: 'me', content: 'Hi Sarah, we\'re thinking about a spring break trip to Hawaii for the family.', timestamp: '2024-12-18T10:00:00Z', status: 'read' },
-      { id: 'm2', sender: 'them', senderName: 'Sarah', content: 'That sounds wonderful! I\'ve got some great options for you. Here\'s a flight I found:', timestamp: '2024-12-18T11:00:00Z', attachments: [{ id: 'a1', type: 'action', actionType: 'flight', actionData: { airline: 'Hawaiian Airlines', departure: 'LAX', arrival: 'HNL', departDate: '2025-03-15', returnDate: '2025-03-22', price: 2400, passengers: 4 } }] },
-      { id: 'm3', sender: 'them', senderName: 'Sarah', content: 'And here\'s a beautiful resort I recommend:', timestamp: '2024-12-18T11:05:00Z', attachments: [{ id: 'a2', type: 'action', actionType: 'hotel', actionData: { name: 'Four Seasons Resort Maui', location: 'Wailea, Maui', checkIn: '2025-03-15', checkOut: '2025-03-22', pricePerNight: 850, rating: 4.9 } }] },
-      { id: 'm4', sender: 'them', senderName: 'Sarah', content: 'Let me know what you think!', timestamp: '2024-12-19T11:00:00Z' },
-    ],
-  },
-  {
-    id: 'c4',
     channelType: 'family',
     title: 'Chen Family',
     subtitle: 'Alice, Emma, Jake',
@@ -211,57 +211,137 @@ const mockConversations: Conversation[] = [
     unreadCount: 5,
     lastActivity: '2024-12-19T09:30:00Z',
     messages: [
-      { id: 'm1', sender: 'them', senderId: 'p4', senderName: 'Alice', content: 'Don\'t forget Emma has soccer practice at 4!', timestamp: '2024-12-19T08:00:00Z' },
+      { id: 'm1', sender: 'them', senderId: 'p4', senderName: 'Alice', content: "Don't forget Emma has soccer practice at 4!", timestamp: '2024-12-19T08:00:00Z', canConvert: true },
       { id: 'm2', sender: 'me', content: 'Got it! I can pick her up.', timestamp: '2024-12-19T08:05:00Z', status: 'read' },
-      { id: 'm3', sender: 'them', senderId: 'p4', senderName: 'Alice', content: 'Perfect. Also, Jake needs his science project supplies.', timestamp: '2024-12-19T09:00:00Z' },
-      { id: 'm4', sender: 'them', senderId: 'p4', senderName: 'Alice', content: 'Here\'s the list:', timestamp: '2024-12-19T09:30:00Z', attachments: [{ id: 'a1', type: 'image', url: getDemoImage('blueprint', 400, 300, 'science-list') }] },
+      { id: 'm3', sender: 'them', senderId: 'p4', senderName: 'Alice', content: 'Perfect. Also, Jake needs his science project supplies.', timestamp: '2024-12-19T09:00:00Z', canConvert: true },
+      { id: 'm4', sender: 'them', senderId: 'p4', senderName: 'Alice', content: 'Can you pick up: poster board, glue sticks, and markers', timestamp: '2024-12-19T09:30:00Z', canConvert: true },
     ],
   },
   {
-    id: 'c5',
+    id: 'c4',
     channelType: 'vendors',
-    title: 'Mike\'s Plumbing',
+    title: "Mike's Plumbing",
     subtitle: 'Kitchen faucet repair',
     avatar: mockParticipants.plumber!.avatar,
     participants: [mockParticipants.plumber!],
     unreadCount: 0,
     lastActivity: '2024-12-17T12:00:00Z',
+    managedByManager: true,
+    managerStatus: 'Sarah replied',
     messages: [
-      { id: 'm1', sender: 'system', content: 'Work order #WO-001 assigned to Mike\'s Plumbing', timestamp: '2024-12-16T10:00:00Z' },
-      { id: 'm2', sender: 'them', senderName: 'Mike\'s Plumbing', content: 'We\'ll be there tomorrow between 2-4 PM.', timestamp: '2024-12-16T11:00:00Z' },
-      { id: 'm3', sender: 'me', content: 'Sounds good, the gate code is 1234.', timestamp: '2024-12-16T11:30:00Z', status: 'read' },
-      { id: 'm4', sender: 'them', senderName: 'Mike\'s Plumbing', content: 'Job completed. Here\'s the photo of the repaired faucet:', timestamp: '2024-12-17T12:00:00Z', attachments: [{ id: 'a1', type: 'image', url: getDemoImage('kitchen', 400, 300, 'repaired-faucet') }] },
+      { id: 'm1', sender: 'system', content: "Work order #WO-001 assigned to Mike's Plumbing", timestamp: '2024-12-16T10:00:00Z' },
+      { id: 'm2', sender: 'them', senderName: "Mike's Plumbing", content: "We'll be there tomorrow between 2-4 PM.", timestamp: '2024-12-16T11:00:00Z' },
+      { id: 'm3', sender: 'manager', senderName: 'Sarah', content: 'Confirmed. The homeowner will be available. Gate code is 1234.', timestamp: '2024-12-16T11:30:00Z' },
+      { id: 'm4', sender: 'them', senderName: "Mike's Plumbing", content: 'Job completed. Here\'s the photo of the repaired faucet:', timestamp: '2024-12-17T12:00:00Z', attachments: [{ id: 'a1', type: 'image', url: getDemoImage('kitchen', 400, 300, 'repaired-faucet') }] },
+      { id: 'm5', sender: 'manager', senderName: 'Sarah', content: 'Perfect, thank you! Invoice received and processed.', timestamp: '2024-12-17T12:30:00Z' },
+    ],
+  },
+  {
+    id: 'c5',
+    channelType: 'vendors',
+    title: 'AirFlow HVAC',
+    subtitle: 'Annual maintenance scheduling',
+    avatar: mockParticipants.hvac!.avatar,
+    participants: [mockParticipants.hvac!],
+    unreadCount: 1,
+    lastActivity: '2024-12-19T09:00:00Z',
+    managedByManager: true,
+    managerStatus: 'Sarah handling',
+    messages: [
+      { id: 'm1', sender: 'manager', senderName: 'Sarah', content: "Hi, I'd like to schedule the annual HVAC maintenance for the Chen residence.", timestamp: '2024-12-18T14:00:00Z' },
+      { id: 'm2', sender: 'them', senderName: 'AirFlow HVAC', content: "We have availability next week. Here's our quote for the service.", timestamp: '2024-12-18T15:00:00Z', attachments: [{ id: 'a1', type: 'action', actionType: 'estimate', actionData: { vendor: 'AirFlow HVAC', amount: 299, description: 'Annual HVAC maintenance', validUntil: '2024-12-26' } }] },
+      { id: 'm3', sender: 'manager', senderName: 'Sarah', content: "Thank you. I'll confirm with the homeowner and get back to you.", timestamp: '2024-12-19T09:00:00Z' },
     ],
   },
   {
     id: 'c6',
-    channelType: 'neighbors',
-    title: 'Jennifer Walsh',
-    subtitle: '123 Oak Lane',
-    avatar: mockParticipants.neighbor!.avatar,
-    participants: [mockParticipants.neighbor!],
+    channelType: 'forwarded',
+    title: 'ConEd',
+    subtitle: 'December Bill',
+    avatar: getDemoImage('vendor-portrait', 100, 100, 'coned-logo'),
+    participants: [],
     unreadCount: 0,
-    lastActivity: '2024-12-15T18:00:00Z',
+    lastActivity: '2024-12-19T08:00:00Z',
+    managedByManager: true,
+    managerStatus: 'Handled',
     messages: [
-      { id: 'm1', sender: 'them', senderName: 'Jennifer', content: 'Hey! Love what you did with the front yard. Who did your landscaping?', timestamp: '2024-12-15T16:00:00Z' },
-      { id: 'm2', sender: 'me', content: 'Thanks! It was Green Thumb Landscaping. They did an amazing job.', timestamp: '2024-12-15T16:30:00Z', status: 'read' },
-      { id: 'm3', sender: 'them', senderName: 'Jennifer', content: 'Great, I\'ll reach out to them. Thanks!', timestamp: '2024-12-15T18:00:00Z' },
+      {
+        id: 'm1',
+        sender: 'system',
+        content: 'Email forwarded to Haven',
+        timestamp: '2024-12-19T07:00:00Z',
+        attachments: [{
+          id: 'e1',
+          type: 'forwarded_email',
+          emailData: {
+            from: 'billing@coned.com',
+            subject: 'Your December Bill is Ready',
+            receivedAt: '2024-12-19T07:00:00Z',
+            handled: true,
+            handledMessage: "$187.43 electric bill. I'll add it to your December statement and pay it.",
+          },
+        }],
+      },
+      { id: 'm2', sender: 'manager', senderName: 'Sarah', content: "Got it - $187.43 electric bill. I'll add it to your December statement and pay it by the due date.", timestamp: '2024-12-19T08:00:00Z' },
+    ],
+  },
+  {
+    id: 'c7',
+    channelType: 'forwarded',
+    title: 'Home Warranty Co',
+    subtitle: 'Warranty Renewal',
+    avatar: getDemoImage('vendor-portrait', 100, 100, 'warranty-logo'),
+    participants: [],
+    unreadCount: 1,
+    lastActivity: '2024-12-18T14:00:00Z',
+    managedByManager: true,
+    managerStatus: 'Sarah reviewing',
+    needsResponse: true,
+    messages: [
+      {
+        id: 'm1',
+        sender: 'system',
+        content: 'Email forwarded to Haven',
+        timestamp: '2024-12-18T10:00:00Z',
+        attachments: [{
+          id: 'e1',
+          type: 'forwarded_email',
+          emailData: {
+            from: 'renewals@homewarranty.com',
+            subject: 'Your Home Warranty Expires in 30 Days',
+            receivedAt: '2024-12-18T10:00:00Z',
+            handled: false,
+          },
+        }],
+      },
+      { id: 'm2', sender: 'manager', senderName: 'Sarah', content: "I've reviewed the renewal options. Your current plan is $450/year. They're offering a 3-year lock at $399/year. Given the age of your HVAC, I recommend renewing. Should I proceed?", timestamp: '2024-12-18T14:00:00Z' },
     ],
   },
 ];
 
 // ============================================================================
-// COMPONENTS
+// HELPER FUNCTIONS
 // ============================================================================
 
-// VIP Badge
-function VipBadge() {
-  return (
-    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center shadow-sm">
-      <Star className="w-3 h-3 text-white fill-white" />
-    </div>
-  );
+function formatTime(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (diffDays === 0) {
+    return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  } else if (diffDays === 1) {
+    return 'Yesterday';
+  } else if (diffDays < 7) {
+    return date.toLocaleDateString('en-US', { weekday: 'short' });
+  } else {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  }
 }
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
 
 // Online Indicator
 function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
@@ -269,6 +349,72 @@ function OnlineIndicator({ isOnline }: { isOnline: boolean }) {
     <div className={`absolute bottom-0 right-0 w-3.5 h-3.5 rounded-full border-2 border-white ${
       isOnline ? 'bg-emerald-500' : 'bg-slate-400'
     }`} />
+  );
+}
+
+// Manager Badge
+function ManagerBadge() {
+  return (
+    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center shadow-sm">
+      <Star className="w-3 h-3 text-white fill-white" />
+    </div>
+  );
+}
+
+// Managed By Sarah Label
+function ManagedLabel({ status }: { status: string }) {
+  const isHandled = status === 'Handled' || status === 'Sarah replied';
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+      isHandled ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+    }`}>
+      {isHandled ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
+      {status}
+    </span>
+  );
+}
+
+// Filter Tabs
+function FilterTabs({
+  activeFilter,
+  onFilterChange,
+  counts,
+}: {
+  activeFilter: FilterType;
+  onFilterChange: (filter: FilterType) => void;
+  counts: Record<FilterType, number>;
+}) {
+  const filters: { type: FilterType; label: string }[] = [
+    { type: 'all', label: 'All' },
+    { type: 'unread', label: 'Unread' },
+    { type: 'needs_response', label: 'Needs Response' },
+    { type: 'manager', label: 'Sarah' },
+    { type: 'family', label: 'Family' },
+  ];
+
+  return (
+    <div className="flex gap-1 overflow-x-auto pb-2 -mx-4 px-4">
+      {filters.map(({ type, label }) => (
+        <button
+          key={type}
+          onClick={() => onFilterChange(type)}
+          className={`flex-shrink-0 px-3 py-1.5 text-sm font-medium rounded-full transition-colors ${
+            activeFilter === type
+              ? 'bg-emerald-600 text-white'
+              : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+          }`}
+        >
+          {label}
+          {counts[type] > 0 && type !== 'all' && (
+            <span className={`ml-1.5 px-1.5 py-0.5 text-xs rounded-full ${
+              activeFilter === type ? 'bg-white/20' : 'bg-slate-200'
+            }`}>
+              {counts[type]}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
   );
 }
 
@@ -282,22 +428,10 @@ function ConversationItem({
   isSelected: boolean;
   onClick: () => void;
 }) {
-  const formatTime = (dateStr: string) => {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
-
-    if (diffDays === 0) {
-      return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    } else if (diffDays === 1) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-    }
-  };
-
   const lastMessage = conversation.messages[conversation.messages.length - 1];
   const participant = conversation.participants[0];
+  const isManagerChat = conversation.isManager;
+  const showManagedLabel = conversation.managedByManager && conversation.managerStatus;
 
   return (
     <button
@@ -305,43 +439,62 @@ function ConversationItem({
       className={`w-full flex items-start gap-3 p-3 text-left transition-colors ${
         isSelected
           ? 'bg-emerald-50 border-l-4 border-l-emerald-600'
-          : conversation.isVip
-          ? 'bg-slate-50 hover:bg-slate-100 border-l-4 border-l-transparent'
+          : isManagerChat
+          ? 'bg-gradient-to-r from-emerald-50/50 to-transparent hover:from-emerald-50 border-l-4 border-l-emerald-400'
           : 'hover:bg-slate-50 border-l-4 border-l-transparent'
       }`}
     >
       <div className="relative flex-shrink-0">
-        <div className="w-12 h-12 rounded-full overflow-hidden bg-slate-200">
+        <div className={`w-12 h-12 rounded-full overflow-hidden ${isManagerChat ? 'ring-2 ring-emerald-400 ring-offset-2' : 'bg-slate-200'}`}>
           <Image src={conversation.avatar} alt="" width={48} height={48} className="object-cover" />
         </div>
-        {conversation.isVip && <VipBadge />}
+        {isManagerChat && <ManagerBadge />}
         {participant && <OnlineIndicator isOnline={participant.isOnline ?? false} />}
       </div>
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between gap-2">
-          <span className={`font-medium truncate ${conversation.unreadCount > 0 ? 'text-slate-900' : 'text-slate-700'}`}>
-            {conversation.title}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`font-medium truncate ${conversation.unreadCount > 0 ? 'text-slate-900' : 'text-slate-700'}`}>
+              {isManagerChat && <MessageCircle className="w-3.5 h-3.5 inline mr-1 text-emerald-600" />}
+              {conversation.title}
+            </span>
+            {participant?.isOnline && isManagerChat && (
+              <span className="text-xs text-emerald-600 font-medium">Online</span>
+            )}
+          </div>
           <span className="text-xs text-slate-500 flex-shrink-0">
             {formatTime(conversation.lastActivity)}
           </span>
         </div>
+
         {conversation.subtitle && (
           <p className="text-xs text-slate-500 truncate">{conversation.subtitle}</p>
         )}
-        {lastMessage && (
+
+        {showManagedLabel && (
+          <div className="mt-1">
+            <ManagedLabel status={conversation.managerStatus!} />
+          </div>
+        )}
+
+        {lastMessage && !showManagedLabel && (
           <p className={`text-sm truncate mt-0.5 ${conversation.unreadCount > 0 ? 'text-slate-900 font-medium' : 'text-slate-500'}`}>
             {lastMessage.sender === 'me' && <span className="text-slate-400">You: </span>}
+            {lastMessage.sender === 'manager' && <span className="text-emerald-600">Sarah: </span>}
             {lastMessage.content}
           </p>
         )}
       </div>
 
-      {conversation.unreadCount > 0 && (
+      {conversation.unreadCount > 0 && !conversation.managedByManager && (
         <div className="flex-shrink-0 w-5 h-5 bg-emerald-600 rounded-full flex items-center justify-center">
           <span className="text-xs text-white font-medium">{conversation.unreadCount}</span>
         </div>
+      )}
+
+      {conversation.needsResponse && (
+        <div className="flex-shrink-0 w-2 h-2 bg-amber-500 rounded-full animate-pulse" />
       )}
     </button>
   );
@@ -359,32 +512,213 @@ function ChannelGroupHeader({
 }) {
   const Icon = group.icon;
   return (
-    <button
-      onClick={onToggle}
-      className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-    >
-      {group.isExpanded ? (
-        <ChevronDown className="w-4 h-4" />
-      ) : (
-        <ChevronRight className="w-4 h-4" />
+    <div>
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+      >
+        {group.isExpanded ? (
+          <ChevronDown className="w-4 h-4" />
+        ) : (
+          <ChevronRight className="w-4 h-4" />
+        )}
+        <Icon className="w-4 h-4" />
+        <span>{group.label}</span>
+        <span className="ml-auto text-xs text-slate-400">{count}</span>
+      </button>
+      {group.description && !group.isExpanded && (
+        <p className="px-9 pb-2 text-xs text-slate-500">{group.description}</p>
       )}
-      <Icon className="w-4 h-4" />
-      <span>{group.label}</span>
-      <span className="ml-auto text-xs text-slate-400">{count}</span>
-    </button>
+    </div>
+  );
+}
+
+// Vendor Section Header (collapsed view)
+function VendorSectionHeader({
+  conversations,
+  isExpanded,
+  onToggle,
+}: {
+  conversations: Conversation[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const handledCount = conversations.filter(c => c.managerStatus === 'Handled' || c.managerStatus === 'Sarah replied').length;
+
+  return (
+    <div className="bg-slate-50 border-y border-slate-200">
+      <button
+        onClick={onToggle}
+        className="w-full flex items-center gap-2 px-3 py-3 text-left"
+      >
+        <div className="flex items-center gap-2 flex-1">
+          <Shield className="w-4 h-4 text-emerald-600" />
+          <div>
+            <p className="text-sm font-medium text-slate-700">Vendor Updates</p>
+            <p className="text-xs text-slate-500">Managed by Sarah</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+            {handledCount}/{conversations.length} handled
+          </span>
+          {isExpanded ? (
+            <ChevronDown className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+          )}
+        </div>
+      </button>
+
+      {!isExpanded && (
+        <div className="px-3 pb-3">
+          <p className="text-xs text-slate-500 bg-white rounded-lg p-2 border border-slate-200">
+            These conversations are handled by your manager. You'll only see messages that need your input.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Forwarded Email Card
+function ForwardedEmailCard({ attachment }: { attachment: MessageAttachment }) {
+  if (attachment.type !== 'forwarded_email' || !attachment.emailData) return null;
+  const { from, subject, handled, handledMessage } = attachment.emailData;
+
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 my-2">
+      <div className="flex items-start gap-3">
+        <div className="p-2 bg-blue-100 rounded-lg">
+          <Mail className="w-4 h-4 text-blue-600" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-blue-900">Forwarded Email</p>
+          <p className="text-xs text-blue-700 truncate">From: {from}</p>
+          <p className="text-xs text-blue-700 truncate">Subject: {subject}</p>
+
+          {handled && handledMessage && (
+            <div className="mt-2 pt-2 border-t border-blue-200">
+              <p className="text-xs text-emerald-700 font-medium flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                Sarah: "{handledMessage}"
+              </p>
+            </div>
+          )}
+        </div>
+        {handled && (
+          <span className="flex-shrink-0 text-xs bg-emerald-100 text-emerald-700 px-2 py-1 rounded-full font-medium flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            Handled
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Quick Request Buttons (for manager chat)
+function QuickRequestButtons({
+  onRequest,
+}: {
+  onRequest: (type: 'broken' | 'schedule' | 'buy' | 'question') => void;
+}) {
+  const buttons = [
+    { type: 'broken' as const, icon: Wrench, label: "Something's broken" },
+    { type: 'schedule' as const, icon: Calendar, label: 'Schedule something' },
+    { type: 'buy' as const, icon: ShoppingCart, label: 'Buy something' },
+    { type: 'question' as const, icon: HelpCircle, label: 'Question' },
+  ];
+
+  return (
+    <div className="border-t border-slate-100 pt-2 pb-1">
+      <p className="text-xs text-slate-500 mb-2 px-1">Quick requests:</p>
+      <div className="flex flex-wrap gap-1.5">
+        {buttons.map(({ type, icon: Icon, label }) => (
+          <button
+            key={type}
+            onClick={() => onRequest(type)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-slate-100 text-slate-700 rounded-full hover:bg-emerald-100 hover:text-emerald-700 transition-colors"
+          >
+            <Icon className="w-3.5 h-3.5" />
+            {label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Message Action Menu (convert to task)
+function MessageActionMenu({
+  message,
+  onConvert,
+  onClose,
+}: {
+  message: Message;
+  onConvert: (type: 'request' | 'calendar' | 'shopping') => void;
+  onClose: () => void;
+}) {
+  if (message.convertedTo) {
+    return (
+      <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-slate-200 p-2 z-10">
+        <p className="text-xs text-emerald-600 flex items-center gap-1">
+          <CheckCircle2 className="w-3 h-3" />
+          Added to {message.convertedTo.type}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="absolute top-full left-0 mt-1 bg-white rounded-lg shadow-lg border border-slate-200 py-1 z-10 min-w-[160px]">
+      <button
+        onClick={() => { onConvert('request'); onClose(); }}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+      >
+        <ClipboardList className="w-4 h-4 text-slate-500" />
+        Make this a request
+      </button>
+      <button
+        onClick={() => { onConvert('calendar'); onClose(); }}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+      >
+        <CalendarPlus className="w-4 h-4 text-slate-500" />
+        Add to calendar
+      </button>
+      <button
+        onClick={() => { onConvert('shopping'); onClose(); }}
+        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50"
+      >
+        <ListPlus className="w-4 h-4 text-slate-500" />
+        Add to shopping list
+      </button>
+    </div>
   );
 }
 
 // Message Bubble
-function MessageBubble({ message, showSender }: { message: Message; showSender: boolean }) {
+function MessageBubble({
+  message,
+  showSender,
+  onConvert,
+}: {
+  message: Message;
+  showSender: boolean;
+  onConvert?: (messageId: string, type: 'request' | 'calendar' | 'shopping') => void;
+}) {
+  const [showActionMenu, setShowActionMenu] = useState(false);
   const isMe = message.sender === 'me';
   const isSystem = message.sender === 'system';
-
-  const formatTime = (dateStr: string) => {
-    return new Date(dateStr).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  };
+  const isManager = message.sender === 'manager';
 
   if (isSystem) {
+    // Check for forwarded email
+    const emailAttachment = message.attachments?.find(a => a.type === 'forwarded_email');
+    if (emailAttachment) {
+      return <ForwardedEmailCard attachment={emailAttachment} />;
+    }
+
     return (
       <div className="flex justify-center my-4">
         <span className="text-xs text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
@@ -395,15 +729,20 @@ function MessageBubble({ message, showSender }: { message: Message; showSender: 
   }
 
   return (
-    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} group`}>
+    <div className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative`}>
       <div className={`max-w-[70%] ${isMe ? 'order-2' : 'order-1'}`}>
         {showSender && !isMe && message.senderName && (
-          <p className="text-xs font-medium text-slate-600 mb-1 ml-3">{message.senderName}</p>
+          <p className={`text-xs font-medium mb-1 ml-3 ${isManager ? 'text-emerald-600' : 'text-slate-600'}`}>
+            {isManager && <Star className="w-3 h-3 inline mr-1" />}
+            {message.senderName}
+          </p>
         )}
         <div
           className={`px-4 py-2.5 ${
             isMe
               ? 'bg-emerald-600 text-white rounded-2xl rounded-tr-sm'
+              : isManager
+              ? 'bg-emerald-50 border border-emerald-200 text-slate-800 rounded-2xl rounded-tl-sm'
               : 'bg-white border border-slate-200 text-slate-800 rounded-2xl rounded-tl-sm shadow-sm'
           }`}
         >
@@ -530,25 +869,6 @@ function MessageBubble({ message, showSender }: { message: Message; showSender: 
                   </div>
                 </div>
               )}
-
-              {attachment.type === 'action' && attachment.actionType === 'calendar' && (
-                <div className="bg-white border border-slate-200 rounded-xl p-4 mt-2 shadow-sm">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="p-2 bg-emerald-100 rounded-lg">
-                      <Calendar className="w-4 h-4 text-emerald-600" />
-                    </div>
-                    <span className="font-medium text-slate-900">Proposed Time</span>
-                  </div>
-                  <div className="flex gap-2">
-                    <button className="flex-1 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700">
-                      Accept
-                    </button>
-                    <button className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50">
-                      Suggest Another
-                    </button>
-                  </div>
-                </div>
-              )}
             </div>
           ))}
         </div>
@@ -566,7 +886,25 @@ function MessageBubble({ message, showSender }: { message: Message; showSender: 
               )}
             </span>
           )}
+
+          {/* Convert action */}
+          {message.canConvert && onConvert && (
+            <button
+              onClick={() => setShowActionMenu(!showActionMenu)}
+              className="ml-2 p-1 hover:bg-slate-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <MoreVertical className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+          )}
         </div>
+
+        {showActionMenu && message.canConvert && onConvert && (
+          <MessageActionMenu
+            message={message}
+            onConvert={(type) => onConvert(message.id, type)}
+            onClose={() => setShowActionMenu(false)}
+          />
+        )}
       </div>
     </div>
   );
@@ -579,20 +917,18 @@ function InfoDrawer({
   onCall,
   onVideoCall,
   onMuteToggle,
-  onBlock,
+  onNotificationSettings,
 }: {
   conversation: Conversation;
   onClose: () => void;
   onCall?: () => void;
   onVideoCall?: () => void;
   onMuteToggle?: () => void;
-  onBlock?: () => void;
+  onNotificationSettings?: () => void;
 }) {
   const participant = conversation.participants[0];
   const allImages = conversation.messages
     .flatMap((m) => m.attachments?.filter((a) => a.type === 'image') || []);
-  const allFiles = conversation.messages
-    .flatMap((m) => m.attachments?.filter((a) => a.type === 'file') || []);
 
   return (
     <div className="w-80 border-l border-slate-200 bg-white flex flex-col h-full">
@@ -608,11 +944,11 @@ function InfoDrawer({
         {/* Profile */}
         <div className="p-6 text-center border-b border-slate-200">
           <div className="relative w-20 h-20 mx-auto mb-3">
-            <div className="w-20 h-20 rounded-full overflow-hidden bg-slate-200">
+            <div className={`w-20 h-20 rounded-full overflow-hidden ${conversation.isManager ? 'ring-2 ring-emerald-400 ring-offset-2' : 'bg-slate-200'}`}>
               <Image src={conversation.avatar} alt="" width={80} height={80} className="object-cover" />
             </div>
-            {conversation.isVip && (
-              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-full flex items-center justify-center">
+            {conversation.isManager && (
+              <div className="absolute -top-1 -right-1 w-6 h-6 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-full flex items-center justify-center">
                 <Star className="w-3.5 h-3.5 text-white fill-white" />
               </div>
             )}
@@ -624,43 +960,51 @@ function InfoDrawer({
           {participant?.responseTime && (
             <p className="text-xs text-emerald-600 mt-1">{participant.responseTime}</p>
           )}
+
+          {conversation.managedByManager && (
+            <div className="mt-3">
+              <ManagedLabel status={conversation.managerStatus || 'Sarah handling'} />
+            </div>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="p-4 border-b border-slate-200">
-          <div className="flex justify-center gap-4">
-            <button
-              onClick={onCall}
-              className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
-            >
-              <div className="p-2 bg-emerald-100 rounded-full">
-                <Phone className="w-5 h-5 text-emerald-600" />
-              </div>
-              <span className="text-xs text-slate-600">Call</span>
-            </button>
-            <button
-              onClick={onVideoCall}
-              className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
-            >
-              <div className="p-2 bg-blue-100 rounded-full">
-                <Video className="w-5 h-5 text-blue-600" />
-              </div>
-              <span className="text-xs text-slate-600">Video</span>
-            </button>
-            <button className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors">
-              <div className="p-2 bg-slate-100 rounded-full">
-                <MoreVertical className="w-5 h-5 text-slate-600" />
-              </div>
-              <span className="text-xs text-slate-600">More</span>
-            </button>
+        {!conversation.managedByManager && (
+          <div className="p-4 border-b border-slate-200">
+            <div className="flex justify-center gap-4">
+              <button
+                onClick={onCall}
+                className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                <div className="p-2 bg-emerald-100 rounded-full">
+                  <Phone className="w-5 h-5 text-emerald-600" />
+                </div>
+                <span className="text-xs text-slate-600">Call</span>
+              </button>
+              <button
+                onClick={onVideoCall}
+                className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors"
+              >
+                <div className="p-2 bg-blue-100 rounded-full">
+                  <Video className="w-5 h-5 text-blue-600" />
+                </div>
+                <span className="text-xs text-slate-600">Video</span>
+              </button>
+              <button className="flex flex-col items-center gap-1 p-3 hover:bg-slate-50 rounded-xl transition-colors">
+                <div className="p-2 bg-slate-100 rounded-full">
+                  <MoreVertical className="w-5 h-5 text-slate-600" />
+                </div>
+                <span className="text-xs text-slate-600">More</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Shared Media */}
         {allImages.length > 0 && (
           <div className="p-4 border-b border-slate-200">
             <h5 className="text-sm font-medium text-slate-900 mb-3 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-slate-500" />
+              <Camera className="w-4 h-4 text-slate-500" />
               Shared Photos ({allImages.length})
             </h5>
             <div className="grid grid-cols-3 gap-2">
@@ -670,66 +1014,35 @@ function InfoDrawer({
                 </div>
               ))}
             </div>
-            {allImages.length > 6 && (
-              <button className="w-full text-sm text-emerald-600 font-medium mt-2 hover:underline">
-                View All
-              </button>
-            )}
           </div>
         )}
 
-        {/* Shared Files */}
-        {allFiles.length > 0 && (
+        {/* Participants */}
+        {conversation.participants.length > 0 && (
           <div className="p-4 border-b border-slate-200">
             <h5 className="text-sm font-medium text-slate-900 mb-3 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-slate-500" />
-              Shared Documents ({allFiles.length})
+              <Users className="w-4 h-4 text-slate-500" />
+              Participants
             </h5>
             <div className="space-y-2">
-              {allFiles.map((file) => (
-                <div key={file.id} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
-                  <FileText className="w-5 h-5 text-slate-400" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-slate-900 truncate">{file.name}</p>
-                    <p className="text-xs text-slate-500">{file.size}</p>
+              {conversation.participants.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 p-2">
+                  <div className="relative w-8 h-8 rounded-full overflow-hidden bg-slate-200">
+                    <Image src={p.avatar} alt="" width={32} height={32} className="object-cover" />
                   </div>
-                  <Download className="w-4 h-4 text-slate-400" />
+                  <div className="flex-1">
+                    <span className="text-sm text-slate-900">{p.name}</span>
+                    {p.role && <p className="text-xs text-slate-500">{p.role}</p>}
+                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {/* Participants */}
-        <div className="p-4 border-b border-slate-200">
-          <h5 className="text-sm font-medium text-slate-900 mb-3 flex items-center gap-2">
-            <Users className="w-4 h-4 text-slate-500" />
-            Participants ({conversation.participants.length + 1})
-          </h5>
-          <div className="space-y-2">
-            <div className="flex items-center gap-3 p-2">
-              <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                <span className="text-sm font-medium text-emerald-700">You</span>
-              </div>
-              <span className="text-sm text-slate-900">You</span>
-            </div>
-            {conversation.participants.map((p) => (
-              <div key={p.id} className="flex items-center gap-3 p-2">
-                <div className="relative w-8 h-8 rounded-full overflow-hidden bg-slate-200">
-                  <Image src={p.avatar} alt="" width={32} height={32} className="object-cover" />
-                </div>
-                <div className="flex-1">
-                  <span className="text-sm text-slate-900">{p.name}</span>
-                  {p.role && <p className="text-xs text-slate-500">{p.role}</p>}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Privacy */}
+        {/* Notifications */}
         <div className="p-4">
-          <h5 className="text-sm font-medium text-slate-900 mb-3">Privacy</h5>
+          <h5 className="text-sm font-medium text-slate-900 mb-3">Notifications</h5>
           <div className="space-y-2">
             <button
               onClick={onMuteToggle}
@@ -745,13 +1058,88 @@ function InfoDrawer({
               </span>
             </button>
             <button
-              onClick={onBlock}
-              className="w-full flex items-center gap-3 p-3 text-left hover:bg-red-50 rounded-lg transition-colors text-red-600"
+              onClick={onNotificationSettings}
+              className="w-full flex items-center gap-3 p-3 text-left hover:bg-slate-50 rounded-lg transition-colors"
             >
-              <Ban className="w-5 h-5" />
-              <span className="text-sm">Block</span>
+              <Settings className="w-5 h-5 text-slate-500" />
+              <span className="text-sm text-slate-700">Notification Preferences</span>
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Notification Preferences Modal
+function NotificationPreferencesModal({
+  onClose,
+  onSave,
+}: {
+  onClose: () => void;
+  onSave: () => void;
+}) {
+  const [prefs, setPrefs] = useState({
+    manager: 'always',
+    handyman: 'scheduled',
+    vendors: 'mentioned',
+    family: 'always',
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div className="p-4 border-b border-slate-200 flex items-center justify-between">
+          <h2 className="text-lg font-bold text-slate-900">Notification Preferences</h2>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="p-4 space-y-4">
+          <p className="text-sm text-slate-600">What should you be notified about?</p>
+
+          {[
+            { key: 'manager', label: 'Manager messages', icon: Star, recommended: 'Always' },
+            { key: 'handyman', label: 'Handyman updates', icon: Wrench, recommended: 'When scheduled at your home' },
+            { key: 'vendors', label: 'Vendor updates', icon: Building2, recommended: 'Only when mentioned' },
+            { key: 'family', label: 'Family messages', icon: Home, recommended: 'Always' },
+          ].map(({ key, label, icon: Icon, recommended }) => (
+            <div key={key} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+              <div className="flex items-center gap-3">
+                <Icon className="w-5 h-5 text-slate-500" />
+                <div>
+                  <p className="text-sm font-medium text-slate-900">{label}</p>
+                  <p className="text-xs text-slate-500">Recommended: {recommended}</p>
+                </div>
+              </div>
+              <select
+                value={prefs[key as keyof typeof prefs]}
+                onChange={(e) => setPrefs({ ...prefs, [key]: e.target.value })}
+                className="text-sm border border-slate-200 rounded-lg px-2 py-1"
+              >
+                <option value="always">Always</option>
+                <option value="scheduled">When scheduled</option>
+                <option value="mentioned">When mentioned</option>
+                <option value="never">Never</option>
+              </select>
+            </div>
+          ))}
+        </div>
+
+        <div className="p-4 border-t border-slate-200 flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => { onSave(); onClose(); }}
+            className="flex-1 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700"
+          >
+            Save Preferences
+          </button>
         </div>
       </div>
     </div>
@@ -768,7 +1156,9 @@ export default function MessagesPage() {
   const [showInfoDrawer, setShowInfoDrawer] = useState(false);
   const [messageInput, setMessageInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNewConvoModal, setShowNewConvoModal] = useState(false);
+  const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+  const [showVendors, setShowVendors] = useState(false);
+  const [showNotificationPrefs, setShowNotificationPrefs] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -780,21 +1170,59 @@ export default function MessagesPage() {
 
   const [channelGroups, setChannelGroups] = useState<ChannelGroup[]>([
     { type: 'family', label: 'Family', icon: Home, isExpanded: true },
-    { type: 'vendors', label: 'Vendors', icon: Wrench, isExpanded: true },
-    { type: 'neighbors', label: 'Neighbors', icon: Users, isExpanded: true },
+    { type: 'forwarded', label: 'Forwarded Emails', icon: Mail, isExpanded: true, description: 'Emails you forwarded to Haven' },
   ]);
 
-  const vipConversations = conversations.filter((c) => c.isVip);
-  const getConversationsByType = (type: ChannelType) =>
-    conversations.filter((c) => c.channelType === type && !c.isVip);
+  // Computed values
+  const teamConversations = useMemo(() =>
+    conversations.filter((c) => c.channelType === 'team'),
+  [conversations]);
 
-  const filteredConversations = searchQuery
-    ? conversations.filter(
+  const vendorConversations = useMemo(() =>
+    conversations.filter((c) => c.channelType === 'vendors'),
+  [conversations]);
+
+  const getConversationsByType = (type: ChannelType) =>
+    conversations.filter((c) => c.channelType === type);
+
+  // Filter counts (smart unread - only count manager/family for badge)
+  const filterCounts = useMemo(() => ({
+    all: conversations.length,
+    unread: conversations.filter(c => c.unreadCount > 0 && !c.managedByManager).length,
+    needs_response: conversations.filter(c => c.needsResponse).length,
+    manager: teamConversations.filter(c => c.isManager).length,
+    family: getConversationsByType('family').length,
+  }), [conversations, teamConversations]);
+
+  // Filtered conversations
+  const filteredConversations = useMemo(() => {
+    let result = conversations;
+
+    if (searchQuery) {
+      result = result.filter(
         (c) =>
           c.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
           c.subtitle?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : null;
+      );
+    }
+
+    switch (activeFilter) {
+      case 'unread':
+        result = result.filter(c => c.unreadCount > 0);
+        break;
+      case 'needs_response':
+        result = result.filter(c => c.needsResponse);
+        break;
+      case 'manager':
+        result = result.filter(c => c.isManager);
+        break;
+      case 'family':
+        result = result.filter(c => c.channelType === 'family');
+        break;
+    }
+
+    return result;
+  }, [conversations, searchQuery, activeFilter]);
 
   const toggleChannelGroup = (type: ChannelType) => {
     setChannelGroups((groups) =>
@@ -817,11 +1245,11 @@ export default function MessagesPage() {
       status: 'sent',
     };
 
-    // Optimistic update - add message to conversation
     const updatedConversation = {
       ...selectedConversation,
       messages: [...selectedConversation.messages, newMessage],
       lastActivity: new Date().toISOString(),
+      needsResponse: false,
     };
 
     setConversations(prev =>
@@ -830,7 +1258,7 @@ export default function MessagesPage() {
     setSelectedConversation(updatedConversation);
     setMessageInput('');
 
-    // Simulate message being delivered
+    // Simulate delivery
     setTimeout(() => {
       setConversations(prev =>
         prev.map(c => {
@@ -846,6 +1274,35 @@ export default function MessagesPage() {
     }, 1000);
   };
 
+  // Quick request handler
+  const handleQuickRequest = (type: 'broken' | 'schedule' | 'buy' | 'question') => {
+    const messages: Record<typeof type, string> = {
+      broken: "Something in my home needs fixing...",
+      schedule: "I need to schedule...",
+      buy: "I need you to buy...",
+      question: "I have a question about...",
+    };
+    setMessageInput(messages[type]);
+  };
+
+  // Convert message to task
+  const handleConvertMessage = (messageId: string, type: 'request' | 'calendar' | 'shopping') => {
+    if (!selectedConversation) return;
+
+    const updatedMessages = selectedConversation.messages.map(m =>
+      m.id === messageId ? { ...m, convertedTo: { type, id: `${type}-${Date.now()}` } } : m
+    );
+
+    const updatedConversation = { ...selectedConversation, messages: updatedMessages };
+    setConversations(prev =>
+      prev.map(c => c.id === selectedConversation.id ? updatedConversation : c)
+    );
+    setSelectedConversation(updatedConversation);
+
+    const typeLabels = { request: 'Help Requests', calendar: 'Calendar', shopping: 'Shopping List' };
+    showToast(`Added to ${typeLabels[type]}`);
+  };
+
   // Handle call
   const handleCall = (participant?: Participant) => {
     const name = participant?.name || selectedConversation?.title || 'Contact';
@@ -856,27 +1313,6 @@ export default function MessagesPage() {
   const handleVideoCall = (participant?: Participant) => {
     const name = participant?.name || selectedConversation?.title || 'Contact';
     showToast(`Starting video call with ${name}...`);
-  };
-
-  // Handle attachment
-  const handleAttachment = () => {
-    showToast('Attach files coming soon!');
-  };
-
-  // Handle camera
-  const handleCamera = () => {
-    showToast('Camera capture coming soon!');
-  };
-
-  // Handle schedule
-  const handleSchedule = () => {
-    showToast('Opening calendar to schedule...');
-    window.location.href = '/app/calendar?action=schedule';
-  };
-
-  // Handle new conversation
-  const handleNewConversation = () => {
-    setShowNewConvoModal(true);
   };
 
   // Handle mute toggle
@@ -890,32 +1326,8 @@ export default function MessagesPage() {
     showToast(isMuted ? 'Notifications muted' : 'Notifications enabled');
   };
 
-  // Handle block (confirm first)
-  const handleBlock = () => {
-    showToast('Block feature requires confirmation');
-  };
-
-  // Handle approve estimate
-  const handleApproveEstimate = (amount: number, vendor: string) => {
-    showToast(`Approved $${amount.toLocaleString()} estimate from ${vendor}`);
-  };
-
-  // Handle decline estimate
-  const handleDeclineEstimate = (vendor: string) => {
-    showToast(`Declined estimate from ${vendor}`);
-  };
-
-  // Handle book flight
-  const handleBookFlight = (airline: string, price: number) => {
-    showToast(`Booking ${airline} flight for $${price.toLocaleString()}...`);
-  };
-
-  // Handle book hotel
-  const handleBookHotel = (name: string, pricePerNight: number) => {
-    showToast(`Booking ${name} at $${pricePerNight}/night...`);
-  };
-
   const participant = selectedConversation?.participants[0];
+  const isManagerChat = selectedConversation?.isManager;
 
   return (
     <div className="h-[calc(100vh-theme(spacing.32))] lg:h-[calc(100vh-theme(spacing.24))] flex flex-col -mx-4 lg:-mx-8 -mt-6 lg:-mt-8">
@@ -929,13 +1341,15 @@ export default function MessagesPage() {
             <div className="flex items-center justify-between mb-4">
               <h1 className="text-xl font-bold text-slate-900">Messages</h1>
               <button
-                onClick={handleNewConversation}
-                className="p-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700"
+                onClick={() => setShowNotificationPrefs(true)}
+                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
               >
-                <Plus className="w-5 h-5" />
+                <Settings className="w-5 h-5 text-slate-500" />
               </button>
             </div>
-            <div className="relative">
+
+            {/* Search */}
+            <div className="relative mb-3">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input
                 type="text"
@@ -945,15 +1359,22 @@ export default function MessagesPage() {
                 className="w-full pl-10 pr-4 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
             </div>
+
+            {/* Filter Tabs */}
+            <FilterTabs
+              activeFilter={activeFilter}
+              onFilterChange={setActiveFilter}
+              counts={filterCounts}
+            />
           </div>
 
           {/* Conversation List */}
           <div className="flex-1 overflow-y-auto">
-            {filteredConversations ? (
-              // Search Results
+            {searchQuery || activeFilter !== 'all' ? (
+              // Filtered Results
               <div>
                 <p className="px-3 py-2 text-xs text-slate-500">
-                  {filteredConversations.length} results
+                  {filteredConversations.length} {filteredConversations.length === 1 ? 'result' : 'results'}
                 </p>
                 {filteredConversations.map((conv) => (
                   <ConversationItem
@@ -966,13 +1387,13 @@ export default function MessagesPage() {
               </div>
             ) : (
               <>
-                {/* VIP Pinned */}
+                {/* Your Haven Team */}
                 <div className="py-2">
-                  <p className="px-3 py-2 text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500" />
-                    Your Team
+                  <p className="px-3 py-2 text-xs font-medium text-emerald-700 uppercase tracking-wider flex items-center gap-1 bg-emerald-50">
+                    <Star className="w-3 h-3 text-emerald-600 fill-emerald-600" />
+                    Your Haven Team
                   </p>
-                  {vipConversations.map((conv) => (
+                  {teamConversations.map((conv) => (
                     <ConversationItem
                       key={conv.id}
                       conversation={conv}
@@ -982,29 +1403,74 @@ export default function MessagesPage() {
                   ))}
                 </div>
 
-                {/* Channel Groups */}
-                {channelGroups.map((group) => {
-                  const groupConversations = getConversationsByType(group.type);
-                  if (groupConversations.length === 0) return null;
-                  return (
-                    <div key={group.type} className="border-t border-slate-100">
-                      <ChannelGroupHeader
-                        group={group}
-                        count={groupConversations.length}
-                        onToggle={() => toggleChannelGroup(group.type)}
-                      />
-                      {group.isExpanded &&
-                        groupConversations.map((conv) => (
-                          <ConversationItem
-                            key={conv.id}
-                            conversation={conv}
-                            isSelected={selectedConversation?.id === conv.id}
-                            onClick={() => setSelectedConversation(conv)}
-                          />
-                        ))}
-                    </div>
-                  );
-                })}
+                {/* Family */}
+                {channelGroups
+                  .filter(g => g.type === 'family')
+                  .map((group) => {
+                    const groupConversations = getConversationsByType(group.type);
+                    if (groupConversations.length === 0) return null;
+                    return (
+                      <div key={group.type} className="border-t border-slate-100">
+                        <ChannelGroupHeader
+                          group={group}
+                          count={groupConversations.length}
+                          onToggle={() => toggleChannelGroup(group.type)}
+                        />
+                        {group.isExpanded &&
+                          groupConversations.map((conv) => (
+                            <ConversationItem
+                              key={conv.id}
+                              conversation={conv}
+                              isSelected={selectedConversation?.id === conv.id}
+                              onClick={() => setSelectedConversation(conv)}
+                            />
+                          ))}
+                      </div>
+                    );
+                  })}
+
+                {/* Vendor Updates (Managed by Sarah) */}
+                {vendorConversations.length > 0 && (
+                  <VendorSectionHeader
+                    conversations={vendorConversations}
+                    isExpanded={showVendors}
+                    onToggle={() => setShowVendors(!showVendors)}
+                  />
+                )}
+                {showVendors && vendorConversations.map((conv) => (
+                  <ConversationItem
+                    key={conv.id}
+                    conversation={conv}
+                    isSelected={selectedConversation?.id === conv.id}
+                    onClick={() => setSelectedConversation(conv)}
+                  />
+                ))}
+
+                {/* Forwarded Emails */}
+                {channelGroups
+                  .filter(g => g.type === 'forwarded')
+                  .map((group) => {
+                    const groupConversations = getConversationsByType(group.type);
+                    if (groupConversations.length === 0) return null;
+                    return (
+                      <div key={group.type} className="border-t border-slate-100">
+                        <ChannelGroupHeader
+                          group={group}
+                          count={groupConversations.length}
+                          onToggle={() => toggleChannelGroup(group.type)}
+                        />
+                        {group.isExpanded &&
+                          groupConversations.map((conv) => (
+                            <ConversationItem
+                              key={conv.id}
+                              conversation={conv}
+                              isSelected={selectedConversation?.id === conv.id}
+                              onClick={() => setSelectedConversation(conv)}
+                            />
+                          ))}
+                      </div>
+                    );
+                  })}
               </>
             )}
           </div>
@@ -1017,7 +1483,9 @@ export default function MessagesPage() {
           {selectedConversation ? (
             <>
               {/* Chat Header */}
-              <div className="bg-white border-b border-slate-200 px-4 py-3 flex items-center gap-3">
+              <div className={`border-b border-slate-200 px-4 py-3 flex items-center gap-3 ${
+                isManagerChat ? 'bg-gradient-to-r from-emerald-50 to-white' : 'bg-white'
+              }`}>
                 <button
                   onClick={() => setSelectedConversation(null)}
                   className="lg:hidden p-2 hover:bg-slate-100 rounded-lg"
@@ -1026,7 +1494,7 @@ export default function MessagesPage() {
                 </button>
 
                 <div className="relative flex-shrink-0">
-                  <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200">
+                  <div className={`w-10 h-10 rounded-full overflow-hidden ${isManagerChat ? 'ring-2 ring-emerald-400 ring-offset-2' : 'bg-slate-200'}`}>
                     <Image
                       src={selectedConversation.avatar}
                       alt=""
@@ -1039,40 +1507,50 @@ export default function MessagesPage() {
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <h2 className="font-semibold text-slate-900 truncate">{selectedConversation.title}</h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-semibold text-slate-900 truncate">{selectedConversation.title}</h2>
+                    {selectedConversation.managedByManager && selectedConversation.managerStatus && (
+                      <ManagedLabel status={selectedConversation.managerStatus} />
+                    )}
+                  </div>
                   <p className="text-xs text-slate-500">
                     {participant?.isOnline ? (
-                      <span className="text-emerald-600">Online</span>
+                      <span className="text-emerald-600 font-medium">Online now</span>
                     ) : participant?.responseTime ? (
                       participant.responseTime
+                    ) : selectedConversation.subtitle ? (
+                      selectedConversation.subtitle
                     ) : (
                       'Offline'
                     )}
                   </p>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() => handleCall(participant)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <Phone className="w-5 h-5 text-slate-600" />
-                  </button>
-                  <button
-                    onClick={() => handleVideoCall(participant)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <Video className="w-5 h-5 text-slate-600" />
-                  </button>
-                  <button
-                    onClick={() => setShowInfoDrawer(!showInfoDrawer)}
-                    className={`p-2 rounded-lg transition-colors ${
-                      showInfoDrawer ? 'bg-emerald-100 text-emerald-600' : 'hover:bg-slate-100 text-slate-600'
-                    }`}
-                  >
-                    <Info className="w-5 h-5" />
-                  </button>
-                </div>
+                {!selectedConversation.managedByManager && (
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => handleCall(participant)}
+                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Phone className="w-5 h-5 text-slate-600" />
+                    </button>
+                    <button
+                      onClick={() => handleVideoCall(participant)}
+                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    >
+                      <Video className="w-5 h-5 text-slate-600" />
+                    </button>
+                  </div>
+                )}
+
+                <button
+                  onClick={() => setShowInfoDrawer(!showInfoDrawer)}
+                  className={`p-2 rounded-lg transition-colors ${
+                    showInfoDrawer ? 'bg-emerald-100 text-emerald-600' : 'hover:bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  <Info className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Messages Area */}
@@ -1085,40 +1563,46 @@ export default function MessagesPage() {
                   const showSender =
                     msg.sender !== 'me' &&
                     msg.sender !== 'system' &&
-                    (!prevMsg || prevMsg.senderId !== msg.senderId || prevMsg.sender === 'system');
-                  return <MessageBubble key={msg.id} message={msg} showSender={showSender} />;
+                    (!prevMsg || prevMsg.senderId !== msg.senderId || prevMsg.sender === 'system' || prevMsg.sender !== msg.sender);
+                  return (
+                    <MessageBubble
+                      key={msg.id}
+                      message={msg}
+                      showSender={showSender}
+                      onConvert={handleConvertMessage}
+                    />
+                  );
                 })}
                 <div ref={messagesEndRef} />
               </div>
 
               {/* Input Zone */}
               <div className="bg-white border-t border-slate-200 p-4">
-                <div className="flex items-end gap-2">
+                {/* Quick Request Buttons (only in manager chat) */}
+                {isManagerChat && (
+                  <QuickRequestButtons onRequest={handleQuickRequest} />
+                )}
+
+                <div className="flex items-end gap-2 mt-2">
                   <div className="flex gap-1">
                     <button
-                      onClick={handleAttachment}
+                      onClick={() => showToast('Attach files coming soon!')}
                       className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                     >
                       <Paperclip className="w-5 h-5 text-slate-500" />
                     </button>
                     <button
-                      onClick={handleCamera}
+                      onClick={() => showToast('Camera capture coming soon!')}
                       className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
                     >
                       <Camera className="w-5 h-5 text-slate-500" />
-                    </button>
-                    <button
-                      onClick={handleSchedule}
-                      className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Calendar className="w-5 h-5 text-slate-500" />
                     </button>
                   </div>
                   <div className="flex-1">
                     <textarea
                       value={messageInput}
                       onChange={(e) => setMessageInput(e.target.value)}
-                      placeholder="Type a message..."
+                      placeholder={isManagerChat ? "Ask Sarah anything..." : "Type a message..."}
                       rows={1}
                       className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl resize-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                       style={{ maxHeight: '120px' }}
@@ -1144,18 +1628,21 @@ export default function MessagesPage() {
             // Empty State
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
               <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-                <Send className="w-10 h-10 text-emerald-600" />
+                <MessageCircle className="w-10 h-10 text-emerald-600" />
               </div>
-              <h2 className="text-xl font-semibold text-slate-900 mb-2">Your Messages</h2>
+              <h2 className="text-xl font-semibold text-slate-900 mb-2">Your Communication Hub</h2>
               <p className="text-slate-500 max-w-sm mb-6">
-                Stay connected with your home team, family, vendors, and neighbors all in one place.
+                Chat with Sarah, your home manager. She handles vendor communications so you don't have to.
               </p>
               <button
-                onClick={handleNewConversation}
+                onClick={() => {
+                  const managerConvo = conversations.find(c => c.isManager);
+                  if (managerConvo) setSelectedConversation(managerConvo);
+                }}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
               >
-                <Plus className="w-5 h-5" />
-                Start a Conversation
+                <MessageCircle className="w-5 h-5" />
+                Message Sarah
               </button>
             </div>
           )}
@@ -1170,7 +1657,7 @@ export default function MessagesPage() {
               onCall={() => handleCall(participant)}
               onVideoCall={() => handleVideoCall(participant)}
               onMuteToggle={handleMuteToggle}
-              onBlock={handleBlock}
+              onNotificationSettings={() => setShowNotificationPrefs(true)}
             />
           </div>
         )}
@@ -1186,48 +1673,12 @@ export default function MessagesPage() {
         </div>
       )}
 
-      {/* New Conversation Modal */}
-      {showNewConvoModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-900">New Conversation</h2>
-              <button
-                onClick={() => setShowNewConvoModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <p className="text-sm text-slate-600 mb-4">Start a conversation with your team:</p>
-                <div className="space-y-2">
-                  {Object.entries(mockParticipants).slice(0, 4).map(([key, p]) => (
-                    <button
-                      key={key}
-                      onClick={() => {
-                        showToast(`Starting conversation with ${p.name}`);
-                        setShowNewConvoModal(false);
-                        // Would select or create conversation with this participant
-                      }}
-                      className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-left"
-                    >
-                      <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-200">
-                        <Image src={p.avatar} alt="" width={40} height={40} className="object-cover" />
-                      </div>
-                      <div>
-                        <p className="font-medium text-slate-900">{p.name}</p>
-                        {p.role && <p className="text-sm text-slate-500">{p.role}</p>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Notification Preferences Modal */}
+      {showNotificationPrefs && (
+        <NotificationPreferencesModal
+          onClose={() => setShowNotificationPrefs(false)}
+          onSave={() => showToast('Notification preferences saved')}
+        />
       )}
     </div>
   );
