@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { getApiClient } from '@/lib/api';
+import { useAuth } from '@/contexts/auth-context';
 import {
   Plus,
   Hammer,
@@ -104,10 +106,10 @@ interface Project {
 }
 
 // ============================================================================
-// MOCK DATA
+// MOCK DATA (Fallback when API is unavailable)
 // ============================================================================
 
-const mockVendors: Vendor[] = [
+const MOCK_VENDORS: Vendor[] = [
   {
     id: 'v1',
     name: 'Tile Masters Pro',
@@ -139,7 +141,7 @@ const mockVendors: Vendor[] = [
   },
 ];
 
-const mockProjects: Project[] = [
+const MOCK_PROJECTS: Project[] = [
   {
     id: 'p1',
     title: 'Kitchen Backsplash Upgrade',
@@ -164,8 +166,8 @@ const mockProjects: Project[] = [
     tasks: [
       { id: 't1', title: 'Remove old backsplash', status: 'done', estimatedCost: 200 },
       { id: 't2', title: 'Prep wall surface', status: 'done', estimatedCost: 150 },
-      { id: 't3', title: 'Install tile', status: 'in_progress', assignee: 'Tile Masters Pro', dueDate: '2024-12-01', estimatedCost: 2500, recommendedVendor: mockVendors[0] },
-      { id: 't4', title: 'Grout and seal', status: 'scheduled', dueDate: '2024-12-08', estimatedCost: 300, recommendedVendor: mockVendors[0] },
+      { id: 't3', title: 'Install tile', status: 'in_progress', assignee: 'Tile Masters Pro', dueDate: '2024-12-01', estimatedCost: 2500, recommendedVendor: MOCK_VENDORS[0] },
+      { id: 't4', title: 'Grout and seal', status: 'scheduled', dueDate: '2024-12-08', estimatedCost: 300, recommendedVendor: MOCK_VENDORS[0] },
       { id: 't5', title: 'Install outlet covers', status: 'todo', estimatedCost: 50 },
     ],
     expenses: [
@@ -196,8 +198,8 @@ const mockProjects: Project[] = [
     tasks: [
       { id: 't1', title: 'Design finalization', status: 'done', estimatedCost: 500 },
       { id: 't2', title: 'Demolition', status: 'in_progress', estimatedCost: 1500 },
-      { id: 't3', title: 'Plumbing rough-in', status: 'scheduled', estimatedCost: 3000, recommendedVendor: mockVendors[1] },
-      { id: 't4', title: 'Electrical work', status: 'todo', estimatedCost: 2000, recommendedVendor: mockVendors[2] },
+      { id: 't3', title: 'Plumbing rough-in', status: 'scheduled', estimatedCost: 3000, recommendedVendor: MOCK_VENDORS[1] },
+      { id: 't4', title: 'Electrical work', status: 'todo', estimatedCost: 2000, recommendedVendor: MOCK_VENDORS[2] },
     ],
     expenses: [
       { id: 'e1', description: 'Vanity and fixtures', category: 'materials', estimatedAmount: 4500, actualAmount: 4200, paid: true },
@@ -281,6 +283,140 @@ const mockProjects: Project[] = [
     suggestedItems: ['Smart thermostat', 'Automated blinds', 'Voice assistants'],
   },
 ];
+
+// ============================================================================
+// API-TO-UI MAPPING FUNCTIONS
+// ============================================================================
+
+// Default cover images by category for projects without images
+const CATEGORY_IMAGES: Record<string, string> = {
+  kitchen: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
+  bathroom: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800',
+  outdoor: 'https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800',
+  interior: 'https://images.unsplash.com/photo-1600494603989-9650cf6dad51?w=800',
+  technology: 'https://images.unsplash.com/photo-1558002038-1055907df827?w=800',
+};
+
+function mapApiTaskToUi(apiTask: Record<string, unknown>): ProjectTask {
+  // Normalize status - ensure it matches our TaskStatus union
+  const rawStatus = String(apiTask.status || 'todo').toLowerCase().replace('-', '_');
+  const validStatuses: TaskStatus[] = ['todo', 'scheduled', 'in_progress', 'done'];
+  const status: TaskStatus = validStatuses.includes(rawStatus as TaskStatus)
+    ? (rawStatus as TaskStatus)
+    : 'todo';
+
+  return {
+    id: String(apiTask.id || `task-${Date.now()}`),
+    title: String(apiTask.title || apiTask.name || 'Untitled Task'),
+    description: apiTask.description ? String(apiTask.description) : undefined,
+    status,
+    assignee: apiTask.assignee ? String(apiTask.assignee) : undefined,
+    dueDate: apiTask.dueDate ? String(apiTask.dueDate) : undefined,
+    estimatedCost: apiTask.estimatedCost ? Number(apiTask.estimatedCost) : undefined,
+    recommendedVendor: apiTask.recommendedVendor
+      ? mapApiVendorToUi(apiTask.recommendedVendor as Record<string, unknown>)
+      : undefined,
+  };
+}
+
+function mapApiVendorToUi(apiVendor: Record<string, unknown>): Vendor {
+  return {
+    id: String(apiVendor.id || `vendor-${Date.now()}`),
+    name: String(apiVendor.name || apiVendor.displayName || 'Unknown Vendor'),
+    trade: String(apiVendor.trade || apiVendor.category || 'General'),
+    rating: Number(apiVendor.rating || apiVendor.averageRating || 0),
+    reviewCount: Number(apiVendor.reviewCount || apiVendor.totalReviews || 0),
+    verified: Boolean(apiVendor.verified || apiVendor.isVerified),
+    responseTime: String(apiVendor.responseTime || 'N/A'),
+    friendsUsed: Array.isArray(apiVendor.friendsUsed) ? apiVendor.friendsUsed.map(String) : undefined,
+  };
+}
+
+function mapApiExpenseToUi(apiExpense: Record<string, unknown>): Expense {
+  const category = String(apiExpense.category || 'other').toLowerCase();
+  const validCategories = ['materials', 'labor', 'permits', 'other'];
+
+  return {
+    id: String(apiExpense.id || `expense-${Date.now()}`),
+    description: String(apiExpense.description || apiExpense.name || 'Expense'),
+    category: validCategories.includes(category) ? category as Expense['category'] : 'other',
+    estimatedAmount: Number(apiExpense.estimatedAmount || apiExpense.estimate || 0),
+    actualAmount: apiExpense.actualAmount !== undefined ? Number(apiExpense.actualAmount) : undefined,
+    date: apiExpense.date ? String(apiExpense.date) : undefined,
+    vendor: apiExpense.vendor ? String(apiExpense.vendor) : undefined,
+    paid: Boolean(apiExpense.paid || apiExpense.isPaid),
+  };
+}
+
+function mapApiProjectToUi(apiProject: Record<string, unknown>): Project {
+  const category = String(apiProject.category || 'Interior');
+  const categoryKey = category.toLowerCase();
+
+  // Calculate actual spend from expenses if not provided
+  let actualSpend = Number(apiProject.actualSpend || 0);
+  const expenses = Array.isArray(apiProject.expenses)
+    ? apiProject.expenses.map((e) => mapApiExpenseToUi(e as Record<string, unknown>))
+    : [];
+
+  if (actualSpend === 0 && expenses.length > 0) {
+    actualSpend = expenses.reduce((sum, exp) => sum + (exp.actualAmount || exp.estimatedAmount), 0);
+  }
+
+  // Map tasks
+  const tasks = Array.isArray(apiProject.tasks)
+    ? apiProject.tasks.map((t) => mapApiTaskToUi(t as Record<string, unknown>))
+    : [];
+
+  // Calculate progress if not provided
+  let progress = Number(apiProject.progress || 0);
+  if (progress === 0 && tasks.length > 0) {
+    const doneTasks = tasks.filter((t) => t.status === 'done').length;
+    progress = Math.round((doneTasks / tasks.length) * 100);
+  }
+
+  // Normalize status
+  const rawStatus = String(apiProject.status || 'active').toLowerCase();
+  const status: Project['status'] = rawStatus === 'wishlist' ? 'wishlist'
+    : rawStatus === 'completed' ? 'completed'
+    : 'active';
+
+  // Map inspiration images
+  const inspiration: InspirationImage[] = Array.isArray(apiProject.inspiration)
+    ? apiProject.inspiration.map((img, idx) => ({
+        id: String((img as Record<string, unknown>).id || `img-${idx}`),
+        url: String((img as Record<string, unknown>).url || ''),
+        source: (img as Record<string, unknown>).source ? String((img as Record<string, unknown>).source) : undefined,
+        sourceUrl: (img as Record<string, unknown>).sourceUrl ? String((img as Record<string, unknown>).sourceUrl) : undefined,
+        caption: (img as Record<string, unknown>).caption ? String((img as Record<string, unknown>).caption) : undefined,
+        aspectRatio: ((img as Record<string, unknown>).aspectRatio as InspirationImage['aspectRatio']) || 'landscape',
+      }))
+    : [];
+
+  return {
+    id: String(apiProject.id || `project-${Date.now()}`),
+    title: String(apiProject.title || apiProject.name || 'Untitled Project'),
+    description: String(apiProject.description || ''),
+    category,
+    coverImage: String(apiProject.coverImage || CATEGORY_IMAGES[categoryKey] || CATEGORY_IMAGES.interior),
+    status,
+    progress,
+    estimatedBudget: Number(apiProject.estimatedBudget || apiProject.budget || 0),
+    actualSpend,
+    dueDate: apiProject.dueDate ? String(apiProject.dueDate) : undefined,
+    startDate: apiProject.startDate ? String(apiProject.startDate) : undefined,
+    inspiration,
+    tasks,
+    expenses,
+    beforeImage: apiProject.beforeImage ? String(apiProject.beforeImage) : undefined,
+    afterImage: apiProject.afterImage ? String(apiProject.afterImage) : undefined,
+    suggestedItems: Array.isArray(apiProject.suggestedItems)
+      ? apiProject.suggestedItems.map(String)
+      : undefined,
+  };
+}
+
+// Mapping functions are available for use within this file
+// To use elsewhere, they would need to be moved to a separate module
 
 // ============================================================================
 // HELPER FUNCTIONS
@@ -648,12 +784,37 @@ function SmartSuggestions({ items, onAdd }: { items: string[]; onAdd: (item: str
   );
 }
 
-// Kanban Task Card
-function TaskCard({ task, onRequestQuote }: { task: ProjectTask; onRequestQuote?: () => void }) {
+// Kanban Task Card - Draggable
+function TaskCard({
+  task,
+  projectId,
+  onRequestQuote,
+  onDragStart,
+  isDragging,
+}: {
+  task: ProjectTask;
+  projectId: string;
+  onRequestQuote?: () => void;
+  onDragStart?: (taskId: string) => void;
+  isDragging?: boolean;
+}) {
+  const handleDragStart = (e: React.DragEvent) => {
+    e.dataTransfer.setData('taskId', task.id);
+    e.dataTransfer.setData('projectId', projectId);
+    e.dataTransfer.effectAllowed = 'move';
+    onDragStart?.(task.id);
+  };
+
   return (
-    <div className="bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-shadow">
+    <div
+      draggable
+      onDragStart={handleDragStart}
+      className={`bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${
+        isDragging ? 'opacity-50 scale-95' : ''
+      }`}
+    >
       <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-slate-300 mt-1 cursor-grab" />
+        <GripVertical className="w-4 h-4 text-slate-300 mt-1" />
         <div className="flex-1 min-w-0">
           <p className="font-medium text-slate-900 text-sm">{task.title}</p>
           {task.dueDate && (
@@ -710,24 +871,83 @@ function TaskCard({ task, onRequestQuote }: { task: ProjectTask; onRequestQuote?
   );
 }
 
-// Kanban Column
-function KanbanColumn({ title, tasks, icon: Icon, color }: {
+// Kanban Column - Drop Zone
+function KanbanColumn({
+  title,
+  tasks,
+  status,
+  projectId,
+  icon: Icon,
+  color,
+  onDrop,
+  onDragStart,
+  draggedTaskId,
+}: {
   title: string;
   tasks: ProjectTask[];
+  status: TaskStatus;
+  projectId: string;
   icon: typeof Circle;
   color: string;
+  onDrop: (taskId: string, projectId: string, newStatus: TaskStatus) => void;
+  onDragStart: (taskId: string) => void;
+  draggedTaskId: string | null;
 }) {
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const taskId = e.dataTransfer.getData('taskId');
+    const sourceProjectId = e.dataTransfer.getData('projectId');
+    if (taskId && sourceProjectId === projectId) {
+      onDrop(taskId, projectId, status);
+    }
+  };
+
   return (
-    <div className="flex-1 min-w-[280px]">
-      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${color} mb-3`}>
+    <div
+      className={`flex-1 min-w-[280px] transition-all ${
+        isDragOver ? 'scale-[1.02]' : ''
+      }`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      <div className={`flex items-center gap-2 px-3 py-2 rounded-lg ${color} mb-3 ${
+        isDragOver ? 'ring-2 ring-emerald-500 ring-offset-2' : ''
+      }`}>
         <Icon className="w-4 h-4" />
         <span className="font-medium text-sm">{title}</span>
         <span className="ml-auto text-xs bg-white/50 px-2 py-0.5 rounded-full">{tasks.length}</span>
       </div>
-      <div className="space-y-2">
+      <div className={`space-y-2 min-h-[100px] rounded-lg p-1 transition-colors ${
+        isDragOver ? 'bg-emerald-50 border-2 border-dashed border-emerald-300' : ''
+      }`}>
         {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} />
+          <TaskCard
+            key={task.id}
+            task={task}
+            projectId={projectId}
+            onDragStart={onDragStart}
+            isDragging={draggedTaskId === task.id}
+          />
         ))}
+        {tasks.length === 0 && (
+          <div className="flex items-center justify-center h-20 text-slate-400 text-sm">
+            {isDragOver ? 'Drop here' : 'No tasks'}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -870,18 +1090,34 @@ function ProjectDetailView({
   project,
   onClose,
   onComplete,
+  onTaskStatusChange,
 }: {
   project: Project;
   onClose: () => void;
   onComplete: () => void;
+  onTaskStatusChange: (projectId: string, taskId: string, newStatus: TaskStatus) => void;
 }) {
   const [activeTab, setActiveTab] = useState<ProjectTab>('inspiration');
   const [showConfetti, setShowConfetti] = useState(false);
+  const [draggedTaskId, setDraggedTaskId] = useState<string | null>(null);
 
   const handleComplete = () => {
     setShowConfetti(true);
     onComplete();
     setTimeout(() => setShowConfetti(false), 3000);
+  };
+
+  const handleDragStart = (taskId: string) => {
+    setDraggedTaskId(taskId);
+  };
+
+  const handleDrop = (taskId: string, projectId: string, newStatus: TaskStatus) => {
+    setDraggedTaskId(null);
+    onTaskStatusChange(projectId, taskId, newStatus);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedTaskId(null);
   };
 
   const tasksByStatus = project.tasks.reduce((acc, task) => {
@@ -991,30 +1227,50 @@ function ProjectDetailView({
 
         {/* Plan Tab */}
         {activeTab === 'plan' && (
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-4 overflow-x-auto pb-4" onDragEnd={handleDragEnd}>
             <KanbanColumn
               title="To Do"
               tasks={tasksByStatus.todo || []}
+              status="todo"
+              projectId={project.id}
               icon={Circle}
               color="bg-slate-100 text-slate-700"
+              onDrop={handleDrop}
+              onDragStart={handleDragStart}
+              draggedTaskId={draggedTaskId}
             />
             <KanbanColumn
               title="Scheduled"
               tasks={tasksByStatus.scheduled || []}
+              status="scheduled"
+              projectId={project.id}
               icon={Calendar}
               color="bg-blue-100 text-blue-700"
+              onDrop={handleDrop}
+              onDragStart={handleDragStart}
+              draggedTaskId={draggedTaskId}
             />
             <KanbanColumn
               title="In Progress"
               tasks={tasksByStatus.in_progress || []}
+              status="in_progress"
+              projectId={project.id}
               icon={Play}
               color="bg-amber-100 text-amber-700"
+              onDrop={handleDrop}
+              onDragStart={handleDragStart}
+              draggedTaskId={draggedTaskId}
             />
             <KanbanColumn
               title="Done"
               tasks={tasksByStatus.done || []}
+              status="done"
+              projectId={project.id}
               icon={CheckCircle2}
               color="bg-emerald-100 text-emerald-700"
+              onDrop={handleDrop}
+              onDragStart={handleDragStart}
+              draggedTaskId={draggedTaskId}
             />
           </div>
         )}
@@ -1049,19 +1305,161 @@ function QuickCaptureFAB({ mode }: { mode: ViewMode }) {
 // ============================================================================
 
 export default function ProjectsPage() {
+  // Auth context for household
+  const { currentHousehold } = useAuth();
+
+  // State - initialize with mocks (hybrid pattern)
   const [viewMode, setViewMode] = useState<ViewMode>('active');
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
-  const [projects, setProjects] = useState(mockProjects);
+  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [_isLoading, setIsLoading] = useState(true);
 
-  const activeProjects = projects.filter((p) => p.status === 'active');
-  const wishlistProjects = projects.filter((p) => p.status === 'wishlist');
+  // Hybrid Data Fetching - load from API, fallback to mocks
+  const loadProjects = useCallback(async () => {
+    if (!currentHousehold?.id) {
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Type for future API methods (not yet in ApiClient)
+      type FutureApiClient = {
+        getProjects?: (householdId: string) => Promise<unknown[]>;
+        getProjectIdeas?: (householdId: string) => Promise<unknown[]>;
+      };
+
+      const api = getApiClient() as unknown as FutureApiClient;
+
+      // Fetch projects in parallel with Promise.allSettled
+      const [projectsResult] = await Promise.allSettled([
+        api.getProjects?.(currentHousehold.id) ?? Promise.resolve([]),
+      ]);
+
+      // Process projects
+      if (projectsResult.status === 'fulfilled') {
+        const projectsData = projectsResult.value;
+        if (Array.isArray(projectsData) && projectsData.length > 0) {
+          setProjects(projectsData.map((p) => mapApiProjectToUi(p as Record<string, unknown>)));
+        }
+        // If empty, keep MOCK_PROJECTS (Demo Mode)
+      } else {
+        console.warn('Failed to fetch projects:', projectsResult.reason);
+        // Keep mock data on failure
+      }
+    } catch (error) {
+      console.error('Error loading projects:', error);
+      // Keep mock data on failure - already initialized with mocks
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentHousehold?.id]);
+
+  // Load data on mount and when household changes
+  useEffect(() => {
+    loadProjects();
+  }, [loadProjects]);
+
+  // Filter projects by view mode
+  const activeProjects = useMemo(
+    () => projects.filter((p) => p.status === 'active'),
+    [projects]
+  );
+  const wishlistProjects = useMemo(
+    () => projects.filter((p) => p.status === 'wishlist'),
+    [projects]
+  );
   const displayedProjects = viewMode === 'active' ? activeProjects : wishlistProjects;
 
-  const handleComplete = (projectId: string) => {
-    setProjects(projects.map((p) =>
+  // Handle project completion with optimistic update
+  const handleComplete = useCallback((projectId: string) => {
+    // Optimistic update
+    setProjects((prev) => prev.map((p) =>
       p.id === projectId ? { ...p, status: 'completed' as const, progress: 100 } : p
     ));
-  };
+
+    // Sync to API (API endpoints not yet implemented)
+    if (currentHousehold?.id) {
+      type FutureApiClient = {
+        updateProject?: (householdId: string, projectId: string, data: Record<string, unknown>) => Promise<unknown>;
+      };
+      const api = getApiClient() as unknown as FutureApiClient;
+      api.updateProject?.(currentHousehold.id, projectId, {
+        status: 'completed',
+        progress: 100,
+      })?.catch((err: unknown) => {
+        console.error('Failed to complete project:', err);
+        // Revert on failure
+        setProjects((prev) => prev.map((p) =>
+          p.id === projectId ? { ...p, status: 'active' as const, progress: p.progress } : p
+        ));
+      });
+    }
+  }, [currentHousehold?.id]);
+
+  // Handle task status change with optimistic update (for Kanban drag-drop)
+  const handleTaskStatusChange = useCallback((projectId: string, taskId: string, newStatus: TaskStatus) => {
+    // Find the project and task
+    const project = projects.find((p) => p.id === projectId);
+    if (!project) return;
+
+    const oldTask = project.tasks.find((t) => t.id === taskId);
+    if (!oldTask || oldTask.status === newStatus) return;
+
+    // Optimistic update
+    setProjects((prev) => prev.map((p) => {
+      if (p.id !== projectId) return p;
+      const updatedTasks = p.tasks.map((t) =>
+        t.id === taskId ? { ...t, status: newStatus } : t
+      );
+      // Recalculate progress based on done tasks
+      const doneTasks = updatedTasks.filter((t) => t.status === 'done').length;
+      const newProgress = updatedTasks.length > 0
+        ? Math.round((doneTasks / updatedTasks.length) * 100)
+        : 0;
+      return { ...p, tasks: updatedTasks, progress: newProgress };
+    }));
+
+    // Also update selectedProject if it's the same one
+    if (selectedProject?.id === projectId) {
+      setSelectedProject((prev) => {
+        if (!prev) return null;
+        const updatedTasks = prev.tasks.map((t) =>
+          t.id === taskId ? { ...t, status: newStatus } : t
+        );
+        const doneTasks = updatedTasks.filter((t) => t.status === 'done').length;
+        const newProgress = updatedTasks.length > 0
+          ? Math.round((doneTasks / updatedTasks.length) * 100)
+          : 0;
+        return { ...prev, tasks: updatedTasks, progress: newProgress };
+      });
+    }
+
+    // Sync to API (API endpoints not yet implemented)
+    if (currentHousehold?.id) {
+      type FutureApiClient = {
+        updateProjectTask?: (householdId: string, projectId: string, taskId: string, data: Record<string, unknown>) => Promise<unknown>;
+      };
+      const api = getApiClient() as unknown as FutureApiClient;
+      api.updateProjectTask?.(currentHousehold.id, projectId, taskId, {
+        status: newStatus,
+      })?.catch((err: unknown) => {
+        console.error('Failed to update task status:', err);
+        // Revert on failure
+        setProjects((prev) => prev.map((p) => {
+          if (p.id !== projectId) return p;
+          const revertedTasks = p.tasks.map((t) =>
+            t.id === taskId ? { ...t, status: oldTask.status } : t
+          );
+          const doneTasks = revertedTasks.filter((t) => t.status === 'done').length;
+          const revertedProgress = revertedTasks.length > 0
+            ? Math.round((doneTasks / revertedTasks.length) * 100)
+            : 0;
+          return { ...p, tasks: revertedTasks, progress: revertedProgress };
+        }));
+      });
+    }
+  }, [projects, selectedProject, currentHousehold?.id]);
 
   // Summary stats
   const totalBudget = activeProjects.reduce((sum, p) => sum + p.estimatedBudget, 0);
@@ -1208,6 +1606,7 @@ export default function ProjectsPage() {
             handleComplete(selectedProject.id);
             setSelectedProject({ ...selectedProject, progress: 100, status: 'completed' });
           }}
+          onTaskStatusChange={handleTaskStatusChange}
         />
       )}
     </div>
