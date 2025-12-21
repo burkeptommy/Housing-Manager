@@ -1,90 +1,438 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
+import {
+  Home,
+  LayoutDashboard,
+  Users,
+  ClipboardList,
+  Inbox,
+  Calendar,
+  Wallet,
+  MessageCircle,
+  Wrench,
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  Bell,
+  Search,
+  LogOut,
+  HelpCircle,
+  Menu,
+  X,
+  CheckCircle2,
+  DollarSign,
+  Plane,
+} from 'lucide-react';
 
-const navigation = [
-  {
-    name: 'Dashboard',
-    href: '/manager',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h14a1 1 0 011 1v2a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM4 13a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zM16 13a1 1 0 011-1h2a1 1 0 011 1v6a1 1 0 01-1 1h-2a1 1 0 01-1-1v-6z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Service Requests',
-    href: '/manager/requests',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Conversations',
-    href: '/manager/conversations',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Households',
-    href: '/manager/households',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Vendors',
-    href: '/manager/vendors',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Verification',
-    href: '/manager/verification',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Pay Bills',
-    href: '/manager/payables',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-      </svg>
-    ),
-  },
-  {
-    name: 'Revenue',
-    href: '/manager/revenue',
-    icon: (
-      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-      </svg>
-    ),
-  },
+// ============================================================================
+// MANAGER PORTAL LAYOUT
+// Primary Color: Indigo (vs Emerald for homeowners)
+// Target: Information-dense, power-user focused
+// ============================================================================
+
+interface NavItem {
+  label: string;
+  href: string;
+  icon: React.ElementType;
+  badge?: number;
+  urgent?: boolean;
+}
+
+const mainNavItems: NavItem[] = [
+  { label: 'Dashboard', href: '/manager', icon: LayoutDashboard },
+  { label: 'Households', href: '/manager/households', icon: Users },
+  { label: 'Requests', href: '/manager/requests', icon: Inbox },
+  { label: 'Conversations', href: '/manager/conversations', icon: MessageCircle },
+  { label: 'Schedule', href: '/manager/schedule', icon: Calendar },
+  { label: 'Vendors', href: '/manager/vendors', icon: Wrench },
+  { label: 'Verification', href: '/manager/verification', icon: CheckCircle2 },
 ];
+
+const financeNavItems: NavItem[] = [
+  { label: 'Pay Bills', href: '/manager/payables', icon: Wallet },
+  { label: 'Revenue', href: '/manager/revenue', icon: DollarSign },
+];
+
+const extraNavItems: NavItem[] = [
+  { label: 'Travel', href: '/manager/travel', icon: Plane },
+];
+
+const bottomNavItems: NavItem[] = [
+  { label: 'Help', href: '/manager/help', icon: HelpCircle },
+  { label: 'Settings', href: '/manager/settings', icon: Settings },
+];
+
+// ============================================================================
+// SIDEBAR COMPONENT
+// ============================================================================
+
+function Sidebar({
+  collapsed,
+  onToggle,
+  user,
+  logout
+}: {
+  collapsed: boolean;
+  onToggle: () => void;
+  user: { firstName?: string; lastName?: string; email?: string } | null;
+  logout: () => void;
+}) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) => {
+    if (href === '/manager') {
+      return pathname === '/manager';
+    }
+    return pathname.startsWith(href);
+  };
+
+  const renderNavItem = (item: NavItem) => {
+    const active = isActive(item.href);
+    return (
+      <Link
+        key={item.href}
+        href={item.href}
+        className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors relative ${
+          active
+            ? 'bg-indigo-600 text-white'
+            : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+        }`}
+        title={collapsed ? item.label : undefined}
+      >
+        <item.icon className="w-5 h-5 flex-shrink-0" />
+        {!collapsed && (
+          <>
+            <span className="text-sm font-medium flex-1">{item.label}</span>
+            {item.badge !== undefined && (
+              <span
+                className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                  item.urgent
+                    ? 'bg-red-500 text-white'
+                    : active
+                      ? 'bg-indigo-500 text-white'
+                      : 'bg-slate-700 text-slate-300'
+                }`}
+              >
+                {item.badge}
+              </span>
+            )}
+          </>
+        )}
+        {collapsed && item.badge !== undefined && (
+          <span
+            className={`absolute top-1 right-1 w-2 h-2 rounded-full ${
+              item.urgent ? 'bg-red-500' : 'bg-indigo-400'
+            }`}
+          />
+        )}
+      </Link>
+    );
+  };
+
+  return (
+    <aside
+      className={`fixed left-0 top-0 h-screen bg-slate-900 text-white z-40 transition-all duration-300 ${
+        collapsed ? 'w-16' : 'w-64'
+      } hidden lg:flex flex-col`}
+    >
+      {/* Logo */}
+      <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
+        <Link href="/manager" className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center flex-shrink-0">
+            <Home className="w-5 h-5 text-white" />
+          </div>
+          {!collapsed && (
+            <div>
+              <span className="font-semibold text-white">Haven</span>
+              <span className="text-xs text-indigo-400 block -mt-0.5">Manager Portal</span>
+            </div>
+          )}
+        </Link>
+        <button
+          onClick={onToggle}
+          className="p-1.5 hover:bg-slate-800 rounded-lg transition-colors"
+        >
+          {collapsed ? (
+            <ChevronRight className="w-4 h-4 text-slate-400" />
+          ) : (
+            <ChevronLeft className="w-4 h-4 text-slate-400" />
+          )}
+        </button>
+      </div>
+
+      {/* Manager Info */}
+      {!collapsed && (
+        <div className="p-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+              <span className="text-sm font-bold text-white">
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-slate-400">Home Manager</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Navigation */}
+      <nav className="flex-1 py-4 overflow-y-auto">
+        {/* Main Items */}
+        <div className="space-y-1 px-3">
+          {mainNavItems.map(renderNavItem)}
+        </div>
+
+        {/* Finance Section */}
+        <div className="mt-6 px-3">
+          {!collapsed && (
+            <p className="px-3 mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Finance</p>
+          )}
+          <div className="space-y-1">
+            {financeNavItems.map(renderNavItem)}
+          </div>
+        </div>
+
+        {/* Extra Section */}
+        <div className="mt-6 px-3">
+          {!collapsed && (
+            <p className="px-3 mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">Services</p>
+          )}
+          <div className="space-y-1">
+            {extraNavItems.map(renderNavItem)}
+          </div>
+        </div>
+      </nav>
+
+      {/* Bottom Navigation */}
+      <div className="border-t border-slate-800 py-4 px-3 space-y-1">
+        {bottomNavItems.map(item => {
+          const active = isActive(item.href);
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                active
+                  ? 'bg-indigo-600 text-white'
+                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+              }`}
+              title={collapsed ? item.label : undefined}
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              {!collapsed && <span className="text-sm font-medium">{item.label}</span>}
+            </Link>
+          );
+        })}
+        <button
+          onClick={logout}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-slate-300 hover:bg-slate-800 hover:text-white w-full"
+          title={collapsed ? 'Sign Out' : undefined}
+        >
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!collapsed && <span className="text-sm font-medium">Sign Out</span>}
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+// ============================================================================
+// MOBILE NAV COMPONENT
+// ============================================================================
+
+function MobileNav({
+  open,
+  onClose,
+  user,
+  logout
+}: {
+  open: boolean;
+  onClose: () => void;
+  user: { firstName?: string; lastName?: string; email?: string } | null;
+  logout: () => void;
+}) {
+  const pathname = usePathname();
+
+  const isActive = (href: string) => {
+    if (href === '/manager') {
+      return pathname === '/manager';
+    }
+    return pathname.startsWith(href);
+  };
+
+  if (!open) return null;
+
+  const allNavItems = [...mainNavItems, ...financeNavItems, ...extraNavItems];
+
+  return (
+    <div className="fixed inset-0 z-50 lg:hidden">
+      <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+      <aside className="fixed left-0 top-0 h-screen w-64 bg-slate-900 text-white overflow-y-auto">
+        {/* Logo */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-slate-800">
+          <Link href="/manager" className="flex items-center gap-3" onClick={onClose}>
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <Home className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <span className="font-semibold text-white">Haven</span>
+              <span className="text-xs text-indigo-400 block -mt-0.5">Manager Portal</span>
+            </div>
+          </Link>
+          <button onClick={onClose} className="p-1.5 hover:bg-slate-800 rounded-lg">
+            <X className="w-5 h-5 text-slate-400" />
+          </button>
+        </div>
+
+        {/* Manager Info */}
+        <div className="p-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+              <span className="text-sm font-bold text-white">
+                {user?.firstName?.[0]}{user?.lastName?.[0]}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-white truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-slate-400">Home Manager</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <nav className="py-4 px-3 space-y-1">
+          {allNavItems.map((item) => {
+            const active = isActive(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={onClose}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                  active
+                    ? 'bg-indigo-600 text-white'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                }`}
+              >
+                <item.icon className="w-5 h-5 flex-shrink-0" />
+                <span className="text-sm font-medium flex-1">{item.label}</span>
+                {item.badge !== undefined && (
+                  <span
+                    className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                      item.urgent
+                        ? 'bg-red-500 text-white'
+                        : active
+                          ? 'bg-indigo-500 text-white'
+                          : 'bg-slate-700 text-slate-300'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+
+        {/* Bottom */}
+        <div className="border-t border-slate-800 py-4 px-3 space-y-1">
+          {bottomNavItems.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={onClose}
+              className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-slate-300 hover:bg-slate-800 hover:text-white"
+            >
+              <item.icon className="w-5 h-5 flex-shrink-0" />
+              <span className="text-sm font-medium">{item.label}</span>
+            </Link>
+          ))}
+          <button
+            onClick={logout}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-slate-300 hover:bg-slate-800 hover:text-white w-full"
+          >
+            <LogOut className="w-5 h-5 flex-shrink-0" />
+            <span className="text-sm font-medium">Sign Out</span>
+          </button>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+// ============================================================================
+// TOP HEADER COMPONENT
+// ============================================================================
+
+function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
+  return (
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-6">
+      {/* Mobile menu button */}
+      <button
+        onClick={onMenuClick}
+        className="lg:hidden p-2 -ml-2 hover:bg-slate-100 rounded-lg transition-colors"
+      >
+        <Menu className="w-5 h-5 text-slate-600" />
+      </button>
+
+      {/* Search */}
+      <div className="flex-1 max-w-xl mx-4 hidden sm:block">
+        <div className="relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search households, tasks, vendors..."
+            className="w-full pl-10 pr-4 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:border-transparent placeholder:text-slate-400"
+          />
+          <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden md:inline-flex px-1.5 py-0.5 text-xs font-mono bg-slate-100 text-slate-500 rounded border border-slate-200">
+            ⌘K
+          </kbd>
+        </div>
+      </div>
+
+      {/* Right side */}
+      <div className="flex items-center gap-2">
+        {/* Mobile search button */}
+        <button className="sm:hidden p-2 hover:bg-slate-100 rounded-lg transition-colors">
+          <Search className="w-5 h-5 text-slate-600" />
+        </button>
+
+        {/* Notifications */}
+        <button className="relative p-2 hover:bg-slate-100 rounded-lg transition-colors">
+          <Bell className="w-5 h-5 text-slate-600" />
+          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
+        </button>
+
+        {/* Quick actions */}
+        <button className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+          Quick Actions
+          <kbd className="px-1 py-0.5 text-xs font-mono bg-indigo-500 rounded">⌘J</kbd>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// ============================================================================
+// MAIN LAYOUT COMPONENT
+// ============================================================================
 
 export default function ManagerLayout({ children }: { children: React.ReactNode }) {
   const { user, isAuthenticated, isLoading, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -97,10 +445,10 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-600 mx-auto"></div>
-          <p className="mt-4 text-slate-600 dark:text-slate-400">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto"></div>
+          <p className="mt-4 text-slate-600">Loading...</p>
         </div>
       </div>
     );
@@ -111,87 +459,31 @@ export default function ManagerLayout({ children }: { children: React.ReactNode 
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      {/* Sidebar */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 lg:fixed lg:inset-y-0 bg-slate-900 dark:bg-slate-950">
-        {/* Logo */}
-        <div className="flex items-center h-16 px-6 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-              <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-              </svg>
-            </div>
-            <div>
-              <span className="text-lg font-semibold text-white">Haven</span>
-              <span className="ml-2 text-xs font-medium text-emerald-400 bg-emerald-900/50 px-2 py-0.5 rounded">Manager</span>
-            </div>
-          </div>
-        </div>
+    <div className="min-h-screen bg-slate-50">
+      {/* Desktop Sidebar */}
+      <Sidebar
+        collapsed={sidebarCollapsed}
+        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
+        user={user}
+        logout={logout}
+      />
 
-        {/* Navigation */}
-        <nav className="flex-1 px-4 py-4 space-y-1 overflow-y-auto">
-          {navigation.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/manager' && pathname.startsWith(item.href));
-            return (
-              <Link
-                key={item.name}
-                href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-emerald-600/20 text-emerald-400'
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                {item.icon}
-                {item.name}
-              </Link>
-            );
-          })}
-        </nav>
+      {/* Mobile Nav */}
+      <MobileNav
+        open={mobileNavOpen}
+        onClose={() => setMobileNavOpen(false)}
+        user={user}
+        logout={logout}
+      />
 
-        {/* User section */}
-        <div className="px-4 py-4 border-t border-slate-800">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
-              <span className="text-sm font-medium text-white">
-                {user?.firstName?.[0]}{user?.lastName?.[0]}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {user?.firstName} {user?.lastName}
-              </p>
-              <p className="text-xs text-slate-400 truncate">{user?.email}</p>
-            </div>
-            <button
-              onClick={logout}
-              className="p-1 text-slate-400 hover:text-white transition-colors"
-              title="Sign out"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      </aside>
-
-      {/* Mobile header */}
-      <div className="lg:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between h-16 px-4 bg-slate-900 border-b border-slate-800">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-            </svg>
-          </div>
-          <span className="text-lg font-semibold text-white">Haven Manager</span>
-        </div>
-      </div>
-
-      {/* Main content */}
-      <div className="lg:pl-64 pt-16 lg:pt-0">
-        <main className="p-4 lg:p-6">{children}</main>
+      {/* Main Content */}
+      <div
+        className={`transition-all duration-300 ${
+          sidebarCollapsed ? 'lg:ml-16' : 'lg:ml-64'
+        }`}
+      >
+        <TopHeader onMenuClick={() => setMobileNavOpen(true)} />
+        <main className="p-6">{children}</main>
       </div>
     </div>
   );
