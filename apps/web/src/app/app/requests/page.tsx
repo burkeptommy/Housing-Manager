@@ -1,50 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { getDemoImage } from '@/lib/imageUtils';
-import { getApiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
-import type {
-  ServiceRequest,
-  ServiceRequestDetail,
-  ServiceRequestStatus,
-  ServiceRequestPriority,
-  CreateServiceRequestRequest,
-} from '@haven/core';
 import {
-  Plus,
   X,
   Wrench,
   Star,
-  Sparkles,
-  AlertTriangle,
-  Phone,
   Camera,
   Mic,
   MicOff,
   ChevronRight,
-  ChevronDown,
-  ChevronUp,
   MessageSquare,
   Clock,
   CheckCircle2,
-  User,
   DollarSign,
   Send,
   Archive,
-  ArrowLeft,
-  Zap,
-  Home,
   Shield,
-  Package,
   HelpCircle,
-  ExternalLink,
   Loader2,
   AlertCircle,
   Search,
-  UserCheck,
-  CalendarCheck,
   Headphones,
   ShoppingCart,
   Calendar,
@@ -52,16 +30,15 @@ import {
   Bell,
   ThumbsUp,
   ThumbsDown,
-  MapPin,
   Check,
+  Sparkles,
+  PartyPopper,
 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type QuickCategory = 'fix' | 'schedule' | 'buy' | 'research' | 'other';
-type RequestStatus = 'received' | 'reviewing' | 'scheduled' | 'in_progress' | 'resolved';
 type InputType = 'choice' | 'schedule' | 'approval' | 'info';
 
 interface HomeownerInput {
@@ -73,6 +50,7 @@ interface HomeownerInput {
   options?: string[];
   amount?: number;
   scheduleTimes?: { id: string; label: string; datetime: string }[];
+  infoPlaceholder?: string; // For info type - what kind of info is needed
   urgent: boolean;
   createdAt: string;
 }
@@ -80,7 +58,6 @@ interface HomeownerInput {
 interface ActiveRequest {
   id: string;
   title: string;
-  status: RequestStatus;
   statusMessage: string;
   vendor?: {
     name: string;
@@ -100,7 +77,10 @@ interface CompletedRequest {
   vendor?: string;
   cost?: number;
   rating?: number;
+  photos?: string[];
+  summary?: string;
   addedToMaintenance?: boolean;
+  acknowledged?: boolean;
 }
 
 // ============================================================================
@@ -114,12 +94,11 @@ const HOUSING_MANAGER = {
   phone: '+1 (512) 555-0100',
 };
 
-const QUICK_CATEGORIES: { id: QuickCategory; label: string; icon: typeof Wrench; color: string; examples: string[] }[] = [
-  { id: 'fix', label: 'Fix', icon: Wrench, color: 'bg-orange-100 text-orange-600', examples: ['Leaky faucet', 'Door won\'t close', 'AC not working'] },
-  { id: 'schedule', label: 'Schedule', icon: Calendar, color: 'bg-blue-100 text-blue-600', examples: ['Cleaning service', 'Lawn care', 'Pool maintenance'] },
-  { id: 'buy', label: 'Buy', icon: ShoppingCart, color: 'bg-purple-100 text-purple-600', examples: ['Light bulbs', 'Air filters', 'Groceries'] },
-  { id: 'research', label: 'Research', icon: Search, color: 'bg-emerald-100 text-emerald-600', examples: ['Best electrician', 'Solar panel options', 'Roof repair quotes'] },
-  { id: 'other', label: 'Other', icon: HelpCircle, color: 'bg-slate-100 text-slate-600', examples: ['Anything else'] },
+const QUICK_PICKS = [
+  { label: 'Something\'s broken', icon: Wrench },
+  { label: 'Schedule service', icon: Calendar },
+  { label: 'Need to buy', icon: ShoppingCart },
+  { label: 'Question', icon: HelpCircle },
 ];
 
 // ============================================================================
@@ -161,22 +140,30 @@ const MOCK_NEEDS_INPUT: HomeownerInput[] = [
     urgent: false,
     createdAt: new Date().toISOString(),
   },
+  {
+    id: 'input-4',
+    requestId: 'req-4',
+    requestTitle: 'Bedroom paint refresh',
+    type: 'info',
+    question: 'What paint color would you like?',
+    infoPlaceholder: 'e.g., Soft white, light gray, Benjamin Moore Sea Salt...',
+    urgent: false,
+    createdAt: new Date().toISOString(),
+  },
 ];
 
 const MOCK_ACTIVE_REQUESTS: ActiveRequest[] = [
   {
-    id: 'req-4',
+    id: 'req-5',
     title: 'Pool filter replacement',
-    status: 'in_progress',
     statusMessage: 'Pool Pro is on site now',
     vendor: { name: 'Pool Pro Services', avatar: getDemoImage('vendor-portrait', 100, 100, 'pool-pro') },
     createdAt: '2024-12-18T09:00:00Z',
     updatedAt: new Date().toISOString(),
   },
   {
-    id: 'req-5',
+    id: 'req-6',
     title: 'Weekly housekeeping',
-    status: 'scheduled',
     statusMessage: 'Scheduled for Friday 9am',
     vendor: { name: 'Sparkle Clean', avatar: getDemoImage('avatar-female', 100, 100, 'maria') },
     scheduledDate: '2024-12-20T09:00:00Z',
@@ -186,15 +173,13 @@ const MOCK_ACTIVE_REQUESTS: ActiveRequest[] = [
   {
     id: 'req-1',
     title: 'Kitchen faucet replacement',
-    status: 'reviewing',
     statusMessage: 'Finding best options for you',
     createdAt: '2024-12-18T08:00:00Z',
     updatedAt: '2024-12-18T08:30:00Z',
   },
   {
-    id: 'req-6',
+    id: 'req-7',
     title: 'Smoke detector batteries',
-    status: 'received',
     statusMessage: 'Sarah is reviewing',
     isRecurring: true,
     previousFixInfo: 'Fixed 3 months ago by handyman',
@@ -210,14 +195,17 @@ const MOCK_COMPLETED: CompletedRequest[] = [
     completedAt: '2024-12-12T15:00:00Z',
     vendor: 'Cool Air HVAC',
     cost: 89,
-    rating: 5,
-    addedToMaintenance: true,
+    photos: [getDemoImage('home-repair', 300, 200, 'hvac-done')],
+    summary: 'Replaced HVAC filter and cleaned vents. System running efficiently.',
+    acknowledged: false,
   },
   {
     id: 'comp-2',
     title: 'Utility bill inquiry',
     completedAt: '2024-12-06T10:00:00Z',
+    summary: 'Contacted power company. Bill was estimated - actual reading shows you\'re owed $47 credit.',
     rating: 4,
+    acknowledged: true,
   },
   {
     id: 'comp-3',
@@ -225,30 +213,17 @@ const MOCK_COMPLETED: CompletedRequest[] = [
     completedAt: '2024-12-01T16:00:00Z',
     vendor: 'Green Thumb Landscaping',
     cost: 175,
+    photos: [getDemoImage('landscape', 300, 200, 'tree-done')],
+    summary: 'Removed overhanging branch from oak tree. Area cleaned up.',
     rating: 5,
     addedToMaintenance: true,
+    acknowledged: true,
   },
 ];
 
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
-
-function getTimeAgo(dateStr: string): string {
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diffMs = now.getTime() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return 'yesterday';
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
@@ -259,67 +234,167 @@ function formatDate(dateStr: string): string {
 // COMPONENTS
 // ============================================================================
 
-// Manager Summary Card - The main view homeowners see
+// Simple inline request creation - one text input
+function QuickRequestInput({
+  onSubmit,
+  isSubmitting,
+}: {
+  onSubmit: (description: string) => void;
+  isSubmitting: boolean;
+}) {
+  const [description, setDescription] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleVoiceInput = () => {
+    setIsListening(!isListening);
+    if (!isListening) {
+      // Simulate voice input
+      setTimeout(() => {
+        setDescription('Kitchen faucet is dripping');
+        setIsListening(false);
+      }, 2000);
+    }
+  };
+
+  const handleSubmit = () => {
+    if (description.trim() && !isSubmitting) {
+      onSubmit(description.trim());
+      setDescription('');
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center gap-3">
+          <input
+            ref={inputRef}
+            type="text"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What do you need help with?"
+            className="flex-1 text-lg bg-transparent border-none outline-none placeholder:text-slate-400"
+            disabled={isSubmitting}
+          />
+          <button
+            onClick={handleVoiceInput}
+            className={`p-2 rounded-full transition-colors ${
+              isListening
+                ? 'bg-red-100 text-red-600 animate-pulse'
+                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+            }`}
+            disabled={isSubmitting}
+          >
+            {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+          </button>
+          <button
+            className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+            disabled={isSubmitting}
+          >
+            <Camera className="w-5 h-5" />
+          </button>
+          {description.trim() && (
+            <button
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="p-2 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 transition-colors disabled:opacity-50"
+            >
+              {isSubmitting ? (
+                <Loader2 className="w-5 h-5 animate-spin" />
+              ) : (
+                <Send className="w-5 h-5" />
+              )}
+            </button>
+          )}
+        </div>
+
+        {isListening && (
+          <div className="mt-3 flex items-center gap-2 text-red-600">
+            <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+            <span className="text-sm">Listening...</span>
+          </div>
+        )}
+      </div>
+
+      {/* Quick picks */}
+      <div className="px-4 pb-4 flex flex-wrap gap-2">
+        {QUICK_PICKS.map((pick) => (
+          <button
+            key={pick.label}
+            onClick={() => setDescription(pick.label)}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-sm hover:bg-slate-100 transition-colors"
+            disabled={isSubmitting}
+          >
+            <pick.icon className="w-3.5 h-3.5" />
+            {pick.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Sarah is handling summary
 function ManagerSummaryCard({
   activeCount,
   needsInputCount,
-  onExpand,
-  isExpanded,
+  onViewDetails,
 }: {
   activeCount: number;
   needsInputCount: number;
-  onExpand: () => void;
-  isExpanded: boolean;
+  onViewDetails: () => void;
 }) {
+  if (activeCount === 0 && needsInputCount === 0) {
+    return (
+      <div className="bg-emerald-50 rounded-xl p-4 flex items-center gap-4">
+        <div className="p-3 bg-emerald-100 rounded-full">
+          <CheckCircle2 className="w-6 h-6 text-emerald-600" />
+        </div>
+        <div>
+          <p className="font-medium text-emerald-900">All caught up!</p>
+          <p className="text-sm text-emerald-700">No active requests right now</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 text-white shadow-lg">
-      <div className="flex items-start gap-4">
+    <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl p-4 text-white">
+      <div className="flex items-center gap-3">
         <div className="relative">
-          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
-            <Headphones className="w-7 h-7" />
+          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+            <Headphones className="w-6 h-6" />
           </div>
-          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full flex items-center justify-center">
-            <Check className="w-3 h-3 text-white" />
+          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center">
+            <Check className="w-2.5 h-2.5 text-white" />
           </div>
         </div>
         <div className="flex-1">
-          <h2 className="text-lg font-semibold">{HOUSING_MANAGER.name} is on it</h2>
-          <p className="text-emerald-100 text-sm mt-1">
-            Managing {activeCount} {activeCount === 1 ? 'item' : 'items'} for you
+          <p className="font-semibold">
+            {HOUSING_MANAGER.name} is handling {activeCount} {activeCount === 1 ? 'request' : 'requests'}
           </p>
+          {needsInputCount > 0 && (
+            <p className="text-emerald-100 text-sm">
+              {needsInputCount} {needsInputCount === 1 ? 'needs' : 'need'} your input
+            </p>
+          )}
         </div>
-        <a
-          href={`tel:${HOUSING_MANAGER.phone}`}
-          className="p-3 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+        <button
+          onClick={onViewDetails}
+          className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
         >
-          <Phone className="w-5 h-5" />
-        </a>
+          <ChevronRight className="w-5 h-5" />
+        </button>
       </div>
-
-      {needsInputCount > 0 && (
-        <div className="mt-4 p-3 bg-amber-500/90 rounded-xl flex items-center gap-3">
-          <Bell className="w-5 h-5" />
-          <span className="font-medium">{needsInputCount} {needsInputCount === 1 ? 'item needs' : 'items need'} your input</span>
-          <ChevronDown className="w-5 h-5 ml-auto" />
-        </div>
-      )}
-
-      <button
-        onClick={onExpand}
-        className="mt-4 w-full flex items-center justify-center gap-2 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-sm"
-      >
-        {isExpanded ? (
-          <>
-            <ChevronUp className="w-4 h-4" />
-            Hide details
-          </>
-        ) : (
-          <>
-            <ChevronDown className="w-4 h-4" />
-            See what's happening
-          </>
-        )}
-      </button>
     </div>
   );
 }
@@ -333,13 +408,15 @@ function NeedsInputCard({
   onRespond: (inputId: string, response: string) => void;
 }) {
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [textResponse, setTextResponse] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async () => {
-    if (!selectedOption) return;
+    const response = input.type === 'info' ? textResponse : selectedOption;
+    if (!response) return;
     setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 500)); // Simulate API call
-    onRespond(input.id, selectedOption);
+    await new Promise((r) => setTimeout(r, 500));
+    onRespond(input.id, response);
     setIsSubmitting(false);
   };
 
@@ -351,10 +428,14 @@ function NeedsInputCard({
         return <Calendar className="w-5 h-5 text-blue-600" />;
       case 'approval':
         return <DollarSign className="w-5 h-5 text-emerald-600" />;
+      case 'info':
+        return <MessageSquare className="w-5 h-5 text-indigo-600" />;
       default:
         return <MessageSquare className="w-5 h-5 text-slate-600" />;
     }
   };
+
+  const canSubmit = input.type === 'info' ? textResponse.trim() : selectedOption;
 
   return (
     <div className={`bg-white rounded-xl border-2 shadow-sm overflow-hidden ${input.urgent ? 'border-amber-400' : 'border-slate-200'}`}>
@@ -451,8 +532,21 @@ function NeedsInputCard({
           </div>
         )}
 
+        {/* Info - Free text response */}
+        {input.type === 'info' && (
+          <div className="mb-4">
+            <textarea
+              value={textResponse}
+              onChange={(e) => setTextResponse(e.target.value)}
+              placeholder={input.infoPlaceholder || 'Type your response...'}
+              rows={3}
+              className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
+            />
+          </div>
+        )}
+
         {/* Submit Button */}
-        {selectedOption && (
+        {canSubmit && (
           <button
             onClick={handleSubmit}
             disabled={isSubmitting}
@@ -476,53 +570,121 @@ function NeedsInputCard({
   );
 }
 
-// Active Request Mini Card
+// Completion Acknowledgment Card - Shows when work is done
+function CompletionCard({
+  request,
+  onAcknowledge,
+  onRate,
+}: {
+  request: CompletedRequest;
+  onAcknowledge: (id: string) => void;
+  onRate: (id: string, rating: number) => void;
+}) {
+  const [selectedRating, setSelectedRating] = useState(request.rating || 0);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAcknowledge = async () => {
+    setIsSubmitting(true);
+    if (selectedRating > 0) {
+      onRate(request.id, selectedRating);
+    }
+    await new Promise((r) => setTimeout(r, 500));
+    onAcknowledge(request.id);
+    setIsSubmitting(false);
+  };
+
+  return (
+    <div className="bg-white rounded-xl border-2 border-emerald-200 shadow-sm overflow-hidden">
+      <div className="bg-emerald-50 px-4 py-3 flex items-center gap-2 border-b border-emerald-200">
+        <PartyPopper className="w-5 h-5 text-emerald-600" />
+        <span className="font-medium text-emerald-800">Completed!</span>
+      </div>
+
+      <div className="p-4">
+        <h3 className="font-semibold text-slate-900 text-lg">{request.title}</h3>
+
+        {request.summary && (
+          <p className="text-slate-600 text-sm mt-2">{request.summary}</p>
+        )}
+
+        {/* Photos */}
+        {request.photos && request.photos.length > 0 && (
+          <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
+            {request.photos.map((photo, i) => (
+              <div key={i} className="relative w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
+                <Image src={photo} alt="Completion photo" fill className="object-cover" />
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Cost & Vendor */}
+        <div className="mt-4 flex items-center gap-4 text-sm">
+          {request.vendor && (
+            <span className="text-slate-600">By {request.vendor}</span>
+          )}
+          {request.cost && (
+            <span className="font-medium text-slate-900">${request.cost.toLocaleString()}</span>
+          )}
+        </div>
+
+        {/* Rating */}
+        {!request.rating && (
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="text-sm text-slate-600 mb-2">How did we do?</p>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  onClick={() => setSelectedRating(star)}
+                  className="p-1"
+                >
+                  <Star
+                    className={`w-7 h-7 transition-colors ${
+                      star <= selectedRating
+                        ? 'text-amber-400 fill-amber-400'
+                        : 'text-slate-200 hover:text-amber-300'
+                    }`}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Acknowledge Button */}
+        <button
+          onClick={handleAcknowledge}
+          disabled={isSubmitting}
+          className="w-full mt-4 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+        >
+          {isSubmitting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <>
+              <CheckCircle2 className="w-4 h-4" />
+              Looks good!
+            </>
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Active Request Mini Card - Minimal info
 function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
-  const getStatusColor = () => {
-    switch (request.status) {
-      case 'in_progress':
-        return 'bg-orange-100 text-orange-700';
-      case 'scheduled':
-        return 'bg-blue-100 text-blue-700';
-      case 'reviewing':
-        return 'bg-purple-100 text-purple-700';
-      default:
-        return 'bg-slate-100 text-slate-700';
-    }
-  };
-
-  const getStatusIcon = () => {
-    switch (request.status) {
-      case 'in_progress':
-        return <Wrench className="w-4 h-4" />;
-      case 'scheduled':
-        return <CalendarCheck className="w-4 h-4" />;
-      case 'reviewing':
-        return <Search className="w-4 h-4" />;
-      default:
-        return <Clock className="w-4 h-4" />;
-    }
-  };
-
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="flex-1">
           <h3 className="font-medium text-slate-900">{request.title}</h3>
-          <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium mt-2 ${getStatusColor()}`}>
-            {getStatusIcon()}
-            {request.statusMessage}
-          </div>
+          <p className="text-sm text-emerald-600 mt-1">{request.statusMessage}</p>
 
           {request.isRecurring && (
-            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-center gap-2 text-amber-700">
-                <RefreshCw className="w-4 h-4" />
-                <span className="text-xs font-medium">Recurring Issue</span>
-              </div>
-              {request.previousFixInfo && (
-                <p className="text-xs text-amber-600 mt-1">{request.previousFixInfo}</p>
-              )}
+            <div className="mt-2 flex items-center gap-1.5 text-amber-600">
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span className="text-xs">Recurring issue</span>
             </div>
           )}
         </div>
@@ -533,35 +695,12 @@ function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
           </div>
         )}
       </div>
-
-      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
-        <span className="text-xs text-slate-500">Updated {getTimeAgo(request.updatedAt)}</span>
-        <button className="text-xs text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1">
-          Details <ChevronRight className="w-3 h-3" />
-        </button>
-      </div>
     </div>
   );
 }
 
-// Completed Request Card
-function CompletedRequestCard({
-  request,
-  onRate,
-}: {
-  request: CompletedRequest;
-  onRate?: (id: string, rating: number) => void;
-}) {
-  const [showRating, setShowRating] = useState(!request.rating);
-  const [selectedRating, setSelectedRating] = useState(0);
-
-  const handleRate = () => {
-    if (selectedRating > 0 && onRate) {
-      onRate(request.id, selectedRating);
-      setShowRating(false);
-    }
-  };
-
+// Completed Request Card - For history
+function CompletedHistoryCard({ request }: { request: CompletedRequest }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
@@ -588,7 +727,7 @@ function CompletedRequestCard({
           )}
         </div>
 
-        {request.rating ? (
+        {request.rating && (
           <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => (
               <Star
@@ -597,97 +736,37 @@ function CompletedRequestCard({
               />
             ))}
           </div>
-        ) : showRating && (
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-0.5">
-              {[1, 2, 3, 4, 5].map((star) => (
-                <button
-                  key={star}
-                  onClick={() => setSelectedRating(star)}
-                  className="p-0.5"
-                >
-                  <Star
-                    className={`w-5 h-5 transition-colors ${
-                      star <= selectedRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'
-                    }`}
-                  />
-                </button>
-              ))}
-            </div>
-            {selectedRating > 0 && (
-              <button
-                onClick={handleRate}
-                className="text-xs text-emerald-600 font-medium"
-              >
-                Submit
-              </button>
-            )}
-          </div>
         )}
       </div>
     </div>
   );
 }
 
-// Ultra-Simple Request Creation
-function QuickRequestModal({
+// Details Modal - Shows all active requests
+function DetailsModal({
+  activeRequests,
+  completedRequests,
   onClose,
-  onSubmit,
 }: {
+  activeRequests: ActiveRequest[];
+  completedRequests: CompletedRequest[];
   onClose: () => void;
-  onSubmit: (category: QuickCategory, description: string, photoUrl?: string) => void;
 }) {
-  const [step, setStep] = useState<'input' | 'category'>('input');
-  const [description, setDescription] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<QuickCategory | null>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  // Focus textarea on mount
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
-
-  const handleVoiceInput = () => {
-    // In a real app, this would use Web Speech API
-    setIsListening(!isListening);
-    if (!isListening) {
-      // Simulate voice input
-      setTimeout(() => {
-        setDescription('Kitchen faucet is dripping');
-        setIsListening(false);
-      }, 2000);
-    }
-  };
-
-  const handleCategorySelect = (category: QuickCategory) => {
-    setSelectedCategory(category);
-  };
-
-  const handleSubmit = async () => {
-    if (!description.trim() || !selectedCategory) return;
-    setIsSubmitting(true);
-    await new Promise((r) => setTimeout(r, 800));
-    onSubmit(selectedCategory, description);
-    setIsSubmitting(false);
-  };
-
-  const handleNext = () => {
-    if (description.trim()) {
-      setStep('category');
-    }
-  };
+  const filteredHistory = completedRequests.filter((r) =>
+    r.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (r.vendor && r.vendor.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+      <div className="relative w-full h-[85vh] sm:max-w-lg sm:h-auto sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">
-            {step === 'input' ? 'What do you need?' : 'Almost done!'}
-          </h2>
+          <h2 className="text-lg font-semibold text-slate-900">Request Details</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
@@ -696,129 +775,78 @@ function QuickRequestModal({
           </button>
         </div>
 
-        <div className="p-6">
-          {step === 'input' ? (
-            <>
-              {/* Text/Voice Input */}
-              <div className="relative">
-                <textarea
-                  ref={textareaRef}
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Tell us what you need... (e.g., kitchen faucet dripping, need groceries picked up)"
-                  rows={3}
-                  className="w-full px-4 py-3 pr-24 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none text-lg"
-                />
-                <div className="absolute right-2 bottom-2 flex items-center gap-2">
-                  <button
-                    onClick={handleVoiceInput}
-                    className={`p-2 rounded-lg transition-colors ${
-                      isListening
-                        ? 'bg-red-100 text-red-600 animate-pulse'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                  </button>
-                  <button className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
-                    <Camera className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
+        {/* Tabs */}
+        <div className="flex bg-slate-100 m-4 rounded-lg p-1">
+          <button
+            onClick={() => setViewMode('active')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'active'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Clock className="w-4 h-4" />
+            In Progress
+            <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-700 rounded text-xs">{activeRequests.length}</span>
+          </button>
+          <button
+            onClick={() => setViewMode('history')}
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              viewMode === 'history'
+                ? 'bg-white text-slate-900 shadow-sm'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Archive className="w-4 h-4" />
+            History
+          </button>
+        </div>
 
-              {isListening && (
-                <div className="mt-3 flex items-center gap-2 text-red-600">
-                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
-                  <span className="text-sm">Listening...</span>
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4">
+          {viewMode === 'active' ? (
+            <div className="space-y-3">
+              {activeRequests.map((request) => (
+                <ActiveRequestMiniCard key={request.id} request={request} />
+              ))}
+              {activeRequests.length === 0 && (
+                <div className="text-center py-8 text-slate-500">
+                  <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-600" />
+                  <p className="font-medium text-slate-900">All caught up!</p>
+                  <p className="text-sm">No active requests right now</p>
                 </div>
               )}
-
-              {/* Quick suggestions */}
-              <div className="mt-4">
-                <p className="text-sm text-slate-500 mb-2">Quick suggestions:</p>
-                <div className="flex flex-wrap gap-2">
-                  {['Leaky faucet', 'Schedule cleaning', 'Pick up dry cleaning', 'AC not cooling'].map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      onClick={() => setDescription(suggestion)}
-                      className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-sm hover:bg-slate-200 transition-colors"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Next Button */}
-              <button
-                onClick={handleNext}
-                disabled={!description.trim()}
-                className="w-full mt-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                Next
-                <ChevronRight className="w-5 h-5" />
-              </button>
-            </>
+            </div>
           ) : (
             <>
-              {/* Show what they typed */}
-              <div className="p-4 bg-slate-50 rounded-xl mb-6">
-                <p className="text-sm text-slate-500">Your request:</p>
-                <p className="text-slate-900 font-medium mt-1">{description}</p>
+              {/* Search */}
+              <div className="relative mb-4">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search history..."
+                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                />
               </div>
 
-              {/* Category Selection */}
-              <p className="text-sm text-slate-700 font-medium mb-3">What type of help is this?</p>
-              <div className="grid grid-cols-5 gap-2">
-                {QUICK_CATEGORIES.map((cat) => (
-                  <button
-                    key={cat.id}
-                    onClick={() => handleCategorySelect(cat.id)}
-                    className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
-                      selectedCategory === cat.id
-                        ? 'border-emerald-500 bg-emerald-50'
-                        : 'border-slate-200 hover:border-slate-300'
-                    }`}
-                  >
-                    <div className={`p-2 rounded-lg ${cat.color}`}>
-                      <cat.icon className="w-5 h-5" />
-                    </div>
-                    <span className="text-xs font-medium text-slate-700 mt-2">{cat.label}</span>
-                  </button>
+              <div className="space-y-3">
+                {filteredHistory.map((request) => (
+                  <CompletedHistoryCard key={request.id} request={request} />
                 ))}
+                {filteredHistory.length === 0 && (
+                  <div className="text-center py-8 text-slate-500">
+                    <Archive className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                    <p className="font-medium text-slate-900">
+                      {searchQuery ? 'No matching requests' : 'No history yet'}
+                    </p>
+                    <p className="text-sm">
+                      {searchQuery ? 'Try a different search' : 'Completed requests will appear here'}
+                    </p>
+                  </div>
+                )}
               </div>
-
-              {/* Submit */}
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setStep('input')}
-                  className="flex-1 py-3 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={!selectedCategory || isSubmitting}
-                  className="flex-1 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Sending...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-5 h-5" />
-                      Send to {HOUSING_MANAGER.name}
-                    </>
-                  )}
-                </button>
-              </div>
-
-              {/* Manager Note */}
-              <p className="text-center text-sm text-slate-500 mt-4">
-                {HOUSING_MANAGER.name} will take it from here. You&apos;ll only hear from us if we need something.
-              </p>
             </>
           )}
         </div>
@@ -838,7 +866,7 @@ function SuccessToast({ onClose }: { onClose: () => void }) {
     <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-2">
       <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg">
         <CheckCircle2 className="w-5 h-5" />
-        <span className="font-medium">Request sent! {HOUSING_MANAGER.name} is on it.</span>
+        <span className="font-medium">Got it! {HOUSING_MANAGER.name} is on it.</span>
       </div>
     </div>
   );
@@ -849,33 +877,43 @@ function SuccessToast({ onClose }: { onClose: () => void }) {
 // ============================================================================
 
 export default function RequestsPage() {
-  const { currentHousehold } = useAuth();
-  const [showQuickRequest, setShowQuickRequest] = useState(false);
+  useAuth(); // Will use for API calls when connected
+  const [showDetails, setShowDetails] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [needsInput, setNeedsInput] = useState<HomeownerInput[]>(MOCK_NEEDS_INPUT);
   const [activeRequests, setActiveRequests] = useState<ActiveRequest[]>(MOCK_ACTIVE_REQUESTS);
   const [completedRequests, setCompletedRequests] = useState<CompletedRequest[]>(MOCK_COMPLETED);
 
-  const handleSubmitRequest = (category: QuickCategory, description: string) => {
-    // In real app, this would call the API
+  // Separate unacknowledged completions
+  const unacknowledgedCompletions = completedRequests.filter((r) => !r.acknowledged);
+  const acknowledgedHistory = completedRequests.filter((r) => r.acknowledged);
+
+  const handleSubmitRequest = async (description: string) => {
+    setIsSubmitting(true);
+    await new Promise((r) => setTimeout(r, 800));
+
     const newRequest: ActiveRequest = {
       id: `req-${Date.now()}`,
       title: description,
-      status: 'received',
       statusMessage: `${HOUSING_MANAGER.name} is reviewing`,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
     setActiveRequests((prev) => [newRequest, ...prev]);
-    setShowQuickRequest(false);
     setShowSuccess(true);
+    setIsSubmitting(false);
   };
 
-  const handleInputRespond = (inputId: string, response: string) => {
+  const handleInputRespond = (inputId: string, _response: string) => {
+    // In real app, would send response to API
     setNeedsInput((prev) => prev.filter((i) => i.id !== inputId));
-    // In real app, this would call the API
+  };
+
+  const handleAcknowledge = (requestId: string) => {
+    setCompletedRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, acknowledged: true } : r))
+    );
   };
 
   const handleRate = (requestId: string, rating: number) => {
@@ -890,22 +928,26 @@ export default function RequestsPage() {
   return (
     <div className="pb-32 lg:pb-8 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Requests</h1>
-          <p className="text-slate-500 mt-1">Your home manager handles everything</p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Help Requests</h1>
+        <p className="text-slate-500 mt-1">Tell us what you need. {HOUSING_MANAGER.name} handles the rest.</p>
       </div>
 
-      {/* Manager Summary */}
-      <ManagerSummaryCard
-        activeCount={activeCount}
-        needsInputCount={needsInputCount}
-        onExpand={() => setIsExpanded(!isExpanded)}
-        isExpanded={isExpanded}
-      />
+      {/* Quick Request Input - Always visible at top */}
+      <QuickRequestInput onSubmit={handleSubmitRequest} isSubmitting={isSubmitting} />
 
-      {/* Needs Your Input Section - Always Visible */}
+      {/* Manager Summary - Shows if there are active requests */}
+      {(activeCount > 0 || needsInputCount > 0) && (
+        <div className="mt-6">
+          <ManagerSummaryCard
+            activeCount={activeCount}
+            needsInputCount={needsInputCount}
+            onViewDetails={() => setShowDetails(true)}
+          />
+        </div>
+      )}
+
+      {/* Needs Your Input Section */}
       {needsInput.length > 0 && (
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
@@ -923,85 +965,32 @@ export default function RequestsPage() {
         </div>
       )}
 
-      {/* Expanded View - Active Requests */}
-      {isExpanded && (
+      {/* Recently Completed - Needs Acknowledgment */}
+      {unacknowledgedCompletions.length > 0 && (
         <div className="mt-6">
-          {/* View Toggle */}
-          <div className="flex bg-slate-100 rounded-lg p-1 mb-4">
-            <button
-              onClick={() => setViewMode('active')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'active'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Clock className="w-4 h-4" />
-              In Progress
-              <span className="px-1.5 py-0.5 bg-slate-200 rounded text-xs">{activeCount}</span>
-            </button>
-            <button
-              onClick={() => setViewMode('history')}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'history'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
-              }`}
-            >
-              <Archive className="w-4 h-4" />
-              History
-              <span className="px-1.5 py-0.5 bg-slate-200 rounded text-xs">{completedRequests.length}</span>
-            </button>
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Just Finished</h2>
           </div>
-
-          {viewMode === 'active' ? (
-            <div className="space-y-3">
-              {activeRequests.map((request) => (
-                <ActiveRequestMiniCard key={request.id} request={request} />
-              ))}
-              {activeRequests.length === 0 && (
-                <div className="text-center py-8 text-slate-500">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-600" />
-                  <p className="font-medium text-slate-900">All caught up!</p>
-                  <p className="text-sm">No active requests right now</p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {completedRequests.map((request) => (
-                <CompletedRequestCard
-                  key={request.id}
-                  request={request}
-                  onRate={handleRate}
-                />
-              ))}
-              {completedRequests.length === 0 && (
-                <div className="text-center py-8 text-slate-500">
-                  <Archive className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-                  <p className="font-medium text-slate-900">No history yet</p>
-                  <p className="text-sm">Completed requests will appear here</p>
-                </div>
-              )}
-            </div>
-          )}
+          <div className="space-y-4">
+            {unacknowledgedCompletions.map((request) => (
+              <CompletionCard
+                key={request.id}
+                request={request}
+                onAcknowledge={handleAcknowledge}
+                onRate={handleRate}
+              />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* New Request FAB */}
-      <button
-        onClick={() => setShowQuickRequest(true)}
-        className="fixed bottom-36 right-4 lg:bottom-8 lg:right-8 flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-medium rounded-full shadow-lg hover:bg-emerald-700 transition-colors z-40"
-      >
-        <Plus className="w-5 h-5" />
-        <span className="hidden sm:inline">I need...</span>
-      </button>
-
-      {/* Quick Request Modal */}
-      {showQuickRequest && (
-        <QuickRequestModal
-          onClose={() => setShowQuickRequest(false)}
-          onSubmit={handleSubmitRequest}
+      {/* Details Modal */}
+      {showDetails && (
+        <DetailsModal
+          activeRequests={activeRequests}
+          completedRequests={acknowledgedHistory}
+          onClose={() => setShowDetails(false)}
         />
       )}
 
