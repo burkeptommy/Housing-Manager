@@ -77,6 +77,22 @@ enum ServiceRequestPriority {
   URGENT
 }
 
+enum HomeownerInputType {
+  NONE         // No input needed
+  CHOICE       // Select from options (e.g., faucet style)
+  SCHEDULE     // Pick a time (Tuesday 9am or Thursday 2pm)
+  APPROVAL     // Approve a cost ($450 - approve?)
+  INFORMATION  // Need more info from homeowner
+}
+
+enum RequestQuickCategory {
+  FIX       // Something's broken
+  SCHEDULE  // Need to schedule a service
+  BUY       // Purchase something
+  RESEARCH  // Look into something
+  OTHER     // Other request
+}
+
 enum TaskStatus {
   PENDING
   IN_PROGRESS
@@ -1039,6 +1055,9 @@ model ServiceRequest {
   status      ServiceRequestStatus   @default(DRAFT)
   priority    ServiceRequestPriority @default(MEDIUM)
 
+  // Quick category for ultra-simple creation
+  quickCategory RequestQuickCategory? @map("quick_category")
+
   // Scheduling
   preferredDate DateTime? @map("preferred_date")
   scheduledDate DateTime? @map("scheduled_date")
@@ -1049,6 +1068,29 @@ model ServiceRequest {
   actualCost    Decimal? @map("actual_cost") @db.Decimal(10, 2)
 
   notes String?
+
+  // Homeowner input tracking
+  requiresHomeownerInput Boolean            @default(false) @map("requires_homeowner_input")
+  inputType              HomeownerInputType @default(NONE) @map("input_type")
+  inputQuestion          String?            @map("input_question") // "Which faucet style?"
+  inputOptions           Json?              @map("input_options") // ["Style A", "Style B", "Style C"]
+  inputResponse          String?            @map("input_response") // Homeowner's response
+  inputRespondedAt       DateTime?          @map("input_responded_at")
+
+  // Recurring detection
+  similarRequestId  String?   @map("similar_request_id") // Links to previous similar request
+  recurringIssue    Boolean   @default(false) @map("recurring_issue")
+  previousFixDate   DateTime? @map("previous_fix_date")
+  previousVendorId  String?   @map("previous_vendor_id")
+
+  // Photo/voice input
+  voiceTranscript String? @map("voice_transcript")
+  photoUrls       Json?   @map("photo_urls") // Array of photo URLs
+
+  // Auto-status updates tracking
+  managerNote       String?   @map("manager_note") // Internal note from manager
+  lastStatusUpdate  String?   @map("last_status_update") // Last update message
+  statusUpdatedAt   DateTime? @map("status_updated_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1063,6 +1105,7 @@ model ServiceRequest {
 
   @@index([householdId, status])
   @@index([vendorId, status])
+  @@index([householdId, requiresHomeownerInput])
   @@map("service_requests")
 }
 

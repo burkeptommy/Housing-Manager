@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import Image from 'next/image';
 import { getDemoImage } from '@/lib/imageUtils';
 import { getApiClient } from '@/lib/api';
@@ -17,32 +17,27 @@ import {
   X,
   Wrench,
   Star,
-  FileText,
   Sparkles,
   AlertTriangle,
   Phone,
   Camera,
-  Video,
+  Mic,
+  MicOff,
   ChevronRight,
+  ChevronDown,
+  ChevronUp,
   MessageSquare,
   Clock,
   CheckCircle2,
   User,
   DollarSign,
   Send,
-  LayoutList,
-  LayoutGrid,
   Archive,
   ArrowLeft,
   Zap,
   Home,
   Shield,
   Package,
-  Utensils,
-  Car,
-  PawPrint,
-  Leaf,
-  Receipt,
   HelpCircle,
   ExternalLink,
   Loader2,
@@ -51,572 +46,189 @@ import {
   UserCheck,
   CalendarCheck,
   Headphones,
+  ShoppingCart,
+  Calendar,
+  RefreshCw,
+  Bell,
+  ThumbsUp,
+  ThumbsDown,
+  MapPin,
+  Check,
 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type RequestCategory = 'repair' | 'service' | 'concierge' | 'admin';
-type RequestPriority = 'low' | 'medium' | 'high' | 'emergency';
+type QuickCategory = 'fix' | 'schedule' | 'buy' | 'research' | 'other';
 type RequestStatus = 'received' | 'reviewing' | 'scheduled' | 'in_progress' | 'resolved';
-type ViewMode = 'active' | 'history';
-type DisplayMode = 'list' | 'kanban';
+type InputType = 'choice' | 'schedule' | 'approval' | 'info';
 
-interface RequestTicket {
+interface HomeownerInput {
   id: string;
-  ticketNumber: string;
-  title: string;
-  description: string;
-  category: RequestCategory;
-  subcategory: string;
-  priority: RequestPriority;
-  status: RequestStatus;
+  requestId: string;
+  requestTitle: string;
+  type: InputType;
+  question: string;
+  options?: string[];
+  amount?: number;
+  scheduleTimes?: { id: string; label: string; datetime: string }[];
+  urgent: boolean;
   createdAt: string;
-  updatedAt: string;
-  resolvedAt?: string;
-  resolutionTime?: string;
+}
+
+interface ActiveRequest {
+  id: string;
+  title: string;
+  status: RequestStatus;
+  statusMessage: string;
   vendor?: {
-    id: string;
     name: string;
     avatar: string;
-    phone: string;
   };
-  mediaUrls: string[];
-  allowEntry: boolean;
-  rating?: number;
-  quote?: {
-    amount: number;
-    approved: boolean;
-  };
-  timeline: TimelineEvent[];
-  messages: ChatMessage[];
   scheduledDate?: string;
+  isRecurring?: boolean;
+  previousFixInfo?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
-interface TimelineEvent {
+interface CompletedRequest {
   id: string;
-  type: 'created' | 'updated' | 'assigned' | 'scheduled' | 'started' | 'completed' | 'message';
-  description: string;
-  timestamp: string;
-  actor?: string;
-}
-
-interface ChatMessage {
-  id: string;
-  senderId: string;
-  senderName: string;
-  senderRole: 'user' | 'manager' | 'vendor';
-  senderAvatar?: string;
-  content: string;
-  timestamp: string;
-  attachments?: string[];
-}
-
-interface CategoryOption {
-  id: RequestCategory;
-  label: string;
-  description: string;
-  icon: typeof Wrench;
-  color: string;
-  subcategories: string[];
-}
-
-interface FormData {
-  category: RequestCategory;
-  subcategory: string;
   title: string;
-  description: string;
-  priority: RequestPriority;
-  allowEntry: boolean;
-}
-
-// Smart status state type
-interface SmartStatusState {
-  headline: string;
-  description: string;
-  stepIndex: number;
-  icon: typeof Search;
-  color: string;
-  bgColor: string;
+  completedAt: string;
+  vendor?: string;
+  cost?: number;
+  rating?: number;
+  addedToMaintenance?: boolean;
 }
 
 // ============================================================================
 // CONSTANTS
 // ============================================================================
 
-// Housing Manager info (would come from household settings in real app)
 const HOUSING_MANAGER = {
-  id: 'steve-manager',
-  name: 'Steve',
-  title: 'Housing Manager',
-  avatar: getDemoImage('avatar-male', 100, 100, 'steve-manager'),
+  name: 'Sarah',
+  title: 'Your Home Manager',
+  avatar: getDemoImage('avatar-female', 100, 100, 'sarah-manager'),
   phone: '+1 (512) 555-0100',
 };
+
+const QUICK_CATEGORIES: { id: QuickCategory; label: string; icon: typeof Wrench; color: string; examples: string[] }[] = [
+  { id: 'fix', label: 'Fix', icon: Wrench, color: 'bg-orange-100 text-orange-600', examples: ['Leaky faucet', 'Door won\'t close', 'AC not working'] },
+  { id: 'schedule', label: 'Schedule', icon: Calendar, color: 'bg-blue-100 text-blue-600', examples: ['Cleaning service', 'Lawn care', 'Pool maintenance'] },
+  { id: 'buy', label: 'Buy', icon: ShoppingCart, color: 'bg-purple-100 text-purple-600', examples: ['Light bulbs', 'Air filters', 'Groceries'] },
+  { id: 'research', label: 'Research', icon: Search, color: 'bg-emerald-100 text-emerald-600', examples: ['Best electrician', 'Solar panel options', 'Roof repair quotes'] },
+  { id: 'other', label: 'Other', icon: HelpCircle, color: 'bg-slate-100 text-slate-600', examples: ['Anything else'] },
+];
 
 // ============================================================================
 // MOCK DATA
 // ============================================================================
 
-const categoryOptions: CategoryOption[] = [
+const MOCK_NEEDS_INPUT: HomeownerInput[] = [
   {
-    id: 'repair',
-    label: 'Something is Broken',
-    description: 'Repairs, maintenance, and fixes',
-    icon: Wrench,
-    color: 'bg-orange-100 text-orange-600',
-    subcategories: ['Plumbing', 'Electrical', 'HVAC', 'Appliances', 'Structural', 'Other'],
+    id: 'input-1',
+    requestId: 'req-1',
+    requestTitle: 'Kitchen faucet replacement',
+    type: 'choice',
+    question: 'Which faucet style do you prefer?',
+    options: ['Modern Chrome Pull-Down ($189)', 'Traditional Brass ($149)', 'Matte Black Touch-Free ($249)'],
+    urgent: false,
+    createdAt: new Date().toISOString(),
   },
   {
-    id: 'service',
-    label: 'I Need a Pro',
-    description: 'Housekeeping, landscaping, specialists',
-    icon: Star,
-    color: 'bg-blue-100 text-blue-600',
-    subcategories: ['Housekeeping', 'Landscaping', 'Pool Service', 'Pest Control', 'Window Cleaning', 'Other'],
+    id: 'input-2',
+    requestId: 'req-2',
+    requestTitle: 'HVAC maintenance',
+    type: 'schedule',
+    question: 'Which time works best for the HVAC technician?',
+    scheduleTimes: [
+      { id: 's1', label: 'Tuesday 9-11am', datetime: '2024-12-24T09:00:00Z' },
+      { id: 's2', label: 'Thursday 2-4pm', datetime: '2024-12-26T14:00:00Z' },
+      { id: 's3', label: 'Friday 10am-12pm', datetime: '2024-12-27T10:00:00Z' },
+    ],
+    urgent: true,
+    createdAt: new Date().toISOString(),
   },
   {
-    id: 'concierge',
-    label: 'Life Help',
-    description: 'Errands, bookings, personal assistance',
-    icon: Sparkles,
-    color: 'bg-purple-100 text-purple-600',
-    subcategories: ['Package Pickup', 'Grocery Run', 'Restaurant Booking', 'Travel Arrangements', 'Pet Care', 'Other'],
-  },
-  {
-    id: 'admin',
-    label: 'Paperwork',
-    description: 'Bills, insurance, documents',
-    icon: FileText,
-    color: 'bg-slate-100 text-slate-600',
-    subcategories: ['Bill Question', 'Insurance Claim', 'Document Request', 'Account Update', 'Other'],
+    id: 'input-3',
+    requestId: 'req-3',
+    requestTitle: 'Garage door motor repair',
+    type: 'approval',
+    question: 'Approve repair cost?',
+    amount: 450,
+    urgent: false,
+    createdAt: new Date().toISOString(),
   },
 ];
 
-const priorityOptions: { id: RequestPriority; label: string; description: string; color: string }[] = [
-  { id: 'low', label: 'Low', description: 'Whenever convenient', color: 'bg-slate-100 text-slate-600' },
-  { id: 'medium', label: 'Medium', description: 'This week', color: 'bg-blue-100 text-blue-600' },
-  { id: 'high', label: 'High', description: 'Urgent - Today', color: 'bg-amber-100 text-amber-600' },
-  { id: 'emergency', label: 'Emergency', description: 'Stop everything', color: 'bg-red-100 text-red-600' },
-];
-
-const MOCK_TICKETS: RequestTicket[] = [
+const MOCK_ACTIVE_REQUESTS: ActiveRequest[] = [
   {
-    id: '1',
-    ticketNumber: 'REQ-001',
-    title: 'Kitchen faucet leaking',
-    description: 'The kitchen faucet has been dripping constantly for the past two days. Water is pooling under the sink.',
-    category: 'repair',
-    subcategory: 'Plumbing',
-    priority: 'high',
+    id: 'req-4',
+    title: 'Pool filter replacement',
     status: 'in_progress',
+    statusMessage: 'Pool Pro is on site now',
+    vendor: { name: 'Pool Pro Services', avatar: getDemoImage('vendor-portrait', 100, 100, 'pool-pro') },
     createdAt: '2024-12-18T09:00:00Z',
-    updatedAt: '2024-12-18T14:30:00Z',
-    vendor: {
-      id: 'v1',
-      name: "Mike's Plumbing",
-      avatar: getDemoImage('vendor-portrait', 100, 100, 'mike-plumber'),
-      phone: '+1 (310) 555-0111',
-    },
-    mediaUrls: [getDemoImage('bathroom', 400, 300, 'leak-1')],
-    allowEntry: true,
-    scheduledDate: '2024-12-18T14:00:00Z',
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-18T09:00:00Z', actor: 'Bob Chen' },
-      { id: 't2', type: 'updated', description: 'Marked as high priority', timestamp: '2024-12-18T09:05:00Z', actor: 'Steve Manager' },
-      { id: 't3', type: 'assigned', description: "Assigned to Mike's Plumbing", timestamp: '2024-12-18T09:30:00Z', actor: 'Steve Manager' },
-      { id: 't4', type: 'scheduled', description: 'Scheduled for today 2:00 PM', timestamp: '2024-12-18T10:00:00Z', actor: "Mike's Plumbing" },
-      { id: 't5', type: 'started', description: 'Work started - Mike checked in', timestamp: '2024-12-18T14:00:00Z', actor: "Mike's Plumbing" },
-    ],
-    messages: [
-      { id: 'm1', senderId: 'u1', senderName: 'Bob Chen', senderRole: 'user', content: 'Here is a photo of the leak under the sink.', timestamp: '2024-12-18T09:02:00Z', attachments: [getDemoImage('bathroom', 400, 300, 'leak-photo')] },
-      { id: 'm2', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "Thanks Bob! I've escalated this and Mike is on his way. He should arrive around 2 PM.", timestamp: '2024-12-18T09:35:00Z' },
-      { id: 'm3', senderId: 'v1', senderName: "Mike's Plumbing", senderRole: 'vendor', content: "On my way! I'll text when I arrive at the gate.", timestamp: '2024-12-18T13:45:00Z' },
-    ],
+    updatedAt: new Date().toISOString(),
   },
   {
-    id: '2',
-    ticketNumber: 'REQ-002',
+    id: 'req-5',
     title: 'Weekly housekeeping',
-    description: 'Schedule regular weekly cleaning service',
-    category: 'service',
-    subcategory: 'Housekeeping',
-    priority: 'low',
     status: 'scheduled',
+    statusMessage: 'Scheduled for Friday 9am',
+    vendor: { name: 'Sparkle Clean', avatar: getDemoImage('avatar-female', 100, 100, 'maria') },
+    scheduledDate: '2024-12-20T09:00:00Z',
     createdAt: '2024-12-17T10:00:00Z',
     updatedAt: '2024-12-17T11:00:00Z',
-    scheduledDate: '2024-12-20T09:00:00Z',
-    vendor: {
-      id: 'v2',
-      name: 'Sparkle Clean Co',
-      avatar: getDemoImage('avatar-female', 100, 100, 'maria-cleaner'),
-      phone: '+1 (310) 555-0222',
-    },
-    mediaUrls: [],
-    allowEntry: true,
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-17T10:00:00Z', actor: 'Alice Chen' },
-      { id: 't2', type: 'assigned', description: 'Assigned to Sparkle Clean Co', timestamp: '2024-12-17T10:30:00Z', actor: 'Steve Manager' },
-      { id: 't3', type: 'scheduled', description: 'Scheduled for every Friday 9:00 AM', timestamp: '2024-12-17T11:00:00Z', actor: 'Sparkle Clean Co' },
-    ],
-    messages: [
-      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "I've arranged Maria from Sparkle Clean to come every Friday morning. Does 9 AM work?", timestamp: '2024-12-17T10:45:00Z' },
-      { id: 'm2', senderId: 'u1', senderName: 'Alice Chen', senderRole: 'user', content: 'Perfect! 9 AM works great.', timestamp: '2024-12-17T10:50:00Z' },
-    ],
   },
   {
-    id: '3',
-    ticketNumber: 'REQ-003',
+    id: 'req-1',
+    title: 'Kitchen faucet replacement',
+    status: 'reviewing',
+    statusMessage: 'Finding best options for you',
+    createdAt: '2024-12-18T08:00:00Z',
+    updatedAt: '2024-12-18T08:30:00Z',
+  },
+  {
+    id: 'req-6',
     title: 'Smoke detector batteries',
-    description: 'Smoke detectors on second floor are beeping - need new batteries',
-    category: 'repair',
-    subcategory: 'Electrical',
-    priority: 'medium',
     status: 'received',
+    statusMessage: 'Sarah is reviewing',
+    isRecurring: true,
+    previousFixInfo: 'Fixed 3 months ago by handyman',
     createdAt: '2024-12-19T08:00:00Z',
     updatedAt: '2024-12-19T08:00:00Z',
-    mediaUrls: [],
-    allowEntry: true,
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-19T08:00:00Z', actor: 'Bob Chen' },
-    ],
-    messages: [],
-  },
-  {
-    id: '4',
-    ticketNumber: 'REQ-004',
-    title: 'Pick up dry cleaning',
-    description: 'Need someone to pick up dry cleaning from Beverly Cleaners on Wilshire',
-    category: 'concierge',
-    subcategory: 'Package Pickup',
-    priority: 'low',
-    status: 'reviewing',
-    createdAt: '2024-12-18T16:00:00Z',
-    updatedAt: '2024-12-18T16:30:00Z',
-    mediaUrls: [],
-    allowEntry: false,
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-18T16:00:00Z', actor: 'Alice Chen' },
-      { id: 't2', type: 'updated', description: 'Under review by Steve', timestamp: '2024-12-18T16:30:00Z', actor: 'Steve Manager' },
-    ],
-    messages: [
-      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: 'I can have someone pick this up tomorrow morning. Is there a ticket number?', timestamp: '2024-12-18T16:35:00Z' },
-    ],
-  },
-  {
-    id: '5',
-    ticketNumber: 'REQ-005',
-    title: 'HVAC filter replacement',
-    description: 'Replaced all HVAC filters throughout the house',
-    category: 'repair',
-    subcategory: 'HVAC',
-    priority: 'low',
-    status: 'resolved',
-    createdAt: '2024-12-10T09:00:00Z',
-    updatedAt: '2024-12-12T15:00:00Z',
-    resolvedAt: '2024-12-12T15:00:00Z',
-    resolutionTime: '2 days',
-    vendor: {
-      id: 'v3',
-      name: 'Cool Air HVAC',
-      avatar: getDemoImage('vendor-portrait', 100, 100, 'hvac-tech'),
-      phone: '+1 (310) 555-0333',
-    },
-    mediaUrls: [],
-    allowEntry: true,
-    rating: 5,
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-10T09:00:00Z', actor: 'Bob Chen' },
-      { id: 't2', type: 'assigned', description: 'Assigned to Cool Air HVAC', timestamp: '2024-12-10T10:00:00Z', actor: 'Steve Manager' },
-      { id: 't3', type: 'scheduled', description: 'Scheduled for Dec 12', timestamp: '2024-12-10T11:00:00Z', actor: 'Cool Air HVAC' },
-      { id: 't4', type: 'completed', description: 'Work completed successfully', timestamp: '2024-12-12T15:00:00Z', actor: 'Cool Air HVAC' },
-    ],
-    messages: [],
-  },
-  {
-    id: '6',
-    ticketNumber: 'REQ-006',
-    title: 'Question about utility bill',
-    description: 'The electricity bill seems unusually high this month. Can someone look into it?',
-    category: 'admin',
-    subcategory: 'Bill Question',
-    priority: 'low',
-    status: 'resolved',
-    createdAt: '2024-12-05T14:00:00Z',
-    updatedAt: '2024-12-06T10:00:00Z',
-    resolvedAt: '2024-12-06T10:00:00Z',
-    resolutionTime: '20 hours',
-    mediaUrls: [],
-    allowEntry: false,
-    rating: 4,
-    timeline: [
-      { id: 't1', type: 'created', description: 'Request submitted', timestamp: '2024-12-05T14:00:00Z', actor: 'Bob Chen' },
-      { id: 't2', type: 'completed', description: 'Issue resolved', timestamp: '2024-12-06T10:00:00Z', actor: 'Steve Manager' },
-    ],
-    messages: [
-      { id: 'm1', senderId: 's1', senderName: 'Steve Manager', senderRole: 'manager', content: "I checked with the utility company - the spike was due to an estimated reading. They'll adjust next month. I've also requested actual meter reads going forward.", timestamp: '2024-12-06T10:00:00Z' },
-      { id: 'm2', senderId: 'u1', senderName: 'Bob Chen', senderRole: 'user', content: 'Great, thanks for looking into this!', timestamp: '2024-12-06T10:15:00Z' },
-    ],
   },
 ];
 
-const subcategoryIcons: Record<string, typeof Wrench> = {
-  'Plumbing': Wrench,
-  'Electrical': Zap,
-  'HVAC': Home,
-  'Appliances': Home,
-  'Housekeeping': Sparkles,
-  'Landscaping': Leaf,
-  'Pool Service': Home,
-  'Pest Control': Shield,
-  'Package Pickup': Package,
-  'Grocery Run': Utensils,
-  'Pet Care': PawPrint,
-  'Travel Arrangements': Car,
-  'Bill Question': Receipt,
-  'Insurance Claim': Shield,
-  'Document Request': FileText,
-};
-
-// ============================================================================
-// SMART STATUS HELPER
-// ============================================================================
-
-function deriveRequestState(ticket: RequestTicket): SmartStatusState {
-  const hasVendor = !!ticket.vendor;
-
-  // Step indices: 0=Received, 1=Triage, 2=Vendor Search, 3=Scheduled, 4=Done
-  switch (ticket.status) {
-    case 'received':
-      return {
-        headline: 'Request Received',
-        description: "Your request is in our queue. We'll review it shortly.",
-        stepIndex: 0,
-        icon: AlertCircle,
-        color: 'text-blue-700',
-        bgColor: 'bg-blue-50 border-blue-200',
-      };
-
-    case 'reviewing':
-      if (!hasVendor) {
-        return {
-          headline: 'Finding Your Pro',
-          description: 'We are reaching out to our trusted network of professionals.',
-          stepIndex: 2,
-          icon: Search,
-          color: 'text-purple-700',
-          bgColor: 'bg-purple-50 border-purple-200',
-        };
-      }
-      return {
-        headline: 'Under Review',
-        description: "Your manager is reviewing this request and will update you soon.",
-        stepIndex: 1,
-        icon: Headphones,
-        color: 'text-purple-700',
-        bgColor: 'bg-purple-50 border-purple-200',
-      };
-
-    case 'scheduled':
-      return {
-        headline: 'Pro Matched & Scheduled',
-        description: hasVendor
-          ? `${ticket.vendor!.name} is confirmed and ready to help.`
-          : 'Your service has been scheduled.',
-        stepIndex: 3,
-        icon: CalendarCheck,
-        color: 'text-amber-700',
-        bgColor: 'bg-amber-50 border-amber-200',
-      };
-
-    case 'in_progress':
-      return {
-        headline: 'Service in Progress',
-        description: hasVendor
-          ? `${ticket.vendor!.name} is currently working on your request.`
-          : 'Work is underway on your request.',
-        stepIndex: 3,
-        icon: Wrench,
-        color: 'text-orange-700',
-        bgColor: 'bg-orange-50 border-orange-200',
-      };
-
-    case 'resolved':
-      return {
-        headline: 'Completed',
-        description: ticket.resolutionTime
-          ? `Resolved in ${ticket.resolutionTime}. Thank you for using Haven!`
-          : 'This request has been successfully completed.',
-        stepIndex: 4,
-        icon: CheckCircle2,
-        color: 'text-emerald-700',
-        bgColor: 'bg-emerald-50 border-emerald-200',
-      };
-
-    default:
-      return {
-        headline: 'Processing',
-        description: 'Your request is being processed.',
-        stepIndex: 1,
-        icon: Clock,
-        color: 'text-slate-700',
-        bgColor: 'bg-slate-50 border-slate-200',
-      };
-  }
-}
-
-// ============================================================================
-// DATA MAPPING FUNCTIONS
-// ============================================================================
-
-function mapApiStatusToUI(apiStatus: ServiceRequestStatus): RequestStatus {
-  switch (apiStatus) {
-    case 'DRAFT':
-    case 'SUBMITTED':
-      return 'received';
-    case 'ASSIGNED':
-      return 'scheduled';
-    case 'IN_PROGRESS':
-      return 'in_progress';
-    case 'COMPLETED':
-    case 'CANCELLED':
-      return 'resolved';
-    default:
-      return 'received';
-  }
-}
-
-function mapUIPriorityToApi(uiPriority: RequestPriority): ServiceRequestPriority {
-  switch (uiPriority) {
-    case 'low':
-      return 'LOW';
-    case 'medium':
-      return 'MEDIUM';
-    case 'high':
-      return 'HIGH';
-    case 'emergency':
-      return 'URGENT';
-    default:
-      return 'MEDIUM';
-  }
-}
-
-function mapApiPriorityToUI(apiPriority: ServiceRequestPriority): RequestPriority {
-  switch (apiPriority) {
-    case 'LOW':
-      return 'low';
-    case 'MEDIUM':
-      return 'medium';
-    case 'HIGH':
-      return 'high';
-    case 'URGENT':
-      return 'emergency';
-    default:
-      return 'medium';
-  }
-}
-
-function mapCategoryNameToUI(categoryName?: string): RequestCategory {
-  if (!categoryName) return 'repair';
-  const lower = categoryName.toLowerCase();
-  if (lower.includes('repair') || lower.includes('maintenance') || lower.includes('plumbing') || lower.includes('electrical') || lower.includes('hvac')) {
-    return 'repair';
-  }
-  if (lower.includes('service') || lower.includes('cleaning') || lower.includes('landscape')) {
-    return 'service';
-  }
-  if (lower.includes('concierge') || lower.includes('errand') || lower.includes('booking')) {
-    return 'concierge';
-  }
-  if (lower.includes('admin') || lower.includes('bill') || lower.includes('document') || lower.includes('insurance')) {
-    return 'admin';
-  }
-  return 'repair';
-}
-
-function mapApiRequestToTicket(apiReq: ServiceRequestDetail | ServiceRequest): RequestTicket {
-  const detail = apiReq as ServiceRequestDetail;
-  const createdAtStr = typeof apiReq.createdAt === 'string' ? apiReq.createdAt : new Date(apiReq.createdAt).toISOString();
-  const updatedAtStr = typeof apiReq.updatedAt === 'string' ? apiReq.updatedAt : new Date(apiReq.updatedAt).toISOString();
-
-  const ticketNumber = `REQ-${apiReq.id.substring(0, 6).toUpperCase()}`;
-  const categoryName = detail.serviceCategory?.name || '';
-  const category = mapCategoryNameToUI(categoryName);
-  const subcategory = categoryName || 'Other';
-
-  let resolutionTime: string | undefined;
-  let resolvedAt: string | undefined;
-  if (apiReq.completedDate) {
-    resolvedAt = typeof apiReq.completedDate === 'string' ? apiReq.completedDate : new Date(apiReq.completedDate).toISOString();
-    const created = new Date(apiReq.createdAt);
-    const completed = new Date(apiReq.completedDate);
-    const diffMs = completed.getTime() - created.getTime();
-    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays > 0) {
-      resolutionTime = `${diffDays} day${diffDays > 1 ? 's' : ''}`;
-    } else {
-      resolutionTime = `${diffHours} hour${diffHours !== 1 ? 's' : ''}`;
-    }
-  }
-
-  const timeline: TimelineEvent[] = [
-    {
-      id: 't-created',
-      type: 'created',
-      description: 'Request submitted',
-      timestamp: createdAtStr,
-      actor: detail.createdBy ? `${detail.createdBy.firstName} ${detail.createdBy.lastName}` : undefined,
-    },
-  ];
-
-  if (detail.vendor) {
-    timeline.push({
-      id: 't-assigned',
-      type: 'assigned',
-      description: `Assigned to ${detail.vendor.companyName}`,
-      timestamp: updatedAtStr,
-    });
-  }
-
-  if (resolvedAt) {
-    timeline.push({
-      id: 't-completed',
-      type: 'completed',
-      description: 'Work completed',
-      timestamp: resolvedAt,
-    });
-  }
-
-  return {
-    id: apiReq.id,
-    ticketNumber,
-    title: apiReq.title,
-    description: apiReq.description,
-    category,
-    subcategory,
-    priority: mapApiPriorityToUI(apiReq.priority),
-    status: mapApiStatusToUI(apiReq.status),
-    createdAt: createdAtStr,
-    updatedAt: updatedAtStr,
-    resolvedAt,
-    resolutionTime,
-    vendor: detail.vendor ? {
-      id: detail.vendor.id,
-      name: detail.vendor.companyName,
-      avatar: getDemoImage('vendor-portrait', 100, 100, detail.vendor.id),
-      phone: '',
-    } : undefined,
-    mediaUrls: [],
-    allowEntry: true,
-    quote: apiReq.estimatedCost ? {
-      amount: apiReq.estimatedCost,
-      approved: apiReq.status === 'IN_PROGRESS' || apiReq.status === 'COMPLETED',
-    } : undefined,
-    timeline,
-    messages: [],
-  };
-}
+const MOCK_COMPLETED: CompletedRequest[] = [
+  {
+    id: 'comp-1',
+    title: 'HVAC filter replacement',
+    completedAt: '2024-12-12T15:00:00Z',
+    vendor: 'Cool Air HVAC',
+    cost: 89,
+    rating: 5,
+    addedToMaintenance: true,
+  },
+  {
+    id: 'comp-2',
+    title: 'Utility bill inquiry',
+    completedAt: '2024-12-06T10:00:00Z',
+    rating: 4,
+  },
+  {
+    id: 'comp-3',
+    title: 'Tree branch removal',
+    completedAt: '2024-12-01T16:00:00Z',
+    vendor: 'Green Thumb Landscaping',
+    cost: 175,
+    rating: 5,
+    addedToMaintenance: true,
+  },
+];
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -638,1080 +250,596 @@ function getTimeAgo(dateStr: string): string {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
-function formatTime(dateStr: string): string {
-  const date = new Date(dateStr);
-  return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-}
-
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-function formatScheduledDate(dateStr: string): string {
-  const date = new Date(dateStr);
-  const today = new Date();
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-
-  if (date.toDateString() === today.toDateString()) {
-    return `Today at ${formatTime(dateStr)}`;
-  }
-  if (date.toDateString() === tomorrow.toDateString()) {
-    return `Tomorrow at ${formatTime(dateStr)}`;
-  }
-  return `${date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} at ${formatTime(dateStr)}`;
 }
 
 // ============================================================================
 // COMPONENTS
 // ============================================================================
 
-// Progress Stepper Component
-function ProgressStepper({ currentStep }: { currentStep: number }) {
-  const steps = [
-    { label: 'Received', icon: AlertCircle },
-    { label: 'Triage', icon: Headphones },
-    { label: 'Pro Found', icon: UserCheck },
-    { label: 'Scheduled', icon: CalendarCheck },
-    { label: 'Done', icon: CheckCircle2 },
-  ];
-
-  return (
-    <div className="flex items-center justify-between w-full">
-      {steps.map((step, index) => {
-        const isCompleted = index < currentStep;
-        const isCurrent = index === currentStep;
-        const StepIcon = step.icon;
-
-        return (
-          <div key={step.label} className="flex items-center flex-1 last:flex-none">
-            <div className="flex flex-col items-center">
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                  isCompleted
-                    ? 'bg-emerald-500 text-white'
-                    : isCurrent
-                      ? 'bg-emerald-100 text-emerald-600 ring-2 ring-emerald-500'
-                      : 'bg-slate-100 text-slate-400'
-                }`}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 className="w-4 h-4" />
-                ) : (
-                  <StepIcon className="w-4 h-4" />
-                )}
-              </div>
-              <span className={`text-xs mt-1 ${isCurrent ? 'text-emerald-600 font-medium' : 'text-slate-500'}`}>
-                {step.label}
-              </span>
-            </div>
-            {index < steps.length - 1 && (
-              <div
-                className={`flex-1 h-0.5 mx-2 ${
-                  index < currentStep ? 'bg-emerald-500' : 'bg-slate-200'
-                }`}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// Latest Update Box
-function LatestUpdateBox({ timeline }: { timeline: TimelineEvent[] }) {
-  const latestEvent = timeline[timeline.length - 1];
-  if (!latestEvent) return null;
-
-  return (
-    <div className="flex items-center gap-3 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-      <div className="p-2 bg-blue-100 rounded-lg">
-        <Clock className="w-5 h-5 text-blue-600" />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-blue-900">Latest Update</p>
-        <p className="text-sm text-blue-700 truncate">
-          {latestEvent.actor && <span className="font-medium">{latestEvent.actor}</span>}
-          {latestEvent.actor && ' • '}
-          {latestEvent.description}
-        </p>
-      </div>
-      <span className="text-xs text-blue-600 whitespace-nowrap">
-        {getTimeAgo(latestEvent.timestamp)}
-      </span>
-    </div>
-  );
-}
-
-// Service Team Card
-function ServiceTeamCard({
-  vendor,
-  onCallManager,
-  onMessageManager,
-  onCallVendor,
-  onMessageVendor,
+// Manager Summary Card - The main view homeowners see
+function ManagerSummaryCard({
+  activeCount,
+  needsInputCount,
+  onExpand,
+  isExpanded,
 }: {
-  vendor?: RequestTicket['vendor'];
-  onCallManager: () => void;
-  onMessageManager: () => void;
-  onCallVendor?: () => void;
-  onMessageVendor?: () => void;
+  activeCount: number;
+  needsInputCount: number;
+  onExpand: () => void;
+  isExpanded: boolean;
 }) {
   return (
-    <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-      <div className="p-4 bg-slate-50 border-b border-slate-200">
-        <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-          <UserCheck className="w-5 h-5 text-emerald-600" />
-          Your Service Team
-        </h3>
-      </div>
-
-      <div className="divide-y divide-slate-100">
-        {/* Housing Manager */}
-        <div className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="relative w-12 h-12 rounded-full overflow-hidden bg-emerald-100 flex items-center justify-center">
-              <Headphones className="w-6 h-6 text-emerald-600" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium text-slate-900">{HOUSING_MANAGER.name}</p>
-              <p className="text-sm text-slate-500">{HOUSING_MANAGER.title}</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onCallManager}
-                className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-              >
-                <Phone className="w-5 h-5" />
-              </button>
-              <button
-                onClick={onMessageManager}
-                className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-              >
-                <MessageSquare className="w-5 h-5" />
-              </button>
-            </div>
+    <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-2xl p-6 text-white shadow-lg">
+      <div className="flex items-start gap-4">
+        <div className="relative">
+          <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+            <Headphones className="w-7 h-7" />
+          </div>
+          <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-400 rounded-full flex items-center justify-center">
+            <Check className="w-3 h-3 text-white" />
           </div>
         </div>
-
-        {/* Assigned Vendor */}
-        {vendor && (
-          <div className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="relative w-12 h-12 rounded-full overflow-hidden">
-                <Image src={vendor.avatar} alt="" fill className="object-cover" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-medium text-slate-900">{vendor.name}</p>
-                <p className="text-sm text-slate-500">Assigned Vendor</p>
-              </div>
-              <div className="flex items-center gap-2">
-                {vendor.phone && onCallVendor && (
-                  <button
-                    onClick={onCallVendor}
-                    className="p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200 transition-colors"
-                  >
-                    <Phone className="w-5 h-5" />
-                  </button>
-                )}
-                {onMessageVendor && (
-                  <button
-                    onClick={onMessageVendor}
-                    className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors"
-                  >
-                    <MessageSquare className="w-5 h-5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* No vendor yet */}
-        {!vendor && (
-          <div className="p-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center">
-                <Search className="w-6 h-6 text-slate-400" />
-              </div>
-              <div className="flex-1">
-                <p className="text-slate-500">Vendor not yet assigned</p>
-                <p className="text-xs text-slate-400">We&apos;re finding the right pro for you</p>
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="flex-1">
+          <h2 className="text-lg font-semibold">{HOUSING_MANAGER.name} is on it</h2>
+          <p className="text-emerald-100 text-sm mt-1">
+            Managing {activeCount} {activeCount === 1 ? 'item' : 'items'} for you
+          </p>
+        </div>
+        <a
+          href={`tel:${HOUSING_MANAGER.phone}`}
+          className="p-3 bg-white/20 rounded-xl hover:bg-white/30 transition-colors"
+        >
+          <Phone className="w-5 h-5" />
+        </a>
       </div>
+
+      {needsInputCount > 0 && (
+        <div className="mt-4 p-3 bg-amber-500/90 rounded-xl flex items-center gap-3">
+          <Bell className="w-5 h-5" />
+          <span className="font-medium">{needsInputCount} {needsInputCount === 1 ? 'item needs' : 'items need'} your input</span>
+          <ChevronDown className="w-5 h-5 ml-auto" />
+        </div>
+      )}
+
+      <button
+        onClick={onExpand}
+        className="mt-4 w-full flex items-center justify-center gap-2 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors text-sm"
+      >
+        {isExpanded ? (
+          <>
+            <ChevronUp className="w-4 h-4" />
+            Hide details
+          </>
+        ) : (
+          <>
+            <ChevronDown className="w-4 h-4" />
+            See what's happening
+          </>
+        )}
+      </button>
     </div>
   );
 }
 
-// Category Selection Step
-function CategoryStep({
-  onSelect,
+// Needs Your Input Card - For homeowner decisions
+function NeedsInputCard({
+  input,
+  onRespond,
 }: {
-  onSelect: (category: RequestCategory) => void;
+  input: HomeownerInput;
+  onRespond: (inputId: string, response: string) => void;
 }) {
-  return (
-    <div className="space-y-4">
-      <div className="text-center mb-6">
-        <h3 className="text-lg font-semibold text-slate-900">What do you need?</h3>
-        <p className="text-sm text-slate-500 mt-1">Select the type of help you need</p>
-      </div>
+  const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {categoryOptions.map((option) => (
-          <button
-            key={option.id}
-            onClick={() => onSelect(option.id)}
-            className="flex items-start gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 transition-all text-left group"
-          >
-            <div className={`p-3 rounded-xl ${option.color}`}>
-              <option.icon className="w-6 h-6" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-slate-900 group-hover:text-emerald-700">{option.label}</p>
-              <p className="text-sm text-slate-500">{option.description}</p>
-            </div>
-            <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-emerald-500 mt-1" />
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
+  const handleSubmit = async () => {
+    if (!selectedOption) return;
+    setIsSubmitting(true);
+    await new Promise((r) => setTimeout(r, 500)); // Simulate API call
+    onRespond(input.id, selectedOption);
+    setIsSubmitting(false);
+  };
 
-// Request Form
-function RequestForm({
-  category,
-  onBack,
-  onSubmit,
-  isSubmitting,
-}: {
-  category: RequestCategory;
-  onBack: () => void;
-  onSubmit: (data: FormData) => void;
-  isSubmitting: boolean;
-}) {
-  const categoryInfo = categoryOptions.find((c) => c.id === category)!;
-  const [subcategory, setSubcategory] = useState('');
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<RequestPriority>('medium');
-  const [allowEntry, setAllowEntry] = useState(true);
-  const [showEmergencyWarning, setShowEmergencyWarning] = useState(false);
-
-  const handlePriorityChange = (p: RequestPriority) => {
-    if (p === 'emergency') {
-      setShowEmergencyWarning(true);
-    } else {
-      setPriority(p);
+  const getIcon = () => {
+    switch (input.type) {
+      case 'choice':
+        return <HelpCircle className="w-5 h-5 text-purple-600" />;
+      case 'schedule':
+        return <Calendar className="w-5 h-5 text-blue-600" />;
+      case 'approval':
+        return <DollarSign className="w-5 h-5 text-emerald-600" />;
+      default:
+        return <MessageSquare className="w-5 h-5 text-slate-600" />;
     }
   };
 
-  const confirmEmergency = () => {
-    setPriority('emergency');
-    setShowEmergencyWarning(false);
-  };
-
-  const handleSubmit = () => {
-    if (!title.trim()) return;
-    onSubmit({
-      category,
-      subcategory: subcategory || 'Other',
-      title,
-      description,
-      priority,
-      allowEntry,
-    });
-  };
-
-  const suggestedTitles: Record<string, string[]> = {
-    'Plumbing': ['Leaking faucet', 'Clogged drain', 'Running toilet', 'Water heater issue'],
-    'Electrical': ['Light not working', 'Outlet not working', 'Circuit breaker tripping', 'Smoke detector beeping'],
-    'HVAC': ['AC not cooling', 'Heater not working', 'Thermostat issue', 'Air filter replacement'],
-    'Housekeeping': ['Deep cleaning', 'Regular cleaning', 'Move-in/out cleaning', 'Post-party cleanup'],
-    'Package Pickup': ['Pick up dry cleaning', 'Receive delivery', 'Return package', 'Pick up prescription'],
-  };
-
   return (
-    <div className="space-y-5">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={onBack}
-          className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-          disabled={isSubmitting}
-        >
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
-        </button>
-        <div className={`p-2 rounded-lg ${categoryInfo.color}`}>
-          <categoryInfo.icon className="w-5 h-5" />
+    <div className={`bg-white rounded-xl border-2 shadow-sm overflow-hidden ${input.urgent ? 'border-amber-400' : 'border-slate-200'}`}>
+      {input.urgent && (
+        <div className="bg-amber-50 px-4 py-2 flex items-center gap-2 border-b border-amber-200">
+          <AlertCircle className="w-4 h-4 text-amber-600" />
+          <span className="text-sm font-medium text-amber-700">Time-sensitive</span>
         </div>
-        <div>
-          <h3 className="font-semibold text-slate-900">{categoryInfo.label}</h3>
-          <p className="text-sm text-slate-500">{categoryInfo.description}</p>
-        </div>
-      </div>
+      )}
 
-      {/* Subcategory */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Type</label>
-        <div className="flex flex-wrap gap-2">
-          {categoryInfo.subcategories.map((sub) => (
-            <button
-              key={sub}
-              onClick={() => setSubcategory(sub)}
-              disabled={isSubmitting}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                subcategory === sub
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
-            >
-              {sub}
-            </button>
-          ))}
+      <div className="p-4">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="p-2 bg-slate-100 rounded-lg">
+            {getIcon()}
+          </div>
+          <div className="flex-1">
+            <p className="text-sm text-slate-500">{input.requestTitle}</p>
+            <h3 className="font-semibold text-slate-900">{input.question}</h3>
+          </div>
         </div>
-      </div>
 
-      {/* Title with suggestions */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Title</label>
-        <input
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          placeholder="Brief description of your request"
-          disabled={isSubmitting}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-slate-50 disabled:text-slate-500"
-        />
-        {subcategory && suggestedTitles[subcategory] && (
-          <div className="flex flex-wrap gap-2 mt-2">
-            {suggestedTitles[subcategory].map((suggestion) => (
+        {/* Choice Options */}
+        {input.type === 'choice' && input.options && (
+          <div className="space-y-2 mb-4">
+            {input.options.map((option) => (
               <button
-                key={suggestion}
-                onClick={() => setTitle(suggestion)}
-                disabled={isSubmitting}
-                className="px-2 py-1 text-xs bg-slate-50 text-slate-600 rounded border border-slate-200 hover:bg-slate-100 disabled:opacity-50"
+                key={option}
+                onClick={() => setSelectedOption(option)}
+                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                  selectedOption === option
+                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
               >
-                {suggestion}
+                <span className="text-sm font-medium text-slate-900">{option}</span>
               </button>
             ))}
           </div>
         )}
-      </div>
 
-      {/* Description */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Description</label>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          placeholder="Provide more details about what you need..."
-          rows={3}
-          disabled={isSubmitting}
-          className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none disabled:bg-slate-50 disabled:text-slate-500"
-        />
-      </div>
-
-      {/* Priority */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Priority</label>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-          {priorityOptions.map((option) => (
-            <button
-              key={option.id}
-              onClick={() => handlePriorityChange(option.id)}
-              disabled={isSubmitting}
-              className={`p-3 rounded-lg border text-center transition-all ${
-                priority === option.id
-                  ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
-                  : 'border-slate-200 hover:border-slate-300'
-              } disabled:opacity-50`}
-            >
-              <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mb-1 ${option.color}`}>
-                {option.label}
-              </span>
-              <p className="text-xs text-slate-500">{option.description}</p>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* Media Upload */}
-      <div>
-        <label className="block text-sm font-medium text-slate-700 mb-2">Add Media</label>
-        <div className="flex gap-3">
-          <button
-            disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors disabled:opacity-50"
-          >
-            <Camera className="w-5 h-5 text-slate-400" />
-            <span className="text-sm text-slate-600">Photo</span>
-          </button>
-          <button
-            disabled={isSubmitting}
-            className="flex-1 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-slate-300 rounded-lg hover:border-emerald-400 hover:bg-emerald-50 transition-colors disabled:opacity-50"
-          >
-            <Video className="w-5 h-5 text-slate-400" />
-            <span className="text-sm text-slate-600">Video</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Entry Permission (for repair/service) */}
-      {(category === 'repair' || category === 'service') && (
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-          <div>
-            <p className="font-medium text-slate-900">Permission to enter if I&apos;m not home?</p>
-            <p className="text-sm text-slate-500">Allow service provider access</p>
+        {/* Schedule Options */}
+        {input.type === 'schedule' && input.scheduleTimes && (
+          <div className="space-y-2 mb-4">
+            {input.scheduleTimes.map((time) => (
+              <button
+                key={time.id}
+                onClick={() => setSelectedOption(time.id)}
+                className={`w-full p-3 rounded-lg border text-left transition-all ${
+                  selectedOption === time.id
+                    ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
+                    : 'border-slate-200 hover:border-slate-300'
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Calendar className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-900">{time.label}</span>
+                </div>
+              </button>
+            ))}
           </div>
-          <button
-            onClick={() => setAllowEntry(!allowEntry)}
-            disabled={isSubmitting}
-            className={`relative w-12 h-6 rounded-full transition-colors ${
-              allowEntry ? 'bg-emerald-600' : 'bg-slate-300'
-            } disabled:opacity-50`}
-          >
-            <span
-              className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-                allowEntry ? 'translate-x-6' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-      )}
-
-      {/* Submit */}
-      <button
-        onClick={handleSubmit}
-        disabled={isSubmitting || !title.trim()}
-        className="w-full py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-      >
-        {isSubmitting ? (
-          <>
-            <Loader2 className="w-5 h-5 animate-spin" />
-            Submitting...
-          </>
-        ) : (
-          'Submit Request'
         )}
-      </button>
 
-      {/* Emergency Warning Modal */}
-      {showEmergencyWarning && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowEmergencyWarning(false)} />
-          <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
-              </div>
-              <h4 className="text-lg font-semibold text-slate-900">Emergency Request</h4>
+        {/* Approval */}
+        {input.type === 'approval' && input.amount && (
+          <div className="mb-4">
+            <div className="p-4 bg-slate-50 rounded-lg text-center mb-3">
+              <p className="text-3xl font-bold text-slate-900">${input.amount.toLocaleString()}</p>
+              <p className="text-sm text-slate-500 mt-1">Estimated repair cost</p>
             </div>
-            <p className="text-sm text-slate-600 mb-4">
-              <strong>For fire or life-safety emergencies, please call 911 immediately.</strong>
-              <br /><br />
-              This app is for property emergencies only (e.g., burst pipe, gas smell, security breach).
-            </p>
-            <a
-              href="tel:+13105550911"
-              className="flex items-center justify-center gap-2 w-full py-3 mb-3 bg-red-600 text-white font-medium rounded-lg hover:bg-red-700 transition-colors"
-            >
-              <Phone className="w-5 h-5" />
-              Call 24/7 Emergency Line
-            </a>
-            <div className="flex gap-3">
+            <div className="grid grid-cols-2 gap-3">
               <button
-                onClick={() => setShowEmergencyWarning(false)}
-                className="flex-1 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                onClick={() => setSelectedOption('decline')}
+                className={`p-3 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                  selectedOption === 'decline'
+                    ? 'border-red-500 bg-red-50 text-red-700'
+                    : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                }`}
               >
-                Cancel
+                <ThumbsDown className="w-4 h-4" />
+                Decline
               </button>
               <button
-                onClick={confirmEmergency}
-                className="flex-1 py-2.5 bg-slate-900 text-white font-medium rounded-lg hover:bg-slate-800 transition-colors"
+                onClick={() => setSelectedOption('approve')}
+                className={`p-3 rounded-lg border transition-all flex items-center justify-center gap-2 ${
+                  selectedOption === 'approve'
+                    ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                    : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                }`}
               >
-                Continue as Emergency
+                <ThumbsUp className="w-4 h-4" />
+                Approve
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Submit Button */}
+        {selectedOption && (
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting}
+            className="w-full py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+          >
+            {isSubmitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Sending...
+              </>
+            ) : (
+              <>
+                <Send className="w-4 h-4" />
+                Send to {HOUSING_MANAGER.name}
+              </>
+            )}
+          </button>
+        )}
+      </div>
     </div>
   );
 }
 
-// New Request Modal
-function NewRequestModal({
-  onClose,
-  onSuccess,
-  householdId,
-}: {
-  onClose: () => void;
-  onSuccess: (ticket: RequestTicket) => void;
-  householdId: string;
-}) {
-  const [step, setStep] = useState<'category' | 'form'>('category');
-  const [selectedCategory, setSelectedCategory] = useState<RequestCategory | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const handleCategorySelect = (category: RequestCategory) => {
-    setSelectedCategory(category);
-    setStep('form');
+// Active Request Mini Card
+function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
+  const getStatusColor = () => {
+    switch (request.status) {
+      case 'in_progress':
+        return 'bg-orange-100 text-orange-700';
+      case 'scheduled':
+        return 'bg-blue-100 text-blue-700';
+      case 'reviewing':
+        return 'bg-purple-100 text-purple-700';
+      default:
+        return 'bg-slate-100 text-slate-700';
+    }
   };
 
-  const handleSubmit = async (formData: FormData) => {
-    setIsSubmitting(true);
-    setError(null);
-
-    try {
-      const api = getApiClient();
-      const payload: CreateServiceRequestRequest = {
-        householdId,
-        title: formData.title,
-        description: formData.description || formData.title,
-        priority: mapUIPriorityToApi(formData.priority),
-      };
-
-      const result = await api.createServiceRequest(payload);
-      const newTicket = mapApiRequestToTicket(result);
-
-      newTicket.category = formData.category;
-      newTicket.subcategory = formData.subcategory;
-      newTicket.allowEntry = formData.allowEntry;
-
-      onSuccess(newTicket);
-    } catch (err) {
-      console.error('Failed to create request:', err);
-      setError('Failed to submit request. Please try again.');
-      setIsSubmitting(false);
+  const getStatusIcon = () => {
+    switch (request.status) {
+      case 'in_progress':
+        return <Wrench className="w-4 h-4" />;
+      case 'scheduled':
+        return <CalendarCheck className="w-4 h-4" />;
+      case 'reviewing':
+        return <Search className="w-4 h-4" />;
+      default:
+        return <Clock className="w-4 h-4" />;
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-8">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full max-w-lg max-h-[90vh] bg-white rounded-xl shadow-xl overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">New Request</h2>
-          <button
-            onClick={onClose}
-            disabled={isSubmitting}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors disabled:opacity-50"
-          >
-            <X className="w-5 h-5 text-slate-500" />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-700">{error}</p>
-          </div>
-        )}
-
-        <div className="flex-1 overflow-y-auto p-6">
-          {step === 'category' && (
-            <CategoryStep onSelect={handleCategorySelect} />
-          )}
-          {step === 'form' && selectedCategory && (
-            <RequestForm
-              category={selectedCategory}
-              onBack={() => setStep('category')}
-              onSubmit={handleSubmit}
-              isSubmitting={isSubmitting}
-            />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Priority Badge
-function PriorityBadge({ priority }: { priority: RequestPriority }) {
-  const config: Record<RequestPriority, { label: string; color: string }> = {
-    low: { label: 'Low', color: 'bg-slate-100 text-slate-600' },
-    medium: { label: 'Medium', color: 'bg-blue-100 text-blue-600' },
-    high: { label: 'Urgent', color: 'bg-amber-100 text-amber-700' },
-    emergency: { label: 'Emergency', color: 'bg-red-100 text-red-700' },
-  };
-
-  const { label, color } = config[priority];
-
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${color}`}>
-      {label}
-    </span>
-  );
-}
-
-// Enhanced Ticket Card with Smart Headlines
-function TicketCard({
-  ticket,
-  isSelected,
-  onClick,
-}: {
-  ticket: RequestTicket;
-  isSelected: boolean;
-  onClick: () => void;
-}) {
-  const categoryInfo = categoryOptions.find((c) => c.id === ticket.category)!;
-  const CategoryIcon = categoryInfo.icon;
-  const smartState = deriveRequestState(ticket);
-  const StatusIcon = smartState.icon;
-  const latestEvent = ticket.timeline[ticket.timeline.length - 1];
-
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left p-4 rounded-xl border transition-all ${
-        isSelected
-          ? 'bg-emerald-50 border-emerald-300 shadow-sm'
-          : 'bg-white border-slate-200 hover:border-slate-300 hover:shadow-sm'
-      }`}
-    >
+    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
-        <div className={`p-2 rounded-lg ${categoryInfo.color}`}>
-          <CategoryIcon className="w-4 h-4" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-slate-500">{ticket.ticketNumber}</span>
-            <PriorityBadge priority={ticket.priority} />
-          </div>
-          <h3 className="font-medium text-slate-900 truncate">{ticket.title}</h3>
-
-          {/* Smart Status Headline */}
-          <div className={`flex items-center gap-1.5 mt-2 ${smartState.color}`}>
-            <StatusIcon className="w-4 h-4" />
-            <span className="text-sm font-medium">{smartState.headline}</span>
+        <div className="flex-1">
+          <h3 className="font-medium text-slate-900">{request.title}</h3>
+          <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium mt-2 ${getStatusColor()}`}>
+            {getStatusIcon()}
+            {request.statusMessage}
           </div>
 
-          {/* Vendor if assigned */}
-          {ticket.vendor && (
-            <div className="flex items-center gap-1.5 mt-1 text-slate-500">
-              <UserCheck className="w-3.5 h-3.5" />
-              <span className="text-xs">{ticket.vendor.name}</span>
-            </div>
-          )}
-
-          {/* Last Activity Footer */}
-          {latestEvent && (
-            <div className="flex items-center gap-1 mt-2 pt-2 border-t border-slate-100">
-              <Clock className="w-3 h-3 text-slate-400" />
-              <span className="text-xs text-slate-400">
-                Last activity: {getTimeAgo(latestEvent.timestamp)}
-              </span>
+          {request.isRecurring && (
+            <div className="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-center gap-2 text-amber-700">
+                <RefreshCw className="w-4 h-4" />
+                <span className="text-xs font-medium">Recurring Issue</span>
+              </div>
+              {request.previousFixInfo && (
+                <p className="text-xs text-amber-600 mt-1">{request.previousFixInfo}</p>
+              )}
             </div>
           )}
         </div>
 
-        <ChevronRight className="w-5 h-5 text-slate-300 flex-shrink-0" />
+        {request.vendor && (
+          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-slate-100">
+            <Image src={request.vendor.avatar} alt={request.vendor.name} fill className="object-cover" />
+          </div>
+        )}
       </div>
-    </button>
+
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+        <span className="text-xs text-slate-500">Updated {getTimeAgo(request.updatedAt)}</span>
+        <button className="text-xs text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1">
+          Details <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
   );
 }
 
-// Enhanced Ticket Detail View - Command Center Style
-function TicketDetail({
-  ticket,
-  onClose,
+// Completed Request Card
+function CompletedRequestCard({
+  request,
   onRate,
-  onMessageSent,
 }: {
-  ticket: RequestTicket;
-  onClose: () => void;
-  onRate: (rating: number) => void;
-  onMessageSent?: (message: ChatMessage) => void;
+  request: CompletedRequest;
+  onRate?: (id: string, rating: number) => void;
 }) {
-  const [message, setMessage] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [showRating, setShowRating] = useState(ticket.status === 'resolved' && !ticket.rating);
+  const [showRating, setShowRating] = useState(!request.rating);
   const [selectedRating, setSelectedRating] = useState(0);
-  const [localMessages, setLocalMessages] = useState<ChatMessage[]>(ticket.messages);
-  const categoryInfo = categoryOptions.find((c) => c.id === ticket.category)!;
-  const SubIcon = subcategoryIcons[ticket.subcategory] ?? HelpCircle;
-  const smartState = deriveRequestState(ticket);
-  const StatusIcon = smartState.icon;
 
-  const isRealTicket = ticket.id.length > 6;
-
-  useEffect(() => {
-    if (!isRealTicket) return;
-
-    const loadMessages = async () => {
-      try {
-        // TODO: Implement message fetching when API is available
-      } catch (err) {
-        console.error('Failed to load messages:', err);
-      }
-    };
-
-    loadMessages();
-  }, [ticket.id, isRealTicket]);
-
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
-
-    const optimisticMessage: ChatMessage = {
-      id: `temp-${Date.now()}`,
-      senderId: 'current-user',
-      senderName: 'You',
-      senderRole: 'user',
-      content: message.trim(),
-      timestamp: new Date().toISOString(),
-    };
-
-    setLocalMessages(prev => [...prev, optimisticMessage]);
-    setMessage('');
-    setIsSending(true);
-
-    if (isRealTicket) {
-      try {
-        // TODO: Implement message sending when API is available
-        onMessageSent?.(optimisticMessage);
-      } catch (err) {
-        console.error('Failed to send message:', err);
-        setLocalMessages(prev => prev.filter(m => m.id !== optimisticMessage.id));
-      }
-    }
-
-    setIsSending(false);
-  };
-
-  const handleSubmitRating = () => {
-    if (selectedRating > 0) {
-      onRate(selectedRating);
+  const handleRate = () => {
+    if (selectedRating > 0 && onRate) {
+      onRate(request.id, selectedRating);
       setShowRating(false);
     }
   };
 
-  const handleCallManager = () => {
-    window.location.href = `tel:${HOUSING_MANAGER.phone}`;
-  };
-
-  const handleCallVendor = () => {
-    if (ticket.vendor?.phone) {
-      window.location.href = `tel:${ticket.vendor.phone}`;
-    }
-  };
-
   return (
-    <div className="h-full flex flex-col bg-white lg:bg-transparent">
-      {/* Mobile Header */}
-      <div className="lg:hidden flex items-center gap-3 p-4 border-b border-slate-200 bg-white">
-        <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg">
-          <ArrowLeft className="w-5 h-5 text-slate-600" />
-        </button>
+    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+      <div className="flex items-start gap-3">
+        <div className="p-2 bg-emerald-100 rounded-lg">
+          <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+        </div>
         <div className="flex-1">
-          <p className="text-sm text-slate-500">{ticket.ticketNumber}</p>
-          <h2 className="font-semibold text-slate-900">{ticket.title}</h2>
-        </div>
-      </div>
+          <h3 className="font-medium text-slate-900">{request.title}</h3>
+          <p className="text-sm text-slate-500">{formatDate(request.completedAt)}</p>
 
-      <div className="flex-1 overflow-y-auto">
-        {/* === STATUS HERO SECTION === */}
-        <div className={`p-6 ${smartState.bgColor} border-b`}>
-          {/* Desktop Title */}
-          <div className="hidden lg:block mb-4">
-            <p className="text-sm text-slate-500 mb-1">{ticket.ticketNumber}</p>
-            <h2 className="text-xl font-bold text-slate-900">{ticket.title}</h2>
-          </div>
-
-          {/* Status Banner */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className={`p-3 rounded-xl ${smartState.color.replace('text-', 'bg-').replace('-700', '-100')}`}>
-              <StatusIcon className={`w-6 h-6 ${smartState.color}`} />
-            </div>
-            <div>
-              <h3 className={`text-lg font-semibold ${smartState.color}`}>{smartState.headline}</h3>
-              <p className="text-sm text-slate-600">{smartState.description}</p>
-            </div>
-          </div>
-
-          {/* Scheduled Date */}
-          {ticket.scheduledDate && ticket.status !== 'resolved' && (
-            <div className="flex items-center gap-2 mb-4 p-3 bg-white/60 rounded-lg">
-              <CalendarCheck className="w-5 h-5 text-emerald-600" />
-              <span className="text-sm font-medium text-slate-700">
-                {formatScheduledDate(ticket.scheduledDate)}
-              </span>
-            </div>
+          {request.vendor && (
+            <p className="text-sm text-slate-600 mt-1">By {request.vendor}</p>
           )}
 
-          {/* Progress Stepper */}
-          <div className="bg-white/80 rounded-xl p-4">
-            <ProgressStepper currentStep={smartState.stepIndex} />
-          </div>
-        </div>
+          {request.cost && (
+            <p className="text-sm font-medium text-slate-900 mt-1">${request.cost.toLocaleString()}</p>
+          )}
 
-        {/* === LATEST UPDATE BOX === */}
-        <div className="p-4 bg-white border-b border-slate-200">
-          <LatestUpdateBox timeline={ticket.timeline} />
-        </div>
-
-        {/* === SERVICE TEAM CARD === */}
-        <div className="p-4 bg-slate-50">
-          <ServiceTeamCard
-            vendor={ticket.vendor}
-            onCallManager={handleCallManager}
-            onMessageManager={() => {
-              setMessage(`Hi ${HOUSING_MANAGER.name}, `);
-            }}
-            onCallVendor={ticket.vendor?.phone ? handleCallVendor : undefined}
-            onMessageVendor={ticket.vendor ? () => setMessage(`Hi ${ticket.vendor!.name}, `) : undefined}
-          />
-        </div>
-
-        {/* === REQUEST DETAILS === */}
-        <div className="p-6 bg-white border-t border-slate-200">
-          <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-            <FileText className="w-5 h-5 text-slate-500" />
-            Request Details
-          </h3>
-
-          <div className="flex flex-wrap gap-3 mb-4">
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
-              <div className={`p-1 rounded ${categoryInfo.color}`}>
-                <categoryInfo.icon className="w-3 h-3" />
-              </div>
-              <span className="text-sm text-slate-700">{categoryInfo.label}</span>
-            </div>
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50 rounded-lg">
-              <SubIcon className="w-4 h-4 text-slate-500" />
-              <span className="text-sm text-slate-700">{ticket.subcategory}</span>
-            </div>
-            <PriorityBadge priority={ticket.priority} />
-          </div>
-
-          <p className="text-slate-600">{ticket.description}</p>
-
-          {/* Media */}
-          {ticket.mediaUrls.length > 0 && (
-            <div className="flex gap-2 mt-4">
-              {ticket.mediaUrls.map((url, index) => (
-                <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden">
-                  <Image src={url} alt="" fill className="object-cover" />
-                </div>
-              ))}
+          {request.addedToMaintenance && (
+            <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded mt-2">
+              <Shield className="w-3 h-3" />
+              Added to Maintenance
             </div>
           )}
         </div>
 
-        {/* Quote Approval */}
-        {ticket.quote && !ticket.quote.approved && (
-          <div className="p-4 bg-amber-50 border-y border-amber-200">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium text-amber-900">Quote Pending Approval</p>
-                <p className="text-2xl font-bold text-amber-700">${ticket.quote.amount.toLocaleString()}</p>
-              </div>
-              <button className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700">
-                Approve Quote
-              </button>
-            </div>
+        {request.rating ? (
+          <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+              <Star
+                key={star}
+                className={`w-4 h-4 ${star <= request.rating! ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`}
+              />
+            ))}
           </div>
-        )}
-
-        {/* Resolution Summary */}
-        {ticket.status === 'resolved' && ticket.resolutionTime && (
-          <div className="p-4 bg-emerald-50 border-y border-emerald-200">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-emerald-100 rounded-lg">
-                <Zap className="w-5 h-5 text-emerald-600" />
-              </div>
-              <div>
-                <p className="font-medium text-emerald-900">Resolved in {ticket.resolutionTime}!</p>
-                <p className="text-sm text-emerald-700">Thanks for using Haven Concierge</p>
-              </div>
-            </div>
-            {ticket.rating && (
-              <div className="flex items-center gap-1 mt-3">
-                <span className="text-sm text-emerald-700 mr-2">Your rating:</span>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star
-                    key={star}
-                    className={`w-5 h-5 ${star <= ticket.rating! ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Rating Prompt */}
-        {showRating && (
-          <div className="p-4 bg-amber-50 border-b border-amber-200">
-            <p className="font-medium text-amber-900 mb-2">How was the service?</p>
-            <div className="flex items-center gap-2 mb-3">
+        ) : showRating && (
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-0.5">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
                   key={star}
                   onClick={() => setSelectedRating(star)}
-                  className="p-1"
+                  className="p-0.5"
                 >
                   <Star
-                    className={`w-8 h-8 transition-colors ${
-                      star <= selectedRating ? 'text-amber-400 fill-amber-400' : 'text-slate-300 hover:text-amber-300'
+                    className={`w-5 h-5 transition-colors ${
+                      star <= selectedRating ? 'text-amber-400 fill-amber-400' : 'text-slate-200 hover:text-amber-300'
                     }`}
                   />
                 </button>
               ))}
             </div>
-            <button
-              onClick={handleSubmitRating}
-              disabled={selectedRating === 0}
-              className="px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Submit Rating
-            </button>
-          </div>
-        )}
-
-        {/* Timeline */}
-        <div className="p-6 bg-white lg:bg-slate-50">
-          <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-slate-500" />
-            Activity Timeline
-          </h3>
-          <div className="space-y-4">
-            {ticket.timeline.map((event, index) => (
-              <div key={event.id} className="flex gap-3">
-                <div className="flex flex-col items-center">
-                  <div className={`w-3 h-3 rounded-full ${
-                    event.type === 'completed' ? 'bg-emerald-500' : 'bg-slate-300'
-                  }`} />
-                  {index < ticket.timeline.length - 1 && (
-                    <div className="w-0.5 h-full bg-slate-200 my-1" />
-                  )}
-                </div>
-                <div className="flex-1 pb-4">
-                  <p className="text-sm font-medium text-slate-900">{event.description}</p>
-                  <p className="text-xs text-slate-500">
-                    {formatDate(event.timestamp)} at {formatTime(event.timestamp)}
-                    {event.actor && ` • ${event.actor}`}
-                  </p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Messages */}
-        {localMessages.length > 0 && (
-          <div className="p-6 bg-white border-t border-slate-200">
-            <h3 className="font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <MessageSquare className="w-5 h-5 text-slate-500" />
-              Conversation
-            </h3>
-            <div className="space-y-4">
-              {localMessages.map((msg) => {
-                const isUser = msg.senderRole === 'user';
-                return (
-                  <div key={msg.id} className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
-                    <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center overflow-hidden flex-shrink-0">
-                      {msg.senderAvatar ? (
-                        <Image src={msg.senderAvatar} alt="" width={32} height={32} className="object-cover" />
-                      ) : (
-                        <User className="w-4 h-4 text-slate-500" />
-                      )}
-                    </div>
-                    <div className={`max-w-[75%] ${isUser ? 'text-right' : ''}`}>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-sm font-medium text-slate-900">{msg.senderName}</span>
-                        <span className="text-xs text-slate-400">{formatTime(msg.timestamp)}</span>
-                      </div>
-                      <div className={`p-3 rounded-xl ${
-                        isUser ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-800'
-                      }`}>
-                        <p className="text-sm">{msg.content}</p>
-                      </div>
-                      {msg.attachments && msg.attachments.length > 0 && (
-                        <div className="flex gap-2 mt-2">
-                          {msg.attachments.map((url, i) => (
-                            <div key={i} className="relative w-24 h-24 rounded-lg overflow-hidden">
-                              <Image src={url} alt="" fill className="object-cover" />
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Invoice Link */}
-        {ticket.quote?.approved && (
-          <div className="p-6 bg-white border-t border-slate-200">
-            <button className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-emerald-100 rounded-lg">
-                  <DollarSign className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div className="text-left">
-                  <p className="font-medium text-slate-900">View Invoice</p>
-                  <p className="text-sm text-slate-500">${ticket.quote.amount.toLocaleString()}</p>
-                </div>
-              </div>
-              <ExternalLink className="w-5 h-5 text-slate-400" />
-            </button>
+            {selectedRating > 0 && (
+              <button
+                onClick={handleRate}
+                className="text-xs text-emerald-600 font-medium"
+              >
+                Submit
+              </button>
+            )}
           </div>
         )}
       </div>
-
-      {/* Message Input */}
-      {ticket.status !== 'resolved' && (
-        <div className="p-4 border-t border-slate-200 bg-white">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="Type a message..."
-              disabled={isSending}
-              className="flex-1 px-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent disabled:bg-slate-50"
-              onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-            />
-            <button
-              onClick={handleSendMessage}
-              disabled={isSending || !message.trim()}
-              className="p-2.5 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {isSending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
-// Empty State
-function EmptyState({ onNewRequest }: { onNewRequest: () => void }) {
+// Ultra-Simple Request Creation
+function QuickRequestModal({
+  onClose,
+  onSubmit,
+}: {
+  onClose: () => void;
+  onSubmit: (category: QuickCategory, description: string, photoUrl?: string) => void;
+}) {
+  const [step, setStep] = useState<'input' | 'category'>('input');
+  const [description, setDescription] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<QuickCategory | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Focus textarea on mount
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+
+  const handleVoiceInput = () => {
+    // In a real app, this would use Web Speech API
+    setIsListening(!isListening);
+    if (!isListening) {
+      // Simulate voice input
+      setTimeout(() => {
+        setDescription('Kitchen faucet is dripping');
+        setIsListening(false);
+      }, 2000);
+    }
+  };
+
+  const handleCategorySelect = (category: QuickCategory) => {
+    setSelectedCategory(category);
+  };
+
+  const handleSubmit = async () => {
+    if (!description.trim() || !selectedCategory) return;
+    setIsSubmitting(true);
+    await new Promise((r) => setTimeout(r, 800));
+    onSubmit(selectedCategory, description);
+    setIsSubmitting(false);
+  };
+
+  const handleNext = () => {
+    if (description.trim()) {
+      setStep('category');
+    }
+  };
+
   return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="w-24 h-24 bg-emerald-100 rounded-full flex items-center justify-center mb-6">
-        <CheckCircle2 className="w-12 h-12 text-emerald-600" />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center">
+      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
+      <div className="relative w-full sm:max-w-lg bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-900">
+            {step === 'input' ? 'What do you need?' : 'Almost done!'}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-slate-500" />
+          </button>
+        </div>
+
+        <div className="p-6">
+          {step === 'input' ? (
+            <>
+              {/* Text/Voice Input */}
+              <div className="relative">
+                <textarea
+                  ref={textareaRef}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Tell us what you need... (e.g., kitchen faucet dripping, need groceries picked up)"
+                  rows={3}
+                  className="w-full px-4 py-3 pr-24 border border-slate-300 rounded-xl focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none text-lg"
+                />
+                <div className="absolute right-2 bottom-2 flex items-center gap-2">
+                  <button
+                    onClick={handleVoiceInput}
+                    className={`p-2 rounded-lg transition-colors ${
+                      isListening
+                        ? 'bg-red-100 text-red-600 animate-pulse'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
+                  >
+                    {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+                  </button>
+                  <button className="p-2 bg-slate-100 text-slate-600 rounded-lg hover:bg-slate-200 transition-colors">
+                    <Camera className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {isListening && (
+                <div className="mt-3 flex items-center gap-2 text-red-600">
+                  <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                  <span className="text-sm">Listening...</span>
+                </div>
+              )}
+
+              {/* Quick suggestions */}
+              <div className="mt-4">
+                <p className="text-sm text-slate-500 mb-2">Quick suggestions:</p>
+                <div className="flex flex-wrap gap-2">
+                  {['Leaky faucet', 'Schedule cleaning', 'Pick up dry cleaning', 'AC not cooling'].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      onClick={() => setDescription(suggestion)}
+                      className="px-3 py-1.5 bg-slate-100 text-slate-700 rounded-full text-sm hover:bg-slate-200 transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Next Button */}
+              <button
+                onClick={handleNext}
+                disabled={!description.trim()}
+                className="w-full mt-6 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                Next
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
+          ) : (
+            <>
+              {/* Show what they typed */}
+              <div className="p-4 bg-slate-50 rounded-xl mb-6">
+                <p className="text-sm text-slate-500">Your request:</p>
+                <p className="text-slate-900 font-medium mt-1">{description}</p>
+              </div>
+
+              {/* Category Selection */}
+              <p className="text-sm text-slate-700 font-medium mb-3">What type of help is this?</p>
+              <div className="grid grid-cols-5 gap-2">
+                {QUICK_CATEGORIES.map((cat) => (
+                  <button
+                    key={cat.id}
+                    onClick={() => handleCategorySelect(cat.id)}
+                    className={`flex flex-col items-center p-3 rounded-xl border-2 transition-all ${
+                      selectedCategory === cat.id
+                        ? 'border-emerald-500 bg-emerald-50'
+                        : 'border-slate-200 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className={`p-2 rounded-lg ${cat.color}`}>
+                      <cat.icon className="w-5 h-5" />
+                    </div>
+                    <span className="text-xs font-medium text-slate-700 mt-2">{cat.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Submit */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setStep('input')}
+                  className="flex-1 py-3 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  Back
+                </button>
+                <button
+                  onClick={handleSubmit}
+                  disabled={!selectedCategory || isSubmitting}
+                  className="flex-1 py-3 bg-emerald-600 text-white font-medium rounded-xl hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Sending...
+                    </>
+                  ) : (
+                    <>
+                      <Send className="w-5 h-5" />
+                      Send to {HOUSING_MANAGER.name}
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {/* Manager Note */}
+              <p className="text-center text-sm text-slate-500 mt-4">
+                {HOUSING_MANAGER.name} will take it from here. You&apos;ll only hear from us if we need something.
+              </p>
+            </>
+          )}
+        </div>
       </div>
-      <h3 className="text-xl font-semibold text-slate-900 mb-2">Everything is running perfectly</h3>
-      <p className="text-slate-500 mb-6 max-w-sm">
-        No active requests right now. Need anything? Your concierge is just one tap away.
-      </p>
-      <button
-        onClick={onNewRequest}
-        className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-      >
-        <Plus className="w-5 h-5" />
-        New Request
-      </button>
+    </div>
+  );
+}
+
+// Success Toast
+function SuccessToast({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000);
+    return () => clearTimeout(timer);
+  }, [onClose]);
+
+  return (
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-2">
+      <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg">
+        <CheckCircle2 className="w-5 h-5" />
+        <span className="font-medium">Request sent! {HOUSING_MANAGER.name} is on it.</span>
+      </div>
     </div>
   );
 }
@@ -1722,239 +850,163 @@ function EmptyState({ onNewRequest }: { onNewRequest: () => void }) {
 
 export default function RequestsPage() {
   const { currentHousehold } = useAuth();
-  const [tickets, setTickets] = useState<RequestTicket[]>(MOCK_TICKETS);
-  const [showModal, setShowModal] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>('active');
-  const [displayMode, setDisplayMode] = useState<DisplayMode>('list');
-  const [selectedTicket, setSelectedTicket] = useState<RequestTicket | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [showQuickRequest, setShowQuickRequest] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
+  const [needsInput, setNeedsInput] = useState<HomeownerInput[]>(MOCK_NEEDS_INPUT);
+  const [activeRequests, setActiveRequests] = useState<ActiveRequest[]>(MOCK_ACTIVE_REQUESTS);
+  const [completedRequests, setCompletedRequests] = useState<CompletedRequest[]>(MOCK_COMPLETED);
 
-  // Load service requests from API with hybrid fallback
-  const loadRequests = useCallback(async () => {
-    if (!currentHousehold?.id) return;
-
-    setIsLoading(true);
-    try {
-      const api = getApiClient();
-      const requests = await api.getServiceRequests(currentHousehold.id);
-
-      if (requests && requests.length > 0) {
-        const mappedTickets = requests.map(mapApiRequestToTicket);
-        setTickets(mappedTickets);
-      }
-      // If empty or error, keep MOCK_TICKETS
-    } catch (err) {
-      console.error('Failed to load requests:', err);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currentHousehold?.id]);
-
-  useEffect(() => {
-    loadRequests();
-  }, [loadRequests]);
-
-  const activeTickets = useMemo(() => tickets.filter((t) => t.status !== 'resolved'), [tickets]);
-  const historyTickets = useMemo(() => tickets.filter((t) => t.status === 'resolved'), [tickets]);
-  const displayedTickets = viewMode === 'active' ? activeTickets : historyTickets;
-
-  const handleNewRequestSuccess = (newTicket: RequestTicket) => {
-    setTickets(prev => [newTicket, ...prev]);
-    setShowModal(false);
-    setSelectedTicket(newTicket);
+  const handleSubmitRequest = (category: QuickCategory, description: string) => {
+    // In real app, this would call the API
+    const newRequest: ActiveRequest = {
+      id: `req-${Date.now()}`,
+      title: description,
+      status: 'received',
+      statusMessage: `${HOUSING_MANAGER.name} is reviewing`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    setActiveRequests((prev) => [newRequest, ...prev]);
+    setShowQuickRequest(false);
+    setShowSuccess(true);
   };
 
-  const handleRate = (ticketId: string, rating: number) => {
-    setTickets(tickets.map((t) =>
-      t.id === ticketId ? { ...t, rating } : t
-    ));
+  const handleInputRespond = (inputId: string, response: string) => {
+    setNeedsInput((prev) => prev.filter((i) => i.id !== inputId));
+    // In real app, this would call the API
   };
 
-  const stats = useMemo(() => ({
-    active: activeTickets.length,
-    pending: activeTickets.filter((t) => t.status === 'received' || t.status === 'reviewing').length,
-    inProgress: activeTickets.filter((t) => t.status === 'in_progress' || t.status === 'scheduled').length,
-    resolved: historyTickets.length,
-  }), [activeTickets, historyTickets]);
+  const handleRate = (requestId: string, rating: number) => {
+    setCompletedRequests((prev) =>
+      prev.map((r) => (r.id === requestId ? { ...r, rating } : r))
+    );
+  };
+
+  const activeCount = activeRequests.length;
+  const needsInputCount = needsInput.length;
 
   return (
-    <div className="pb-32 lg:pb-8">
+    <div className="pb-32 lg:pb-8 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Request Command Center</h1>
-          <p className="text-slate-500 mt-1">Track, manage, and communicate on all your service requests</p>
-        </div>
-        <button
-          onClick={() => setShowModal(true)}
-          className="hidden lg:inline-flex items-center gap-2 px-5 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-        >
-          <Plus className="w-5 h-5" />
-          New Request
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Clock className="w-5 h-5 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.active}</p>
-              <p className="text-sm text-slate-500">Active</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-purple-100 rounded-lg">
-              <Search className="w-5 h-5 text-purple-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.pending}</p>
-              <p className="text-sm text-slate-500">Finding Pros</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <Wrench className="w-5 h-5 text-orange-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.inProgress}</p>
-              <p className="text-sm text-slate-500">In Progress</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-emerald-100 rounded-lg">
-              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900">{stats.resolved}</p>
-              <p className="text-sm text-slate-500">Completed</p>
-            </div>
-          </div>
+          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Requests</h1>
+          <p className="text-slate-500 mt-1">Your home manager handles everything</p>
         </div>
       </div>
 
-      {/* View Controls */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex bg-slate-100 rounded-lg p-1">
-          <button
-            onClick={() => setViewMode('active')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'active'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Clock className="w-4 h-4" />
-            Active
-            <span className="ml-1 px-1.5 py-0.5 bg-slate-200 rounded text-xs">{activeTickets.length}</span>
-          </button>
-          <button
-            onClick={() => setViewMode('history')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-              viewMode === 'history'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            <Archive className="w-4 h-4" />
-            History
-            <span className="ml-1 px-1.5 py-0.5 bg-slate-200 rounded text-xs">{historyTickets.length}</span>
-          </button>
-        </div>
+      {/* Manager Summary */}
+      <ManagerSummaryCard
+        activeCount={activeCount}
+        needsInputCount={needsInputCount}
+        onExpand={() => setIsExpanded(!isExpanded)}
+        isExpanded={isExpanded}
+      />
 
-        <div className="hidden lg:flex items-center gap-2">
-          <button
-            onClick={() => setDisplayMode('list')}
-            className={`p-2 rounded-lg transition-colors ${
-              displayMode === 'list' ? 'bg-slate-200 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
-            }`}
-          >
-            <LayoutList className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => setDisplayMode('kanban')}
-            className={`p-2 rounded-lg transition-colors ${
-              displayMode === 'kanban' ? 'bg-slate-200 text-slate-900' : 'text-slate-500 hover:bg-slate-100'
-            }`}
-          >
-            <LayoutGrid className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-
-      {/* Loading State */}
-      {isLoading && (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-        </div>
-      )}
-
-      {/* Content */}
-      {!isLoading && displayedTickets.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200">
-          <EmptyState onNewRequest={() => setShowModal(true)} />
-        </div>
-      ) : !isLoading && (
-        <div className="lg:grid lg:grid-cols-5 lg:gap-6">
-          {/* Ticket List */}
-          <div className={`lg:col-span-2 space-y-3 ${selectedTicket ? 'hidden lg:block' : ''}`}>
-            {displayedTickets.map((ticket) => (
-              <TicketCard
-                key={ticket.id}
-                ticket={ticket}
-                isSelected={selectedTicket?.id === ticket.id}
-                onClick={() => setSelectedTicket(ticket)}
-              />
+      {/* Needs Your Input Section - Always Visible */}
+      {needsInput.length > 0 && (
+        <div className="mt-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Bell className="w-5 h-5 text-amber-600" />
+            <h2 className="text-lg font-semibold text-slate-900">Needs Your Input</h2>
+            <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-sm font-medium rounded-full">
+              {needsInput.length}
+            </span>
+          </div>
+          <div className="space-y-4">
+            {needsInput.map((input) => (
+              <NeedsInputCard key={input.id} input={input} onRespond={handleInputRespond} />
             ))}
           </div>
-
-          {/* Ticket Detail */}
-          <div className={`lg:col-span-3 ${selectedTicket ? '' : 'hidden lg:block'}`}>
-            {selectedTicket ? (
-              <div className="fixed inset-0 z-40 bg-white lg:static lg:bg-transparent lg:rounded-xl lg:border lg:border-slate-200 lg:shadow-sm lg:overflow-hidden">
-                <TicketDetail
-                  ticket={selectedTicket}
-                  onClose={() => setSelectedTicket(null)}
-                  onRate={(rating) => handleRate(selectedTicket.id, rating)}
-                />
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-12 text-center">
-                <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <MessageSquare className="w-8 h-8 text-slate-400" />
-                </div>
-                <p className="text-slate-500">Select a request to view details</p>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
-      {/* Mobile FAB */}
+      {/* Expanded View - Active Requests */}
+      {isExpanded && (
+        <div className="mt-6">
+          {/* View Toggle */}
+          <div className="flex bg-slate-100 rounded-lg p-1 mb-4">
+            <button
+              onClick={() => setViewMode('active')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'active'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              In Progress
+              <span className="px-1.5 py-0.5 bg-slate-200 rounded text-xs">{activeCount}</span>
+            </button>
+            <button
+              onClick={() => setViewMode('history')}
+              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                viewMode === 'history'
+                  ? 'bg-white text-slate-900 shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Archive className="w-4 h-4" />
+              History
+              <span className="px-1.5 py-0.5 bg-slate-200 rounded text-xs">{completedRequests.length}</span>
+            </button>
+          </div>
+
+          {viewMode === 'active' ? (
+            <div className="space-y-3">
+              {activeRequests.map((request) => (
+                <ActiveRequestMiniCard key={request.id} request={request} />
+              ))}
+              {activeRequests.length === 0 && (
+                <div className="text-center py-8 text-slate-500">
+                  <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-600" />
+                  <p className="font-medium text-slate-900">All caught up!</p>
+                  <p className="text-sm">No active requests right now</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {completedRequests.map((request) => (
+                <CompletedRequestCard
+                  key={request.id}
+                  request={request}
+                  onRate={handleRate}
+                />
+              ))}
+              {completedRequests.length === 0 && (
+                <div className="text-center py-8 text-slate-500">
+                  <Archive className="w-12 h-12 mx-auto mb-3 text-slate-400" />
+                  <p className="font-medium text-slate-900">No history yet</p>
+                  <p className="text-sm">Completed requests will appear here</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* New Request FAB */}
       <button
-        onClick={() => setShowModal(true)}
-        className="lg:hidden fixed bottom-36 right-4 w-12 h-12 bg-emerald-600 text-white rounded-full shadow-lg hover:bg-emerald-700 flex items-center justify-center z-40"
+        onClick={() => setShowQuickRequest(true)}
+        className="fixed bottom-36 right-4 lg:bottom-8 lg:right-8 flex items-center gap-2 px-5 py-3 bg-emerald-600 text-white font-medium rounded-full shadow-lg hover:bg-emerald-700 transition-colors z-40"
       >
         <Plus className="w-5 h-5" />
+        <span className="hidden sm:inline">I need...</span>
       </button>
 
-      {/* New Request Modal */}
-      {showModal && currentHousehold && (
-        <NewRequestModal
-          onClose={() => setShowModal(false)}
-          onSuccess={handleNewRequestSuccess}
-          householdId={currentHousehold.id}
+      {/* Quick Request Modal */}
+      {showQuickRequest && (
+        <QuickRequestModal
+          onClose={() => setShowQuickRequest(false)}
+          onSubmit={handleSubmitRequest}
         />
       )}
+
+      {/* Success Toast */}
+      {showSuccess && <SuccessToast onClose={() => setShowSuccess(false)} />}
     </div>
   );
 }
