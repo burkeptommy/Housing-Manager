@@ -193,6 +193,7 @@ enum VendorCategory {
   HEALTH_INSURANCE
   LIFE_INSURANCE
   PET_INSURANCE
+  UMBRELLA_INSURANCE
 
   // Loans & Credit
   CREDIT_CARD
@@ -200,6 +201,21 @@ enum VendorCategory {
   PERSONAL_LOAN
   VEHICLE_LOAN
   HELOC
+
+  // Kids & Activities
+  TUITION            // School tuition
+  CHILDCARE          // Nanny, babysitter, daycare
+  SPORTS_ACTIVITIES  // Sports leagues, lessons
+  MUSIC_LESSONS      // Piano, guitar, etc.
+  TUTORING           // Academic tutoring
+  CAMPS              // Summer/winter camps
+  EXTRACURRICULAR    // Other activities
+
+  // Pet Care
+  PET_FOOD           // Auto-ship pet food
+  PET_GROOMING       // Grooming services
+  VET_CARE           // Veterinary services
+  PET_DAYCARE        // Pet daycare/boarding
 
   // Subscriptions & Services
   STREAMING
@@ -1407,6 +1423,8 @@ model BillAccount {
   paymentResponsibility PaymentResponsibility @default(OWNER_PAYS_DIRECT) @map("payment_responsibility")
   typicalAmount         Decimal?              @map("typical_amount") @db.Decimal(10, 2)
   nextDueDate           DateTime?             @map("next_due_date")
+  lastPaidDate          DateTime?             @map("last_paid_date")
+  lastPaidAmount        Decimal?              @map("last_paid_amount") @db.Decimal(10, 2)
 
   // Vendor Autopay Settings (when paymentResponsibility = VENDOR_AUTOPAY)
   // This tracks if autopay is set up directly with the vendor
@@ -1419,6 +1437,16 @@ model BillAccount {
   havenAutoPayEnabled          Boolean  @default(true) @map("haven_auto_pay_enabled")
   // Whether to include in the monthly consolidated invoice (vs. pay individually)
   includeInConsolidatedInvoice Boolean  @default(true) @map("include_in_consolidated_invoice")
+
+  // Mortgage-specific fields (only for category = MORTGAGE)
+  loanBalance         Decimal?  @map("loan_balance") @db.Decimal(12, 2)
+  interestRate        Decimal?  @map("interest_rate") @db.Decimal(5, 3) // e.g., 6.875%
+  loanTermMonths      Int?      @map("loan_term_months") // e.g., 360 for 30-year
+  loanOriginationDate DateTime? @map("loan_origination_date")
+  estimatedPayoffDate DateTime? @map("estimated_payoff_date")
+  escrowAmount        Decimal?  @map("escrow_amount") @db.Decimal(10, 2) // Property tax/insurance escrow
+  principalAmount     Decimal?  @map("principal_amount") @db.Decimal(10, 2) // Monthly principal portion
+  interestAmount      Decimal?  @map("interest_amount") @db.Decimal(10, 2) // Monthly interest portion
 
   // Portal & Support
   portalUrl    String? @map("portal_url")

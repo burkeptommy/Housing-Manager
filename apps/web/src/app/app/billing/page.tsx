@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Receipt,
   Download,
   X,
@@ -31,26 +32,62 @@ import {
   ArrowRight,
   CalendarDays,
   Wallet,
+  Users,
+  PawPrint,
+  GraduationCap,
+  Car,
+  Umbrella,
+  Wifi,
+  Droplets,
+  Flame,
+  Printer,
+  ExternalLink,
+  Info,
+  BadgeCheck,
 } from 'lucide-react';
 
 // ============================================================================
 // TYPES
 // ============================================================================
 
-type TransactionStatus = 'completed' | 'pending' | 'failed' | 'requires_approval';
-type TransactionCategory = 'utilities' | 'maintenance' | 'services' | 'projects' | 'insurance' | 'membership' | 'other';
+type BillCategory =
+  | 'membership'
+  | 'mortgage'
+  | 'utilities'
+  | 'insurance'
+  | 'household_services'
+  | 'kids_activities'
+  | 'childcare'
+  | 'pet_care'
+  | 'maintenance';
+
+type PaymentStatus = 'paid' | 'scheduled' | 'due_soon' | 'overdue' | 'pending';
 
 interface BillItem {
   id: string;
   vendor: string;
   description: string;
   amount: number;
-  category: TransactionCategory;
-  status: TransactionStatus;
-  date: Date;
-  receiptUrl?: string;
-  isRecurring?: boolean;
+  category: BillCategory;
+  status: PaymentStatus;
+  paidDate?: Date;
   dueDate?: Date;
+  isRecurring?: boolean;
+  frequency?: string;
+  accountNumber?: string;
+}
+
+interface MortgageDetails {
+  lender: string;
+  accountNumber: string;
+  monthlyPayment: number;
+  principalAndInterest: number;
+  escrowAmount: number;
+  loanBalance: number;
+  interestRate: number;
+  payoffDate: Date;
+  lastPaidDate: Date;
+  nextDueDate: Date;
 }
 
 interface AuthorizationRequest {
@@ -58,28 +95,24 @@ interface AuthorizationRequest {
   vendor: string;
   description: string;
   amount: number;
-  category: TransactionCategory;
+  category: BillCategory;
   date: Date;
   urgency: 'low' | 'medium' | 'high';
   managerNote: string;
   managerName: string;
 }
 
-interface UpcomingBill {
-  id: string;
-  vendor: string;
-  amount: number;
-  dueDate: Date;
-  category: TransactionCategory;
-  isEstimate?: boolean;
-}
-
-interface BillAccount {
-  id: string;
-  vendor: string;
-  accountNumber: string;
-  isAutoPay: boolean;
-  category: TransactionCategory;
+interface StatementBreakdown {
+  membership: number;
+  mortgage: number;
+  utilities: number;
+  insurance: number;
+  householdServices: number;
+  kidsActivities: number;
+  childcare: number;
+  petCare: number;
+  maintenance: number;
+  total: number;
 }
 
 // ============================================================================
@@ -88,126 +121,240 @@ interface BillAccount {
 
 const HAVEN_MEMBERSHIP_FEE = 149;
 
+const MOCK_MORTGAGE: MortgageDetails = {
+  lender: 'First National Bank',
+  accountNumber: '****4521',
+  monthlyPayment: 3200,
+  principalAndInterest: 2850,
+  escrowAmount: 350,
+  loanBalance: 412500,
+  interestRate: 6.875,
+  payoffDate: new Date(2054, 0, 1),
+  lastPaidDate: new Date(2024, 11, 1),
+  nextDueDate: new Date(2025, 0, 1),
+};
+
 const generateMockBills = (): BillItem[] => {
   const now = new Date();
   const thisMonth = now.getMonth();
   const thisYear = now.getFullYear();
 
   return [
-    // Membership (Haven's fee)
+    // Mortgage & Housing
     {
-      id: 'bill-0',
-      vendor: 'Haven Home Management',
-      description: 'Monthly membership',
-      amount: HAVEN_MEMBERSHIP_FEE,
-      category: 'membership',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, 1),
+      id: 'bill-m1',
+      vendor: 'First National Bank',
+      description: 'Mortgage payment',
+      amount: 2850,
+      category: 'mortgage',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 1),
       isRecurring: true,
+      frequency: 'Monthly',
     },
-    // Utilities - auto-paid
     {
-      id: 'bill-1',
-      vendor: 'Power & Light Co.',
-      description: 'Electric bill',
+      id: 'bill-m2',
+      vendor: 'County Tax Office',
+      description: 'Property tax (escrow)',
+      amount: 350,
+      category: 'mortgage',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 1),
+      isRecurring: true,
+      frequency: 'Included',
+    },
+
+    // Utilities
+    {
+      id: 'bill-u1',
+      vendor: 'ConEd',
+      description: 'Electric',
       amount: 187.43,
       category: 'utilities',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 3),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 15),
       isRecurring: true,
-      receiptUrl: '/receipts/power-dec.pdf',
     },
     {
-      id: 'bill-2',
-      vendor: 'City Water Authority',
-      description: 'Water & sewer',
+      id: 'bill-u2',
+      vendor: 'National Grid',
+      description: 'Natural gas',
       amount: 94.50,
       category: 'utilities',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 5),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 12),
       isRecurring: true,
     },
     {
-      id: 'bill-3',
-      vendor: 'Gas Company',
-      description: 'Natural gas',
+      id: 'bill-u3',
+      vendor: 'City Water Authority',
+      description: 'Water & sewer',
       amount: 78.50,
       category: 'utilities',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 8),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 10),
       isRecurring: true,
     },
     {
-      id: 'bill-4',
-      vendor: 'Internet Plus',
-      description: 'Fiber internet',
-      amount: 89.99,
+      id: 'bill-u4',
+      vendor: 'Verizon Fios',
+      description: 'Internet (1 Gbps)',
+      amount: 187.50,
       category: 'utilities',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 10),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 8),
       isRecurring: true,
     },
+
     // Insurance
     {
-      id: 'bill-5',
-      vendor: 'SafeHome Insurance',
+      id: 'bill-i1',
+      vendor: 'State Farm',
       description: 'Homeowners premium',
       amount: 312,
       category: 'insurance',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 10),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 11),
       isRecurring: true,
-    },
-    // Services - auto-paid recurring
-    {
-      id: 'bill-6',
-      vendor: 'Green Thumb Landscaping',
-      description: 'Monthly lawn care',
-      amount: 175,
-      category: 'services',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 7),
-      isRecurring: true,
+      frequency: 'Monthly',
     },
     {
-      id: 'bill-7',
-      vendor: 'Pool Masters',
-      description: 'Pool maintenance',
-      amount: 85,
-      category: 'services',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 6),
+      id: 'bill-i2',
+      vendor: 'Geico',
+      description: 'Auto insurance',
+      amount: 156,
+      category: 'insurance',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 15),
       isRecurring: true,
+      frequency: 'Monthly',
     },
     {
-      id: 'bill-8',
+      id: 'bill-i3',
+      vendor: 'Chubb',
+      description: 'Umbrella policy',
+      amount: 0,
+      category: 'insurance',
+      status: 'paid',
+      paidDate: new Date(thisYear, 5, 1),
+      isRecurring: true,
+      frequency: 'Paid annually',
+    },
+
+    // Household Services
+    {
+      id: 'bill-s1',
       vendor: 'CleanPro Services',
-      description: 'Bi-weekly cleaning',
-      amount: 180,
-      category: 'services',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 12),
+      description: 'House cleaning',
+      amount: 360,
+      category: 'household_services',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 14),
       isRecurring: true,
+      frequency: 'Bi-weekly',
     },
-    // Maintenance - one-time
     {
-      id: 'bill-9',
+      id: 'bill-s2',
+      vendor: 'Green Thumb Landscaping',
+      description: 'Lawn care',
+      amount: 175,
+      category: 'household_services',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 14),
+      isRecurring: true,
+      frequency: 'Weekly',
+    },
+    {
+      id: 'bill-s3',
+      vendor: 'Crystal Clear Pools',
+      description: 'Pool service',
+      amount: 175,
+      category: 'household_services',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 10),
+      isRecurring: true,
+      frequency: 'Weekly',
+    },
+    {
+      id: 'bill-s4',
+      vendor: 'Bug-Free Pest Control',
+      description: 'Quarterly pest treatment',
+      amount: 185,
+      category: 'household_services',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 5),
+      isRecurring: true,
+      frequency: 'Quarterly',
+    },
+
+    // Kids & Activities
+    {
+      id: 'bill-k1',
+      vendor: 'Westlake Middle School',
+      description: 'Tuition - Emma',
+      amount: 2200,
+      category: 'kids_activities',
+      status: 'due_soon',
+      dueDate: new Date(thisYear, thisMonth, now.getDate() + 5),
+      isRecurring: true,
+      frequency: 'Monthly',
+    },
+    {
+      id: 'bill-k2',
+      vendor: 'Austin FC Youth',
+      description: 'Travel soccer - Emma',
+      amount: 350,
+      category: 'kids_activities',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 1),
+      isRecurring: true,
+      frequency: 'Monthly',
+    },
+    {
+      id: 'bill-k3',
+      vendor: 'Harmony Music Academy',
+      description: 'Piano lessons - Jake',
+      amount: 200,
+      category: 'kids_activities',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 5),
+      isRecurring: true,
+      frequency: 'Monthly',
+    },
+    {
+      id: 'bill-k4',
+      vendor: 'Creative Arts Studio',
+      description: 'Art class - Jake',
+      amount: 25,
+      category: 'kids_activities',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 3),
+      isRecurring: true,
+      frequency: 'Weekly',
+    },
+
+    // Pet Care
+    {
+      id: 'bill-p1',
+      vendor: 'Blue Buffalo',
+      description: 'Dog food (auto-ship)',
+      amount: 150,
+      category: 'pet_care',
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 8),
+      isRecurring: true,
+      frequency: 'Monthly',
+    },
+
+    // Maintenance (one-time or recent)
+    {
+      id: 'bill-x1',
       vendor: 'HandyPro Services',
       description: 'Garbage disposal replacement',
-      amount: 195,
+      amount: 62.30,
       category: 'maintenance',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 14),
-      receiptUrl: '/receipts/handypro.pdf',
-    },
-    {
-      id: 'bill-10',
-      vendor: 'HVAC Solutions',
-      description: 'Annual AC tune-up',
-      amount: 149,
-      category: 'maintenance',
-      status: 'completed',
-      date: new Date(thisYear, thisMonth, now.getDate() - 18),
+      status: 'paid',
+      paidDate: new Date(thisYear, thisMonth, 14),
     },
   ];
 };
@@ -226,8 +373,8 @@ const generateAuthorizationRequests = (): AuthorizationRequest[] => {
       category: 'maintenance',
       date: new Date(thisYear, thisMonth, now.getDate(), 14, 30),
       urgency: 'high',
-      managerNote: 'Urgent - Water damage prevention. Vendor is on-site waiting for approval. I recommend approving immediately to prevent further damage.',
-      managerName: 'Steve',
+      managerNote: 'Urgent - Pipe burst in kitchen. Vendor is on-site and waiting for approval. I recommend approving immediately to prevent water damage to cabinets.',
+      managerName: 'Sarah',
     },
     {
       id: 'auth-2',
@@ -237,31 +384,11 @@ const generateAuthorizationRequests = (): AuthorizationRequest[] => {
       category: 'maintenance',
       date: new Date(thisYear, thisMonth, now.getDate() - 1, 10, 0),
       urgency: 'medium',
-      managerNote: 'Recommended after last storm. I obtained 3 quotes - this is the best value. Happy to discuss alternatives if you prefer.',
-      managerName: 'Steve',
+      managerNote: 'Recommended after last storm. I obtained 3 quotes - this is the best value ($875 vs $1,200 and $950). Happy to discuss alternatives.',
+      managerName: 'Sarah',
     },
   ];
 };
-
-const generateUpcomingBills = (): UpcomingBill[] => {
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-
-  return [
-    { id: 'up-1', vendor: 'Power & Light Co.', amount: 195, dueDate: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 15), category: 'utilities', isEstimate: true },
-    { id: 'up-2', vendor: 'City Water Authority', amount: 94.50, dueDate: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 10), category: 'utilities' },
-    { id: 'up-3', vendor: 'SafeHome Insurance', amount: 312, dueDate: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1), category: 'insurance' },
-    { id: 'up-4', vendor: 'Green Thumb Landscaping', amount: 175, dueDate: new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 7), category: 'services' },
-  ];
-};
-
-const mockBillAccounts: BillAccount[] = [
-  { id: 'acc-1', vendor: 'Power & Light Co.', accountNumber: '****4521', isAutoPay: true, category: 'utilities' },
-  { id: 'acc-2', vendor: 'City Water Authority', accountNumber: '****7832', isAutoPay: true, category: 'utilities' },
-  { id: 'acc-3', vendor: 'Gas Company', accountNumber: '****1156', isAutoPay: true, category: 'utilities' },
-  { id: 'acc-4', vendor: 'Internet Plus', accountNumber: '****9044', isAutoPay: true, category: 'utilities' },
-  { id: 'acc-5', vendor: 'SafeHome Insurance', accountNumber: 'POL-88721', isAutoPay: true, category: 'insurance' },
-];
 
 // ============================================================================
 // HELPERS
@@ -282,39 +409,64 @@ const formatFullDate = (date: Date) => {
   return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 };
 
-const getCategoryIcon = (category: TransactionCategory) => {
+const getCategoryIcon = (category: BillCategory) => {
   switch (category) {
+    case 'mortgage': return Home;
     case 'utilities': return Zap;
-    case 'maintenance': return Wrench;
-    case 'services': return Sparkles;
-    case 'projects': return Home;
     case 'insurance': return ShieldCheck;
+    case 'household_services': return Sparkles;
+    case 'kids_activities': return GraduationCap;
+    case 'childcare': return Users;
+    case 'pet_care': return PawPrint;
+    case 'maintenance': return Wrench;
     case 'membership': return Receipt;
     default: return DollarSign;
   }
 };
 
-const getCategoryColor = (category: TransactionCategory) => {
+const getCategoryColor = (category: BillCategory) => {
   switch (category) {
-    case 'utilities': return { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'text-amber-600', light: 'bg-amber-50' };
-    case 'maintenance': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: 'text-blue-600', light: 'bg-blue-50' };
-    case 'services': return { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'text-purple-600', light: 'bg-purple-50' };
-    case 'projects': return { bg: 'bg-rose-100', text: 'text-rose-700', icon: 'text-rose-600', light: 'bg-rose-50' };
-    case 'insurance': return { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: 'text-emerald-600', light: 'bg-emerald-50' };
-    case 'membership': return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'text-slate-600', light: 'bg-slate-50' };
-    default: return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'text-slate-600', light: 'bg-slate-50' };
+    case 'mortgage': return { bg: 'bg-indigo-100', text: 'text-indigo-700', icon: 'text-indigo-600', border: 'border-indigo-200' };
+    case 'utilities': return { bg: 'bg-amber-100', text: 'text-amber-700', icon: 'text-amber-600', border: 'border-amber-200' };
+    case 'insurance': return { bg: 'bg-emerald-100', text: 'text-emerald-700', icon: 'text-emerald-600', border: 'border-emerald-200' };
+    case 'household_services': return { bg: 'bg-purple-100', text: 'text-purple-700', icon: 'text-purple-600', border: 'border-purple-200' };
+    case 'kids_activities': return { bg: 'bg-pink-100', text: 'text-pink-700', icon: 'text-pink-600', border: 'border-pink-200' };
+    case 'childcare': return { bg: 'bg-rose-100', text: 'text-rose-700', icon: 'text-rose-600', border: 'border-rose-200' };
+    case 'pet_care': return { bg: 'bg-orange-100', text: 'text-orange-700', icon: 'text-orange-600', border: 'border-orange-200' };
+    case 'maintenance': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: 'text-blue-600', border: 'border-blue-200' };
+    case 'membership': return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'text-slate-600', border: 'border-slate-200' };
+    default: return { bg: 'bg-slate-100', text: 'text-slate-700', icon: 'text-slate-600', border: 'border-slate-200' };
   }
 };
 
-const getCategoryLabel = (category: TransactionCategory) => {
+const getCategoryLabel = (category: BillCategory) => {
   switch (category) {
+    case 'mortgage': return 'Mortgage & Housing';
     case 'utilities': return 'Utilities';
-    case 'maintenance': return 'Maintenance';
-    case 'services': return 'Services';
-    case 'projects': return 'Projects';
     case 'insurance': return 'Insurance';
-    case 'membership': return 'Membership';
+    case 'household_services': return 'Household Services';
+    case 'kids_activities': return 'Kids & Activities';
+    case 'childcare': return 'Childcare';
+    case 'pet_care': return 'Pet Care';
+    case 'maintenance': return 'Maintenance & Repairs';
+    case 'membership': return 'Haven Membership';
     default: return 'Other';
+  }
+};
+
+const getStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
+  switch (status) {
+    case 'paid':
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full"><CheckCircle2 className="w-3 h-3" /> Paid</span>;
+    case 'scheduled':
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded-full"><Clock className="w-3 h-3" /> Scheduled</span>;
+    case 'due_soon':
+      const daysUntil = dueDate ? Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : 0;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full"><AlertTriangle className="w-3 h-3" /> Due in {daysUntil} days</span>;
+    case 'overdue':
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full"><AlertCircle className="w-3 h-3" /> Overdue</span>;
+    default:
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs font-medium rounded-full">Pending</span>;
   }
 };
 
@@ -368,10 +520,9 @@ function AuthorizationCard({
   return (
     <div
       className={`bg-white rounded-xl border-2 p-5 transition-all hover:shadow-lg ${
-        request.urgency === 'high' ? 'border-red-200 bg-red-50/30' : 'border-slate-200'
+        request.urgency === 'high' ? 'border-red-300 bg-red-50/30' : 'border-slate-200'
       }`}
     >
-      {/* Urgency Banner */}
       {request.urgency === 'high' && (
         <div className="flex items-center gap-2 text-red-700 text-sm font-medium mb-4 -mt-1">
           <AlertCircle className="w-4 h-4" />
@@ -394,7 +545,6 @@ function AuthorizationCard({
         </div>
       </div>
 
-      {/* Manager Note */}
       <div className="mb-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
         <div className="flex items-start gap-3">
           <div className="w-8 h-8 bg-emerald-200 rounded-full flex items-center justify-center flex-shrink-0">
@@ -413,7 +563,7 @@ function AuthorizationCard({
           className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
         >
           <Check className="w-4 h-4" />
-          Authorize
+          Approve
         </button>
         <button
           onClick={() => onDecline(request.id)}
@@ -427,13 +577,96 @@ function AuthorizationCard({
   );
 }
 
+function MortgageCard({ mortgage }: { mortgage: MortgageDetails }) {
+  const [showDetails, setShowDetails] = useState(false);
+
+  return (
+    <div className="bg-white rounded-2xl border border-indigo-200 shadow-sm overflow-hidden">
+      <div className="p-5 bg-gradient-to-r from-indigo-50 to-indigo-100/50">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="p-3 bg-indigo-200 rounded-xl">
+              <Home className="w-6 h-6 text-indigo-700" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">Mortgage & Housing</h3>
+              <p className="text-sm text-slate-600">{mortgage.lender}</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-2xl font-bold text-slate-900">{formatCurrency(mortgage.monthlyPayment)}</div>
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
+              <CheckCircle2 className="w-3 h-3" /> Paid {formatDate(mortgage.lastPaidDate)}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-5 space-y-3">
+        <div className="flex items-center justify-between py-2 border-b border-slate-100">
+          <span className="text-sm text-slate-600">Principal & Interest</span>
+          <span className="font-medium text-slate-900">{formatCurrency(mortgage.principalAndInterest)}</span>
+        </div>
+        <div className="flex items-center justify-between py-2 border-b border-slate-100">
+          <span className="text-sm text-slate-600">Property Tax (Escrow)</span>
+          <span className="font-medium text-slate-900">{formatCurrency(mortgage.escrowAmount)}</span>
+        </div>
+        <div className="flex items-center justify-between py-2">
+          <span className="text-sm text-slate-600">Next Payment</span>
+          <span className="text-sm font-medium text-blue-600">{formatDate(mortgage.nextDueDate)} - Scheduled</span>
+        </div>
+      </div>
+
+      <button
+        onClick={() => setShowDetails(!showDetails)}
+        className="w-full flex items-center justify-center gap-2 py-3 border-t border-slate-100 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+      >
+        {showDetails ? (
+          <>
+            <ChevronUp className="w-4 h-4" />
+            Hide Loan Details
+          </>
+        ) : (
+          <>
+            <ChevronDown className="w-4 h-4" />
+            View Loan Details
+          </>
+        )}
+      </button>
+
+      {showDetails && (
+        <div className="p-5 bg-slate-50 border-t border-slate-100 space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-slate-500">Loan Balance</p>
+              <p className="font-semibold text-slate-900">{formatCurrency(mortgage.loanBalance)}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Interest Rate</p>
+              <p className="font-semibold text-slate-900">{mortgage.interestRate}%</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Account Number</p>
+              <p className="font-semibold text-slate-900">{mortgage.accountNumber}</p>
+            </div>
+            <div>
+              <p className="text-xs text-slate-500">Estimated Payoff</p>
+              <p className="font-semibold text-slate-900">{mortgage.payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function BillCategoryGroup({
   category,
   bills,
   isExpanded,
   onToggle,
 }: {
-  category: TransactionCategory;
+  category: BillCategory;
   bills: BillItem[];
   isExpanded: boolean;
   onToggle: () => void;
@@ -441,19 +674,23 @@ function BillCategoryGroup({
   const CategoryIcon = getCategoryIcon(category);
   const categoryColor = getCategoryColor(category);
   const total = bills.reduce((sum, bill) => sum + bill.amount, 0);
+  const hasDueSoon = bills.some(b => b.status === 'due_soon' || b.status === 'overdue');
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200">
+    <div className={`bg-white rounded-xl border ${hasDueSoon ? 'border-amber-300' : 'border-slate-200'} overflow-hidden`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors rounded-xl"
+        className="w-full flex items-center justify-between p-4 hover:bg-slate-50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${categoryColor.bg}`}>
             <CategoryIcon className={`w-5 h-5 ${categoryColor.icon}`} />
           </div>
           <div className="text-left">
-            <div className="font-medium text-slate-900">{getCategoryLabel(category)}</div>
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-900">{getCategoryLabel(category)}</span>
+              {hasDueSoon && <AlertTriangle className="w-4 h-4 text-amber-500" />}
+            </div>
             <div className="text-sm text-slate-500">{bills.length} {bills.length === 1 ? 'item' : 'items'}</div>
           </div>
         </div>
@@ -464,31 +701,39 @@ function BillCategoryGroup({
       </button>
 
       {isExpanded && (
-        <div className="px-4 pb-4 space-y-2">
-          {bills.map((bill) => (
-            <div
-              key={bill.id}
-              className={`flex items-center justify-between p-3 rounded-lg ${categoryColor.light}`}
-            >
-              <div className="flex items-center gap-3">
+        <div className="px-4 pb-4">
+          <div className="border-t border-slate-100 pt-3 space-y-2">
+            {bills.map((bill) => (
+              <div
+                key={bill.id}
+                className={`flex items-center justify-between p-3 rounded-lg ${
+                  bill.status === 'due_soon' ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'
+                }`}
+              >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
                     <span className="font-medium text-slate-900">{bill.vendor}</span>
-                    {bill.isRecurring && (
+                    {bill.isRecurring && bill.frequency && (
                       <span className="px-1.5 py-0.5 text-[10px] font-medium bg-slate-200 text-slate-600 rounded">
-                        Auto
+                        {bill.frequency}
                       </span>
                     )}
                   </div>
                   <div className="text-sm text-slate-500">{bill.description}</div>
                 </div>
+                <div className="text-right">
+                  <div className="font-medium text-slate-900">{formatCurrency(bill.amount)}</div>
+                  <div className="mt-1">
+                    {bill.status === 'paid' && bill.paidDate ? (
+                      <span className="text-xs text-emerald-600">Paid {formatDate(bill.paidDate)}</span>
+                    ) : (
+                      getStatusBadge(bill.status, bill.dueDate)
+                    )}
+                  </div>
+                </div>
               </div>
-              <div className="text-right">
-                <div className="font-medium text-slate-900">{formatCurrency(bill.amount)}</div>
-                <div className="text-xs text-slate-400">Paid {formatDate(bill.date)}</div>
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -502,19 +747,17 @@ function BillCategoryGroup({
 export default function BillingPage() {
   const [bills] = useState<BillItem[]>(generateMockBills);
   const [authRequests, setAuthRequests] = useState<AuthorizationRequest[]>(generateAuthorizationRequests);
-  const [upcomingBills] = useState<UpcomingBill[]>(generateUpcomingBills);
-  const [billAccounts] = useState<BillAccount[]>(mockBillAccounts);
+  const [mortgage] = useState<MortgageDetails>(MOCK_MORTGAGE);
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
-  const [showAddAccountModal, setShowAddAccountModal] = useState(false);
   const [trustThreshold, setTrustThreshold] = useState(200);
   const [tempThreshold, setTempThreshold] = useState(200);
 
   // Category expansion state
-  const [expandedCategories, setExpandedCategories] = useState<Set<TransactionCategory>>(new Set(['utilities']));
+  const [expandedCategories, setExpandedCategories] = useState<Set<BillCategory>>(new Set(['utilities', 'kids_activities']));
 
   // Toast helper
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
@@ -527,16 +770,16 @@ export default function BillingPage() {
     setAuthRequests((prev) => prev.filter((req) => req.id !== id));
     setShowConfetti(true);
     setTimeout(() => setShowConfetti(false), 2500);
-    showToast('Authorized! Your manager will proceed.', 'success');
+    showToast('Approved! Sarah will proceed.', 'success');
   }, []);
 
   const handleDecline = useCallback((id: string) => {
     setAuthRequests((prev) => prev.filter((req) => req.id !== id));
-    showToast('Declined. Your manager has been notified.', 'info');
+    showToast('Declined. Sarah has been notified.', 'info');
   }, []);
 
   // Toggle category expansion
-  const toggleCategory = (category: TransactionCategory) => {
+  const toggleCategory = (category: BillCategory) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(category)) {
@@ -556,32 +799,48 @@ export default function BillingPage() {
   };
 
   // Computed values
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long' });
+  const currentYear = new Date().getFullYear();
 
-  const statementBreakdown = useMemo(() => {
-    const membership = bills.filter(b => b.category === 'membership').reduce((s, b) => s + b.amount, 0);
+  const statementBreakdown: StatementBreakdown = useMemo(() => {
+    const membership = HAVEN_MEMBERSHIP_FEE;
+    const mortgageTotal = bills.filter(b => b.category === 'mortgage').reduce((s, b) => s + b.amount, 0);
     const utilities = bills.filter(b => b.category === 'utilities').reduce((s, b) => s + b.amount, 0);
     const insurance = bills.filter(b => b.category === 'insurance').reduce((s, b) => s + b.amount, 0);
-    const billsPaid = utilities + insurance;
-    const services = bills.filter(b => ['services', 'maintenance', 'projects'].includes(b.category)).reduce((s, b) => s + b.amount, 0);
+    const householdServices = bills.filter(b => b.category === 'household_services').reduce((s, b) => s + b.amount, 0);
+    const kidsActivities = bills.filter(b => b.category === 'kids_activities').reduce((s, b) => s + b.amount, 0);
+    const childcare = bills.filter(b => b.category === 'childcare').reduce((s, b) => s + b.amount, 0);
+    const petCare = bills.filter(b => b.category === 'pet_care').reduce((s, b) => s + b.amount, 0);
+    const maintenance = bills.filter(b => b.category === 'maintenance').reduce((s, b) => s + b.amount, 0);
 
-    return { membership, billsPaid, services, total: membership + billsPaid + services };
+    return {
+      membership,
+      mortgage: mortgageTotal,
+      utilities,
+      insurance,
+      householdServices,
+      kidsActivities,
+      childcare,
+      petCare,
+      maintenance,
+      total: membership + mortgageTotal + utilities + insurance + householdServices + kidsActivities + childcare + petCare + maintenance,
+    };
   }, [bills]);
 
   const billsByCategory = useMemo(() => {
-    const grouped: Record<TransactionCategory, BillItem[]> = {
-      utilities: [],
-      maintenance: [],
-      services: [],
-      projects: [],
-      insurance: [],
+    const grouped: Record<BillCategory, BillItem[]> = {
       membership: [],
-      other: [],
+      mortgage: [],
+      utilities: [],
+      insurance: [],
+      household_services: [],
+      kids_activities: [],
+      childcare: [],
+      pet_care: [],
+      maintenance: [],
     };
     bills.forEach((bill) => {
-      if (bill.category !== 'membership') {
-        grouped[bill.category].push(bill);
-      }
+      grouped[bill.category].push(bill);
     });
     return grouped;
   }, [bills]);
@@ -595,6 +854,9 @@ export default function BillingPage() {
     const now = new Date();
     return Math.ceil((nextPaymentDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
   }, [nextPaymentDate]);
+
+  // Calculate YTD (mock - multiply by 11 months + this month)
+  const ytdTotal = statementBreakdown.total * 11;
 
   return (
     <div className="min-h-screen bg-slate-50 pb-24 lg:pb-8">
@@ -625,7 +887,7 @@ export default function BillingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             {/* Left: Statement Info */}
-            <div>
+            <div className="flex-1">
               <div className="flex items-center gap-2 text-emerald-400 text-sm font-medium mb-2">
                 <Receipt className="w-4 h-4" />
                 Your {currentMonth} Statement
@@ -637,23 +899,69 @@ export default function BillingPage() {
                 Due {formatFullDate(nextPaymentDate)} • {daysUntilDue} days
               </p>
 
-              {/* Breakdown */}
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Haven Membership</span>
-                  <span className="font-medium">{formatCurrency(statementBreakdown.membership)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Bills Paid on Your Behalf</span>
-                  <span className="font-medium">{formatCurrency(statementBreakdown.billsPaid)}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-300">Services This Month</span>
-                  <span className="font-medium">{formatCurrency(statementBreakdown.services)}</span>
-                </div>
-                <div className="border-t border-slate-700 pt-3 flex items-center justify-between font-semibold">
-                  <span>Total Due</span>
-                  <span className="text-emerald-400">{formatCurrency(statementBreakdown.total)}</span>
+              {/* Breakdown Table */}
+              <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
+                <div className="space-y-2.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-slate-500" />
+                      Haven Membership
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.membership)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Home className="w-4 h-4 text-indigo-400" />
+                      Mortgage & Housing
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.mortgage)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Zap className="w-4 h-4 text-amber-400" />
+                      Utilities
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.utilities)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-emerald-400" />
+                      Insurance
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.insurance)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-purple-400" />
+                      Household Services
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.householdServices)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <GraduationCap className="w-4 h-4 text-pink-400" />
+                      Kids & Activities
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.kidsActivities)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <PawPrint className="w-4 h-4 text-orange-400" />
+                      Pet Care
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.petCare)}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-slate-300 flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-blue-400" />
+                      Maintenance & Repairs
+                    </span>
+                    <span className="font-medium">{formatCurrency(statementBreakdown.maintenance)}</span>
+                  </div>
+                  <div className="border-t border-white/10 pt-3 mt-3 flex items-center justify-between font-semibold">
+                    <span>Total Due January 1</span>
+                    <span className="text-emerald-400 text-lg">{formatCurrency(statementBreakdown.total)}</span>
+                  </div>
                 </div>
               </div>
 
@@ -679,7 +987,7 @@ export default function BillingPage() {
             <div className="bg-white/10 backdrop-blur rounded-2xl p-6 lg:w-80">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-emerald-500/20 rounded-lg">
-                  <RefreshCw className="w-5 h-5 text-emerald-400" />
+                  <BadgeCheck className="w-5 h-5 text-emerald-400" />
                 </div>
                 <div>
                   <div className="font-semibold">Auto-Pay Enabled</div>
@@ -701,7 +1009,7 @@ export default function BillingPage() {
               </div>
 
               <p className="text-xs text-slate-400">
-                You don&apos;t need to do anything. Haven will charge your account automatically.
+                Haven pays all your bills throughout the month, then charges you once on the 1st. No action needed.
               </p>
             </div>
           </div>
@@ -717,8 +1025,9 @@ export default function BillingPage() {
               <div>
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
-                    <h2 className="text-lg font-semibold text-slate-900">Your Manager Needs Authorization</h2>
-                    <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-semibold rounded-full">
+                    <AlertCircle className="w-5 h-5 text-amber-500" />
+                    <h2 className="text-lg font-semibold text-slate-900">Sarah Needs Your Approval</h2>
+                    <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
                       {authRequests.length}
                     </span>
                   </div>
@@ -727,23 +1036,11 @@ export default function BillingPage() {
                       setTempThreshold(trustThreshold);
                       setShowThresholdModal(true);
                     }}
-                    className="text-sm text-emerald-600 hover:text-emerald-700 font-medium flex items-center gap-1"
+                    className="text-sm text-slate-500 hover:text-slate-700 font-medium flex items-center gap-1"
                   >
                     <Settings className="w-4 h-4" />
-                    Set Trust Threshold
+                    Auto-approve under {formatCurrency(trustThreshold)}
                   </button>
-                </div>
-
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl mb-4">
-                  <div className="flex items-start gap-3">
-                    <Lightbulb className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-amber-800">
-                        <strong>These are exceptions, not routine bills.</strong> Your manager handles day-to-day expenses automatically.
-                        Items here exceed your auto-approval threshold of <strong>{formatCurrency(trustThreshold)}</strong>.
-                      </p>
-                    </div>
-                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4">
@@ -759,139 +1056,125 @@ export default function BillingPage() {
               </div>
             )}
 
-            {/* What Haven Paid This Month */}
+            {/* Mortgage Section */}
             <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-                  <h2 className="text-lg font-semibold text-slate-900">What Haven Paid This Month</h2>
-                </div>
-                <span className="text-sm text-slate-500">
-                  {bills.filter(b => b.category !== 'membership').length} items • {formatCurrency(statementBreakdown.billsPaid + statementBreakdown.services)}
-                </span>
-              </div>
+              <h2 className="text-lg font-semibold text-slate-900 mb-4">This Month&apos;s Bills</h2>
+              <MortgageCard mortgage={mortgage} />
+            </div>
 
-              <div className="p-4 bg-emerald-50 border border-emerald-200 rounded-xl mb-4">
-                <p className="text-sm text-emerald-800">
-                  <strong>You didn&apos;t have to do anything.</strong> Haven automatically paid these bills and coordinated these services for you.
-                </p>
-              </div>
-
-              <div className="space-y-3">
-                {Object.entries(billsByCategory)
-                  .filter(([, categoryBills]) => categoryBills.length > 0)
-                  .map(([category, categoryBills]) => (
-                    <BillCategoryGroup
-                      key={category}
-                      category={category as TransactionCategory}
-                      bills={categoryBills}
-                      isExpanded={expandedCategories.has(category as TransactionCategory)}
-                      onToggle={() => toggleCategory(category as TransactionCategory)}
-                    />
-                  ))}
-              </div>
+            {/* Bills by Category */}
+            <div className="space-y-3">
+              {(Object.entries(billsByCategory) as [BillCategory, BillItem[]][])
+                .filter(([category, categoryBills]) => categoryBills.length > 0 && category !== 'mortgage' && category !== 'membership')
+                .map(([category, categoryBills]) => (
+                  <BillCategoryGroup
+                    key={category}
+                    category={category}
+                    bills={categoryBills}
+                    isExpanded={expandedCategories.has(category)}
+                    onToggle={() => toggleCategory(category)}
+                  />
+                ))}
             </div>
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Upcoming Bills */}
+            {/* Annual Summary */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-slate-900">Upcoming Bills</h3>
-                <CalendarDays className="w-5 h-5 text-slate-400" />
-              </div>
-
-              <div className="space-y-3">
-                {upcomingBills.slice(0, 4).map((bill) => {
-                  const CategoryIcon = getCategoryIcon(bill.category);
-                  const categoryColor = getCategoryColor(bill.category);
-                  return (
-                    <div key={bill.id} className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${categoryColor.bg}`}>
-                        <CategoryIcon className={`w-4 h-4 ${categoryColor.icon}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-slate-900 truncate">{bill.vendor}</span>
-                          {bill.isEstimate && (
-                            <span className="text-[10px] text-slate-400">est.</span>
-                          )}
-                        </div>
-                        <div className="text-xs text-slate-500">Due {formatDate(bill.dueDate)}</div>
-                      </div>
-                      <span className="text-sm font-medium text-slate-700">{formatCurrency(bill.amount)}</span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-slate-500">Est. Next Month</span>
-                  <span className="font-semibold text-slate-900">
-                    {formatCurrency(upcomingBills.reduce((s, b) => s + b.amount, 0) + HAVEN_MEMBERSHIP_FEE)}
-                  </span>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <TrendingUp className="w-5 h-5 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-slate-900">{currentYear} Summary</h3>
+                  <p className="text-sm text-slate-500">Year-to-date spending</p>
                 </div>
               </div>
+
+              <div className="p-4 bg-slate-50 rounded-lg mb-4">
+                <div className="text-center">
+                  <div className="text-3xl font-bold text-slate-900">{formatCurrency(ytdTotal)}</div>
+                  <div className="text-sm text-slate-500 mt-1">Total paid by Haven this year</div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => showToast('Opening annual summary...', 'info')}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
+              >
+                View Full Report
+                <ArrowRight className="w-4 h-4" />
+              </button>
             </div>
 
             {/* Bill Accounts */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-semibold text-slate-900">Bill Accounts</h3>
-                <span className="text-xs text-slate-500">{billAccounts.length} linked</span>
+                <span className="text-xs text-slate-500">12 linked</span>
               </div>
 
-              <div className="space-y-2">
-                {billAccounts.slice(0, 4).map((account) => (
-                  <div key={account.id} className="flex items-center justify-between p-2 hover:bg-slate-50 rounded-lg transition-colors">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm text-slate-700">{account.vendor}</span>
-                      {account.isAutoPay && (
-                        <RefreshCw className="w-3 h-3 text-emerald-500" />
-                      )}
-                    </div>
-                    <span className="text-xs text-slate-400 font-mono">{account.accountNumber}</span>
-                  </div>
-                ))}
-              </div>
+              <p className="text-sm text-slate-600 mb-4">
+                Haven pays these bills on your behalf and includes them in your monthly statement.
+              </p>
 
               <button
-                onClick={() => setShowAddAccountModal(true)}
-                className="w-full mt-4 flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+                onClick={() => showToast('Opening bill account management...', 'info')}
+                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
               >
-                <Plus className="w-4 h-4" />
-                <span className="text-sm font-medium">Add Bill Account</span>
+                <Settings className="w-4 h-4" />
+                <span className="text-sm font-medium">Manage Accounts</span>
               </button>
             </div>
 
-            {/* Annual Summary Link */}
+            {/* Payment Method */}
             <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <TrendingUp className="w-5 h-5 text-purple-600" />
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-900">Payment Method</h3>
+                <button className="text-sm text-emerald-600 font-medium">Change</button>
+              </div>
+
+              <div className="p-4 bg-slate-50 rounded-lg flex items-center gap-4">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Building2 className="w-5 h-5 text-blue-600" />
+                </div>
+                <div className="flex-1">
+                  <div className="font-medium text-slate-900">Chase Checking</div>
+                  <div className="text-sm text-slate-500">•••• 9876</div>
+                </div>
+                <BadgeCheck className="w-5 h-5 text-emerald-500" />
+              </div>
+            </div>
+
+            {/* Tax Documents */}
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2 bg-slate-100 rounded-lg">
+                  <FileText className="w-5 h-5 text-slate-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">Annual Summary</h3>
-                  <p className="text-sm text-slate-500">2024 spending overview</p>
+                  <h3 className="font-semibold text-slate-900">Tax Documents</h3>
+                  <p className="text-sm text-slate-500">Download for your records</p>
                 </div>
               </div>
 
-              <div className="p-3 bg-slate-50 rounded-lg mb-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-600">Total 2024</span>
-                  <span className="font-semibold text-slate-900">{formatCurrency(statementBreakdown.total * 11)}</span>
-                </div>
+              <div className="space-y-2">
+                <button
+                  onClick={() => showToast('Downloading 2024 tax summary...', 'info')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <span className="text-sm font-medium text-slate-700">2024 Tax Summary</span>
+                  <Download className="w-4 h-4 text-slate-400" />
+                </button>
+                <button
+                  onClick={() => showToast('Downloading property tax records...', 'info')}
+                  className="w-full flex items-center justify-between p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+                >
+                  <span className="text-sm font-medium text-slate-700">Property Tax Records</span>
+                  <Download className="w-4 h-4 text-slate-400" />
+                </button>
               </div>
-
-              <button
-                onClick={() => showToast('Opening annual summary...', 'info')}
-                className="w-full flex items-center justify-center gap-2 px-4 py-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors font-medium text-sm"
-              >
-                View Full Report
-                <ArrowRight className="w-4 h-4" />
-              </button>
             </div>
 
             {/* How It Works */}
@@ -903,12 +1186,12 @@ export default function BillingPage() {
                 <div>
                   <h3 className="font-semibold mb-1">One Bill, Zero Hassle</h3>
                   <p className="text-sm text-emerald-100">
-                    Haven pays all your home bills and sends you one simple statement each month.
+                    Haven pays ALL your household bills - mortgage, utilities, insurance, services, activities - then sends you one simple statement.
                   </p>
                 </div>
               </div>
               <button
-                onClick={() => showToast('Opening how it works guide...', 'info')}
+                onClick={() => showToast('Opening guide...', 'info')}
                 className="w-full px-4 py-2 bg-white text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-50 transition-colors"
               >
                 Learn How It Works
@@ -945,33 +1228,36 @@ export default function BillingPage() {
             </div>
 
             <div className="p-6 overflow-y-auto max-h-[calc(85vh-200px)]">
-              {/* Membership */}
-              <div className="mb-6">
-                <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Membership</h3>
-                <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-200 rounded-lg">
-                      <Receipt className="w-4 h-4 text-slate-600" />
-                    </div>
-                    <span className="font-medium text-slate-900">Haven Home Management</span>
-                  </div>
-                  <span className="font-semibold text-slate-900">{formatCurrency(HAVEN_MEMBERSHIP_FEE)}</span>
-                </div>
-              </div>
-
-              {/* Bills by category */}
-              {Object.entries(billsByCategory)
+              {/* Statement content - grouped by category */}
+              {(Object.entries(billsByCategory) as [BillCategory, BillItem[]][])
                 .filter(([, categoryBills]) => categoryBills.length > 0)
                 .map(([category, categoryBills]) => {
-                  const CategoryIcon = getCategoryIcon(category as TransactionCategory);
-                  const categoryColor = getCategoryColor(category as TransactionCategory);
+                  const CategoryIcon = getCategoryIcon(category);
+                  const categoryColor = getCategoryColor(category);
                   const categoryTotal = categoryBills.reduce((s, b) => s + b.amount, 0);
+
+                  if (category === 'membership') {
+                    return (
+                      <div key={category} className="mb-6">
+                        <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3">Membership</h3>
+                        <div className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-slate-200 rounded-lg">
+                              <Receipt className="w-4 h-4 text-slate-600" />
+                            </div>
+                            <span className="font-medium text-slate-900">Haven Home Management</span>
+                          </div>
+                          <span className="font-semibold text-slate-900">{formatCurrency(HAVEN_MEMBERSHIP_FEE)}</span>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
                     <div key={category} className="mb-6">
                       <div className="flex items-center justify-between mb-3">
                         <h3 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">
-                          {getCategoryLabel(category as TransactionCategory)}
+                          {getCategoryLabel(category)}
                         </h3>
                         <span className="text-sm font-medium text-slate-700">{formatCurrency(categoryTotal)}</span>
                       </div>
@@ -989,7 +1275,9 @@ export default function BillingPage() {
                             </div>
                             <div className="text-right">
                               <div className="font-medium text-slate-900">{formatCurrency(bill.amount)}</div>
-                              <div className="text-xs text-slate-400">{formatDate(bill.date)}</div>
+                              {bill.paidDate && (
+                                <div className="text-xs text-slate-400">{formatDate(bill.paidDate)}</div>
+                              )}
                             </div>
                           </div>
                         ))}
@@ -1026,7 +1314,7 @@ export default function BillingPage() {
 
             <div className="space-y-4">
               <p className="text-slate-600">
-                Your manager can automatically approve expenses under this amount without asking you first.
+                Sarah can automatically approve routine expenses under this amount without asking you first.
               </p>
 
               <div className="p-4 bg-slate-50 rounded-xl">
@@ -1069,68 +1357,6 @@ export default function BillingPage() {
                 className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
               >
                 Save Threshold
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Add Bill Account Modal */}
-      {showAddAccountModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-slate-900">Add Bill Account</h2>
-              <button
-                onClick={() => setShowAddAccountModal(false)}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-              >
-                <X className="w-5 h-5 text-slate-500" />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <p className="text-slate-600">
-                Link a new bill account so Haven can pay it automatically on your behalf.
-              </p>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Bill Provider</label>
-                <select className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent">
-                  <option value="">Select a provider...</option>
-                  <option value="electric">Electric Company</option>
-                  <option value="gas">Gas Company</option>
-                  <option value="water">Water Authority</option>
-                  <option value="internet">Internet Provider</option>
-                  <option value="trash">Trash/Recycling</option>
-                  <option value="hoa">HOA Dues</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Account Number</label>
-                <input
-                  type="text"
-                  placeholder="Enter your account number"
-                  className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
-                />
-              </div>
-
-              <div className="p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                <p className="text-sm text-emerald-800">
-                  <strong>Secure:</strong> Your account info is encrypted and only used to pay your bills.
-                </p>
-              </div>
-
-              <button
-                onClick={() => {
-                  setShowAddAccountModal(false);
-                  showToast('Bill account added! Your manager will verify the connection.', 'success');
-                }}
-                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
-              >
-                Add Account
               </button>
             </div>
           </div>
