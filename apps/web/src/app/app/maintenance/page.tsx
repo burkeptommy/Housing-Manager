@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import {
   Thermometer,
   Droplets,
@@ -11,28 +12,30 @@ import {
   AlertCircle,
   CheckCircle2,
   Clock,
-  Phone,
-  MessageCircle,
   Star,
-  Plus,
   FileText,
   Search,
   Wrench,
   Settings,
-  RefreshCw,
   X,
-  Camera,
   Activity,
   Waves,
   Refrigerator,
   WashingMachine,
   AirVent,
   BadgeCheck,
-  ExternalLink,
   Loader2,
+  Calendar,
+  Headphones,
+  Check,
+  Camera,
+  Shield,
+  ClipboardCheck,
+  UserCheck,
 } from 'lucide-react';
 import { getApiClient } from '@/lib/api';
 import { useAuth } from '@/contexts/auth-context';
+import { getDemoImage } from '@/lib/imageUtils';
 
 // ============================================================================
 // TYPES
@@ -40,6 +43,7 @@ import { useAuth } from '@/contexts/auth-context';
 
 type AssetHealth = 'excellent' | 'good' | 'fair' | 'needs_attention' | 'critical';
 type AlertSeverity = 'critical' | 'warning' | 'info' | 'success';
+type ManagerStatus = 'scheduling' | 'ordered' | 'scheduled' | 'completed' | 'monitoring';
 
 interface HomeAsset {
   id: string;
@@ -49,9 +53,11 @@ interface HomeAsset {
   model?: string;
   icon: typeof Thermometer;
   installDate: Date;
-  expectedLifespan: number; // years
+  expectedLifespan: number;
   lastService?: Date;
+  lastServiceVendor?: string;
   nextServiceDue?: Date;
+  nextServiceMonth?: string;
   health: AssetHealth;
   location?: string;
   warrantyExpires?: Date;
@@ -67,6 +73,38 @@ interface MaintenanceAlert {
   severity: AlertSeverity;
   daysOverdue?: number;
   dueDate?: Date;
+  managerStatus: ManagerStatus;
+  managerMessage: string;
+}
+
+interface ScheduledService {
+  id: string;
+  date: Date;
+  assetName: string;
+  serviceType: string;
+  vendorName: string;
+  vendorId?: string;
+  isConfirmed: boolean;
+}
+
+interface WarrantyAlert {
+  id: string;
+  assetName: string;
+  assetId: string;
+  expiresAt: Date;
+  monthsRemaining: number;
+  recommendation: string;
+}
+
+interface HandymanVisit {
+  id: string;
+  date: Date;
+  handymanName: string;
+  handymanAvatar?: string;
+  tasksCompleted: string[];
+  notes?: string;
+  photos?: string[];
+  recommendations?: { item: string; action: string }[];
 }
 
 interface TrustedVendor {
@@ -74,13 +112,10 @@ interface TrustedVendor {
   name: string;
   company: string;
   trade: string;
-  phone: string;
-  email: string;
-  avatar?: string;
-  initials: string;
-  lastVisit?: Date;
   rating: number;
   jobsCompleted: number;
+  initials: string;
+  isPreferred?: boolean;
 }
 
 interface ServiceRecord {
@@ -94,460 +129,19 @@ interface ServiceRecord {
   description: string;
   cost?: number;
   invoiceUrl?: string;
-  notes?: string;
+  scheduledBy: 'Sarah' | 'Homeowner' | 'Auto';
   diy: boolean;
 }
 
 // ============================================================================
-// MOCK DATA (Fallback for demos)
+// CONSTANTS
 // ============================================================================
 
-const MOCK_ASSETS: HomeAsset[] = [
-  {
-    id: 'hvac-main',
-    name: 'Main HVAC System',
-    category: 'Climate',
-    brand: 'Carrier',
-    model: 'Infinity 26',
-    icon: AirVent,
-    installDate: new Date(2019, 5, 15),
-    expectedLifespan: 15,
-    lastService: new Date(2024, 3, 10),
-    nextServiceDue: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 14 days overdue
-    health: 'needs_attention',
-    location: 'Attic',
-    warrantyExpires: new Date(2029, 5, 15),
-    serialNumber: 'CAR-INF26-2019-0615',
-  },
-  {
-    id: 'water-heater',
-    name: 'Water Heater',
-    category: 'Plumbing',
-    brand: 'Rheem',
-    model: 'Performance Plus',
-    icon: Flame,
-    installDate: new Date(2020, 8, 22),
-    expectedLifespan: 12,
-    lastService: new Date(2024, 9, 5),
-    nextServiceDue: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-    health: 'good',
-    location: 'Garage',
-    warrantyExpires: new Date(2026, 8, 22),
-    serialNumber: 'RHM-PP50-2020-0922',
-  },
-  {
-    id: 'roof',
-    name: 'Roof System',
-    category: 'Structure',
-    brand: 'GAF',
-    model: 'Timberline HDZ',
-    icon: Home,
-    installDate: new Date(2018, 3, 10),
-    expectedLifespan: 30,
-    lastService: new Date(2024, 10, 15),
-    nextServiceDue: new Date(Date.now() + 335 * 24 * 60 * 60 * 1000),
-    health: 'excellent',
-    location: 'Exterior',
-  },
-  {
-    id: 'pool-pump',
-    name: 'Pool Equipment',
-    category: 'Pool',
-    brand: 'Pentair',
-    model: 'IntelliFlo VSF',
-    icon: Waves,
-    installDate: new Date(2021, 4, 1),
-    expectedLifespan: 10,
-    lastService: new Date(2024, 8, 20),
-    nextServiceDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    health: 'good',
-    location: 'Backyard',
-    serialNumber: 'PEN-VSF-2021-0501',
-  },
-  {
-    id: 'electrical-panel',
-    name: 'Electrical Panel',
-    category: 'Electrical',
-    brand: 'Square D',
-    model: 'QO 200A',
-    icon: Zap,
-    installDate: new Date(2015, 2, 8),
-    expectedLifespan: 40,
-    lastService: new Date(2023, 11, 12),
-    nextServiceDue: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-    health: 'excellent',
-    location: 'Garage',
-  },
-  {
-    id: 'water-softener',
-    name: 'Water Softener',
-    category: 'Plumbing',
-    brand: 'Culligan',
-    model: 'HE Series',
-    icon: Droplets,
-    installDate: new Date(2022, 1, 14),
-    expectedLifespan: 15,
-    lastService: new Date(2024, 7, 30),
-    nextServiceDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 2 weeks
-    health: 'good',
-    location: 'Garage',
-    notes: 'Salt refill needed every 2 months',
-  },
-  {
-    id: 'refrigerator',
-    name: 'Kitchen Refrigerator',
-    category: 'Appliances',
-    brand: 'Sub-Zero',
-    model: 'BI-36U',
-    icon: Refrigerator,
-    installDate: new Date(2020, 6, 1),
-    expectedLifespan: 20,
-    lastService: new Date(2024, 5, 15),
-    nextServiceDue: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-    health: 'excellent',
-    location: 'Kitchen',
-    warrantyExpires: new Date(2025, 6, 1),
-    serialNumber: 'SZ-BI36U-2020-0701',
-  },
-  {
-    id: 'washer-dryer',
-    name: 'Washer & Dryer',
-    category: 'Appliances',
-    brand: 'LG',
-    model: 'WM4500HBA / DLEX4500B',
-    icon: WashingMachine,
-    installDate: new Date(2023, 0, 20),
-    expectedLifespan: 12,
-    lastService: new Date(2024, 6, 10),
-    nextServiceDue: new Date(Date.now() + 150 * 24 * 60 * 60 * 1000),
-    health: 'excellent',
-    location: 'Laundry Room',
-    warrantyExpires: new Date(2026, 0, 20),
-    serialNumber: 'LG-WM4500-2023-0120',
-  },
-];
-
-const MOCK_ALERTS: MaintenanceAlert[] = [
-  {
-    id: 'a1',
-    assetId: 'hvac-main',
-    assetName: 'Main HVAC System',
-    message: 'HVAC Service Overdue',
-    severity: 'critical',
-    daysOverdue: 14,
-  },
-  {
-    id: 'a2',
-    assetId: 'water-softener',
-    assetName: 'Water Softener',
-    message: 'Water filter expires in 2 weeks',
-    severity: 'warning',
-    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: 'a3',
-    assetId: 'roof',
-    assetName: 'Roof System',
-    message: 'Annual inspection completed',
-    severity: 'success',
-  },
-  {
-    id: 'a4',
-    assetName: 'Smoke Detectors',
-    message: 'Battery replacement due next month',
-    severity: 'info',
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-  },
-];
-
-const MOCK_VENDORS: TrustedVendor[] = [
-  {
-    id: 'v1',
-    name: 'Mike Thompson',
-    company: 'Thompson HVAC Services',
-    trade: 'HVAC',
-    phone: '(512) 555-0201',
-    email: 'mike@thompsonhvac.com',
-    initials: 'MT',
-    lastVisit: new Date(2024, 3, 10),
-    rating: 4.9,
-    jobsCompleted: 8,
-  },
-  {
-    id: 'v2',
-    name: 'Sarah Martinez',
-    company: 'Elite Plumbing Co.',
-    trade: 'Plumber',
-    phone: '(512) 555-0202',
-    email: 'sarah@eliteplumbing.com',
-    initials: 'SM',
-    lastVisit: new Date(2024, 9, 5),
-    rating: 5.0,
-    jobsCompleted: 5,
-  },
-  {
-    id: 'v3',
-    name: 'James Wilson',
-    company: 'Wilson Electric',
-    trade: 'Electrician',
-    phone: '(512) 555-0203',
-    email: 'james@wilsonelectric.com',
-    initials: 'JW',
-    lastVisit: new Date(2023, 11, 12),
-    rating: 4.8,
-    jobsCompleted: 3,
-  },
-  {
-    id: 'v4',
-    name: 'Crystal Clear Pools',
-    company: 'Crystal Clear Pool Service',
-    trade: 'Pool',
-    phone: '(512) 555-0204',
-    email: 'service@crystalclearpools.com',
-    initials: 'CC',
-    lastVisit: new Date(2024, 8, 20),
-    rating: 4.7,
-    jobsCompleted: 12,
-  },
-];
-
-const MOCK_HISTORY: ServiceRecord[] = [
-  {
-    id: 's1',
-    assetId: 'roof',
-    assetName: 'Roof System',
-    date: new Date(2024, 10, 15),
-    vendor: 'ABC Roofing',
-    serviceType: 'Annual Inspection',
-    description: 'Complete roof inspection. All shingles in good condition. Minor gutter cleaning performed.',
-    cost: 150,
-    invoiceUrl: '/invoices/roof-2024.pdf',
-    diy: false,
-  },
-  {
-    id: 's2',
-    assetId: 'water-heater',
-    assetName: 'Water Heater',
-    date: new Date(2024, 9, 5),
-    vendor: 'Elite Plumbing Co.',
-    vendorId: 'v2',
-    serviceType: 'Annual Flush',
-    description: 'Flushed sediment, checked anode rod (50% remaining), inspected connections.',
-    cost: 125,
-    invoiceUrl: '/invoices/waterheater-2024.pdf',
-    diy: false,
-  },
-  {
-    id: 's3',
-    assetId: 'pool-pump',
-    assetName: 'Pool Equipment',
-    date: new Date(2024, 8, 20),
-    vendor: 'Crystal Clear Pool Service',
-    vendorId: 'v4',
-    serviceType: 'Quarterly Service',
-    description: 'Chemical balance, filter cleaning, pump inspection. Replaced O-ring seal.',
-    cost: 175,
-    invoiceUrl: '/invoices/pool-q3-2024.pdf',
-    diy: false,
-  },
-  {
-    id: 's4',
-    assetId: 'water-softener',
-    assetName: 'Water Softener',
-    date: new Date(2024, 7, 30),
-    serviceType: 'Salt Refill',
-    description: 'Added 80lbs Morton salt pellets.',
-    cost: 35,
-    diy: true,
-  },
-  {
-    id: 's5',
-    assetId: 'refrigerator',
-    assetName: 'Kitchen Refrigerator',
-    date: new Date(2024, 5, 15),
-    vendor: 'Sub-Zero Authorized Service',
-    serviceType: 'Annual Maintenance',
-    description: 'Condenser coil cleaning, door seal inspection, temperature calibration.',
-    cost: 250,
-    invoiceUrl: '/invoices/subzero-2024.pdf',
-    diy: false,
-  },
-  {
-    id: 's6',
-    assetId: 'hvac-main',
-    assetName: 'Main HVAC System',
-    date: new Date(2024, 3, 10),
-    vendor: 'Thompson HVAC Services',
-    vendorId: 'v1',
-    serviceType: 'Spring Tune-Up',
-    description: 'Full system inspection, filter replacement, coil cleaning, refrigerant check.',
-    cost: 189,
-    invoiceUrl: '/invoices/hvac-spring-2024.pdf',
-    diy: false,
-  },
-];
-
-// ============================================================================
-// API MAPPING HELPERS
-// ============================================================================
-
-// Map asset type/category to Lucide icon
-function getAssetIcon(type?: string, category?: string): typeof Thermometer {
-  const typeOrCat = (type || category || '').toUpperCase();
-
-  if (typeOrCat.includes('HVAC') || typeOrCat.includes('AIR') || typeOrCat.includes('CLIMATE')) {
-    return AirVent;
-  }
-  if (typeOrCat.includes('PLUMBING') || typeOrCat.includes('WATER_HEATER') || typeOrCat.includes('WATER')) {
-    return Droplets;
-  }
-  if (typeOrCat.includes('HEATING') || typeOrCat.includes('FURNACE') || typeOrCat.includes('HEATER')) {
-    return Flame;
-  }
-  if (typeOrCat.includes('ELECTRICAL') || typeOrCat.includes('ELECTRIC')) {
-    return Zap;
-  }
-  if (typeOrCat.includes('ROOF') || typeOrCat.includes('STRUCTURE')) {
-    return Home;
-  }
-  if (typeOrCat.includes('POOL') || typeOrCat.includes('SPA')) {
-    return Waves;
-  }
-  if (typeOrCat.includes('REFRIGERATOR') || typeOrCat.includes('FRIDGE')) {
-    return Refrigerator;
-  }
-  if (typeOrCat.includes('WASHER') || typeOrCat.includes('DRYER') || typeOrCat.includes('LAUNDRY')) {
-    return WashingMachine;
-  }
-  if (typeOrCat.includes('APPLIANCE')) {
-    return Zap;
-  }
-
-  return Wrench; // Default
-}
-
-// Map API asset status to UI health
-function mapAssetHealth(status?: string): AssetHealth {
-  const statusUpper = (status || '').toUpperCase();
-
-  if (statusUpper.includes('CRITICAL') || statusUpper.includes('FAILED')) {
-    return 'critical';
-  }
-  if (statusUpper.includes('NEEDS_SERVICE') || statusUpper.includes('ATTENTION') || statusUpper.includes('OVERDUE')) {
-    return 'needs_attention';
-  }
-  if (statusUpper.includes('FAIR') || statusUpper.includes('AGING')) {
-    return 'fair';
-  }
-  if (statusUpper.includes('GOOD') || statusUpper.includes('OK')) {
-    return 'good';
-  }
-
-  return 'excellent'; // Default to excellent
-}
-
-// Map API asset to UI HomeAsset (used when assets API is available)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _mapApiAssetToUi(apiAsset: Record<string, unknown>): HomeAsset {
-  const installDate = apiAsset.installDate || apiAsset.purchaseDate || apiAsset.createdAt;
-  const lastServiceDate = apiAsset.lastServiceDate || apiAsset.lastMaintenance;
-  const nextServiceDate = apiAsset.nextServiceDue || apiAsset.nextMaintenanceDate;
-  const warrantyDate = apiAsset.warrantyExpires || apiAsset.warrantyEndDate;
-
-  return {
-    id: String(apiAsset.id),
-    name: String(apiAsset.name || apiAsset.displayName || 'Unknown Asset'),
-    category: String(apiAsset.category || apiAsset.type || 'General'),
-    brand: String(apiAsset.brand || apiAsset.manufacturer || 'Unknown'),
-    model: apiAsset.model ? String(apiAsset.model) : undefined,
-    icon: getAssetIcon(apiAsset.type as string, apiAsset.category as string),
-    installDate: installDate ? new Date(installDate as string) : new Date(),
-    expectedLifespan: Number(apiAsset.expectedLifespan || apiAsset.lifespan || 15),
-    lastService: lastServiceDate ? new Date(lastServiceDate as string) : undefined,
-    nextServiceDue: nextServiceDate ? new Date(nextServiceDate as string) : undefined,
-    health: mapAssetHealth(apiAsset.status as string),
-    location: apiAsset.location ? String(apiAsset.location) : undefined,
-    warrantyExpires: warrantyDate ? new Date(warrantyDate as string) : undefined,
-    notes: apiAsset.notes ? String(apiAsset.notes) : undefined,
-    serialNumber: apiAsset.serialNumber ? String(apiAsset.serialNumber) : undefined,
-  };
-}
-
-// Map API service record to UI ServiceRecord (used when service history API is available)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _mapApiServiceRecord(apiRecord: Record<string, unknown>): ServiceRecord {
-  const vendorObj = apiRecord.vendor as Record<string, unknown> | undefined;
-  const assetObj = apiRecord.asset as Record<string, unknown> | undefined;
-
-  return {
-    id: String(apiRecord.id),
-    assetId: String(apiRecord.assetId || assetObj?.id || ''),
-    assetName: String(assetObj?.name || apiRecord.assetName || 'Unknown Asset'),
-    date: new Date(apiRecord.date as string || apiRecord.serviceDate as string || apiRecord.createdAt as string),
-    vendor: vendorObj ? String(vendorObj.name || vendorObj.displayName) : (apiRecord.vendorName ? String(apiRecord.vendorName) : undefined),
-    vendorId: vendorObj ? String(vendorObj.id) : undefined,
-    serviceType: String(apiRecord.serviceType || apiRecord.type || 'Service'),
-    description: String(apiRecord.description || apiRecord.notes || ''),
-    cost: apiRecord.cost !== undefined ? Number(apiRecord.cost) : undefined,
-    invoiceUrl: apiRecord.invoiceUrl ? String(apiRecord.invoiceUrl) : undefined,
-    notes: apiRecord.notes ? String(apiRecord.notes) : undefined,
-    diy: Boolean(apiRecord.isDiy || apiRecord.diy || !vendorObj),
-  };
-}
-
-// Map API vendor to UI TrustedVendor
-function mapApiVendorToUi(apiVendor: Record<string, unknown>): TrustedVendor {
-  const name = String(apiVendor.name || apiVendor.displayName || 'Unknown');
-  const nameParts = name.split(' ').filter(Boolean);
-  const firstPart = nameParts[0] || '';
-  const lastPart = nameParts[nameParts.length - 1] || '';
-  const initials = nameParts.length >= 2 && firstPart.length > 0 && lastPart.length > 0
-    ? `${firstPart.charAt(0)}${lastPart.charAt(0)}`.toUpperCase()
-    : name.substring(0, 2).toUpperCase();
-
-  return {
-    id: String(apiVendor.id),
-    name: name,
-    company: String(apiVendor.company || apiVendor.businessName || name),
-    trade: String(apiVendor.trade || apiVendor.category || apiVendor.specialty || 'General'),
-    phone: String(apiVendor.phone || apiVendor.phoneNumber || ''),
-    email: String(apiVendor.email || ''),
-    avatar: apiVendor.avatar ? String(apiVendor.avatar) : undefined,
-    initials: initials,
-    lastVisit: apiVendor.lastVisit ? new Date(apiVendor.lastVisit as string) : undefined,
-    rating: Number(apiVendor.rating || apiVendor.averageRating || 5),
-    jobsCompleted: Number(apiVendor.jobsCompleted || apiVendor.completedJobs || 0),
-  };
-}
-
-// Map API alert to UI MaintenanceAlert (used when alerts API is available)
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function _mapApiAlertToUi(apiAlert: Record<string, unknown>): MaintenanceAlert {
-  const severity = String(apiAlert.severity || apiAlert.priority || 'info').toLowerCase();
-  let alertSeverity: AlertSeverity = 'info';
-
-  if (severity.includes('critical') || severity.includes('high') || severity.includes('urgent')) {
-    alertSeverity = 'critical';
-  } else if (severity.includes('warning') || severity.includes('medium')) {
-    alertSeverity = 'warning';
-  } else if (severity.includes('success') || severity.includes('completed') || severity.includes('resolved')) {
-    alertSeverity = 'success';
-  }
-
-  return {
-    id: String(apiAlert.id),
-    assetId: apiAlert.assetId ? String(apiAlert.assetId) : undefined,
-    assetName: String(apiAlert.assetName || (apiAlert.asset as Record<string, unknown>)?.name || 'Unknown'),
-    message: String(apiAlert.message || apiAlert.title || apiAlert.description || ''),
-    severity: alertSeverity,
-    daysOverdue: apiAlert.daysOverdue ? Number(apiAlert.daysOverdue) : undefined,
-    dueDate: apiAlert.dueDate ? new Date(apiAlert.dueDate as string) : undefined,
-  };
-}
-
-// ============================================================================
-// CONFIG
-// ============================================================================
+const HOUSING_MANAGER = {
+  name: 'Sarah',
+  title: 'Your Home Manager',
+  avatar: getDemoImage('avatar-female', 100, 100, 'sarah-manager'),
+};
 
 const healthConfig: Record<AssetHealth, { color: string; bgColor: string; label: string }> = {
   excellent: { color: 'text-emerald-700', bgColor: 'bg-emerald-100', label: 'Excellent' },
@@ -565,52 +159,1035 @@ const alertConfig: Record<AlertSeverity, { color: string; bgColor: string; borde
 };
 
 // ============================================================================
-// COMPONENT
+// MOCK DATA
+// ============================================================================
+
+const MOCK_ASSETS: HomeAsset[] = [
+  {
+    id: 'hvac-main',
+    name: 'Main HVAC System',
+    category: 'Climate',
+    brand: 'Carrier',
+    model: 'Infinity 26',
+    icon: AirVent,
+    installDate: new Date(2019, 5, 15),
+    expectedLifespan: 15,
+    lastService: new Date(2024, 3, 10),
+    lastServiceVendor: 'AirFlow HVAC',
+    nextServiceDue: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'January',
+    health: 'needs_attention',
+    location: 'Attic',
+    warrantyExpires: new Date(2029, 5, 15),
+    serialNumber: 'CAR-INF26-2019-0615',
+  },
+  {
+    id: 'water-heater',
+    name: 'Water Heater',
+    category: 'Plumbing',
+    brand: 'Rheem',
+    model: 'Performance Plus',
+    icon: Flame,
+    installDate: new Date(2020, 8, 22),
+    expectedLifespan: 12,
+    lastService: new Date(2024, 9, 5),
+    lastServiceVendor: 'Elite Plumbing Co.',
+    nextServiceDue: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'February',
+    health: 'good',
+    location: 'Garage',
+    warrantyExpires: new Date(2026, 8, 22),
+    serialNumber: 'RHM-PP50-2020-0922',
+  },
+  {
+    id: 'roof',
+    name: 'Roof System',
+    category: 'Structure',
+    brand: 'GAF',
+    model: 'Timberline HDZ',
+    icon: Home,
+    installDate: new Date(2018, 3, 10),
+    expectedLifespan: 30,
+    lastService: new Date(2024, 10, 15),
+    lastServiceVendor: 'ABC Roofing',
+    nextServiceDue: new Date(Date.now() + 335 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'November',
+    health: 'excellent',
+    location: 'Exterior',
+  },
+  {
+    id: 'pool-pump',
+    name: 'Pool Equipment',
+    category: 'Pool',
+    brand: 'Pentair',
+    model: 'IntelliFlo VSF',
+    icon: Waves,
+    installDate: new Date(2021, 4, 1),
+    expectedLifespan: 10,
+    lastService: new Date(2024, 8, 20),
+    lastServiceVendor: 'Crystal Clear Pools',
+    nextServiceDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'January',
+    health: 'good',
+    location: 'Backyard',
+    warrantyExpires: new Date(2025, 3, 1), // Expires in ~4 months
+    serialNumber: 'PEN-VSF-2021-0501',
+  },
+  {
+    id: 'electrical-panel',
+    name: 'Electrical Panel',
+    category: 'Electrical',
+    brand: 'Square D',
+    model: 'QO 200A',
+    icon: Zap,
+    installDate: new Date(2015, 2, 8),
+    expectedLifespan: 40,
+    lastService: new Date(2023, 11, 12),
+    lastServiceVendor: 'Wilson Electric',
+    nextServiceDue: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'June',
+    health: 'excellent',
+    location: 'Garage',
+  },
+  {
+    id: 'water-softener',
+    name: 'Water Softener',
+    category: 'Plumbing',
+    brand: 'Culligan',
+    model: 'HE Series',
+    icon: Droplets,
+    installDate: new Date(2022, 1, 14),
+    expectedLifespan: 15,
+    lastService: new Date(2024, 7, 30),
+    lastServiceVendor: 'DIY',
+    nextServiceDue: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    health: 'good',
+    location: 'Garage',
+    notes: 'Salt refill needed every 2 months',
+  },
+  {
+    id: 'refrigerator',
+    name: 'Kitchen Refrigerator',
+    category: 'Appliances',
+    brand: 'Sub-Zero',
+    model: 'BI-36U',
+    icon: Refrigerator,
+    installDate: new Date(2020, 6, 1),
+    expectedLifespan: 20,
+    lastService: new Date(2024, 5, 15),
+    lastServiceVendor: 'Sub-Zero Authorized Service',
+    nextServiceDue: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'June',
+    health: 'excellent',
+    location: 'Kitchen',
+    warrantyExpires: new Date(2025, 6, 1),
+    serialNumber: 'SZ-BI36U-2020-0701',
+  },
+  {
+    id: 'washer-dryer',
+    name: 'Washer & Dryer',
+    category: 'Appliances',
+    brand: 'LG',
+    model: 'WM4500HBA / DLEX4500B',
+    icon: WashingMachine,
+    installDate: new Date(2023, 0, 20),
+    expectedLifespan: 12,
+    lastService: new Date(2024, 6, 10),
+    lastServiceVendor: 'Appliance Pros',
+    nextServiceDue: new Date(Date.now() + 150 * 24 * 60 * 60 * 1000),
+    nextServiceMonth: 'May',
+    health: 'excellent',
+    location: 'Laundry Room',
+    warrantyExpires: new Date(2026, 0, 20),
+    serialNumber: 'LG-WM4500-2023-0120',
+  },
+];
+
+const MOCK_ALERTS: MaintenanceAlert[] = [
+  {
+    id: 'a1',
+    assetId: 'hvac-main',
+    assetName: 'Main HVAC System',
+    message: 'HVAC Service Overdue',
+    severity: 'critical',
+    daysOverdue: 14,
+    managerStatus: 'scheduling',
+    managerMessage: 'Sarah is scheduling with AirFlow HVAC',
+  },
+  {
+    id: 'a2',
+    assetId: 'water-softener',
+    assetName: 'Water Softener',
+    message: 'Water filter expires in 2 weeks',
+    severity: 'warning',
+    dueDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+    managerStatus: 'ordered',
+    managerMessage: 'Replacement ordered, arrives Dec 28',
+  },
+  {
+    id: 'a3',
+    assetId: 'roof',
+    assetName: 'Roof System',
+    message: 'Annual inspection completed',
+    severity: 'success',
+    managerStatus: 'completed',
+    managerMessage: 'No issues found',
+  },
+];
+
+const MOCK_SCHEDULED_SERVICES: ScheduledService[] = [
+  {
+    id: 'svc-1',
+    date: new Date(2025, 0, 7),
+    assetName: 'Main HVAC System',
+    serviceType: 'HVAC Service',
+    vendorName: 'AirFlow HVAC',
+    vendorId: 'v1',
+    isConfirmed: true,
+  },
+  {
+    id: 'svc-2',
+    date: new Date(2025, 0, 15),
+    assetName: 'Gutters',
+    serviceType: 'Gutter Cleaning',
+    vendorName: 'Clean Gutters Co',
+    isConfirmed: true,
+  },
+  {
+    id: 'svc-3',
+    date: new Date(2025, 1, 1),
+    assetName: 'Pool Equipment',
+    serviceType: 'Pool Opening Prep',
+    vendorName: 'Crystal Clear Pools',
+    vendorId: 'v4',
+    isConfirmed: false,
+  },
+  {
+    id: 'svc-4',
+    date: new Date(2025, 2, 15),
+    assetName: 'Lawn',
+    serviceType: 'Spring Lawn Care',
+    vendorName: 'Green Thumb Landscaping',
+    isConfirmed: false,
+  },
+];
+
+const MOCK_WARRANTY_ALERTS: WarrantyAlert[] = [
+  {
+    id: 'war-1',
+    assetName: 'Pool Pump',
+    assetId: 'pool-pump',
+    expiresAt: new Date(2025, 3, 1),
+    monthsRemaining: 4,
+    recommendation: 'Schedule inspection before warranty ends to catch any issues.',
+  },
+];
+
+const MOCK_HANDYMAN_VISITS: HandymanVisit[] = [
+  {
+    id: 'hv-1',
+    date: new Date(2024, 11, 15),
+    handymanName: 'Mike',
+    handymanAvatar: getDemoImage('avatar-male', 100, 100, 'mike-handyman'),
+    tasksCompleted: [
+      'Changed HVAC filter',
+      'Checked smoke detector batteries',
+      'Inspected water heater',
+      'Tested garage door sensors',
+    ],
+    notes: 'Noticed deck boards slightly warped. Recommend sealing before spring.',
+    photos: [getDemoImage('home-repair', 300, 200, 'deck-inspection')],
+    recommendations: [
+      { item: 'Deck', action: 'Get quote for deck sealing' },
+    ],
+  },
+];
+
+const MOCK_VENDORS: TrustedVendor[] = [
+  { id: 'v1', name: 'AirFlow HVAC', company: 'AirFlow HVAC Services', trade: 'HVAC', rating: 4.9, jobsCompleted: 8, initials: 'AH', isPreferred: true },
+  { id: 'v2', name: 'Elite Plumbing', company: 'Elite Plumbing Co.', trade: 'Plumbing', rating: 5.0, jobsCompleted: 5, initials: 'EP', isPreferred: true },
+  { id: 'v3', name: 'Wilson Electric', company: 'Wilson Electric', trade: 'Electrical', rating: 4.8, jobsCompleted: 3, initials: 'WE' },
+  { id: 'v4', name: 'Crystal Clear Pools', company: 'Crystal Clear Pool Service', trade: 'Pool', rating: 4.7, jobsCompleted: 12, initials: 'CC', isPreferred: true },
+  { id: 'v5', name: 'ABC Roofing', company: 'ABC Roofing Inc.', trade: 'Roofing', rating: 4.6, jobsCompleted: 2, initials: 'AR' },
+];
+
+const MOCK_HISTORY: ServiceRecord[] = [
+  {
+    id: 's1',
+    assetId: 'roof',
+    assetName: 'Roof System',
+    date: new Date(2024, 10, 15),
+    vendor: 'ABC Roofing',
+    serviceType: 'Annual Inspection',
+    description: 'Complete roof inspection. All shingles in good condition. Minor gutter cleaning performed.',
+    cost: 150,
+    invoiceUrl: '/invoices/roof-2024.pdf',
+    scheduledBy: 'Sarah',
+    diy: false,
+  },
+  {
+    id: 's2',
+    assetId: 'water-heater',
+    assetName: 'Water Heater',
+    date: new Date(2024, 9, 5),
+    vendor: 'Elite Plumbing Co.',
+    vendorId: 'v2',
+    serviceType: 'Annual Flush',
+    description: 'Flushed sediment, checked anode rod (50% remaining), inspected connections.',
+    cost: 125,
+    invoiceUrl: '/invoices/waterheater-2024.pdf',
+    scheduledBy: 'Sarah',
+    diy: false,
+  },
+  {
+    id: 's3',
+    assetId: 'pool-pump',
+    assetName: 'Pool Equipment',
+    date: new Date(2024, 8, 20),
+    vendor: 'Crystal Clear Pool Service',
+    vendorId: 'v4',
+    serviceType: 'Quarterly Service',
+    description: 'Chemical balance, filter cleaning, pump inspection. Replaced O-ring seal.',
+    cost: 175,
+    invoiceUrl: '/invoices/pool-q3-2024.pdf',
+    scheduledBy: 'Sarah',
+    diy: false,
+  },
+  {
+    id: 's4',
+    assetId: 'water-softener',
+    assetName: 'Water Softener',
+    date: new Date(2024, 7, 30),
+    serviceType: 'Salt Refill',
+    description: 'Added 80lbs Morton salt pellets.',
+    cost: 35,
+    scheduledBy: 'Homeowner',
+    diy: true,
+  },
+  {
+    id: 's5',
+    assetId: 'refrigerator',
+    assetName: 'Kitchen Refrigerator',
+    date: new Date(2024, 5, 15),
+    vendor: 'Sub-Zero Authorized Service',
+    serviceType: 'Annual Maintenance',
+    description: 'Condenser coil cleaning, door seal inspection, temperature calibration.',
+    cost: 250,
+    invoiceUrl: '/invoices/subzero-2024.pdf',
+    scheduledBy: 'Auto',
+    diy: false,
+  },
+  {
+    id: 's6',
+    assetId: 'hvac-main',
+    assetName: 'Main HVAC System',
+    date: new Date(2024, 3, 10),
+    vendor: 'AirFlow HVAC',
+    vendorId: 'v1',
+    serviceType: 'Spring Tune-Up',
+    description: 'Full system inspection, filter replacement, coil cleaning, refrigerant check.',
+    cost: 189,
+    invoiceUrl: '/invoices/hvac-spring-2024.pdf',
+    scheduledBy: 'Sarah',
+    diy: false,
+  },
+];
+
+// ============================================================================
+// UTILITY FUNCTIONS
+// ============================================================================
+
+function getAssetIcon(type?: string, category?: string): typeof Thermometer {
+  const typeOrCat = (type || category || '').toUpperCase();
+  if (typeOrCat.includes('HVAC') || typeOrCat.includes('AIR') || typeOrCat.includes('CLIMATE')) return AirVent;
+  if (typeOrCat.includes('PLUMBING') || typeOrCat.includes('WATER')) return Droplets;
+  if (typeOrCat.includes('HEATING') || typeOrCat.includes('HEATER')) return Flame;
+  if (typeOrCat.includes('ELECTRICAL')) return Zap;
+  if (typeOrCat.includes('ROOF') || typeOrCat.includes('STRUCTURE')) return Home;
+  if (typeOrCat.includes('POOL')) return Waves;
+  if (typeOrCat.includes('REFRIGERATOR')) return Refrigerator;
+  if (typeOrCat.includes('WASHER') || typeOrCat.includes('LAUNDRY')) return WashingMachine;
+  return Wrench;
+}
+
+function mapAssetHealth(status?: string): AssetHealth {
+  const statusUpper = (status || '').toUpperCase();
+  if (statusUpper.includes('CRITICAL') || statusUpper.includes('FAILED')) return 'critical';
+  if (statusUpper.includes('NEEDS_SERVICE') || statusUpper.includes('ATTENTION')) return 'needs_attention';
+  if (statusUpper.includes('FAIR') || statusUpper.includes('AGING')) return 'fair';
+  if (statusUpper.includes('GOOD') || statusUpper.includes('OK')) return 'good';
+  return 'excellent';
+}
+
+function mapApiVendorToUi(apiVendor: Record<string, unknown>): TrustedVendor {
+  const name = String(apiVendor.name || apiVendor.displayName || 'Unknown');
+  const nameParts = name.split(' ').filter(Boolean);
+  const initials = nameParts.length >= 2
+    ? `${nameParts[0]?.charAt(0) || ''}${nameParts[nameParts.length - 1]?.charAt(0) || ''}`.toUpperCase()
+    : name.substring(0, 2).toUpperCase();
+
+  return {
+    id: String(apiVendor.id),
+    name: name,
+    company: String(apiVendor.company || apiVendor.businessName || name),
+    trade: String(apiVendor.trade || apiVendor.category || 'General'),
+    initials,
+    rating: Number(apiVendor.rating || 5),
+    jobsCompleted: Number(apiVendor.jobsCompleted || 0),
+  };
+}
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+// Manager Summary Card - Shows Sarah is proactively managing
+function ManagerSummaryCard({
+  activeAlerts,
+  scheduledServices,
+}: {
+  activeAlerts: number;
+  scheduledServices: number;
+}) {
+  return (
+    <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 rounded-xl p-4 text-white">
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
+            <Headphones className="w-6 h-6" />
+          </div>
+          <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-emerald-400 rounded-full flex items-center justify-center">
+            <Check className="w-2.5 h-2.5 text-white" />
+          </div>
+        </div>
+        <div className="flex-1">
+          <p className="font-semibold">{HOUSING_MANAGER.name} is managing your home</p>
+          <p className="text-emerald-100 text-sm">
+            {activeAlerts > 0 ? `${activeAlerts} items being handled • ` : ''}
+            {scheduledServices} upcoming services
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Active Alert Card - Shows what manager is doing
+function ActiveAlertCard({ alert }: { alert: MaintenanceAlert }) {
+  const config = alertConfig[alert.severity];
+  const AlertIcon = config.icon;
+
+  const getStatusEmoji = () => {
+    switch (alert.managerStatus) {
+      case 'scheduling': return '📅';
+      case 'ordered': return '📦';
+      case 'scheduled': return '✅';
+      case 'completed': return '✓';
+      default: return '👀';
+    }
+  };
+
+  return (
+    <div className={`p-4 rounded-xl border ${config.bgColor} ${config.borderColor}`}>
+      <div className="flex items-start gap-3">
+        <AlertIcon className={`w-5 h-5 ${config.color} flex-shrink-0 mt-0.5`} />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1">
+            <p className={`font-medium ${config.color}`}>{alert.message}</p>
+            {alert.daysOverdue && (
+              <span className="text-xs font-medium text-red-700 bg-red-100 px-2 py-0.5 rounded-full">
+                +{alert.daysOverdue} days
+              </span>
+            )}
+          </div>
+          <p className="text-sm text-slate-600 mb-2">{alert.assetName}</p>
+          <div className="flex items-center gap-2 text-sm">
+            <span>{getStatusEmoji()}</span>
+            <span className="text-emerald-700 font-medium">{alert.managerMessage}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Upcoming Service Card
+function UpcomingServiceCard({ services }: { services: ScheduledService[] }) {
+  const formatDate = (date: Date) => {
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-200 flex items-center gap-2">
+        <Calendar className="w-5 h-5 text-emerald-600" />
+        <h3 className="font-semibold text-slate-900">Upcoming Service</h3>
+        <span className="text-sm text-slate-500">Auto-scheduled by {HOUSING_MANAGER.name}</span>
+      </div>
+      <div className="divide-y divide-slate-100">
+        {services.map((service) => (
+          <div key={service.id} className="flex items-center gap-4 px-4 py-3">
+            <div className="w-16 text-center">
+              <p className="text-sm font-medium text-slate-900">{formatDate(service.date)}</p>
+            </div>
+            <div className="flex-1">
+              <p className="font-medium text-slate-900">{service.serviceType}</p>
+              <p className="text-sm text-slate-500">{service.assetName}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-slate-700">{service.vendorName}</p>
+              {service.isConfirmed ? (
+                <span className="text-xs text-emerald-600">✓ Confirmed</span>
+              ) : (
+                <span className="text-xs text-amber-600">Pending confirmation</span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Warranty Alert Card
+function WarrantyAlertCard({
+  alert,
+  onApprove,
+  onSkip,
+}: {
+  alert: WarrantyAlert;
+  onApprove: () => void;
+  onSkip: () => void;
+}) {
+  return (
+    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+      <div className="flex items-start gap-3 mb-3">
+        <Shield className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+        <div>
+          <h4 className="font-medium text-blue-800">Warranty Expiring Soon</h4>
+          <p className="text-sm text-blue-700 mt-1">
+            {alert.assetName} warranty expires {alert.expiresAt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })} ({alert.monthsRemaining} months)
+          </p>
+          <p className="text-sm text-blue-600 mt-2">
+            <strong>{HOUSING_MANAGER.name}&apos;s recommendation:</strong> {alert.recommendation}
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2 ml-8">
+        <button
+          onClick={onApprove}
+          className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Approve inspection
+        </button>
+        <button
+          onClick={onSkip}
+          className="px-4 py-2 border border-blue-300 text-blue-700 text-sm font-medium rounded-lg hover:bg-blue-100 transition-colors"
+        >
+          Skip - I&apos;ll risk it
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Handyman Visit Card
+function HandymanVisitCard({
+  visit,
+  onViewPhotos,
+  onRequestQuote,
+}: {
+  visit: HandymanVisit;
+  onViewPhotos: () => void;
+  onRequestQuote: (item: string) => void;
+}) {
+  return (
+    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+      <div className="p-4 border-b border-slate-200 flex items-center gap-3">
+        <ClipboardCheck className="w-5 h-5 text-emerald-600" />
+        <h3 className="font-semibold text-slate-900">Recent Handyman Visit</h3>
+        <span className="text-sm text-slate-500">
+          {visit.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      </div>
+      <div className="p-4">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center overflow-hidden">
+            {visit.handymanAvatar ? (
+              <Image src={visit.handymanAvatar} alt={visit.handymanName} width={40} height={40} className="object-cover" />
+            ) : (
+              <UserCheck className="w-5 h-5 text-emerald-600" />
+            )}
+          </div>
+          <div>
+            <p className="font-medium text-slate-900">{visit.handymanName} completed monthly maintenance:</p>
+          </div>
+        </div>
+
+        <div className="space-y-2 mb-4">
+          {visit.tasksCompleted.map((task, idx) => (
+            <div key={idx} className="flex items-center gap-2 text-sm">
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+              <span className="text-slate-700">{task}</span>
+            </div>
+          ))}
+        </div>
+
+        {visit.notes && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-amber-800">
+              <strong>Notes:</strong> &quot;{visit.notes}&quot;
+            </p>
+          </div>
+        )}
+
+        <div className="flex gap-2">
+          {visit.photos && visit.photos.length > 0 && (
+            <button
+              onClick={onViewPhotos}
+              className="flex items-center gap-2 px-3 py-2 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+            >
+              <Camera className="w-4 h-4" />
+              View photos
+            </button>
+          )}
+          {visit.recommendations?.map((rec, idx) => (
+            <button
+              key={idx}
+              onClick={() => onRequestQuote(rec.item)}
+              className="flex items-center gap-2 px-3 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              Request {rec.action.toLowerCase()}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Asset Card - Simplified, manager-focused
+function AssetCard({
+  asset,
+  onClick,
+}: {
+  asset: HomeAsset;
+  onClick: () => void;
+}) {
+  const AssetIcon = asset.icon;
+  const healthStyle = healthConfig[asset.health];
+  const ageYears = Math.floor((Date.now() - asset.installDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  const agePercent = Math.min(100, (ageYears / asset.expectedLifespan) * 100);
+  const isOverdue = asset.nextServiceDue && asset.nextServiceDue.getTime() < Date.now();
+
+  return (
+    <div
+      className={`bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
+        isOverdue ? 'border-red-300' : 'border-slate-200'
+      }`}
+      onClick={onClick}
+    >
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+            <AssetIcon className="w-6 h-6 text-emerald-600" />
+          </div>
+          <span className={`text-xs font-medium px-2 py-1 rounded-full ${healthStyle.bgColor} ${healthStyle.color}`}>
+            {healthStyle.label}
+          </span>
+        </div>
+        <h3 className="font-semibold text-slate-900">{asset.name}</h3>
+        <p className="text-sm text-slate-500">{asset.brand} {asset.model && `• ${asset.model}`}</p>
+      </div>
+
+      {/* Lifespan Bar */}
+      <div className="px-4 pb-3">
+        <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
+          <span>Lifespan</span>
+          <span>Year {ageYears} of {asset.expectedLifespan}</span>
+        </div>
+        <div className="w-full bg-slate-100 rounded-full h-2">
+          <div
+            className={`h-2 rounded-full transition-all ${
+              agePercent > 80 ? 'bg-red-500' : agePercent > 60 ? 'bg-amber-500' : 'bg-emerald-500'
+            }`}
+            style={{ width: `${agePercent}%` }}
+          />
+        </div>
+      </div>
+
+      {/* Manager-focused footer */}
+      <div className={`px-4 py-3 border-t ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
+        <div className="space-y-1">
+          {asset.lastServiceVendor && (
+            <p className="text-xs text-slate-500">
+              Last serviced by {asset.lastServiceVendor}
+            </p>
+          )}
+          <p className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-slate-600'}`}>
+            {isOverdue
+              ? `${HOUSING_MANAGER.name} is scheduling service`
+              : asset.nextServiceMonth
+              ? `Next service: ${HOUSING_MANAGER.name} will schedule for ${asset.nextServiceMonth}`
+              : 'No service scheduled'}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Verified Vendors Section
+function VerifiedVendorsSection({ vendors }: { vendors: TrustedVendor[] }) {
+  const preferredVendors = vendors.filter(v => v.isPreferred);
+  const otherVendors = vendors.filter(v => !v.isPreferred);
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="flex items-center gap-2 mb-4">
+        <BadgeCheck className="w-5 h-5 text-emerald-600" />
+        <h2 className="font-semibold text-slate-900">Your Verified Vendors</h2>
+      </div>
+      <p className="text-sm text-slate-500 mb-4">
+        {HOUSING_MANAGER.name} has relationships with {vendors.length} verified vendors for your home.
+        All scheduling and coordination goes through Haven.
+      </p>
+
+      {preferredVendors.length > 0 && (
+        <div className="mb-4">
+          <p className="text-xs font-medium text-slate-500 uppercase mb-2">Preferred</p>
+          <div className="grid grid-cols-2 gap-2">
+            {preferredVendors.map((vendor) => (
+              <div key={vendor.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
+                  <span className="text-xs font-semibold text-emerald-700">{vendor.initials}</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-900 text-sm truncate">{vendor.company}</p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-500">{vendor.trade}</span>
+                    <div className="flex items-center gap-0.5 text-amber-500">
+                      <Star className="w-3 h-3 fill-current" />
+                      <span className="text-xs">{vendor.rating}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {otherVendors.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-slate-500 uppercase mb-2">Other Vendors ({otherVendors.length})</p>
+          <div className="flex flex-wrap gap-2">
+            {otherVendors.map((vendor) => (
+              <span key={vendor.id} className="px-3 py-1.5 bg-slate-100 text-slate-600 text-sm rounded-full">
+                {vendor.company}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Service History Section
+function ServiceHistorySection({
+  history,
+  assets,
+}: {
+  history: ServiceRecord[];
+  assets: HomeAsset[];
+}) {
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+
+  const filteredHistory = useMemo(() => {
+    let filtered = history;
+    if (filter !== 'all') {
+      filtered = filtered.filter(s => s.assetId === filter);
+    }
+    if (search) {
+      const searchLower = search.toLowerCase();
+      filtered = filtered.filter(s =>
+        s.assetName.toLowerCase().includes(searchLower) ||
+        s.serviceType.toLowerCase().includes(searchLower) ||
+        s.vendor?.toLowerCase().includes(searchLower)
+      );
+    }
+    return filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
+  }, [history, filter, search]);
+
+  const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0 }).format(amount);
+
+  const toggleExpand = (id: string) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const getScheduledByLabel = (scheduledBy: string) => {
+    switch (scheduledBy) {
+      case 'Sarah': return `Scheduled by ${HOUSING_MANAGER.name}`;
+      case 'Auto': return 'Auto-scheduled';
+      case 'Homeowner': return 'DIY';
+      default: return scheduledBy;
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Clock className="w-5 h-5 text-slate-400" />
+          <h2 className="font-semibold text-slate-900">Service History</h2>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex gap-2 mb-4">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search history..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          />
+        </div>
+        <select
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        >
+          <option value="all">All Assets</option>
+          {assets.map(asset => (
+            <option key={asset.id} value={asset.id}>{asset.name}</option>
+          ))}
+        </select>
+      </div>
+
+      {/* Timeline */}
+      <div className="relative">
+        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200" />
+        <div className="space-y-4">
+          {filteredHistory.slice(0, 5).map((record) => {
+            const isExpanded = expanded.has(record.id);
+            return (
+              <div key={record.id} className="relative pl-10">
+                <div className={`absolute left-2.5 top-1 w-3 h-3 rounded-full border-2 border-white ${
+                  record.diy ? 'bg-blue-500' : 'bg-emerald-500'
+                }`} />
+
+                <div className="cursor-pointer" onClick={() => toggleExpand(record.id)}>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-medium text-slate-900">{record.serviceType}</p>
+                      <p className="text-sm text-slate-500">{record.assetName}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-slate-500">{formatDate(record.date)}</p>
+                      {record.cost !== undefined && (
+                        <p className="text-sm font-medium text-slate-900">{formatCurrency(record.cost)}</p>
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div className="mt-2 p-3 bg-slate-50 rounded-lg">
+                      <p className="text-sm text-slate-600 mb-2">{record.description}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {record.vendor && (
+                            <span className="text-xs text-slate-500">by {record.vendor}</span>
+                          )}
+                          <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
+                            {getScheduledByLabel(record.scheduledBy)}
+                          </span>
+                        </div>
+                        {record.invoiceUrl && (
+                          <button className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700">
+                            <FileText className="w-3 h-3" />
+                            Invoice
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {filteredHistory.length === 0 && (
+        <div className="text-center py-8">
+          <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-600 font-medium">No service records</p>
+          <p className="text-sm text-slate-500 mt-1">{HOUSING_MANAGER.name} will log all services here</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Asset Detail Modal
+function AssetDetailModal({
+  asset,
+  onClose,
+}: {
+  asset: HomeAsset;
+  onClose: () => void;
+}) {
+  const AssetIcon = asset.icon;
+  const healthStyle = healthConfig[asset.health];
+  const isOverdue = asset.nextServiceDue && asset.nextServiceDue.getTime() < Date.now();
+
+  const formatDate = (date: Date) => date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="flex min-h-full items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50" onClick={onClose} />
+        <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
+          <div className="p-6 border-b border-slate-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
+                  <AssetIcon className="w-7 h-7 text-emerald-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold text-slate-900">{asset.name}</h3>
+                  <p className="text-sm text-slate-500">{asset.brand} {asset.model}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+          </div>
+
+          <div className="p-6 space-y-4">
+            {/* Health Status */}
+            <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
+              <span className="text-slate-600">Health Status</span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${healthStyle.bgColor} ${healthStyle.color}`}>
+                {healthStyle.label}
+              </span>
+            </div>
+
+            {/* Details Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-500">Install Date</p>
+                <p className="font-medium text-slate-900">{formatDate(asset.installDate)}</p>
+              </div>
+              <div className="p-3 bg-slate-50 rounded-lg">
+                <p className="text-xs text-slate-500">Expected Lifespan</p>
+                <p className="font-medium text-slate-900">{asset.expectedLifespan} years</p>
+              </div>
+              {asset.location && (
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Location</p>
+                  <p className="font-medium text-slate-900">{asset.location}</p>
+                </div>
+              )}
+              {asset.warrantyExpires && (
+                <div className="p-3 bg-slate-50 rounded-lg">
+                  <p className="text-xs text-slate-500">Warranty Until</p>
+                  <p className="font-medium text-slate-900">{formatDate(asset.warrantyExpires)}</p>
+                </div>
+              )}
+              {asset.serialNumber && (
+                <div className="p-3 bg-slate-50 rounded-lg col-span-2">
+                  <p className="text-xs text-slate-500">Serial Number</p>
+                  <p className="font-medium text-slate-900 font-mono">{asset.serialNumber}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Service Info */}
+            <div className="border-t border-slate-200 pt-4">
+              <h4 className="font-medium text-slate-900 mb-3">Service Schedule</h4>
+              <div className="space-y-2">
+                {asset.lastService && (
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-600">Last Service</span>
+                    <div className="text-right">
+                      <p className="font-medium text-slate-900">{formatDate(asset.lastService)}</p>
+                      {asset.lastServiceVendor && (
+                        <p className="text-xs text-slate-500">by {asset.lastServiceVendor}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-600">Next Service</span>
+                  <div className="text-right">
+                    <p className={`font-medium ${isOverdue ? 'text-red-600' : 'text-slate-900'}`}>
+                      {asset.nextServiceMonth || 'Not scheduled'}
+                    </p>
+                    <p className="text-xs text-emerald-600">{HOUSING_MANAGER.name} will schedule</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {asset.notes && (
+              <div className="border-t border-slate-200 pt-4">
+                <h4 className="font-medium text-slate-900 mb-2">Notes</h4>
+                <p className="text-sm text-slate-600">{asset.notes}</p>
+              </div>
+            )}
+          </div>
+
+          <div className="p-6 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+            <p className="text-sm text-slate-600 text-center">
+              All maintenance is scheduled and coordinated by {HOUSING_MANAGER.name}
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN PAGE
 // ============================================================================
 
 export default function MaintenancePage() {
   const { currentHousehold } = useAuth();
 
-  // Data State - initialized with mocks for immediate display
-  const [assets, setAssets] = useState<HomeAsset[]>(MOCK_ASSETS);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [alerts, _setAlerts] = useState<MaintenanceAlert[]>(MOCK_ALERTS);
+  // State
+  const [assets] = useState<HomeAsset[]>(MOCK_ASSETS);
+  const [alerts] = useState<MaintenanceAlert[]>(MOCK_ALERTS);
+  const [scheduledServices] = useState<ScheduledService[]>(MOCK_SCHEDULED_SERVICES);
+  const [warrantyAlerts, setWarrantyAlerts] = useState<WarrantyAlert[]>(MOCK_WARRANTY_ALERTS);
+  const [handymanVisits] = useState<HandymanVisit[]>(MOCK_HANDYMAN_VISITS);
   const [vendors, setVendors] = useState<TrustedVendor[]>(MOCK_VENDORS);
-  const [serviceHistory, setServiceHistory] = useState<ServiceRecord[]>(MOCK_HISTORY);
-
-  // Loading State
+  const [serviceHistory] = useState<ServiceRecord[]>(MOCK_HISTORY);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
-
-  // UI State
   const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
-  const [showLogServiceModal, setShowLogServiceModal] = useState(false);
-  const [showAssetDetailModal, setShowAssetDetailModal] = useState<HomeAsset | null>(null);
-  const [historyFilter, setHistoryFilter] = useState<string>('all');
-  const [historySearch, setHistorySearch] = useState('');
-  const [expandedHistory, setExpandedHistory] = useState<Set<string>>(new Set());
-
-  // Form State for Log Service Modal
-  const [formAssetId, setFormAssetId] = useState<string>('');
-  const [formServiceType, setFormServiceType] = useState<string>('');
-  const [formDate, setFormDate] = useState<string>(new Date().toISOString().split('T')[0] || '');
-  const [formIsDiy, setFormIsDiy] = useState<boolean>(false);
-  const [formVendorId, setFormVendorId] = useState<string>('');
-  const [formCost, setFormCost] = useState<string>('');
-  const [formNotes, setFormNotes] = useState<string>('');
-
-  // Toast state for user feedback
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
+
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
   };
 
-  // ============================================================================
-  // DATA FETCHING
-  // ============================================================================
-
-  const loadMaintenanceData = useCallback(async () => {
+  // Load data
+  const loadData = useCallback(async () => {
     if (!currentHousehold?.id) {
       setIsLoading(false);
       return;
@@ -618,194 +1195,46 @@ export default function MaintenancePage() {
 
     try {
       const api = getApiClient();
-
-      // Fetch vendors (the only API method that exists for maintenance-related data)
-      // Assets, alerts, and service history API endpoints don't exist yet
-      // so we use mock data for those
       const vendorsResult = await Promise.allSettled([
         api.getHouseholdVendors(currentHousehold.id),
       ]);
 
-      // Process vendors
       if (vendorsResult[0].status === 'fulfilled') {
         const vendorsData = vendorsResult[0].value;
         if (Array.isArray(vendorsData) && vendorsData.length > 0) {
           setVendors(vendorsData.map((v) => mapApiVendorToUi(v as unknown as Record<string, unknown>)));
         }
-        // If empty or failed, keep MOCK_VENDORS
       }
-
-      // Assets, alerts, and service history keep using MOCK data
-      // since those API endpoints are not yet implemented
     } catch (error) {
       console.error('Error loading maintenance data:', error);
-      // Keep mock data on error - dashboard never looks broken
     } finally {
       setIsLoading(false);
     }
   }, [currentHousehold?.id]);
 
   useEffect(() => {
-    loadMaintenanceData();
-  }, [loadMaintenanceData]);
+    loadData();
+  }, [loadData]);
 
-  // ============================================================================
-  // SAVE SERVICE
-  // ============================================================================
-
-  const handleSaveService = async () => {
-    if (!formAssetId || !formServiceType) return;
-
-    const selectedAssetData = assets.find(a => a.id === formAssetId);
-    if (!selectedAssetData) return;
-
-    const selectedVendor = vendors.find(v => v.id === formVendorId);
-
-    // Create new service record for optimistic update
-    const newRecord: ServiceRecord = {
-      id: `temp-${Date.now()}`,
-      assetId: formAssetId,
-      assetName: selectedAssetData.name,
-      date: formDate ? new Date(formDate) : new Date(),
-      vendor: selectedVendor?.name,
-      vendorId: selectedVendor?.id,
-      serviceType: formServiceType,
-      description: formNotes || formServiceType,
-      cost: formCost ? parseFloat(formCost) : undefined,
-      diy: formIsDiy,
-    };
-
-    // Optimistic update - add to history immediately
-    setServiceHistory(prev => [newRecord, ...prev]);
-
-    // Update asset's lastService date
-    setAssets(prev => prev.map(asset =>
-      asset.id === formAssetId
-        ? { ...asset, lastService: formDate ? new Date(formDate) : new Date(), health: 'good' as AssetHealth }
-        : asset
-    ));
-
-    // Close modal and reset form
-    setShowLogServiceModal(false);
-    setSelectedAsset(null);
-    resetForm();
-
-    // API endpoint for saving service records doesn't exist yet
-    // Keep the optimistic update for demo mode
-    setIsSaving(true);
-    try {
-      // When API is ready, we would call:
-      // const api = getApiClient();
-      // const response = await api.createServiceRecord({...});
-      // For now, just simulate a short delay
-      await new Promise(resolve => setTimeout(resolve, 300));
-    } catch (error) {
-      console.error('Failed to save service record:', error);
-      // Keep optimistic update - works in demo mode
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const resetForm = () => {
-    setFormAssetId('');
-    setFormServiceType('');
-    setFormDate(new Date().toISOString().split('T')[0] || '');
-    setFormIsDiy(false);
-    setFormVendorId('');
-    setFormCost('');
-    setFormNotes('');
-  };
-
-  // Handle alert action
-  const handleAlertAction = useCallback((alert: MaintenanceAlert) => {
-    if (alert.assetId) {
-      const asset = assets.find(a => a.id === alert.assetId);
-      if (asset) {
-        setSelectedAsset(asset);
-        setShowLogServiceModal(true);
-        showToast('Schedule service for ' + alert.assetName, 'info');
-      }
-    } else {
-      showToast('Creating service request for ' + alert.assetName, 'info');
-    }
-  }, [assets]);
-
-  // Handle add asset (placeholder)
-  const handleAddAsset = useCallback(() => {
-    showToast('Add Asset feature coming soon! For now, contact your manager.', 'info');
-  }, []);
-
-  // Handle find pros
-  const handleFindPros = useCallback(() => {
-    window.location.href = '/app/community?tab=vendors';
-  }, []);
-
-  // Handle request pro
-  const handleRequestPro = useCallback((assetName?: string) => {
-    const message = assetName ? `&subject=Service for ${assetName}` : '';
-    window.location.href = '/app/requests?action=new' + message;
-  }, []);
-
-  // Handle call vendor
-  const handleCallVendor = useCallback((vendor: TrustedVendor) => {
-    showToast('Calling ' + vendor.name + '...', 'info');
-    // In production, this would open tel: link
-    window.location.href = 'tel:' + vendor.phone.replace(/\D/g, '');
-  }, []);
-
-  // Handle message vendor
-  const handleMessageVendor = useCallback((vendor: TrustedVendor) => {
-    showToast('Opening message to ' + vendor.name, 'info');
-    window.location.href = '/app/messages?vendor=' + vendor.id;
-  }, []);
-
-  // Handle schedule vendor
-  const handleScheduleVendor = useCallback((vendor: TrustedVendor) => {
-    showToast('Scheduling with ' + vendor.name, 'info');
-    window.location.href = '/app/requests?vendor=' + vendor.id + '&action=schedule';
-  }, []);
-
-  // Handle download invoice
-  const handleDownloadInvoice = useCallback((record: ServiceRecord) => {
-    showToast('Downloading invoice for ' + record.serviceType, 'info');
-    // In production would open actual invoice URL
-  }, []);
-
-  // Handle view all history
-  const handleViewAllHistory = useCallback(() => {
-    showToast('Showing full service history', 'info');
-    // Could navigate to a dedicated history page or expand view
-  }, []);
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
-
-  // Calculate overall health score
+  // Computed values
   const healthScore = useMemo(() => {
     let score = 100;
-
-    // Deduct for overdue maintenance
     alerts.forEach(alert => {
-      if (alert.severity === 'critical') {
-        score -= 15;
-      } else if (alert.severity === 'warning') {
-        score -= 5;
-      }
+      if (alert.severity === 'critical') score -= 15;
+      else if (alert.severity === 'warning') score -= 5;
     });
-
-    // Factor in asset health
     assets.forEach(asset => {
       if (asset.health === 'critical') score -= 10;
       else if (asset.health === 'needs_attention') score -= 5;
       else if (asset.health === 'fair') score -= 2;
     });
-
     return Math.max(0, Math.min(100, score));
   }, [alerts, assets]);
 
-  // Get health score color
+  const activeAlerts = useMemo(() =>
+    alerts.filter(a => a.severity !== 'success')
+  , [alerts]);
+
   const getHealthScoreColor = (score: number) => {
     if (score >= 90) return 'text-emerald-600';
     if (score >= 70) return 'text-green-600';
@@ -815,821 +1244,179 @@ export default function MaintenancePage() {
   };
 
   const getHealthScoreStroke = (score: number) => {
-    if (score >= 90) return '#059669'; // emerald-600
-    if (score >= 70) return '#16a34a'; // green-600
-    if (score >= 50) return '#ca8a04'; // yellow-600
-    if (score >= 30) return '#ea580c'; // orange-600
-    return '#dc2626'; // red-600
+    if (score >= 90) return '#059669';
+    if (score >= 70) return '#16a34a';
+    if (score >= 50) return '#ca8a04';
+    if (score >= 30) return '#ea580c';
+    return '#dc2626';
   };
 
-  // Calculate asset age percentage
-  const getAssetAgePercent = (asset: HomeAsset) => {
-    const ageYears = (Date.now() - asset.installDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
-    return Math.min(100, (ageYears / asset.expectedLifespan) * 100);
-  };
-
-  // Check if service is overdue
-  const isOverdue = (date?: Date) => {
-    if (!date) return false;
-    return date.getTime() < Date.now();
-  };
-
-  // Format helpers
-  const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-    }).format(amount);
-  };
-
-  const getDaysUntil = (date: Date) => {
-    return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-  };
-
-  const getRelativeTime = (date: Date) => {
-    const days = getDaysUntil(date);
-    if (days < 0) return `${Math.abs(days)} days overdue`;
-    if (days === 0) return 'Today';
-    if (days === 1) return 'Tomorrow';
-    if (days < 7) return `In ${days} days`;
-    if (days < 30) return `In ${Math.ceil(days / 7)} weeks`;
-    if (days < 365) return `In ${Math.ceil(days / 30)} months`;
-    return `In ${Math.ceil(days / 365)} years`;
-  };
-
-  // Filter service history
-  const filteredHistory = useMemo(() => {
-    let filtered = serviceHistory;
-    if (historyFilter !== 'all') {
-      filtered = filtered.filter(s => s.assetId === historyFilter);
-    }
-    if (historySearch) {
-      const search = historySearch.toLowerCase();
-      filtered = filtered.filter(s =>
-        s.assetName.toLowerCase().includes(search) ||
-        s.serviceType.toLowerCase().includes(search) ||
-        s.description.toLowerCase().includes(search) ||
-        s.vendor?.toLowerCase().includes(search)
-      );
-    }
-    return filtered.sort((a, b) => b.date.getTime() - a.date.getTime());
-  }, [serviceHistory, historyFilter, historySearch]);
-
-  // Toggle history expansion
-  const toggleHistory = (id: string) => {
-    setExpandedHistory(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
-
-  // Calculate circumference for SVG gauge
   const radius = 80;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (healthScore / 100) * circumference;
 
-  // Set form asset when modal opens with pre-selected asset
-  useEffect(() => {
-    if (selectedAsset) {
-      setFormAssetId(selectedAsset.id);
-    }
-  }, [selectedAsset]);
+  // Handlers
+  const handleApproveWarrantyInspection = (alertId: string) => {
+    setWarrantyAlerts(prev => prev.filter(a => a.id !== alertId));
+    showToast(`${HOUSING_MANAGER.name} will schedule the inspection`, 'success');
+  };
+
+  const handleSkipWarrantyInspection = (alertId: string) => {
+    setWarrantyAlerts(prev => prev.filter(a => a.id !== alertId));
+    showToast('Noted - skipping inspection', 'info');
+  };
+
+  const handleViewPhotos = () => {
+    showToast('Opening photos...', 'info');
+  };
+
+  const handleRequestQuote = (item: string) => {
+    showToast(`${HOUSING_MANAGER.name} will get a quote for ${item}`, 'success');
+  };
 
   return (
-    <div className="space-y-6 pb-20">
-      {/* Toast Notification */}
+    <div className="space-y-6 pb-20 max-w-6xl mx-auto">
+      {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
           <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
             toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
           }`}>
-            {toast.type === 'success' ? (
-              <CheckCircle2 className="w-5 h-5" />
-            ) : (
-              <AlertCircle className="w-5 h-5" />
-            )}
+            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
             <span className="font-medium">{toast.message}</span>
           </div>
         </div>
       )}
 
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Maintenance</h1>
-          <p className="text-slate-600 mt-1">Proactive home health monitoring and service tracking</p>
-        </div>
-        <button
-          onClick={() => setShowLogServiceModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          Log Service
-        </button>
-      </div>
-
-      {/* Health Score Dashboard */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Health Gauge */}
-          <div className="flex flex-col items-center lg:items-start">
-            <div className="relative">
-              {isLoading ? (
-                <div className="w-48 h-48 flex items-center justify-center">
-                  <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
-                </div>
-              ) : (
-                <svg className="w-48 h-48 transform -rotate-90">
-                  {/* Background circle */}
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r={radius}
-                    stroke="#e2e8f0"
-                    strokeWidth="16"
-                    fill="none"
-                  />
-                  {/* Progress circle */}
-                  <circle
-                    cx="96"
-                    cy="96"
-                    r={radius}
-                    stroke={getHealthScoreStroke(healthScore)}
-                    strokeWidth="16"
-                    fill="none"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    strokeDashoffset={strokeDashoffset}
-                    className="transition-all duration-1000"
-                  />
-                </svg>
-              )}
-              {!isLoading && (
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <Activity className={`w-6 h-6 ${getHealthScoreColor(healthScore)} mb-1`} />
-                  <span className={`text-4xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}</span>
-                  <span className="text-sm text-slate-500">Home Health</span>
-                </div>
-              )}
-            </div>
-            <p className="text-sm text-slate-500 mt-2 text-center lg:text-left max-w-[200px]">
-              {healthScore >= 90 ? 'Your home is in excellent condition!' :
-               healthScore >= 70 ? 'A few items need attention soon.' :
-               healthScore >= 50 ? 'Several maintenance tasks are due.' :
-               'Multiple critical issues need immediate attention.'}
-            </p>
-          </div>
-
-          {/* Alerts */}
-          <div className="flex-1">
-            <h3 className="font-semibold text-slate-900 mb-3">Active Alerts</h3>
-            <div className="space-y-2">
-              {alerts.map((alert) => {
-                const config = alertConfig[alert.severity];
-                const AlertIcon = config.icon;
-                return (
-                  <div
-                    key={alert.id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border ${config.bgColor} ${config.borderColor}`}
-                  >
-                    <AlertIcon className={`w-5 h-5 ${config.color} flex-shrink-0`} />
-                    <div className="flex-1 min-w-0">
-                      <p className={`font-medium ${config.color}`}>{alert.message}</p>
-                      <p className="text-sm text-slate-600">{alert.assetName}</p>
-                    </div>
-                    {alert.daysOverdue && (
-                      <span className="text-xs font-medium text-red-700 bg-red-100 px-2 py-1 rounded-full">
-                        +{alert.daysOverdue} days
-                      </span>
-                    )}
-                    {alert.severity !== 'success' && (
-                      <button
-                        onClick={() => handleAlertAction(alert)}
-                        className="text-sm font-medium text-emerald-600 hover:text-emerald-700 whitespace-nowrap"
-                      >
-                        Take Action
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* My Assets Grid */}
+      {/* Header */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-slate-400" />
-            <h2 className="font-semibold text-slate-900">My Assets</h2>
-            <span className="text-sm text-slate-500">({assets.length})</span>
-          </div>
-          <button
-            onClick={handleAddAsset}
-            className="text-sm text-emerald-600 font-medium hover:text-emerald-700"
-          >
-            + Add Asset
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {assets.map((asset) => {
-            const AssetIcon = asset.icon;
-            const agePercent = getAssetAgePercent(asset);
-            const overdue = isOverdue(asset.nextServiceDue);
-            const healthStyle = healthConfig[asset.health];
-
-            return (
-              <div
-                key={asset.id}
-                className={`bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
-                  overdue ? 'border-red-300' : 'border-slate-200'
-                }`}
-                onClick={() => setShowAssetDetailModal(asset)}
-              >
-                {/* Header */}
-                <div className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      <AssetIcon className="w-6 h-6 text-emerald-600" />
-                    </div>
-                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${healthStyle.bgColor} ${healthStyle.color}`}>
-                      {healthStyle.label}
-                    </span>
-                  </div>
-                  <h3 className="font-semibold text-slate-900">{asset.name}</h3>
-                  <p className="text-sm text-slate-500">{asset.brand} {asset.model && `• ${asset.model}`}</p>
-                </div>
-
-                {/* Lifespan Bar */}
-                <div className="px-4 pb-3">
-                  <div className="flex items-center justify-between text-xs text-slate-500 mb-1">
-                    <span>Lifespan</span>
-                    <span>Year {Math.floor(agePercent / 100 * asset.expectedLifespan)} of {asset.expectedLifespan}</span>
-                  </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all ${
-                        agePercent > 80 ? 'bg-red-500' :
-                        agePercent > 60 ? 'bg-amber-500' :
-                        'bg-emerald-500'
-                      }`}
-                      style={{ width: `${agePercent}%` }}
-                    />
-                  </div>
-                </div>
-
-                {/* Service Status */}
-                <div className={`px-4 py-3 border-t ${overdue ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-100'}`}>
-                  <div className="flex items-center justify-between text-sm">
-                    <div>
-                      <p className="text-slate-500">Next Service</p>
-                      <p className={`font-medium ${overdue ? 'text-red-700' : 'text-slate-900'}`}>
-                        {asset.nextServiceDue ? getRelativeTime(asset.nextServiceDue) : 'Not scheduled'}
-                      </p>
-                    </div>
-                    <div className="flex gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedAsset(asset);
-                          setShowLogServiceModal(true);
-                        }}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
-                        title="Log Service"
-                      >
-                        <Wrench className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleRequestPro(asset.name);
-                        }}
-                        className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
-                        title="Request Pro"
-                      >
-                        <Phone className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Home Maintenance</h1>
+        <p className="text-slate-500 mt-1">We fix it before it breaks. {HOUSING_MANAGER.name} handles all scheduling.</p>
       </div>
 
-      {/* Bottom Section: My Team + Service History */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* My Team (Trusted Vendors) */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <BadgeCheck className="w-5 h-5 text-emerald-600" />
-              <h2 className="font-semibold text-slate-900">My Team</h2>
-            </div>
-            <button
-              onClick={handleFindPros}
-              className="text-sm text-emerald-600 font-medium hover:text-emerald-700 flex items-center gap-1"
-            >
-              Find Pros
-              <ExternalLink className="w-4 h-4" />
-            </button>
-          </div>
+      {/* Manager Summary */}
+      <ManagerSummaryCard
+        activeAlerts={activeAlerts.length}
+        scheduledServices={scheduledServices.length}
+      />
 
-          {vendors.length > 0 ? (
-            <div className="space-y-3">
-              {vendors.map((vendor) => (
-                <div
-                  key={vendor.id}
-                  className="flex items-center gap-4 p-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
-                >
-                  <div className="w-12 h-12 bg-emerald-100 rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-semibold text-emerald-700">{vendor.initials}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900">{vendor.name}</p>
-                      <div className="flex items-center gap-0.5 text-amber-500">
-                        <Star className="w-3 h-3 fill-current" />
-                        <span className="text-xs font-medium">{vendor.rating}</span>
-                      </div>
-                    </div>
-                    <p className="text-sm text-slate-500">{vendor.trade} • {vendor.company}</p>
-                    {vendor.lastVisit && (
-                      <p className="text-xs text-slate-400">Last visit: {formatDate(vendor.lastVisit)}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => handleCallVendor(vendor)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
-                      title="Call"
-                    >
-                      <Phone className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleMessageVendor(vendor)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
-                      title="Message"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleScheduleVendor(vendor)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-white rounded-lg transition-colors"
-                      title="Schedule"
-                    >
-                      <RefreshCw className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <BadgeCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">Build your team</p>
-              <p className="text-sm text-slate-500 mt-1">Find trusted pros in the Social Directory</p>
-              <button
-                onClick={handleFindPros}
-                className="mt-4 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-              >
-                Browse Directory
-              </button>
+      {/* Health Score + Active Items */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Health Score Gauge */}
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 flex flex-col items-center">
+          <div className="relative">
+            {isLoading ? (
+              <div className="w-48 h-48 flex items-center justify-center">
+                <Loader2 className="w-12 h-12 text-emerald-600 animate-spin" />
+              </div>
+            ) : (
+              <svg className="w-48 h-48 transform -rotate-90">
+                <circle cx="96" cy="96" r={radius} stroke="#e2e8f0" strokeWidth="16" fill="none" />
+                <circle
+                  cx="96" cy="96" r={radius}
+                  stroke={getHealthScoreStroke(healthScore)}
+                  strokeWidth="16"
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={strokeDashoffset}
+                  className="transition-all duration-1000"
+                />
+              </svg>
+            )}
+            {!isLoading && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <Activity className={`w-6 h-6 ${getHealthScoreColor(healthScore)} mb-1`} />
+                <span className={`text-4xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}</span>
+                <span className="text-sm text-slate-500">Home Health</span>
+              </div>
+            )}
+          </div>
+          <p className="text-sm text-slate-500 mt-4 text-center">
+            {healthScore >= 90 ? 'Your home is in excellent condition!' :
+             healthScore >= 70 ? 'A few items being handled.' :
+             healthScore >= 50 ? 'Several maintenance tasks in progress.' :
+             'Multiple items need attention.'}
+          </p>
+        </div>
+
+        {/* Active Items */}
+        <div className="lg:col-span-2 space-y-4">
+          <h3 className="font-semibold text-slate-900">Active Items ({activeAlerts.length})</h3>
+          {activeAlerts.map(alert => (
+            <ActiveAlertCard key={alert.id} alert={alert} />
+          ))}
+          {activeAlerts.length === 0 && (
+            <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
+              <CheckCircle2 className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <p className="font-medium text-emerald-800">All caught up!</p>
+              <p className="text-sm text-emerald-600">No active maintenance issues</p>
             </div>
           )}
         </div>
+      </div>
+
+      {/* Upcoming Services */}
+      {scheduledServices.length > 0 && (
+        <UpcomingServiceCard services={scheduledServices} />
+      )}
+
+      {/* Warranty Alerts */}
+      {warrantyAlerts.map(alert => (
+        <WarrantyAlertCard
+          key={alert.id}
+          alert={alert}
+          onApprove={() => handleApproveWarrantyInspection(alert.id)}
+          onSkip={() => handleSkipWarrantyInspection(alert.id)}
+        />
+      ))}
+
+      {/* Recent Handyman Visit */}
+      {handymanVisits.length > 0 && handymanVisits[0] && (
+        <HandymanVisitCard
+          visit={handymanVisits[0]}
+          onViewPhotos={handleViewPhotos}
+          onRequestQuote={handleRequestQuote}
+        />
+      )}
+
+      {/* Assets Grid */}
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Settings className="w-5 h-5 text-slate-400" />
+          <h2 className="font-semibold text-slate-900">Your Home Systems</h2>
+          <span className="text-sm text-slate-500">({assets.length})</span>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {assets.map((asset) => (
+            <AssetCard
+              key={asset.id}
+              asset={asset}
+              onClick={() => setSelectedAsset(asset)}
+            />
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Verified Vendors */}
+        <VerifiedVendorsSection vendors={vendors} />
 
         {/* Service History */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-slate-400" />
-              <h2 className="font-semibold text-slate-900">Service History</h2>
-            </div>
-            <button
-              onClick={handleViewAllHistory}
-              className="text-sm text-slate-500 hover:text-slate-700"
-            >
-              View All
-            </button>
-          </div>
-
-          {/* Filters */}
-          <div className="flex gap-2 mb-4">
-            <div className="relative flex-1">
-              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search history..."
-                value={historySearch}
-                onChange={(e) => setHistorySearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-              />
-            </div>
-            <select
-              value={historyFilter}
-              onChange={(e) => setHistoryFilter(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="all">All Assets</option>
-              {assets.map(asset => (
-                <option key={asset.id} value={asset.id}>{asset.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Timeline */}
-          <div className="relative">
-            {/* Timeline line */}
-            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200" />
-
-            <div className="space-y-4">
-              {filteredHistory.slice(0, 5).map((record) => {
-                const isExpanded = expandedHistory.has(record.id);
-                return (
-                  <div key={record.id} className="relative pl-10">
-                    {/* Timeline dot */}
-                    <div className={`absolute left-2.5 top-1 w-3 h-3 rounded-full border-2 border-white ${
-                      record.diy ? 'bg-blue-500' : 'bg-emerald-500'
-                    }`} />
-
-                    <div
-                      className="cursor-pointer"
-                      onClick={() => toggleHistory(record.id)}
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-slate-900">{record.serviceType}</p>
-                          <p className="text-sm text-slate-500">{record.assetName}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-sm text-slate-500">{formatDate(record.date)}</p>
-                          {record.cost !== undefined && (
-                            <p className="text-sm font-medium text-slate-900">{formatCurrency(record.cost)}</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {isExpanded && (
-                        <div className="mt-2 p-3 bg-slate-50 rounded-lg">
-                          <p className="text-sm text-slate-600 mb-2">{record.description}</p>
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {record.diy ? (
-                                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">DIY</span>
-                              ) : record.vendor && (
-                                <span className="text-xs text-slate-500">by {record.vendor}</span>
-                              )}
-                            </div>
-                            {record.invoiceUrl && (
-                              <button
-                                onClick={(e) => { e.stopPropagation(); handleDownloadInvoice(record); }}
-                                className="flex items-center gap-1 text-xs text-emerald-600 hover:text-emerald-700"
-                              >
-                                <FileText className="w-3 h-3" />
-                                Invoice
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {filteredHistory.length === 0 && (
-            <div className="text-center py-8">
-              <Clock className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-              <p className="text-slate-600 font-medium">No service records yet</p>
-              <p className="text-sm text-slate-500 mt-1">Log your first service to start tracking</p>
-            </div>
-          )}
-        </div>
+        <ServiceHistorySection history={serviceHistory} assets={assets} />
       </div>
-
-      {/* Log Service Modal */}
-      {showLogServiceModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => {
-              setShowLogServiceModal(false);
-              setSelectedAsset(null);
-              resetForm();
-            }} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Log Service</h3>
-                  <button
-                    onClick={() => {
-                      setShowLogServiceModal(false);
-                      setSelectedAsset(null);
-                      resetForm();
-                    }}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Asset</label>
-                  <select
-                    value={formAssetId}
-                    onChange={(e) => setFormAssetId(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  >
-                    <option value="">Select an asset...</option>
-                    {assets.map(asset => (
-                      <option key={asset.id} value={asset.id}>{asset.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Service Type</label>
-                  <input
-                    type="text"
-                    value={formServiceType}
-                    onChange={(e) => setFormServiceType(e.target.value)}
-                    placeholder="e.g., Filter Replacement, Annual Tune-Up"
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Date</label>
-                  <input
-                    type="date"
-                    value={formDate}
-                    onChange={(e) => setFormDate(e.target.value)}
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                  />
-                </div>
-
-                <div className="flex items-center gap-4">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="serviceBy"
-                      value="diy"
-                      checked={formIsDiy}
-                      onChange={() => setFormIsDiy(true)}
-                      className="text-emerald-600"
-                    />
-                    <span className="text-sm text-slate-700">DIY</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="serviceBy"
-                      value="vendor"
-                      checked={!formIsDiy}
-                      onChange={() => setFormIsDiy(false)}
-                      className="text-emerald-600"
-                    />
-                    <span className="text-sm text-slate-700">Professional</span>
-                  </label>
-                </div>
-
-                {!formIsDiy && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Vendor (Optional)</label>
-                    <select
-                      value={formVendorId}
-                      onChange={(e) => setFormVendorId(e.target.value)}
-                      className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    >
-                      <option value="">Select a vendor...</option>
-                      {vendors.map(vendor => (
-                        <option key={vendor.id} value={vendor.id}>{vendor.name} - {vendor.trade}</option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Cost (Optional)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">$</span>
-                    <input
-                      type="number"
-                      value={formCost}
-                      onChange={(e) => setFormCost(e.target.value)}
-                      placeholder="0.00"
-                      className="w-full pl-7 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Notes</label>
-                  <textarea
-                    rows={3}
-                    value={formNotes}
-                    onChange={(e) => setFormNotes(e.target.value)}
-                    placeholder="Describe what was done..."
-                    className="w-full px-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Upload Invoice (Optional)</label>
-                  <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-emerald-500 transition-colors cursor-pointer">
-                    <Camera className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-                    <p className="text-sm text-slate-600">Click to upload or drag and drop</p>
-                    <p className="text-xs text-slate-400 mt-1">PDF, PNG, JPG up to 10MB</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6 border-t border-slate-200 flex gap-3">
-                <button
-                  onClick={() => {
-                    setShowLogServiceModal(false);
-                    setSelectedAsset(null);
-                    resetForm();
-                  }}
-                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleSaveService}
-                  disabled={!formAssetId || !formServiceType || isSaving}
-                  className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                >
-                  {isSaving && <Loader2 className="w-4 h-4 animate-spin" />}
-                  Save Service
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Asset Detail Modal */}
-      {showAssetDetailModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-center justify-center p-4">
-            <div className="fixed inset-0 bg-black/50" onClick={() => setShowAssetDetailModal(null)} />
-            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-              <div className="p-6 border-b border-slate-200">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
-                      {(() => {
-                        const AssetIcon = showAssetDetailModal.icon;
-                        return <AssetIcon className="w-7 h-7 text-emerald-600" />;
-                      })()}
-                    </div>
-                    <div>
-                      <h3 className="text-lg font-semibold text-slate-900">{showAssetDetailModal.name}</h3>
-                      <p className="text-sm text-slate-500">{showAssetDetailModal.brand} {showAssetDetailModal.model}</p>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => setShowAssetDetailModal(null)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
-                    <X className="w-5 h-5 text-slate-400" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 space-y-4">
-                {/* Health Status */}
-                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg">
-                  <span className="text-slate-600">Health Status</span>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    healthConfig[showAssetDetailModal.health].bgColor
-                  } ${healthConfig[showAssetDetailModal.health].color}`}>
-                    {healthConfig[showAssetDetailModal.health].label}
-                  </span>
-                </div>
-
-                {/* Details Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500">Install Date</p>
-                    <p className="font-medium text-slate-900">{formatDate(showAssetDetailModal.installDate)}</p>
-                  </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="text-xs text-slate-500">Expected Lifespan</p>
-                    <p className="font-medium text-slate-900">{showAssetDetailModal.expectedLifespan} years</p>
-                  </div>
-                  {showAssetDetailModal.location && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <p className="text-xs text-slate-500">Location</p>
-                      <p className="font-medium text-slate-900">{showAssetDetailModal.location}</p>
-                    </div>
-                  )}
-                  {showAssetDetailModal.warrantyExpires && (
-                    <div className="p-3 bg-slate-50 rounded-lg">
-                      <p className="text-xs text-slate-500">Warranty Until</p>
-                      <p className="font-medium text-slate-900">{formatDate(showAssetDetailModal.warrantyExpires)}</p>
-                    </div>
-                  )}
-                  {showAssetDetailModal.serialNumber && (
-                    <div className="p-3 bg-slate-50 rounded-lg col-span-2">
-                      <p className="text-xs text-slate-500">Serial Number</p>
-                      <p className="font-medium text-slate-900 font-mono">{showAssetDetailModal.serialNumber}</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Service Status */}
-                <div className="border-t border-slate-200 pt-4">
-                  <h4 className="font-medium text-slate-900 mb-3">Service Schedule</h4>
-                  <div className="space-y-2">
-                    {showAssetDetailModal.lastService && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Last Service</span>
-                        <span className="font-medium text-slate-900">{formatDate(showAssetDetailModal.lastService)}</span>
-                      </div>
-                    )}
-                    {showAssetDetailModal.nextServiceDue && (
-                      <div className="flex items-center justify-between">
-                        <span className="text-slate-600">Next Due</span>
-                        <span className={`font-medium ${
-                          isOverdue(showAssetDetailModal.nextServiceDue) ? 'text-red-600' : 'text-slate-900'
-                        }`}>
-                          {getRelativeTime(showAssetDetailModal.nextServiceDue)}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Notes */}
-                {showAssetDetailModal.notes && (
-                  <div className="border-t border-slate-200 pt-4">
-                    <h4 className="font-medium text-slate-900 mb-2">Notes</h4>
-                    <p className="text-sm text-slate-600">{showAssetDetailModal.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-6 border-t border-slate-200 flex gap-3">
-                <button
-                  onClick={() => {
-                    setSelectedAsset(showAssetDetailModal);
-                    setShowAssetDetailModal(null);
-                    setShowLogServiceModal(true);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
-                >
-                  <Wrench className="w-5 h-5" />
-                  Log Service
-                </button>
-                <button
-                  onClick={() => {
-                    handleRequestPro(showAssetDetailModal.name);
-                    setShowAssetDetailModal(null);
-                  }}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-                >
-                  <Phone className="w-5 h-5" />
-                  Request Pro
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+      {selectedAsset && (
+        <AssetDetailModal
+          asset={selectedAsset}
+          onClose={() => setSelectedAsset(null)}
+        />
       )}
-
-      {/* Mobile FAB */}
-      <div className="fixed bottom-20 right-4 lg:bottom-6 lg:right-6 sm:hidden">
-        <button
-          onClick={() => setShowLogServiceModal(true)}
-          className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors"
-        >
-          <Plus className="w-6 h-6" />
-        </button>
-      </div>
     </div>
   );
 }
 
-// Export mapping functions for future use when APIs are available
-export { _mapApiAssetToUi, _mapApiServiceRecord, _mapApiAlertToUi };
+// Export for API mapping when available
+export { getAssetIcon, mapAssetHealth, mapApiVendorToUi };
