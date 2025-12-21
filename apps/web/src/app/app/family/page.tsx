@@ -46,6 +46,23 @@ import {
   UserPlus,
   Loader2,
   Cat,
+  Calendar,
+  CreditCard,
+  Bell,
+  Sparkles,
+  Clock,
+  FileText,
+  Printer,
+  Download,
+  Send,
+  RefreshCw,
+  ArrowRight,
+  CheckCircle2,
+  ShoppingBag,
+  Stethoscope,
+  ClipboardList,
+  Navigation,
+  UserCheck,
 } from 'lucide-react';
 
 // ============================================================================
@@ -98,6 +115,7 @@ interface Activity {
   coachName?: string;
   monthlyFee: number;
   schedule: string;
+  contact?: string;
 }
 
 interface ChildMember {
@@ -130,6 +148,7 @@ interface ChildMember {
     shirt: string;
     pants: string;
     shoe: string;
+    lastUpdated?: Date;
   };
 }
 
@@ -173,13 +192,66 @@ interface StaffMember {
   schedule: { day: string; hours: string }[];
   permissions: string[];
   startDate: Date;
+  contractEndDate?: Date;
 }
 
 type FamilyMember = AdultMember | ChildMember | PetMember | StaffMember;
 
+// Smart Alert Types
+interface SmartAlert {
+  id: string;
+  type: 'tuition' | 'vaccine' | 'size' | 'contract' | 'activity' | 'shopping' | 'appointment';
+  priority: 'urgent' | 'soon' | 'info';
+  title: string;
+  description: string;
+  dueDate?: Date;
+  action?: {
+    label: string;
+    handler: () => void;
+  };
+  memberId?: string;
+  memberName?: string;
+}
+
+// Pickup/Logistics Types
+interface PickupEvent {
+  id: string;
+  childName: string;
+  childId: string;
+  location: string;
+  time: string;
+  activity: string;
+  driver?: string;
+  driverId?: string;
+  status: 'unassigned' | 'assigned' | 'confirmed' | 'completed';
+}
+
+// Bill Account Types
+interface BillAccount {
+  id: string;
+  name: string;
+  category: 'education' | 'activities' | 'childcare' | 'pet' | 'membership';
+  amount: number;
+  frequency: 'weekly' | 'monthly' | 'quarterly' | 'annually';
+  dueDay?: number;
+  recipient: string;
+  autopay: boolean;
+  linkedMemberId?: string;
+}
+
 // ============================================================================
-// MOCK DATA (Fallback for demo mode)
+// MOCK DATA
 // ============================================================================
+
+const MANAGER_NAME = 'Sarah';
+
+// Calculate dates relative to now
+const today = new Date();
+const getDate = (daysOffset: number) => {
+  const date = new Date(today);
+  date.setDate(date.getDate() + daysOffset);
+  return date;
+};
 
 const MOCK_ADULTS: AdultMember[] = [
   {
@@ -239,12 +311,12 @@ const MOCK_CHILDREN: ChildMember[] = [
     school: {
       name: 'Westlake Middle School',
       tuitionMonthly: 2200,
-      tuitionDue: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+      tuitionDue: getDate(5),
       address: '4100 Westbank Dr, Austin, TX',
     },
     activities: [
-      { name: 'Travel Soccer', organization: 'Lonestar SC', coachName: 'Coach Martinez', monthlyFee: 350, schedule: 'Tue/Thu 5-7pm, Sat 9am' },
-      { name: 'Piano Lessons', organization: 'Austin Music Academy', monthlyFee: 200, schedule: 'Wed 4pm' },
+      { name: 'Travel Soccer', organization: 'Lonestar SC', coachName: 'Coach Martinez', monthlyFee: 350, schedule: 'Tue/Thu 5-7pm, Sat 9am', contact: '(512) 555-KICK' },
+      { name: 'Piano Lessons', organization: 'Austin Music Academy', monthlyFee: 200, schedule: 'Wed 4pm', contact: '(512) 555-KEYS' },
     ],
     careProvider: { name: 'Maria Santos', id: 's1' },
     health: {
@@ -253,7 +325,7 @@ const MOCK_CHILDREN: ChildMember[] = [
       allergies: ['Peanuts', 'Tree nuts'],
       medications: ['EpiPen (emergency)'],
     },
-    sizes: { shirt: 'Youth M', pants: '12', shoe: '6' },
+    sizes: { shirt: 'Youth M', pants: '12', shoe: '6', lastUpdated: getDate(-180) },
   },
   {
     id: 'c2',
@@ -265,12 +337,12 @@ const MOCK_CHILDREN: ChildMember[] = [
     location: { status: 'school', label: 'At School', returnTime: '3:00 PM', eventName: 'Eanes Elementary' },
     school: {
       name: 'Eanes Elementary',
-      tuitionMonthly: 0, // Public school
+      tuitionMonthly: 0,
       address: '4101 Bee Cave Rd, Austin, TX',
     },
     activities: [
-      { name: 'Little League', organization: 'West Austin Little League', coachName: 'Coach Johnson', monthlyFee: 75, schedule: 'Mon/Wed 5pm' },
-      { name: 'Art Class', organization: 'Creative Kids Studio', monthlyFee: 150, schedule: 'Sat 10am' },
+      { name: 'Little League', organization: 'West Austin Little League', coachName: 'Coach Johnson', monthlyFee: 75, schedule: 'Mon/Wed 5pm', contact: '(512) 555-BALL' },
+      { name: 'Art Class', organization: 'Creative Kids Studio', monthlyFee: 150, schedule: 'Sat 10am', contact: '(512) 555-ARTS' },
     ],
     careProvider: { name: 'Maria Santos', id: 's1' },
     health: {
@@ -278,7 +350,7 @@ const MOCK_CHILDREN: ChildMember[] = [
       pediatricianPhone: '(512) 555-PEDS',
       allergies: [],
     },
-    sizes: { shirt: 'Youth S', pants: '8', shoe: '3' },
+    sizes: { shirt: 'Youth S', pants: '8', shoe: '3', lastUpdated: getDate(-45) },
   },
 ];
 
@@ -297,7 +369,7 @@ const MOCK_PETS: PetMember[] = [
       phone: '(512) 555-VETS',
       clinic: 'Westlake Animal Hospital',
     },
-    vaccinesDue: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+    vaccinesDue: getDate(30),
     microchipId: '985141001234567',
     food: {
       brand: 'Blue Buffalo',
@@ -329,11 +401,58 @@ const MOCK_STAFF: StaffMember[] = [
     ],
     permissions: ["Kids' Schedules", 'Emergency Contacts', 'Medical Info'],
     startDate: new Date(2023, 5, 15),
+    contractEndDate: getDate(7),
+  },
+];
+
+// Mock today's pickups
+const MOCK_PICKUPS: PickupEvent[] = [
+  {
+    id: 'pk1',
+    childName: 'Emma',
+    childId: 'c1',
+    location: 'Westlake Middle School',
+    time: '3:30 PM',
+    activity: 'School',
+    driver: 'Maria Santos',
+    driverId: 's1',
+    status: 'confirmed',
+  },
+  {
+    id: 'pk2',
+    childName: 'Jake',
+    childId: 'c2',
+    location: 'Eanes Elementary',
+    time: '3:00 PM',
+    activity: 'School',
+    driver: 'Maria Santos',
+    driverId: 's1',
+    status: 'confirmed',
+  },
+  {
+    id: 'pk3',
+    childName: 'Emma',
+    childId: 'c1',
+    location: 'Oak Park Soccer Fields',
+    time: '7:00 PM',
+    activity: 'Soccer Practice',
+    status: 'unassigned',
+  },
+  {
+    id: 'pk4',
+    childName: 'Jake',
+    childId: 'c2',
+    location: 'West Austin Fields',
+    time: '7:00 PM',
+    activity: 'Little League',
+    driver: 'Bob Miller',
+    driverId: 'a1',
+    status: 'assigned',
   },
 ];
 
 // ============================================================================
-// MAPPING FUNCTIONS
+// HELPER FUNCTIONS
 // ============================================================================
 
 function getInitials(name: string): string {
@@ -366,7 +485,6 @@ function mapRoleToDisplay(role: string): string {
 function mapToAdult(apiMember: ApiFamilyMember): AdultMember {
   const name = apiMember.displayName || apiMember.user?.displayName || 'Unknown';
   const email = apiMember.user?.email || '';
-  // MemberProfile has emergencyPhone and workPhone, use workPhone for adults
   const phone = apiMember.profile?.workPhone || apiMember.profile?.emergencyPhone || '';
   const isAdmin = apiMember.role.toUpperCase() === 'OWNER' || apiMember.role.toUpperCase() === 'ADMIN';
 
@@ -388,20 +506,15 @@ function mapToAdult(apiMember: ApiFamilyMember): AdultMember {
 
 function mapToChild(apiMember: ApiFamilyMember): ChildMember {
   const name = apiMember.displayName || 'Unknown';
-
   return {
     id: apiMember.id,
     type: 'child',
     name,
     initials: getInitials(name),
-    age: 0, // Would need to calculate from profile.birthday
+    age: 0,
     grade: '',
     location: { status: 'unknown', label: 'Unknown' },
-    school: {
-      name: 'Not set',
-      tuitionMonthly: 0,
-      address: '',
-    },
+    school: { name: 'Not set', tuitionMonthly: 0, address: '' },
     activities: [],
     health: {
       pediatrician: 'Not set',
@@ -409,18 +522,13 @@ function mapToChild(apiMember: ApiFamilyMember): ChildMember {
       allergies: apiMember.profile?.dietaryRestrictions || [],
     },
     sizes: apiMember.profile?.shirtSize
-      ? {
-          shirt: apiMember.profile.shirtSize,
-          pants: '',
-          shoe: '',
-        }
+      ? { shirt: apiMember.profile.shirtSize, pants: '', shoe: '' }
       : undefined,
   };
 }
 
 function mapToStaff(apiMember: ApiFamilyMember): StaffMember {
   const name = apiMember.displayName || 'Unknown';
-
   return {
     id: apiMember.id,
     type: 'staff',
@@ -439,12 +547,9 @@ function mapToStaff(apiMember: ApiFamilyMember): StaffMember {
 
 function mapPetTypeToSpecies(type: PetType): 'dog' | 'cat' | 'other' {
   switch (type) {
-    case 'DOG':
-      return 'dog';
-    case 'CAT':
-      return 'cat';
-    default:
-      return 'other';
+    case 'DOG': return 'dog';
+    case 'CAT': return 'cat';
+    default: return 'other';
   }
 }
 
@@ -461,7 +566,6 @@ function calculateAgeFromBirthday(birthday?: string | null): number {
 }
 
 function mapToPet(apiPet: Pet): PetMember {
-  // Get next vaccination date from vet records if available
   const nextVaccineDate = apiPet.vetRecords
     ?.filter((r) => r.nextVaccinationDate)
     .sort((a, b) => new Date(a.nextVaccinationDate!).getTime() - new Date(b.nextVaccinationDate!).getTime())[0]
@@ -488,14 +592,11 @@ function mapToPet(apiPet: Pet): PetMember {
       type: apiPet.foodType || '',
       monthlyAmount: apiPet.feedingSchedule || '',
     },
-    monthlyExpenses: 0, // Not available in API
+    monthlyExpenses: 0,
   };
 }
 
-// ============================================================================
-// LOCATION STATUS CONFIG
-// ============================================================================
-
+// Location status config
 const locationConfig: Record<LocationStatus, { color: string; bgColor: string; icon: typeof Home }> = {
   home: { color: 'text-green-700', bgColor: 'bg-green-100', icon: Home },
   away: { color: 'text-slate-700', bgColor: 'bg-slate-100', icon: Car },
@@ -505,10 +606,6 @@ const locationConfig: Record<LocationStatus, { color: string; bgColor: string; i
   unknown: { color: 'text-slate-500', bgColor: 'bg-slate-50', icon: MapPin },
 };
 
-// ============================================================================
-// ADD MEMBER FORM TYPES
-// ============================================================================
-
 type AddMemberType = 'adult' | 'child' | 'pet' | 'staff';
 
 interface AddMemberFormData {
@@ -516,7 +613,6 @@ interface AddMemberFormData {
   name: string;
   email?: string;
   phone?: string;
-  // Pet specific
   petType?: PetType;
   breed?: string;
 }
@@ -528,11 +624,12 @@ interface AddMemberFormData {
 export default function FamilyPage() {
   const { currentHousehold } = useAuth();
 
-  // Data State - initialized with mocks
+  // Data State
   const [adults, setAdults] = useState<AdultMember[]>(MOCK_ADULTS);
   const [children, setChildren] = useState<ChildMember[]>(MOCK_CHILDREN);
   const [pets, setPets] = useState<PetMember[]>(MOCK_PETS);
   const [staff, setStaff] = useState<StaffMember[]>(MOCK_STAFF);
+  const [pickups, setPickups] = useState<PickupEvent[]>(MOCK_PICKUPS);
   const [isLoading, setIsLoading] = useState(true);
 
   // UI State
@@ -540,12 +637,21 @@ export default function FamilyPage() {
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set());
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState<FamilyMember | null>(null);
+  const [showEmergencyCard, setShowEmergencyCard] = useState(false);
+  const [showSyncModal, setShowSyncModal] = useState<'calendar' | 'billing' | null>(null);
   const [addMemberStep, setAddMemberStep] = useState<'select' | 'form'>('select');
   const [addMemberType, setAddMemberType] = useState<AddMemberType | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showToast, setShowToast] = useState<string | null>(null);
+
+  // Toast helper
+  const toast = useCallback((message: string) => {
+    setShowToast(message);
+    setTimeout(() => setShowToast(null), 3000);
+  }, []);
 
   // ============================================================================
-  // DATA FETCHING
+  // DATA LOADING
   // ============================================================================
 
   const loadFamilyData = useCallback(async () => {
@@ -556,14 +662,11 @@ export default function FamilyPage() {
 
     try {
       const api = getApiClient();
-
-      // Fetch members and pets in parallel
       const [membersResult, petsResult] = await Promise.allSettled([
         api.getFamilyMembers(),
         api.getFamilyPets(),
       ]);
 
-      // Process members
       if (membersResult.status === 'fulfilled' && membersResult.value.length > 0) {
         const apiMembers = membersResult.value;
         const newAdults: AdultMember[] = [];
@@ -572,33 +675,26 @@ export default function FamilyPage() {
 
         apiMembers.forEach((member) => {
           const roleUpper = member.role.toUpperCase();
-          // Categorize by role
           if (roleUpper === 'CHILD') {
             newChildren.push(mapToChild(member));
           } else if (roleUpper === 'STAFF') {
             newStaff.push(mapToStaff(member));
           } else {
-            // OWNER, MANAGER, MEMBER are all adults
             newAdults.push(mapToAdult(member));
           }
         });
 
-        // Only update if we got data
         if (newAdults.length > 0) setAdults(newAdults);
         if (newChildren.length > 0) setChildren(newChildren);
         if (newStaff.length > 0) setStaff(newStaff);
       }
-      // If empty or error, keep MOCK data (already the default)
 
-      // Process pets
       if (petsResult.status === 'fulfilled' && petsResult.value.length > 0) {
         const mappedPets = petsResult.value.map(mapToPet);
         setPets(mappedPets);
       }
-      // If empty or error, keep MOCK_PETS
     } catch (error) {
       console.error('Failed to load family data:', error);
-      // Keep mock data as fallback
     } finally {
       setIsLoading(false);
     }
@@ -609,134 +705,239 @@ export default function FamilyPage() {
   }, [loadFamilyData]);
 
   // ============================================================================
-  // ADD MEMBER HANDLER
+  // COMPUTED VALUES - SMART ALERTS
   // ============================================================================
 
-  const handleAddMember = async (formData: AddMemberFormData) => {
-    if (!currentHousehold?.id) return;
+  const smartAlerts = useMemo(() => {
+    const alerts: SmartAlert[] = [];
+    const now = new Date();
 
-    setIsSubmitting(true);
-    try {
-      const api = getApiClient();
-
-      if (formData.type === 'pet') {
-        // Create pet via API
-        const petRequest: CreatePetRequest = {
-          name: formData.name,
-          type: formData.petType || 'DOG',
-          breed: formData.breed,
-        };
-
-        const newPet = await api.createPet(petRequest);
-        const mappedPet = mapToPet(newPet);
-        setPets((prev) => [...prev, mappedPet]);
-      } else {
-        // For adults/staff, we would call inviteMember API
-        // For now, do optimistic update with local data
-        const id = `temp-${Date.now()}`;
-        const name = formData.name;
-
-        if (formData.type === 'adult') {
-          const newAdult: AdultMember = {
-            id,
-            type: 'adult',
-            name,
-            initials: getInitials(name),
-            role: 'Family Member',
-            isAdmin: false,
-            email: formData.email || '',
-            phone: formData.phone || '',
-            location: { status: 'unknown', label: 'Invited' },
-            clubs: [],
-          };
-          setAdults((prev) => [...prev, newAdult]);
-        } else if (formData.type === 'child') {
-          const newChild: ChildMember = {
-            id,
-            type: 'child',
-            name,
-            initials: getInitials(name),
-            age: 0,
-            grade: '',
-            location: { status: 'unknown', label: 'Unknown' },
-            school: { name: 'Not set', tuitionMonthly: 0, address: '' },
-            activities: [],
-            health: {
-              pediatrician: 'Not set',
-              pediatricianPhone: '',
-              allergies: [],
-            },
-          };
-          setChildren((prev) => [...prev, newChild]);
-        } else if (formData.type === 'staff') {
-          const newStaffMember: StaffMember = {
-            id,
-            type: 'staff',
-            name,
-            initials: getInitials(name),
-            role: 'Staff',
-            email: formData.email || '',
-            phone: formData.phone || '',
-            location: { status: 'unknown', label: 'Invited' },
-            weeklyStipend: 0,
-            schedule: [],
-            permissions: [],
-            startDate: new Date(),
-          };
-          setStaff((prev) => [...prev, newStaffMember]);
+    // Tuition due alerts
+    children.forEach((child) => {
+      if (child.school.tuitionDue && child.school.tuitionMonthly > 0) {
+        const daysUntil = Math.ceil((child.school.tuitionDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 7 && daysUntil >= 0) {
+          alerts.push({
+            id: `tuition-${child.id}`,
+            type: 'tuition',
+            priority: daysUntil <= 2 ? 'urgent' : 'soon',
+            title: `${child.name}'s tuition due in ${daysUntil} days`,
+            description: `${child.school.name} - $${child.school.tuitionMonthly.toLocaleString()}`,
+            dueDate: child.school.tuitionDue,
+            memberId: child.id,
+            memberName: child.name,
+            action: { label: 'Pay Now', handler: () => toast(`Payment initiated for ${child.school.name}`) },
+          });
         }
       }
-
-      // Reset modal state
-      setShowAddMemberModal(false);
-      setAddMemberStep('select');
-      setAddMemberType(null);
-    } catch (error) {
-      console.error('Failed to add member:', error);
-      // Could show error toast here
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // ============================================================================
-  // COMPUTED VALUES
-  // ============================================================================
-
-  // All members for logistics dashboard
-  const allMembers = useMemo(() => {
-    return [...adults, ...children, ...pets, ...staff];
-  }, [adults, children, pets, staff]);
-
-  // Financial calculations
-  const monthlyLifestyleCosts = useMemo(() => {
-    let total = 0;
-
-    // Adult club dues
-    adults.forEach((adult) => {
-      adult.clubs.forEach((club) => {
-        total += club.monthlyDues;
-      });
     });
+
+    // Pet vaccine alerts
+    pets.forEach((pet) => {
+      if (pet.vaccinesDue) {
+        const daysUntil = Math.ceil((pet.vaccinesDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 30 && daysUntil >= 0) {
+          alerts.push({
+            id: `vaccine-${pet.id}`,
+            type: 'vaccine',
+            priority: daysUntil <= 7 ? 'urgent' : 'soon',
+            title: `${pet.name}'s vaccines due ${daysUntil <= 0 ? 'today' : `in ${daysUntil} days`}`,
+            description: `Schedule appointment with ${pet.vet.clinic}`,
+            dueDate: pet.vaccinesDue,
+            memberId: pet.id,
+            memberName: pet.name,
+            action: { label: 'Ask Sarah to Schedule', handler: () => toast(`${MANAGER_NAME} will schedule ${pet.name}'s vet appointment`) },
+          });
+        }
+      }
+    });
+
+    // Size update alerts (6 months since last update)
+    children.forEach((child) => {
+      if (child.sizes?.lastUpdated) {
+        const daysSinceUpdate = Math.floor((now.getTime() - child.sizes.lastUpdated.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysSinceUpdate >= 180) {
+          alerts.push({
+            id: `size-${child.id}`,
+            type: 'size',
+            priority: 'info',
+            title: `${child.name}'s sizes may be outdated`,
+            description: `Last updated ${Math.floor(daysSinceUpdate / 30)} months ago`,
+            memberId: child.id,
+            memberName: child.name,
+            action: { label: 'Update Sizes', handler: () => setShowEditModal(child) },
+          });
+        }
+      }
+    });
+
+    // Staff contract expiring
+    staff.forEach((s) => {
+      if (s.contractEndDate) {
+        const daysUntil = Math.ceil((s.contractEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        if (daysUntil <= 14 && daysUntil >= 0) {
+          alerts.push({
+            id: `contract-${s.id}`,
+            type: 'contract',
+            priority: daysUntil <= 7 ? 'urgent' : 'soon',
+            title: `${s.name}'s contract expires in ${daysUntil} days`,
+            description: `${s.role} via ${s.agency || 'Direct hire'}`,
+            dueDate: s.contractEndDate,
+            memberId: s.id,
+            memberName: s.name,
+            action: { label: 'Renew Contract', handler: () => toast(`${MANAGER_NAME} will handle contract renewal`) },
+          });
+        }
+      }
+    });
+
+    return alerts.sort((a, b) => {
+      const priorityOrder = { urgent: 0, soon: 1, info: 2 };
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
+    });
+  }, [children, pets, staff, toast]);
+
+  // Computed bill accounts from family data
+  const autoBillAccounts = useMemo(() => {
+    const accounts: BillAccount[] = [];
 
     // School tuition
     children.forEach((child) => {
-      total += child.school.tuitionMonthly;
-      child.activities.forEach((activity) => {
-        total += activity.monthlyFee;
-      });
+      if (child.school.tuitionMonthly > 0) {
+        accounts.push({
+          id: `school-${child.id}`,
+          name: child.school.name,
+          category: 'education',
+          amount: child.school.tuitionMonthly,
+          frequency: 'monthly',
+          dueDay: 5,
+          recipient: child.name,
+          autopay: false,
+          linkedMemberId: child.id,
+        });
+      }
     });
 
-    // Pet expenses
-    pets.forEach((pet) => {
-      total += pet.monthlyExpenses;
+    // Activities
+    children.forEach((child) => {
+      child.activities.forEach((activity, idx) => {
+        accounts.push({
+          id: `activity-${child.id}-${idx}`,
+          name: activity.name,
+          category: 'activities',
+          amount: activity.monthlyFee,
+          frequency: 'monthly',
+          recipient: child.name,
+          autopay: false,
+          linkedMemberId: child.id,
+        });
+      });
     });
 
     // Staff stipends
     staff.forEach((s) => {
-      total += s.weeklyStipend * 4.33; // Monthly average
+      if (s.weeklyStipend > 0) {
+        accounts.push({
+          id: `staff-${s.id}`,
+          name: `${s.name} (${s.role})`,
+          category: 'childcare',
+          amount: s.weeklyStipend,
+          frequency: 'weekly',
+          recipient: s.name,
+          autopay: true,
+          linkedMemberId: s.id,
+        });
+      }
     });
 
+    // Pet expenses
+    pets.forEach((pet) => {
+      if (pet.monthlyExpenses > 0) {
+        accounts.push({
+          id: `pet-${pet.id}`,
+          name: `${pet.name} Care`,
+          category: 'pet',
+          amount: pet.monthlyExpenses,
+          frequency: 'monthly',
+          recipient: pet.name,
+          autopay: false,
+          linkedMemberId: pet.id,
+        });
+      }
+    });
+
+    // Adult memberships
+    adults.forEach((adult) => {
+      adult.clubs.forEach((club, idx) => {
+        accounts.push({
+          id: `club-${adult.id}-${idx}`,
+          name: club.name,
+          category: 'membership',
+          amount: club.monthlyDues,
+          frequency: 'monthly',
+          recipient: adult.name,
+          autopay: true,
+          linkedMemberId: adult.id,
+        });
+      });
+    });
+
+    return accounts;
+  }, [children, staff, pets, adults]);
+
+  // Computed calendar events from family data
+  const autoCalendarEvents = useMemo(() => {
+    const events: { title: string; schedule: string; member: string; type: string }[] = [];
+
+    children.forEach((child) => {
+      child.activities.forEach((activity) => {
+        events.push({
+          title: `${child.name.split(' ')[0]}'s ${activity.name}`,
+          schedule: activity.schedule,
+          member: child.name,
+          type: 'recurring',
+        });
+      });
+    });
+
+    staff.forEach((s) => {
+      events.push({
+        title: `${s.name} (${s.role})`,
+        schedule: s.schedule.map(d => `${d.day.slice(0, 3)}: ${d.hours}`).join(', '),
+        member: s.name,
+        type: 'availability',
+      });
+    });
+
+    pets.forEach((pet) => {
+      if (pet.vaccinesDue) {
+        events.push({
+          title: `${pet.name} - Vaccines Due`,
+          schedule: pet.vaccinesDue.toLocaleDateString(),
+          member: pet.name,
+          type: 'reminder',
+        });
+      }
+    });
+
+    return events;
+  }, [children, staff, pets]);
+
+  const allMembers = useMemo(() => {
+    return [...adults, ...children, ...pets, ...staff];
+  }, [adults, children, pets, staff]);
+
+  const monthlyLifestyleCosts = useMemo(() => {
+    let total = 0;
+    adults.forEach((adult) => {
+      adult.clubs.forEach((club) => { total += club.monthlyDues; });
+    });
+    children.forEach((child) => {
+      total += child.school.tuitionMonthly;
+      child.activities.forEach((activity) => { total += activity.monthlyFee; });
+    });
+    pets.forEach((pet) => { total += pet.monthlyExpenses; });
+    staff.forEach((s) => { total += s.weeklyStipend * 4.33; });
     return total;
   }, [adults, children, pets, staff]);
 
@@ -744,44 +945,95 @@ export default function FamilyPage() {
   // HANDLERS
   // ============================================================================
 
+  const handleAddMember = async (formData: AddMemberFormData) => {
+    if (!currentHousehold?.id) return;
+    setIsSubmitting(true);
+    try {
+      const api = getApiClient();
+      if (formData.type === 'pet') {
+        const petRequest: CreatePetRequest = {
+          name: formData.name,
+          type: formData.petType || 'DOG',
+          breed: formData.breed,
+        };
+        const newPet = await api.createPet(petRequest);
+        const mappedPet = mapToPet(newPet);
+        setPets((prev) => [...prev, mappedPet]);
+      } else {
+        const id = `temp-${Date.now()}`;
+        const name = formData.name;
+        if (formData.type === 'adult') {
+          const newAdult: AdultMember = {
+            id, type: 'adult', name, initials: getInitials(name), role: 'Family Member', isAdmin: false,
+            email: formData.email || '', phone: formData.phone || '', location: { status: 'unknown', label: 'Invited' }, clubs: [],
+          };
+          setAdults((prev) => [...prev, newAdult]);
+        } else if (formData.type === 'child') {
+          const newChild: ChildMember = {
+            id, type: 'child', name, initials: getInitials(name), age: 0, grade: '',
+            location: { status: 'unknown', label: 'Unknown' }, school: { name: 'Not set', tuitionMonthly: 0, address: '' },
+            activities: [], health: { pediatrician: 'Not set', pediatricianPhone: '', allergies: [] },
+          };
+          setChildren((prev) => [...prev, newChild]);
+        } else if (formData.type === 'staff') {
+          const newStaffMember: StaffMember = {
+            id, type: 'staff', name, initials: getInitials(name), role: 'Staff',
+            email: formData.email || '', phone: formData.phone || '', location: { status: 'unknown', label: 'Invited' },
+            weeklyStipend: 0, schedule: [], permissions: [], startDate: new Date(),
+          };
+          setStaff((prev) => [...prev, newStaffMember]);
+        }
+      }
+      setShowAddMemberModal(false);
+      setAddMemberStep('select');
+      setAddMemberType(null);
+      toast(`${formData.name} added successfully`);
+    } catch (error) {
+      console.error('Failed to add member:', error);
+      toast('Failed to add member');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleAssignDriver = useCallback((pickupId: string, driverName: string, driverId: string) => {
+    setPickups(prev => prev.map(p =>
+      p.id === pickupId ? { ...p, driver: driverName, driverId, status: 'assigned' as const } : p
+    ));
+    toast(`${driverName} assigned for pickup`);
+  }, [toast]);
+
+  const handleSyncToCalendar = useCallback(() => {
+    toast(`${autoCalendarEvents.length} events synced to calendar`);
+    setShowSyncModal(null);
+  }, [autoCalendarEvents.length, toast]);
+
+  const handleSyncToBilling = useCallback(() => {
+    toast(`${autoBillAccounts.length} bill accounts created`);
+    setShowSyncModal(null);
+  }, [autoBillAccounts.length, toast]);
+
   const toggleCard = (id: string) => {
     setExpandedCards((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) { next.delete(id); } else { next.add(id); }
       return next;
     });
   };
 
-  // ============================================================================
-  // FORMAT HELPERS
-  // ============================================================================
-
+  // Format helpers
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(amount);
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-    });
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const getDaysUntil = (date: Date) => {
-    const days = Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    return days;
+    return Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   };
 
-  // Render location status pill
   const renderLocationPill = (location: LocationInfo) => {
     const config = locationConfig[location.status];
     const Icon = config.icon;
@@ -818,115 +1070,248 @@ export default function FamilyPage() {
   return (
     <div className="space-y-6 pb-20">
       {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Family</h1>
           <p className="text-slate-600 mt-1">Household members, logistics, and lifestyle management</p>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowEmergencyCard(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 font-medium rounded-lg hover:bg-red-100 transition-colors border border-red-200"
+          >
+            <Shield className="w-4 h-4" />
+            <span className="hidden sm:inline">Emergency Card</span>
+          </button>
+          <button
+            onClick={() => setShowAddMemberModal(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+          >
+            <UserPlus className="w-5 h-5" />
+            Add Member
+          </button>
+        </div>
+      </div>
+
+      {/* Smart Alerts for Manager */}
+      {smartAlerts.length > 0 && (
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Bell className="w-5 h-5 text-amber-500" />
+              <h2 className="font-semibold text-slate-900">Smart Alerts</h2>
+              <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                {smartAlerts.length}
+              </span>
+            </div>
+            <button className="text-sm text-slate-500 hover:text-slate-700">View All</button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {smartAlerts.slice(0, 6).map((alert) => {
+              const priorityStyles = {
+                urgent: 'bg-red-50 border-red-200',
+                soon: 'bg-amber-50 border-amber-200',
+                info: 'bg-blue-50 border-blue-200',
+              };
+              const iconStyles = {
+                urgent: 'text-red-500',
+                soon: 'text-amber-500',
+                info: 'text-blue-500',
+              };
+              const getAlertIcon = () => {
+                switch (alert.type) {
+                  case 'tuition': return DollarSign;
+                  case 'vaccine': return Syringe;
+                  case 'size': return Shirt;
+                  case 'contract': return FileText;
+                  case 'shopping': return ShoppingBag;
+                  default: return AlertCircle;
+                }
+              };
+              const Icon = getAlertIcon();
+
+              return (
+                <div
+                  key={alert.id}
+                  className={`flex items-start gap-3 p-4 rounded-xl border ${priorityStyles[alert.priority]}`}
+                >
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
+                    alert.priority === 'urgent' ? 'bg-red-100' :
+                    alert.priority === 'soon' ? 'bg-amber-100' : 'bg-blue-100'
+                  }`}>
+                    <Icon className={`w-5 h-5 ${iconStyles[alert.priority]}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 text-sm">{alert.title}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">{alert.description}</p>
+                    {alert.action && (
+                      <button
+                        onClick={alert.action.handler}
+                        className={`mt-2 text-xs font-medium ${
+                          alert.priority === 'urgent' ? 'text-red-600 hover:text-red-700' :
+                          alert.priority === 'soon' ? 'text-amber-600 hover:text-amber-700' :
+                          'text-blue-600 hover:text-blue-700'
+                        }`}
+                      >
+                        {alert.action.label} →
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Today's Logistics - Enhanced */}
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        <div className="p-4 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                <Navigation className="w-5 h-5 text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="font-semibold text-slate-900">Today's Logistics</h2>
+                <p className="text-sm text-slate-500">
+                  {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => toast('Messaging Maria...')}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              >
+                <MessageCircle className="w-4 h-4" />
+                Message Maria
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Pickup Timeline */}
+        <div className="p-4">
+          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-3">Pickups & Drop-offs</h3>
+          <div className="space-y-3">
+            {pickups.sort((a, b) => a.time.localeCompare(b.time)).map((pickup) => {
+              const isUnassigned = pickup.status === 'unassigned';
+              return (
+                <div
+                  key={pickup.id}
+                  className={`flex items-center gap-4 p-3 rounded-xl ${
+                    isUnassigned ? 'bg-red-50 border border-red-200' : 'bg-slate-50'
+                  }`}
+                >
+                  <div className={`text-center min-w-[60px] ${isUnassigned ? 'text-red-600' : 'text-slate-600'}`}>
+                    <p className="text-lg font-bold">{pickup.time.split(' ')[0]}</p>
+                    <p className="text-xs">{pickup.time.split(' ')[1]}</p>
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium text-slate-900">{pickup.childName}</span>
+                      <ArrowRight className="w-3 h-3 text-slate-400" />
+                      <span className="text-sm text-slate-600 truncate">{pickup.activity}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 flex items-center gap-1 mt-0.5">
+                      <MapPin className="w-3 h-3" />
+                      {pickup.location}
+                    </p>
+                  </div>
+
+                  {isUnassigned ? (
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-red-500" />
+                      <select
+                        onChange={(e) => {
+                          const [name, id] = e.target.value.split('|');
+                          if (name && id) handleAssignDriver(pickup.id, name, id);
+                        }}
+                        className="text-sm px-3 py-1.5 border border-red-300 rounded-lg bg-white text-red-700 focus:ring-2 focus:ring-red-500"
+                        defaultValue=""
+                      >
+                        <option value="" disabled>Assign Driver</option>
+                        {adults.map(a => <option key={a.id} value={`${a.name}|${a.id}`}>{a.name}</option>)}
+                        {staff.map(s => <option key={s.id} value={`${s.name}|${s.id}`}>{s.name}</option>)}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-emerald-100 rounded-full flex items-center justify-center">
+                        <UserCheck className="w-4 h-4 text-emerald-600" />
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-medium text-slate-900">{pickup.driver}</p>
+                        <p className={`text-xs ${
+                          pickup.status === 'confirmed' ? 'text-green-600' : 'text-amber-600'
+                        }`}>
+                          {pickup.status === 'confirmed' ? 'Confirmed' : 'Pending'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Quick Actions for Logistics */}
+        <div className="px-4 pb-4 flex gap-2 flex-wrap">
+          <button
+            onClick={() => toast('Arranging backup driver...')}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Arrange Backup
+          </button>
+          <button
+            onClick={() => toast('Opening carpool chat...')}
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+          >
+            <Users className="w-4 h-4" />
+            Carpool Options
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Sync Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Sync to Calendar */}
         <button
-          onClick={() => setShowAddMemberModal(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+          onClick={() => setShowSyncModal('calendar')}
+          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
         >
-          <UserPlus className="w-5 h-5" />
-          Add Member
+          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+            <Calendar className="w-6 h-6 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-slate-900">Sync to Calendar</p>
+            <p className="text-sm text-slate-500">{autoCalendarEvents.length} events from family data</p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400" />
+        </button>
+
+        {/* Sync to Billing */}
+        <button
+          onClick={() => setShowSyncModal('billing')}
+          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+        >
+          <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
+            <CreditCard className="w-6 h-6 text-emerald-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-medium text-slate-900">Create Bill Accounts</p>
+            <p className="text-sm text-slate-500">{autoBillAccounts.length} recurring bills detected</p>
+          </div>
+          <ArrowRight className="w-5 h-5 text-slate-400" />
         </button>
       </div>
 
-      {/* Today's Logistics Dashboard */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <MapPin className="w-5 h-5 text-emerald-600" />
-            <h2 className="font-semibold text-slate-900">Today's Logistics</h2>
-          </div>
-          <span className="text-sm text-slate-500">
-            {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
-          </span>
-        </div>
-
-        <p className="text-sm text-slate-500 mb-4">Where is everyone right now?</p>
-
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {allMembers.map((member) => {
-            const config = locationConfig[member.location.status];
-            const Icon = config.icon;
-            return (
-              <div
-                key={member.id}
-                className="flex flex-col items-center p-4 bg-slate-50 rounded-xl hover:bg-slate-100 transition-colors"
-              >
-                {/* Avatar */}
-                <div className="relative mb-2">
-                  <div
-                    className={`w-14 h-14 rounded-full flex items-center justify-center ${
-                      member.type === 'pet'
-                        ? 'bg-amber-100'
-                        : member.type === 'staff'
-                          ? 'bg-purple-100'
-                          : member.type === 'child'
-                            ? 'bg-blue-100'
-                            : 'bg-emerald-100'
-                    }`}
-                  >
-                    {member.type === 'pet' ? (
-                      (member as PetMember).species === 'cat' ? (
-                        <Cat className="w-7 h-7 text-amber-600" />
-                      ) : (
-                        <Dog className="w-7 h-7 text-amber-600" />
-                      )
-                    ) : (
-                      <span
-                        className={`text-lg font-semibold ${
-                          member.type === 'staff'
-                            ? 'text-purple-600'
-                            : member.type === 'child'
-                              ? 'text-blue-600'
-                              : 'text-emerald-600'
-                        }`}
-                      >
-                        {member.initials}
-                      </span>
-                    )}
-                  </div>
-                  {/* Status dot */}
-                  <span
-                    className={`absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full border-2 border-white ${
-                      member.location.status === 'home'
-                        ? 'bg-green-500'
-                        : member.location.status === 'unknown'
-                          ? 'bg-slate-400'
-                          : 'bg-blue-500'
-                    }`}
-                  />
-                </div>
-
-                {/* Name */}
-                <p className="font-medium text-slate-900 text-sm text-center">{member.name.split(' ')[0]}</p>
-
-                {/* Status */}
-                <div className={`flex items-center gap-1 mt-1 ${config.color}`}>
-                  <Icon className="w-3 h-3" />
-                  <span className="text-xs">{member.location.label}</span>
-                </div>
-
-                {/* Return time */}
-                {member.location.returnTime && (
-                  <p className="text-xs text-slate-400 mt-0.5">Back {member.location.returnTime}</p>
-                )}
-
-                {/* Check-in button for non-home members */}
-                {member.location.status !== 'home' && member.type !== 'pet' && (
-                  <button className="mt-2 text-xs text-emerald-600 hover:text-emerald-700 font-medium">
-                    Check In
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Financial Roll-up (Admin only) */}
+      {/* Financial Roll-up */}
       {showFinancials && (
         <div className="bg-gradient-to-r from-slate-900 to-slate-800 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
@@ -957,12 +1342,7 @@ export default function FamilyPage() {
             <div className="bg-white/10 rounded-lg p-3">
               <p className="text-slate-400 text-xs">Education & Activities</p>
               <p className="font-semibold">
-                {formatCurrency(
-                  children.reduce(
-                    (sum, c) => sum + c.school.tuitionMonthly + c.activities.reduce((s, a) => s + a.monthlyFee, 0),
-                    0
-                  )
-                )}
+                {formatCurrency(children.reduce((sum, c) => sum + c.school.tuitionMonthly + c.activities.reduce((s, a) => s + a.monthlyFee, 0), 0))}
               </p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
@@ -998,7 +1378,6 @@ export default function FamilyPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {adults.map((adult) => (
             <div key={adult.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* Header */}
               <div className="p-4 border-b border-slate-100">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
@@ -1019,16 +1398,12 @@ export default function FamilyPage() {
                       <div className="mt-1">{renderLocationPill(adult.location)}</div>
                     </div>
                   </div>
-                  <button
-                    onClick={() => setShowEditModal(adult)}
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => setShowEditModal(adult)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Quick Contact */}
               <div className="px-4 py-3 bg-slate-50 flex items-center gap-4">
                 <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
                   <Phone className="w-4 h-4" />
@@ -1040,22 +1415,16 @@ export default function FamilyPage() {
                 </button>
               </div>
 
-              {/* Expandable Details */}
               <button
                 onClick={() => toggleCard(adult.id)}
                 className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
               >
                 <span>Lifestyle Details</span>
-                {expandedCards.has(adult.id) ? (
-                  <ChevronDown className="w-4 h-4" />
-                ) : (
-                  <ChevronRight className="w-4 h-4" />
-                )}
+                {expandedCards.has(adult.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
               </button>
 
               {expandedCards.has(adult.id) && (
                 <div className="px-4 pb-4 space-y-4">
-                  {/* Work */}
                   {adult.work && (
                     <div>
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Work</p>
@@ -1070,7 +1439,6 @@ export default function FamilyPage() {
                     </div>
                   )}
 
-                  {/* Clubs */}
                   {adult.clubs.length > 0 && (
                     <div>
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Memberships</p>
@@ -1081,23 +1449,16 @@ export default function FamilyPage() {
                               <Star className="w-5 h-5 text-amber-500" />
                               <div>
                                 <p className="font-medium text-slate-900">{club.name}</p>
-                                <p className="text-xs text-slate-400">
-                                  {club.type} • {club.membershipId}
-                                </p>
+                                <p className="text-xs text-slate-400">{club.type} • {club.membershipId}</p>
                               </div>
                             </div>
-                            {showFinancials && (
-                              <span className="text-sm font-medium text-slate-600">
-                                {formatCurrency(club.monthlyDues)}/mo
-                              </span>
-                            )}
+                            {showFinancials && <span className="text-sm font-medium text-slate-600">{formatCurrency(club.monthlyDues)}/mo</span>}
                           </div>
                         ))}
                       </div>
                     </div>
                   )}
 
-                  {/* Wellness */}
                   {adult.wellness && (
                     <div>
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Wellness</p>
@@ -1107,22 +1468,6 @@ export default function FamilyPage() {
                           <p className="font-medium text-slate-900">{adult.wellness.gym}</p>
                           <p className="text-xs text-slate-400">ID: {adult.wellness.membershipId}</p>
                         </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Civic */}
-                  {adult.civic && adult.civic.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-                        Civic Organizations
-                      </p>
-                      <div className="flex flex-wrap gap-2">
-                        {adult.civic.map((org, idx) => (
-                          <span key={idx} className="px-3 py-1 bg-blue-50 text-blue-700 text-sm rounded-full">
-                            {org}
-                          </span>
-                        ))}
                       </div>
                     </div>
                   )}
@@ -1144,9 +1489,9 @@ export default function FamilyPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {children.map((child) => {
             const tuitionDue = child.school.tuitionDue ? getDaysUntil(child.school.tuitionDue) : null;
+            const sizeOutdated = child.sizes?.lastUpdated && getDaysUntil(child.sizes.lastUpdated) <= -180;
             return (
               <div key={child.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Header */}
                 <div className="p-4 border-b border-slate-100">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
@@ -1155,32 +1500,23 @@ export default function FamilyPage() {
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-900">{child.name}</h3>
-                        <p className="text-sm text-slate-500">
-                          {child.age} years old • {child.grade}
-                        </p>
+                        <p className="text-sm text-slate-500">{child.age} years old • {child.grade}</p>
                         <div className="mt-1">{renderLocationPill(child.location)}</div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowEditModal(child)}
-                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
+                    <button onClick={() => setShowEditModal(child)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Alerts */}
                 {child.health.allergies.length > 0 && (
                   <div className="px-4 py-2 bg-red-50 border-b border-red-100 flex items-center gap-2">
                     <AlertTriangle className="w-4 h-4 text-red-600" />
-                    <span className="text-sm text-red-700 font-medium">
-                      Allergies: {child.health.allergies.join(', ')}
-                    </span>
+                    <span className="text-sm text-red-700 font-medium">Allergies: {child.health.allergies.join(', ')}</span>
                   </div>
                 )}
 
-                {/* School Info */}
                 <div className="p-4 border-b border-slate-100">
                   <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Education</p>
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
@@ -1193,9 +1529,7 @@ export default function FamilyPage() {
                     </div>
                     {child.school.tuitionMonthly > 0 && showFinancials && (
                       <div className="text-right">
-                        <p className="text-sm font-medium text-slate-900">
-                          {formatCurrency(child.school.tuitionMonthly)}/mo
-                        </p>
+                        <p className="text-sm font-medium text-slate-900">{formatCurrency(child.school.tuitionMonthly)}/mo</p>
                         {tuitionDue !== null && tuitionDue <= 7 && (
                           <span className="text-xs text-red-600 font-medium">Due in {tuitionDue} days</span>
                         )}
@@ -1204,22 +1538,16 @@ export default function FamilyPage() {
                   </div>
                 </div>
 
-                {/* Expandable Details */}
                 <button
                   onClick={() => toggleCard(child.id)}
                   className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                 >
                   <span>Activities & Support Team</span>
-                  {expandedCards.has(child.id) ? (
-                    <ChevronDown className="w-4 h-4" />
-                  ) : (
-                    <ChevronRight className="w-4 h-4" />
-                  )}
+                  {expandedCards.has(child.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                 </button>
 
                 {expandedCards.has(child.id) && (
                   <div className="px-4 pb-4 space-y-4">
-                    {/* Activities */}
                     {child.activities.length > 0 && (
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Activities</p>
@@ -1227,11 +1555,9 @@ export default function FamilyPage() {
                           {child.activities.map((activity, idx) => (
                             <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
                               <div className="flex items-center gap-3">
-                                {activity.name.toLowerCase().includes('soccer') ||
-                                activity.name.toLowerCase().includes('league') ? (
+                                {activity.name.toLowerCase().includes('soccer') || activity.name.toLowerCase().includes('league') ? (
                                   <Trophy className="w-5 h-5 text-amber-500" />
-                                ) : activity.name.toLowerCase().includes('piano') ||
-                                  activity.name.toLowerCase().includes('music') ? (
+                                ) : activity.name.toLowerCase().includes('piano') || activity.name.toLowerCase().includes('music') ? (
                                   <Music className="w-5 h-5 text-purple-500" />
                                 ) : activity.name.toLowerCase().includes('art') ? (
                                   <Palette className="w-5 h-5 text-pink-500" />
@@ -1243,23 +1569,17 @@ export default function FamilyPage() {
                                   <p className="text-xs text-slate-500">{activity.organization}</p>
                                   {activity.coachName && <p className="text-xs text-slate-400">{activity.coachName}</p>}
                                   <p className="text-xs text-slate-400 mt-0.5">
-                                    <Timer className="w-3 h-3 inline mr-1" />
-                                    {activity.schedule}
+                                    <Timer className="w-3 h-3 inline mr-1" />{activity.schedule}
                                   </p>
                                 </div>
                               </div>
-                              {showFinancials && (
-                                <span className="text-sm font-medium text-slate-600">
-                                  {formatCurrency(activity.monthlyFee)}/mo
-                                </span>
-                              )}
+                              {showFinancials && <span className="text-sm font-medium text-slate-600">{formatCurrency(activity.monthlyFee)}/mo</span>}
                             </div>
                           ))}
                         </div>
                       </div>
                     )}
 
-                    {/* Care Provider */}
                     {child.careProvider && (
                       <div>
                         <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Care Provider</p>
@@ -1273,12 +1593,11 @@ export default function FamilyPage() {
                       </div>
                     )}
 
-                    {/* Health Info */}
                     <div>
                       <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Health</p>
                       <div className="space-y-2">
                         <div className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
-                          <Syringe className="w-5 h-5 text-green-600" />
+                          <Stethoscope className="w-5 h-5 text-green-600" />
                           <div>
                             <p className="font-medium text-slate-900">{child.health.pediatrician}</p>
                             <p className="text-xs text-slate-400">{child.health.pediatricianPhone}</p>
@@ -1286,18 +1605,23 @@ export default function FamilyPage() {
                         </div>
                         {child.health.medications && child.health.medications.length > 0 && (
                           <div className="p-3 bg-amber-50 rounded-lg">
-                            <p className="text-sm text-amber-700 font-medium">
-                              Medications: {child.health.medications.join(', ')}
-                            </p>
+                            <p className="text-sm text-amber-700 font-medium">Medications: {child.health.medications.join(', ')}</p>
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Sizes */}
                     {child.sizes && (
                       <div>
-                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Sizes</p>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide">Sizes</p>
+                          {sizeOutdated && (
+                            <span className="text-xs text-amber-600 flex items-center gap-1">
+                              <AlertCircle className="w-3 h-3" />
+                              May need update
+                            </span>
+                          )}
+                        </div>
                         <div className="grid grid-cols-3 gap-2">
                           <div className="p-2 bg-slate-50 rounded-lg text-center">
                             <Shirt className="w-4 h-4 mx-auto text-slate-400 mb-1" />
@@ -1315,6 +1639,14 @@ export default function FamilyPage() {
                             <p className="font-medium text-slate-900">{child.sizes.shoe}</p>
                           </div>
                         </div>
+                        {sizeOutdated && (
+                          <button
+                            onClick={() => toast(`${MANAGER_NAME} will ask about ${child.name}'s current sizes`)}
+                            className="w-full mt-2 py-2 text-sm text-amber-700 bg-amber-50 rounded-lg hover:bg-amber-100 transition-colors"
+                          >
+                            Ask Sarah to order new clothes?
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -1338,66 +1670,56 @@ export default function FamilyPage() {
             const vaccinesDays = pet.vaccinesDue ? getDaysUntil(pet.vaccinesDue) : null;
             return (
               <div key={pet.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Header */}
                 <div className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-amber-100 rounded-full flex items-center justify-center">
-                        {pet.species === 'cat' ? (
-                          <Cat className="w-7 h-7 text-amber-600" />
-                        ) : (
-                          <Dog className="w-7 h-7 text-amber-600" />
-                        )}
+                        {pet.species === 'cat' ? <Cat className="w-7 h-7 text-amber-600" /> : <Dog className="w-7 h-7 text-amber-600" />}
                       </div>
                       <div>
                         <h3 className="font-semibold text-slate-900">{pet.name}</h3>
-                        <p className="text-sm text-slate-500">
-                          {pet.breed} • {pet.age} years old
-                        </p>
+                        <p className="text-sm text-slate-500">{pet.breed} • {pet.age} years old</p>
                         <div className="mt-1">{renderLocationPill(pet.location)}</div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowEditModal(pet)}
-                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
+                    <button onClick={() => setShowEditModal(pet)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
 
-                {/* Vaccine Alert */}
                 {vaccinesDays !== null && vaccinesDays <= 30 && (
-                  <div
-                    className={`px-4 py-2 flex items-center gap-2 ${
-                      vaccinesDays <= 7 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'
-                    }`}
-                  >
-                    <AlertCircle className={`w-4 h-4 ${vaccinesDays <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
-                    <span className={`text-sm font-medium ${vaccinesDays <= 7 ? 'text-red-700' : 'text-amber-700'}`}>
-                      Vaccines due {pet.vaccinesDue && formatDate(pet.vaccinesDue)}
-                    </span>
+                  <div className={`px-4 py-2 flex items-center justify-between ${
+                    vaccinesDays <= 7 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className={`w-4 h-4 ${vaccinesDays <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
+                      <span className={`text-sm font-medium ${vaccinesDays <= 7 ? 'text-red-700' : 'text-amber-700'}`}>
+                        Vaccines due {pet.vaccinesDue && formatDate(pet.vaccinesDue)}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => toast(`${MANAGER_NAME} will schedule ${pet.name}'s vet visit`)}
+                      className={`text-xs font-medium ${vaccinesDays <= 7 ? 'text-red-600' : 'text-amber-600'}`}
+                    >
+                      Schedule →
+                    </button>
                   </div>
                 )}
 
-                {/* Details */}
                 <div className="p-4 space-y-3 bg-slate-50">
                   <div className="flex items-center gap-3">
                     <Syringe className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-sm font-medium text-slate-900">{pet.vet.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {pet.vet.clinic} • {pet.vet.phone}
-                      </p>
+                      <p className="text-xs text-slate-500">{pet.vet.clinic} • {pet.vet.phone}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Utensils className="w-4 h-4 text-slate-400" />
                     <div>
                       <p className="text-sm font-medium text-slate-900">{pet.food.brand}</p>
-                      <p className="text-xs text-slate-500">
-                        {pet.food.type} • {pet.food.monthlyAmount}/mo
-                      </p>
+                      <p className="text-xs text-slate-500">{pet.food.type} • {pet.food.monthlyAmount}/mo</p>
                     </div>
                   </div>
                   {pet.microchipId && (
@@ -1429,96 +1751,376 @@ export default function FamilyPage() {
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {staff.map((s) => (
-              <div key={s.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                {/* Header */}
-                <div className="p-4 border-b border-slate-100">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                      <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
-                        <span className="text-lg font-semibold text-purple-600">{s.initials}</span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-semibold text-slate-900">{s.name}</h3>
-                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">
-                            {s.role}
-                          </span>
+            {staff.map((s) => {
+              const contractDays = s.contractEndDate ? getDaysUntil(s.contractEndDate) : null;
+              return (
+                <div key={s.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 border-b border-slate-100">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
+                          <span className="text-lg font-semibold text-purple-600">{s.initials}</span>
                         </div>
-                        {s.agency && <p className="text-sm text-slate-500">via {s.agency}</p>}
-                        <div className="mt-1">{renderLocationPill(s.location)}</div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-semibold text-slate-900">{s.name}</h3>
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">{s.role}</span>
+                          </div>
+                          {s.agency && <p className="text-sm text-slate-500">via {s.agency}</p>}
+                          <div className="mt-1">{renderLocationPill(s.location)}</div>
+                        </div>
+                      </div>
+                      <button onClick={() => setShowEditModal(s)} className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {contractDays !== null && contractDays <= 14 && (
+                    <div className={`px-4 py-2 flex items-center justify-between ${
+                      contractDays <= 7 ? 'bg-red-50 border-b border-red-100' : 'bg-amber-50 border-b border-amber-100'
+                    }`}>
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className={`w-4 h-4 ${contractDays <= 7 ? 'text-red-600' : 'text-amber-600'}`} />
+                        <span className={`text-sm font-medium ${contractDays <= 7 ? 'text-red-700' : 'text-amber-700'}`}>
+                          Contract expires in {contractDays} days
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => toast(`${MANAGER_NAME} will handle contract renewal`)}
+                        className={`text-xs font-medium ${contractDays <= 7 ? 'text-red-600' : 'text-amber-600'}`}
+                      >
+                        Renew →
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="px-4 py-3 bg-slate-50 flex items-center gap-4 border-b border-slate-100">
+                    <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
+                      <Phone className="w-4 h-4" />
+                      {s.phone || 'No phone'}
+                    </button>
+                    <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
+                      <MessageCircle className="w-4 h-4" />
+                      Message
+                    </button>
+                  </div>
+
+                  {s.schedule.length > 0 && (
+                    <div className="p-4">
+                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
+                      <div className="grid grid-cols-5 gap-1">
+                        {s.schedule.map((day, idx) => (
+                          <div key={idx} className="text-center p-2 bg-purple-50 rounded-lg">
+                            <p className="text-xs font-medium text-purple-700">{day.day.slice(0, 3)}</p>
+                            <p className="text-xs text-slate-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
+                            <p className="text-xs text-slate-600">{day.hours.split(' - ')[1]}</p>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    <button
-                      onClick={() => setShowEditModal(s)}
-                      className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
+                  )}
+
+                  <div className="px-4 pb-4 space-y-3">
+                    {s.permissions.length > 0 && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">App Permissions</p>
+                        <div className="flex flex-wrap gap-2">
+                          {s.permissions.map((perm, idx) => (
+                            <span key={idx} className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full">
+                              <Check className="w-3 h-3 text-green-600" />
+                              {perm}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {showFinancials && s.weeklyStipend > 0 && (
+                      <div className="pt-3 border-t border-slate-200">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm text-slate-500">Weekly Stipend</p>
+                          <p className="font-semibold text-slate-900">{formatCurrency(s.weeklyStipend)}</p>
+                        </div>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          Since {s.startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Emergency Card Modal */}
+      {showEmergencyCard && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowEmergencyCard(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-slate-200 bg-red-50">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                      <Shield className="w-5 h-5 text-red-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">Emergency Info Card</h3>
+                      <p className="text-sm text-slate-500">Print for babysitters</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowEmergencyCard(false)} className="p-2 hover:bg-red-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-6">
+                {/* Emergency Contacts */}
+                <div>
+                  <h4 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+                    <Phone className="w-4 h-4 text-red-500" />
+                    Emergency Contacts
+                  </h4>
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-lg">
+                    {adults.map(a => (
+                      <div key={a.id} className="flex justify-between">
+                        <span className="font-medium">{a.name}</span>
+                        <span className="text-slate-600">{a.phone}</span>
+                      </div>
+                    ))}
+                    <div className="pt-2 mt-2 border-t border-slate-200">
+                      <div className="flex justify-between">
+                        <span className="font-medium">Poison Control</span>
+                        <span className="text-slate-600">1-800-222-1222</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
 
-                {/* Quick Contact */}
-                <div className="px-4 py-3 bg-slate-50 flex items-center gap-4 border-b border-slate-100">
-                  <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
-                    <Phone className="w-4 h-4" />
-                    {s.phone || 'No phone'}
-                  </button>
-                  <button className="flex items-center gap-1.5 text-sm text-slate-600 hover:text-emerald-600 transition-colors">
-                    <MessageCircle className="w-4 h-4" />
-                    Message
-                  </button>
-                </div>
+                {/* Kids Info */}
+                {children.map(child => (
+                  <div key={child.id}>
+                    <h4 className="font-medium text-slate-900 mb-3">{child.name}</h4>
+                    <div className="space-y-2 bg-slate-50 p-4 rounded-lg text-sm">
+                      {child.health.allergies.length > 0 && (
+                        <div className="p-2 bg-red-100 rounded-lg">
+                          <p className="font-medium text-red-700">ALLERGIES: {child.health.allergies.join(', ')}</p>
+                        </div>
+                      )}
+                      {child.health.medications && child.health.medications.length > 0 && (
+                        <div className="p-2 bg-amber-100 rounded-lg">
+                          <p className="font-medium text-amber-700">Medications: {child.health.medications.join(', ')}</p>
+                        </div>
+                      )}
+                      <div className="flex justify-between">
+                        <span>Pediatrician</span>
+                        <span className="font-medium">{child.health.pediatrician}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Doctor Phone</span>
+                        <span className="font-medium">{child.health.pediatricianPhone}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>School</span>
+                        <span className="font-medium">{child.school.name}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
 
-                {/* Schedule */}
-                {s.schedule.length > 0 && (
-                  <div className="p-4">
-                    <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
-                    <div className="grid grid-cols-5 gap-1">
-                      {s.schedule.map((day, idx) => (
-                        <div key={idx} className="text-center p-2 bg-purple-50 rounded-lg">
-                          <p className="text-xs font-medium text-purple-700">{day.day.slice(0, 3)}</p>
-                          <p className="text-xs text-slate-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
-                          <p className="text-xs text-slate-600">{day.hours.split(' - ')[1]}</p>
+                {/* Pet Info */}
+                {pets.length > 0 && (
+                  <div>
+                    <h4 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+                      <Dog className="w-4 h-4 text-amber-500" />
+                      Pet Info
+                    </h4>
+                    <div className="space-y-2 bg-slate-50 p-4 rounded-lg text-sm">
+                      {pets.map(pet => (
+                        <div key={pet.id}>
+                          <p className="font-medium">{pet.name} ({pet.breed})</p>
+                          <p className="text-slate-500">Vet: {pet.vet.clinic} - {pet.vet.phone}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
 
-                {/* Permissions & Compensation */}
-                <div className="px-4 pb-4 space-y-3">
-                  {s.permissions.length > 0 && (
-                    <div>
-                      <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">App Permissions</p>
-                      <div className="flex flex-wrap gap-2">
-                        {s.permissions.map((perm, idx) => (
-                          <span
-                            key={idx}
-                            className="flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 text-xs rounded-full"
-                          >
-                            <Check className="w-3 h-3 text-green-600" />
-                            {perm}
-                          </span>
-                        ))}
-                      </div>
+                {/* Home Info */}
+                <div>
+                  <h4 className="font-medium text-slate-900 mb-3 flex items-center gap-2">
+                    <Home className="w-4 h-4 text-slate-500" />
+                    Home Info
+                  </h4>
+                  <div className="space-y-2 bg-slate-50 p-4 rounded-lg text-sm">
+                    <div className="flex justify-between">
+                      <span>WiFi Password</span>
+                      <span className="font-medium font-mono">MillerFamily2024</span>
                     </div>
-                  )}
-
-                  {showFinancials && s.weeklyStipend > 0 && (
-                    <div className="pt-3 border-t border-slate-200">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm text-slate-500">Weekly Stipend</p>
-                        <p className="font-semibold text-slate-900">{formatCurrency(s.weeklyStipend)}</p>
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        Since {s.startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                      </p>
+                    <div className="flex justify-between">
+                      <span>Alarm Code</span>
+                      <span className="font-medium font-mono">****</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               </div>
-            ))}
+
+              <div className="p-6 border-t border-slate-200 flex gap-3">
+                <button
+                  onClick={() => toast('Printing emergency card...')}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+                >
+                  <Printer className="w-4 h-4" />
+                  Print
+                </button>
+                <button
+                  onClick={() => toast('Downloading PDF...')}
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  <Download className="w-4 h-4" />
+                  Download PDF
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync to Calendar Modal */}
+      {showSyncModal === 'calendar' && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowSyncModal(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Calendar className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">Sync to Calendar</h3>
+                      <p className="text-sm text-slate-500">{autoCalendarEvents.length} events from family data</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
+                {autoCalendarEvents.map((event, idx) => (
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 text-sm">{event.title}</p>
+                      <p className="text-xs text-slate-500">{event.schedule}</p>
+                    </div>
+                    <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                      event.type === 'recurring' ? 'bg-blue-100 text-blue-700' :
+                      event.type === 'availability' ? 'bg-purple-100 text-purple-700' :
+                      'bg-amber-100 text-amber-700'
+                    }`}>
+                      {event.type}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-6 border-t border-slate-200 flex gap-3">
+                <button
+                  onClick={() => setShowSyncModal(null)}
+                  className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSyncToCalendar}
+                  className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  Sync All Events
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync to Billing Modal */}
+      {showSyncModal === 'billing' && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowSyncModal(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+              <div className="p-6 border-b border-slate-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
+                      <CreditCard className="w-5 h-5 text-emerald-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-900">Create Bill Accounts</h3>
+                      <p className="text-sm text-slate-500">{autoBillAccounts.length} recurring bills detected</p>
+                    </div>
+                  </div>
+                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-slate-400" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
+                {autoBillAccounts.map((account) => (
+                  <div key={account.id} className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-slate-900 text-sm">{account.name}</p>
+                      <p className="text-xs text-slate-500">For {account.recipient}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-medium text-slate-900">{formatCurrency(account.amount)}</p>
+                      <p className="text-xs text-slate-500">/{account.frequency}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="p-6 border-t border-slate-200">
+                <div className="flex items-center justify-between mb-4 p-3 bg-emerald-50 rounded-lg">
+                  <span className="text-sm font-medium text-emerald-700">Total Monthly</span>
+                  <span className="text-lg font-bold text-emerald-700">
+                    {formatCurrency(autoBillAccounts.reduce((sum, a) => {
+                      if (a.frequency === 'weekly') return sum + a.amount * 4.33;
+                      if (a.frequency === 'monthly') return sum + a.amount;
+                      if (a.frequency === 'quarterly') return sum + a.amount / 3;
+                      if (a.frequency === 'annually') return sum + a.amount / 12;
+                      return sum;
+                    }, 0))}
+                  </span>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowSyncModal(null)}
+                    className="flex-1 py-2.5 border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleSyncToBilling}
+                    className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Create Accounts
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1555,7 +2157,6 @@ export default function FamilyPage() {
                 {addMemberStep === 'select' ? (
                   <>
                     <p className="text-sm text-slate-500 mb-4">What type of member would you like to add?</p>
-
                     <div className="grid grid-cols-2 gap-3">
                       {[
                         { type: 'adult' as AddMemberType, icon: User, label: 'Adult', description: 'Invite via email', color: 'emerald' },
@@ -1571,7 +2172,7 @@ export default function FamilyPage() {
                               setAddMemberType(option.type);
                               setAddMemberStep('form');
                             }}
-                            className={`flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl hover:border-${option.color}-500 hover:bg-${option.color}-50 transition-colors text-center`}
+                            className="flex flex-col items-center p-4 border-2 border-slate-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors text-center"
                           >
                             <div className={`w-12 h-12 bg-${option.color}-100 rounded-full flex items-center justify-center mb-2`}>
                               <Icon className={`w-6 h-6 text-${option.color}-600`} />
@@ -1609,10 +2210,7 @@ export default function FamilyPage() {
               <div className="p-6 border-b border-slate-200">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-semibold text-slate-900">Edit {showEditModal.name}</h3>
-                  <button
-                    onClick={() => setShowEditModal(null)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
-                  >
+                  <button onClick={() => setShowEditModal(null)} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
                     <X className="w-5 h-5 text-slate-400" />
                   </button>
                 </div>
@@ -1710,7 +2308,10 @@ export default function FamilyPage() {
                   Cancel
                 </button>
                 <button
-                  onClick={() => setShowEditModal(null)}
+                  onClick={() => {
+                    setShowEditModal(null);
+                    toast('Changes saved');
+                  }}
                   className="flex-1 py-2.5 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
                 >
                   Save Changes
@@ -1721,8 +2322,21 @@ export default function FamilyPage() {
         </div>
       )}
 
+      {/* Toast */}
+      {showToast && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-slate-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
+          {showToast}
+        </div>
+      )}
+
       {/* Mobile FAB */}
-      <div className="fixed bottom-6 right-6 sm:hidden">
+      <div className="fixed bottom-24 right-4 sm:hidden flex flex-col gap-2">
+        <button
+          onClick={() => setShowEmergencyCard(true)}
+          className="w-12 h-12 bg-red-500 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-red-600 transition-colors"
+        >
+          <Shield className="w-5 h-5" />
+        </button>
         <button
           onClick={() => setShowAddMemberModal(true)}
           className="w-14 h-14 bg-emerald-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-emerald-700 transition-colors"
