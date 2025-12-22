@@ -25,7 +25,15 @@ export {
   // Households
   DEMO_HOUSEHOLDS,
 
-  // Smith Family (primary demo)
+  // Morrison Family (primary demo - Fairfield County, CT)
+  MORRISON_ADULTS,
+  MORRISON_CHILDREN,
+  MORRISON_PETS,
+  MORRISON_STAFF,
+  MORRISON_VEHICLES,
+  MORRISON_FAMILY,
+
+  // Backwards compatibility aliases
   SMITH_ADULTS,
   SMITH_CHILDREN,
   SMITH_PETS,

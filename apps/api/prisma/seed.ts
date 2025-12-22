@@ -250,53 +250,53 @@ const demoVendors = [
   },
   // Service vendors
   {
-    displayName: 'Green Thumb Lawn Care',
+    displayName: 'Country Landscape Design',
     category: VendorCategory.LAWN_CARE,
-    phone: '555-0110',
-    email: 'service@greenthumb.example.com',
-    websiteUrl: 'https://greenthumb.example.com',
+    phone: '(203) 555-5296',
+    email: 'service@countrylandscape.example.com',
+    websiteUrl: 'https://countrylandscape.example.com',
   },
   {
-    displayName: 'Bug-Free Pest Control',
+    displayName: 'Terminix Northeast',
     category: VendorCategory.PEST_CONTROL,
-    phone: '555-0111',
-    email: 'schedule@bugfree.example.com',
-    websiteUrl: 'https://bugfree.example.com',
+    phone: '(203) 555-0111',
+    email: 'schedule@terminix-ne.example.com',
+    websiteUrl: 'https://terminix-ne.example.com',
   },
   {
-    displayName: 'Sparkle Clean Services',
+    displayName: 'Molly Maid of Greenwich',
     category: VendorCategory.CLEANING,
-    phone: '555-0112',
-    email: 'book@sparkleclean.example.com',
-    websiteUrl: 'https://sparkleclean.example.com',
+    phone: '(203) 555-0112',
+    email: 'book@mollymaid-greenwich.example.com',
+    websiteUrl: 'https://mollymaid-greenwich.example.com',
   },
   {
-    displayName: 'Snow Away Removal',
+    displayName: 'Fairfield County Snow Removal',
     category: VendorCategory.SNOW_REMOVAL,
-    phone: '555-0113',
-    email: 'service@snowaway.example.com',
-    websiteUrl: 'https://snowaway.example.com',
+    phone: '(203) 555-0113',
+    email: 'service@fcsnow.example.com',
+    websiteUrl: 'https://fcsnow.example.com',
   },
   {
-    displayName: 'Chimney Masters',
+    displayName: 'New England Chimney Sweeps',
     category: VendorCategory.CHIMNEY_SWEEP,
-    phone: '555-0114',
-    email: 'schedule@chimneymasters.example.com',
-    websiteUrl: 'https://chimneymasters.example.com',
+    phone: '(203) 555-0114',
+    email: 'schedule@nechimney.example.com',
+    websiteUrl: 'https://nechimney.example.com',
   },
   {
-    displayName: 'Reliable Septic Services',
+    displayName: 'Fairfield Septic Services',
     category: VendorCategory.SEPTIC_SERVICE,
-    phone: '555-0115',
-    email: 'service@reliableseptic.example.com',
-    websiteUrl: 'https://reliableseptic.example.com',
+    phone: '(203) 555-0115',
+    email: 'service@fairfieldseptic.example.com',
+    websiteUrl: 'https://fairfieldseptic.example.com',
   },
   {
-    displayName: 'Crystal Clear Pool Service',
+    displayName: 'Pools Unlimited CT',
     category: VendorCategory.POOL_SERVICE,
-    phone: '555-0116',
-    email: 'schedule@crystalclearpool.example.com',
-    websiteUrl: 'https://crystalclearpool.example.com',
+    phone: '(203) 555-0116',
+    email: 'schedule@poolsunlimitedct.example.com',
+    websiteUrl: 'https://poolsunlimitedct.example.com',
   },
 ];
 
@@ -745,7 +745,7 @@ async function main() {
   // Create Handyman Users (Internal Staff)
   const handymanPassword = await bcrypt.hash('Handy123!', 12);
 
-  // Handyman #1 - Carlos (assigned to Bob's properties in CA)
+  // Handyman #1 - Carlos (assigned to Westchester County, NY properties)
   const handymanCarlos = await prisma.user.upsert({
     where: { email: 'carlos@haven.app' },
     update: {},
@@ -753,8 +753,8 @@ async function main() {
       email: 'carlos@haven.app',
       passwordHash: handymanPassword,
       firstName: 'Carlos',
-      lastName: 'Rodriguez',
-      displayName: 'Carlos Rodriguez',
+      lastName: 'Reyes',
+      displayName: 'Carlos Reyes',
       role: UserRole.HANDYMAN,
       emailVerified: true,
       emailVerifiedAt: new Date(),
@@ -762,16 +762,16 @@ async function main() {
   });
   console.log(`✅ Created handyman user: ${handymanCarlos.email}`);
 
-  // Handyman #2 - Dave (assigned to CT and IL properties)
+  // Handyman #2 - Mike (assigned to Fairfield County, CT properties)
   const handymanDave = await prisma.user.upsert({
     where: { email: 'dave@haven.app' },
     update: {},
     create: {
       email: 'dave@haven.app',
       passwordHash: handymanPassword,
-      firstName: 'Dave',
-      lastName: 'Wilson',
-      displayName: 'Dave Wilson',
+      firstName: 'Mike',
+      lastName: 'Castellano',
+      displayName: 'Mike Castellano',
       role: UserRole.HANDYMAN,
       emailVerified: true,
       emailVerifiedAt: new Date(),
@@ -834,20 +834,20 @@ async function main() {
   // Keep the original demo user for backward compatibility
   const demoUser = homeownerBob; // Alias for existing code
 
-  // Create Bob's Villa - household with Manager Steve and Handyman Dave assigned
+  // Create Bob's Villa - household with Manager Steve and Handyman Mike assigned
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
     update: {
       managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Dave handles CT properties
+      assignedHandymanId: handymanDave.id, // Mike handles Fairfield County CT properties
     },
     create: {
       id: 'demo-household-id',
       name: "Bob's Villa",
-      description: 'A beautiful single-family home managed by Haven',
+      description: 'A beautiful single-family home in Greenwich, CT managed by Haven',
       ownerId: homeownerBob.id,
       managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Dave handles CT properties
+      assignedHandymanId: handymanDave.id, // Mike handles Fairfield County CT properties
       stripeCustomerId: 'cus_household_demo_123',
       billingCycleDay: 1,
       billingSettings: {
@@ -867,10 +867,10 @@ async function main() {
       homeProfile: {
         create: {
           propertyType: 'SINGLE_FAMILY',
-          addressLine1: '456 Oak Lane',
-          city: 'Pleasantville',
+          addressLine1: '147 Round Hill Road',
+          city: 'Greenwich',
           state: 'CT',
-          postalCode: '06001',
+          postalCode: '06831',
           country: 'US',
           squareFeet: 2800,
           yearBuilt: 2005,
@@ -946,15 +946,15 @@ async function main() {
     where: { id: 'alice-household-id' },
     update: {
       managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Dave handles IL properties too
+      assignedHandymanId: handymanCarlos.id, // Carlos handles Westchester County NY properties
     },
     create: {
       id: 'alice-household-id',
       name: "The Johnson Family Home",
-      description: 'A cozy suburban family home with 4 family members',
+      description: 'A cozy suburban family home in Scarsdale, NY with 4 family members',
       ownerId: homeownerAlice.id,
       managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Dave handles IL properties
+      assignedHandymanId: handymanCarlos.id, // Carlos handles Westchester County NY properties
       stripeCustomerId: 'cus_household_alice_123',
       billingCycleDay: 15,
       billingSettings: {
@@ -966,10 +966,10 @@ async function main() {
       homeProfile: {
         create: {
           propertyType: 'SINGLE_FAMILY',
-          addressLine1: '742 Evergreen Terrace',
-          city: 'Springfield',
-          state: 'IL',
-          postalCode: '62701',
+          addressLine1: '45 Fox Meadow Road',
+          city: 'Scarsdale',
+          state: 'NY',
+          postalCode: '10583',
           country: 'US',
           squareFeet: 2200,
           yearBuilt: 1995,
@@ -1920,19 +1920,19 @@ async function main() {
   console.log('    Password: AceRoof123!');
   console.log('    Portal:   /vendor (Vendor Portal)');
   console.log('');
-  console.log('  🛠️  Handyman Carlos (CA Properties):');
+  console.log('  🛠️  Handyman Carlos Reyes (Westchester County, NY):');
   console.log('    Email:    carlos@haven.app');
   console.log('    Password: Handy123!');
-  console.log('    Assigned: Malibu Mansion, Beverly Hills Estate');
+  console.log('    Assigned: The Johnson Family Home (Scarsdale)');
   console.log('    Portal:   /handyman');
   console.log('');
-  console.log('  🛠️  Handyman Dave (CT/IL Properties):');
+  console.log('  🛠️  Handyman Mike Castellano (Fairfield County, CT):');
   console.log('    Email:    dave@haven.app');
   console.log('    Password: Handy123!');
-  console.log('    Assigned: Bob\'s Villa, The Johnson Family Home');
+  console.log('    Assigned: Bob\'s Villa (Greenwich)');
   console.log('    Portal:   /handyman');
   console.log('');
-  console.log('  🛠️  Handyman Maria (Floater):');
+  console.log('  🛠️  Handyman Maria Santos (Floater):');
   console.log('    Email:    maria@haven.app');
   console.log('    Password: Handy123!');
   console.log('    Assigned: Available for any property');
@@ -1942,34 +1942,34 @@ async function main() {
   console.log('  HOUSEHOLD ASSIGNMENT');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
-  console.log("  Bob's Villa:");
+  console.log("  Bob's Villa (Greenwich, CT):");
   console.log('    Owner:    Bob Smith (bob@example.com)');
   console.log('    Manager:  Steve Manager (steve@haven.app)');
-  console.log('    Handyman: Dave Wilson (dave@haven.app)');
-  console.log('  - 3 bed, 2.5 bath single family home');
+  console.log('    Handyman: Mike Castellano (dave@haven.app)');
+  console.log('  - 3 bed, 2.5 bath single family home on Round Hill Road');
   console.log('  - Features: pool, septic, chimney, lawn, snow removal');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
   console.log(`  - ${maintenanceTasks.length} maintenance tasks for 12 months`);
   console.log('');
-  console.log('  Malibu Mansion:');
+  console.log('  Malibu Mansion (CA - Multi-property demo):');
   console.log('    Owner:    Bob Smith (bob@example.com)');
   console.log('    Manager:  Steve Manager (steve@haven.app)');
-  console.log('    Handyman: Carlos Rodriguez (carlos@haven.app)');
+  console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 5 bed, 6 bath beachfront estate');
   console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
   console.log('');
-  console.log('  Beverly Hills Estate:');
+  console.log('  Beverly Hills Estate (CA - Multi-property demo):');
   console.log('    Owner:    Bob Smith (bob@example.com)');
   console.log('    Manager:  Steve Manager (steve@haven.app)');
-  console.log('    Handyman: Carlos Rodriguez (carlos@haven.app)');
+  console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 6 bed, 7 bath Mediterranean estate');
   console.log('  - Work Orders: 1 COMPLETED (awaiting verification), 1 IN_PROGRESS');
   console.log('');
-  console.log('  The Johnson Family Home:');
+  console.log('  The Johnson Family Home (Scarsdale, NY):');
   console.log('    Owner:    Alice Johnson (alice@example.com)');
   console.log('    Manager:  Steve Manager (steve@haven.app)');
-  console.log('    Handyman: Dave Wilson (dave@haven.app)');
-  console.log('  - 4 bed, 2.5 bath suburban family home');
+  console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
+  console.log('  - 4 bed, 2.5 bath suburban family home on Fox Meadow Road');
   console.log('  - Family Members: Alice, Michael (spouse), Emma (14), Jack (10)');
   console.log('  - Features: hot tub, gas fireplace, smart home, generator');
   console.log('  - Work Orders: 1 OPEN (Hot Tub Service)');
