@@ -14,6 +14,7 @@ import {
   Settings,
   User,
   Menu,
+  Search,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -37,7 +38,7 @@ export const sidebarNavigation: NavSection[] = [
       { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
       { name: 'Calendar', href: '/app/calendar', icon: Calendar },
       { name: 'Messages', href: '/app/concierge', icon: MessageSquare },
-      { name: 'Social', href: '/app/community', icon: Users },
+      { name: 'Find Pros', href: '/app/community', icon: Search },
     ],
   },
   {
