@@ -2206,6 +2206,252 @@ async function main() {
   console.log('    - Flight proposal awaiting selection');
   console.log('    - House protocol with departure checklist');
 
+  // ═══════════════════════════════════════════════════════════════════════════
+  // CONVERSATION DATA (Messaging between Manager and Homeowner)
+  // ═══════════════════════════════════════════════════════════════════════════
+  console.log('');
+  console.log('📬 Creating conversation demo data...');
+
+  // bobMembership already exists from earlier in seed file (line ~920)
+
+  // Conversation 1: Trip Planning Discussion
+  const tripConversation = await prisma.conversation.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      subject: 'Park City Ski Trip Planning',
+      status: 'OPEN',
+      homeownerUnreadCount: 1,
+      homeManagerUnreadCount: 0,
+    },
+  });
+
+  // Create assignment for manager
+  await prisma.homeManagerAssignment.create({
+    data: {
+      conversationId: tripConversation.id,
+      homeManagerUserId: managerSarah.id,
+    },
+  });
+
+  // Messages for trip conversation
+  await prisma.supportMessage.createMany({
+    data: [
+      {
+        conversationId: tripConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Hi Sarah! We\'re planning a ski trip to Park City in February. Can you help with travel arrangements?',
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Hi Bob! I\'d be happy to help with your Park City trip. I know some great properties near the slopes. How many people and what dates are you thinking?',
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // 4 days ago + 30 min
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'All 4 of us - me, Alice, Emma, and Jake. We\'re looking at February 1-8. The kids have that week off from school.',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Perfect timing! I\'ll research ski-in/ski-out properties that work well for families. Do you prefer a hotel or a private rental? Any preference for proximity to Park City Main Street?',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // 3 days ago + 45 min
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'A private rental would be nice so we have more space. Close to Main Street would be great for dinners. Budget is around $15K for the week including flights.',
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000), // 2 days ago
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Got it! I\'ve found 3 excellent options. I\'ll put together a proposal with property details, flight options from Newark, and ski rental recommendations. Should have it ready by tomorrow.',
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000 + 20 * 60 * 1000), // 2 days ago + 20 min
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: null,
+        senderRole: 'SYSTEM',
+        body: 'Sarah created a trip proposal: Park City Family Ski Trip',
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000), // 1 day ago
+      },
+      {
+        conversationId: tripConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Hi Bob! Your Park City trip proposal is ready. I\'ve included 3 property options, flight comparisons, and a recommended itinerary. Check it out in the Travel section and let me know your thoughts!',
+        createdAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000 + 10 * 60 * 1000), // 1 day ago + 10 min
+      },
+    ],
+  });
+  console.log(`✅ Created trip planning conversation (8 messages)`);
+
+  // Conversation 2: Maintenance Request
+  const maintenanceConversation = await prisma.conversation.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      subject: 'Kitchen Faucet Issue',
+      status: 'OPEN',
+      homeownerUnreadCount: 0,
+      homeManagerUnreadCount: 0,
+    },
+  });
+
+  await prisma.homeManagerAssignment.create({
+    data: {
+      conversationId: maintenanceConversation.id,
+      homeManagerUserId: managerSarah.id,
+    },
+  });
+
+  await prisma.supportMessage.createMany({
+    data: [
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Sarah, our kitchen faucet has been dripping. It\'s getting worse and keeping us up at night. Can we get someone to look at it?',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000), // 5 days ago
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Hi Bob! Sorry to hear about the faucet. I\'ll have Mike take a look. He\'s available tomorrow morning - would 9am work?',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 15 * 60 * 1000), // + 15 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: '9am works great. Alice will be home to let him in.',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // + 30 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: null,
+        senderRole: 'SYSTEM',
+        body: 'Work order WO-2024-001 created and assigned to Mike Rodriguez',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000), // + 45 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Perfect! I\'ve scheduled Mike for tomorrow at 9am. He\'ll text when he\'s on his way. The gate code is still 1234, right?',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 50 * 60 * 1000), // + 50 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Yes, gate code is still 1234. Thanks Sarah!',
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000 + 60 * 60 * 1000), // + 1 hour
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Update: Mike looked at the faucet. The cartridge needs replacement - it\'s a Kohler model. He can pick up the part today and come back tomorrow to install it. Total will be about $85 including parts.',
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000), // 4 days ago
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'That sounds reasonable. Go ahead with the repair. Thanks for the quick turnaround!',
+        createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000 + 30 * 60 * 1000), // + 30 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: null,
+        senderRole: 'SYSTEM',
+        body: 'Work order WO-2024-001 marked as completed',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000), // 3 days ago
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Great news - the faucet is fixed! Mike replaced the cartridge and tested it. No more dripping. I\'ve added the receipt to your billing section. Let me know if you have any issues!',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 10 * 60 * 1000), // + 10 min
+      },
+      {
+        conversationId: maintenanceConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Amazing, thank you Sarah! Finally a quiet night. You and Mike are the best!',
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000 + 4 * 60 * 60 * 1000), // + 4 hours
+      },
+    ],
+  });
+  console.log(`✅ Created maintenance conversation (11 messages)`);
+
+  // Conversation 3: Quick question (closed)
+  const quickConversation = await prisma.conversation.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      subject: 'Pool cover question',
+      status: 'CLOSED',
+      homeownerUnreadCount: 0,
+      homeManagerUnreadCount: 0,
+    },
+  });
+
+  await prisma.homeManagerAssignment.create({
+    data: {
+      conversationId: quickConversation.id,
+      homeManagerUserId: managerSarah.id,
+    },
+  });
+
+  await prisma.supportMessage.createMany({
+    data: [
+      {
+        conversationId: quickConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Quick question - when does the pool company usually come to put on the winter cover?',
+        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000), // 2 weeks ago
+      },
+      {
+        conversationId: quickConversation.id,
+        senderUserId: managerSarah.id,
+        senderRole: 'HOME_MANAGER',
+        body: 'Blue Wave Pool Service typically does winter closings between October 15-November 15. Your closing is scheduled for October 28th. I\'ll confirm the exact time with them and let you know!',
+        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000 + 20 * 60 * 1000), // + 20 min
+      },
+      {
+        conversationId: quickConversation.id,
+        senderUserId: homeownerBob.id,
+        senderRole: 'HOMEOWNER',
+        body: 'Thanks Sarah! That\'s what I needed to know.',
+        createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000 + 25 * 60 * 1000), // + 25 min
+      },
+    ],
+  });
+  console.log(`✅ Created pool question conversation (3 messages, CLOSED)`);
+
+  console.log('');
+  console.log('  Conversation Demo Summary:');
+  console.log('    - 3 conversations between Bob and Sarah');
+  console.log('    - Trip planning (8 messages, OPEN)');
+  console.log('    - Maintenance request (11 messages, OPEN)');
+  console.log('    - Quick question (3 messages, CLOSED)');
+
   console.log('');
   console.log('🎉 Database seed completed successfully!');
   console.log('');
