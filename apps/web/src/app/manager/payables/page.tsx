@@ -1,630 +1,1005 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { getApiClient } from '@/lib/api';
-import type {
-  VendorPayable,
-  TransactionPayoutMethod,
-  BatchPayPreview,
-  ExecutePayoutResponse,
-} from '@haven/core';
+import { useState } from 'react';
+import {
+  CreditCard,
+  Building2,
+  Zap,
+  Shield,
+  Heart,
+  GraduationCap,
+  Trophy,
+  Dog,
+  Wrench,
+  AlertTriangle,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  X,
+  FileText,
+  ExternalLink,
+  Settings,
+  BarChart3,
+  Send,
+  Plus,
+  Upload,
+  Link2,
+} from 'lucide-react';
 
-interface SelectedPayable {
-  transactionId: string;
-  payoutMethod: TransactionPayoutMethod;
+// ============================================================================
+// TYPES
+// ============================================================================
+
+type BillCategory = 'mortgage' | 'utilities' | 'insurance' | 'childcare' | 'education' | 'activities' | 'pet' | 'services';
+type BillStatus = 'paid' | 'scheduled' | 'due_soon' | 'overdue' | 'pending_approval';
+type ViewMode = 'by_due_date' | 'by_household' | 'all';
+
+interface Bill {
+  id: string;
+  vendorName: string;
+  category: BillCategory;
+  amount: number;
+  dueDate: string;
+  status: BillStatus;
+  householdId: string;
+  householdName: string;
+  accountNumber?: string;
+  autoPay: boolean;
+  billUrl?: string;
+  notes?: string;
 }
 
-export default function PayablesPage() {
-  const [payables, setPayables] = useState<VendorPayable[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
-  const [selectedItems, setSelectedItems] = useState<Map<string, SelectedPayable>>(new Map());
-  const [showBatchPayModal, setShowBatchPayModal] = useState(false);
-  const [batchPreview, setBatchPreview] = useState<BatchPayPreview | null>(null);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const [executionResult, setExecutionResult] = useState<ExecutePayoutResponse | null>(null);
+interface PaymentAccount {
+  id: string;
+  name: string;
+  type: 'operating' | 'float';
+  balance: number;
+}
 
-  const api = getApiClient();
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 
-  const loadPayables = useCallback(async () => {
-    try {
-      setIsLoading(true);
-      const data = await api.getPayables();
-      setPayables(data);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to load payables';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [api]);
+const mockBills: Bill[] = [
+  // Overdue
+  {
+    id: 'bill1',
+    vendorName: 'ConEd Electric',
+    category: 'utilities',
+    amount: 187.43,
+    dueDate: 'Dec 18',
+    status: 'overdue',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    accountNumber: '****4521',
+    autoPay: false,
+  },
+  {
+    id: 'bill2',
+    vendorName: 'National Grid Gas',
+    category: 'utilities',
+    amount: 94.50,
+    dueDate: 'Dec 19',
+    status: 'overdue',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    accountNumber: '****8834',
+    autoPay: false,
+  },
+  // Due This Week
+  {
+    id: 'bill3',
+    vendorName: 'Westlake Middle School',
+    category: 'education',
+    amount: 2200.00,
+    dueDate: 'Dec 23',
+    status: 'due_soon',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    accountNumber: 'Student ID: 45892',
+    autoPay: false,
+    notes: 'Spring semester tuition',
+  },
+  {
+    id: 'bill4',
+    vendorName: 'Maria Santos (Nanny)',
+    category: 'childcare',
+    amount: 1200.00,
+    dueDate: 'Dec 22',
+    status: 'due_soon',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    autoPay: true,
+  },
+  {
+    id: 'bill5',
+    vendorName: 'Comcast Internet',
+    category: 'utilities',
+    amount: 189.99,
+    dueDate: 'Dec 24',
+    status: 'due_soon',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    accountNumber: '****7721',
+    autoPay: false,
+  },
+  {
+    id: 'bill6',
+    vendorName: 'State Farm Insurance',
+    category: 'insurance',
+    amount: 284.00,
+    dueDate: 'Dec 25',
+    status: 'due_soon',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    accountNumber: 'Policy #HO-4892',
+    autoPay: true,
+  },
+  // Scheduled
+  {
+    id: 'bill7',
+    vendorName: 'Chase Mortgage',
+    category: 'mortgage',
+    amount: 3450.00,
+    dueDate: 'Jan 1',
+    status: 'scheduled',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    accountNumber: 'Loan #****9921',
+    autoPay: true,
+  },
+  {
+    id: 'bill8',
+    vendorName: 'Soccer Stars Academy',
+    category: 'activities',
+    amount: 175.00,
+    dueDate: 'Dec 28',
+    status: 'scheduled',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    notes: "Emma's winter session",
+    autoPay: false,
+  },
+  // Pending Approval
+  {
+    id: 'bill9',
+    vendorName: 'Happy Paws Vet',
+    category: 'pet',
+    amount: 342.50,
+    dueDate: 'Dec 27',
+    status: 'pending_approval',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    notes: 'Annual checkup + vaccines',
+    autoPay: false,
+  },
+  {
+    id: 'bill10',
+    vendorName: 'A-1 Lawn Care',
+    category: 'services',
+    amount: 150.00,
+    dueDate: 'Dec 26',
+    status: 'pending_approval',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    notes: 'December service',
+    autoPay: false,
+  },
+  {
+    id: 'bill11',
+    vendorName: 'Kumon Learning',
+    category: 'education',
+    amount: 320.00,
+    dueDate: 'Dec 30',
+    status: 'pending_approval',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    notes: 'Math tutoring - January',
+    autoPay: false,
+  },
+];
 
-  useEffect(() => {
-    loadPayables();
-  }, [loadPayables]);
+const mockPaymentAccounts: PaymentAccount[] = [
+  { id: 'acc1', name: 'Haven Operating Account', type: 'operating', balance: 45230.00 },
+  { id: 'acc2', name: 'Smith Family Float', type: 'float', balance: 8420.00 },
+  { id: 'acc3', name: 'Johnson Family Float', type: 'float', balance: 3150.00 },
+];
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const newSelected = new Map<string, SelectedPayable>();
-      payables.forEach((p) => {
-        newSelected.set(p.transactionId, {
-          transactionId: p.transactionId,
-          payoutMethod: p.recommendedPayoutMethod,
-        });
-      });
-      setSelectedItems(newSelected);
-    } else {
-      setSelectedItems(new Map());
-    }
-  };
+// ============================================================================
+// HELPER FUNCTIONS & CONFIGS
+// ============================================================================
 
-  const handleSelectItem = (payable: VendorPayable, checked: boolean) => {
-    const newSelected = new Map(selectedItems);
-    if (checked) {
-      newSelected.set(payable.transactionId, {
-        transactionId: payable.transactionId,
-        payoutMethod: payable.recommendedPayoutMethod,
-      });
-    } else {
-      newSelected.delete(payable.transactionId);
-    }
-    setSelectedItems(newSelected);
-  };
+const categoryConfig: Record<BillCategory, { label: string; icon: React.ReactNode; color: string }> = {
+  mortgage: { label: 'Mortgage', icon: <Building2 className="w-5 h-5" />, color: 'text-indigo-600' },
+  utilities: { label: 'Utilities', icon: <Zap className="w-5 h-5" />, color: 'text-amber-600' },
+  insurance: { label: 'Insurance', icon: <Shield className="w-5 h-5" />, color: 'text-blue-600' },
+  childcare: { label: 'Childcare', icon: <Heart className="w-5 h-5" />, color: 'text-pink-600' },
+  education: { label: 'Education', icon: <GraduationCap className="w-5 h-5" />, color: 'text-purple-600' },
+  activities: { label: 'Activities', icon: <Trophy className="w-5 h-5" />, color: 'text-orange-600' },
+  pet: { label: 'Pet', icon: <Dog className="w-5 h-5" />, color: 'text-emerald-600' },
+  services: { label: 'Services', icon: <Wrench className="w-5 h-5" />, color: 'text-slate-600' },
+};
 
-  const handlePayoutMethodChange = (transactionId: string, method: TransactionPayoutMethod) => {
-    const newSelected = new Map(selectedItems);
-    const item = newSelected.get(transactionId);
-    if (item) {
-      newSelected.set(transactionId, { ...item, payoutMethod: method });
-      setSelectedItems(newSelected);
-    }
-  };
+const formatCurrency = (amount: number): string => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+};
 
-  const handleBatchPay = async () => {
-    if (selectedItems.size === 0) return;
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
-    try {
-      const items = Array.from(selectedItems.values());
-      const preview = await api.previewPayout({ items });
-      setBatchPreview(preview);
-      setShowBatchPayModal(true);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to preview payout';
-      setError(message);
-    }
-  };
+export default function BillPaymentCenterPage() {
+  const [bills] = useState<Bill[]>(mockBills);
+  const [accounts] = useState<PaymentAccount[]>(mockPaymentAccounts);
+  const [viewMode, setViewMode] = useState<ViewMode>('by_due_date');
+  const [selectedBills, setSelectedBills] = useState<string[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showLogExpenseModal, setShowLogExpenseModal] = useState(false);
+  const [expandedHouseholds, setExpandedHouseholds] = useState<string[]>(['hh1', 'hh2']);
+  const [selectedPaymentAccount, setSelectedPaymentAccount] = useState<string>('acc1');
+  const [sendConfirmation, setSendConfirmation] = useState(false);
+  const [logToRecords, setLogToRecords] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
 
-  const handleExecutePayout = async () => {
-    if (!batchPreview) return;
+  // Computed values
+  const overdueBills = bills.filter(b => b.status === 'overdue');
+  const dueSoonBills = bills.filter(b => b.status === 'due_soon');
+  const pendingApprovalBills = bills.filter(b => b.status === 'pending_approval');
+  const allUnpaidBills = bills.filter(b => b.status !== 'paid');
 
-    try {
-      setIsExecuting(true);
-      const items = Array.from(selectedItems.values());
-      const result = await api.executePayout({ items });
-      setExecutionResult(result);
-
-      if (result.success) {
-        // Reload payables after successful execution
-        await loadPayables();
-        setSelectedItems(new Map());
-      }
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to execute payout';
-      setError(message);
-    } finally {
-      setIsExecuting(false);
-    }
-  };
-
-  const closeModal = () => {
-    setShowBatchPayModal(false);
-    setBatchPreview(null);
-    setExecutionResult(null);
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
-
-  const getMethodLabel = (method: TransactionPayoutMethod): string => {
-    const labels: Record<TransactionPayoutMethod, string> = {
-      CHECKBOOK_IO: 'Mail Check',
-      STRIPE: 'Stripe Transfer',
-      CASH: 'Cash',
-      COMPANY_CARD: 'Company Card',
-      BANK_TRANSFER: 'Bank Transfer',
-    };
-    return labels[method];
-  };
-
-  const getMethodIcon = (method: TransactionPayoutMethod) => {
-    switch (method) {
-      case 'CHECKBOOK_IO':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        );
-      case 'STRIPE':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-          </svg>
-        );
-      default:
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-          </svg>
-        );
-    }
-  };
-
-  const selectedTotal = Array.from(selectedItems.keys()).reduce((sum, id) => {
-    const payable = payables.find((p) => p.transactionId === id);
-    return sum + (payable?.amount || 0);
+  const overdueTotal = overdueBills.reduce((sum, b) => sum + b.amount, 0);
+  const dueThisWeekTotal = dueSoonBills.reduce((sum, b) => sum + b.amount, 0);
+  const selectedTotal = selectedBills.reduce((sum, id) => {
+    const bill = bills.find(b => b.id === id);
+    return sum + (bill?.amount || 0);
   }, 0);
 
-  if (isLoading) {
+  // Group by household
+  const billsByHousehold = allUnpaidBills.reduce((acc, bill) => {
+    if (!acc[bill.householdId]) {
+      acc[bill.householdId] = { name: bill.householdName, bills: [] };
+    }
+    acc[bill.householdId]!.bills.push(bill);
+    return acc;
+  }, {} as Record<string, { name: string; bills: Bill[] }>);
+
+  const toggleBillSelection = (billId: string) => {
+    setSelectedBills(prev =>
+      prev.includes(billId)
+        ? prev.filter(id => id !== billId)
+        : [...prev, billId]
+    );
+  };
+
+  const selectAllInSection = (billIds: string[]) => {
+    const allSelected = billIds.every(id => selectedBills.includes(id));
+    if (allSelected) {
+      setSelectedBills(prev => prev.filter(id => !billIds.includes(id)));
+    } else {
+      setSelectedBills(prev => [...new Set([...prev, ...billIds])]);
+    }
+  };
+
+  const toggleHouseholdExpanded = (householdId: string) => {
+    setExpandedHouseholds(prev =>
+      prev.includes(householdId)
+        ? prev.filter(id => id !== householdId)
+        : [...prev, householdId]
+    );
+  };
+
+  const handleStartPayment = () => {
+    if (selectedBills.length > 0) {
+      setShowPaymentModal(true);
+    }
+  };
+
+  const handleProcessPayment = async () => {
+    setIsProcessing(true);
+    // Simulate payment processing
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    setIsProcessing(false);
+    setPaymentSuccess(true);
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setPaymentSuccess(false);
+    if (paymentSuccess) {
+      setSelectedBills([]);
+    }
+  };
+
+  // Get selected bills grouped by household
+  const selectedBillsData = selectedBills.map(id => bills.find(b => b.id === id)!).filter(Boolean);
+  const selectedByHousehold = selectedBillsData.reduce((acc, bill) => {
+    if (!acc[bill.householdId]) {
+      acc[bill.householdId] = { name: bill.householdName, bills: [], total: 0 };
+    }
+    acc[bill.householdId]!.bills.push(bill);
+    acc[bill.householdId]!.total += bill.amount;
+    return acc;
+  }, {} as Record<string, { name: string; bills: Bill[]; total: number }>);
+
+  // Bill Row Component
+  const BillRow = ({ bill, showHousehold = true }: { bill: Bill; showHousehold?: boolean }) => {
+    const category = categoryConfig[bill.category];
+    const isSelected = selectedBills.includes(bill.id);
+
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <div
+        className={`p-4 rounded-lg border transition-all ${
+          isSelected
+            ? 'bg-indigo-50 border-indigo-300'
+            : 'bg-white border-slate-200 hover:border-slate-300'
+        }`}
+      >
+        <div className="flex items-start gap-4">
+          {/* Checkbox */}
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => toggleBillSelection(bill.id)}
+            className="mt-1 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+          />
+
+          {/* Category Icon */}
+          <div className={`flex-shrink-0 ${category.color}`}>
+            {category.icon}
+          </div>
+
+          {/* Main Content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h4 className="font-medium text-slate-900">{bill.vendorName}</h4>
+                <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                  {showHousehold && (
+                    <>
+                      <span>{bill.householdName}</span>
+                      <span>•</span>
+                    </>
+                  )}
+                  {bill.accountNumber && (
+                    <>
+                      <span>Account: {bill.accountNumber}</span>
+                      <span>•</span>
+                    </>
+                  )}
+                  <span className={bill.autoPay ? 'text-emerald-600' : 'text-slate-400'}>
+                    Auto-pay: {bill.autoPay ? 'ON' : 'OFF'}
+                  </span>
+                </div>
+                {bill.notes && (
+                  <p className="text-sm text-slate-500 mt-1 italic">{bill.notes}</p>
+                )}
+              </div>
+
+              <div className="text-right flex-shrink-0">
+                <p className="font-semibold text-slate-900">{formatCurrency(bill.amount)}</p>
+                <p className={`text-sm ${bill.status === 'overdue' ? 'text-red-600 font-medium' : 'text-slate-500'}`}>
+                  Due: {bill.dueDate}
+                </p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2 mt-3">
+              <button className="px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors">
+                Pay Now
+              </button>
+              <button className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors">
+                Schedule
+              </button>
+              {bill.billUrl && (
+                <button className="px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1">
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  View Bill
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
-  }
+  };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-24">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Pay Bills</h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Review and pay unpaid vendor invoices
-          </p>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+            <CreditCard className="w-6 h-6 text-indigo-600" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Bill Payment Center</h1>
+            <p className="text-slate-500">Manage and pay bills on behalf of households</p>
+          </div>
         </div>
-        {selectedItems.size > 0 && (
+
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+          <div className="bg-amber-50 rounded-xl p-4 border border-amber-100">
+            <p className="text-2xl font-bold text-slate-900">{formatCurrency(dueThisWeekTotal)}</p>
+            <p className="text-sm text-slate-600">Due This Week</p>
+          </div>
+          <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+            <div className="flex items-center gap-2">
+              <p className="text-2xl font-bold text-slate-900">{formatCurrency(overdueTotal)}</p>
+              <span className="w-2.5 h-2.5 bg-red-500 rounded-full animate-pulse" />
+            </div>
+            <p className="text-sm text-slate-600">Overdue</p>
+          </div>
+          <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+            <p className="text-2xl font-bold text-slate-900">{allUnpaidBills.length}</p>
+            <p className="text-sm text-slate-600">Bills to Pay</p>
+          </div>
+          <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+            <p className="text-2xl font-bold text-slate-900">{pendingApprovalBills.length}</p>
+            <p className="text-sm text-slate-600">Pending Approval</p>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-3">
           <button
-            onClick={handleBatchPay}
-            className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+            onClick={handleStartPayment}
+            disabled={selectedBills.length === 0}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-            </svg>
-            Batch Pay ({selectedItems.size}) - {formatCurrency(selectedTotal)}
+            <CreditCard className="w-5 h-5" />
+            Start Payment Session
           </button>
-        )}
+          <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+            <BarChart3 className="w-5 h-5" />
+            Payment Report
+          </button>
+          <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+            <Settings className="w-5 h-5" />
+            Auto-Pay Settings
+          </button>
+          <button
+            onClick={() => setShowLogExpenseModal(true)}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+          >
+            <Plus className="w-5 h-5" />
+            Log Expense
+          </button>
+        </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-          <button
-            onClick={() => setError('')}
-            className="mt-2 text-sm text-red-700 dark:text-red-300 underline"
-          >
-            Dismiss
-          </button>
+      {/* View Toggles */}
+      <div className="flex gap-2 bg-white rounded-lg p-1 shadow-sm border border-slate-200 w-fit">
+        <button
+          onClick={() => setViewMode('by_due_date')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            viewMode === 'by_due_date'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          By Due Date
+        </button>
+        <button
+          onClick={() => setViewMode('by_household')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            viewMode === 'by_household'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          By Household
+        </button>
+        <button
+          onClick={() => setViewMode('all')}
+          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            viewMode === 'all'
+              ? 'bg-indigo-600 text-white'
+              : 'text-slate-600 hover:bg-slate-100'
+          }`}
+        >
+          All Bills
+        </button>
+      </div>
+
+      {/* Bills List */}
+      {viewMode === 'by_due_date' && (
+        <div className="space-y-6">
+          {/* Overdue Section */}
+          {overdueBills.length > 0 && (
+            <div className="bg-red-50 rounded-xl border border-red-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="w-5 h-5 text-red-600" />
+                  <h3 className="font-semibold text-red-800">OVERDUE</h3>
+                  <span className="text-sm text-red-600">({overdueBills.length} bills)</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-lg font-bold text-red-700">{formatCurrency(overdueTotal)}</span>
+                  <button
+                    onClick={() => selectAllInSection(overdueBills.map(b => b.id))}
+                    className="text-sm text-red-600 hover:text-red-800 font-medium"
+                  >
+                    {overdueBills.every(b => selectedBills.includes(b.id)) ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {overdueBills.map(bill => (
+                  <BillRow key={bill.id} bill={bill} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Due This Week Section */}
+          {dueSoonBills.length > 0 && (
+            <div className="bg-amber-50 rounded-xl border border-amber-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-5 h-5 text-amber-600" />
+                  <h3 className="font-semibold text-amber-800">DUE THIS WEEK</h3>
+                  <span className="text-sm text-amber-600">({dueSoonBills.length} bills)</span>
+                </div>
+                <div className="flex items-center gap-4">
+                  <span className="text-lg font-bold text-amber-700">{formatCurrency(dueThisWeekTotal)}</span>
+                  <button
+                    onClick={() => selectAllInSection(dueSoonBills.map(b => b.id))}
+                    className="text-sm text-amber-600 hover:text-amber-800 font-medium"
+                  >
+                    {dueSoonBills.every(b => selectedBills.includes(b.id)) ? 'Deselect All' : 'Select All'}
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {dueSoonBills.map(bill => (
+                  <BillRow key={bill.id} bill={bill} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Approval Section */}
+          {pendingApprovalBills.length > 0 && (
+            <div className="bg-purple-50 rounded-xl border border-purple-200 p-4">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-5 h-5 text-purple-600" />
+                  <h3 className="font-semibold text-purple-800">PENDING APPROVAL</h3>
+                  <span className="text-sm text-purple-600">({pendingApprovalBills.length} bills)</span>
+                </div>
+                <span className="text-lg font-bold text-purple-700">
+                  {formatCurrency(pendingApprovalBills.reduce((sum, b) => sum + b.amount, 0))}
+                </span>
+              </div>
+              <div className="space-y-3">
+                {pendingApprovalBills.map(bill => (
+                  <BillRow key={bill.id} bill={bill} />
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{payables.length}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Unpaid Invoices</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                {formatCurrency(payables.reduce((sum, p) => sum + p.amount, 0))}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Total Outstanding</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{selectedItems.size}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Selected</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{formatCurrency(selectedTotal)}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">To Pay</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      {viewMode === 'by_household' && (
+        <div className="space-y-4">
+          {Object.entries(billsByHousehold).map(([householdId, { name, bills: householdBills }]) => {
+            const isExpanded = expandedHouseholds.includes(householdId);
+            const householdTotal = householdBills.reduce((sum, b) => sum + b.amount, 0);
 
-      {/* Payables Table */}
-      <div className="card overflow-hidden">
-        <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Unpaid Vendor Invoices</h2>
-        </div>
-
-        {payables.length === 0 ? (
-          <div className="p-12 text-center">
-            <svg className="w-12 h-12 mx-auto text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">All caught up!</h3>
-            <p className="text-slate-600 dark:text-slate-400">No unpaid vendor invoices at the moment.</p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-800">
-                <tr>
-                  <th className="px-6 py-3 text-left">
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.size === payables.length && payables.length > 0}
-                      onChange={(e) => handleSelectAll(e.target.checked)}
-                      className="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Vendor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Property
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Description
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Date
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Amount
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Payout Method
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {payables.map((payable) => {
-                  const isSelected = selectedItems.has(payable.transactionId);
-                  const selectedMethod = selectedItems.get(payable.transactionId)?.payoutMethod || payable.recommendedPayoutMethod;
-
-                  return (
-                    <tr
-                      key={payable.id}
-                      className={`${
-                        isSelected
-                          ? 'bg-emerald-50 dark:bg-emerald-900/10'
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      }`}
+            return (
+              <div key={householdId} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <button
+                  onClick={() => toggleHouseholdExpanded(householdId)}
+                  className="w-full px-4 py-3 flex items-center justify-between hover:bg-slate-50 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    {isExpanded ? (
+                      <ChevronDown className="w-5 h-5 text-slate-400" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-slate-400" />
+                    )}
+                    <h3 className="font-semibold text-slate-900">{name}</h3>
+                    <span className="text-sm text-slate-500">({householdBills.length} bills)</span>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <span className="font-semibold text-slate-900">{formatCurrency(householdTotal)}</span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        selectAllInSection(householdBills.map(b => b.id));
+                      }}
+                      className="text-sm text-indigo-600 hover:text-indigo-800 font-medium"
                     >
-                      <td className="px-6 py-4">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={(e) => handleSelectItem(payable, e.target.checked)}
-                          className="rounded border-slate-300 dark:border-slate-600 text-emerald-600 focus:ring-emerald-500"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{payable.vendorName}</p>
-                          {payable.vendorEmail && (
-                            <p className="text-sm text-slate-500 dark:text-slate-400">{payable.vendorEmail}</p>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                        {payable.householdName}
-                      </td>
-                      <td className="px-6 py-4">
-                        <p className="text-slate-900 dark:text-white max-w-xs truncate">{payable.description}</p>
-                      </td>
-                      <td className="px-6 py-4 text-slate-600 dark:text-slate-300">
-                        {formatDate(payable.createdAt)}
-                      </td>
-                      <td className="px-6 py-4 text-right font-medium text-slate-900 dark:text-white">
-                        {formatCurrency(payable.amount)}
-                      </td>
-                      <td className="px-6 py-4">
-                        {isSelected ? (
-                          <select
-                            value={selectedMethod}
-                            onChange={(e) =>
-                              handlePayoutMethodChange(payable.transactionId, e.target.value as TransactionPayoutMethod)
-                            }
-                            className="block w-full px-3 py-1.5 text-sm rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500"
-                          >
-                            {payable.availablePayoutMethods.map((method) => (
-                              <option key={method} value={method}>
-                                {getMethodLabel(method)}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
-                            {getMethodIcon(payable.recommendedPayoutMethod)}
-                            <span>{getMethodLabel(payable.recommendedPayoutMethod)}</span>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                      {householdBills.every(b => selectedBills.includes(b.id)) ? 'Deselect' : 'Select All'}
+                    </button>
+                  </div>
+                </button>
 
-      {/* Batch Pay Modal */}
-      {showBatchPayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-          <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full max-h-[80vh] overflow-hidden">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                {executionResult ? 'Payment Complete' : 'Confirm Batch Payment'}
-              </h3>
+                {isExpanded && (
+                  <div className="px-4 pb-4 space-y-3">
+                    {householdBills.map(bill => (
+                      <BillRow key={bill.id} bill={bill} showHousehold={false} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {viewMode === 'all' && (
+        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 space-y-3">
+          {allUnpaidBills.map(bill => (
+            <BillRow key={bill.id} bill={bill} />
+          ))}
+        </div>
+      )}
+
+      {/* Batch Selection Bar */}
+      {selectedBills.length > 0 && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 shadow-lg p-4 z-40">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <input
+                type="checkbox"
+                checked={true}
+                readOnly
+                className="w-5 h-5 rounded border-slate-300 text-indigo-600"
+              />
+              <span className="font-medium text-slate-900">
+                {selectedBills.length} bill{selectedBills.length > 1 ? 's' : ''} selected
+              </span>
+              <span className="text-slate-500">({formatCurrency(selectedTotal)})</span>
+            </div>
+            <div className="flex items-center gap-3">
               <button
-                onClick={closeModal}
-                className="p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                onClick={() => setSelectedBills([])}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                Clear
+              </button>
+              <button
+                onClick={handleStartPayment}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2"
+              >
+                Pay Selected
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Session Modal */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CreditCard className="w-6 h-6 text-indigo-600" />
+                <h2 className="text-xl font-semibold text-slate-900">Payment Session</h2>
+              </div>
+              <button
+                onClick={handleClosePaymentModal}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
               </button>
             </div>
 
             {/* Modal Body */}
             <div className="p-6 overflow-y-auto max-h-[60vh]">
-              {executionResult ? (
-                <div className="space-y-6">
-                  {/* Execution Result */}
-                  <div className={`p-4 rounded-lg ${
-                    executionResult.success
-                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800'
-                      : 'bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800'
-                  }`}>
-                    <div className="flex items-center gap-3">
-                      {executionResult.success ? (
-                        <svg className="w-8 h-8 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-8 h-8 text-yellow-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                        </svg>
-                      )}
-                      <div>
-                        <p className="font-semibold text-slate-900 dark:text-white">
-                          {executionResult.success ? 'All payments processed!' : 'Some payments failed'}
-                        </p>
-                        <p className="text-sm text-slate-600 dark:text-slate-400">
-                          {executionResult.successfulItems} of {executionResult.totalItems} payments successful
-                        </p>
+              {paymentSuccess ? (
+                /* Success State */
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle2 className="w-8 h-8 text-emerald-600" />
+                  </div>
+                  <h3 className="text-xl font-semibold text-slate-900 mb-2">Payment Successful!</h3>
+                  <p className="text-slate-500 mb-6">
+                    {selectedBills.length} bill{selectedBills.length > 1 ? 's' : ''} paid totaling {formatCurrency(selectedTotal)}
+                  </p>
+                  <div className="bg-slate-50 rounded-lg p-4 mb-6 text-left">
+                    <p className="text-sm text-slate-600 mb-2">
+                      <span className="font-medium">Transaction ID:</span> TXN-2024122101-{Math.random().toString(36).substring(7).toUpperCase()}
+                    </p>
+                    <p className="text-sm text-slate-600">
+                      <span className="font-medium">Confirmation:</span> Sent to household accounts
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Payment Preview */
+                <>
+                  <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-4">
+                    Selected for Payment
+                  </h3>
+
+                  {/* Bills by Household */}
+                  <div className="space-y-6 mb-6">
+                    {Object.entries(selectedByHousehold).map(([householdId, { name, bills: hBills, total }]) => (
+                      <div key={householdId}>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-semibold text-slate-900">{name}</h4>
+                          <span className="text-sm font-medium text-slate-500">Subtotal: {formatCurrency(total)}</span>
+                        </div>
+                        <div className="space-y-2 pl-4 border-l-2 border-slate-200">
+                          {hBills.map(bill => {
+                            const category = categoryConfig[bill.category];
+                            return (
+                              <div key={bill.id} className="flex items-center justify-between py-2">
+                                <div className="flex items-center gap-3">
+                                  <span className={category.color}>{category.icon}</span>
+                                  <span className="text-slate-700">{bill.vendorName}</span>
+                                </div>
+                                <span className="font-medium text-slate-900">{formatCurrency(bill.amount)}</span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
+                    ))}
+                  </div>
+
+                  {/* Total */}
+                  <div className="border-t border-slate-200 pt-4 mb-6">
+                    <div className="flex items-center justify-between">
+                      <span className="text-lg font-semibold text-slate-900">TOTAL</span>
+                      <span className="text-2xl font-bold text-slate-900">{formatCurrency(selectedTotal)}</span>
                     </div>
                   </div>
 
-                  {/* Summary */}
-                  {executionResult.summary && (
-                    <div className="grid grid-cols-2 gap-4">
-                      {executionResult.summary.checksQueued > 0 && (
-                        <div className="p-4 rounded-lg bg-emerald-50 dark:bg-emerald-900/20">
-                          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                            {executionResult.summary.checksQueued}
-                          </p>
-                          <p className="text-sm text-emerald-700 dark:text-emerald-300">Checks Queued</p>
-                          <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200 mt-1">
-                            {formatCurrency(executionResult.summary.totalCheckAmount)}
-                          </p>
-                        </div>
-                      )}
-                      {executionResult.summary.stripeTransfers > 0 && (
-                        <div className="p-4 rounded-lg bg-purple-50 dark:bg-purple-900/20">
-                          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                            {executionResult.summary.stripeTransfers}
-                          </p>
-                          <p className="text-sm text-purple-700 dark:text-purple-300">Stripe Transfers</p>
-                          <p className="text-sm font-medium text-purple-800 dark:text-purple-200 mt-1">
-                            {formatCurrency(executionResult.summary.totalStripeAmount)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Individual Results */}
-                  <div className="space-y-2">
-                    {executionResult.results.map((result) => (
-                      <div
-                        key={result.transactionId}
-                        className={`p-3 rounded-lg flex items-center justify-between ${
-                          result.success
-                            ? 'bg-slate-50 dark:bg-slate-700/50'
-                            : 'bg-red-50 dark:bg-red-900/20'
-                        }`}
-                      >
-                        <div className="flex items-center gap-3">
-                          {result.success ? (
-                            <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          ) : (
-                            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                          )}
-                          <div>
-                            <p className="text-sm font-medium text-slate-900 dark:text-white">
-                              {getMethodLabel(result.payoutMethod)}
-                            </p>
-                            {result.referenceId && (
-                              <p className="text-xs text-slate-500 dark:text-slate-400">
-                                Ref: {result.referenceId}
-                              </p>
-                            )}
-                            {result.error && (
-                              <p className="text-xs text-red-600 dark:text-red-400">{result.error}</p>
-                            )}
+                  {/* Payment Method */}
+                  <div className="mb-6">
+                    <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">
+                      Payment Method
+                    </h3>
+                    <div className="space-y-2">
+                      {accounts.map(account => (
+                        <label
+                          key={account.id}
+                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                            selectedPaymentAccount === account.id
+                              ? 'border-indigo-500 bg-indigo-50'
+                              : 'border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="radio"
+                              name="paymentAccount"
+                              value={account.id}
+                              checked={selectedPaymentAccount === account.id}
+                              onChange={() => setSelectedPaymentAccount(account.id)}
+                              className="w-4 h-4 text-indigo-600 focus:ring-indigo-500"
+                            />
+                            <span className="font-medium text-slate-900">{account.name}</span>
                           </div>
-                        </div>
-                        {result.estimatedDelivery && (
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            Est. delivery: {result.estimatedDelivery}
-                          </span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : batchPreview ? (
-                <div className="space-y-6">
-                  {/* Preview Summary */}
-                  <div className="p-4 rounded-lg bg-slate-50 dark:bg-slate-700/50">
-                    <div className="flex items-center justify-between mb-4">
-                      <span className="text-lg font-semibold text-slate-900 dark:text-white">Total Amount</span>
-                      <span className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                        {formatCurrency(batchPreview.totalAmount)}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      {batchPreview.checkCount > 0 && (
-                        <div className="flex items-center gap-2">
-                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          <span className="text-sm text-slate-600 dark:text-slate-300">
-                            {batchPreview.checkCount} checks ({formatCurrency(batchPreview.checkTotal)})
-                          </span>
-                        </div>
-                      )}
-                      {batchPreview.stripeCount > 0 && (
-                        <div className="flex items-center gap-2">
-                          <svg className="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <span className="text-sm text-slate-600 dark:text-slate-300">
-                            {batchPreview.stripeCount} Stripe transfers ({formatCurrency(batchPreview.stripeTotal)})
-                          </span>
-                        </div>
-                      )}
+                          <span className="text-slate-600">Balance: {formatCurrency(account.balance)}</span>
+                        </label>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Items List */}
-                  <div className="space-y-2">
-                    <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                      Payment Details
-                    </h4>
-                    {batchPreview.items.map((item) => (
-                      <div
-                        key={item.transactionId}
-                        className="p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 flex items-center justify-between"
-                      >
-                        <div>
-                          <p className="font-medium text-slate-900 dark:text-white">{item.vendorName}</p>
-                          <p className="text-sm text-slate-500 dark:text-slate-400">{item.methodLabel}</p>
-                        </div>
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {formatCurrency(item.amount)}
-                        </span>
-                      </div>
-                    ))}
+                  {/* Options */}
+                  <div className="space-y-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sendConfirmation}
+                        onChange={(e) => setSendConfirmation(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-slate-700">Send confirmation to homeowners</span>
+                    </label>
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={logToRecords}
+                        onChange={(e) => setLogToRecords(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      />
+                      <span className="text-slate-700">Log to household expense records</span>
+                    </label>
                   </div>
-                </div>
-              ) : null}
+                </>
+              )}
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-4 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-3">
-              {executionResult ? (
-                <button
-                  onClick={closeModal}
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-                >
-                  Done
-                </button>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              {paymentSuccess ? (
+                <>
+                  <button
+                    onClick={handleClosePaymentModal}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+                  >
+                    Done
+                  </button>
+                  <button className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">
+                    View Report
+                  </button>
+                </>
               ) : (
                 <>
                   <button
-                    onClick={closeModal}
-                    className="px-4 py-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors font-medium"
+                    onClick={handleClosePaymentModal}
+                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                   >
                     Cancel
                   </button>
                   <button
-                    onClick={handleExecutePayout}
-                    disabled={isExecuting}
-                    className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    onClick={handleProcessPayment}
+                    disabled={isProcessing}
+                    className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
-                    {isExecuting ? (
+                    {isProcessing ? (
                       <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                         Processing...
                       </>
                     ) : (
                       <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Execute Payment
+                        Process Payment
+                        <ChevronRight className="w-5 h-5" />
                       </>
                     )}
                   </button>
                 </>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Log Expense Modal */}
+      {showLogExpenseModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Plus className="w-6 h-6 text-indigo-600" />
+                <h2 className="text-xl font-semibold text-slate-900">Log Expense</h2>
+              </div>
+              <button
+                onClick={() => setShowLogExpenseModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-4">
+              {/* Household */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Household</label>
+                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                  <option>Select household...</option>
+                  <option>Smith Family</option>
+                  <option>Johnson Family</option>
+                </select>
+              </div>
+
+              {/* Amount & Date */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Amount</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500">$</span>
+                    <input
+                      type="number"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="w-full pl-8 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Date</label>
+                  <div className="relative">
+                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input
+                      type="date"
+                      className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Category */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Category</label>
+                <select className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                  <option>Select category...</option>
+                  <option>Services</option>
+                  <option>Utilities</option>
+                  <option>Supplies</option>
+                  <option>Repairs</option>
+                  <option>Other</option>
+                </select>
+              </div>
+
+              {/* Vendor/Payee */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vendor/Payee</label>
+                <input
+                  type="text"
+                  placeholder="Enter vendor name"
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+              </div>
+
+              {/* Description */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Description</label>
+                <textarea
+                  rows={2}
+                  placeholder="Enter description..."
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              {/* Link to Work Order */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Link to Work Order (optional)</label>
+                <div className="relative">
+                  <Link2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <select className="w-full pl-10 pr-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                    <option>None</option>
+                    <option>WO-1892 - HVAC Service</option>
+                    <option>WO-1891 - Kitchen Faucet</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Receipt Upload */}
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Receipt (optional)</label>
+                <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors cursor-pointer">
+                  <Upload className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                  <p className="text-sm text-slate-600">Click to upload or drag and drop</p>
+                  <p className="text-xs text-slate-400">PNG, JPG, PDF up to 10MB</p>
+                </div>
+              </div>
+
+              {/* Add to Statement */}
+              <label className="flex items-center gap-3 cursor-pointer pt-2">
+                <input
+                  type="checkbox"
+                  defaultChecked
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                />
+                <span className="text-slate-700">Add to household statement</span>
+              </label>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end gap-3">
+              <button
+                onClick={() => setShowLogExpenseModal(false)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+              >
+                Cancel
+              </button>
+              <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                <Send className="w-4 h-4" />
+                Log Expense
+              </button>
             </div>
           </div>
         </div>
