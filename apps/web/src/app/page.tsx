@@ -148,9 +148,9 @@ function HeroSection() {
 
                 <div className="bg-slate-50 rounded-lg p-3">
                   <p className="text-xs text-slate-600">
-                    <span className="font-semibold text-emerald-700">6 Vendors</span> Auto-Paid.
+                    <span className="font-semibold text-emerald-700">$6,749/mo</span> Total Household.
                     <br />
-                    <span className="font-semibold text-emerald-700">1 Monthly Statement</span> to Haven.
+                    <span className="font-semibold text-emerald-700">1 Statement</span> to Haven.
                   </p>
                 </div>
               </div>
@@ -305,10 +305,10 @@ function HowItWorksSection() {
               <div className="mt-4 p-3 bg-white rounded-lg border border-slate-200">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">December Statement</span>
-                  <span className="font-medium text-slate-900">$4,847</span>
+                  <span className="font-medium text-slate-900">$6,749</span>
                 </div>
                 <div className="mt-2 text-xs text-slate-500">
-                  You pay Haven once. We handle the rest.
+                  Mortgage, taxes, utilities, vendors. All handled.
                 </div>
               </div>
             </div>
@@ -372,15 +372,15 @@ function OneBillSection() {
             </div>
 
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-medium text-emerald-950 mb-6">
-              All Your Bills.<br />One Payment to Haven.
+              Mortgage. Utilities.<br />Everything.
             </h2>
 
             <div className="mb-8">
               <p className="text-lg text-slate-500 mb-4 italic">
-                &quot;Stop writing checks to 15 different vendors every month.&quot;
+                &quot;One payment covers your entire household.&quot;
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
-                We consolidate and pay all your recurring bills: utilities, lawn care, childcare, cleaning, subscriptions, and more. You make one payment to Haven each month. We handle the rest. You only approve maintenance, repairs, or big purchases.
+                We pay your mortgage, property taxes, utilities, landscaping, cleaning, childcare, and every other household bill. You make one payment to Haven each month. We handle the rest. You only approve repairs or big purchases.
               </p>
             </div>
 
@@ -422,7 +422,7 @@ function OneBillSection() {
               <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-sm text-slate-500 mb-1">House Wallet Balance</p>
-                  <p className="text-3xl font-bold text-slate-900">$8,420.00</p>
+                  <p className="text-3xl font-bold text-slate-900">$14,280.00</p>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-100 rounded-full">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -434,7 +434,7 @@ function OneBillSection() {
               <div className="bg-white rounded-xl p-4 mb-4">
                 <div className="flex items-center justify-between mb-3">
                   <span className="text-sm font-semibold text-slate-900">December Statement</span>
-                  <span className="text-sm text-slate-500">$4,847 total</span>
+                  <span className="text-sm text-slate-500">$6,749 total</span>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm">
@@ -442,14 +442,14 @@ function OneBillSection() {
                       <div className="w-2 h-2 bg-emerald-500 rounded-full" />
                       <span className="text-slate-600">Recurring Bills (automatic)</span>
                     </div>
-                    <span className="text-slate-700 font-medium">$3,847</span>
+                    <span className="text-slate-700 font-medium">$6,600</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                      <span className="text-slate-600">Repairs & Projects (approved)</span>
+                      <span className="text-slate-600">Haven Membership</span>
                     </div>
-                    <span className="text-slate-700 font-medium">$1,000</span>
+                    <span className="text-slate-700 font-medium">$149</span>
                   </div>
                 </div>
               </div>
@@ -460,39 +460,39 @@ function OneBillSection() {
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center">
+                        <Home className="w-4 h-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Chase Mortgage</p>
+                        <p className="text-xs text-slate-500">Dec 1 • Monthly</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-slate-900">$4,200</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 bg-amber-100 rounded-lg flex items-center justify-center">
+                        <Building className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-slate-900">Greenwich Property Tax</p>
+                        <p className="text-xs text-slate-500">Dec 1 • Quarterly escrow</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-medium text-slate-900">$850</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
                         <Zap className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">Eversource</p>
+                        <p className="text-sm font-medium text-slate-900">Eversource Electric</p>
                         <p className="text-xs text-slate-500">Dec 15 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$287</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
-                        <Sparkles className="w-4 h-4 text-green-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Fairfield Landscaping</p>
-                        <p className="text-xs text-slate-500">Dec 12 • Routine</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium text-slate-900">$475</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
-                        <Thermometer className="w-4 h-4 text-orange-600" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900">Petro Home Services</p>
-                        <p className="text-xs text-slate-500">Dec 10 • Oil delivery</p>
-                      </div>
-                    </div>
-                    <span className="text-sm font-medium text-slate-900">$425</span>
+                    <span className="text-sm font-medium text-slate-900">$290</span>
                   </div>
                 </div>
               </div>
@@ -1260,14 +1260,46 @@ function PricingSection() {
                 <p className="text-xs text-slate-500 mt-1">Your Home Manager, platform, preventive care</p>
               </div>
               <div className="bg-white rounded-xl p-4">
-                <p className="text-sm font-medium text-slate-900 mb-1">Your Vendor Bills</p>
+                <p className="text-sm font-medium text-slate-900 mb-1">Your Household Bills</p>
                 <p className="text-2xl font-bold text-slate-900">At cost</p>
-                <p className="text-xs text-slate-500 mt-1">Electric, water, landscaper, etc. No markup</p>
+                <p className="text-xs text-slate-500 mt-1">Mortgage, taxes, utilities, vendors. No markup</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl p-4 mb-4">
+              <p className="text-sm font-semibold text-slate-900 mb-3">Example Monthly Breakdown:</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-3">
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Mortgage</span>
+                  <span className="text-slate-900 font-medium">$4,200</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Property Taxes</span>
+                  <span className="text-slate-900 font-medium">$850</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Electric</span>
+                  <span className="text-slate-900 font-medium">$290</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Gas/Heat</span>
+                  <span className="text-slate-900 font-medium">$145</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Landscaping</span>
+                  <span className="text-slate-900 font-medium">$475</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-600">Cleaning Service</span>
+                  <span className="text-slate-900 font-medium">$640</span>
+                </div>
+              </div>
+              <div className="pt-3 border-t border-slate-200 flex justify-between text-sm">
+                <span className="font-semibold text-slate-900">Total to Haven</span>
+                <span className="font-bold text-emerald-600">$6,749/mo</span>
               </div>
             </div>
             <p className="text-sm text-slate-600">
-              <strong>Example:</strong> Your electric is $180, gas is $125, internet is $150, and lawn care is $200.
-              You pay Haven <strong>$804 once</strong> ($149 membership + $655 vendor bills). We pay all your vendors for you.
+              You pay Haven once. We pay your mortgage, property taxes, utilities, and all household vendors. One statement, complete visibility, zero hassle.
             </p>
           </div>
         </div>
@@ -1288,19 +1320,19 @@ function PricingSection() {
 // ============================================================================
 
 function BillCalculatorSection() {
-  const [selectedServices, setSelectedServices] = useState<string[]>(['electric', 'gas', 'water', 'internet', 'landscaping']);
+  const [selectedServices, setSelectedServices] = useState<string[]>(['mortgage', 'propertytax', 'electric', 'gas', 'landscaping', 'housekeeping']);
 
   const services = [
-    { id: 'electric', name: 'Electric', avgCost: 185 },
-    { id: 'gas', name: 'Gas/Heat', avgCost: 125 },
+    { id: 'mortgage', name: 'Mortgage', avgCost: 4200 },
+    { id: 'propertytax', name: 'Property Taxes', avgCost: 850 },
+    { id: 'electric', name: 'Electric', avgCost: 290 },
+    { id: 'gas', name: 'Gas/Heat', avgCost: 145 },
     { id: 'water', name: 'Water/Sewer', avgCost: 95 },
     { id: 'internet', name: 'Internet/Cable', avgCost: 150 },
-    { id: 'landscaping', name: 'Lawn Care', avgCost: 200 },
-    { id: 'housekeeping', name: 'Cleaning Service', avgCost: 400 },
-    { id: 'childcare', name: 'Childcare/Nanny', avgCost: 800 },
-    { id: 'pest', name: 'Pest Control', avgCost: 75 },
-    { id: 'security', name: 'Security/Alarm', avgCost: 55 },
-    { id: 'subscriptions', name: 'Subscriptions', avgCost: 100 },
+    { id: 'landscaping', name: 'Lawn Care', avgCost: 475 },
+    { id: 'housekeeping', name: 'Cleaning Service', avgCost: 640 },
+    { id: 'childcare', name: 'Childcare/Nanny', avgCost: 1200 },
+    { id: 'security', name: 'Security/Alarm', avgCost: 85 },
   ];
 
   const toggleService = (id: string) => {
@@ -1505,7 +1537,7 @@ function FAQSection() {
   const faqs = [
     {
       question: "How does the One Bill system actually work?",
-      answer: "When you join Haven, you make one monthly payment to us. We use that to pay all your household vendors: utilities, lawn care, cleaning, childcare, and any other recurring services. You get a clear statement on the 1st showing exactly where every dollar went. Routine bills are handled automatically. Repairs, maintenance, or larger purchases require your approval before we proceed.",
+      answer: "When you join Haven, you make one monthly payment to us. We use that to pay everything: your mortgage, property taxes, utilities, lawn care, cleaning, childcare, and any other recurring household expenses. You get a clear statement on the 1st showing exactly where every dollar went. Routine bills are handled automatically. Repairs, maintenance, or larger purchases require your approval before we proceed.",
     },
     {
       question: "Is my money safe? How does the Household Wallet work?",
@@ -1681,7 +1713,7 @@ export default function HomePage() {
             Stop being the unpaid project manager of your own home.
           </p>
           <p className="text-lg text-emerald-700 font-medium mb-10 max-w-2xl mx-auto">
-            One monthly payment to Haven. We pay all your bills, coordinate your vendors, and handle home maintenance so you don&apos;t have to.
+            One monthly payment to Haven. We pay your mortgage, property taxes, utilities, and vendors. We coordinate everything so you don&apos;t have to.
           </p>
           <Link
             href="/register"
