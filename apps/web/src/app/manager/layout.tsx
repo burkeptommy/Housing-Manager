@@ -9,7 +9,6 @@ import {
   Home,
   LayoutDashboard,
   Users,
-  ClipboardList,
   Inbox,
   Calendar,
   Wallet,
