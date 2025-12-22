@@ -1103,55 +1103,63 @@ function PricingSection() {
       <div className="max-w-7xl mx-auto">
         <div className="text-center mb-16">
           <h2 className="font-serif text-4xl sm:text-5xl font-medium text-emerald-950 mb-4">
-            Simple, Transparent Pricing.
+            Simple Pricing. Real Value.
           </h2>
           <p className="text-lg text-slate-600 max-w-2xl mx-auto">
-            Fixed monthly membership. No surprise fees. No percentage cuts.
+            Choose the level of support that fits your household. No contracts, cancel anytime.
           </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {/* Haven Standard */}
+
+          {/* HAVEN - Core Home Management */}
           <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
             <div className="mb-6">
-              <h3 className="font-serif text-2xl font-medium text-emerald-950 mb-1">Haven Standard</h3>
-              <p className="text-slate-500">Essential Management</p>
+              <h3 className="font-serif text-2xl font-medium text-emerald-950 mb-1">Haven</h3>
+              <p className="text-slate-500">Home Management</p>
             </div>
             <div className="mb-6">
-              <span className="text-5xl font-bold text-emerald-950">$49</span>
+              <span className="text-5xl font-bold text-emerald-950">$149</span>
               <span className="text-slate-500">/month</span>
             </div>
+            <p className="text-slate-600 mb-6">
+              Everything you need to stop managing your home and start enjoying it.
+            </p>
             <ul className="space-y-4 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Bill Tracking and Reminders</span>
+                <span className="text-slate-600">One bill pays everything (mortgage, utilities, all vendors)</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Family Calendar Sync</span>
+                <span className="text-slate-600">Dedicated home manager</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Digital Secretary (Email Triage)</span>
+                <span className="text-slate-600">Maintenance and repair coordination</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Vendor Network Access</span>
+                <span className="text-slate-600">Vendor management and oversight</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Home Vault (Documents)</span>
+                <span className="text-slate-600">Monthly preventive handyman visit</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                <span className="text-slate-600">Document vault and home records</span>
               </li>
             </ul>
             <Link
-              href="/register?plan=standard"
-              className="block w-full text-center px-6 py-3 border-2 border-emerald-950 text-emerald-950 font-medium rounded-xl hover:bg-emerald-50 transition-colors"
+              href="/register?plan=haven"
+              className="block w-full text-center px-6 py-3 bg-emerald-950 text-white font-medium rounded-xl hover:bg-emerald-900 transition-colors"
             >
               Get Started
             </Link>
           </div>
 
-          {/* Haven Concierge - Highlighted */}
+          {/* HAVEN+ - Full Life Management - HIGHLIGHTED */}
           <div className="relative bg-emerald-950 rounded-2xl p-8 text-white shadow-2xl shadow-emerald-950/20 lg:-mt-4 lg:mb-[-1rem]">
             <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
               <span className="inline-flex items-center gap-1 px-4 py-1 bg-amber-400 text-emerald-950 text-sm font-semibold rounded-full">
@@ -1160,154 +1168,174 @@ function PricingSection() {
               </span>
             </div>
             <div className="mb-6 pt-4">
-              <h3 className="font-serif text-2xl font-medium mb-1">Haven Concierge</h3>
-              <p className="text-emerald-300">The Modern Family Office</p>
+              <h3 className="font-serif text-2xl font-medium mb-1">Haven+</h3>
+              <p className="text-emerald-300">Home + Life Management</p>
             </div>
             <div className="mb-6">
-              <span className="text-5xl font-bold">$149</span>
+              <span className="text-5xl font-bold">$349</span>
               <span className="text-emerald-300">/month</span>
             </div>
+            <p className="text-emerald-100 mb-6">
+              Beyond home management. We handle the errands, events, and everything else.
+            </p>
             <ul className="space-y-4 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Everything in Standard</span>
+                <span className="text-emerald-100">Everything in Haven</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Dedicated Human Manager</span>
+                <span className="text-emerald-100">Errand running (dry cleaning, pickups, returns)</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">One Bill Pays Everything</span>
+                <span className="text-emerald-100">Package tracking and return handling</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Monthly Handyman Visits (Included)</span>
+                <span className="text-emerald-100">Event planning assistance</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Errand and Research Assistance</span>
+                <span className="text-emerald-100">Pet care coordination</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Project Management (Zero Fee)</span>
+                <span className="text-emerald-100">Guest preparation</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                <span className="text-emerald-100">Personal shopping and gifts</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                <span className="text-emerald-100">Priority response time</span>
               </li>
             </ul>
             <Link
-              href="/register?plan=concierge"
+              href="/register?plan=haven-plus"
               className="block w-full text-center px-6 py-3 bg-white text-emerald-950 font-medium rounded-xl hover:bg-emerald-50 transition-colors"
             >
-              Start Concierge
+              Get Started
             </Link>
           </div>
 
-          {/* Haven Estate */}
+          {/* HAVEN ESTATE - Custom */}
           <div className="bg-white rounded-2xl p-8 border border-slate-200 shadow-sm">
             <div className="mb-6">
               <h3 className="font-serif text-2xl font-medium text-emerald-950 mb-1">Haven Estate</h3>
-              <p className="text-slate-500">Full Estate Support</p>
+              <p className="text-slate-500">Full Estate Management</p>
             </div>
             <div className="mb-6">
-              <span className="text-5xl font-bold text-emerald-950">$300</span>
-              <span className="text-slate-500">/month</span>
+              <span className="text-5xl font-bold text-emerald-950">Custom</span>
             </div>
+            <p className="text-slate-600 mb-6">
+              For complex households, multiple properties, or full-service estate management needs.
+            </p>
             <ul className="space-y-4 mb-8">
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Everything in Concierge</span>
+                <span className="text-slate-600">Everything in Haven+</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Priority 24/7 Support</span>
+                <span className="text-slate-600">Multiple property management</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Enhanced Handyman Visits (2x/month)</span>
+                <span className="text-slate-600">Household staff coordination</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Complex Project Oversight</span>
+                <span className="text-slate-600">24/7 priority support line</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Trust and Estate Accounting</span>
+                <span className="text-slate-600">Dedicated senior manager</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-slate-600">Multi-Property Support</span>
+                <span className="text-slate-600">Seasonal property transitions</span>
               </li>
             </ul>
             <Link
-              href="/register?plan=estate"
+              href="/contact?inquiry=estate"
               className="block w-full text-center px-6 py-3 border-2 border-emerald-950 text-emerald-950 font-medium rounded-xl hover:bg-emerald-50 transition-colors"
             >
-              Contact Sales
+              Contact Us
             </Link>
           </div>
         </div>
 
-        {/* Billing Clarity Box */}
-        <div className="mt-12 max-w-3xl mx-auto">
+        {/* Billing Clarity Box - Updated */}
+        <div className="mt-16 max-w-4xl mx-auto">
           <div className="bg-amber-50 rounded-2xl p-6 border border-amber-200">
             <h3 className="font-semibold text-emerald-950 mb-3 flex items-center gap-2">
               <DollarSign className="w-5 h-5 text-amber-600" />
-              How Your Monthly Charge Works
+              How Billing Works
             </h3>
             <div className="grid sm:grid-cols-2 gap-4 mb-4">
               <div className="bg-white rounded-xl p-4">
                 <p className="text-sm font-medium text-slate-900 mb-1">Haven Membership</p>
-                <p className="text-2xl font-bold text-emerald-600">$149<span className="text-sm text-slate-500 font-normal">/mo</span></p>
-                <p className="text-xs text-slate-500 mt-1">Your Home Manager, platform, preventive care</p>
+                <p className="text-2xl font-bold text-emerald-600">$149 <span className="text-sm font-normal text-slate-500">or</span> $349</p>
+                <p className="text-xs text-slate-500 mt-1">Your manager, platform, and services</p>
               </div>
               <div className="bg-white rounded-xl p-4">
                 <p className="text-sm font-medium text-slate-900 mb-1">Your Household Bills</p>
-                <p className="text-2xl font-bold text-slate-900">At cost</p>
-                <p className="text-xs text-slate-500 mt-1">Mortgage, taxes, utilities, vendors. No markup</p>
+                <p className="text-2xl font-bold text-slate-900">At Cost</p>
+                <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors. No markup, ever.</p>
               </div>
             </div>
+
+            {/* Example Statement */}
             <div className="bg-white rounded-xl p-4 mb-4">
-              <p className="text-sm font-semibold text-slate-900 mb-3">Example Monthly Breakdown:</p>
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-3">
+              <p className="text-sm font-semibold text-slate-900 mb-3">Example Monthly Statement</p>
+              <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-slate-600">Mortgage</span>
                   <span className="text-slate-900 font-medium">$4,200</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Property Taxes</span>
+                  <span className="text-slate-600">Property Tax (escrow)</span>
                   <span className="text-slate-900 font-medium">$850</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Electric</span>
-                  <span className="text-slate-900 font-medium">$290</span>
+                  <span className="text-slate-600">Utilities (electric, gas, water)</span>
+                  <span className="text-slate-900 font-medium">$520</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Gas/Heat</span>
-                  <span className="text-slate-900 font-medium">$145</span>
+                  <span className="text-slate-600">Internet</span>
+                  <span className="text-slate-900 font-medium">$150</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Landscaping</span>
-                  <span className="text-slate-900 font-medium">$475</span>
+                  <span className="text-slate-600">Lawn care</span>
+                  <span className="text-slate-900 font-medium">$200</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-slate-600">Cleaning Service</span>
-                  <span className="text-slate-900 font-medium">$640</span>
+                  <span className="text-slate-600">Cleaning service</span>
+                  <span className="text-slate-900 font-medium">$400</span>
                 </div>
-              </div>
-              <div className="pt-3 border-t border-slate-200 flex justify-between text-sm">
-                <span className="font-semibold text-slate-900">Total to Haven</span>
-                <span className="font-bold text-emerald-600">$6,749/mo</span>
+                <div className="flex justify-between pt-2 border-t border-slate-200">
+                  <span className="text-slate-600">Haven membership</span>
+                  <span className="text-emerald-600 font-medium">$149</span>
+                </div>
+                <div className="flex justify-between pt-2 border-t border-slate-900">
+                  <span className="text-slate-900 font-bold">You Pay Haven (once)</span>
+                  <span className="text-slate-900 font-bold">$6,469</span>
+                </div>
               </div>
             </div>
+
             <p className="text-sm text-slate-600">
-              You pay Haven once. We pay your mortgage, property taxes, utilities, and all household vendors. One statement, complete visibility, zero hassle.
+              You fund your Haven account once each month. We pay every bill on time, every time.
             </p>
           </div>
         </div>
 
-        {/* Additional pricing note */}
+        {/* FAQ quick hits */}
         <div className="mt-8 text-center">
           <p className="text-slate-500 text-sm">
-            All plans include FDIC-insured Household Wallet. Cancel anytime. No contracts.
+            All plans include FDIC-insured household account. No contracts. Cancel anytime.
           </p>
         </div>
       </div>
@@ -1445,7 +1473,7 @@ function BillCalculatorSection() {
             </div>
 
             <p className="text-center text-sm text-slate-500 mb-4">
-              + $149/mo Haven Concierge membership
+              + $149/mo Haven membership (or $349/mo for Haven+)
             </p>
 
             <Link
@@ -1538,6 +1566,10 @@ function FAQSection() {
     {
       question: "How does the One Bill system actually work?",
       answer: "When you join Haven, you make one monthly payment to us. We use that to pay everything: your mortgage, property taxes, utilities, lawn care, cleaning, childcare, and any other recurring household expenses. You get a clear statement on the 1st showing exactly where every dollar went. Routine bills are handled automatically. Repairs, maintenance, or larger purchases require your approval before we proceed.",
+    },
+    {
+      question: "What's the difference between Haven and Haven+?",
+      answer: "Haven ($149/mo) focuses on home management: consolidating all your bills, coordinating maintenance and repairs, and giving you a dedicated Home Manager. Haven+ ($349/mo) adds life management services: errands and shopping, package handling, event planning and coordination, pet care arrangements, and guest preparation. Think of Haven as everything your house needs, and Haven+ as everything your household needs.",
     },
     {
       question: "Is my money safe? How does the Household Wallet work?",
