@@ -1,474 +1,680 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { getApiClient } from '@/lib/api';
-import type { Vendor } from '@haven/core';
+import { useState } from 'react';
+import {
+  Wrench,
+  Search,
+  Plus,
+  Upload,
+  Star,
+  Phone,
+  Mail,
+  ClipboardList,
+  ChevronRight,
+  X,
+  MapPin,
+  Clock,
+  FileText,
+  Shield,
+  Building2,
+  Zap,
+  Snowflake,
+  Home,
+  Leaf,
+  Sparkles,
+  Bug,
+  Droplets,
+  BarChart3,
+} from 'lucide-react';
 
-type VendorCategory =
-  | 'HVAC_SERVICE' | 'PLUMBING' | 'ELECTRICAL' | 'ROOFING' | 'LANDSCAPING'
-  | 'PEST_CONTROL' | 'CLEANING' | 'POOL_SERVICE' | 'SEPTIC_SERVICE'
-  | 'GUTTER_CLEANING' | 'CHIMNEY_SWEEP' | 'HANDYMAN' | 'OTHER';
+// ============================================================================
+// TYPES
+// ============================================================================
 
-const categoryLabels: Record<string, string> = {
-  HVAC_SERVICE: 'HVAC',
-  PLUMBING: 'Plumbing',
-  ELECTRICAL: 'Electrical',
-  ROOFING: 'Roofing',
-  LANDSCAPING: 'Landscaping',
-  LAWN_CARE: 'Lawn Care',
-  PEST_CONTROL: 'Pest Control',
-  CLEANING: 'Cleaning',
-  POOL_SERVICE: 'Pool Service',
-  SEPTIC_SERVICE: 'Septic Service',
-  GUTTER_CLEANING: 'Gutter Cleaning',
-  CHIMNEY_SWEEP: 'Chimney Sweep',
-  HANDYMAN: 'Handyman',
-  ELECTRIC: 'Electric Utility',
-  GAS: 'Gas Utility',
-  WATER_SEWER: 'Water/Sewer',
-  INTERNET: 'Internet',
-  SECURITY_MONITORING: 'Security',
-  OTHER: 'Other',
-};
+type VendorCategory = 'plumbing' | 'electrical' | 'hvac' | 'roofing' | 'landscaping' | 'cleaning' | 'pest_control' | 'pool';
 
-const categoryColors: Record<string, string> = {
-  HVAC_SERVICE: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  PLUMBING: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-400',
-  ELECTRICAL: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  PEST_CONTROL: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  CLEANING: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  LAWN_CARE: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  LANDSCAPING: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  POOL_SERVICE: 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400',
-  SEPTIC_SERVICE: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  GUTTER_CLEANING: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  CHIMNEY_SWEEP: 'bg-stone-100 text-stone-700 dark:bg-stone-900/30 dark:text-stone-400',
-  HANDYMAN: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-  OTHER: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-300',
-};
-
-interface VendorWithStats extends Vendor {
-  workOrderCount?: number;
-  avgRating?: number;
+interface Vendor {
+  id: string;
+  name: string;
+  category: VendorCategory;
+  contactName: string;
+  phone: string;
+  email?: string;
+  serviceArea: string;
+  priceLevel: 1 | 2 | 3; // $ to $$$
+  rating: number;
+  reviewCount: number;
+  responseTime: string;
+  usageCount: number;
+  isVerified: boolean;
+  recentJobs: { household: string; date: string }[];
+  notes?: string;
 }
 
-export default function ManagerVendorsPage() {
-  const [vendors, setVendors] = useState<VendorWithStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState('');
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
+const mockVendors: Vendor[] = [
+  {
+    id: 'v1',
+    name: "Mike's Plumbing Pro",
+    category: 'plumbing',
+    contactName: 'Mike Chen',
+    phone: '(512) 555-PLMB',
+    email: 'mike@mikesplumbing.com',
+    serviceArea: 'Austin Metro',
+    priceLevel: 1,
+    rating: 4.9,
+    reviewCount: 127,
+    responseTime: '2-4 hours',
+    usageCount: 47,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Smith', date: 'Dec 18' },
+      { household: 'Johnson', date: 'Dec 10' },
+    ],
+  },
+  {
+    id: 'v2',
+    name: 'AirFlow HVAC Services',
+    category: 'hvac',
+    contactName: 'John Davis',
+    phone: '(512) 555-HVAC',
+    email: 'service@airflowhvac.com',
+    serviceArea: 'Greater Austin',
+    priceLevel: 2,
+    rating: 4.8,
+    reviewCount: 89,
+    responseTime: '4-6 hours',
+    usageCount: 32,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Smith', date: 'Dec 20' },
+      { household: 'Miller', date: 'Dec 5' },
+    ],
+  },
+  {
+    id: 'v3',
+    name: 'Bright Spark Electric',
+    category: 'electrical',
+    contactName: 'Tom Wilson',
+    phone: '(512) 555-ELEC',
+    serviceArea: 'Austin Area',
+    priceLevel: 2,
+    rating: 4.7,
+    reviewCount: 64,
+    responseTime: 'Same day',
+    usageCount: 28,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Johnson', date: 'Dec 15' },
+    ],
+  },
+  {
+    id: 'v4',
+    name: 'Green Thumb Landscaping',
+    category: 'landscaping',
+    contactName: 'Maria Garcia',
+    phone: '(512) 555-LAWN',
+    email: 'info@greenthumb.com',
+    serviceArea: 'Austin Metro',
+    priceLevel: 1,
+    rating: 4.6,
+    reviewCount: 156,
+    responseTime: '1-2 days',
+    usageCount: 52,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Smith', date: 'Dec 19' },
+      { household: 'Johnson', date: 'Dec 19' },
+      { household: 'Miller', date: 'Dec 18' },
+    ],
+  },
+  {
+    id: 'v5',
+    name: 'Apex Roofing Co',
+    category: 'roofing',
+    contactName: 'Dave Brown',
+    phone: '(512) 555-ROOF',
+    serviceArea: 'Central Texas',
+    priceLevel: 3,
+    rating: 4.9,
+    reviewCount: 42,
+    responseTime: '24-48 hours',
+    usageCount: 8,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Miller', date: 'Nov 28' },
+    ],
+  },
+  {
+    id: 'v6',
+    name: 'Crystal Clear Pools',
+    category: 'pool',
+    contactName: 'Steve Martinez',
+    phone: '(512) 555-POOL',
+    email: 'service@crystalclear.com',
+    serviceArea: 'Austin Metro',
+    priceLevel: 2,
+    rating: 4.5,
+    reviewCount: 78,
+    responseTime: 'Weekly service',
+    usageCount: 24,
+    isVerified: false,
+    recentJobs: [
+      { household: 'Smith', date: 'Dec 21' },
+    ],
+  },
+  {
+    id: 'v7',
+    name: 'Sparkle Clean Services',
+    category: 'cleaning',
+    contactName: 'Lisa Wong',
+    phone: '(512) 555-CLEN',
+    email: 'book@sparkleclean.com',
+    serviceArea: 'Austin',
+    priceLevel: 2,
+    rating: 4.8,
+    reviewCount: 203,
+    responseTime: '1-2 days',
+    usageCount: 36,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Johnson', date: 'Dec 20' },
+      { household: 'Smith', date: 'Dec 15' },
+    ],
+  },
+  {
+    id: 'v8',
+    name: 'Bug-B-Gone Pest Control',
+    category: 'pest_control',
+    contactName: 'Rick Taylor',
+    phone: '(512) 555-BUGS',
+    serviceArea: 'Greater Austin',
+    priceLevel: 1,
+    rating: 4.4,
+    reviewCount: 91,
+    responseTime: 'Same day',
+    usageCount: 15,
+    isVerified: true,
+    recentJobs: [
+      { household: 'Miller', date: 'Dec 12' },
+    ],
+  },
+];
+
+// ============================================================================
+// CATEGORY CONFIG
+// ============================================================================
+
+const categoryConfig: Record<VendorCategory, { label: string; icon: React.ReactNode; bgColor: string; textColor: string }> = {
+  plumbing: {
+    label: 'Plumbing',
+    icon: <Wrench className="w-4 h-4" />,
+    bgColor: 'bg-blue-100',
+    textColor: 'text-blue-600',
+  },
+  electrical: {
+    label: 'Electrical',
+    icon: <Zap className="w-4 h-4" />,
+    bgColor: 'bg-amber-100',
+    textColor: 'text-amber-600',
+  },
+  hvac: {
+    label: 'HVAC',
+    icon: <Snowflake className="w-4 h-4" />,
+    bgColor: 'bg-cyan-100',
+    textColor: 'text-cyan-600',
+  },
+  roofing: {
+    label: 'Roofing',
+    icon: <Home className="w-4 h-4" />,
+    bgColor: 'bg-slate-200',
+    textColor: 'text-slate-700',
+  },
+  landscaping: {
+    label: 'Landscaping',
+    icon: <Leaf className="w-4 h-4" />,
+    bgColor: 'bg-green-100',
+    textColor: 'text-green-600',
+  },
+  cleaning: {
+    label: 'Cleaning',
+    icon: <Sparkles className="w-4 h-4" />,
+    bgColor: 'bg-purple-100',
+    textColor: 'text-purple-600',
+  },
+  pest_control: {
+    label: 'Pest Control',
+    icon: <Bug className="w-4 h-4" />,
+    bgColor: 'bg-red-100',
+    textColor: 'text-red-600',
+  },
+  pool: {
+    label: 'Pool',
+    icon: <Droplets className="w-4 h-4" />,
+    bgColor: 'bg-blue-50',
+    textColor: 'text-blue-500',
+  },
+};
+
+const allCategories: VendorCategory[] = ['plumbing', 'electrical', 'hvac', 'roofing', 'landscaping', 'cleaning', 'pest_control', 'pool'];
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function VendorNetworkPage() {
+  const [vendors] = useState<Vendor[]>(mockVendors);
   const [searchQuery, setSearchQuery] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [selectedVendor, setSelectedVendor] = useState<VendorWithStats | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<VendorCategory | 'all'>('all');
+  const [selectedVendor, setSelectedVendor] = useState<Vendor | null>(null);
   const [showAddModal, setShowAddModal] = useState(false);
 
-  const api = getApiClient();
-
-  const loadVendors = useCallback(async () => {
-    try {
-      const vendorsData = await api.getVendors();
-      setVendors(vendorsData as VendorWithStats[]);
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to load vendors';
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [api]);
-
-  useEffect(() => {
-    loadVendors();
-  }, [loadVendors]);
-
-  const filteredVendors = vendors.filter((vendor) => {
-    const matchesSearch =
-      !searchQuery ||
-      vendor.displayName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      vendor.serviceDescription?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      categoryFilter === 'all' || vendor.category === categoryFilter;
-
+  // Filter vendors
+  const filteredVendors = vendors.filter(vendor => {
+    const matchesSearch = !searchQuery ||
+      vendor.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      vendor.contactName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = selectedCategory === 'all' || vendor.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const categories = [...new Set(vendors.map((v) => v.category))].sort();
+  // Get frequently used vendors (top 6 by usage)
+  const frequentlyUsed = [...vendors].sort((a, b) => b.usageCount - a.usageCount).slice(0, 6);
 
-  if (isLoading) {
+  const getPriceLevel = (level: number) => {
+    return '$'.repeat(level);
+  };
+
+  // Vendor Card Component
+  const VendorCard = ({ vendor }: { vendor: Vendor }) => {
+    const category = categoryConfig[vendor.category];
+
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+      <div
+        onClick={() => setSelectedVendor(vendor)}
+        className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+      >
+        {/* Header */}
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <div className={`w-10 h-10 ${category.bgColor} rounded-lg flex items-center justify-center ${category.textColor}`}>
+              {category.icon}
+            </div>
+            <div>
+              <h3 className="font-semibold text-slate-900">{vendor.name}</h3>
+              <div className="flex items-center gap-2 text-sm text-slate-500">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${category.bgColor} ${category.textColor}`}>
+                  {category.label}
+                </span>
+                <span>•</span>
+                <span>{vendor.serviceArea}</span>
+                <span>•</span>
+                <span className="text-slate-400">{getPriceLevel(vendor.priceLevel)}</span>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1">
+            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+            <span className="font-medium text-slate-900">{vendor.rating}</span>
+            <span className="text-slate-400 text-sm">({vendor.reviewCount})</span>
+          </div>
+        </div>
+
+        {/* Contact & Stats */}
+        <div className="border-t border-slate-100 pt-3 mb-3">
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <div className="flex items-center gap-1">
+              <Phone className="w-4 h-4 text-slate-400" />
+              <span>{vendor.contactName}</span>
+              <span>•</span>
+              <span>{vendor.phone}</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 mt-2 text-sm text-slate-500">
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4 text-slate-400" />
+              <span>Response: {vendor.responseTime}</span>
+            </div>
+            <span>•</span>
+            <span>Used {vendor.usageCount} times</span>
+            {vendor.isVerified && (
+              <>
+                <span>•</span>
+                <div className="flex items-center gap-1 text-emerald-600">
+                  <Shield className="w-4 h-4" />
+                  <span>Verified</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Recent Jobs */}
+        {vendor.recentJobs.length > 0 && (
+          <div className="border-t border-slate-100 pt-3 mb-3">
+            <p className="text-sm text-slate-500">
+              Recent: {vendor.recentJobs.map((job, i) => (
+                <span key={i}>
+                  {job.household} ({job.date}){i < vendor.recentJobs.length - 1 ? ', ' : ''}
+                </span>
+              ))}
+            </p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="border-t border-slate-100 pt-3 flex items-center gap-2">
+          <button
+            onClick={(e) => { e.stopPropagation(); window.location.href = `tel:${vendor.phone}`; }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+          >
+            <Phone className="w-4 h-4" />
+            Call
+          </button>
+          {vendor.email && (
+            <button
+              onClick={(e) => { e.stopPropagation(); window.location.href = `mailto:${vendor.email}`; }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <Mail className="w-4 h-4" />
+              Email
+            </button>
+          )}
+          <button
+            onClick={(e) => { e.stopPropagation(); }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            <ClipboardList className="w-4 h-4" />
+            Work Order
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); setSelectedVendor(vendor); }}
+            className="ml-auto inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+          >
+            View
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Vendor Management</h1>
-          <p className="text-slate-600 dark:text-slate-400">
-            Manage service providers and contractors
-          </p>
+      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <Wrench className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Vendor Network</h1>
+              <p className="text-slate-500">Manage your trusted service providers</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              Add Vendor
+            </button>
+            <button className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-50 transition-colors">
+              <Upload className="w-5 h-5" />
+              Import
+            </button>
+          </div>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Vendor
-        </button>
+
+        {/* Search */}
+        <div className="relative mb-4">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search vendors..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        {/* Category Pills */}
+        <div className="flex gap-2 flex-wrap">
+          <button
+            onClick={() => setSelectedCategory('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              selectedCategory === 'all'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+            }`}
+          >
+            All
+          </button>
+          {allCategories.map(cat => {
+            const config = categoryConfig[cat];
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  selectedCategory === cat
+                    ? 'bg-indigo-600 text-white'
+                    : `${config.bgColor} ${config.textColor} hover:opacity-80`
+                }`}
+              >
+                {config.icon}
+                {config.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
-      {/* Error */}
-      {error && (
-        <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-          <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
+      {/* Frequently Used Section */}
+      {selectedCategory === 'all' && !searchQuery && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-slate-900">Frequently Used</h2>
+            <button className="text-sm text-indigo-600 hover:text-indigo-700 font-medium">
+              View All
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {frequentlyUsed.map(vendor => (
+              <VendorCard key={vendor.id} vendor={vendor} />
+            ))}
+          </div>
         </div>
       )}
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="flex-1">
-          <div className="relative">
-            <svg
-              className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-              />
-            </svg>
-            <input
-              type="text"
-              placeholder="Search vendors..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-        <select
-          value={categoryFilter}
-          onChange={(e) => setCategoryFilter(e.target.value)}
-          className="px-4 py-2 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-800 text-slate-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-        >
-          <option value="all">All Categories</option>
-          {categories.map((cat) => (
-            <option key={cat} value={cat}>
-              {categoryLabels[cat] || cat}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{vendors.length}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Total Vendors</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                {vendors.filter((v) => v.isVerified).length}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Verified</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                {vendors.filter((v) => v.isLocal).length}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Local Providers</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <svg className="w-5 h-5 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{categories.length}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Categories</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Vendors Grid */}
-      {filteredVendors.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredVendors.map((vendor) => (
-            <div
-              key={vendor.id}
-              onClick={() => setSelectedVendor(vendor)}
-              className="card cursor-pointer hover:shadow-md transition-shadow"
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="w-12 h-12 rounded-lg bg-slate-100 dark:bg-slate-700 flex items-center justify-center">
-                  <svg className="w-6 h-6 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                  </svg>
-                </div>
-                <span
-                  className={`text-xs font-medium px-2 py-1 rounded-full ${
-                    categoryColors[vendor.category] || categoryColors.OTHER
-                  }`}
-                >
-                  {categoryLabels[vendor.category] || vendor.category}
-                </span>
-              </div>
-
-              <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-1">
-                {vendor.displayName}
-              </h3>
-
-              {vendor.serviceDescription && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
-                  {vendor.serviceDescription}
-                </p>
-              )}
-
-              <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
-                {vendor.phone && (
-                  <div className="flex items-center gap-1">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                    <span>{vendor.phone}</span>
-                  </div>
-                )}
-                {vendor.isVerified && (
-                  <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <span>Verified</span>
-                  </div>
-                )}
-              </div>
-
-              {vendor.rating && (
-                <div className="flex items-center gap-1 mt-2">
-                  {[...Array(5)].map((_, i) => (
-                    <svg
-                      key={i}
-                      className={`w-4 h-4 ${
-                        i < Math.round(vendor.rating || 0)
-                          ? 'text-yellow-400'
-                          : 'text-slate-300 dark:text-slate-600'
-                      }`}
-                      fill="currentColor"
-                      viewBox="0 0 20 20"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                  <span className="text-sm text-slate-500 ml-1">
-                    ({vendor.reviewCount || 0})
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="card text-center py-12">
-          <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-          </div>
-          <h2 className="text-xl font-semibold text-slate-900 dark:text-white mb-2">
-            No vendors found
+      {/* All Vendors / Filtered */}
+      {(selectedCategory !== 'all' || searchQuery) && (
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            {searchQuery ? `Search Results (${filteredVendors.length})` : `${categoryConfig[selectedCategory as VendorCategory]?.label || 'All'} Vendors`}
           </h2>
-          <p className="text-slate-600 dark:text-slate-400">
-            {searchQuery || categoryFilter !== 'all'
-              ? 'Try adjusting your filters'
-              : 'Add vendors to get started'}
-          </p>
+          {filteredVendors.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredVendors.map(vendor => (
+                <VendorCard key={vendor.id} vendor={vendor} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
+              <Building2 className="w-12 h-12 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-slate-900 mb-2">No vendors found</h3>
+              <p className="text-slate-500">Try adjusting your search or filters</p>
+            </div>
+          )}
         </div>
       )}
 
       {/* Vendor Detail Modal */}
       {selectedVendor && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={() => setSelectedVendor(null)} />
-
-            <div className="relative transform overflow-hidden rounded-xl bg-white dark:bg-slate-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              {/* Header */}
-              <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
-                      {selectedVendor.displayName}
-                    </h3>
-                    <span
-                      className={`inline-block mt-1 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        categoryColors[selectedVendor.category] || categoryColors.OTHER
-                      }`}
-                    >
-                      {categoryLabels[selectedVendor.category] || selectedVendor.category}
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 ${categoryConfig[selectedVendor.category].bgColor} rounded-xl flex items-center justify-center ${categoryConfig[selectedVendor.category].textColor}`}>
+                  {categoryConfig[selectedVendor.category].icon}
+                </div>
+                <div>
+                  <h2 className="text-xl font-semibold text-slate-900">{selectedVendor.name}</h2>
+                  <div className="flex items-center gap-2 text-sm text-slate-500">
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${categoryConfig[selectedVendor.category].bgColor} ${categoryConfig[selectedVendor.category].textColor}`}>
+                      {categoryConfig[selectedVendor.category].label}
                     </span>
+                    <span>•</span>
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                      <span className="font-medium text-slate-900">{selectedVendor.rating}</span>
+                      <span className="text-slate-400">({selectedVendor.reviewCount} reviews)</span>
+                    </div>
                   </div>
-                  <button
-                    onClick={() => setSelectedVendor(null)}
-                    className="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
                 </div>
               </div>
+              <button
+                onClick={() => setSelectedVendor(null)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              {/* Content */}
-              <div className="px-6 py-4 space-y-4">
-                {selectedVendor.serviceDescription && (
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Description</h4>
-                    <p className="text-slate-900 dark:text-white">{selectedVendor.serviceDescription}</p>
-                  </div>
-                )}
-
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto max-h-[60vh]">
+              {/* Contact Info */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Contact Information</h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {selectedVendor.contactName && (
+                  <div className="flex items-center gap-3">
+                    <Phone className="w-5 h-5 text-slate-400" />
                     <div>
-                      <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Contact</h4>
-                      <p className="text-slate-900 dark:text-white">{selectedVendor.contactName}</p>
-                    </div>
-                  )}
-                  {selectedVendor.phone && (
-                    <div>
-                      <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Phone</h4>
-                      <a href={`tel:${selectedVendor.phone}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
+                      <p className="text-sm text-slate-500">Phone</p>
+                      <a href={`tel:${selectedVendor.phone}`} className="font-medium text-indigo-600 hover:text-indigo-700">
                         {selectedVendor.phone}
                       </a>
                     </div>
-                  )}
+                  </div>
                   {selectedVendor.email && (
+                    <div className="flex items-center gap-3">
+                      <Mail className="w-5 h-5 text-slate-400" />
+                      <div>
+                        <p className="text-sm text-slate-500">Email</p>
+                        <a href={`mailto:${selectedVendor.email}`} className="font-medium text-indigo-600 hover:text-indigo-700">
+                          {selectedVendor.email}
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-3">
+                    <MapPin className="w-5 h-5 text-slate-400" />
                     <div>
-                      <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Email</h4>
-                      <a href={`mailto:${selectedVendor.email}`} className="text-emerald-600 dark:text-emerald-400 hover:underline">
-                        {selectedVendor.email}
-                      </a>
+                      <p className="text-sm text-slate-500">Service Area</p>
+                      <p className="font-medium text-slate-900">{selectedVendor.serviceArea}</p>
                     </div>
-                  )}
-                  {selectedVendor.websiteUrl && (
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Clock className="w-5 h-5 text-slate-400" />
                     <div>
-                      <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Website</h4>
-                      <a
-                        href={selectedVendor.websiteUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-600 dark:text-emerald-400 hover:underline"
-                      >
-                        Visit Website
-                      </a>
+                      <p className="text-sm text-slate-500">Response Time</p>
+                      <p className="font-medium text-slate-900">{selectedVendor.responseTime}</p>
                     </div>
-                  )}
-                </div>
-
-                {(selectedVendor.addressLine1 || selectedVendor.city) && (
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">Address</h4>
-                    <p className="text-slate-900 dark:text-white">
-                      {selectedVendor.addressLine1}
-                      {selectedVendor.addressLine2 && <br />}
-                      {selectedVendor.addressLine2}
-                      {selectedVendor.city && (
-                        <>
-                          <br />
-                          {selectedVendor.city}, {selectedVendor.state} {selectedVendor.postalCode}
-                        </>
-                      )}
-                    </p>
                   </div>
-                )}
-
-                {selectedVendor.licenseNumber && (
-                  <div>
-                    <h4 className="text-sm font-medium text-slate-500 dark:text-slate-400 mb-1">License Number</h4>
-                    <p className="text-slate-900 dark:text-white">{selectedVendor.licenseNumber}</p>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-4 pt-2">
-                  {selectedVendor.isVerified && (
-                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                      </svg>
-                      <span className="text-sm font-medium">Verified</span>
-                    </div>
-                  )}
-                  {selectedVendor.isLocal && (
-                    <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                      </svg>
-                      <span className="text-sm font-medium">Local Provider</span>
-                    </div>
-                  )}
                 </div>
               </div>
 
-              {/* Footer */}
-              <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-4 flex gap-3">
+              {/* Performance Metrics */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Performance</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="bg-slate-50 rounded-lg p-4 text-center">
+                    <p className="text-2xl font-bold text-slate-900">{selectedVendor.usageCount}</p>
+                    <p className="text-sm text-slate-500">Jobs Completed</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 text-center">
+                    <div className="flex items-center justify-center gap-1">
+                      <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
+                      <span className="text-2xl font-bold text-slate-900">{selectedVendor.rating}</span>
+                    </div>
+                    <p className="text-sm text-slate-500">Avg Rating</p>
+                  </div>
+                  <div className="bg-slate-50 rounded-lg p-4 text-center">
+                    <p className="text-2xl font-bold text-slate-900">95%</p>
+                    <p className="text-sm text-slate-500">On-Time</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Recent Jobs */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Recent Jobs</h3>
+                <div className="space-y-2">
+                  {selectedVendor.recentJobs.map((job, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                      <span className="text-slate-900">{job.household} Family</span>
+                      <span className="text-sm text-slate-500">{job.date}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Documents */}
+              <div className="mb-6">
+                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Documents</h3>
+                <div className="space-y-2">
+                  {[
+                    { name: 'Insurance Certificate', status: 'verified' },
+                    { name: 'Business License', status: 'verified' },
+                    { name: 'W-9 Form', status: 'on_file' },
+                  ].map((doc, i) => (
+                    <div key={i} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-slate-400" />
+                        <span className="text-slate-900">{doc.name}</span>
+                      </div>
+                      <span className={`text-sm font-medium ${doc.status === 'verified' ? 'text-emerald-600' : 'text-slate-500'}`}>
+                        {doc.status === 'verified' ? 'Verified' : 'On File'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Manager Notes */}
+              <div>
+                <h3 className="text-sm font-medium text-slate-500 uppercase tracking-wide mb-3">Manager Notes (Private)</h3>
+                <textarea
+                  placeholder="Add private notes about this vendor..."
+                  rows={3}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none"
+                  defaultValue={selectedVendor.notes || ''}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-between">
+              <button className="inline-flex items-center gap-2 px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors">
+                <BarChart3 className="w-4 h-4" />
+                View Full History
+              </button>
+              <div className="flex gap-3">
                 <button
                   onClick={() => setSelectedVendor(null)}
-                  className="flex-1 px-4 py-2 text-slate-700 dark:text-slate-300 font-medium rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
                 >
                   Close
                 </button>
-                <button
-                  onClick={() => {
-                    // TODO: Implement edit functionality
-                    setSelectedVendor(null);
-                  }}
-                  className="flex-1 px-4 py-2 bg-emerald-600 text-white font-medium rounded-lg hover:bg-emerald-700 transition-colors"
-                >
-                  Edit Vendor
+                <button className="px-6 py-2 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition-colors flex items-center gap-2">
+                  <ClipboardList className="w-4 h-4" />
+                  Create Work Order
                 </button>
               </div>
             </div>
@@ -476,41 +682,31 @@ export default function ManagerVendorsPage() {
         </div>
       )}
 
-      {/* Add Vendor Modal Placeholder */}
+      {/* Add Vendor Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-            <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={() => setShowAddModal(false)} />
-
-            <div className="relative transform overflow-hidden rounded-xl bg-white dark:bg-slate-800 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg">
-              <div className="border-b border-slate-200 dark:border-slate-700 px-6 py-4">
-                <div className="flex items-start justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Add New Vendor</h3>
-                  <button
-                    onClick={() => setShowAddModal(false)}
-                    className="text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              <div className="px-6 py-4">
-                <p className="text-slate-600 dark:text-slate-400 text-center py-8">
-                  Vendor creation form coming soon. For now, vendors can be added via the admin panel or database.
-                </p>
-              </div>
-
-              <div className="border-t border-slate-200 dark:border-slate-700 px-6 py-4">
-                <button
-                  onClick={() => setShowAddModal(false)}
-                  className="w-full px-4 py-2 text-slate-700 dark:text-slate-300 font-medium rounded-lg border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                >
-                  Close
-                </button>
-              </div>
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full">
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+              <h2 className="text-xl font-semibold text-slate-900">Add New Vendor</h2>
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <p className="text-slate-500 text-center py-8">
+                Vendor creation form coming soon.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-slate-200 flex justify-end">
+              <button
+                onClick={() => setShowAddModal(false)}
+                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium transition-colors"
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>
