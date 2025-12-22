@@ -917,7 +917,7 @@ async function main() {
   console.log(`✅ Created demo household: ${demoHousehold.name}`);
 
   // Ensure Bob's membership exists (needed if household was previously created)
-  await prisma.householdMember.upsert({
+  const bobMembership = await prisma.householdMember.upsert({
     where: {
       householdId_userId: {
         householdId: demoHousehold.id,
@@ -1887,6 +1887,325 @@ async function main() {
   });
   console.log(`✅ Created ASSIGNED work order: ${assignedWorkOrder.title}`);
 
+  // ============================================================================
+  // TRAVEL CONCIERGE DEMO DATA
+  // ============================================================================
+
+  console.log('');
+  console.log('✈️ Setting up Travel Concierge demo data...');
+
+  // Create travel profile for Bob
+  const bobTravelProfile = await prisma.travelProfile.upsert({
+    where: { householdMemberId: bobMembership.id },
+    update: {},
+    create: {
+      householdMemberId: bobMembership.id,
+
+      // Known Traveler Numbers
+      tsaPreCheck: '123456789',
+      globalEntry: 'GE987654321',
+
+      // Passport info
+      passportNumber: 'P12345678',
+      passportExpiry: new Date('2028-06-15'),
+      passportCountry: 'US',
+
+      // Preferences
+      seatingPreference: 'AISLE',
+      mealPreference: 'No preference',
+      airlineLoyalty: [
+        { airline: 'United', number: 'MP123456789', tier: 'Premier Gold' },
+        { airline: 'Delta', number: 'DL987654321', tier: 'Silver Medallion' },
+      ],
+      hotelLoyalty: [
+        { chain: 'Marriott Bonvoy', number: 'MB111222333', tier: 'Gold' },
+        { chain: 'Hilton Honors', number: 'HH444555666', tier: 'Silver' },
+      ],
+
+      // Emergency contact
+      emergencyContactName: 'Alice Smith',
+      emergencyContactPhone: '+1 203-555-0123',
+    },
+  });
+  console.log(`✅ Created travel profile for Bob`);
+
+  // Trip 1: Upcoming ski trip (BOOKED status - shows in pipeline)
+  const skiTrip = await prisma.trip.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      assignedManagerId: managerSarah.id,
+
+      title: 'Aspen Anniversary Ski Trip',
+      destination: 'Aspen, Colorado',
+      departureCity: 'Newark, NJ',
+      startDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+      endDate: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000),   // 7 day trip
+
+      travelerCount: 2,
+      travelers: [
+        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Alice Smith', type: 'adult' },
+      ],
+
+      budgetMin: 8000,
+      budgetMax: 15000,
+      budgetNotes: 'Dates are fixed (anniversary). Prefer luxury accommodations.',
+
+      notes: 'This is our 10th anniversary trip. Would love a room with mountain views.',
+
+      status: 'BOOKED',
+      totalEstimatedCost: 13100,
+    },
+  });
+  console.log(`✅ Created ski trip to Aspen (BOOKED)`);
+
+  // Add itinerary items for the ski trip
+  await prisma.itineraryItem.createMany({
+    data: [
+      {
+        tripId: skiTrip.id,
+        type: 'FLIGHT',
+        title: 'Outbound Flight - EWR to ASE',
+        startDateTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000 + 8 * 60 * 60 * 1000), // 8:30 AM
+        endDateTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000 + 12.75 * 60 * 60 * 1000), // 12:45 PM
+        startLocation: 'Newark Liberty International Airport (EWR)',
+        endLocation: 'Aspen/Pitkin County Airport (ASE)',
+        confirmationNumber: 'UA789456',
+        providerName: 'United Airlines',
+        cost: 2400,
+        sortOrder: 1,
+      },
+      {
+        tripId: skiTrip.id,
+        type: 'STAY',
+        title: 'The Little Nell - 7 Nights',
+        startDateTime: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000 + 15 * 60 * 60 * 1000), // 3 PM check-in
+        endDateTime: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000 + 11 * 60 * 60 * 1000), // 11 AM checkout
+        startLocation: '675 E Durant Ave, Aspen, CO 81611',
+        confirmationNumber: 'LN-2024-78945',
+        providerName: 'The Little Nell',
+        description: 'Premier King Room - Mountain View. Ski valet, spa access, and restaurant reservations included.',
+        cost: 8500,
+        sortOrder: 2,
+      },
+      {
+        tripId: skiTrip.id,
+        type: 'FLIGHT',
+        title: 'Return Flight - ASE to EWR',
+        startDateTime: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000 + 14 * 60 * 60 * 1000), // 2 PM
+        endDateTime: new Date(Date.now() + 37 * 24 * 60 * 60 * 1000 + 20.5 * 60 * 60 * 1000), // 8:30 PM
+        startLocation: 'Aspen/Pitkin County Airport (ASE)',
+        endLocation: 'Newark Liberty International Airport (EWR)',
+        confirmationNumber: 'UA789457',
+        providerName: 'United Airlines',
+        cost: 2200,
+        sortOrder: 10,
+      },
+    ],
+  });
+  console.log(`✅ Created itinerary items for ski trip`);
+
+  // Trip 2: Inquiry stage (Bob just requested)
+  const springBreakTrip = await prisma.trip.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      // No manager assigned yet - in inquiry stage
+
+      title: 'Spring Break Family Vacation',
+      destination: 'Turks and Caicos',
+      departureCity: 'Newark, NJ',
+      startDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days from now
+      endDate: new Date(Date.now() + 97 * 24 * 60 * 60 * 1000),   // 7 days
+      isFlexibleDates: true,
+
+      travelerCount: 4,
+      travelers: [
+        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Alice Smith', type: 'adult' },
+        { name: 'Emma Smith', type: 'child', age: 14 },
+        { name: 'Jack Smith', type: 'child', age: 10 },
+      ],
+
+      budgetMin: 15000,
+      budgetMax: 25000,
+      budgetNotes: 'Flexible by a few days. Looking for villa with pool and beach access.',
+
+      notes: 'Kids want snorkeling and beach time. Adults want spa and fine dining options. Need 3 bedrooms minimum.',
+
+      status: 'INQUIRY',
+    },
+  });
+  console.log(`✅ Created spring break inquiry (INQUIRY)`);
+
+  // Trip 3: Proposal sent, awaiting selection
+  const businessTrip = await prisma.trip.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      assignedManagerId: managerSarah.id,
+
+      title: 'SF Business Meetings',
+      destination: 'San Francisco, CA',
+      departureCity: 'Newark, NJ',
+      startDate: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000), // 14 days from now
+      endDate: new Date(Date.now() + 16 * 24 * 60 * 60 * 1000),   // 2 days
+
+      travelerCount: 1,
+      travelers: [
+        { name: 'Bob Smith', type: 'adult' },
+      ],
+
+      budgetMin: 2000,
+      budgetMax: 4000,
+      budgetNotes: 'None - meetings are scheduled. Prefer downtown hotel near Financial District.',
+
+      status: 'PROPOSAL_SENT',
+    },
+  });
+  console.log(`✅ Created SF business trip (PROPOSAL_SENT)`);
+
+  // Create a proposal for the SF trip
+  await prisma.tripProposal.create({
+    data: {
+      tripId: businessTrip.id,
+      createdByManagerId: managerSarah.id,
+      category: 'FLIGHT',
+      title: 'Flight Options - EWR to SFO',
+      description: 'Here are the best direct flight options for your dates:',
+      options: [
+        {
+          index: 0,
+          title: 'United UA 2045 - Morning',
+          details: 'Depart 7:00 AM, Arrive 10:30 AM (Business Class)',
+          price: 1200,
+          recommended: true,
+          pros: ['Direct flight', 'Early arrival for meetings', 'Lie-flat seats'],
+          cons: ['Early wake-up required'],
+        },
+        {
+          index: 1,
+          title: 'United UA 2089 - Midday',
+          details: 'Depart 12:00 PM, Arrive 3:30 PM (Business Class)',
+          price: 1350,
+          recommended: false,
+          pros: ['More relaxed departure', 'Direct flight'],
+          cons: ['Late arrival, less time for meetings'],
+        },
+      ],
+      sentAt: new Date(),
+    },
+  });
+  console.log(`✅ Created flight proposal for SF trip`);
+
+  // Trip 4: Recently completed trip (for history)
+  await prisma.trip.create({
+    data: {
+      householdId: demoHousehold.id,
+      createdByUserId: homeownerBob.id,
+      assignedManagerId: managerSarah.id,
+
+      title: 'Napa Wine Tasting Weekend',
+      destination: 'Napa Valley, CA',
+      departureCity: 'Newark, NJ',
+      startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // 30 days ago
+      endDate: new Date(Date.now() - 26 * 24 * 60 * 60 * 1000),   // 4 days
+
+      travelerCount: 2,
+      travelers: [
+        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Alice Smith', type: 'adult' },
+      ],
+
+      budgetMin: 5000,
+      budgetMax: 8000,
+
+      status: 'COMPLETED',
+      totalActualCost: 6200,
+    },
+  });
+  console.log(`✅ Created Napa trip (COMPLETED - history)`);
+
+  // House protocol for the ski trip (pre-trip checklist)
+  const skiProtocol = await prisma.houseProtocol.create({
+    data: {
+      tripId: skiTrip.id,
+      householdId: demoHousehold.id,
+      scheduledDate: new Date(Date.now() + 29 * 24 * 60 * 60 * 1000), // Day before departure
+      status: 'PENDING',
+      notes: 'Pre-departure checklist for 7-day ski trip',
+    },
+  });
+
+  // Create protocol items separately
+  await prisma.houseProtocolItem.createMany({
+    data: [
+      {
+        protocolId: skiProtocol.id,
+        title: 'Set alarm system to Away mode',
+        description: 'Ensure all zones are armed and motion sensors active',
+        category: 'Security',
+        sortOrder: 1,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Lock all doors and windows',
+        description: 'Check front, back, garage, and all windows',
+        category: 'Security',
+        sortOrder: 2,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Set thermostat to vacation mode (60°F)',
+        description: 'Lower heating to save energy but prevent pipe freezing',
+        category: 'HVAC',
+        sortOrder: 3,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Turn off water main (optional)',
+        description: 'Recommended for extended trips to prevent water damage',
+        category: 'Utilities',
+        sortOrder: 4,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Hold mail delivery',
+        description: 'USPS hold request submitted through 2/15',
+        category: 'Mail',
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        sortOrder: 5,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Notify landscaper of absence',
+        description: 'Country Landscape Design - snow removal as needed',
+        category: 'Outdoor',
+        status: 'COMPLETED',
+        completedAt: new Date(),
+        sortOrder: 6,
+      },
+      {
+        protocolId: skiProtocol.id,
+        title: 'Confirm pet sitter arrangements',
+        description: 'Drop off at Paws & Claws on departure morning',
+        category: 'Pets',
+        sortOrder: 7,
+      },
+    ],
+  });
+  console.log(`✅ Created house protocol for ski trip`);
+
+  console.log('');
+  console.log('  Travel Demo Summary:');
+  console.log('    - 4 trips created (INQUIRY, PROPOSAL_SENT, BOOKED, COMPLETED)');
+  console.log('    - Travel profile for Bob with TSA/Global Entry');
+  console.log('    - Itinerary items for booked trip');
+  console.log('    - Flight proposal awaiting selection');
+  console.log('    - House protocol with departure checklist');
+
   console.log('');
   console.log('🎉 Database seed completed successfully!');
   console.log('');
@@ -1985,6 +2304,22 @@ async function main() {
   console.log('');
   console.log('  Manager Verification Queue (/manager/verification):');
   console.log('    1 COMPLETED job awaiting verification (Gutter Repair)');
+  console.log('');
+  console.log('═══════════════════════════════════════════════════');
+  console.log('  TRAVEL CONCIERGE DEMO');
+  console.log('═══════════════════════════════════════════════════');
+  console.log('');
+  console.log('  📊 TRAVEL DEMO DATA:');
+  console.log('    Ski Trip (Aspen): BOOKED - departing in 30 days');
+  console.log('    Spring Break (Turks): INQUIRY - needs assignment');
+  console.log('    SF Business: PROPOSAL_SENT - awaiting selection');
+  console.log('    Napa Weekend: COMPLETED - in history');
+  console.log('');
+  console.log('  Travel Profile for Bob:');
+  console.log('    TSA PreCheck: 123456789');
+  console.log('    Global Entry: GE987654321');
+  console.log('    Airlines: United (Premier Gold), Delta (Silver Medallion)');
+  console.log('    Hotels: Marriott (Gold), Hilton (Silver)');
   console.log('');
 }
 
