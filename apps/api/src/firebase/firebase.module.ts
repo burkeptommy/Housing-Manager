@@ -14,9 +14,6 @@ export class FirebaseModule {
       provide: FIREBASE_APP,
       inject: [ConfigService],
       useFactory: (configService: ConfigService): admin.app.App => {
-        const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
-        const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
-        const privateKey = configService.get<string>('FIREBASE_PRIVATE_KEY');
         const emulatorHost = configService.get<string>('FIREBASE_AUTH_EMULATOR_HOST');
 
         // Check if using emulator
@@ -27,20 +24,33 @@ export class FirebaseModule {
 
           if (admin.apps.length === 0) {
             return admin.initializeApp({
-              projectId: projectId || 'demo-project',
+              projectId: configService.get<string>('FIREBASE_PROJECT_ID') || 'demo-project',
             });
           }
           return admin.app();
         }
 
-        // If running in GCP with default credentials
-        if (!projectId && !clientEmail && !privateKey) {
-          this.logger.log('Initializing Firebase with application default credentials');
-          if (admin.apps.length === 0) {
-            return admin.initializeApp();
+        // Try to use FIREBASE_SERVICE_ACCOUNT JSON first (Cloud Run style)
+        const serviceAccountJson = configService.get<string>('FIREBASE_SERVICE_ACCOUNT');
+        if (serviceAccountJson) {
+          try {
+            const serviceAccount = JSON.parse(serviceAccountJson);
+            this.logger.log(`Initializing Firebase from service account JSON for project: ${serviceAccount.project_id}`);
+            if (admin.apps.length === 0) {
+              return admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount),
+              });
+            }
+            return admin.app();
+          } catch (e) {
+            this.logger.error('Failed to parse FIREBASE_SERVICE_ACCOUNT JSON:', e);
           }
-          return admin.app();
         }
+
+        // Try individual environment variables
+        const projectId = configService.get<string>('FIREBASE_PROJECT_ID');
+        const clientEmail = configService.get<string>('FIREBASE_CLIENT_EMAIL');
+        const privateKey = configService.get<string>('FIREBASE_PRIVATE_KEY');
 
         // Use explicit credentials
         if (projectId && clientEmail && privateKey) {
@@ -58,8 +68,8 @@ export class FirebaseModule {
           return admin.app();
         }
 
-        // Fallback: try default credentials anyway
-        this.logger.warn('Firebase credentials not fully configured, attempting default credentials');
+        // Fallback: try application default credentials (works on GCP)
+        this.logger.log('Initializing Firebase with application default credentials');
         if (admin.apps.length === 0) {
           return admin.initializeApp();
         }
