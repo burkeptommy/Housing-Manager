@@ -47,7 +47,7 @@ const mainNavItems: NavItem[] = [
   { label: 'Households', href: '/manager/households', icon: Users },
   { label: 'Requests', href: '/manager/requests', icon: Inbox },
   { label: 'Conversations', href: '/manager/conversations', icon: MessageCircle },
-  { label: 'Schedule', href: '/manager/schedule', icon: Calendar },
+  { label: 'Schedule', href: '/manager/calendar', icon: Calendar },
   { label: 'Vendors', href: '/manager/vendors', icon: Wrench },
   { label: 'Verification', href: '/manager/verification', icon: CheckCircle2 },
 ];
