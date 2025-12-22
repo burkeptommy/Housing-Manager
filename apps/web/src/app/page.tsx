@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Shield,
   Plane,
@@ -35,49 +35,14 @@ import {
   Download,
   Zap,
   Droplets,
+  Snowflake,
 } from 'lucide-react';
-
-// ============================================================================
-// ROTATING WORDS CONFIG
-// ============================================================================
-
-const rotatingWords = [
-  { word: 'Home', color: 'text-emerald-600' },
-  { word: 'Finances', color: 'text-amber-500' },
-  { word: 'Projects', color: 'text-orange-500' },
-  { word: 'Family', color: 'text-blue-600' },
-  { word: 'Life', color: 'text-indigo-600' },
-];
 
 // ============================================================================
 // HERO SECTION - "Zero Noise" Promise
 // ============================================================================
 
 function HeroSection() {
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isPaused, setIsPaused] = useState(false);
-
-  useEffect(() => {
-    if (isPaused) return;
-
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => {
-        const next = prev + 1;
-        // Pause on "Life" (last word)
-        if (next === rotatingWords.length - 1) {
-          setIsPaused(true);
-          setTimeout(() => {
-            setIsPaused(false);
-            setCurrentIndex(0);
-          }, 4000);
-        }
-        return next < rotatingWords.length ? next : 0;
-      });
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [isPaused]);
-
   return (
     <section className="pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
       <div className="max-w-7xl mx-auto">
@@ -86,32 +51,13 @@ function HeroSection() {
           <div>
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-full mb-8">
               <Sparkles className="w-4 h-4 text-emerald-700" />
-              <span className="text-sm font-medium text-emerald-800">Own your home. Live like you rent.</span>
+              <span className="text-sm font-medium text-emerald-800">Premium home management</span>
             </div>
 
             <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-medium text-emerald-950 leading-tight tracking-tight mb-6">
-              The Operating System
+              Stop Managing Your Home.
               <br />
-              <span className="inline-flex items-baseline">
-                <span>for Your&nbsp;</span>
-                <span className="relative inline-flex overflow-hidden" style={{ minWidth: '3ch' }}>
-                  <AnimatePresence mode="wait">
-                    <motion.span
-                      key={currentIndex}
-                      initial={{ y: '100%', opacity: 0 }}
-                      animate={{ y: 0, opacity: 1 }}
-                      exit={{ y: '-100%', opacity: 0 }}
-                      transition={{
-                        duration: 0.4,
-                        ease: [0.4, 0, 0.2, 1],
-                      }}
-                      className={`inline-block whitespace-nowrap ${rotatingWords[currentIndex]?.color ?? 'text-emerald-600'}`}
-                    >
-                      {rotatingWords[currentIndex]?.word ?? 'Home'}.
-                    </motion.span>
-                  </AnimatePresence>
-                </span>
-              </span>
+              <span className="text-emerald-600">Start Living In It.</span>
             </h1>
 
             <p className="text-xl sm:text-2xl font-medium text-emerald-800 mb-4">
@@ -119,7 +65,7 @@ function HeroSection() {
             </p>
 
             <p className="text-lg sm:text-xl text-slate-600 max-w-xl mb-8 leading-relaxed">
-              Stop juggling 20 vendors, 15 passwords, and surprise invoices. Haven consolidates everything into one monthly statement and one person who handles it all.
+              You manage a demanding career and a busy family. Let us manage everything else.
             </p>
 
             <div className="flex flex-col sm:flex-row items-start gap-4">
@@ -127,7 +73,7 @@ function HeroSection() {
                 href="/register"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
               >
-                See If Haven Is In Your Area
+                Get Started — $149/month
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <a
@@ -137,6 +83,10 @@ function HeroSection() {
                 See How It Works
               </a>
             </div>
+
+            <p className="text-sm text-slate-500 mt-6">
+              Trusted by families in Greenwich, Scarsdale, and Darien
+            </p>
 
             {/* Trust indicators */}
             <div className="flex flex-wrap items-center gap-6 mt-12 pt-8 border-t border-slate-200">
@@ -217,10 +167,10 @@ function HeroSection() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
-                      <span className="text-sm font-bold text-white">SM</span>
+                      <span className="text-sm font-bold text-white">SH</span>
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Steve, Your Manager</p>
+                      <p className="text-sm font-semibold text-slate-900">Sarah, Your Manager</p>
                       <p className="text-xs text-slate-500">Just now</p>
                     </div>
                   </div>
@@ -238,7 +188,7 @@ function HeroSection() {
                   <div>
                     <p className="text-sm font-medium text-slate-900 mb-1">Work Completed</p>
                     <p className="text-xs text-slate-600">
-                      Annual HVAC Service completed. Filters changed & report filed.
+                      Annual furnace service completed. Filter changed, all clear for winter.
                     </p>
                   </div>
                 </div>
@@ -265,22 +215,22 @@ function HeroSection() {
                 </div>
 
                 <div className="bg-gradient-to-r from-sky-50 to-indigo-50 rounded-xl p-3 mb-3">
-                  <p className="text-sm font-medium text-slate-900 mb-1">Spring Break Trip</p>
-                  <p className="text-xs text-slate-600">March 15-22, 2025 • Maui, HI</p>
+                  <p className="text-sm font-medium text-slate-900 mb-1">February Ski Trip</p>
+                  <p className="text-xs text-slate-600">Feb 15-22, 2025 • Stowe, VT</p>
                 </div>
 
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span className="text-xs text-slate-600">Flights booked (4 travelers)</span>
+                    <span className="text-xs text-slate-600">Lodge booked (2 suites)</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span className="text-xs text-slate-600">House Sitter confirmed</span>
+                    <span className="text-xs text-slate-600">Driveway plowing arranged</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                    <span className="text-xs text-slate-600">Pet care arranged</span>
+                    <span className="text-xs text-slate-600">House check scheduled</span>
                   </div>
                 </div>
               </div>
@@ -397,7 +347,7 @@ function HowItWorksSection() {
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
           >
-            See If Haven Is In Your Area
+            Get Started — $149/month
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
@@ -515,11 +465,11 @@ function OneBillSection() {
                         <Zap className="w-4 h-4 text-blue-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">SCE Electric</p>
+                        <p className="text-sm font-medium text-slate-900">Eversource</p>
                         <p className="text-xs text-slate-500">Dec 15 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$187</span>
+                    <span className="text-sm font-medium text-slate-900">$287</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
@@ -527,23 +477,23 @@ function OneBillSection() {
                         <Sparkles className="w-4 h-4 text-green-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">Green Thumb Landscaping</p>
+                        <p className="text-sm font-medium text-slate-900">Fairfield Landscaping</p>
                         <p className="text-xs text-slate-500">Dec 12 • Routine</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$340</span>
+                    <span className="text-sm font-medium text-slate-900">$475</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-cyan-100 rounded-lg flex items-center justify-center">
-                        <Activity className="w-4 h-4 text-cyan-600" />
+                      <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                        <Thermometer className="w-4 h-4 text-orange-600" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-slate-900">Crystal Clear Pools</p>
-                        <p className="text-xs text-slate-500">Dec 10 • Routine</p>
+                        <p className="text-sm font-medium text-slate-900">Petro Home Services</p>
+                        <p className="text-xs text-slate-500">Dec 10 • Oil delivery</p>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-slate-900">$175</span>
+                    <span className="text-sm font-medium text-slate-900">$425</span>
                   </div>
                 </div>
               </div>
@@ -570,10 +520,10 @@ function SingleContactSection() {
               {/* Header */}
               <div className="p-4 border-b border-slate-100 flex items-center gap-3">
                 <div className="w-12 h-12 bg-emerald-600 rounded-full flex items-center justify-center">
-                  <span className="text-lg font-bold text-white">SM</span>
+                  <span className="text-lg font-bold text-white">SH</span>
                 </div>
                 <div className="flex-1">
-                  <p className="font-semibold text-slate-900">Steve, Your Manager</p>
+                  <p className="font-semibold text-slate-900">Sarah, Your Manager</p>
                   <p className="text-sm text-emerald-600">Online • Handles everything</p>
                 </div>
                 <div className="w-10 h-10 bg-emerald-50 rounded-full flex items-center justify-center">
@@ -586,7 +536,7 @@ function SingleContactSection() {
                 {/* User message */}
                 <div className="flex justify-end">
                   <div className="bg-emerald-600 text-white rounded-2xl rounded-br-md px-4 py-2 max-w-[80%]">
-                    <p className="text-sm">The roof is leaking in the guest room. Can you handle it?</p>
+                    <p className="text-sm">The furnace is making a weird noise. Can you handle it before it gets really cold?</p>
                     <p className="text-xs text-emerald-200 mt-1">10:32 AM</p>
                   </div>
                 </div>
@@ -594,7 +544,7 @@ function SingleContactSection() {
                 {/* Manager response */}
                 <div className="flex justify-start">
                   <div className="bg-white rounded-2xl rounded-bl-md px-4 py-2 max-w-[80%] shadow-sm">
-                    <p className="text-sm text-slate-700">On it. I&apos;ve already contacted Ace Roofing (they did your neighbor&apos;s roof last month). They can come tomorrow at 9am. I&apos;ll meet them at the house.</p>
+                    <p className="text-sm text-slate-700">On it. I&apos;ve already called Hometown Heating—they service half of Darien. They can come tomorrow at 9am. I&apos;ll meet them at the house.</p>
                     <p className="text-xs text-slate-400 mt-1">10:34 AM</p>
                   </div>
                 </div>
@@ -606,8 +556,8 @@ function SingleContactSection() {
                       <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                       <span className="text-xs font-semibold text-emerald-600">APPOINTMENT CONFIRMED</span>
                     </div>
-                    <p className="text-sm font-medium text-slate-900">Ace Roofing Co.</p>
-                    <p className="text-xs text-slate-500">Tomorrow, 9:00 AM • Quote: $850-$1,200</p>
+                    <p className="text-sm font-medium text-slate-900">Hometown Heating & Cooling</p>
+                    <p className="text-xs text-slate-500">Tomorrow, 9:00 AM • Est. $150-$300</p>
                   </div>
                 </div>
 
@@ -624,7 +574,7 @@ function SingleContactSection() {
               <div className="p-4 border-t border-slate-100">
                 <div className="flex items-center gap-3">
                   <div className="flex-1 bg-slate-100 rounded-full px-4 py-2">
-                    <span className="text-sm text-slate-400">Message Steve...</span>
+                    <span className="text-sm text-slate-400">Message Sarah...</span>
                   </div>
                   <div className="w-10 h-10 bg-emerald-600 rounded-full flex items-center justify-center">
                     <ArrowRight className="w-5 h-5 text-white" />
@@ -712,24 +662,24 @@ function ProactiveCareSection() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-xl p-4 border border-slate-200">
-                <Filter className="w-6 h-6 text-emerald-600 mb-2" />
-                <p className="font-medium text-slate-900">Filter Changes</p>
-                <p className="text-sm text-slate-500">Monthly HVAC service</p>
+                <Thermometer className="w-6 h-6 text-emerald-600 mb-2" />
+                <p className="font-medium text-slate-900">Furnace Service</p>
+                <p className="text-sm text-slate-500">Annual tune-up before winter</p>
+              </div>
+              <div className="bg-white rounded-xl p-4 border border-slate-200">
+                <Snowflake className="w-6 h-6 text-emerald-600 mb-2" />
+                <p className="font-medium text-slate-900">Winterization</p>
+                <p className="text-sm text-slate-500">Pipes, irrigation, outdoor prep</p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200">
                 <Activity className="w-6 h-6 text-emerald-600 mb-2" />
-                <p className="font-medium text-slate-900">System Checks</p>
-                <p className="text-sm text-slate-500">Sensors & detectors</p>
+                <p className="font-medium text-slate-900">Generator Check</p>
+                <p className="text-sm text-slate-500">Storm season ready</p>
               </div>
               <div className="bg-white rounded-xl p-4 border border-slate-200">
-                <Clock className="w-6 h-6 text-emerald-600 mb-2" />
-                <p className="font-medium text-slate-900">Warranty Tracking</p>
-                <p className="text-sm text-slate-500">Never miss a claim</p>
-              </div>
-              <div className="bg-white rounded-xl p-4 border border-slate-200">
-                <Calendar className="w-6 h-6 text-emerald-600 mb-2" />
-                <p className="font-medium text-slate-900">Scheduled Service</p>
-                <p className="text-sm text-slate-500">Auto-booked pros</p>
+                <Droplets className="w-6 h-6 text-emerald-600 mb-2" />
+                <p className="font-medium text-slate-900">Gutter Cleaning</p>
+                <p className="text-sm text-slate-500">Fall leaves, spring debris</p>
               </div>
             </div>
           </div>
@@ -894,8 +844,8 @@ function NetworkSection() {
                     </div>
                     <div className="absolute -top-12 left-1/2 -translate-x-1/2">
                       <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
-                        <p className="font-semibold">Verified Plumber</p>
-                        <p className="text-slate-500">Used by 3 neighbors</p>
+                        <p className="font-semibold">Hometown Plumbing</p>
+                        <p className="text-slate-500">Trusted by 8 Greenwich families</p>
                       </div>
                     </div>
                   </div>
@@ -909,8 +859,8 @@ function NetworkSection() {
                     </div>
                     <div className="absolute -top-12 left-1/2 -translate-x-1/2">
                       <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
-                        <p className="font-semibold">Trusted Landscaper</p>
-                        <p className="text-slate-500">5 homes on your block</p>
+                        <p className="font-semibold">Darien Landscape Design</p>
+                        <p className="text-slate-500">12 homes in your neighborhood</p>
                       </div>
                     </div>
                   </div>
@@ -924,8 +874,8 @@ function NetworkSection() {
                     </div>
                     <div className="absolute -top-12 left-1/2 -translate-x-1/2">
                       <div className="px-2 py-1 bg-white rounded text-xs font-medium text-slate-900 whitespace-nowrap shadow-lg">
-                        <p className="font-semibold">Ace Roofing</p>
-                        <p className="text-slate-500">4 roofs this street</p>
+                        <p className="font-semibold">Fairfield County Roofing</p>
+                        <p className="text-slate-500">6 roofs on Round Hill</p>
                       </div>
                     </div>
                   </div>
@@ -946,11 +896,11 @@ function NetworkSection() {
                 <div className="backdrop-blur-xl bg-white/95 rounded-xl p-4 border border-white/20">
                   <div className="grid grid-cols-3 gap-4 text-center">
                     <div>
-                      <p className="text-2xl font-bold text-emerald-600">47</p>
+                      <p className="text-2xl font-bold text-emerald-600">89</p>
                       <p className="text-xs text-slate-500">Verified Vendors</p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-emerald-600">12</p>
+                      <p className="text-2xl font-bold text-emerald-600">47</p>
                       <p className="text-xs text-slate-500">Haven Homes Nearby</p>
                     </div>
                     <div>
@@ -989,8 +939,8 @@ function NetworkSection() {
                   <Star className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">&quot;Ace Roofing did 4 homes on our street&quot;</p>
-                  <p className="text-sm text-slate-500">— The Johnsons, 3 doors down</p>
+                  <p className="font-medium text-slate-900">&quot;Fairfield County Roofing did 6 homes on Round Hill&quot;</p>
+                  <p className="text-sm text-slate-500">— The Hendersons, North Street</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
@@ -999,7 +949,7 @@ function NetworkSection() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">&quot;30% off landscaping with the group rate&quot;</p>
-                  <p className="text-sm text-slate-500">— The Garcias, across the street</p>
+                  <p className="text-sm text-slate-500">— The Mitchells, Round Hill Road</p>
                 </div>
               </div>
             </div>
@@ -1072,13 +1022,13 @@ function VaultSection() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent" />
                 <div className="absolute bottom-4 left-4">
                   <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-lg font-bold text-white">1247 Beverly Drive</h3>
+                    <h3 className="text-lg font-bold text-white">47 Round Hill Road</h3>
                     <span className="px-2 py-0.5 bg-emerald-500/90 text-white text-xs font-medium rounded-full flex items-center gap-1">
                       <Shield className="w-3 h-3" />
                       Haven Managed
                     </span>
                   </div>
-                  <p className="text-slate-300 text-sm">Beverly Hills, CA • 4,200 sq ft</p>
+                  <p className="text-slate-300 text-sm">Greenwich, CT • 5,800 sq ft</p>
                 </div>
               </div>
 
@@ -1342,16 +1292,18 @@ function BillCalculatorSection() {
   const [selectedServices, setSelectedServices] = useState<string[]>(['electric', 'water', 'landscaping', 'pool']);
 
   const services = [
-    { id: 'electric', name: 'Electric', avgCost: 187 },
-    { id: 'water', name: 'Water', avgCost: 85 },
-    { id: 'gas', name: 'Gas', avgCost: 65 },
-    { id: 'internet', name: 'Internet', avgCost: 89 },
-    { id: 'landscaping', name: 'Landscaping', avgCost: 340 },
-    { id: 'pool', name: 'Pool Service', avgCost: 175 },
-    { id: 'housekeeping', name: 'Housekeeping', avgCost: 400 },
-    { id: 'pest', name: 'Pest Control', avgCost: 75 },
-    { id: 'security', name: 'Security System', avgCost: 49 },
-    { id: 'trash', name: 'Trash/Recycling', avgCost: 35 },
+    { id: 'electric', name: 'Electric', avgCost: 245 },
+    { id: 'gas', name: 'Natural Gas', avgCost: 180 },
+    { id: 'oil', name: 'Heating Oil', avgCost: 350 },
+    { id: 'water', name: 'Water/Sewer', avgCost: 120 },
+    { id: 'internet', name: 'Internet/Cable', avgCost: 189 },
+    { id: 'landscaping', name: 'Landscaping', avgCost: 475 },
+    { id: 'pool', name: 'Pool Service', avgCost: 225 },
+    { id: 'housekeeping', name: 'Housekeeping', avgCost: 600 },
+    { id: 'snow', name: 'Snow Removal', avgCost: 150 },
+    { id: 'pest', name: 'Pest Control', avgCost: 95 },
+    { id: 'security', name: 'Security System', avgCost: 65 },
+    { id: 'generator', name: 'Generator Service', avgCost: 85 },
   ];
 
   const toggleService = (id: string) => {
@@ -1471,7 +1423,7 @@ function BillCalculatorSection() {
               href="/register"
               className="block w-full text-center px-6 py-3 bg-emerald-950 text-white font-medium rounded-xl hover:bg-emerald-900 transition-colors"
             >
-              See If Haven Is In Your Area
+              Get Started — $149/month
             </Link>
           </div>
         </div>
@@ -1487,22 +1439,22 @@ function BillCalculatorSection() {
 function SocialProofSection() {
   const quotes = [
     {
-      quote: "I used to spend 3 hours a month just paying bills and chasing vendors. Now I glance at one statement and move on with my life.",
+      quote: "Between the train to the city and the kids' schedules, I had zero bandwidth for home stuff. Now Sarah handles everything—I just approve the big items.",
       author: "Jennifer M.",
-      role: "Working mom of 3",
-      highlight: "3 hours → 5 minutes",
+      role: "Managing Director, Greenwich",
+      highlight: "Zero bandwidth → Total control",
     },
     {
-      quote: "When our AC broke at 2am, I just texted Sarah. By morning, it was fixed. I never called a single contractor.",
-      author: "Marcus R.",
-      role: "Tech executive",
-      highlight: "Zero vendor calls",
+      quote: "Our furnace died during that January cold snap. One text to Haven and they had someone there in 2 hours. I didn't miss a single meeting.",
+      author: "David R.",
+      role: "Private Equity, Scarsdale",
+      highlight: "2-hour response",
     },
     {
-      quote: "The transparency is incredible. I finally understand where every dollar goes, and nothing slips through the cracks.",
+      quote: "We just moved from the city and had no idea how to find contractors in Darien. Haven's network saved us months of trial and error.",
       author: "Priya S.",
-      role: "Attorney",
-      highlight: "Full visibility",
+      role: "New homeowner, Darien",
+      highlight: "Instant vendor network",
     },
   ];
 
@@ -1563,16 +1515,16 @@ function FAQSection() {
       answer: "Your Household Wallet is FDIC-insured and held at a regulated partner bank. You fund the wallet via bank transfer, and Haven uses it to pay your vendors. You maintain full visibility and control—you can see every transaction in real-time and withdraw funds at any time. We never mark up vendor costs or take a percentage of transactions.",
     },
     {
-      question: "What if I want to approve certain expenses?",
-      answer: "You set your own approval thresholds. For example, you might set auto-approve for anything under $500 (routine bills) but require approval for larger expenses. Your Home Manager will text you for approval on big items, with full context and their recommendation, so you can approve with one tap.",
+      question: "Do you handle snow removal and winter emergencies?",
+      answer: "Yes! We coordinate snow plowing, ice management, and emergency services. When a nor'easter hits, we proactively check on your home, ensure your driveway is cleared before you need to leave, and monitor for any issues like frozen pipes or power outages. If you're traveling, we'll do house checks to make sure everything is safe.",
     },
     {
-      question: "What's included in the monthly membership vs. actual vendor costs?",
-      answer: "Your Haven membership ($49-$300/mo depending on tier) covers the service: your Home Manager, the platform, preventive maintenance coordination, and bill consolidation. Actual vendor costs (electric bill, landscaper, plumber, etc.) are billed at-cost through your statement—no markup. So if your electrician charges $200, you pay $200.",
+      question: "Can you help with generator maintenance?",
+      answer: "Absolutely. Many homes in Fairfield and Westchester have whole-house generators, and we ensure they're serviced annually, tested before storm season, and ready when you need them. We also monitor fuel levels and coordinate refills for propane or natural gas generators.",
     },
     {
-      question: "Can I keep some vendors and add new ones?",
-      answer: "Yes! Keep your trusted vendors and we'll manage the relationship. If you need a new vendor, your Home Manager will recommend options from our vetted network—often with neighborhood group rates. Either way, all bills flow through your single Haven statement.",
+      question: "What about homes with staff (nannies, housekeepers)?",
+      answer: "We work alongside your existing household staff. We handle vendor coordination and home maintenance so your nanny can focus on the kids and your housekeeper can focus on cleaning—not waiting around for the plumber. We also help with staff scheduling and payroll coordination if needed.",
     },
     {
       question: "What happens if something goes wrong at 2am?",
@@ -1632,13 +1584,13 @@ function StickyCTAFooter() {
       <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
         <div className="hidden sm:block">
           <p className="text-sm font-medium text-slate-900">One bill. One contact. Zero hassle.</p>
-          <p className="text-xs text-slate-500">See if Haven is available in your neighborhood</p>
+          <p className="text-xs text-slate-500">Serving Fairfield County & Westchester</p>
         </div>
         <Link
           href="/register"
           className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-950 text-white text-sm font-medium rounded-xl hover:bg-emerald-900 transition-colors"
         >
-          Check Availability
+          Get Started — $149/mo
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
@@ -1738,10 +1690,10 @@ export default function HomePage() {
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
           >
-            See If Haven Is In Your Area
+            Get Started — $149/month
             <ArrowRight className="w-5 h-5" />
           </Link>
-          <p className="text-sm text-slate-500 mt-4">Currently serving select neighborhoods in Los Angeles and Orange County.</p>
+          <p className="text-sm text-slate-500 mt-4">Now serving Greenwich, Darien, New Canaan, Westport, Scarsdale, Rye, and surrounding communities.</p>
         </div>
       </section>
 
@@ -1827,7 +1779,7 @@ export default function HomePage() {
                 <li><Link href="/vendor/login" className="text-emerald-300 hover:text-white text-sm transition-colors">Vendor Portal</Link></li>
                 <li><a href="#" className="text-emerald-300 hover:text-white text-sm transition-colors">Become a Handyman</a></li>
                 <li><a href="#" className="text-emerald-300 hover:text-white text-sm transition-colors">Real Estate Partners</a></li>
-                <li><a href="#" className="text-emerald-300 hover:text-white text-sm transition-colors">Insurance Partners</a></li>
+                <li><a href="#" className="text-emerald-300 hover:text-white text-sm transition-colors">Property Managers</a></li>
               </ul>
             </div>
           </div>
