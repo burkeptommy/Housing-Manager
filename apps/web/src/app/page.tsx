@@ -73,7 +73,7 @@ function HeroSection() {
                 href="/register"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
               >
-                Get Started — $149/month
+                Get Started - $149/month
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <a
@@ -275,14 +275,16 @@ function HowItWorksSection() {
               </div>
               <h3 className="text-xl font-semibold text-emerald-950 mb-3">Connect Your Vendors</h3>
               <p className="text-slate-600 leading-relaxed">
-                Link your utilities, landscaper, pool service, tutor—everyone who bills you. We set up auto-pay and take over the relationship.
+                Link your utilities, landscaper, childcare, cleaning service, and everyone else who bills you. We set up auto-pay and manage the relationships.
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
                 <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Electric</span>
                 <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Water</span>
-                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Pool</span>
-                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Lawn</span>
-                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">+12 more</span>
+                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Internet</span>
+                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Lawn Care</span>
+                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Childcare</span>
+                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">Cleaning</span>
+                <span className="px-2 py-1 bg-white rounded text-xs text-slate-500 border border-slate-200">+more</span>
               </div>
             </div>
           </div>
@@ -296,20 +298,17 @@ function HowItWorksSection() {
               <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center mb-6">
                 <FileText className="w-7 h-7 text-emerald-600" />
               </div>
-              <h3 className="text-xl font-semibold text-emerald-950 mb-3">One Monthly Statement</h3>
+              <h3 className="text-xl font-semibold text-emerald-950 mb-3">One Bill to Haven</h3>
               <p className="text-slate-600 leading-relaxed">
-                On the 1st, you get one PDF: every vendor, every charge, clearly categorized. Routine bills are auto-paid. Big items wait for your approval.
+                You pay Haven once a month. We pay all your vendors for you. On the 1st, you get a clear statement showing every charge. Routine bills are handled automatically. Repairs, upgrades, and projects require your approval first.
               </p>
               <div className="mt-4 p-3 bg-white rounded-lg border border-slate-200">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-slate-600">December Statement</span>
                   <span className="font-medium text-slate-900">$4,847</span>
                 </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <div className="flex-1 h-2 bg-emerald-200 rounded-full overflow-hidden">
-                    <div className="h-full w-4/5 bg-emerald-600 rounded-full" />
-                  </div>
-                  <span className="text-xs text-slate-500">Auto-paid</span>
+                <div className="mt-2 text-xs text-slate-500">
+                  You pay Haven once. We handle the rest.
                 </div>
               </div>
             </div>
@@ -347,7 +346,7 @@ function HowItWorksSection() {
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
           >
-            Get Started — $149/month
+            Get Started - $149/month
             <ArrowRight className="w-5 h-5" />
           </Link>
         </div>
@@ -373,15 +372,15 @@ function OneBillSection() {
             </div>
 
             <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-medium text-emerald-950 mb-6">
-              20 Vendors.<br />One Monthly Statement.
+              All Your Bills.<br />One Payment to Haven.
             </h2>
 
             <div className="mb-8">
               <p className="text-lg text-slate-500 mb-4 italic">
-                &quot;Stop chasing invoices from the pool guy, the landscaper, and the tutor.&quot;
+                &quot;Stop writing checks to 15 different vendors every month.&quot;
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
-                We audit and auto-pay your recurring bills—utilities, subscriptions, staff. You don&apos;t need to approve the electric bill every month. We only notify you for the big ticket items and exceptions.
+                We consolidate and pay all your recurring bills: utilities, lawn care, childcare, cleaning, subscriptions, and more. You make one payment to Haven each month. We handle the rest. You only approve maintenance, repairs, or big purchases.
               </p>
             </div>
 
@@ -391,8 +390,8 @@ function OneBillSection() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">Automatic Bill Pay</p>
-                  <p className="text-sm text-slate-500">All vendors paid on time, every time</p>
+                  <p className="font-medium text-slate-900">One Payment, All Bills Covered</p>
+                  <p className="text-sm text-slate-500">Pay Haven once. We pay everyone else.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -400,8 +399,8 @@ function OneBillSection() {
                   <Check className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">Exception-Only Approvals</p>
-                  <p className="text-sm text-slate-500">Big expenses need your OK. Routine ones don&apos;t.</p>
+                  <p className="font-medium text-slate-900">Approve Only What Matters</p>
+                  <p className="text-sm text-slate-500">Routine bills are automatic. Repairs and projects need your OK.</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -441,14 +440,14 @@ function OneBillSection() {
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-emerald-500 rounded-full" />
-                      <span className="text-slate-600">Auto-Paid (routine)</span>
+                      <span className="text-slate-600">Recurring Bills (automatic)</span>
                     </div>
                     <span className="text-slate-700 font-medium">$3,847</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-2 h-2 bg-amber-500 rounded-full" />
-                      <span className="text-slate-600">You Approved</span>
+                      <span className="text-slate-600">Repairs & Projects (approved)</span>
                     </div>
                     <span className="text-slate-700 font-medium">$1,000</span>
                   </div>
@@ -544,7 +543,7 @@ function SingleContactSection() {
                 {/* Manager response */}
                 <div className="flex justify-start">
                   <div className="bg-white rounded-2xl rounded-bl-md px-4 py-2 max-w-[80%] shadow-sm">
-                    <p className="text-sm text-slate-700">On it. I&apos;ve already called Hometown Heating—they service half of Darien. They can come tomorrow at 9am. I&apos;ll meet them at the house.</p>
+                    <p className="text-sm text-slate-700">On it. I&apos;ve already called Hometown Heating. They service half of Darien and can come tomorrow at 9am. I&apos;ll meet them at the house.</p>
                     <p className="text-xs text-slate-400 mt-1">10:34 AM</p>
                   </div>
                 </div>
@@ -600,7 +599,7 @@ function SingleContactSection() {
                 &quot;When something breaks, you shouldn&apos;t have to be the project manager.&quot;
               </p>
               <p className="text-lg text-emerald-100 leading-relaxed">
-                One dedicated Manager. One dedicated Handyman. Whether it&apos;s a leaky roof or booking a flight, you text <em>one</em> thread. We coordinate the rest.
+                One dedicated Manager. One dedicated Handyman. Whether it&apos;s a leaky faucet or scheduling a repair, you text one thread. We coordinate everything else.
               </p>
             </div>
 
@@ -620,7 +619,7 @@ function SingleContactSection() {
                 </div>
                 <div>
                   <p className="font-medium text-white">Beyond Home Repairs</p>
-                  <p className="text-sm text-emerald-300">Travel, logistics, research—we handle it all</p>
+                  <p className="text-sm text-emerald-300">Errands, logistics, and research handled</p>
                 </div>
               </div>
             </div>
@@ -653,10 +652,10 @@ function ProactiveCareSection() {
 
             <div className="mb-8">
               <p className="text-lg text-slate-500 mb-4 italic">
-                &quot;Home maintenance is usually reactive and expensive.&quot;
+                &quot;Most homeowners only fix things after they break.&quot;
               </p>
               <p className="text-lg text-slate-600 leading-relaxed">
-                Just like a luxury apartment building, we perform monthly preventative rounds. Changing filters, flushing heaters, checking sensors—so small issues never become emergencies.
+                Just like a luxury apartment building, we perform monthly preventative rounds. Changing filters, flushing heaters, checking sensors. Small issues never become emergencies.
               </p>
             </div>
 
@@ -940,7 +939,7 @@ function NetworkSection() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">&quot;Fairfield County Roofing did 6 homes on Round Hill&quot;</p>
-                  <p className="text-sm text-slate-500">— The Hendersons, North Street</p>
+                  <p className="text-sm text-slate-500">The Hendersons, North Street</p>
                 </div>
               </div>
               <div className="flex items-center gap-3 p-4 bg-slate-50 rounded-xl">
@@ -949,7 +948,7 @@ function NetworkSection() {
                 </div>
                 <div>
                   <p className="font-medium text-slate-900">&quot;30% off landscaping with the group rate&quot;</p>
-                  <p className="text-sm text-slate-500">— The Mitchells, Round Hill Road</p>
+                  <p className="text-sm text-slate-500">The Mitchells, Round Hill Road</p>
                 </div>
               </div>
             </div>
@@ -1179,7 +1178,7 @@ function PricingSection() {
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">One-Bill Pay (Retainer Model)</span>
+                <span className="text-emerald-100">One Bill Pays Everything</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -1187,7 +1186,7 @@ function PricingSection() {
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                <span className="text-emerald-100">Travel Planning and Booking</span>
+                <span className="text-emerald-100">Errand and Research Assistance</span>
               </li>
               <li className="flex items-start gap-3">
                 <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -1263,12 +1262,12 @@ function PricingSection() {
               <div className="bg-white rounded-xl p-4">
                 <p className="text-sm font-medium text-slate-900 mb-1">Your Vendor Bills</p>
                 <p className="text-2xl font-bold text-slate-900">At cost</p>
-                <p className="text-xs text-slate-500 mt-1">Electric, water, landscaper, etc. — no markup</p>
+                <p className="text-xs text-slate-500 mt-1">Electric, water, landscaper, etc. No markup</p>
               </div>
             </div>
             <p className="text-sm text-slate-600">
-              <strong>Example:</strong> Your electric bill is $180, landscaper is $340, and pool service is $175.
-              Your total charge = $149 (Haven) + $695 (vendors) = <strong>$844/mo on one statement.</strong>
+              <strong>Example:</strong> Your electric is $180, gas is $125, internet is $150, and lawn care is $200.
+              You pay Haven <strong>$804 once</strong> ($149 membership + $655 vendor bills). We pay all your vendors for you.
             </p>
           </div>
         </div>
@@ -1289,21 +1288,19 @@ function PricingSection() {
 // ============================================================================
 
 function BillCalculatorSection() {
-  const [selectedServices, setSelectedServices] = useState<string[]>(['electric', 'water', 'landscaping', 'pool']);
+  const [selectedServices, setSelectedServices] = useState<string[]>(['electric', 'gas', 'water', 'internet', 'landscaping']);
 
   const services = [
-    { id: 'electric', name: 'Electric', avgCost: 245 },
-    { id: 'gas', name: 'Natural Gas', avgCost: 180 },
-    { id: 'oil', name: 'Heating Oil', avgCost: 350 },
-    { id: 'water', name: 'Water/Sewer', avgCost: 120 },
-    { id: 'internet', name: 'Internet/Cable', avgCost: 189 },
-    { id: 'landscaping', name: 'Landscaping', avgCost: 475 },
-    { id: 'pool', name: 'Pool Service', avgCost: 225 },
-    { id: 'housekeeping', name: 'Housekeeping', avgCost: 600 },
-    { id: 'snow', name: 'Snow Removal', avgCost: 150 },
-    { id: 'pest', name: 'Pest Control', avgCost: 95 },
-    { id: 'security', name: 'Security System', avgCost: 65 },
-    { id: 'generator', name: 'Generator Service', avgCost: 85 },
+    { id: 'electric', name: 'Electric', avgCost: 185 },
+    { id: 'gas', name: 'Gas/Heat', avgCost: 125 },
+    { id: 'water', name: 'Water/Sewer', avgCost: 95 },
+    { id: 'internet', name: 'Internet/Cable', avgCost: 150 },
+    { id: 'landscaping', name: 'Lawn Care', avgCost: 200 },
+    { id: 'housekeeping', name: 'Cleaning Service', avgCost: 400 },
+    { id: 'childcare', name: 'Childcare/Nanny', avgCost: 800 },
+    { id: 'pest', name: 'Pest Control', avgCost: 75 },
+    { id: 'security', name: 'Security/Alarm', avgCost: 55 },
+    { id: 'subscriptions', name: 'Subscriptions', avgCost: 100 },
   ];
 
   const toggleService = (id: string) => {
@@ -1423,7 +1420,7 @@ function BillCalculatorSection() {
               href="/register"
               className="block w-full text-center px-6 py-3 bg-emerald-950 text-white font-medium rounded-xl hover:bg-emerald-900 transition-colors"
             >
-              Get Started — $149/month
+              Get Started - $149/month
             </Link>
           </div>
         </div>
@@ -1439,22 +1436,22 @@ function BillCalculatorSection() {
 function SocialProofSection() {
   const quotes = [
     {
-      quote: "Between the train to the city and the kids' schedules, I had zero bandwidth for home stuff. Now Sarah handles everything—I just approve the big items.",
+      quote: "I used to spend hours every month paying different bills and coordinating repairs. Now I pay Haven once and everything is handled.",
       author: "Jennifer M.",
-      role: "Managing Director, Greenwich",
-      highlight: "Zero bandwidth → Total control",
+      role: "Working parent",
+      highlight: "One payment, done",
     },
     {
-      quote: "Our furnace died during that January cold snap. One text to Haven and they had someone there in 2 hours. I didn't miss a single meeting.",
-      author: "David R.",
-      role: "Private Equity, Scarsdale",
-      highlight: "2-hour response",
+      quote: "When our furnace broke, I just sent a text. By the next morning it was fixed. I never had to call anyone or take time off work.",
+      author: "Marcus R.",
+      role: "Software engineer",
+      highlight: "Zero phone calls",
     },
     {
-      quote: "We just moved from the city and had no idea how to find contractors in Darien. Haven's network saved us months of trial and error.",
+      quote: "The best part is knowing exactly what I spend on the house each month. One clear statement, no surprises, no forgotten bills.",
       author: "Priya S.",
-      role: "New homeowner, Darien",
-      highlight: "Instant vendor network",
+      role: "Small business owner",
+      highlight: "Complete visibility",
     },
   ];
 
@@ -1508,11 +1505,11 @@ function FAQSection() {
   const faqs = [
     {
       question: "How does the One Bill system actually work?",
-      answer: "When you join Haven, we become the payment contact for all your home vendors—utilities, landscapers, pool service, etc. Each vendor sends their invoice to Haven. We audit every charge, pay them automatically from your Household Wallet, and send you one consolidated statement on the 1st of each month. Routine bills are auto-approved; anything unusual or over your threshold gets flagged for your approval.",
+      answer: "When you join Haven, you make one monthly payment to us. We use that to pay all your household vendors: utilities, lawn care, cleaning, childcare, and any other recurring services. You get a clear statement on the 1st showing exactly where every dollar went. Routine bills are handled automatically. Repairs, maintenance, or larger purchases require your approval before we proceed.",
     },
     {
       question: "Is my money safe? How does the Household Wallet work?",
-      answer: "Your Household Wallet is FDIC-insured and held at a regulated partner bank. You fund the wallet via bank transfer, and Haven uses it to pay your vendors. You maintain full visibility and control—you can see every transaction in real-time and withdraw funds at any time. We never mark up vendor costs or take a percentage of transactions.",
+      answer: "Your Household Wallet is FDIC-insured and held at a regulated partner bank. You fund the wallet via bank transfer, and Haven uses it to pay your vendors. You maintain full visibility and control. You can see every transaction in real-time and withdraw funds at any time. We never mark up vendor costs or take a percentage of transactions.",
     },
     {
       question: "Do you handle snow removal and winter emergencies?",
@@ -1524,11 +1521,11 @@ function FAQSection() {
     },
     {
       question: "What about homes with staff (nannies, housekeepers)?",
-      answer: "We work alongside your existing household staff. We handle vendor coordination and home maintenance so your nanny can focus on the kids and your housekeeper can focus on cleaning—not waiting around for the plumber. We also help with staff scheduling and payroll coordination if needed.",
+      answer: "We work alongside your existing household staff. We handle vendor coordination and home maintenance so your nanny can focus on the kids and your housekeeper can focus on cleaning, not waiting around for the plumber. We also help with staff scheduling and payroll coordination if needed.",
     },
     {
       question: "What happens if something goes wrong at 2am?",
-      answer: "Concierge and Estate members have 24/7 emergency support. Text your Home Manager anytime—even overnight—and we'll dispatch the right vendor. You won't have to Google plumbers at midnight or wait on hold with your insurance company.",
+      answer: "Concierge and Estate members have 24/7 emergency support. Text your Home Manager anytime, even overnight, and we'll dispatch the right vendor. You won't have to Google plumbers at midnight or wait on hold with your insurance company.",
     },
   ];
 
@@ -1590,7 +1587,7 @@ function StickyCTAFooter() {
           href="/register"
           className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-6 py-3 bg-emerald-950 text-white text-sm font-medium rounded-xl hover:bg-emerald-900 transition-colors"
         >
-          Get Started — $149/mo
+          Get Started - $149/mo
           <ArrowRight className="w-4 h-4" />
         </Link>
       </div>
@@ -1684,13 +1681,13 @@ export default function HomePage() {
             Stop being the unpaid project manager of your own home.
           </p>
           <p className="text-lg text-emerald-700 font-medium mb-10 max-w-2xl mx-auto">
-            Let Haven consolidate your vendors, pay your bills, and handle the chaos—so you can just enjoy the house.
+            One monthly payment to Haven. We pay all your bills, coordinate your vendors, and handle home maintenance so you don&apos;t have to.
           </p>
           <Link
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-950 text-white text-lg font-medium rounded-xl hover:bg-emerald-900 transition-colors shadow-lg shadow-emerald-950/20"
           >
-            Get Started — $149/month
+            Get Started - $149/month
             <ArrowRight className="w-5 h-5" />
           </Link>
           <p className="text-sm text-slate-500 mt-4">Now serving Greenwich, Darien, New Canaan, Westport, Scarsdale, Rye, and surrounding communities.</p>
