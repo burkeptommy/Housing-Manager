@@ -51,6 +51,38 @@ create_firebase_user() {
 
 echo "Step 1: Creating Firebase Users"
 echo "--------------------------------"
+echo ""
+echo -e "${BLUE}Creating main demo users (from seed.ts)...${NC}"
+
+# ============================================================================
+# MAIN DEMO USERS (matches seed.ts)
+# These are the primary demo accounts with full data in the database
+# ============================================================================
+
+# Homeowners
+BOB_UID=$(create_firebase_user "bob@example.com" "Bob123!" "Bob Smith")
+ALICE_UID=$(create_firebase_user "alice@example.com" "Alice123!" "Alice Johnson")
+
+# Manager
+STEVE_UID=$(create_firebase_user "steve@haven.app" "Manager123!" "Steve Manager")
+
+# Admin
+ADMIN_UID=$(create_firebase_user "admin@haven.app" "Admin123!" "Admin User")
+
+# Handymen
+CARLOS_UID=$(create_firebase_user "carlos@haven.app" "Handy123!" "Carlos Reyes")
+DAVE_UID=$(create_firebase_user "dave@haven.app" "Handy123!" "Mike Castellano")
+MARIA_UID=$(create_firebase_user "maria@haven.app" "Handy123!" "Maria Santos")
+
+# Vendor user
+VENDOR_UID=$(create_firebase_user "vendor@aceroofing.example.com" "AceRoof123!" "Mike Johnson")
+
+echo ""
+echo -e "${BLUE}Creating additional demo users...${NC}"
+
+# ============================================================================
+# ADDITIONAL DEMO USERS (legacy setup-demo.sh users)
+# ============================================================================
 
 # Create homeowner users
 HOMEOWNER1_UID=$(create_firebase_user "sarah@demo.haven.local" "demo1234" "Sarah Johnson")
@@ -60,8 +92,8 @@ HOMEOWNER3_UID=$(create_firebase_user "emily@demo.haven.local" "demo1234" "Emily
 # Create home manager user
 MANAGER_UID=$(create_firebase_user "manager@demo.haven.local" "demo1234" "Alex Thompson")
 
-# Create admin user
-ADMIN_UID=$(create_firebase_user "admin@demo.haven.local" "demo1234" "Admin User")
+# Create admin user (alternative)
+ADMIN2_UID=$(create_firebase_user "admin@demo.haven.local" "demo1234" "Admin User")
 
 echo ""
 echo "Step 2: Seeding Database"
@@ -596,36 +628,75 @@ echo "════════════════════════�
 echo "  DEMO SETUP COMPLETE!"
 echo "═══════════════════════════════════════════════════════════════"
 echo ""
-echo "  🏠 HOMEOWNER ACCOUNTS (3 different homes):"
+echo "  ┌─────────────────────────────────────────────────────────────┐"
+echo "  │  PRIMARY DEMO ACCOUNTS (from seed.ts - full data)          │"
+echo "  └─────────────────────────────────────────────────────────────┘"
+echo ""
+echo "  🏠 HOMEOWNER ACCOUNTS:"
 echo "  ─────────────────────────────────────────────"
-echo "  1. Sarah Johnson - The Johnson Residence"
-echo "     Email:    sarah@demo.haven.local"
-echo "     Password: demo1234"
-echo "     Plan:     Premium"
+echo "  Bob Smith (Bob's Villa, Greenwich CT)"
+echo "     Email:    bob@example.com"
+echo "     Password: Bob123!"
+echo "     Portal:   /app (homeowner portal)"
 echo ""
-echo "  2. Mike Chen - The Chen Family"
-echo "     Email:    mike@demo.haven.local"
-echo "     Password: demo1234"
-echo "     Plan:     Essentials"
+echo "  Alice Johnson (Scarsdale, NY)"
+echo "     Email:    alice@example.com"
+echo "     Password: Alice123!"
+echo "     Portal:   /app (homeowner portal)"
 echo ""
-echo "  3. Emily Rodriguez - Casa Rodriguez"
-echo "     Email:    emily@demo.haven.local"
-echo "     Password: demo1234"
-echo "     Plan:     Free"
-echo ""
-echo "  👔 HOME MANAGER ACCOUNT:"
+echo "  👔 MANAGER ACCOUNT:"
 echo "  ─────────────────────────────────────────────"
-echo "     Alex Thompson (manages all 3 homes)"
-echo "     Email:    manager@demo.haven.local"
-echo "     Password: demo1234"
+echo "  Steve Manager"
+echo "     Email:    steve@haven.app"
+echo "     Password: Manager123!"
+echo "     Portal:   /manager"
+echo ""
+echo "  🛠️  HANDYMAN ACCOUNTS:"
+echo "  ─────────────────────────────────────────────"
+echo "  Carlos Reyes (Westchester NY)"
+echo "     Email:    carlos@haven.app"
+echo "     Password: Handy123!"
+echo "     Portal:   /handyman"
+echo ""
+echo "  Mike Castellano (Fairfield CT)"
+echo "     Email:    dave@haven.app"
+echo "     Password: Handy123!"
+echo "     Portal:   /handyman"
+echo ""
+echo "  Maria Santos (Floater)"
+echo "     Email:    maria@haven.app"
+echo "     Password: Handy123!"
+echo "     Portal:   /handyman"
+echo ""
+echo "  🏪 VENDOR ACCOUNT:"
+echo "  ─────────────────────────────────────────────"
+echo "  Mike Johnson (Ace Roofing)"
+echo "     Email:    vendor@aceroofing.example.com"
+echo "     Password: AceRoof123!"
+echo "     Portal:   /vendor"
 echo ""
 echo "  🔑 ADMIN ACCOUNT:"
 echo "  ─────────────────────────────────────────────"
-echo "     Email:    admin@demo.haven.local"
-echo "     Password: demo1234"
+echo "     Email:    admin@haven.app"
+echo "     Password: Admin123!"
+echo "     Portal:   /admin"
 echo ""
+echo "  ┌─────────────────────────────────────────────────────────────┐"
+echo "  │  ADDITIONAL DEMO ACCOUNTS (setup-demo.sh only)             │"
+echo "  └─────────────────────────────────────────────────────────────┘"
+echo ""
+echo "  🏠 More Homeowners:"
+echo "     sarah@demo.haven.local    / demo1234 (The Johnson Residence)"
+echo "     mike@demo.haven.local     / demo1234 (The Chen Family)"
+echo "     emily@demo.haven.local    / demo1234 (Casa Rodriguez)"
+echo ""
+echo "  👔 Alt Manager:  manager@demo.haven.local / demo1234"
+echo "  🔑 Alt Admin:    admin@demo.haven.local   / demo1234"
+echo ""
+echo "  ─────────────────────────────────────────────"
 echo "  📱 WEB APP:           http://localhost:3000"
 echo "  🔥 Firebase Emulator: http://localhost:4001"
 echo "  📡 API:               http://localhost:4000/api"
+echo "  ─────────────────────────────────────────────"
 echo ""
 echo "═══════════════════════════════════════════════════════════════"
