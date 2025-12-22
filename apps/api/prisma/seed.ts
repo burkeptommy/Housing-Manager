@@ -725,22 +725,22 @@ async function main() {
   });
   console.log(`✅ Created admin user: ${adminUser.email} (Platform Owner)`);
 
-  // Create Manager Steve (Haven Staff Member - Home Manager)
-  const managerSteve = await prisma.user.upsert({
-    where: { email: 'steve@haven.app' },
+  // Create Manager Sarah Harrison (Haven Staff Member - Home Manager)
+  const managerSarah = await prisma.user.upsert({
+    where: { email: 'sarah@haven.app' },
     update: {},
     create: {
-      email: 'steve@haven.app',
+      email: 'sarah@haven.app',
       passwordHash: managerPassword,
-      firstName: 'Steve',
-      lastName: 'Manager',
-      displayName: 'Manager Steve',
+      firstName: 'Sarah',
+      lastName: 'Harrison',
+      displayName: 'Sarah Harrison',
       role: UserRole.MANAGER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
-  console.log(`✅ Created staff user: ${managerSteve.email} (Home Manager)`);
+  console.log(`✅ Created staff user: ${managerSarah.email} (Home Manager)`);
 
   // Create Handyman Users (Internal Staff)
   const handymanPassword = await bcrypt.hash('Handy123!', 12);
@@ -762,22 +762,22 @@ async function main() {
   });
   console.log(`✅ Created handyman user: ${handymanCarlos.email}`);
 
-  // Handyman #2 - Mike (assigned to Fairfield County, CT properties)
-  const handymanDave = await prisma.user.upsert({
-    where: { email: 'dave@haven.app' },
+  // Handyman #2 - Mike Rodriguez (assigned to Fairfield County, CT properties)
+  const handymanMike = await prisma.user.upsert({
+    where: { email: 'mike@haven.app' },
     update: {},
     create: {
-      email: 'dave@haven.app',
+      email: 'mike@haven.app',
       passwordHash: handymanPassword,
       firstName: 'Mike',
-      lastName: 'Castellano',
-      displayName: 'Mike Castellano',
+      lastName: 'Rodriguez',
+      displayName: 'Mike Rodriguez',
       role: UserRole.HANDYMAN,
       emailVerified: true,
       emailVerifiedAt: new Date(),
     },
   });
-  console.log(`✅ Created handyman user: ${handymanDave.email}`);
+  console.log(`✅ Created handyman user: ${handymanMike.email}`);
 
   // Handyman #3 - Maria (floater - helps across all properties)
   const handymanMaria = await prisma.user.upsert({
@@ -838,16 +838,16 @@ async function main() {
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
     update: {
-      managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Mike handles Fairfield County CT properties
+      managerId: managerSarah.id,
+      assignedHandymanId: handymanMike.id, // Mike handles Fairfield County CT properties
     },
     create: {
       id: 'demo-household-id',
       name: "Bob's Villa",
       description: 'A beautiful single-family home in Greenwich, CT managed by Haven',
       ownerId: homeownerBob.id,
-      managerId: managerSteve.id,
-      assignedHandymanId: handymanDave.id, // Mike handles Fairfield County CT properties
+      managerId: managerSarah.id,
+      assignedHandymanId: handymanMike.id, // Mike handles Fairfield County CT properties
       stripeCustomerId: 'cus_household_demo_123',
       billingCycleDay: 1,
       billingSettings: {
@@ -945,7 +945,7 @@ async function main() {
   const aliceHousehold = await prisma.household.upsert({
     where: { id: 'alice-household-id' },
     update: {
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       assignedHandymanId: handymanCarlos.id, // Carlos handles Westchester County NY properties
     },
     create: {
@@ -953,7 +953,7 @@ async function main() {
       name: "The Johnson Family Home",
       description: 'A cozy suburban family home in Scarsdale, NY with 4 family members',
       ownerId: homeownerAlice.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       assignedHandymanId: handymanCarlos.id, // Carlos handles Westchester County NY properties
       stripeCustomerId: 'cus_household_alice_123',
       billingCycleDay: 15,
@@ -1187,7 +1187,7 @@ async function main() {
     create: {
       id: 'wo-alice-hot-tub',
       householdId: aliceHousehold.id,
-      createdByUserId: managerSteve.id,
+      createdByUserId: managerSarah.id,
       title: 'Hot Tub Annual Service',
       description: 'Annual maintenance for the backyard hot tub. Check filters, water chemistry, jets, and heater.',
       status: WorkOrderStatus.OPEN,
@@ -1399,7 +1399,7 @@ async function main() {
       id: 'tx-pool-cleaning',
       householdId: demoHousehold.id,
       vendorId: poolVendor?.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Pool Cleaning',
       amount: 150,
       payoutMethod: TransactionPayoutMethod.COMPANY_CARD,
@@ -1413,7 +1413,7 @@ async function main() {
       id: 'tx-emergency-locksmith',
       householdId: demoHousehold.id,
       vendorId: null, // External vendor not in system
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Emergency Locksmith',
       amount: 300,
       payoutMethod: TransactionPayoutMethod.CASH,
@@ -1427,7 +1427,7 @@ async function main() {
       id: 'tx-management-fee',
       householdId: demoHousehold.id,
       vendorId: null, // Haven internal
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Management Fee',
       amount: 100,
       payoutMethod: TransactionPayoutMethod.STRIPE,
@@ -1547,7 +1547,7 @@ async function main() {
       id: 'tx-landscaping-fall-cleanup',
       householdId: demoHousehold.id,
       vendorId: oldSchoolLandscaping.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Fall Leaf Cleanup & Yard Work',
       amount: 450,
       payoutMethod: TransactionPayoutMethod.CHECKBOOK_IO,
@@ -1561,7 +1561,7 @@ async function main() {
       id: 'tx-landscaping-snow-deposit',
       householdId: demoHousehold.id,
       vendorId: oldSchoolLandscaping.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Winter Snow Removal - Season Deposit',
       amount: 800,
       payoutMethod: TransactionPayoutMethod.CHECKBOOK_IO,
@@ -1575,7 +1575,7 @@ async function main() {
       id: 'tx-plumber-emergency',
       householdId: demoHousehold.id,
       vendorId: techPlumbers.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Emergency Water Heater Repair',
       amount: 375,
       payoutMethod: TransactionPayoutMethod.STRIPE,
@@ -1589,7 +1589,7 @@ async function main() {
       id: 'tx-plumber-inspection',
       householdId: demoHousehold.id,
       vendorId: techPlumbers.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Annual Plumbing Inspection',
       amount: 150,
       payoutMethod: TransactionPayoutMethod.STRIPE,
@@ -1603,7 +1603,7 @@ async function main() {
       id: 'tx-chimney-sweep',
       householdId: demoHousehold.id,
       vendorId: vendorMap.get(VendorCategory.CHIMNEY_SWEEP) || null,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       description: 'Annual Chimney Sweep & Inspection',
       amount: 275,
       payoutMethod: TransactionPayoutMethod.COMPANY_CARD,
@@ -1662,7 +1662,7 @@ async function main() {
       name: 'Malibu Mansion',
       description: 'Beachfront luxury estate in Malibu',
       ownerId: homeownerBob.id, // Bob owns multiple properties
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
       stripeCustomerId: 'cus_malibu_mansion_demo',
       billingCycleDay: 1,
@@ -1719,7 +1719,7 @@ async function main() {
       name: 'Beverly Hills Estate',
       description: 'Classic Mediterranean estate in Beverly Hills',
       ownerId: homeownerBob.id,
-      managerId: managerSteve.id,
+      managerId: managerSarah.id,
       assignedHandymanId: handymanCarlos.id, // Carlos handles CA properties
       stripeCustomerId: 'cus_beverly_hills_demo',
       billingCycleDay: 1,
@@ -1802,7 +1802,7 @@ async function main() {
     create: {
       id: 'wo-open-shingles',
       householdId: malibuMansion.id,
-      createdByUserId: managerSteve.id,
+      createdByUserId: managerSarah.id,
       title: 'Fix Shingles - Wind Damage',
       description: 'Several shingles were damaged during recent Santa Ana winds. Need to inspect and replace affected shingles on the south-facing roof section. Access via ladder on the west side of the property. Property gate code: 4521. Park in the circular driveway.',
       status: WorkOrderStatus.OPEN,
@@ -1821,7 +1821,7 @@ async function main() {
     create: {
       id: 'wo-completed-gutter-repair',
       householdId: beverlyHillsEstate.id,
-      createdByUserId: managerSteve.id,
+      createdByUserId: managerSarah.id,
       vendorId: aceRoofing.id,
       title: 'Gutter Repair & Cleaning',
       description: 'Clean all gutters and repair loose section on north side of house. Replace damaged gutter guard on garage section. Found additional damage on garage gutter guard - replaced entire section. All gutters cleaned and flowing properly. Recommend full inspection in spring.',
@@ -1851,7 +1851,7 @@ async function main() {
     create: {
       id: 'wo-in-progress-pool',
       householdId: beverlyHillsEstate.id,
-      createdByUserId: managerSteve.id,
+      createdByUserId: managerSarah.id,
       vendorId: poolVendor?.id,
       title: 'Pool Pump Repair',
       description: 'Pool pump making unusual noise. May need bearing replacement or motor inspection. Pool equipment located behind the pool house.',
@@ -1874,7 +1874,7 @@ async function main() {
     create: {
       id: 'wo-assigned-hvac',
       householdId: malibuMansion.id,
-      createdByUserId: managerSteve.id,
+      createdByUserId: managerSarah.id,
       vendorId: aceRoofing.id, // Ace Roofing also does some general maintenance
       title: 'HVAC Annual Inspection',
       description: 'Annual maintenance and filter replacement for central HVAC system. Check all vents, inspect ductwork, and test thermostat. HVAC system is Carrier brand, installed 2019. Filters are 20x25x4.',
@@ -1899,8 +1899,8 @@ async function main() {
   console.log('    Password: Admin123!');
   console.log('    Role:     Can access ALL records');
   console.log('');
-  console.log('  👔 Manager Steve (Haven Staff):');
-  console.log('    Email:    steve@haven.app');
+  console.log('  👔 Manager Sarah Harrison (Haven Staff):');
+  console.log('    Email:    sarah@haven.app');
   console.log('    Password: Manager123!');
   console.log('    Role:     Can access households assigned to them');
   console.log('');
@@ -1926,8 +1926,8 @@ async function main() {
   console.log('    Assigned: The Johnson Family Home (Scarsdale)');
   console.log('    Portal:   /handyman');
   console.log('');
-  console.log('  🛠️  Handyman Mike Castellano (Fairfield County, CT):');
-  console.log('    Email:    dave@haven.app');
+  console.log('  🛠️  Handyman Mike Rodriguez (Fairfield County, CT):');
+  console.log('    Email:    mike@haven.app');
   console.log('    Password: Handy123!');
   console.log('    Assigned: Bob\'s Villa (Greenwich)');
   console.log('    Portal:   /handyman');
@@ -1944,8 +1944,8 @@ async function main() {
   console.log('');
   console.log("  Bob's Villa (Greenwich, CT):");
   console.log('    Owner:    Bob Smith (bob@example.com)');
-  console.log('    Manager:  Steve Manager (steve@haven.app)');
-  console.log('    Handyman: Mike Castellano (dave@haven.app)');
+  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
+  console.log('    Handyman: Mike Rodriguez (mike@haven.app)');
   console.log('  - 3 bed, 2.5 bath single family home on Round Hill Road');
   console.log('  - Features: pool, septic, chimney, lawn, snow removal');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
@@ -1953,21 +1953,21 @@ async function main() {
   console.log('');
   console.log('  Malibu Mansion (CA - Multi-property demo):');
   console.log('    Owner:    Bob Smith (bob@example.com)');
-  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 5 bed, 6 bath beachfront estate');
   console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
   console.log('');
   console.log('  Beverly Hills Estate (CA - Multi-property demo):');
   console.log('    Owner:    Bob Smith (bob@example.com)');
-  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 6 bed, 7 bath Mediterranean estate');
   console.log('  - Work Orders: 1 COMPLETED (awaiting verification), 1 IN_PROGRESS');
   console.log('');
   console.log('  The Johnson Family Home (Scarsdale, NY):');
   console.log('    Owner:    Alice Johnson (alice@example.com)');
-  console.log('    Manager:  Steve Manager (steve@haven.app)');
+  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 4 bed, 2.5 bath suburban family home on Fox Meadow Road');
   console.log('  - Family Members: Alice, Michael (spouse), Emma (14), Jack (10)');

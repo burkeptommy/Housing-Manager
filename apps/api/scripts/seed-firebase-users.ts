@@ -32,11 +32,11 @@ const demoUsers = [
   { email: 'alice@example.com', password: 'Alice123!', displayName: 'Alice Morrison' },
 
   // Manager
-  { email: 'steve@haven.app', password: 'Manager123!', displayName: 'Steve Manager' },
+  { email: 'sarah@haven.app', password: 'Manager123!', displayName: 'Sarah Harrison' },
 
   // Handymen
   { email: 'carlos@haven.app', password: 'Handy123!', displayName: 'Carlos Reyes' },
-  { email: 'dave@haven.app', password: 'Handy123!', displayName: 'Mike Castellano' },
+  { email: 'mike@haven.app', password: 'Handy123!', displayName: 'Mike Rodriguez' },
   { email: 'maria@haven.app', password: 'Handy123!', displayName: 'Maria Santos' },
 
   // Vendor
