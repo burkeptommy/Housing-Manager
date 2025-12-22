@@ -1,710 +1,881 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { getApiClient } from '@/lib/api';
-import type { WorkOrder, WorkOrderStatus, UpdateWorkOrderRequest } from '@haven/core';
+import { useState } from 'react';
+import {
+  ClipboardList,
+  Plus,
+  Calendar,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  Phone,
+  MapPin,
+  DollarSign,
+  User,
+  Truck,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  Home,
+  ExternalLink,
+  Camera,
+  FileText,
+  Send,
+} from 'lucide-react';
 
-const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+// ============================================================================
+// TYPES
+// ============================================================================
 
-const STATUS_OPTIONS: WorkOrderStatus[] = ['DRAFT', 'REQUESTED', 'SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+interface WorkOrder {
+  id: string;
+  orderNumber: string;
+  title: string;
+  description: string;
+  householdId: string;
+  householdName: string;
+  address: string;
+  status: 'new' | 'assigned' | 'scheduled' | 'in_progress' | 'completed' | 'cancelled';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  category: string;
+  vendor?: {
+    id: string;
+    name: string;
+    contactName: string;
+    phone: string;
+  };
+  scheduledDate?: string;
+  scheduledTime?: string;
+  estimatedCost?: number;
+  actualCost?: number;
+  linkedRequestId?: string;
+  linkedRequestTitle?: string;
+  technicianStatus?: string;
+  createdAt: string;
+  updatedAt: string;
+  notes: WorkOrderNote[];
+  photos: string[];
+}
 
-const STATUS_COLORS: Record<string, string> = {
-  DRAFT: 'bg-slate-100 text-slate-700 dark:bg-slate-700 dark:text-slate-400',
-  REQUESTED: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
-  SCHEDULED: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  IN_PROGRESS: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  COMPLETED: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  CANCELLED: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+interface WorkOrderNote {
+  id: string;
+  content: string;
+  author: string;
+  createdAt: string;
+  type: 'internal' | 'vendor' | 'homeowner';
+}
+
+type TabType = 'all' | 'scheduled_today' | 'in_progress' | 'waiting_approval' | 'completed';
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
+const mockWorkOrders: WorkOrder[] = [
+  {
+    id: 'wo1',
+    orderNumber: 'WO-1892',
+    title: 'HVAC Annual Service',
+    description: 'Annual maintenance and inspection of HVAC system. Check refrigerant levels, clean coils, replace filter.',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    address: '456 Oak Lane',
+    status: 'in_progress',
+    priority: 'medium',
+    category: 'HVAC',
+    vendor: {
+      id: 'v1',
+      name: 'AirFlow HVAC',
+      contactName: 'John',
+      phone: '(512) 555-0101',
+    },
+    scheduledDate: 'Today',
+    scheduledTime: '9:00 AM',
+    estimatedCost: 150,
+    technicianStatus: 'Technician en route (ETA 8:45am)',
+    createdAt: '2024-12-18',
+    updatedAt: '2024-12-21',
+    linkedRequestId: 'r1',
+    linkedRequestTitle: 'Annual HVAC maintenance due',
+    notes: [
+      { id: 'n1', content: 'Homeowner prefers morning appointments', author: 'Sarah', createdAt: '2024-12-18', type: 'internal' },
+      { id: 'n2', content: 'Confirmed for Dec 21 at 9am', author: 'John (AirFlow)', createdAt: '2024-12-19', type: 'vendor' },
+    ],
+    photos: [],
+  },
+  {
+    id: 'wo2',
+    orderNumber: 'WO-1891',
+    title: 'Kitchen Faucet Repair',
+    description: 'Repair dripping kitchen faucet. Likely washer replacement.',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    address: '456 Oak Lane',
+    status: 'scheduled',
+    priority: 'medium',
+    category: 'Plumbing',
+    vendor: {
+      id: 'v2',
+      name: "Mike's Plumbing",
+      contactName: 'Mike',
+      phone: '(512) 555-0102',
+    },
+    scheduledDate: 'Tomorrow',
+    scheduledTime: '10:00 AM',
+    estimatedCost: 75,
+    createdAt: '2024-12-19',
+    updatedAt: '2024-12-20',
+    linkedRequestId: 'r2',
+    linkedRequestTitle: 'Kitchen faucet dripping',
+    notes: [],
+    photos: [],
+  },
+  {
+    id: 'wo3',
+    orderNumber: 'WO-1890',
+    title: 'Roof Leak Repair',
+    description: 'Investigate and repair leak near chimney flashing. Water stains visible in attic.',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    address: '789 Maple Drive',
+    status: 'completed',
+    priority: 'high',
+    category: 'Roofing',
+    vendor: {
+      id: 'v3',
+      name: 'Ace Roofing',
+      contactName: 'Steve',
+      phone: '(512) 555-0103',
+    },
+    scheduledDate: 'Dec 19',
+    scheduledTime: '8:00 AM',
+    estimatedCost: 350,
+    actualCost: 425,
+    createdAt: '2024-12-15',
+    updatedAt: '2024-12-19',
+    notes: [
+      { id: 'n3', content: 'Additional flashing work needed - approved by homeowner', author: 'Sarah', createdAt: '2024-12-19', type: 'internal' },
+    ],
+    photos: ['before1.jpg', 'after1.jpg'],
+  },
+  {
+    id: 'wo4',
+    orderNumber: 'WO-1889',
+    title: 'Pool Heater Inspection',
+    description: 'Pool heater not warming properly. Inspect and diagnose issue.',
+    householdId: 'hh1',
+    householdName: 'Smith Family',
+    address: '456 Oak Lane',
+    status: 'assigned',
+    priority: 'low',
+    category: 'Pool',
+    vendor: {
+      id: 'v4',
+      name: 'Pool Pros',
+      contactName: 'Dave',
+      phone: '(512) 555-0104',
+    },
+    estimatedCost: 100,
+    createdAt: '2024-12-20',
+    updatedAt: '2024-12-20',
+    notes: [],
+    photos: [],
+  },
+  {
+    id: 'wo5',
+    orderNumber: 'WO-1888',
+    title: 'Garage Door Spring Replacement',
+    description: 'Replace broken torsion spring on garage door.',
+    householdId: 'hh3',
+    householdName: 'Garcia Residence',
+    address: '321 Cedar Street',
+    status: 'new',
+    priority: 'high',
+    category: 'Garage Door',
+    createdAt: '2024-12-21',
+    updatedAt: '2024-12-21',
+    notes: [],
+    photos: [],
+  },
+  {
+    id: 'wo6',
+    orderNumber: 'WO-1887',
+    title: 'AC Compressor Replacement Quote',
+    description: 'Get quotes for AC compressor replacement. Unit is 15 years old.',
+    householdId: 'hh2',
+    householdName: 'Johnson Family',
+    address: '789 Maple Drive',
+    status: 'scheduled',
+    priority: 'medium',
+    category: 'HVAC',
+    vendor: {
+      id: 'v1',
+      name: 'AirFlow HVAC',
+      contactName: 'John',
+      phone: '(512) 555-0101',
+    },
+    scheduledDate: 'Today',
+    scheduledTime: '2:00 PM',
+    estimatedCost: 0,
+    technicianStatus: 'Quote visit - no cost',
+    createdAt: '2024-12-20',
+    updatedAt: '2024-12-21',
+    notes: [],
+    photos: [],
+  },
+];
+
+const households = [
+  { id: 'hh1', name: 'Smith Family' },
+  { id: 'hh2', name: 'Johnson Family' },
+  { id: 'hh3', name: 'Garcia Residence' },
+  { id: 'hh4', name: 'Williams Estate' },
+];
+
+const vendors = [
+  { id: 'v1', name: 'AirFlow HVAC' },
+  { id: 'v2', name: "Mike's Plumbing" },
+  { id: 'v3', name: 'Ace Roofing' },
+  { id: 'v4', name: 'Pool Pros' },
+];
+
+const categories = ['All', 'HVAC', 'Plumbing', 'Electrical', 'Roofing', 'Pool', 'Garage Door', 'Appliance'];
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+const statusConfig: Record<WorkOrder['status'], { label: string; bgColor: string; textColor: string }> = {
+  new: { label: 'New', bgColor: 'bg-slate-100', textColor: 'text-slate-600' },
+  assigned: { label: 'Assigned', bgColor: 'bg-blue-100', textColor: 'text-blue-600' },
+  scheduled: { label: 'Scheduled', bgColor: 'bg-indigo-100', textColor: 'text-indigo-600' },
+  in_progress: { label: 'In Progress', bgColor: 'bg-amber-100', textColor: 'text-amber-600' },
+  completed: { label: 'Completed', bgColor: 'bg-emerald-100', textColor: 'text-emerald-600' },
+  cancelled: { label: 'Cancelled', bgColor: 'bg-red-100', textColor: 'text-red-600' },
 };
 
-export default function ManagerWorkOrdersPage() {
-  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedOrder, setSelectedOrder] = useState<WorkOrder | null>(null);
+const priorityConfig: Record<WorkOrder['priority'], { label: string; color: string }> = {
+  low: { label: 'Low', color: 'text-slate-500' },
+  medium: { label: 'Medium', color: 'text-blue-600' },
+  high: { label: 'High', color: 'text-amber-600' },
+  urgent: { label: 'Urgent', color: 'text-red-600' },
+};
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
+
+export default function WorkOrdersPage() {
+  const [workOrders] = useState<WorkOrder[]>(mockWorkOrders);
+  const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [showNewOrderModal, setShowNewOrderModal] = useState(false);
+  const [expandedOrders, setExpandedOrders] = useState<string[]>([]);
 
   // Filters
-  const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | 'ALL'>('ALL');
-  const [showUnassigned, setShowUnassigned] = useState(false);
-  const [showUpcoming, setShowUpcoming] = useState(false);
+  const [householdFilter, setHouseholdFilter] = useState('all');
+  const [vendorFilter, setVendorFilter] = useState('all');
+  const [categoryFilter, setCategoryFilter] = useState('All');
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const loadData = useCallback(async () => {
-    const api = getApiClient();
-    try {
-      const ordersData = await api.getInternalWorkOrders({
-        status: statusFilter !== 'ALL' ? statusFilter : undefined,
-        unassigned: showUnassigned || undefined,
-        upcoming: showUpcoming || undefined,
-      });
-      setWorkOrders(ordersData);
-    } catch (error) {
-      console.error('Failed to load work orders:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [statusFilter, showUnassigned, showUpcoming]);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  // Group orders by status
-  const groupedOrders = {
-    requested: workOrders.filter((o) => o.status === 'REQUESTED'),
-    scheduled: workOrders.filter((o) => o.status === 'SCHEDULED'),
-    inProgress: workOrders.filter((o) => o.status === 'IN_PROGRESS'),
-    completed: workOrders.filter((o) => o.status === 'COMPLETED'),
+  // Stats
+  const stats = {
+    scheduledToday: workOrders.filter(wo => wo.scheduledDate === 'Today').length,
+    inProgress: workOrders.filter(wo => wo.status === 'in_progress').length,
+    needsAssignment: workOrders.filter(wo => wo.status === 'new').length,
+    completedThisWeek: workOrders.filter(wo => wo.status === 'completed').length,
   };
 
-  const formatDate = (date: string | null | undefined) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-    });
-  };
+  // Filter work orders
+  let filteredOrders = [...workOrders];
 
-  const formatDateTime = (date: string | null | undefined) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+  // Tab filter
+  if (activeTab === 'scheduled_today') {
+    filteredOrders = filteredOrders.filter(wo => wo.scheduledDate === 'Today');
+  } else if (activeTab === 'in_progress') {
+    filteredOrders = filteredOrders.filter(wo => wo.status === 'in_progress');
+  } else if (activeTab === 'waiting_approval') {
+    filteredOrders = filteredOrders.filter(wo => wo.status === 'new' || wo.status === 'assigned');
+  } else if (activeTab === 'completed') {
+    filteredOrders = filteredOrders.filter(wo => wo.status === 'completed');
+  }
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
-      </div>
+  // Additional filters
+  if (householdFilter !== 'all') {
+    filteredOrders = filteredOrders.filter(wo => wo.householdId === householdFilter);
+  }
+  if (vendorFilter !== 'all') {
+    filteredOrders = filteredOrders.filter(wo => wo.vendor?.id === vendorFilter);
+  }
+  if (categoryFilter !== 'All') {
+    filteredOrders = filteredOrders.filter(wo => wo.category === categoryFilter);
+  }
+  if (searchQuery) {
+    filteredOrders = filteredOrders.filter(wo =>
+      wo.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      wo.orderNumber.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }
 
+  const toggleExpanded = (id: string) => {
+    setExpandedOrders(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const tabs: { id: TabType; label: string; count?: number }[] = [
+    { id: 'all', label: 'All', count: workOrders.length },
+    { id: 'scheduled_today', label: 'Scheduled Today', count: stats.scheduledToday },
+    { id: 'in_progress', label: 'In Progress', count: stats.inProgress },
+    { id: 'waiting_approval', label: 'Needs Assignment', count: stats.needsAssignment },
+    { id: 'completed', label: 'Completed' },
+  ];
+
   return (
-    <div className="space-y-6">
+    <div className="min-h-screen bg-slate-50">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-            Work Orders
-          </h1>
-          <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Manage vendor visits for all households
-          </p>
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-3">
+              <ClipboardList className="w-8 h-8 text-indigo-600" />
+              <h1 className="text-2xl font-bold text-slate-900">Work Orders</h1>
+            </div>
+            <button
+              onClick={() => setShowNewOrderModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              New Work Order
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex items-center gap-1 border-b border-slate-200 -mb-px">
+            {tabs.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'text-indigo-600 border-indigo-600'
+                    : 'text-slate-500 border-transparent hover:text-slate-700'
+                }`}
+              >
+                {tab.label}
+                {tab.count !== undefined && (
+                  <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+                    activeTab === tab.id ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'
+                  }`}>
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
       {/* Filters */}
-      <div className="card">
-        <div className="flex flex-wrap gap-4 items-end">
-          <div className="flex-1 min-w-[200px]">
-            <label className="label block mb-1.5">Status</label>
+      <div className="bg-white border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search work orders..."
+                className="w-full pl-9 pr-4 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as WorkOrderStatus | 'ALL')}
-              className="input"
+              value={householdFilter}
+              onChange={(e) => setHouseholdFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="ALL">All Statuses</option>
-              {STATUS_OPTIONS.map((status) => (
-                <option key={status} value={status}>
-                  {status.replace('_', ' ')}
-                </option>
+              <option value="all">All Households</option>
+              {households.map(h => (
+                <option key={h.id} value={h.id}>{h.name}</option>
+              ))}
+            </select>
+            <select
+              value={vendorFilter}
+              onChange={(e) => setVendorFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              <option value="all">All Vendors</option>
+              {vendors.map(v => (
+                <option key={v.id} value={v.id}>{v.name}</option>
+              ))}
+            </select>
+            <select
+              value={categoryFilter}
+              onChange={(e) => setCategoryFilter(e.target.value)}
+              className="px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            >
+              {categories.map(c => (
+                <option key={c} value={c}>{c}</option>
               ))}
             </select>
           </div>
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showUnassigned}
-                onChange={(e) => setShowUnassigned(e.target.checked)}
-                className="rounded border-slate-300 dark:border-slate-600"
-              />
-              <span className="text-sm text-slate-600 dark:text-slate-400">Unassigned only</span>
-            </label>
-            <label className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={showUpcoming}
-                onChange={(e) => setShowUpcoming(e.target.checked)}
-                className="rounded border-slate-300 dark:border-slate-600"
-              />
-              <span className="text-sm text-slate-600 dark:text-slate-400">Upcoming (7 days)</span>
-            </label>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Stats Cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div className="bg-indigo-50 rounded-lg p-4 border border-indigo-100">
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-indigo-600" />
+              <p className="text-xs font-medium text-indigo-600 uppercase tracking-wide">Today</p>
+            </div>
+            <p className="text-2xl font-bold text-indigo-700 mt-1">{stats.scheduledToday}</p>
+          </div>
+          <div className="bg-amber-50 rounded-lg p-4 border border-amber-100">
+            <div className="flex items-center gap-2">
+              <Truck className="w-5 h-5 text-amber-600" />
+              <p className="text-xs font-medium text-amber-600 uppercase tracking-wide">In Progress</p>
+            </div>
+            <p className="text-2xl font-bold text-amber-700 mt-1">{stats.inProgress}</p>
+          </div>
+          <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="w-5 h-5 text-red-600" />
+              <p className="text-xs font-medium text-red-600 uppercase tracking-wide">Needs Assignment</p>
+            </div>
+            <p className="text-2xl font-bold text-red-700 mt-1">{stats.needsAssignment}</p>
+          </div>
+          <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-100">
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Completed</p>
+            </div>
+            <p className="text-2xl font-bold text-emerald-700 mt-1">{stats.completedThisWeek}</p>
           </div>
         </div>
-      </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="card bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800">
-          <p className="text-sm text-emerald-600 dark:text-emerald-400 font-medium">New Requests</p>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{groupedOrders.requested.length}</p>
-        </div>
-        <div className="card bg-purple-50 dark:bg-purple-900/20 border-purple-200 dark:border-purple-800">
-          <p className="text-sm text-purple-600 dark:text-purple-400 font-medium">Scheduled</p>
-          <p className="text-2xl font-bold text-purple-700 dark:text-purple-300">{groupedOrders.scheduled.length}</p>
-        </div>
-        <div className="card bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800">
-          <p className="text-sm text-yellow-600 dark:text-yellow-400 font-medium">In Progress</p>
-          <p className="text-2xl font-bold text-yellow-700 dark:text-yellow-300">{groupedOrders.inProgress.length}</p>
-        </div>
-        <div className="card bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800">
-          <p className="text-sm text-green-600 dark:text-green-400 font-medium">Completed</p>
-          <p className="text-2xl font-bold text-green-700 dark:text-green-300">{groupedOrders.completed.length}</p>
-        </div>
-      </div>
+        {/* Work Order Cards */}
+        {filteredOrders.length === 0 ? (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+            <ClipboardList className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+            <h3 className="font-medium text-slate-900">No work orders found</h3>
+            <p className="text-sm text-slate-500">No work orders match your current filters.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {filteredOrders.map(order => {
+              const status = statusConfig[order.status];
+              const isExpanded = expandedOrders.includes(order.id);
+              const isToday = order.scheduledDate === 'Today';
 
-      {/* Work Orders Table */}
-      {workOrders.length === 0 ? (
-        <div className="card text-center py-12">
-          <svg className="w-16 h-16 mx-auto text-slate-300 dark:text-slate-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-          </svg>
-          <p className="text-slate-500 dark:text-slate-400">
-            No work orders match your filters
-          </p>
-        </div>
-      ) : (
-        <div className="card p-0 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-slate-50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Work Order
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Household
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Vendor
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Scheduled
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {workOrders.map((order) => (
-                  <tr key={order.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="px-6 py-4">
-                      <div>
-                        <p className="font-medium text-slate-900 dark:text-white">
-                          {order.title}
-                        </p>
-                        {order.description && (
-                          <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1">
-                            {order.description}
-                          </p>
+              return (
+                <div
+                  key={order.id}
+                  className={`bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden ${
+                    order.status === 'in_progress' ? 'ring-2 ring-amber-200' : ''
+                  }`}
+                >
+                  {/* Card Header */}
+                  <div className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-start gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium text-slate-500">{order.orderNumber}</span>
+                            <h3 className="font-semibold text-slate-900">{order.title}</h3>
+                          </div>
+                          <div className="flex items-center gap-2 text-sm text-slate-500">
+                            <Home className="w-4 h-4" />
+                            <span>{order.householdName}</span>
+                            <span>•</span>
+                            <span>{order.address}</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {isToday && order.scheduledTime && (
+                          <span className="inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 text-indigo-700 text-sm font-medium rounded">
+                            <Calendar className="w-4 h-4" />
+                            TODAY {order.scheduledTime}
+                          </span>
+                        )}
+                        <span className={`px-2 py-1 rounded text-xs font-medium ${status.bgColor} ${status.textColor}`}>
+                          {status.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Vendor & Status Row */}
+                    <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+                      <div className="flex items-center gap-4 text-sm">
+                        {order.vendor ? (
+                          <span className="flex items-center gap-1 text-slate-600">
+                            <User className="w-4 h-4" />
+                            <span className="font-medium">{order.vendor.name}</span>
+                            <span className="text-slate-400">({order.vendor.contactName})</span>
+                          </span>
+                        ) : (
+                          <span className="text-amber-600 font-medium">Unassigned</span>
+                        )}
+                        {order.estimatedCost !== undefined && order.estimatedCost > 0 && (
+                          <span className="flex items-center gap-1 text-slate-600">
+                            <DollarSign className="w-4 h-4" />
+                            Est: ${order.estimatedCost}
+                          </span>
+                        )}
+                        {order.actualCost !== undefined && (
+                          <span className="flex items-center gap-1 text-emerald-600">
+                            <DollarSign className="w-4 h-4" />
+                            Actual: ${order.actualCost}
+                          </span>
                         )}
                       </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                      {order.household?.name || '-'}
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                      {order.vendor?.displayName || (
-                        <span className="text-amber-600 dark:text-amber-400">Unassigned</span>
+                      {order.technicianStatus && (
+                        <span className="text-sm text-slate-500">
+                          Status: {order.technicianStatus}
+                        </span>
                       )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`text-xs font-medium px-2 py-1 rounded ${STATUS_COLORS[order.status]}`}>
-                        {order.status.replace('_', ' ')}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-slate-600 dark:text-slate-400">
-                      {order.scheduledStart ? formatDateTime(order.scheduledStart) : (
-                        order.preferredDate ? (
-                          <span className="text-slate-400">Pref: {formatDate(order.preferredDate)}</span>
-                        ) : '-'
+                    </div>
+
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
+                      {order.status === 'in_progress' && (
+                        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors">
+                          <MapPin className="w-4 h-4" />
+                          Track
+                        </button>
                       )}
-                    </td>
-                    <td className="px-6 py-4 text-right">
+                      {order.vendor && (
+                        <>
+                          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+                            <Phone className="w-4 h-4" />
+                            Call Tech
+                          </button>
+                          <button className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors">
+                            <Phone className="w-4 h-4" />
+                            Call Homeowner
+                          </button>
+                        </>
+                      )}
                       <button
-                        onClick={() => setSelectedOrder(order)}
-                        className="text-emerald-600 hover:text-emerald-500 dark:text-emerald-400 text-sm font-medium"
+                        onClick={() => toggleExpanded(order.id)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
                       >
-                        Manage
+                        <FileText className="w-4 h-4" />
+                        Details
+                        {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
-                    </td>
-                  </tr>
+                      {order.status !== 'completed' && order.status !== 'cancelled' && (
+                        <button className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors">
+                          <CheckCircle2 className="w-4 h-4" />
+                          Complete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Expanded Details */}
+                  {isExpanded && (
+                    <div className="px-4 pb-4 space-y-4 border-t border-slate-100 pt-4 bg-slate-50">
+                      {/* Description */}
+                      <div>
+                        <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Description</h4>
+                        <p className="text-sm text-slate-700">{order.description}</p>
+                      </div>
+
+                      {/* Linked Request */}
+                      {order.linkedRequestTitle && (
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Linked Request</h4>
+                          <button className="text-sm text-indigo-600 hover:text-indigo-700 flex items-center gap-1">
+                            {order.linkedRequestTitle}
+                            <ExternalLink className="w-3 h-3" />
+                          </button>
+                        </div>
+                      )}
+
+                      {/* Schedule Info */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Scheduled</h4>
+                          <p className="text-sm text-slate-700">
+                            {order.scheduledDate || 'Not scheduled'}
+                            {order.scheduledTime && ` at ${order.scheduledTime}`}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Category</h4>
+                          <p className="text-sm text-slate-700">{order.category}</p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Priority</h4>
+                          <p className={`text-sm font-medium ${priorityConfig[order.priority].color}`}>
+                            {priorityConfig[order.priority].label}
+                          </p>
+                        </div>
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-1">Created</h4>
+                          <p className="text-sm text-slate-700">{order.createdAt}</p>
+                        </div>
+                      </div>
+
+                      {/* Photos */}
+                      {order.photos.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Photos</h4>
+                          <div className="flex gap-2">
+                            {order.photos.map((_, i) => (
+                              <div key={i} className="w-20 h-20 bg-slate-200 rounded-lg flex items-center justify-center">
+                                <Camera className="w-6 h-6 text-slate-400" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Notes */}
+                      {order.notes.length > 0 && (
+                        <div>
+                          <h4 className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">Notes</h4>
+                          <div className="space-y-2">
+                            {order.notes.map(note => (
+                              <div key={note.id} className="bg-white rounded-lg p-3 border border-slate-200">
+                                <p className="text-sm text-slate-700">{note.content}</p>
+                                <p className="text-xs text-slate-400 mt-1">
+                                  {note.author} • {note.createdAt}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Add Note */}
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          placeholder="Add a note..."
+                          className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        />
+                        <button className="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                          <Send className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* New Work Order Modal */}
+      {showNewOrderModal && (
+        <NewWorkOrderModal onClose={() => setShowNewOrderModal(false)} />
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW WORK ORDER MODAL
+// ============================================================================
+
+function NewWorkOrderModal({ onClose }: { onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    householdId: '',
+    title: '',
+    description: '',
+    category: '',
+    priority: 'medium',
+    vendorId: '',
+    scheduledDate: '',
+    scheduledTime: '',
+    estimatedCost: '',
+    notifyHomeowner: true,
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h2 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+            <Plus className="w-5 h-5 text-indigo-600" />
+            New Work Order
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <div className="p-4 space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Household <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.householdId}
+                onChange={(e) => setFormData(prev => ({ ...prev, householdId: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Select...</option>
+                {households.map(h => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
                 ))}
-              </tbody>
-            </table>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Category <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={formData.category}
+                onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Select...</option>
+                {categories.filter(c => c !== 'All').map(c => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Title <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.title}
+              onChange={(e) => setFormData(prev => ({ ...prev, title: e.target.value }))}
+              placeholder="e.g., HVAC Annual Service"
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Description
+            </label>
+            <textarea
+              value={formData.description}
+              onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+              placeholder="Detailed scope of work..."
+              rows={3}
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Assign Vendor
+              </label>
+              <select
+                value={formData.vendorId}
+                onChange={(e) => setFormData(prev => ({ ...prev, vendorId: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">Select vendor...</option>
+                {vendors.map(v => (
+                  <option key={v.id} value={v.id}>{v.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Priority
+              </label>
+              <select
+                value={formData.priority}
+                onChange={(e) => setFormData(prev => ({ ...prev, priority: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+                <option value="urgent">Urgent</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Scheduled Date
+              </label>
+              <input
+                type="date"
+                value={formData.scheduledDate}
+                onChange={(e) => setFormData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Scheduled Time
+              </label>
+              <input
+                type="time"
+                value={formData.scheduledTime}
+                onChange={(e) => setFormData(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">
+                Estimated Cost
+              </label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="number"
+                  value={formData.estimatedCost}
+                  onChange={(e) => setFormData(prev => ({ ...prev, estimatedCost: e.target.value }))}
+                  placeholder="0.00"
+                  className="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              id="notifyHomeowner"
+              checked={formData.notifyHomeowner}
+              onChange={(e) => setFormData(prev => ({ ...prev, notifyHomeowner: e.target.checked }))}
+              className="w-4 h-4 text-indigo-600 rounded border-slate-300 focus:ring-indigo-500"
+            />
+            <label htmlFor="notifyHomeowner" className="text-sm text-slate-700">
+              Notify homeowner when scheduled
+            </label>
           </div>
         </div>
-      )}
 
-      {/* Work Order Management Modal */}
-      {selectedOrder && (
-        <WorkOrderManageModal
-          order={selectedOrder}
-          onClose={() => setSelectedOrder(null)}
-          onUpdate={() => {
-            setSelectedOrder(null);
-            loadData();
-          }}
-        />
-      )}
-    </div>
-  );
-}
-
-// Note Item Component with attachment display
-function NoteItem({ note }: { note: { id: string; body: string; createdAt: string; author?: { firstName: string | null; lastName: string | null }; attachmentFile?: { id: string; contentType: string } | null } }) {
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
-
-  // Load signed URL for file assets
-  useEffect(() => {
-    if (note.attachmentFile?.id) {
-      const api = getApiClient();
-      api.getFileAssetUrl(note.attachmentFile.id)
-        .then((res) => setImageUrl(res.url))
-        .catch(() => setImageUrl(null));
-    }
-  }, [note.attachmentFile?.id]);
-
-  const isImage = note.attachmentFile?.contentType?.startsWith('image/');
-
-  return (
-    <div className="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-      <p className="text-sm text-slate-600 dark:text-slate-300">{note.body}</p>
-      {imageUrl && isImage && (
-        <a
-          href={imageUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block mt-2"
-        >
-          <img
-            src={imageUrl}
-            alt="Attachment"
-            className="max-w-full max-h-48 rounded-lg object-cover"
-          />
-        </a>
-      )}
-      {imageUrl && !isImage && (
-        <a
-          href={imageUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="text-sm text-emerald-600 dark:text-emerald-400 underline mt-2 block"
-        >
-          View attachment
-        </a>
-      )}
-      <p className="text-xs text-slate-400 mt-1">
-        {note.author?.firstName} {note.author?.lastName} &mdash;{' '}
-        {new Date(note.createdAt).toLocaleString()}
-      </p>
-    </div>
-  );
-}
-
-// Work Order Management Modal
-function WorkOrderManageModal({
-  order,
-  onClose,
-  onUpdate,
-}: {
-  order: WorkOrder;
-  onClose: () => void;
-  onUpdate: () => void;
-}) {
-  const [status, setStatus] = useState<WorkOrderStatus>(order.status);
-  const [scheduledStart, setScheduledStart] = useState(
-    order.scheduledStart ? new Date(order.scheduledStart).toISOString().slice(0, 16) : ''
-  );
-  const [scheduledEnd, setScheduledEnd] = useState(
-    order.scheduledEnd ? new Date(order.scheduledEnd).toISOString().slice(0, 16) : ''
-  );
-  const [estimatedCost, setEstimatedCost] = useState(
-    order.estimatedCost !== null ? String(order.estimatedCost) : ''
-  );
-  const [actualCost, setActualCost] = useState(
-    order.actualCost !== null ? String(order.actualCost) : ''
-  );
-  const [note, setNote] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState('');
-
-  // File upload state
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [filePreview, setFilePreview] = useState<string | null>(null);
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  // Clean up file preview URL
-  useEffect(() => {
-    return () => {
-      if (filePreview) URL.revokeObjectURL(filePreview);
-    };
-  }, [filePreview]);
-
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setUploadError(null);
-
-    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
-      setUploadError('Please select an image file (JPEG, PNG, GIF, or WebP)');
-      return;
-    }
-
-    if (file.size > MAX_FILE_SIZE) {
-      setUploadError('File is too large. Maximum size is 10MB.');
-      return;
-    }
-
-    setSelectedFile(file);
-    setFilePreview(URL.createObjectURL(file));
-  };
-
-  const clearSelectedFile = () => {
-    setSelectedFile(null);
-    if (filePreview) URL.revokeObjectURL(filePreview);
-    setFilePreview(null);
-    setUploadError(null);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-    setIsSubmitting(true);
-
-    try {
-      const api = getApiClient();
-      const updates: UpdateWorkOrderRequest = {
-        status,
-        scheduledStart: scheduledStart || undefined,
-        scheduledEnd: scheduledEnd || undefined,
-        estimatedCost: estimatedCost ? parseFloat(estimatedCost) : undefined,
-        actualCost: actualCost ? parseFloat(actualCost) : undefined,
-      };
-
-      await api.updateInternalWorkOrder(order.id, updates);
-
-      // Add note if provided (with optional file attachment)
-      if (note.trim() || selectedFile) {
-        let attachmentFileId: string | undefined;
-
-        // Upload file if selected
-        if (selectedFile && order.household?.id) {
-          setIsUploading(true);
-          try {
-            const fileAsset = await api.uploadFileToGcs(selectedFile, {
-              householdId: order.household.id,
-              type: 'ISSUE_PHOTO',
-            });
-            attachmentFileId = fileAsset.id;
-          } catch (err: any) {
-            setUploadError(err.message || 'Failed to upload file');
-            setIsSubmitting(false);
-            setIsUploading(false);
-            return;
-          }
-          setIsUploading(false);
-        }
-
-        await api.addWorkOrderNote(order.id, {
-          body: note.trim() || (selectedFile ? 'Added a photo' : ''),
-          attachmentFileId,
-        });
-      }
-
-      onUpdate();
-    } catch (err: unknown) {
-      const message =
-        err && typeof err === 'object' && 'message' in err
-          ? (err as { message: string }).message
-          : 'Failed to update work order';
-      setError(message);
-      setIsSubmitting(false);
-    }
-  };
-
-  const formatDateTime = (date: string | null | undefined) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString('en-US', {
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto">
-      <div className="flex min-h-screen items-center justify-center p-4">
-        {/* Backdrop */}
-        <div
-          className="fixed inset-0 bg-black/50 transition-opacity"
-          onClick={onClose}
-        />
-
-        {/* Modal */}
-        <div className="relative w-full max-w-2xl bg-white dark:bg-slate-800 rounded-xl shadow-xl">
-          {/* Header */}
-          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
-                Manage Work Order
-              </h2>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
-                {order.title}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-1 text-slate-400 hover:text-slate-500 dark:hover:text-slate-300"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Order Details */}
-          <div className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-700/50">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-slate-500 dark:text-slate-400">Household:</span>
-                <span className="ml-2 text-slate-900 dark:text-white">{order.household?.name}</span>
-              </div>
-              <div>
-                <span className="text-slate-500 dark:text-slate-400">Vendor:</span>
-                <span className="ml-2 text-slate-900 dark:text-white">
-                  {order.vendor?.displayName || 'Unassigned'}
-                </span>
-              </div>
-              {order.preferredDate && (
-                <div>
-                  <span className="text-slate-500 dark:text-slate-400">Preferred Date:</span>
-                  <span className="ml-2 text-slate-900 dark:text-white">
-                    {new Date(order.preferredDate).toLocaleDateString()}
-                    {order.preferredTimeWindowStart && ` ${order.preferredTimeWindowStart}`}
-                    {order.preferredTimeWindowEnd && ` - ${order.preferredTimeWindowEnd}`}
-                  </span>
-                </div>
-              )}
-              {order.maintenanceTask && (
-                <div>
-                  <span className="text-slate-500 dark:text-slate-400">Linked Task:</span>
-                  <span className="ml-2 text-slate-900 dark:text-white">{order.maintenanceTask.title}</span>
-                </div>
-              )}
-              <div className="col-span-2">
-                <span className="text-slate-500 dark:text-slate-400">Created:</span>
-                <span className="ml-2 text-slate-900 dark:text-white">{formatDateTime(order.createdAt)}</span>
-              </div>
-            </div>
-            {order.description && (
-              <div className="mt-3 pt-3 border-t border-slate-200 dark:border-slate-600">
-                <p className="text-sm text-slate-600 dark:text-slate-300">{order.description}</p>
-              </div>
-            )}
-          </div>
-
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="p-6 space-y-4">
-            {error && (
-              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="status" className="label block mb-1.5">
-                  Status
-                </label>
-                <select
-                  id="status"
-                  value={status}
-                  onChange={(e) => setStatus(e.target.value as WorkOrderStatus)}
-                  className="input"
-                >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s} value={s}>
-                      {s.replace('_', ' ')}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="scheduledStart" className="label block mb-1.5">
-                  Scheduled Start
-                </label>
-                <input
-                  id="scheduledStart"
-                  type="datetime-local"
-                  value={scheduledStart}
-                  onChange={(e) => setScheduledStart(e.target.value)}
-                  className="input"
-                />
-              </div>
-              <div>
-                <label htmlFor="scheduledEnd" className="label block mb-1.5">
-                  Scheduled End
-                </label>
-                <input
-                  id="scheduledEnd"
-                  type="datetime-local"
-                  value={scheduledEnd}
-                  onChange={(e) => setScheduledEnd(e.target.value)}
-                  className="input"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="estimatedCost" className="label block mb-1.5">
-                  Estimated Cost ($)
-                </label>
-                <input
-                  id="estimatedCost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={estimatedCost}
-                  onChange={(e) => setEstimatedCost(e.target.value)}
-                  className="input"
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <label htmlFor="actualCost" className="label block mb-1.5">
-                  Actual Cost ($)
-                </label>
-                <input
-                  id="actualCost"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={actualCost}
-                  onChange={(e) => setActualCost(e.target.value)}
-                  className="input"
-                  placeholder="0.00"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="note" className="label block mb-1.5">
-                Add Internal Note
-              </label>
-              {/* File Preview */}
-              {selectedFile && filePreview && (
-                <div className="mb-2">
-                  <div className="relative inline-block">
-                    <img
-                      src={filePreview}
-                      alt="Preview"
-                      className="max-h-24 rounded-lg object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={clearSelectedFile}
-                      className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600"
-                    >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              )}
-              {/* Upload Error */}
-              {uploadError && (
-                <p className="text-sm text-red-500 mb-2">{uploadError}</p>
-              )}
-              <div className="flex gap-2">
-                {/* Hidden file input */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept={ALLOWED_IMAGE_TYPES.join(',')}
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                {/* Attach button */}
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={isUploading || isSubmitting}
-                  className="p-2 text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors disabled:opacity-50 border border-slate-200 dark:border-slate-600"
-                  title="Attach photo"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </button>
-                <textarea
-                  id="note"
-                  value={note}
-                  onChange={(e) => setNote(e.target.value)}
-                  className="input min-h-[80px] flex-1"
-                  placeholder="Add a note about this work order..."
-                />
-              </div>
-            </div>
-
-            {/* Existing Notes */}
-            {order.notes && order.notes.length > 0 && (
-              <div className="border-t border-slate-200 dark:border-slate-700 pt-4">
-                <h4 className="font-medium text-slate-900 dark:text-white mb-3">Notes</h4>
-                <div className="space-y-2">
-                  {order.notes.map((n) => (
-                    <NoteItem key={n.id} note={n} />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Footer */}
-            <div className="flex items-center justify-end gap-3 pt-4">
-              <button type="button" onClick={onClose} className="btn btn-secondary">
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="btn btn-primary bg-emerald-600 hover:bg-emerald-700"
-              >
-                {isSubmitting ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                    </svg>
-                    Saving...
-                  </>
-                ) : (
-                  'Save Changes'
-                )}
-              </button>
-            </div>
-          </form>
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 p-4 border-t border-slate-200 bg-slate-50">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-medium text-slate-600 hover:text-slate-800"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onClose}
+            disabled={!formData.householdId || !formData.title || !formData.category}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Create Work Order
+            <ChevronRight className="w-4 h-4" />
+          </button>
         </div>
       </div>
     </div>
