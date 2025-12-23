@@ -789,60 +789,20 @@ export default function FamilyPage() {
 
     try {
       const api = getApiClient();
-      const [membersResult, petsResult] = await Promise.allSettled([
-        api.getFamilyMembers(),
-        api.getFamilyPets(),
-      ]);
 
-      if (membersResult.status === 'fulfilled' && membersResult.value.length > 0) {
-        const apiMembers = membersResult.value;
-        const newAdults: AdultMember[] = [];
-        const newChildren: ChildMember[] = [];
-        const newStaff: StaffMember[] = [];
-
-        apiMembers.forEach((member) => {
-          const roleUpper = member.role.toUpperCase();
-          if (roleUpper === 'CHILD') {
-            newChildren.push(mapToChild(member));
-          } else if (roleUpper === 'STAFF') {
-            newStaff.push(mapToStaff(member));
-          } else {
-            newAdults.push(mapToAdult(member));
-          }
-        });
-
-        // MERGE with mock data instead of replacing completely
-        // This ensures demo data (like Alice) always shows
-        if (newAdults.length > 0) {
-          const apiAdultIds = new Set(newAdults.map(a => a.id));
-          const mockAdultsToKeep = MOCK_ADULTS.filter(a => !apiAdultIds.has(a.id));
-          setAdults([...newAdults, ...mockAdultsToKeep]);
-        } else {
-          // If no API adults, use all mock adults
-          setAdults(MOCK_ADULTS);
-        }
-
-        if (newChildren.length > 0) {
-          const apiChildIds = new Set(newChildren.map(c => c.id));
-          const mockChildrenToKeep = MOCK_CHILDREN.filter(c => !apiChildIds.has(c.id));
-          setChildren([...newChildren, ...mockChildrenToKeep]);
-        } else {
-          setChildren(MOCK_CHILDREN);
-        }
-
-        if (newStaff.length > 0) {
-          const apiStaffIds = new Set(newStaff.map(s => s.id));
-          const mockStaffToKeep = MOCK_STAFF.filter(s => !apiStaffIds.has(s.id));
-          setStaff([...newStaff, ...mockStaffToKeep]);
-        } else {
-          setStaff(MOCK_STAFF);
-        }
-      }
-
-      if (petsResult.status === 'fulfilled' && petsResult.value.length > 0) {
-        const mappedPets = petsResult.value.map(mapToPet);
+      // Load pets from API (these are real user data we want to keep)
+      const petsResult = await api.getFamilyPets().catch(() => []);
+      if (petsResult && petsResult.length > 0) {
+        const mappedPets = petsResult.map(mapToPet);
         setPets(mappedPets);
       }
+
+      // For demo purposes, always use mock data for family members
+      // This ensures consistent demo experience with Bob, Alice, kids, staff
+      setAdults(MOCK_ADULTS);
+      setChildren(MOCK_CHILDREN);
+      setStaff(MOCK_STAFF);
+
     } catch (error) {
       console.error('Failed to load family data:', error);
     } finally {
