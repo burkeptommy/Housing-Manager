@@ -75,7 +75,7 @@ function HeroHeader({ name, stats }: { name: string; stats: { completedToday: nu
         <div className="flex items-start justify-between mb-8">
           <div>
             <p className="text-teal-200 text-sm font-medium mb-1">{formatCurrentDate()}</p>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-white">
               Good {getTimeOfDay()}, {name}!
             </h1>
             <p className="text-teal-200 mt-2">Ready to tackle today's tasks</p>

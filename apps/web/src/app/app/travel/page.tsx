@@ -108,7 +108,7 @@ export default function TravelPage() {
                       ? `${daysUntilDeparture(activeTrip.startDate)} days until departure`
                       : 'Trip in progress'}
                   </p>
-                  <h2 className="text-2xl font-bold mt-1">{activeTrip.destination}</h2>
+                  <h2 className="text-2xl font-bold mt-1 text-white">{activeTrip.destination}</h2>
                   <p className="text-emerald-100 mt-2">
                     {new Date(activeTrip.startDate).toLocaleDateString()} -{' '}
                     {new Date(activeTrip.endDate).toLocaleDateString()}

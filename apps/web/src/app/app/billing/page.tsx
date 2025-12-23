@@ -892,7 +892,7 @@ export default function BillingPage() {
                 <Receipt className="w-4 h-4" />
                 Your {currentMonth} Statement
               </div>
-              <h1 className="text-4xl lg:text-5xl font-bold mb-2">
+              <h1 className="text-4xl lg:text-5xl font-bold mb-2 text-white">
                 {formatCurrency(statementBreakdown.total)}
               </h1>
               <p className="text-slate-400 mb-6">
@@ -1184,7 +1184,7 @@ export default function BillingPage() {
                   <Wallet className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">One Bill, Zero Hassle</h3>
+                  <h3 className="font-semibold mb-1 text-white">One Bill, Zero Hassle</h3>
                   <p className="text-sm text-emerald-100">
                     Haven pays ALL your household bills - mortgage, utilities, insurance, services, activities - then sends you one simple statement.
                   </p>

@@ -143,7 +143,7 @@ function HeroHeader({ stats }: { stats: { openJobs: number; totalValue: number; 
         <div className="flex items-start justify-between mb-8">
           <div>
             <p className="text-orange-200 text-sm font-medium mb-1">{formatCurrentDate()}</p>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight text-white">
               Job Board
             </h1>
             <p className="text-orange-200 mt-2">Available jobs in your service area</p>

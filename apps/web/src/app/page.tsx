@@ -1168,7 +1168,7 @@ function PricingSection() {
               </span>
             </div>
             <div className="mb-6 pt-4">
-              <h3 className="font-serif text-2xl font-medium mb-1">Haven+</h3>
+              <h3 className="font-serif text-2xl font-medium mb-1 text-white">Haven+</h3>
               <p className="text-emerald-300">Home + Life Management</p>
             </div>
             <div className="mb-6">
