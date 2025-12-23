@@ -99,7 +99,7 @@ function HeroSection() {
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full mb-6">
               <HeartHandshake className="w-4 h-4 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-800">
-                Full-service home management — not just software
+                Full-service home management, not just software
               </span>
             </div>
 
@@ -116,7 +116,7 @@ function HeroSection() {
             </p>
 
             <p className="text-lg text-slate-600 max-w-xl mb-8 leading-relaxed">
-              Not another app to organize your chaos — <strong>actual humans who eliminate it.</strong> Your dedicated Home Manager handles everything so you can focus on what matters.
+              Not another app to organize your chaos. <strong>Actual humans who eliminate it.</strong> Your dedicated Home Manager handles everything so you can focus on what matters.
             </p>
 
             {/* Value Props */}
@@ -206,7 +206,7 @@ function HeroSection() {
                   <DollarSign className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">December bills paid</p>
-                    <p className="text-xs text-slate-500">Mortgage, utilities, lawn care — all set</p>
+                    <p className="text-xs text-slate-500">Mortgage, utilities, lawn care. All set.</p>
                   </div>
                 </div>
 
@@ -214,7 +214,7 @@ function HeroSection() {
                   <Calendar className="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">Gutter cleaning scheduled</p>
-                    <p className="text-xs text-slate-500">Tuesday 10am — no action needed</p>
+                    <p className="text-xs text-slate-500">Tuesday 10am. No action needed.</p>
                   </div>
                 </div>
               </div>
@@ -348,7 +348,7 @@ function ProblemSection() {
         <div className="mt-12 text-center">
           <p className="text-2xl text-white">
             <span className="font-bold">8+ hours per month</span>
-            <span className="text-slate-300"> — that's what our members get back.</span>
+            <span className="text-slate-300">. That's what our members get back.</span>
           </p>
         </div>
       </div>
@@ -410,10 +410,10 @@ function CompetitorSection() {
             { feature: 'Setup/Onboarding', software: '$3,000 - $5,000', haven: '$0' },
             { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
             { feature: 'Contract Required', software: '12-month prepaid', haven: 'Month-to-month' },
-            { feature: 'Bills Paid For You', software: '❌ No — you pay each vendor', haven: '✅ Yes — one payment covers all' },
-            { feature: 'Vendor Coordination', software: '❌ No — just a contact list', haven: '✅ Yes — we call, schedule, oversee' },
-            { feature: 'Handyman Visits', software: '❌ No', haven: '✅ Yes — monthly preventive visits' },
-            { feature: 'Humans Doing Work', software: '❌ No — software only', haven: '✅ Yes — dedicated manager' },
+            { feature: 'Bills Paid For You', software: '❌ No (you pay each vendor)', haven: '✅ Yes, one payment covers all' },
+            { feature: 'Vendor Coordination', software: '❌ No (just a contact list)', haven: '✅ Yes, we call, schedule, oversee' },
+            { feature: 'Handyman Visits', software: '❌ No', haven: '✅ Yes, monthly preventive visits' },
+            { feature: 'Humans Doing Work', software: '❌ No (software only)', haven: '✅ Yes, dedicated manager' },
             { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
           ].map((row, i) => (
             <div key={i} className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
@@ -437,13 +437,13 @@ function CompetitorSection() {
               Why pay more for software that makes YOU do the work?
             </p>
             <p className="text-lg text-slate-600 mb-6">
-              Haven costs <span className="text-emerald-600 font-semibold">$26/month less</span> with <span className="text-emerald-600 font-semibold">no setup fee</span> — and we actually do the work.
+              Haven costs <span className="text-emerald-600 font-semibold">$26/month less</span> with <span className="text-emerald-600 font-semibold">no setup fee</span>, and we actually do the work.
             </p>
             <Link
               href="/register"
               className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/25"
             >
-              Get Actual Help — $349/month
+              Get Actual Help for $349/month
               <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
@@ -558,7 +558,7 @@ function ServicesSection() {
             Everything Your Home Needs. Handled.
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            From paying your mortgage to changing your furnace filter — we've got it.
+            From paying your mortgage to changing your furnace filter, we've got it.
           </p>
         </div>
 
@@ -830,7 +830,7 @@ function PricingSection() {
             <div className="bg-white rounded-xl p-4 border border-amber-100">
               <p className="text-sm font-medium text-slate-600 mb-1">Your Household Bills</p>
               <p className="text-2xl font-bold text-slate-900">At Cost</p>
-              <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors — zero markup</p>
+              <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors at zero markup</p>
             </div>
           </div>
           <p className="text-sm text-slate-600">
@@ -935,15 +935,15 @@ function FAQSection() {
   const faqs = [
     {
       q: 'Is this only for rich people with big estates?',
-      a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Lite plan works perfectly for condos and apartments. The value comes from saving you time and preventing expensive repairs — that's valuable for any homeowner.",
+      a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Lite plan works perfectly for condos and apartments. The value comes from saving you time and preventing expensive repairs. That's valuable for any homeowner.",
     },
     {
       q: 'How is Haven different from household management software?',
-      a: "Software gives you tools to organize things yourself — you still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely. That's why we cost less than software-only solutions while delivering far more value.",
+      a: "Software gives you tools to organize things yourself. You still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely. That's why we cost less than software-only solutions while delivering far more value.",
     },
     {
       q: 'Why should I pay for this when I can manage things myself?',
-      a: "You can. The question is whether you want to. If you enjoy tracking down vendors, waiting on hold, and remembering when the furnace filter was last changed — keep doing that. If you'd rather text once and have it handled, that's what we do. Most members say they get 8+ hours back every month.",
+      a: "You can. The question is whether you want to. If you enjoy tracking down vendors, waiting on hold, and remembering when the furnace filter was last changed, keep doing that. If you'd rather text once and have it handled, that's what we do. Most members say they get 8+ hours back every month.",
     },
     {
       q: 'Do I have to sign an annual contract?',
@@ -955,7 +955,7 @@ function FAQSection() {
     },
     {
       q: 'Is my money safe?',
-      a: "Yes. Your Haven Wallet is FDIC-insured through our banking partner. You see every transaction in real-time, maintain full visibility, and can withdraw anytime. We never mark up vendor costs — your bills pass through at exactly what they cost.",
+      a: "Yes. Your Haven Wallet is FDIC-insured through our banking partner. You see every transaction in real-time, maintain full visibility, and can withdraw anytime. We never mark up vendor costs. Your bills pass through at exactly what they cost.",
     },
   ];
 
