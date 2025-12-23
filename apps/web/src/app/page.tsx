@@ -1116,10 +1116,10 @@ export default function HomePage() {
       <Navigation />
       <HeroSection />
       <ProblemSection />
-      <CompetitorSection />
       <HowItWorksSection />
       <ServicesSection />
       <PricingSection />
+      <CompetitorSection />
       <SocialProofSection />
       <FAQSection />
       <FinalCTASection />
