@@ -202,11 +202,12 @@ export default function JobDetailPage() {
   };
 
   const openInMaps = () => {
-    if (!job?.household.homeProfile) return;
-    const { latitude, longitude } = job.household.homeProfile;
-    const address = encodeURIComponent(job.household.homeProfile.address);
+    if (!job?.household?.homeProfile) return;
+    const { latitude, longitude, address } = job.household.homeProfile;
+    if (!address) return;
+    const encodedAddress = encodeURIComponent(address);
     // Try to open in Google Maps, fallback to Apple Maps
-    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}&destination_place_id=${address}`;
+    const url = `https://www.google.com/maps/dir/?api=1&destination=${latitude || 0},${longitude || 0}&destination_place_id=${encodedAddress}`;
     window.open(url, '_blank');
   };
 
@@ -245,7 +246,7 @@ export default function JobDetailPage() {
             <span className={`px-2.5 py-1 rounded text-sm font-medium ${STATUS_COLORS[job.status]}`}>
               {job.status.replace('_', ' ')}
             </span>
-            <span className="text-slate-500 dark:text-slate-400">{job.household.name}</span>
+            <span className="text-slate-500 dark:text-slate-400">{job.household?.name || 'Unknown Location'}</span>
           </div>
         </div>
         <div className="text-right">
@@ -352,7 +353,7 @@ export default function JobDetailPage() {
       </div>
 
       {/* Location Card */}
-      {job.household.homeProfile && (
+      {job.household?.homeProfile?.address && (
         <div className="card">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Location</h2>
           <div className="flex items-start gap-3 mb-4">
@@ -375,7 +376,7 @@ export default function JobDetailPage() {
       )}
 
       {/* Notes */}
-      {job.notes.length > 0 && (
+      {(job.notes?.length || 0) > 0 && (
         <div className="card">
           <h2 className="text-lg font-semibold text-slate-900 dark:text-white mb-4">Notes</h2>
           <div className="space-y-3">

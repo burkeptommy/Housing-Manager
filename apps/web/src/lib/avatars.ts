@@ -7,11 +7,11 @@ const DEFAULT_STYLE: AvatarStyle = 'lorelei';
 
 // Pre-defined avatar seeds for demo users
 export const demoAvatars = {
-  // Morrison Family
-  bob: 'bob-morrison-haven',
-  alice: 'alice-morrison-haven',
-  emma: 'emma-morrison-haven',
-  jack: 'jack-morrison-haven',
+  // Burke Family (38 Bedford Rd, Greenwich, CT)
+  bob: 'bob-burke-haven',
+  alice: 'alice-burke-haven',
+  emma: 'emma-burke-haven',
+  jack: 'jack-burke-haven',
   max: 'max-dog-haven',
 
   // Staff
@@ -52,15 +52,19 @@ export function getDiceBearAvatar(
 export function getUserAvatar(name: string, fallbackToInitials: boolean = false): string | undefined {
   const lowerName = name.toLowerCase().trim();
 
-  // Check known users
+  // Check known users (Burke family at 38 Bedford Rd, Greenwich, CT)
   const knownUsers: Record<string, string> = {
-    'bob morrison': demoAvatars.bob,
+    'bob burke': demoAvatars.bob,
+    'bob morrison': demoAvatars.bob, // legacy compatibility
     'bob': demoAvatars.bob,
-    'alice morrison': demoAvatars.alice,
+    'alice burke': demoAvatars.alice,
+    'alice morrison': demoAvatars.alice, // legacy compatibility
     'alice': demoAvatars.alice,
-    'emma morrison': demoAvatars.emma,
+    'emma burke': demoAvatars.emma,
+    'emma morrison': demoAvatars.emma, // legacy compatibility
     'emma': demoAvatars.emma,
-    'jack morrison': demoAvatars.jack,
+    'jack burke': demoAvatars.jack,
+    'jack morrison': demoAvatars.jack, // legacy compatibility
     'jack': demoAvatars.jack,
     'max': demoAvatars.max,
     'sarah harrison': demoAvatars.sarah,

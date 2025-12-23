@@ -796,7 +796,7 @@ async function main() {
   });
   console.log(`✅ Created handyman user: ${handymanMaria.email}`);
 
-  // Create Homeowner Bob (Client)
+  // Create Homeowner Bob Burke (Client - 38 Bedford Rd, Greenwich, CT)
   const homeownerBob = await prisma.user.upsert({
     where: { email: 'bob@example.com' },
     update: {},
@@ -804,8 +804,8 @@ async function main() {
       email: 'bob@example.com',
       passwordHash: homeownerPassword,
       firstName: 'Bob',
-      lastName: 'Smith',
-      displayName: 'Bob Smith',
+      lastName: 'Burke',
+      displayName: 'Bob Burke',
       role: UserRole.HOMEOWNER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
@@ -834,7 +834,7 @@ async function main() {
   // Keep the original demo user for backward compatibility
   const demoUser = homeownerBob; // Alias for existing code
 
-  // Create Bob's Villa - household with Manager Steve and Handyman Mike assigned
+  // Create Burke Family Home - 38 Bedford Rd, Greenwich, CT (Inspiration Farm)
   const demoHousehold = await prisma.household.upsert({
     where: { id: 'demo-household-id' },
     update: {
@@ -843,8 +843,8 @@ async function main() {
     },
     create: {
       id: 'demo-household-id',
-      name: "Bob's Villa",
-      description: 'A beautiful single-family home in Greenwich, CT managed by Haven',
+      name: 'Inspiration Farm',
+      description: 'Historic 1920 Colonial on 4.38 acres in Greenwich, CT managed by Haven',
       ownerId: homeownerBob.id,
       managerId: managerSarah.id,
       assignedHandymanId: handymanMike.id, // Mike handles Fairfield County CT properties
@@ -867,32 +867,34 @@ async function main() {
       homeProfile: {
         create: {
           propertyType: 'SINGLE_FAMILY',
-          addressLine1: '147 Round Hill Road',
+          addressLine1: '38 Bedford Rd',
           city: 'Greenwich',
           state: 'CT',
           postalCode: '06831',
           country: 'US',
-          squareFeet: 2800,
-          yearBuilt: 2005,
-          bedrooms: 3,
-          bathrooms: 2.5,
+          squareFeet: 4500,
+          yearBuilt: 1920,
+          bedrooms: 4,
+          bathrooms: 5.5,
           stories: 2,
           garageSpaces: 2,
+          lotSize: 4.38,
           notes: JSON.stringify({
             systems: {
               hasPool: true,
-              poolType: 'inground',
+              poolType: 'gunite-saltwater',
               hasHotTub: false,
               septicOrSewer: 'septic',
               hasFireplace: true,
               fireplaceType: 'wood-burning',
               hasSprinklerSystem: true,
               hasSecuritySystem: true,
-              hasSmartHome: false,
+              hasSmartHome: true,
               hasSolarPanels: false,
-              hasGenerator: false,
+              hasGenerator: true,
+              generatorType: 'Generac 22kW',
               hasSumpPump: true,
-              hasWellWater: false,
+              hasWellWater: true,
               hasRadonMitigation: false,
             },
             features: {
@@ -902,13 +904,19 @@ async function main() {
               basementType: 'finished',
               hasAttic: true,
               roofType: 'asphalt shingles',
-              roofAge: 8,
+              roofAge: 5,
               hvacType: 'central air/forced air',
               hvacAge: 5,
               waterHeaterType: 'tank',
-              waterHeaterAge: 6,
+              waterHeaterAge: 3,
+              horseBarn: true,
+              grtaTrailAccess: true,
+              invisibleFence: true,
+              wineCellar: true,
+              homeOffice: true,
+              mudroom: true,
             },
-            notes: 'Beautiful property with mature landscaping. Pool was renovated in 2020.',
+            notes: 'Historic property on 4.38 acres with pool, horse barn, and GRTA trail access. Major systems updated 2019-2022.',
           }),
         },
       },
@@ -939,7 +947,155 @@ async function main() {
   console.log(`✅ Created household membership for Bob`);
 
   // ============================================================================
-  // ALICE'S HOUSEHOLD - 1 house with 4 family members
+  // BURKE FAMILY MEMBERS - Bob's household at 38 Bedford Rd
+  // ============================================================================
+  const burkePassword = await bcrypt.hash('Burke123!', 12);
+
+  // Alice Burke (Spouse)
+  const aliceBurke = await prisma.user.upsert({
+    where: { email: 'alice.burke@example.com' },
+    update: {},
+    create: {
+      email: 'alice.burke@example.com',
+      passwordHash: burkePassword,
+      firstName: 'Alice',
+      lastName: 'Burke',
+      displayName: 'Alice Burke',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: demoHousehold.id,
+        userId: aliceBurke.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: demoHousehold.id,
+      userId: aliceBurke.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Alice (Spouse)',
+    },
+  });
+
+  // Emma Burke (Daughter - 14 years old)
+  const emmaBurke = await prisma.user.upsert({
+    where: { email: 'emma.burke@example.com' },
+    update: {},
+    create: {
+      email: 'emma.burke@example.com',
+      passwordHash: burkePassword,
+      firstName: 'Emma',
+      lastName: 'Burke',
+      displayName: 'Emma Burke',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: demoHousehold.id,
+        userId: emmaBurke.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: demoHousehold.id,
+      userId: emmaBurke.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Emma (Daughter)',
+      birthday: new Date('2010-06-22'),
+      interests: ['dance', 'reading'],
+    },
+  });
+
+  // Jack Burke (Son - 10 years old)
+  const jackBurke = await prisma.user.upsert({
+    where: { email: 'jack.burke@example.com' },
+    update: {},
+    create: {
+      email: 'jack.burke@example.com',
+      passwordHash: burkePassword,
+      firstName: 'Jack',
+      lastName: 'Burke',
+      displayName: 'Jack Burke',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: demoHousehold.id,
+        userId: jackBurke.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: demoHousehold.id,
+      userId: jackBurke.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Jack (Son)',
+      birthday: new Date('2014-11-08'),
+      interests: ['soccer', 'video games'],
+    },
+  });
+
+  // Max (Family Dog - Golden Retriever)
+  // Create a placeholder user for the pet first
+  const maxPet = await prisma.user.upsert({
+    where: { email: 'max.burke@haven.pet' },
+    update: {},
+    create: {
+      email: 'max.burke@haven.pet',
+      firstName: 'Max',
+      lastName: 'Burke',
+      displayName: 'Max (Dog)',
+      role: UserRole.HOMEOWNER,
+      emailVerified: false,
+    },
+  });
+
+  await prisma.householdMember.upsert({
+    where: {
+      householdId_userId: {
+        householdId: demoHousehold.id,
+        userId: maxPet.id,
+      },
+    },
+    update: {},
+    create: {
+      householdId: demoHousehold.id,
+      userId: maxPet.id,
+      role: 'MEMBER',
+      status: 'ACTIVE',
+      joinedAt: new Date(),
+      nickname: 'Max (Dog)',
+      medicalNotes: 'Golden Retriever, 4 years old. Vet: Greenwich Animal Hospital. Allergies: none.',
+      interests: ['walks', 'fetch', 'belly rubs'],
+    },
+  });
+
+  console.log(`✅ Created Burke family members: Alice (spouse), Emma (14), Jack (10), Max (dog)`);
+
+  // ============================================================================
+  // ALICE JOHNSON'S HOUSEHOLD - 1 house with 4 family members
   // ============================================================================
 
   const aliceHousehold = await prisma.household.upsert({
@@ -1362,7 +1518,7 @@ async function main() {
   });
   console.log(`✅ Created Company Wallet (Balance: $${companyWallet.balance})`);
 
-  // Create Client Bank Account for Bob's Villa
+  // Create Client Bank Account for Inspiration Farm (Burke household)
   const clientBankAccount = await prisma.clientBankAccount.upsert({
     where: { id: 'demo-bank-account' },
     update: {},
@@ -2073,7 +2229,7 @@ async function main() {
 
       travelerCount: 2,
       travelers: [
-        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Bob Burke', type: 'adult' },
         { name: 'Alice Smith', type: 'adult' },
       ],
 
@@ -2151,7 +2307,7 @@ async function main() {
 
       travelerCount: 4,
       travelers: [
-        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Bob Burke', type: 'adult' },
         { name: 'Alice Smith', type: 'adult' },
         { name: 'Emma Smith', type: 'child', age: 14 },
         { name: 'Jack Smith', type: 'child', age: 10 },
@@ -2183,7 +2339,7 @@ async function main() {
 
       travelerCount: 1,
       travelers: [
-        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Bob Burke', type: 'adult' },
       ],
 
       budgetMin: 2000,
@@ -2243,7 +2399,7 @@ async function main() {
 
       travelerCount: 2,
       travelers: [
-        { name: 'Bob Smith', type: 'adult' },
+        { name: 'Bob Burke', type: 'adult' },
         { name: 'Alice Smith', type: 'adult' },
       ],
 
@@ -2598,10 +2754,11 @@ async function main() {
   console.log('    Password: Manager123!');
   console.log('    Role:     Can access households assigned to them');
   console.log('');
-  console.log('  🏠 Homeowner Bob (Client - 3 properties):');
+  console.log('  🏠 Homeowner Bob Burke (Client - 3 properties):');
   console.log('    Email:    bob@example.com');
   console.log('    Password: Bob123!');
-  console.log('    Properties: Bob\'s Villa (CT), Malibu Mansion (CA), Beverly Hills Estate (CA)');
+  console.log('    Properties: Inspiration Farm (CT), Malibu Mansion (CA), Beverly Hills Estate (CA)');
+  console.log('    Family: Bob, Alice (spouse), Emma (14), Jack (10), Max (dog)');
   console.log('');
   console.log('  🏠 Homeowner Alice (Client - 1 property, 4 family members):');
   console.log('    Email:    alice@example.com');
@@ -2636,24 +2793,25 @@ async function main() {
   console.log('  HOUSEHOLD ASSIGNMENT');
   console.log('═══════════════════════════════════════════════════');
   console.log('');
-  console.log("  Bob's Villa (Greenwich, CT):");
-  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log("  Inspiration Farm (Greenwich, CT):");
+  console.log('    Owner:    Bob Burke (bob@example.com)');
+  console.log('    Family:   Alice (spouse), Emma (14), Jack (10), Max (dog)');
   console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Mike Rodriguez (mike@haven.app)');
-  console.log('  - 3 bed, 2.5 bath single family home on Round Hill Road');
-  console.log('  - Features: pool, septic, chimney, lawn, snow removal');
+  console.log('  - 4 bed, 5.5 bath 1920 Colonial on 4.38 acres at 38 Bedford Rd');
+  console.log('  - Features: pool, horse barn, GRTA trails, generator, septic');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
   console.log(`  - ${maintenanceTasks.length} maintenance tasks for 12 months`);
   console.log('');
   console.log('  Malibu Mansion (CA - Multi-property demo):');
-  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log('    Owner:    Bob Burke (bob@example.com)');
   console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 5 bed, 6 bath beachfront estate');
   console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
   console.log('');
   console.log('  Beverly Hills Estate (CA - Multi-property demo):');
-  console.log('    Owner:    Bob Smith (bob@example.com)');
+  console.log('    Owner:    Bob Burke (bob@example.com)');
   console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 6 bed, 7 bath Mediterranean estate');

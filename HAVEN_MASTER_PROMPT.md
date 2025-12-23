@@ -1,3 +1,127 @@
+# 🏠 HAVEN MASTER UPDATE PROMPT
+## Complete Homepage Redesign + Platform Fixes
+
+This is a comprehensive update to transform Haven into a market-leading home management platform that crushes the competition (Nines Living). Execute all parts in order.
+
+---
+
+# PART 1: COMPETITIVE CONTEXT
+
+## Our Competition: Nines Living (ninesliving.com)
+
+**What Nines Charges:**
+- Starter: $4,500/year ($375/mo) + $3,000 onboarding = $7,500 first year
+- Standard: $6,300/year ($525/mo) + $5,000 onboarding = $11,300 first year
+- 12-month prepaid commitment required
+
+**What Nines Provides:**
+- Software platform only (digital household manual)
+- Templates, task lists, protocols
+- Document storage
+- Phone/email support
+- NO bill payment
+- NO vendor coordination (just tracking)
+- NO handyman visits
+- NO humans doing actual work
+
+**Our Advantage:**
+Haven charges LESS than Nines and provides ACTUAL SERVICE — real humans who do the work, not just software to help you do it yourself.
+
+| Feature | Nines Starter | Haven Lite |
+|---------|---------------|------------|
+| Monthly Price | $375 | $349 |
+| Onboarding Fee | $3,000+ | $0 |
+| First Year Cost | $7,500+ | $4,188 |
+| Contract | 12-mo prepaid | Monthly |
+| Bills Paid For You | ❌ | ✅ |
+| Vendors Coordinated | ❌ | ✅ |
+| Humans Doing Work | ❌ | ✅ |
+
+**Kill Shot Messaging:**
+> "Nines charges $375/month for software to help YOU manage your home.
+> Haven charges $349/month and WE manage your home for you."
+
+---
+
+# PART 2: HAVEN PRICING TIERS
+
+## Tier 1: HAVEN LITE — $349/month
+**"The Smart Start"**
+- Bill consolidation & auto-pay (up to 15 accounts)
+- Vendor directory & reactive coordination
+- Document vault & digital home manual
+- Text-based home manager support (25:1 ratio)
+- Same-day response during business hours
+- No onboarding fee
+- Month-to-month (no annual commitment)
+
+*Target: Condos, apartments, townhomes, smaller homes*
+*Margin: ~31%*
+
+---
+
+## Tier 2: HAVEN — $749/month ⭐ MOST POPULAR
+**"Complete Home Management"**
+- Everything in Lite
+- Proactive home manager with regular check-ins (12:1 ratio)
+- Monthly handyman visit (2 hours)
+- Vendor oversight, vetting & negotiation
+- Maintenance tracking & preventive care program
+- Seasonal prep coordination
+- Grocery & household supply coordination
+- 12-hour response time
+
+*Target: Most homeowners, busy families, professionals*
+*Margin: ~28%*
+
+---
+
+## Tier 3: HAVEN+ — $1,499/month
+**"Home + Life Management"**
+- Everything in Haven
+- Personal assistant services (5:1 ratio)
+- Errand running, pickups & returns
+- Package management
+- Shopping & personal procurement
+- Travel coordination & booking
+- Event planning assistance
+- Pet care coordination
+- Guest preparation
+- 4-hour priority response
+- Enhanced handyman (4 hours/month)
+
+*Target: Executives, affluent families, busy professionals*
+*Margin: ~17%*
+
+---
+
+## Tier 4: HAVEN ESTATE — $3,499+/month
+**"White Glove Service"**
+- Dedicated home manager (2:1 or 1:1 ratio)
+- Dedicated handyman access (8+ hours/month)
+- Full concierge services
+- Multiple property management
+- Custom service scope
+- 2-hour priority response
+- Quarterly home review meetings
+
+*Target: Estates, UHNW families, multiple properties*
+*Margin: ~15%*
+
+---
+
+## How Billing Works (Explain on Homepage)
+- **Haven Membership:** $349-$3,499/mo (your manager, platform, handyman)
+- **Household Bills:** Passed through at cost, zero markup
+- **Example:** $3,200 in monthly bills + $749 Haven = $3,949 total to Haven. We pay everyone else.
+
+---
+
+# PART 3: HOMEPAGE COMPLETE REWRITE
+
+Replace the entire contents of `apps/web/src/app/page.tsx` with:
+
+```tsx
 'use client';
 
 import { useState } from 'react';
@@ -67,8 +191,8 @@ function Navigation() {
             <a href="#pricing" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Pricing</a>
             <a href="#compare" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Compare</a>
             <Link href="/login" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Login</Link>
-            <Link
-              href="/register"
+            <Link 
+              href="/register" 
               className="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
             >
               Get Started
@@ -90,7 +214,7 @@ function HeroSection() {
   return (
     <section className="relative pt-24 pb-16 lg:pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
       <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
-
+      
       <div className="max-w-7xl mx-auto relative">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           {/* Left Column - Content */}
@@ -114,7 +238,7 @@ function HeroSection() {
             <p className="text-xl lg:text-2xl text-slate-900 font-semibold mb-2">
               One bill. One contact. Zero hassle.
             </p>
-
+            
             <p className="text-lg text-slate-600 max-w-xl mb-8 leading-relaxed">
               Not another app to organize your chaos — <strong>actual humans who eliminate it.</strong> Your dedicated Home Manager handles everything so you can focus on what matters.
             </p>
@@ -170,7 +294,7 @@ function HeroSection() {
           {/* Right Column - Visual */}
           <div className="relative hidden lg:block">
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-emerald-200/30 to-sky-200/30 rounded-full blur-3xl" />
-
+            
             {/* Manager Card */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -192,7 +316,7 @@ function HeroSection() {
                   </div>
                 </div>
               </div>
-
+              
               <div className="p-5 space-y-3">
                 <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
@@ -201,7 +325,7 @@ function HeroSection() {
                     <p className="text-xs text-slate-500">Filter changed, ready for winter</p>
                   </div>
                 </div>
-
+                
                 <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
                   <DollarSign className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div>
@@ -209,7 +333,7 @@ function HeroSection() {
                     <p className="text-xs text-slate-500">Mortgage, utilities, lawn care — all set</p>
                   </div>
                 </div>
-
+                
                 <div className="flex items-start gap-3 p-3 bg-sky-50 rounded-xl border border-sky-100">
                   <Calendar className="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" />
                   <div>
@@ -218,7 +342,7 @@ function HeroSection() {
                   </div>
                 </div>
               </div>
-
+              
               <div className="p-4 bg-slate-50 border-t border-slate-100">
                 <p className="text-xs text-center text-slate-500 font-medium">
                   ✨ No action needed from you. We've got it covered.
@@ -285,7 +409,7 @@ function ProblemSection() {
     <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-white">
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
             Owning a home shouldn't feel like a second job.
           </h2>
           <p className="text-xl text-slate-300 max-w-3xl mx-auto">
@@ -721,11 +845,11 @@ function PricingSection() {
 
         <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => (
-            <div
+            <div 
               key={plan.name}
               className={`relative rounded-2xl p-8 ${
-                plan.popular
-                  ? 'bg-emerald-900 text-white shadow-2xl shadow-emerald-900/20 lg:-mt-4 lg:mb-[-1rem]'
+                plan.popular 
+                  ? 'bg-emerald-900 text-white shadow-2xl shadow-emerald-900/20 lg:-mt-4 lg:mb-[-1rem]' 
                   : 'bg-white border-2 border-slate-200 shadow-sm'
               }`}
             >
@@ -737,7 +861,7 @@ function PricingSection() {
                   </span>
                 </div>
               )}
-
+              
               <div className={`mb-6 ${plan.popular ? 'pt-4' : ''}`}>
                 <h3 className={`text-2xl font-bold mb-1 ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
                   {plan.name}
@@ -746,14 +870,14 @@ function PricingSection() {
                   {plan.description}
                 </p>
               </div>
-
+              
               <div className="mb-6">
                 <span className={`text-5xl font-bold ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
                   ${plan.price}
                 </span>
                 <span className={plan.popular ? 'text-emerald-300' : 'text-slate-500'}>/month</span>
               </div>
-
+              
               <ul className="space-y-3 mb-8">
                 {plan.features.map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
@@ -766,7 +890,7 @@ function PricingSection() {
                   </li>
                 ))}
               </ul>
-
+              
               <Link
                 href={`/register?plan=${plan.name.toLowerCase()}`}
                 className={`block w-full text-center px-6 py-3 font-semibold rounded-xl transition-colors ${
@@ -777,7 +901,7 @@ function PricingSection() {
               >
                 {plan.cta}
               </Link>
-
+              
               <p className={`text-center text-sm mt-4 ${plan.popular ? 'text-emerald-300' : 'text-slate-500'}`}>
                 {plan.best}
               </p>
@@ -792,10 +916,10 @@ function PricingSection() {
               <div>
                 <div className="flex items-center gap-3 mb-2">
                   <Building2 className="w-6 h-6 text-amber-400" />
-                  <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
+                  <h3 className="text-2xl font-bold">Haven Estate</h3>
                 </div>
                 <p className="text-slate-300 mb-2">White glove service for estates & multiple properties</p>
-                <p className="text-3xl font-bold text-white">$3,499<span className="text-lg text-slate-400">+/month</span></p>
+                <p className="text-3xl font-bold">$3,499<span className="text-lg text-slate-400">+/month</span></p>
               </div>
               <div className="flex flex-col gap-3">
                 <ul className="text-sm text-slate-300 space-y-1">
@@ -998,7 +1122,7 @@ function FinalCTASection() {
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-emerald-900 to-emerald-950 text-white">
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="font-serif text-4xl sm:text-5xl font-bold mb-6 text-white">
+        <h2 className="font-serif text-4xl sm:text-5xl font-bold mb-6">
           Ready to stop managing your home?
         </h2>
         <p className="text-2xl text-emerald-200 mb-4">
@@ -1072,13 +1196,13 @@ function Footer() {
           <div>
             <h4 className="font-semibold mb-4 text-white">Partners</h4>
             <ul className="space-y-3 text-slate-400 text-sm">
-              <li><Link href="/vendor" className="hover:text-white transition-colors">Vendor Portal</Link></li>
-              <li><Link href="/handyman" className="hover:text-white transition-colors">Handyman Portal</Link></li>
+              <li><Link href="/vendor/login" className="hover:text-white transition-colors">Vendor Portal</Link></li>
+              <li><Link href="/handyman/login" className="hover:text-white transition-colors">Handyman Portal</Link></li>
               <li><a href="#" className="hover:text-white transition-colors">Become a Partner</a></li>
             </ul>
           </div>
         </div>
-
+        
         {/* Trust Badges */}
         <div className="flex flex-wrap items-center justify-center gap-8 py-8 border-t border-slate-800">
           {[
@@ -1127,3 +1251,520 @@ export default function HomePage() {
     </div>
   );
 }
+```
+
+---
+
+# PART 4: GLOBAL STYLES UPDATE
+
+Add these styles to `apps/web/src/app/globals.css`:
+
+```css
+/* Add after existing styles */
+
+/* Typography Rules */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Page titles - ONLY h1 elements with this class get serif */
+h1.page-title,
+.page-title {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Everything else uses Inter */
+body, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Override for explicit serif usage */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif !important;
+}
+
+/* Contrast Fixes - White text on dark backgrounds */
+.bg-emerald-900 *,
+.bg-emerald-950 *,
+.bg-slate-900 *,
+.bg-slate-800 *,
+[class*="bg-emerald-9"] *,
+[class*="bg-slate-9"] *,
+[class*="bg-slate-8"] * {
+  --tw-text-opacity: 1;
+}
+
+/* Ensure headings in dark sections are white */
+.bg-emerald-900 h1,
+.bg-emerald-900 h2,
+.bg-emerald-900 h3,
+.bg-emerald-950 h1,
+.bg-emerald-950 h2,
+.bg-emerald-950 h3,
+.bg-slate-900 h1,
+.bg-slate-900 h2,
+.bg-slate-900 h3 {
+  color: white;
+}
+```
+
+---
+
+# PART 5: PROPERTY CONFIGURATION
+
+Create `apps/web/src/lib/demo-property.ts`:
+
+```typescript
+// Demo property configuration - 38 Bedford Rd, Greenwich, CT
+export const demoProperty = {
+  address: {
+    street: '38 Bedford Rd',
+    city: 'Greenwich',
+    state: 'CT',
+    zip: '06831',
+    full: '38 Bedford Rd, Greenwich, CT 06831',
+  },
+  name: 'Inspiration Farm',
+  details: {
+    bedrooms: 4,
+    bathrooms: 5.5,
+    squareFeet: 4500,
+    lotSize: '4.38 acres',
+    yearBuilt: 1920,
+    style: 'Colonial',
+    stories: 2,
+  },
+  features: [
+    'Pool',
+    'Horse barn',
+    'GRTA trail access',
+    'Generator',
+    'Security system',
+    'Irrigation system',
+    'Invisible fence',
+    'Wine cellar',
+    'Home office',
+    'Mudroom',
+  ],
+  systems: [
+    { name: 'HVAC', type: 'Carrier Central Air', installed: '2019', lastService: '2024-03-15' },
+    { name: 'Water Heater', type: 'Rheem 50 Gallon', installed: '2021', lastService: '2024-01-10' },
+    { name: 'Well Pump', type: 'Grundfos', installed: '2018', lastService: '2024-06-01' },
+    { name: 'Septic', type: '1500 Gallon', installed: '2015', lastService: '2024-02-20' },
+    { name: 'Generator', type: 'Generac 22kW', installed: '2020', lastService: '2024-04-15' },
+    { name: 'Security', type: 'ADT Smart Home', installed: '2022', lastService: '2024-05-01' },
+    { name: 'Pool', type: 'Gunite, Salt Water', installed: '2010', lastService: '2024-05-15' },
+    { name: 'Irrigation', type: 'Rain Bird', installed: '2019', lastService: '2024-04-01' },
+  ],
+  images: [
+    'https://photos.zillowstatic.com/fp/1d1c3e9a0e6b9c1d5c8b0e9a0e6b9c1d-cc_ft_768.webp',
+    'https://photos.zillowstatic.com/fp/2e2d4f0b1f7c0d2e6d9c1f0b1f7c0d2e-cc_ft_768.webp',
+    'https://photos.zillowstatic.com/fp/3f3e5g1c2g8d1e3f7e0d2g1c2g8d1e3f-cc_ft_768.webp',
+  ],
+  accessNotes: {
+    gateCode: '1234#',
+    alarmCode: '5678',
+    wifiNetwork: 'InspirationFarm_5G',
+    wifiPassword: 'Welcome2024!',
+    lockboxLocation: 'Back door, under mat',
+    emergencyShutoffs: {
+      water: 'Basement, northeast corner',
+      gas: 'Exterior, south side of house',
+      electrical: 'Basement, main panel by stairs',
+    },
+  },
+};
+
+export type DemoProperty = typeof demoProperty;
+```
+
+---
+
+# PART 6: AVATAR SYSTEM
+
+Create `apps/web/src/lib/avatars.ts`:
+
+```typescript
+// DiceBear avatar system for consistent user avatars
+const AVATAR_STYLE = 'lorelei';
+const AVATAR_BASE_URL = 'https://api.dicebear.com/7.x';
+
+// Predefined avatar seeds for consistent appearance
+const userAvatarSeeds: Record<string, string> = {
+  'Bob': 'bob-burke-haven',
+  'Alice': 'alice-burke-haven',
+  'Emma': 'emma-burke-haven',
+  'Jack': 'jack-burke-haven',
+  'Sarah': 'sarah-manager-haven',
+  'Mike': 'mike-handyman-haven',
+  'Admin': 'admin-haven-system',
+};
+
+// Background colors for avatars
+const avatarBackgrounds = [
+  'b6e3f4', // light blue
+  'c0aede', // light purple
+  'd1d4f9', // light indigo
+  'ffd5dc', // light pink
+  'ffdfbf', // light orange
+  'a3e4d7', // light teal
+];
+
+export function getAvatarUrl(seed: string, size: number = 128): string {
+  const bgIndex = seed.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % avatarBackgrounds.length;
+  const bg = avatarBackgrounds[bgIndex];
+  
+  return `${AVATAR_BASE_URL}/${AVATAR_STYLE}/svg?seed=${encodeURIComponent(seed)}&size=${size}&backgroundColor=${bg}`;
+}
+
+export function getUserAvatar(name: string, size: number = 128): string {
+  const seed = userAvatarSeeds[name] || `${name.toLowerCase()}-haven-user`;
+  return getAvatarUrl(seed, size);
+}
+
+export function getInitials(name: string): string {
+  return name
+    .split(' ')
+    .map(part => part[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+// Avatar component props
+export interface AvatarProps {
+  name: string;
+  size?: 'sm' | 'md' | 'lg' | 'xl';
+  className?: string;
+}
+
+export const avatarSizes = {
+  sm: 32,
+  md: 48,
+  lg: 64,
+  xl: 96,
+};
+```
+
+---
+
+# PART 7: VENDOR IMAGES
+
+Create `apps/web/src/lib/images.ts`:
+
+```typescript
+// Vendor images by category
+export const vendorImages: Record<string, string[]> = {
+  plumbing: [
+    'https://images.unsplash.com/photo-1607472586893-edb57bdc0e39?w=400',
+    'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=400',
+  ],
+  electrical: [
+    'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=400',
+    'https://images.unsplash.com/photo-1558618666-fcd25c85cd64?w=400',
+  ],
+  hvac: [
+    'https://images.unsplash.com/photo-1585771724684-38269d6639fd?w=400',
+    'https://images.unsplash.com/photo-1631545806609-35d4ae440431?w=400',
+  ],
+  landscaping: [
+    'https://images.unsplash.com/photo-1558904541-efa843a96f01?w=400',
+    'https://images.unsplash.com/photo-1592417817098-8fd3d9eb14a5?w=400',
+  ],
+  cleaning: [
+    'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=400',
+    'https://images.unsplash.com/photo-1628177142898-93e36e4e3a50?w=400',
+  ],
+  roofing: [
+    'https://images.unsplash.com/photo-1632778149955-e80f8ceca2e8?w=400',
+  ],
+  painting: [
+    'https://images.unsplash.com/photo-1562259949-e8e7689d7828?w=400',
+  ],
+  pest_control: [
+    'https://images.unsplash.com/photo-1609840114035-3c981b782dfe?w=400',
+  ],
+  pool: [
+    'https://images.unsplash.com/photo-1576013551627-0cc20b96c2a7?w=400',
+  ],
+  security: [
+    'https://images.unsplash.com/photo-1558002038-1055907df827?w=400',
+  ],
+  appliance: [
+    'https://images.unsplash.com/photo-1584568694244-14fbdf83bd30?w=400',
+  ],
+  general: [
+    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=400',
+  ],
+};
+
+export function getVendorImage(category: string, index: number = 0): string {
+  const normalizedCategory = category.toLowerCase().replace(/\s+/g, '_');
+  const images = vendorImages[normalizedCategory] || vendorImages.general;
+  return images[index % images.length];
+}
+
+// Property images
+export const propertyImages = {
+  exterior: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
+  interior: 'https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800',
+  kitchen: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=800',
+  bathroom: 'https://images.unsplash.com/photo-1552321554-5fefe8c9ef14?w=800',
+  backyard: 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800',
+};
+```
+
+---
+
+# PART 8: SEED DATA UPDATE
+
+Update `apps/api/prisma/seed.ts` to include:
+
+1. **Property:** 38 Bedford Rd, Greenwich, CT 06831
+2. **Family:** Bob (head), Alice (spouse), Emma (14), Jack (10), Max (dog)
+3. **Vendors:** 25+ vendors across categories
+4. **Avatar URLs:** Use DiceBear
+
+Add this to your seed file:
+
+```typescript
+// Family members for the Burke household
+const familyMembers = [
+  {
+    name: 'Bob Burke',
+    role: 'HEAD',
+    email: 'bob@example.com',
+    phone: '203-555-0101',
+    relationship: 'Head of Household',
+  },
+  {
+    name: 'Alice Burke',
+    role: 'SPOUSE',
+    email: 'alice@example.com',
+    phone: '203-555-0102',
+    relationship: 'Spouse',
+  },
+  {
+    name: 'Emma Burke',
+    role: 'CHILD',
+    email: 'emma@example.com',
+    phone: '203-555-0103',
+    relationship: 'Daughter',
+    notes: 'Age 14, attends Greenwich Academy',
+  },
+  {
+    name: 'Jack Burke',
+    role: 'CHILD',
+    phone: null,
+    relationship: 'Son',
+    notes: 'Age 10, attends North Street School',
+  },
+  {
+    name: 'Max',
+    role: 'PET',
+    relationship: 'Family Dog',
+    notes: 'Golden Retriever, 4 years old. Vet: Greenwich Animal Hospital',
+  },
+];
+
+// Comprehensive vendor list
+const vendors = [
+  // Plumbing
+  { name: 'Greenwich Plumbing Co.', category: 'Plumbing', phone: '203-555-1001', email: 'service@greenwichplumbing.com', rating: 5 },
+  { name: 'Drain Masters CT', category: 'Plumbing', phone: '203-555-1002', email: 'help@drainmastersct.com', rating: 4 },
+  
+  // Electrical
+  { name: 'Spark Electric LLC', category: 'Electrical', phone: '203-555-2001', email: 'jobs@sparkelectric.com', rating: 5 },
+  { name: 'PowerPro Electrical', category: 'Electrical', phone: '203-555-2002', email: 'info@powerproct.com', rating: 4 },
+  
+  // HVAC
+  { name: 'ComfortAir HVAC', category: 'HVAC', phone: '203-555-3001', email: 'service@comfortairhvac.com', rating: 5 },
+  { name: 'Cool Breeze Heating & Air', category: 'HVAC', phone: '203-555-3002', email: 'schedule@coolbreezect.com', rating: 4 },
+  
+  // Landscaping
+  { name: 'Green Thumb Landscaping', category: 'Landscaping', phone: '203-555-4001', email: 'info@greenthumbct.com', rating: 5 },
+  { name: 'Perfect Lawns LLC', category: 'Landscaping', phone: '203-555-4002', email: 'service@perfectlawns.com', rating: 4 },
+  { name: 'Tree Care Specialists', category: 'Landscaping', phone: '203-555-4003', email: 'trees@treecarect.com', rating: 5 },
+  
+  // Cleaning
+  { name: 'Pristine Home Cleaning', category: 'Cleaning', phone: '203-555-5001', email: 'book@pristinehome.com', rating: 5 },
+  { name: 'Maid Perfect', category: 'Cleaning', phone: '203-555-5002', email: 'schedule@maidperfect.com', rating: 4 },
+  
+  // Pool
+  { name: 'Crystal Pool Service', category: 'Pool', phone: '203-555-6001', email: 'service@crystalpool.com', rating: 5 },
+  
+  // Pest Control
+  { name: 'Guardian Pest Control', category: 'Pest Control', phone: '203-555-7001', email: 'help@guardianpest.com', rating: 4 },
+  
+  // Security
+  { name: 'SecureHome CT', category: 'Security', phone: '203-555-8001', email: 'support@securehomect.com', rating: 5 },
+  
+  // Roofing
+  { name: 'Top Notch Roofing', category: 'Roofing', phone: '203-555-9001', email: 'quotes@topnotchroofing.com', rating: 5 },
+  
+  // Painting
+  { name: 'Pro Painters Greenwich', category: 'Painting', phone: '203-555-0201', email: 'estimate@propainters.com', rating: 4 },
+  
+  // Appliance
+  { name: 'ApplianceFix CT', category: 'Appliance', phone: '203-555-0301', email: 'repair@appliancefixct.com', rating: 4 },
+  
+  // General Contractor
+  { name: 'BuildRight Construction', category: 'General Contractor', phone: '203-555-0401', email: 'projects@buildright.com', rating: 5 },
+  
+  // Garage Door
+  { name: 'Precision Garage Doors', category: 'Garage Door', phone: '203-555-0501', email: 'service@precisiondoors.com', rating: 4 },
+  
+  // Chimney
+  { name: 'Clean Sweep Chimney', category: 'Chimney', phone: '203-555-0601', email: 'schedule@cleansweep.com', rating: 5 },
+  
+  // Windows
+  { name: 'Clear View Windows', category: 'Windows', phone: '203-555-0701', email: 'quote@clearviewct.com', rating: 4 },
+  
+  // Flooring
+  { name: 'Elite Flooring Solutions', category: 'Flooring', phone: '203-555-0801', email: 'info@eliteflooring.com', rating: 5 },
+  
+  // Septic
+  { name: 'AAA Septic Services', category: 'Septic', phone: '203-555-0901', email: 'pump@aaaseptic.com', rating: 4 },
+  
+  // Generator
+  { name: 'PowerGuard Generators', category: 'Generator', phone: '203-555-1101', email: 'service@powerguard.com', rating: 5 },
+  
+  // Snow Removal
+  { name: 'Snow Pro CT', category: 'Snow Removal', phone: '203-555-1201', email: 'plow@snowproct.com', rating: 4 },
+];
+
+// Property configuration
+const property = {
+  addressLine1: '38 Bedford Rd',
+  addressLine2: null,
+  city: 'Greenwich',
+  state: 'CT',
+  zipCode: '06831',
+  propertyType: 'SINGLE_FAMILY',
+  bedrooms: 4,
+  bathrooms: 5.5,
+  squareFeet: 4500,
+  lotSize: 4.38,
+  yearBuilt: 1920,
+};
+```
+
+---
+
+# PART 9: NULL SAFETY FIXES
+
+Apply these patterns throughout the codebase:
+
+## Handyman Portal Fixes
+
+In any file displaying task/household data:
+
+```typescript
+// Before
+const address = task.household.homeProfile.addressLine1;
+
+// After
+const address = task.household?.homeProfile?.addressLine1 || 'Address not set';
+const city = task.household?.homeProfile?.city || '';
+const state = task.household?.homeProfile?.state || '';
+const fullAddress = address + (city ? `, ${city}` : '') + (state ? `, ${state}` : '');
+```
+
+## Vendor Portal Fixes
+
+```typescript
+// Before
+{vendor.jobs.map(job => ...)}
+
+// After
+{(vendor?.jobs || []).map(job => ...)}
+```
+
+## General Pattern
+
+```typescript
+// For arrays
+const items = data?.items || [];
+
+// For strings
+const name = user?.name || 'Unknown';
+
+// For numbers
+const count = data?.count ?? 0;
+
+// For nested objects
+const profileImage = user?.profile?.avatar?.url || '/default-avatar.png';
+```
+
+---
+
+# PART 10: VERIFICATION CHECKLIST
+
+After running this prompt, verify:
+
+## Homepage
+- [ ] Hero shows "Start for $349/month"
+- [ ] Competitor comparison section shows Haven vs. software pricing
+- [ ] Pricing section shows $349 / $749 / $1,499 / $3,499+
+- [ ] FAQ addresses "is this only for rich people?"
+- [ ] All dark sections have white text
+- [ ] Only h1 titles use serif font
+
+## Property
+- [ ] Dashboard shows 38 Bedford Rd, Greenwich, CT
+- [ ] Property details show 4 bed, 5.5 bath, 4500 sqft
+
+## Family
+- [ ] Family page shows Bob, Alice, Emma, Jack, Max
+
+## Vendors
+- [ ] Vendors page shows 25+ vendors
+- [ ] Map card doesn't overflow
+
+## Avatars
+- [ ] All users show DiceBear illustrated avatars
+
+## Portals
+- [ ] Handyman portal loads without null errors
+- [ ] Vendor portal loads without null errors
+
+---
+
+# EXECUTION INSTRUCTIONS
+
+```bash
+cd /Users/tomburke/Projects/Housing-Manager
+
+# 1. Apply all changes from this prompt
+
+# 2. Reset and reseed the database
+cd apps/api
+pnpm prisma db push --force-reset
+pnpm prisma db seed
+
+# 3. Start the API
+pnpm dev
+
+# 4. In another terminal, start the web app
+cd apps/web
+pnpm dev
+
+# 5. Test at http://localhost:3000
+```
+
+---
+
+# SUMMARY
+
+This prompt transforms Haven from a basic housing manager into a **market-dominating competitor** that:
+
+1. **Beats Nines on price** — $349 vs $375/month
+2. **Beats Nines on value** — $0 setup vs $3,000+
+3. **Beats Nines on flexibility** — Monthly vs annual
+4. **Beats Nines on service** — We DO the work, not just track it
+5. **Clear competitive positioning** — Software vs. Service comparison
+6. **Realistic pricing** — Based on actual unit economics
+7. **Complete visual overhaul** — Professional, polished homepage
+8. **All previous fixes included** — Typography, avatars, vendors, family, null safety
+
+**The kill shot**: Haven costs LESS than Nines while delivering ACTUAL SERVICE instead of just software.

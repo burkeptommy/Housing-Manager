@@ -511,3 +511,52 @@
     @apply bg-warm-900/70;
   }
 }
+
+/* ============================================================================
+   PART 4: TYPOGRAPHY & CONTRAST FIXES (from HAVEN_MASTER_PROMPT)
+   ============================================================================ */
+
+/* Typography Rules */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Page titles - ONLY h1 elements with this class get serif */
+h1.page-title,
+.page-title {
+  font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Everything else uses Inter */
+body, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Override for explicit serif usage */
+.font-serif {
+  font-family: 'Playfair Display', Georgia, serif !important;
+}
+
+/* Contrast Fixes - White text on dark backgrounds */
+.bg-emerald-900 *,
+.bg-emerald-950 *,
+.bg-slate-900 *,
+.bg-slate-800 *,
+[class*="bg-emerald-9"] *,
+[class*="bg-slate-9"] *,
+[class*="bg-slate-8"] * {
+  --tw-text-opacity: 1;
+}
+
+/* Ensure headings in dark sections are white */
+.bg-emerald-900 h1,
+.bg-emerald-900 h2,
+.bg-emerald-900 h3,
+.bg-emerald-950 h1,
+.bg-emerald-950 h2,
+.bg-emerald-950 h3,
+.bg-slate-900 h1,
+.bg-slate-900 h2,
+.bg-slate-900 h3 {
+  color: white;
+}

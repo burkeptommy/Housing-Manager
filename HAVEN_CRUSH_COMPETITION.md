@@ -1,8 +1,263 @@
+# 🏠 HAVEN - CRUSH THE COMPETITION HOMEPAGE
+
+## COMPETITIVE POSITIONING
+
+### Nines = Software Tool (You Manage)
+### Haven = Full-Service Team (We Manage For You)
+
+---
+
+## STRATEGIC HOMEPAGE SECTIONS
+
+### SECTION 1: HERO
+**Headline:** "Stop Managing Your Home. Start Living In It."
+**Subhead:** "One bill. One contact. Zero hassle."
+**Body:** Not another app to organize your chaos — actual humans who eliminate it. Your dedicated Home Manager and Handyman handle everything so you can focus on what matters.
+
+**Key Visual:** Floating UI cards showing:
+- Message from "Sarah, Your Manager" saying "Furnace fixed. Invoice approved. Nothing needed from you."
+- Bill consolidation (12 vendor logos → 1 Haven logo)
+- Time saved counter
+
+**CTA:** "Start for $99/month" (transparent, no hidden pricing)
+
+**Trust Bar:**
+- FDIC-Insured
+- $2M Coverage  
+- SOC 2 Certified (add this)
+- 4.9★ Rating
+
+---
+
+### SECTION 2: THE PROBLEM (Empathy + Pain Points)
+**Headline:** "Owning a home shouldn't feel like a second job."
+
+**Two-Column Comparison:**
+
+| Without Haven | With Haven |
+|---------------|------------|
+| 12+ vendor relationships | 1 dedicated manager |
+| Dozens of bills arriving randomly | 1 monthly statement |
+| Hours coordinating repairs | Text once, done |
+| Forgotten maintenance = emergencies | Proactive monthly visits |
+| You're the unpaid project manager | We're the paid experts |
+
+**Bottom Line:** "8+ hours per month — that's what our members get back."
+
+---
+
+### SECTION 3: THE DIFFERENCE (vs. Competitors)
+**Headline:** "Software vs. Service: There's No Comparison"
+
+**Kill Shot Copy:**
+> Other companies give you an app to organize your home management chaos. That's like giving a drowning person a waterproof notebook.
+>
+> Haven doesn't organize your problems. We solve them.
+
+**Comparison Table:**
+
+| | Household Apps | Haven |
+|---|----------------|-------|
+| Bills | You pay 15 vendors separately | One payment, we pay everyone |
+| Repairs | You find, call, and manage contractors | We handle everything start to finish |
+| Coordination | You're the project manager | Your manager coordinates for you |
+| Maintenance | You remember (or forget) | Monthly handyman visits, automatically |
+| When things break | You scramble | You text. We fix. |
+| Work required | All of it | Almost none |
+
+**Bottom Line:** "Apps give you tools. Haven gives you time."
+
+---
+
+### SECTION 4: HOW IT WORKS (3 Steps)
+**Headline:** "From Chaos to Calm in 3 Steps"
+
+1. **Tell Us About Your Home**
+   - Connect your vendors, bills, and preferences
+   - We set up auto-pay and take over relationships
+   
+2. **Fund Your Haven Wallet**
+   - One monthly payment to Haven
+   - We pay your mortgage, utilities, lawn care, everyone
+   - FDIC-insured, full visibility
+   
+3. **Text Your Manager**
+   - Something need fixing? Have a question?
+   - Text Sarah. She coordinates everything.
+   - Get results, not to-do lists.
+
+---
+
+### SECTION 5: EVERYTHING WE HANDLE
+**Headline:** "What Your Home Manager and Handyman Actually Do"
+
+**Four Service Pillars:**
+
+#### 💰 Bill Management
+- Pay your mortgage, property taxes
+- All utilities (electric, gas, water, internet)
+- Insurance premiums, HOA dues
+- Every vendor invoice, on time
+
+#### 🔧 Home Maintenance  
+- Monthly preventive handyman visits
+- HVAC service, filter changes
+- Plumbing, electrical, appliance issues
+- Seasonal prep (winterization, spring opening)
+
+#### 👥 Vendor Coordination
+- Find and vet qualified pros
+- Schedule and oversee all work
+- Handle disputes and issues
+- No more being on hold
+
+#### ✨ Life Management (Haven+)
+- Errand running & pickups
+- Package tracking & returns
+- Pet care coordination
+- Event planning, guest prep
+
+**The Handyman Difference Box:**
+> Unlike software tools that just track maintenance, Haven includes a dedicated handyman who physically visits your home monthly. They catch small issues before they become expensive emergencies.
+>
+> **Last month, our handymen saved members an average of $847** by catching issues early.
+
+---
+
+### SECTION 6: TRANSPARENT PRICING
+**Headline:** "Plans That Fit Real Life"
+**Subhead:** "No hidden fees. No annual contracts. No 'schedule a demo' to see prices."
+
+| Plan | Price | Best For |
+|------|-------|----------|
+| **Starter** | $99/mo | Condos, townhomes, smaller homes |
+| **Haven** ⭐ | $149/mo | Most homeowners — our most popular |
+| **Haven+** | $349/mo | Full home + life management |
+
+**How Billing Works:**
+- Haven membership: $99-$349/mo (your manager, platform, handyman)
+- Your household bills: At cost, zero markup
+- Example: $2,500 bills + $149 membership = $2,649 total to Haven
+
+**vs. Competition:**
+> Some services hide pricing and require annual commitments. We believe in transparency. See exactly what you pay. Cancel anytime.
+
+---
+
+### SECTION 7: SOCIAL PROOF
+**Headline:** "Real Homeowners. Real Results."
+
+**Testimonials (emphasize accessibility):**
+
+> "I thought this kind of service was only for people with mansions. Turns out it's for anyone tired of being their own property manager. Worth every penny."
+> — **Marcus T.**, Software Developer, 3BR Colonial
+
+> "Last month Sarah caught an overcharge from our landscaper and saved us $400. The membership paid for itself."
+> — **Jennifer L.**, Working Mom, Townhouse  
+
+> "The monthly handyman visit is worth the membership alone. Mike caught a small leak that would've destroyed our basement."
+> — **David S.**, Small Business Owner, 4BR Home
+
+**Stats Grid:**
+- 8+ hours saved monthly
+- 500+ families served
+- 4.9/5 average rating
+- $0 hidden fees
+
+---
+
+### SECTION 8: FAQ (Address Objections)
+**Headline:** "Questions? We Have Answers."
+
+**Q: Is this only for rich people with big estates?**
+> Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Starter plan at $99/month works perfectly for condos and townhomes. The value comes from saving you time and preventing expensive repairs.
+
+**Q: How is Haven different from household management apps?**
+> Apps give you software to organize things yourself — you still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely.
+
+**Q: Why would I pay for this when I can manage things myself?**
+> You can. The question is whether you want to. If you enjoy tracking down vendors, waiting on hold, and remembering when the furnace filter was last changed — keep doing that. If you'd rather text once and have it handled, that's what we do.
+
+**Q: Do I have to sign an annual contract?**
+> No. Month-to-month, cancel anytime. Some companies lock you into 12-month prepaid commitments. We don't.
+
+---
+
+### SECTION 9: FINAL CTA
+**Headline:** "Ready to stop managing your home?"
+
+**Body:** 
+One bill. One contact. Zero hassle.
+Join hundreds of families who've reclaimed their time.
+
+**CTA Button:** "Start for $99/month →"
+
+**Fine Print:** No contracts. No setup fees. Cancel anytime.
+
+---
+
+### SECTION 10: FOOTER
+- Trust badges: FDIC-Insured | SOC 2 | $2M Covered | BBB A+
+- Links: How It Works | Pricing | FAQ | Login | Vendor Portal
+- Contact: Phone, email
+- Social proof: "Trusted by 500+ families"
+
+---
+
+## KEY MESSAGING PILLARS
+
+### Against Nines Specifically:
+
+1. **"We do the work, not just track it"**
+   - Nines = organize your tasks
+   - Haven = complete your tasks
+
+2. **"One bill, not one more app"**
+   - Nines = you still pay 15 vendors
+   - Haven = pay once, we handle the rest
+
+3. **"Humans, not software"**
+   - Nines = digital household manual
+   - Haven = dedicated team (Manager + Handyman)
+
+4. **"Transparent, flexible pricing"**
+   - Nines = hidden pricing, annual lock-in
+   - Haven = prices on website, monthly, cancel anytime
+
+5. **"For everyone, not just estates"**
+   - Nines = UHNW families, family offices
+   - Haven = anyone tired of managing their home
+
+---
+
+## VISUAL/DESIGN BEATS
+
+### Match Nines' Polish:
+- Clean, minimal design
+- Professional photography
+- Consistent typography
+- Trust badges prominently displayed
+
+### Beat Nines:
+- Show actual UI of the app (they have nice mockups)
+- Real testimonials from regular people (not just estate managers)
+- Pricing visible above the fold
+- Clear differentiation messaging
+- Less corporate, more approachable
+
+---
+
+## IMPLEMENTATION FILE
+
+Replace `apps/web/src/app/page.tsx` with the following:
+
+```tsx
 'use client';
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import Image from 'next/image';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Home,
   Check,
@@ -24,27 +279,41 @@ import {
   Lock,
   BadgeCheck,
   CheckCircle2,
+  Thermometer,
+  MapPin,
+  Heart,
+  Phone,
+  Mail,
+  Package,
+  Car,
+  Dog,
+  Gift,
+  Plane,
+  Snowflake,
+  Sun,
+  Leaf,
+  AlertTriangle,
+  ClipboardList,
+  Receipt,
+  Key,
+  Camera,
+  Bell,
+  Activity,
+  Filter,
   ChevronDown,
   ChevronRight,
+  Play,
   Award,
+  TrendingUp,
   ShieldCheck,
+  Smartphone,
+  Building2,
   Hammer,
   PiggyBank,
   Timer,
   Bot,
   Laptop,
   HeartHandshake,
-  Receipt,
-  Heart,
-  Phone,
-  Mail,
-  Package,
-  Car,
-  ClipboardList,
-  Flame,
-  Leaf,
-  Building2,
-  MapPin,
 } from 'lucide-react';
 
 // ============================================================================
@@ -62,16 +331,12 @@ function Navigation() {
             <span className="text-xl font-bold text-slate-900">Haven</span>
           </Link>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">How It Works</a>
-            <a href="#services" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Services</a>
-            <a href="#pricing" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Pricing</a>
-            <a href="#compare" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Compare</a>
-            <Link href="/login" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Login</Link>
-            <Link
-              href="/register"
-              className="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-            >
-              Get Started
+            <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 text-sm font-medium">How It Works</a>
+            <a href="#services" className="text-slate-600 hover:text-slate-900 text-sm font-medium">Services</a>
+            <a href="#pricing" className="text-slate-600 hover:text-slate-900 text-sm font-medium">Pricing</a>
+            <Link href="/login" className="text-slate-600 hover:text-slate-900 text-sm font-medium">Login</Link>
+            <Link href="/register" className="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm">
+              Start for $99/mo
             </Link>
           </div>
           <Link href="/register" className="md:hidden px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg">
@@ -89,17 +354,18 @@ function Navigation() {
 function HeroSection() {
   return (
     <section className="relative pt-24 pb-16 lg:pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
+      {/* Background decoration */}
       <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
-
+      
       <div className="max-w-7xl mx-auto relative">
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left Column - Content */}
+          {/* Left Column */}
           <div className="relative z-10">
             {/* Badge */}
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full mb-6">
               <HeartHandshake className="w-4 h-4 text-emerald-600" />
               <span className="text-sm font-medium text-emerald-800">
-                Full-service home management — not just software
+                Full-service home management — not just another app
               </span>
             </div>
 
@@ -114,32 +380,34 @@ function HeroSection() {
             <p className="text-xl lg:text-2xl text-slate-900 font-semibold mb-2">
               One bill. One contact. Zero hassle.
             </p>
-
+            
             <p className="text-lg text-slate-600 max-w-xl mb-8 leading-relaxed">
-              Not another app to organize your chaos — <strong>actual humans who eliminate it.</strong> Your dedicated Home Manager handles everything so you can focus on what matters.
+              Not another app to organize your chaos — <strong>actual humans who eliminate it.</strong> Your dedicated Home Manager and Handyman handle everything so you can focus on what matters.
             </p>
 
-            {/* Value Props */}
+            {/* Key Benefits Pills */}
             <div className="flex flex-wrap gap-3 mb-8">
-              {[
-                { icon: Receipt, label: 'One Bill', color: 'amber' },
-                { icon: MessageSquare, label: 'One Contact', color: 'emerald' },
-                { icon: CheckCircle2, label: 'Zero Hassle', color: 'sky' },
-              ].map(({ icon: Icon, label, color }) => (
-                <div key={label} className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
-                  <Icon className={`w-4 h-4 text-${color}-600`} />
-                  <span className="text-sm font-medium text-slate-700">{label}</span>
-                </div>
-              ))}
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                <Receipt className="w-4 h-4 text-amber-600" />
+                <span className="text-sm font-medium text-slate-700">One Bill</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                <MessageSquare className="w-4 h-4 text-emerald-600" />
+                <span className="text-sm font-medium text-slate-700">One Contact</span>
+              </div>
+              <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
+                <CheckCircle2 className="w-4 h-4 text-sky-600" />
+                <span className="text-sm font-medium text-slate-700">Zero Hassle</span>
+              </div>
             </div>
 
-            {/* CTAs */}
+            {/* CTA */}
             <div className="flex flex-col sm:flex-row items-start gap-4 mb-10">
               <Link
                 href="/register"
                 className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 text-white text-lg font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/25 hover:shadow-xl hover:shadow-emerald-600/30"
               >
-                Start for $349/month
+                Start for $99/month
                 <ArrowRight className="w-5 h-5" />
               </Link>
               <a
@@ -153,25 +421,31 @@ function HeroSection() {
 
             {/* Trust Bar */}
             <div className="flex flex-wrap items-center gap-6 pt-8 border-t border-slate-200">
-              {[
-                { icon: Lock, label: 'FDIC-Insured' },
-                { icon: Shield, label: '$2M Coverage' },
-                { icon: ShieldCheck, label: 'SOC 2 Certified' },
-                { icon: Star, label: '4.9/5 Rating', fill: true },
-              ].map(({ icon: Icon, label, fill }) => (
-                <div key={label} className="flex items-center gap-2 text-slate-500">
-                  <Icon className={`w-4 h-4 ${fill ? 'text-amber-400 fill-amber-400' : ''}`} />
-                  <span className="text-sm font-medium">{label}</span>
-                </div>
-              ))}
+              <div className="flex items-center gap-2 text-slate-500">
+                <Lock className="w-4 h-4" />
+                <span className="text-sm font-medium">FDIC-Insured</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-500">
+                <Shield className="w-4 h-4" />
+                <span className="text-sm font-medium">$2M Coverage</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-500">
+                <ShieldCheck className="w-4 h-4" />
+                <span className="text-sm font-medium">SOC 2 Certified</span>
+              </div>
+              <div className="flex items-center gap-2 text-slate-500">
+                <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                <span className="text-sm font-medium">4.9/5 Rating</span>
+              </div>
             </div>
           </div>
 
           {/* Right Column - Visual */}
           <div className="relative hidden lg:block">
+            {/* Glow Effect */}
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-emerald-200/30 to-sky-200/30 rounded-full blur-3xl" />
-
-            {/* Manager Card */}
+            
+            {/* Main Card */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -187,38 +461,38 @@ function HeroSection() {
                     <p className="font-semibold text-slate-900">Sarah, Your Home Manager</p>
                     <p className="text-sm text-emerald-600 flex items-center gap-1.5">
                       <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      Active now
+                      Just now
                     </p>
                   </div>
                 </div>
               </div>
-
+              
               <div className="p-5 space-y-3">
                 <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
                   <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">Furnace service completed</p>
-                    <p className="text-xs text-slate-500">Filter changed, ready for winter</p>
+                    <p className="text-xs text-slate-500">Filter changed, ready for winter. Invoice: $185</p>
                   </div>
                 </div>
-
+                
                 <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
                   <DollarSign className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-slate-900">December bills paid</p>
-                    <p className="text-xs text-slate-500">Mortgage, utilities, lawn care — all set</p>
+                    <p className="text-xs text-slate-500">Electric, gas, water, lawn care. Total: $847</p>
                   </div>
                 </div>
-
+                
                 <div className="flex items-start gap-3 p-3 bg-sky-50 rounded-xl border border-sky-100">
                   <Calendar className="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" />
                   <div>
-                    <p className="text-sm font-medium text-slate-900">Gutter cleaning scheduled</p>
-                    <p className="text-xs text-slate-500">Tuesday 10am — no action needed</p>
+                    <p className="text-sm font-medium text-slate-900">Gutter cleaning tomorrow</p>
+                    <p className="text-xs text-slate-500">9am-11am. Mike will be there — no action needed.</p>
                   </div>
                 </div>
               </div>
-
+              
               <div className="p-4 bg-slate-50 border-t border-slate-100">
                 <p className="text-xs text-center text-slate-500 font-medium">
                   ✨ No action needed from you. We've got it covered.
@@ -226,7 +500,7 @@ function HeroSection() {
               </div>
             </motion.div>
 
-            {/* Floating Badge - Bills */}
+            {/* Floating Badge - Bills Consolidated */}
             <motion.div
               initial={{ opacity: 0, x: -30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -235,12 +509,12 @@ function HeroSection() {
             >
               <div className="flex items-center gap-3 mb-2">
                 <div className="flex -space-x-2">
-                  {[Zap, Droplets, Wifi, Flame].map((Icon, i) => (
+                  {[Zap, Droplets, Wifi, Sparkles].map((Icon, i) => (
                     <div key={i} className={`w-7 h-7 rounded-full flex items-center justify-center border-2 border-white ${
-                      ['bg-amber-100', 'bg-cyan-100', 'bg-purple-100', 'bg-orange-100'][i]
+                      ['bg-blue-100', 'bg-cyan-100', 'bg-purple-100', 'bg-green-100'][i]
                     }`}>
                       <Icon className={`w-3.5 h-3.5 ${
-                        ['text-amber-600', 'text-cyan-600', 'text-purple-600', 'text-orange-600'][i]
+                        ['text-blue-600', 'text-cyan-600', 'text-purple-600', 'text-green-600'][i]
                       }`} />
                     </div>
                   ))}
@@ -253,7 +527,7 @@ function HeroSection() {
               <p className="text-sm font-semibold text-slate-900">12 bills → 1 payment</p>
             </motion.div>
 
-            {/* Floating Badge - Time */}
+            {/* Floating Badge - Time Saved */}
             <motion.div
               initial={{ opacity: 0, x: 30 }}
               animate={{ opacity: 1, x: 0 }}
@@ -285,7 +559,7 @@ function ProblemSection() {
     <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-white">
+          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4">
             Owning a home shouldn't feel like a second job.
           </h2>
           <p className="text-xl text-slate-300 max-w-3xl mx-auto">
@@ -298,18 +572,19 @@ function ProblemSection() {
           <div className="bg-slate-800/60 backdrop-blur rounded-2xl p-6 lg:p-8 border border-slate-700">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <X className="w-5 h-5 text-red-400" />
+                <AlertTriangle className="w-5 h-5 text-red-400" />
               </div>
-              <h3 className="text-xl font-semibold text-white">Without Haven</h3>
+              <h3 className="text-xl font-semibold">Without Haven</h3>
             </div>
             <ul className="space-y-4">
               {[
-                '12+ vendor relationships to juggle',
-                'Dozens of bills arriving at random',
-                'Hours spent on hold with contractors',
-                'Forgotten maintenance = expensive repairs',
-                "You're the unpaid project manager",
-                'Constant mental overhead',
+                "12+ vendor relationships to manage",
+                "Dozens of passwords and accounts",
+                "Bills arriving at random times",
+                "Missed maintenance = expensive repairs",
+                "Hours on hold with service companies",
+                "Being your own project manager",
+                "Constant mental overhead",
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <X className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
@@ -325,16 +600,17 @@ function ProblemSection() {
               <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
                 <CheckCircle2 className="w-5 h-5 text-emerald-400" />
               </div>
-              <h3 className="text-xl font-semibold text-white">With Haven</h3>
+              <h3 className="text-xl font-semibold">With Haven</h3>
             </div>
             <ul className="space-y-4">
               {[
-                '1 dedicated Home Manager',
-                '1 monthly bill, auto-paid',
-                'Text your manager, we make the calls',
-                'Proactive maintenance catches issues early',
-                'Results, not more to-do lists',
-                'Complete peace of mind',
+                "1 dedicated Home Manager",
+                "1 login, 1 dashboard",
+                "1 monthly bill, auto-paid",
+                "Proactive maintenance catches issues early",
+                "Text your manager, we make the calls",
+                "Results, not more to-do lists",
+                "Complete peace of mind",
               ].map((item, i) => (
                 <li key={i} className="flex items-start gap-3">
                   <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
@@ -357,96 +633,109 @@ function ProblemSection() {
 }
 
 // ============================================================================
-// COMPETITOR COMPARISON SECTION
+// SOFTWARE VS SERVICE SECTION (COMPETITOR KILLER)
 // ============================================================================
-function CompetitorSection() {
+function SoftwareVsServiceSection() {
   return (
-    <section id="compare" className="py-20 px-4 sm:px-6 lg:px-8 bg-amber-50 border-y border-amber-100">
+    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-amber-50 border-y border-amber-100">
       <div className="max-w-6xl mx-auto">
         <div className="text-center mb-12">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 rounded-full mb-4">
-            <Award className="w-4 h-4 text-amber-700" />
+            <Laptop className="w-4 h-4 text-amber-700" />
             <span className="text-sm font-semibold text-amber-800">The Real Difference</span>
           </div>
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
             Software vs. Service
           </h2>
           <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-            Other companies give you software to organize your home management chaos.
+            Other companies give you an app to organize your home management chaos. 
             <strong> That's like giving a drowning person a waterproof notebook.</strong>
           </p>
         </div>
 
-        {/* Main Comparison Table */}
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mb-12">
-          {/* Header */}
-          <div className="grid grid-cols-3 divide-x divide-slate-200">
+        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden">
+          <div className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200">
+            {/* Header Row */}
             <div className="p-6 bg-slate-50">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Feature</p>
+              <p className="text-lg font-semibold text-slate-900">Feature</p>
             </div>
             <div className="p-6 bg-slate-100">
               <div className="flex items-center gap-2">
                 <Bot className="w-5 h-5 text-slate-400" />
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">Household Software</p>
-                  <p className="text-xs text-slate-400">$375/mo + $3K setup</p>
-                </div>
+                <p className="text-lg font-semibold text-slate-500">Household Apps</p>
               </div>
             </div>
             <div className="p-6 bg-emerald-50">
               <div className="flex items-center gap-2">
                 <Home className="w-5 h-5 text-emerald-600" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-700">Haven</p>
-                  <p className="text-xs text-emerald-600">$349/mo, no setup fee</p>
-                </div>
+                <p className="text-lg font-semibold text-emerald-700">Haven</p>
               </div>
             </div>
           </div>
 
-          {/* Rows */}
           {[
-            { feature: 'Monthly Cost', software: '$375/month', haven: '$349/month' },
-            { feature: 'Setup/Onboarding', software: '$3,000 - $5,000', haven: '$0' },
-            { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
-            { feature: 'Contract Required', software: '12-month prepaid', haven: 'Month-to-month' },
-            { feature: 'Bills Paid For You', software: '❌ No — you pay each vendor', haven: '✅ Yes — one payment covers all' },
-            { feature: 'Vendor Coordination', software: '❌ No — just a contact list', haven: '✅ Yes — we call, schedule, oversee' },
-            { feature: 'Handyman Visits', software: '❌ No', haven: '✅ Yes — monthly preventive visits' },
-            { feature: 'Humans Doing Work', software: '❌ No — software only', haven: '✅ Yes — dedicated manager' },
-            { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
+            {
+              feature: "Bill Payment",
+              app: "You pay 15 vendors separately",
+              haven: "One payment, we pay everyone",
+            },
+            {
+              feature: "When Things Break",
+              app: "You find, call, and manage contractors",
+              haven: "You text. We fix.",
+            },
+            {
+              feature: "Coordination",
+              app: "You're the project manager",
+              haven: "Your manager handles it",
+            },
+            {
+              feature: "Maintenance",
+              app: "You remember (or forget)",
+              haven: "Monthly handyman visits, automatically",
+            },
+            {
+              feature: "Work Required",
+              app: "All of it",
+              haven: "Almost none",
+            },
+            {
+              feature: "What You Get",
+              app: "A better to-do list",
+              haven: "Time back",
+            },
           ].map((row, i) => (
-            <div key={i} className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
-              <div className="p-4 md:p-5">
-                <p className="font-medium text-slate-900 text-sm">{row.feature}</p>
+            <div key={i} className="grid md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-slate-200 border-t border-slate-200">
+              <div className="p-4 md:p-6">
+                <p className="font-medium text-slate-900">{row.feature}</p>
               </div>
-              <div className="p-4 md:p-5 bg-slate-50/50">
-                <p className="text-sm text-slate-600">{row.software}</p>
+              <div className="p-4 md:p-6 bg-slate-50">
+                <div className="flex items-start gap-2">
+                  <X className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-slate-600">{row.app}</p>
+                </div>
               </div>
-              <div className="p-4 md:p-5 bg-emerald-50/50">
-                <p className="text-sm text-slate-900 font-medium">{row.haven}</p>
+              <div className="p-4 md:p-6 bg-emerald-50/50">
+                <div className="flex items-start gap-2">
+                  <Check className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <p className="text-sm text-slate-900 font-medium">{row.haven}</p>
+                </div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Bottom Message */}
-        <div className="text-center">
-          <div className="inline-block bg-white rounded-2xl p-8 shadow-lg border border-slate-200">
-            <p className="text-2xl font-bold text-slate-900 mb-2">
-              Why pay more for software that makes YOU do the work?
-            </p>
-            <p className="text-lg text-slate-600 mb-6">
-              Haven costs <span className="text-emerald-600 font-semibold">$26/month less</span> with <span className="text-emerald-600 font-semibold">no setup fee</span> — and we actually do the work.
-            </p>
-            <Link
-              href="/register"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/25"
-            >
-              Get Actual Help — $349/month
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </div>
+        <div className="mt-10 text-center">
+          <p className="text-xl text-slate-600 mb-6">
+            <strong className="text-slate-900">Apps give you tools.</strong> Haven gives you time.
+          </p>
+          <Link
+            href="/register"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/25"
+          >
+            Get Actual Help — $99/month
+            <ArrowRight className="w-5 h-5" />
+          </Link>
         </div>
       </div>
     </section>
@@ -457,30 +746,6 @@ function CompetitorSection() {
 // HOW IT WORKS
 // ============================================================================
 function HowItWorksSection() {
-  const steps = [
-    {
-      step: 1,
-      icon: ClipboardList,
-      title: 'Tell Us About Your Home',
-      description: 'Share your vendors, bills, and preferences. We set up auto-pay and take over the relationships.',
-      color: 'amber',
-    },
-    {
-      step: 2,
-      icon: PiggyBank,
-      title: 'Fund Your Haven Wallet',
-      description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
-      color: 'emerald',
-    },
-    {
-      step: 3,
-      icon: MessageSquare,
-      title: 'Text Your Manager',
-      description: "Something need fixing? Question about your home? Text once. Your dedicated manager handles everything.",
-      color: 'sky',
-    },
-  ];
-
   return (
     <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
@@ -493,14 +758,36 @@ function HowItWorksSection() {
             From Chaos to Calm in 3 Steps
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Get started in minutes. We handle everything from there.
+            Get started in minutes. We'll handle everything from there.
           </p>
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {steps.map(({ step, icon: Icon, title, description, color }) => (
+          {[
+            {
+              step: 1,
+              icon: ClipboardList,
+              title: "Tell Us About Your Home",
+              description: "Share your vendors, bills, and preferences. We'll set up auto-pay and take over the relationships.",
+              color: "amber",
+            },
+            {
+              step: 2,
+              icon: PiggyBank,
+              title: "Fund Your Haven Wallet",
+              description: "One monthly payment to Haven. We pay your mortgage, utilities, and every vendor. FDIC-insured.",
+              color: "emerald",
+            },
+            {
+              step: 3,
+              icon: MessageSquare,
+              title: "Text Your Manager",
+              description: "Something need fixing? Have a question? Text once. Your dedicated manager coordinates everything.",
+              color: "sky",
+            },
+          ].map(({ step, icon: Icon, title, description, color }) => (
             <div key={step} className="relative">
-              <div className={`absolute -top-4 -left-4 w-12 h-12 bg-${color}-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
+              <div className={`absolute -top-4 -left-4 w-12 h-12 bg-${color}-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg shadow-${color}-500/30`}>
                 {step}
               </div>
               <div className="bg-slate-50 rounded-2xl p-8 pt-12 h-full border border-slate-200 hover:border-slate-300 transition-colors">
@@ -525,28 +812,28 @@ function ServicesSection() {
   const services = [
     {
       icon: Receipt,
-      title: 'Bill Management',
-      color: 'amber',
-      items: ['Mortgage & property taxes', 'All utilities (electric, gas, water)', 'Insurance & HOA dues', 'Every vendor invoice, on time'],
+      title: "Bill Management",
+      color: "amber",
+      items: ["Mortgage & property taxes", "All utilities", "Insurance & HOA", "Every vendor invoice"],
     },
     {
       icon: Wrench,
-      title: 'Home Maintenance',
-      color: 'emerald',
-      items: ['Monthly handyman visits', 'HVAC service & filter changes', 'Plumbing & electrical coordination', 'Seasonal prep & winterization'],
+      title: "Home Maintenance",
+      color: "emerald",
+      items: ["Monthly handyman visits", "HVAC service", "Plumbing & electrical", "Seasonal prep"],
     },
     {
       icon: Users,
-      title: 'Vendor Coordination',
-      color: 'sky',
-      items: ['Find & vet qualified pros', 'Schedule & oversee all work', 'Handle disputes & issues', 'Negotiate on your behalf'],
+      title: "Vendor Coordination",
+      color: "sky",
+      items: ["Find & vet pros", "Schedule & oversee", "Handle disputes", "No more phone tag"],
     },
     {
       icon: Heart,
-      title: 'Life Management',
-      color: 'rose',
-      badge: 'Haven+',
-      items: ['Errand running & pickups', 'Package handling & returns', 'Travel coordination', 'Event planning'],
+      title: "Life Management",
+      color: "rose",
+      badge: "Haven+",
+      items: ["Errand running", "Package handling", "Pet care", "Event planning"],
     },
   ];
 
@@ -597,18 +884,18 @@ function ServicesSection() {
                 <Hammer className="w-4 h-4 text-emerald-300" />
                 <span className="text-sm font-semibold text-emerald-200">The Haven Difference</span>
               </div>
-              <h3 className="font-serif text-2xl sm:text-3xl font-bold mb-4 text-white">
+              <h3 className="font-serif text-2xl sm:text-3xl font-bold mb-4">
                 Your Own Dedicated Handyman
               </h3>
               <p className="text-emerald-100 text-lg leading-relaxed mb-6">
-                Unlike software that just tracks maintenance, Haven includes a dedicated handyman who physically visits your home monthly. They catch small issues before they become expensive emergencies.
+                Unlike apps that just track maintenance, Haven includes a dedicated handyman who physically visits your home monthly. They catch small issues before they become expensive emergencies.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 {[
-                  'Monthly preventive visits',
-                  'Same person every time',
-                  'Filter changes included',
-                  'Minor repairs on the spot',
+                  "Monthly preventive visits",
+                  "Same person every time",
+                  "Filter changes included",
+                  "Minor repairs on the spot",
                 ].map((item, i) => (
                   <div key={i} className="flex items-center gap-2">
                     <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
@@ -629,9 +916,9 @@ function ServicesSection() {
               </div>
               <div className="space-y-3">
                 {[
-                  { label: 'Next visit', value: 'Tuesday, 10am' },
-                  { label: 'Issues caught this year', value: '12 (saved $3,400+)' },
-                  { label: 'Your home', value: 'Knows it inside & out' },
+                  { label: "Next visit", value: "Tuesday, 10am" },
+                  { label: "Issues caught this month", value: "3 (saved $1,200+)" },
+                  { label: "Your home", value: "Knows it inside & out" },
                 ].map((stat, i) => (
                   <div key={i} className="flex items-center justify-between p-3 bg-emerald-900/60 rounded-lg">
                     <span className="text-emerald-200 text-sm">{stat.label}</span>
@@ -651,58 +938,6 @@ function ServicesSection() {
 // PRICING SECTION
 // ============================================================================
 function PricingSection() {
-  const plans = [
-    {
-      name: 'Lite',
-      price: 349,
-      description: 'Essential home management',
-      popular: false,
-      features: [
-        'Bill consolidation (up to 15 accounts)',
-        'Vendor coordination (reactive)',
-        'Text-based home manager',
-        'Document vault & home manual',
-        'Same-day response',
-      ],
-      cta: 'Get Started',
-      best: 'Best for condos & apartments',
-    },
-    {
-      name: 'Haven',
-      price: 749,
-      description: 'Complete home management',
-      popular: true,
-      features: [
-        'Everything in Lite',
-        'Proactive home manager',
-        'Monthly handyman visit (2 hrs)',
-        'Vendor oversight & negotiation',
-        'Maintenance scheduling',
-        'Grocery coordination',
-        '12-hour response time',
-      ],
-      cta: 'Get Started',
-      best: 'Best for most homeowners',
-    },
-    {
-      name: 'Haven+',
-      price: 1499,
-      description: 'Home + life management',
-      popular: false,
-      features: [
-        'Everything in Haven',
-        'Personal assistant services',
-        'Errands, shopping & returns',
-        'Travel coordination',
-        'Event planning',
-        '4-hour priority response',
-        'Enhanced handyman (4 hrs/mo)',
-      ],
-      cta: 'Get Started',
-      best: 'Best for busy executives',
-    },
-  ];
-
   return (
     <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
       <div className="max-w-7xl mx-auto">
@@ -715,108 +950,120 @@ function PricingSection() {
             Plans That Fit Real Life
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            No hidden fees. No setup costs. No annual contracts.
+            No hidden fees. No annual contracts. No "schedule a demo" to see prices.
           </p>
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative rounded-2xl p-8 ${
-                plan.popular
-                  ? 'bg-emerald-900 text-white shadow-2xl shadow-emerald-900/20 lg:-mt-4 lg:mb-[-1rem]'
-                  : 'bg-white border-2 border-slate-200 shadow-sm'
-              }`}
+          {/* Starter */}
+          <div className="bg-white rounded-2xl p-8 border-2 border-slate-200 shadow-sm">
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-slate-900 mb-1">Starter</h3>
+              <p className="text-slate-500">Essential home management</p>
+            </div>
+            <div className="mb-6">
+              <span className="text-5xl font-bold text-slate-900">$99</span>
+              <span className="text-slate-500">/month</span>
+            </div>
+            <ul className="space-y-3 mb-8">
+              {[
+                "Bill consolidation (up to 8 accounts)",
+                "Dedicated home manager",
+                "Vendor coordination",
+                "Maintenance scheduling",
+                "Document vault",
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-slate-600">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/register?plan=starter"
+              className="block w-full text-center px-6 py-3 bg-slate-100 text-slate-900 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
             >
-              {plan.popular && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <span className="inline-flex items-center gap-1 px-4 py-1.5 bg-amber-400 text-slate-900 text-sm font-bold rounded-full shadow-lg">
-                    <Star className="w-4 h-4" />
-                    Most Popular
-                  </span>
-                </div>
-              )}
+              Get Started
+            </Link>
+          </div>
 
-              <div className={`mb-6 ${plan.popular ? 'pt-4' : ''}`}>
-                <h3 className={`text-2xl font-bold mb-1 ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
-                  {plan.name}
-                </h3>
-                <p className={plan.popular ? 'text-emerald-300' : 'text-slate-500'}>
-                  {plan.description}
-                </p>
-              </div>
-
-              <div className="mb-6">
-                <span className={`text-5xl font-bold ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
-                  ${plan.price}
-                </span>
-                <span className={plan.popular ? 'text-emerald-300' : 'text-slate-500'}>/month</span>
-              </div>
-
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <Check className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                      plan.popular ? 'text-emerald-400' : 'text-emerald-600'
-                    }`} />
-                    <span className={plan.popular ? 'text-emerald-50' : 'text-slate-600'}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href={`/register?plan=${plan.name.toLowerCase()}`}
-                className={`block w-full text-center px-6 py-3 font-semibold rounded-xl transition-colors ${
-                  plan.popular
-                    ? 'bg-white text-emerald-900 hover:bg-emerald-50'
-                    : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
-                }`}
-              >
-                {plan.cta}
-              </Link>
-
-              <p className={`text-center text-sm mt-4 ${plan.popular ? 'text-emerald-300' : 'text-slate-500'}`}>
-                {plan.best}
-              </p>
+          {/* Haven - Popular */}
+          <div className="relative bg-emerald-900 rounded-2xl p-8 text-white shadow-2xl shadow-emerald-900/20 lg:-mt-4 lg:mb-[-1rem]">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <span className="inline-flex items-center gap-1 px-4 py-1.5 bg-amber-400 text-slate-900 text-sm font-bold rounded-full shadow-lg">
+                <Star className="w-4 h-4" />
+                Most Popular
+              </span>
             </div>
-          ))}
-        </div>
-
-        {/* Estate Tier */}
-        <div className="mt-12 max-w-4xl mx-auto">
-          <div className="bg-slate-900 rounded-2xl p-8 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <Building2 className="w-6 h-6 text-amber-400" />
-                  <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
-                </div>
-                <p className="text-slate-300 mb-2">White glove service for estates & multiple properties</p>
-                <p className="text-3xl font-bold text-white">$3,499<span className="text-lg text-slate-400">+/month</span></p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <ul className="text-sm text-slate-300 space-y-1">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated home manager (2:1 or 1:1)</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated handyman access</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Full concierge & multiple properties</li>
-                </ul>
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-slate-900 font-semibold rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  Contact Us
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
+            <div className="mb-6 pt-4">
+              <h3 className="text-2xl font-bold mb-1">Haven</h3>
+              <p className="text-emerald-300">Complete home management</p>
             </div>
+            <div className="mb-6">
+              <span className="text-5xl font-bold">$149</span>
+              <span className="text-emerald-300">/month</span>
+            </div>
+            <ul className="space-y-3 mb-8">
+              {[
+                "Unlimited bill accounts",
+                "Dedicated home manager",
+                "Monthly handyman visit",
+                "Vendor oversight & negotiation",
+                "Preventive maintenance program",
+                "24-hour response time",
+                "Full document vault",
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-emerald-50">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/register?plan=haven"
+              className="block w-full text-center px-6 py-3 bg-white text-emerald-900 font-semibold rounded-xl hover:bg-emerald-50 transition-colors"
+            >
+              Get Started
+            </Link>
+          </div>
+
+          {/* Haven+ */}
+          <div className="bg-white rounded-2xl p-8 border-2 border-slate-200 shadow-sm">
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-slate-900 mb-1">Haven+</h3>
+              <p className="text-slate-500">Home + life management</p>
+            </div>
+            <div className="mb-6">
+              <span className="text-5xl font-bold text-slate-900">$349</span>
+              <span className="text-slate-500">/month</span>
+            </div>
+            <ul className="space-y-3 mb-8">
+              {[
+                "Everything in Haven",
+                "Errand running & pickups",
+                "Package tracking & returns",
+                "Event planning assistance",
+                "Pet care coordination",
+                "Personal shopping",
+                "4-hour priority response",
+              ].map((item, i) => (
+                <li key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-slate-600">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/register?plan=haven-plus"
+              className="block w-full text-center px-6 py-3 bg-slate-100 text-slate-900 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              Get Started
+            </Link>
           </div>
         </div>
 
         {/* How Billing Works */}
-        <div className="mt-12 max-w-4xl mx-auto bg-amber-50 rounded-2xl p-6 lg:p-8 border border-amber-200">
+        <div className="mt-16 max-w-4xl mx-auto bg-amber-50 rounded-2xl p-6 lg:p-8 border border-amber-200">
           <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
             <DollarSign className="w-5 h-5 text-amber-600" />
             How Your Bill Works
@@ -824,22 +1071,25 @@ function PricingSection() {
           <div className="grid sm:grid-cols-2 gap-4 mb-4">
             <div className="bg-white rounded-xl p-4 border border-amber-100">
               <p className="text-sm font-medium text-slate-600 mb-1">Haven Membership</p>
-              <p className="text-2xl font-bold text-emerald-600">$349–$3,499</p>
+              <p className="text-2xl font-bold text-emerald-600">$99–$349</p>
               <p className="text-xs text-slate-500 mt-1">Your manager, platform, handyman visits</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-amber-100">
               <p className="text-sm font-medium text-slate-600 mb-1">Your Household Bills</p>
               <p className="text-2xl font-bold text-slate-900">At Cost</p>
-              <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors — zero markup</p>
+              <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors. Zero markup.</p>
             </div>
           </div>
           <p className="text-sm text-slate-600">
-            <strong>Example:</strong> $3,200 in monthly bills + $749 Haven = <strong>$3,949 total</strong>. One payment to Haven. We pay everyone else.
+            <strong>Example:</strong> $2,500 in bills + $149 Haven = <strong>$2,649 total</strong>. One payment. We pay everyone else.
           </p>
         </div>
 
         <div className="mt-8 text-center">
           <p className="text-slate-500 font-medium">No contracts. No setup fees. Cancel anytime.</p>
+          <p className="text-sm text-slate-400 mt-2">
+            Unlike some services that require 12-month annual commitments and hidden pricing.
+          </p>
         </div>
       </div>
     </section>
@@ -850,27 +1100,6 @@ function PricingSection() {
 // SOCIAL PROOF
 // ============================================================================
 function SocialProofSection() {
-  const testimonials = [
-    {
-      quote: "I thought this kind of service was only for people with mansions. Turns out it's for anyone tired of being their own property manager. Best money I spend each month.",
-      name: 'Marcus T.',
-      role: 'Software Developer, 3BR Colonial',
-      highlight: 'Worth every penny',
-    },
-    {
-      quote: "Last month Sarah caught an overcharge from our landscaper and saved us $400. The membership has literally paid for itself multiple times over.",
-      name: 'Jennifer L.',
-      role: 'Working Mom, Townhouse',
-      highlight: 'Saved $400',
-    },
-    {
-      quote: "The monthly handyman visit is worth the membership alone. Mike caught a small leak that would've destroyed our basement. Can't imagine going back.",
-      name: 'David S.',
-      role: 'Small Business Owner, 4BR Home',
-      highlight: 'Prevented major repair',
-    },
-  ];
-
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
       <div className="max-w-7xl mx-auto">
@@ -884,7 +1113,26 @@ function SocialProofSection() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((t, i) => (
+          {[
+            {
+              quote: "I thought this kind of service was only for people with mansions. Turns out it's for anyone tired of being their own property manager. Worth every penny.",
+              name: "Marcus T.",
+              role: "Software Developer, 3BR Colonial",
+              highlight: "Worth every penny",
+            },
+            {
+              quote: "Last month Sarah caught an overcharge from our landscaper and saved us $400. The membership paid for itself.",
+              name: "Jennifer L.",
+              role: "Working Mom, Townhouse",
+              highlight: "Saved $400",
+            },
+            {
+              quote: "The monthly handyman visit is worth the membership alone. Mike caught a small leak that would've destroyed our basement.",
+              name: "David S.",
+              role: "Small Business Owner, 4BR Home",
+              highlight: "Prevented major repair",
+            },
+          ].map((t, i) => (
             <div key={i} className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
               <div className="flex items-center gap-1 mb-4">
                 {[...Array(5)].map((_, j) => (
@@ -910,10 +1158,10 @@ function SocialProofSection() {
         {/* Stats */}
         <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
           {[
-            { value: '8+', label: 'Hours saved monthly' },
-            { value: '500+', label: 'Families served' },
-            { value: '4.9', label: 'Average rating' },
-            { value: '$0', label: 'Hidden fees' },
+            { value: "8+", label: "Hours saved monthly" },
+            { value: "500+", label: "Families served" },
+            { value: "4.9", label: "Average rating" },
+            { value: "$0", label: "Hidden fees" },
           ].map((stat, i) => (
             <div key={i}>
               <p className="text-4xl font-bold text-emerald-600">{stat.value}</p>
@@ -934,28 +1182,28 @@ function FAQSection() {
 
   const faqs = [
     {
-      q: 'Is this only for rich people with big estates?',
-      a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Lite plan works perfectly for condos and apartments. The value comes from saving you time and preventing expensive repairs — that's valuable for any homeowner.",
+      q: "Is this only for rich people with big estates?",
+      a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Starter plan at $99/month works perfectly for condos and townhomes. The value comes from saving you time and preventing expensive repairs — that's valuable for any homeowner.",
     },
     {
-      q: 'How is Haven different from household management software?',
-      a: "Software gives you tools to organize things yourself — you still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely. That's why we cost less than software-only solutions while delivering far more value.",
+      q: "How is Haven different from household management apps?",
+      a: "Apps give you software to organize things yourself — you still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely. Big difference.",
     },
     {
-      q: 'Why should I pay for this when I can manage things myself?',
-      a: "You can. The question is whether you want to. If you enjoy tracking down vendors, waiting on hold, and remembering when the furnace filter was last changed — keep doing that. If you'd rather text once and have it handled, that's what we do. Most members say they get 8+ hours back every month.",
+      q: "Do I have to sign an annual contract?",
+      a: "No. Month-to-month, cancel anytime. Some competitors lock you into 12-month prepaid commitments. We don't believe in that.",
     },
     {
-      q: 'Do I have to sign an annual contract?',
-      a: 'No. Month-to-month, cancel anytime. Some competitors lock you into 12-month prepaid commitments with thousands in setup fees. We believe if we do a good job, you\'ll stay. No contracts needed.',
+      q: "How does the one-bill system work?",
+      a: "You make one monthly payment to Haven. We use it to pay your mortgage, utilities, lawn care, cleaning, and every other household expense. Routine bills are automatic. Repairs and one-time expenses require your approval first. One payment, full visibility.",
     },
     {
-      q: 'How does the one-bill system work?',
-      a: 'You make one monthly payment to Haven. We use it to pay your mortgage, utilities, lawn care, cleaning, and every other household expense. Routine bills are automatic. Repairs and one-time expenses require your approval first. You see every transaction in real-time.',
+      q: "Is my money safe?",
+      a: "Yes. Your Haven Wallet is FDIC-insured and held at a regulated partner bank. You see every transaction in real-time and can withdraw anytime. We never mark up vendor costs.",
     },
     {
-      q: 'Is my money safe?',
-      a: "Yes. Your Haven Wallet is FDIC-insured through our banking partner. You see every transaction in real-time, maintain full visibility, and can withdraw anytime. We never mark up vendor costs — your bills pass through at exactly what they cost.",
+      q: "What if something breaks at 2am?",
+      a: "Haven and Haven+ members have 24/7 emergency support. Text your manager anytime — even overnight — and we'll dispatch the right vendor. No more Googling plumbers at midnight.",
     },
   ];
 
@@ -998,7 +1246,7 @@ function FinalCTASection() {
   return (
     <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-emerald-900 to-emerald-950 text-white">
       <div className="max-w-4xl mx-auto text-center">
-        <h2 className="font-serif text-4xl sm:text-5xl font-bold mb-6 text-white">
+        <h2 className="font-serif text-4xl sm:text-5xl font-bold mb-6">
           Ready to stop managing your home?
         </h2>
         <p className="text-2xl text-emerald-200 mb-4">
@@ -1014,7 +1262,7 @@ function FinalCTASection() {
             href="/register"
             className="inline-flex items-center gap-2 px-8 py-4 bg-white text-emerald-900 text-lg font-bold rounded-xl hover:bg-emerald-50 transition-colors shadow-xl"
           >
-            Start for $349/month
+            Start for $99/month
             <ArrowRight className="w-5 h-5" />
           </Link>
           <Link
@@ -1052,40 +1300,40 @@ function Footer() {
             </p>
           </div>
           <div>
-            <h4 className="font-semibold mb-4 text-white">Product</h4>
+            <h4 className="font-semibold mb-4">Product</h4>
             <ul className="space-y-3 text-slate-400 text-sm">
               <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
               <li><a href="#services" className="hover:text-white transition-colors">Services</a></li>
               <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#compare" className="hover:text-white transition-colors">Compare</a></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-white">Company</h4>
-            <ul className="space-y-3 text-slate-400 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
               <li><Link href="/login" className="hover:text-white transition-colors">Member Login</Link></li>
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold mb-4 text-white">Partners</h4>
+            <h4 className="font-semibold mb-4">Company</h4>
             <ul className="space-y-3 text-slate-400 text-sm">
-              <li><Link href="/vendor" className="hover:text-white transition-colors">Vendor Portal</Link></li>
-              <li><Link href="/handyman" className="hover:text-white transition-colors">Handyman Portal</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">Become a Partner</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">About</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Press</a></li>
+            </ul>
+          </div>
+          <div>
+            <h4 className="font-semibold mb-4">Partners</h4>
+            <ul className="space-y-3 text-slate-400 text-sm">
+              <li><Link href="/vendor/login" className="hover:text-white transition-colors">Vendor Portal</Link></li>
+              <li><a href="#" className="hover:text-white transition-colors">Become a Handyman</a></li>
+              <li><a href="#" className="hover:text-white transition-colors">Property Managers</a></li>
             </ul>
           </div>
         </div>
-
+        
         {/* Trust Badges */}
         <div className="flex flex-wrap items-center justify-center gap-8 py-8 border-t border-slate-800">
           {[
-            { icon: Lock, label: 'FDIC-Insured' },
-            { icon: Shield, label: '$2M Coverage' },
-            { icon: ShieldCheck, label: 'SOC 2' },
-            { icon: BadgeCheck, label: 'Vetted Pros' },
+            { icon: Lock, label: "FDIC-Insured" },
+            { icon: Shield, label: "$2M Coverage" },
+            { icon: ShieldCheck, label: "SOC 2" },
+            { icon: BadgeCheck, label: "Vetted Pros" },
           ].map(({ icon: Icon, label }) => (
             <div key={label} className="flex items-center gap-2 text-slate-400">
               <Icon className="w-5 h-5" />
@@ -1108,7 +1356,7 @@ function Footer() {
 }
 
 // ============================================================================
-// MAIN PAGE COMPONENT
+// MAIN PAGE
 // ============================================================================
 export default function HomePage() {
   return (
@@ -1116,7 +1364,7 @@ export default function HomePage() {
       <Navigation />
       <HeroSection />
       <ProblemSection />
-      <CompetitorSection />
+      <SoftwareVsServiceSection />
       <HowItWorksSection />
       <ServicesSection />
       <PricingSection />
@@ -1127,3 +1375,37 @@ export default function HomePage() {
     </div>
   );
 }
+```
+
+---
+
+## SUMMARY: HOW WE CRUSH NINES
+
+### 1. **Positioning**: We're a SERVICE, not just SOFTWARE
+- They organize your chaos; we eliminate it
+- They give you tools; we give you time
+
+### 2. **Accessibility**: We're for EVERYONE, not just UHNW
+- $99 Starter tier vs. their hidden pricing
+- "Professional home management shouldn't require a trust fund"
+
+### 3. **Transparency**: Pricing on the website
+- They hide behind "Schedule Demo"
+- We show $99 / $149 / $349 clearly
+
+### 4. **Flexibility**: Monthly, no contracts
+- They require 12-month annual commitment
+- We're month-to-month, cancel anytime
+
+### 5. **Actual Service**: We DO the work
+- One bill (they can't claim this)
+- Dedicated handyman visits (they can't claim this)
+- Bills actually get paid (they can't claim this)
+- Repairs actually happen (they can't claim this)
+
+### 6. **Trust Signals**: Match and exceed
+- Add SOC 2 certification
+- Emphasize FDIC insurance
+- Feature real testimonials from regular people
+
+The core message: **"Apps give you tools. Haven gives you time."**
