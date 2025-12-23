@@ -198,19 +198,19 @@ export default function SettingsPage() {
             className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
               isActive
                 ? 'bg-emerald-50 text-emerald-700 border-l-4 border-emerald-600 pl-3'
-                : 'text-slate-700 hover:bg-slate-100'
+                : 'text-warm-700 hover:bg-warm-100'
             }`}
           >
             <div className="flex items-center gap-3">
-              <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-warm-400'}`} />
               <div>
-                <p className={`font-medium ${isActive ? 'text-emerald-700' : 'text-slate-900'}`}>{item.label}</p>
+                <p className={`font-medium ${isActive ? 'text-emerald-700' : 'text-warm-900'}`}>{item.label}</p>
                 {isMobile && (
-                  <p className="text-sm text-slate-500">{item.description}</p>
+                  <p className="text-sm text-warm-500">{item.description}</p>
                 )}
               </div>
             </div>
-            {isMobile && <ChevronRight className="w-5 h-5 text-slate-400" />}
+            {isMobile && <ChevronRight className="w-5 h-5 text-warm-400" />}
           </button>
         );
       })}
@@ -221,13 +221,13 @@ export default function SettingsPage() {
   const renderGeneralSection = () => (
     <div className="space-y-6">
       {/* App Experience */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">App Experience</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">App Experience</h3>
 
         {/* Theme */}
         <div className="mb-6">
-          <label className="block text-sm font-medium text-slate-700 mb-2">Theme</label>
-          <div className="flex bg-slate-100 rounded-lg p-1">
+          <label className="block text-sm font-medium text-warm-700 mb-2">Theme</label>
+          <div className="flex bg-warm-100 rounded-lg p-1">
             {[
               { value: 'system', label: 'System', icon: Monitor },
               { value: 'light', label: 'Light', icon: Sun },
@@ -243,8 +243,8 @@ export default function SettingsPage() {
                   }}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     theme === option.value
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-warm-900 shadow-sm'
+                      : 'text-warm-600 hover:text-warm-900'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -257,8 +257,8 @@ export default function SettingsPage() {
 
         {/* Density */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-2">Display Density</label>
-          <div className="flex bg-slate-100 rounded-lg p-1">
+          <label className="block text-sm font-medium text-warm-700 mb-2">Display Density</label>
+          <div className="flex bg-warm-100 rounded-lg p-1">
             {[
               { value: 'comfortable', label: 'Comfortable', icon: Maximize2 },
               { value: 'compact', label: 'Compact', icon: Minimize2 },
@@ -273,8 +273,8 @@ export default function SettingsPage() {
                   }}
                   className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                     density === option.value
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600 hover:text-slate-900'
+                      ? 'bg-white text-warm-900 shadow-sm'
+                      : 'text-warm-600 hover:text-warm-900'
                   }`}
                 >
                   <Icon className="w-4 h-4" />
@@ -283,50 +283,50 @@ export default function SettingsPage() {
               );
             })}
           </div>
-          <p className="text-xs text-slate-500 mt-2">Adjusts spacing in tables and lists</p>
+          <p className="text-xs text-warm-500 mt-2">Adjusts spacing in tables and lists</p>
         </div>
       </div>
 
       {/* Household Meta */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Household Information</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">Household Information</h3>
 
         <div className="space-y-4">
           {/* Home Name */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Home Name</label>
+            <label className="block text-sm font-medium text-warm-700 mb-2">Home Name</label>
             <div className="flex items-center gap-2">
               <div className="relative flex-1">
-                <Home className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <Home className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
                 <input
                   type="text"
                   value={homeName}
                   onChange={(e) => setHomeName(e.target.value)}
                   onBlur={() => showToast('Home name saved')}
-                  className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   placeholder="Enter home name"
                 />
               </div>
             </div>
-            <p className="text-xs text-slate-500 mt-1">This name appears in your dashboard and reports</p>
+            <p className="text-xs text-warm-500 mt-1">This name appears in your dashboard and reports</p>
           </div>
 
           {/* Address */}
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Address</label>
-            <div className="flex items-start gap-3 p-4 bg-slate-50 rounded-lg border border-slate-200">
-              <MapPin className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+            <label className="block text-sm font-medium text-warm-700 mb-2">Address</label>
+            <div className="flex items-start gap-3 p-4 bg-warm-50 rounded-lg border border-warm-200">
+              <MapPin className="w-5 h-5 text-warm-400 flex-shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="font-medium text-slate-900">
+                <p className="font-medium text-warm-900">
                   {currentHousehold?.name || '123 Oak Street'}
                 </p>
-                <p className="text-sm text-slate-500">Austin, TX 78701</p>
+                <p className="text-sm text-warm-500">Austin, TX 78701</p>
               </div>
               <div className="relative group">
-                <button className="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
+                <button className="p-2 text-warm-400 hover:text-warm-600 rounded-lg hover:bg-warm-100 transition-colors">
                   <Info className="w-4 h-4" />
                 </button>
-                <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-slate-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                <div className="absolute right-0 top-full mt-1 w-48 p-2 bg-warm-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
                   Contact support to change your address
                 </div>
               </div>
@@ -341,7 +341,7 @@ export default function SettingsPage() {
   const renderSubscriptionSection = () => (
     <div className="space-y-6">
       {/* Current Plan */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
         <div className="flex items-start justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
@@ -349,37 +349,37 @@ export default function SettingsPage() {
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-slate-900">Haven Premium</h3>
+                <h3 className="font-semibold text-warm-900">Haven Premium</h3>
                 <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
                   Active
                 </span>
               </div>
-              <p className="text-sm text-slate-500">Full-service home management</p>
+              <p className="text-sm text-warm-500">Full-service home management</p>
             </div>
           </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <p className="text-sm text-slate-500">Next billing date</p>
-            <p className="font-semibold text-slate-900">January 15, 2026</p>
+          <div className="p-4 bg-warm-50 rounded-lg">
+            <p className="text-sm text-warm-500">Next billing date</p>
+            <p className="font-semibold text-warm-900">January 15, 2026</p>
           </div>
-          <div className="p-4 bg-slate-50 rounded-lg">
-            <p className="text-sm text-slate-500">Monthly amount</p>
-            <p className="font-semibold text-slate-900">$299.00</p>
+          <div className="p-4 bg-warm-50 rounded-lg">
+            <p className="text-sm text-warm-500">Monthly amount</p>
+            <p className="font-semibold text-warm-900">$299.00</p>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <button
             onClick={() => showToast('Plan options coming soon')}
-            className="px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 transition-colors"
+            className="px-4 py-2 bg-warm-100 text-warm-700 font-medium rounded-lg hover:bg-warm-200 transition-colors"
           >
             Change Plan
           </button>
           <button
             onClick={() => showToast('Please contact support to cancel')}
-            className="text-sm text-slate-500 hover:text-slate-700 transition-colors"
+            className="text-sm text-warm-500 hover:text-warm-700 transition-colors"
           >
             Cancel Subscription
           </button>
@@ -387,20 +387,20 @@ export default function SettingsPage() {
       </div>
 
       {/* Payment Method */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Payment Method</h3>
-        <p className="text-sm text-slate-500 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">Payment Method</h3>
+        <p className="text-sm text-warm-500 mb-4">
           This card is used for your Haven subscription (separate from House Wallet)
         </p>
 
-        <div className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200 mb-4">
+        <div className="flex items-center justify-between p-4 bg-warm-50 rounded-lg border border-warm-200 mb-4">
           <div className="flex items-center gap-4">
             <div className="w-12 h-8 bg-gradient-to-r from-blue-600 to-blue-800 rounded flex items-center justify-center">
               <span className="text-white text-xs font-bold">VISA</span>
             </div>
             <div>
-              <p className="font-medium text-slate-900">Visa ending in 4242</p>
-              <p className="text-sm text-slate-500">Expires 12/26</p>
+              <p className="font-medium text-warm-900">Visa ending in 4242</p>
+              <p className="text-sm text-warm-500">Expires 12/26</p>
             </div>
           </div>
           <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Default</span>
@@ -415,26 +415,26 @@ export default function SettingsPage() {
       </div>
 
       {/* Invoice History */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Invoice History</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">Invoice History</h3>
 
         <div className="space-y-3">
           {invoices.map((invoice) => (
             <div
               key={invoice.id}
-              className="flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors"
+              className="flex items-center justify-between p-4 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors"
             >
               <div className="flex items-center gap-4">
-                <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-slate-400" />
+                <div className="w-10 h-10 bg-white rounded-lg border border-warm-200 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-warm-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-slate-900">{formatDate(invoice.date)}</p>
-                  <p className="text-sm text-slate-500">Haven Premium</p>
+                  <p className="font-medium text-warm-900">{formatDate(invoice.date)}</p>
+                  <p className="text-sm text-warm-500">Haven Premium</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
-                <span className="font-medium text-slate-900">{formatCurrency(invoice.amount)}</span>
+                <span className="font-medium text-warm-900">{formatCurrency(invoice.amount)}</span>
                 <span className={`text-xs px-2 py-0.5 rounded-full ${
                   invoice.status === 'paid'
                     ? 'bg-green-100 text-green-700'
@@ -444,7 +444,7 @@ export default function SettingsPage() {
                 </span>
                 <button
                   onClick={() => showToast('Downloading invoice...')}
-                  className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
+                  className="p-2 text-warm-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
                 >
                   <Download className="w-5 h-5" />
                 </button>
@@ -459,9 +459,9 @@ export default function SettingsPage() {
   // Render Integrations Section
   const renderIntegrationsSection = () => (
     <div className="space-y-6">
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-2">Connected Services</h3>
-        <p className="text-sm text-slate-500 mb-6">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-2">Connected Services</h3>
+        <p className="text-sm text-warm-500 mb-6">
           Manage third-party connections that power your Haven experience
         </p>
 
@@ -471,36 +471,36 @@ export default function SettingsPage() {
             return (
               <div
                 key={integration.id}
-                className="flex items-center justify-between p-4 bg-slate-50 rounded-lg border border-slate-200"
+                className="flex items-center justify-between p-4 bg-warm-50 rounded-lg border border-warm-200"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white rounded-xl border border-slate-200 flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-slate-600" />
+                  <div className="w-12 h-12 bg-white rounded-xl border border-warm-200 flex items-center justify-center">
+                    <Icon className="w-6 h-6 text-warm-600" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-slate-900">{integration.name}</p>
+                      <p className="font-medium text-warm-900">{integration.name}</p>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         integration.status === 'connected'
                           ? 'bg-green-100 text-green-700'
                           : integration.status === 'active'
                           ? 'bg-emerald-100 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'
+                          : 'bg-warm-100 text-warm-600'
                       }`}>
                         {integration.status.charAt(0).toUpperCase() + integration.status.slice(1)}
                       </span>
                     </div>
-                    <p className="text-sm text-slate-500">{integration.description}</p>
+                    <p className="text-sm text-warm-500">{integration.description}</p>
                     {integration.details && (
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-slate-400">{integration.details}</span>
+                        <span className="text-xs text-warm-400">{integration.details}</span>
                         {integration.id === 'email-forwarding' && (
                           <button
                             onClick={() => {
                               navigator.clipboard.writeText(integration.details || '');
                               showToast('Email address copied');
                             }}
-                            className="p-1 text-slate-400 hover:text-slate-600 transition-colors"
+                            className="p-1 text-warm-400 hover:text-warm-600 transition-colors"
                           >
                             <Copy className="w-3 h-3" />
                           </button>
@@ -508,7 +508,7 @@ export default function SettingsPage() {
                       </div>
                     )}
                     {integration.lastSync && (
-                      <p className="text-xs text-slate-400 mt-1">
+                      <p className="text-xs text-warm-400 mt-1">
                         Last synced: {getTimeSince(integration.lastSync)}
                       </p>
                     )}
@@ -518,7 +518,7 @@ export default function SettingsPage() {
                   {integration.status === 'connected' && (
                     <button
                       onClick={() => showToast(`Syncing ${integration.name}...`)}
-                      className="p-2 text-slate-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
+                      className="p-2 text-warm-400 hover:text-emerald-600 rounded-lg hover:bg-white transition-colors"
                     >
                       <RefreshCw className="w-5 h-5" />
                     </button>
@@ -534,7 +534,7 @@ export default function SettingsPage() {
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                       integration.status === 'disconnected'
                         ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-50'
+                        : 'bg-white border border-warm-200 text-warm-700 hover:bg-warm-50'
                     }`}
                   >
                     {integration.status === 'disconnected' ? 'Connect' : 'Manage'}
@@ -548,7 +548,7 @@ export default function SettingsPage() {
         {/* Add Integration */}
         <button
           onClick={() => showToast('Browse integrations coming soon!')}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-slate-300 rounded-lg text-slate-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
         >
           <Plus className="w-5 h-5" />
           <span className="font-medium">Add Integration</span>
@@ -561,15 +561,15 @@ export default function SettingsPage() {
   const renderPrivacySection = () => (
     <div className="space-y-6">
       {/* Export Data */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-2">Export Your Data</h3>
-        <p className="text-sm text-slate-500 mb-4">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-2">Export Your Data</h3>
+        <p className="text-sm text-warm-500 mb-4">
           Download a complete archive of your household data
         </p>
 
-        <div className="p-4 bg-slate-50 rounded-lg border border-slate-200 mb-4">
-          <p className="font-medium text-slate-900 mb-2">Your archive includes:</p>
-          <ul className="space-y-1 text-sm text-slate-600">
+        <div className="p-4 bg-warm-50 rounded-lg border border-warm-200 mb-4">
+          <p className="font-medium text-warm-900 mb-2">Your archive includes:</p>
+          <ul className="space-y-1 text-sm text-warm-600">
             <li className="flex items-center gap-2">
               <Check className="w-4 h-4 text-emerald-600" />
               Transaction history (CSV)
@@ -599,19 +599,19 @@ export default function SettingsPage() {
       </div>
 
       {/* Privacy Mode */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
+            <div className="w-12 h-12 bg-warm-100 rounded-xl flex items-center justify-center">
               {privacyMode ? (
-                <EyeOff className="w-6 h-6 text-slate-600" />
+                <EyeOff className="w-6 h-6 text-warm-600" />
               ) : (
-                <Eye className="w-6 h-6 text-slate-600" />
+                <Eye className="w-6 h-6 text-warm-600" />
               )}
             </div>
             <div>
-              <h3 className="font-semibold text-slate-900">Privacy Mode</h3>
-              <p className="text-sm text-slate-500 mt-1">
+              <h3 className="font-semibold text-warm-900">Privacy Mode</h3>
+              <p className="text-sm text-warm-500 mt-1">
                 Hide financial information on the dashboard. Useful when guests are visiting.
               </p>
             </div>
@@ -622,7 +622,7 @@ export default function SettingsPage() {
               showToast(privacyMode ? 'Privacy mode disabled' : 'Privacy mode enabled');
             }}
             className={`relative w-14 h-7 rounded-full transition-colors ${
-              privacyMode ? 'bg-emerald-600' : 'bg-slate-200'
+              privacyMode ? 'bg-emerald-600' : 'bg-warm-200'
             }`}
           >
             <span
@@ -662,8 +662,8 @@ export default function SettingsPage() {
   const renderSupportSection = () => (
     <div className="space-y-6">
       {/* Concierge Status */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Your Home Manager</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">Your Home Manager</h3>
 
         <div className="flex items-center gap-4 p-4 bg-emerald-50 rounded-lg border border-emerald-200">
           <div className="relative">
@@ -673,7 +673,7 @@ export default function SettingsPage() {
             <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-slate-900">Sarah Harrison</p>
+            <p className="font-semibold text-warm-900">Sarah Harrison</p>
             <p className="text-sm text-emerald-700">Online - Available now</p>
           </div>
           <button
@@ -689,8 +689,8 @@ export default function SettingsPage() {
       </div>
 
       {/* Resources */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">Resources</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">Resources</h3>
 
         <div className="space-y-3">
           {[
@@ -703,18 +703,18 @@ export default function SettingsPage() {
               <button
                 key={index}
                 onClick={item.action}
-                className="w-full flex items-center justify-between p-4 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors text-left"
+                className="w-full flex items-center justify-between p-4 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors text-left"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-white rounded-lg border border-slate-200 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-slate-600" />
+                  <div className="w-10 h-10 bg-white rounded-lg border border-warm-200 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-warm-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-slate-900">{item.label}</p>
-                    <p className="text-sm text-slate-500">{item.description}</p>
+                    <p className="font-medium text-warm-900">{item.label}</p>
+                    <p className="text-sm text-warm-500">{item.description}</p>
                   </div>
                 </div>
-                <ExternalLink className="w-5 h-5 text-slate-400" />
+                <ExternalLink className="w-5 h-5 text-warm-400" />
               </button>
             );
           })}
@@ -722,25 +722,25 @@ export default function SettingsPage() {
       </div>
 
       {/* App Info */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="font-semibold text-slate-900 mb-4">About Haven</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="font-semibold text-warm-900 mb-4">About Haven</h3>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between py-2">
-            <span className="text-slate-600">Version</span>
-            <span className="font-medium text-slate-900">v2.4.0</span>
+            <span className="text-warm-600">Version</span>
+            <span className="font-medium text-warm-900">v2.4.0</span>
           </div>
-          <div className="flex items-center justify-between py-2 border-t border-slate-100">
-            <span className="text-slate-600">Build</span>
-            <span className="font-medium text-slate-900">#2024.12.19</span>
+          <div className="flex items-center justify-between py-2 border-t border-warm-100">
+            <span className="text-warm-600">Build</span>
+            <span className="font-medium text-warm-900">#2024.12.19</span>
           </div>
-          <div className="flex items-center justify-between py-2 border-t border-slate-100">
-            <span className="text-slate-600">Account ID</span>
-            <span className="font-mono text-sm text-slate-900">HH-{currentHousehold?.id?.slice(0, 8) || 'MILLER01'}</span>
+          <div className="flex items-center justify-between py-2 border-t border-warm-100">
+            <span className="text-warm-600">Account ID</span>
+            <span className="font-mono text-sm text-warm-900">HH-{currentHousehold?.id?.slice(0, 8) || 'MILLER01'}</span>
           </div>
         </div>
 
-        <div className="mt-4 pt-4 border-t border-slate-200 flex items-center justify-center gap-4 text-sm text-slate-500">
+        <div className="mt-4 pt-4 border-t border-warm-200 flex items-center justify-center gap-4 text-sm text-warm-500">
           <a href="#" className="hover:text-emerald-600 transition-colors">Terms of Service</a>
           <span>•</span>
           <a href="#" className="hover:text-emerald-600 transition-colors">Privacy Policy</a>
@@ -771,15 +771,15 @@ export default function SettingsPage() {
     <div className="space-y-6 pb-20">
       {/* Page Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Settings</h1>
-        <p className="text-slate-600 mt-1">Manage your Haven app and household preferences</p>
+        <h1 className="text-2xl font-bold text-warm-900">Settings</h1>
+        <p className="text-warm-600 mt-1">Manage your Haven app and household preferences</p>
       </div>
 
       {/* Desktop Layout */}
       <div className="hidden md:flex gap-6">
         {/* Left Sidebar */}
         <div className="w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sticky top-6">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4 sticky top-6">
             {renderNav()}
           </div>
         </div>
@@ -793,7 +793,7 @@ export default function SettingsPage() {
       {/* Mobile Layout */}
       <div className="md:hidden">
         {mobileView === 'nav' ? (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
             {renderNav()}
           </div>
         ) : (
@@ -801,14 +801,14 @@ export default function SettingsPage() {
             {/* Back Button */}
             <button
               onClick={() => setMobileView('nav')}
-              className="flex items-center gap-2 text-slate-600 hover:text-slate-900 mb-4"
+              className="flex items-center gap-2 text-warm-600 hover:text-warm-900 mb-4"
             >
               <ChevronLeft className="w-5 h-5" />
               <span className="font-medium">Back to Settings</span>
             </button>
 
             {/* Section Title */}
-            <h2 className="text-lg font-semibold text-slate-900 mb-4">
+            <h2 className="text-lg font-semibold text-warm-900 mb-4">
               {navItems.find((item) => item.id === activeSection)?.label}
             </h2>
 
@@ -820,7 +820,7 @@ export default function SettingsPage() {
 
       {/* Toast Notification */}
       {toast.visible && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-slate-900 text-white rounded-lg shadow-lg z-50 animate-slide-up">
+        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-warm-900 text-white rounded-lg shadow-lg z-50 animate-slide-up">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="font-medium">{toast.message}</span>
         </div>
@@ -832,56 +832,56 @@ export default function SettingsPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowUpdateCardModal(false)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-slate-200">
+              <div className="p-6 border-b border-warm-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-slate-900">Update Payment Method</h3>
+                  <h3 className="text-lg font-semibold text-warm-900">Update Payment Method</h3>
                   <button
                     onClick={() => setShowUpdateCardModal(false)}
-                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-slate-400" />
+                    <X className="w-5 h-5 text-warm-400" />
                   </button>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Card Number</label>
+                  <label className="block text-sm font-medium text-warm-700 mb-2">Card Number</label>
                   <input
                     type="text"
                     placeholder="1234 5678 9012 3456"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">Expiry Date</label>
+                    <label className="block text-sm font-medium text-warm-700 mb-2">Expiry Date</label>
                     <input
                       type="text"
                       placeholder="MM/YY"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-2">CVC</label>
+                    <label className="block text-sm font-medium text-warm-700 mb-2">CVC</label>
                     <input
                       type="text"
                       placeholder="123"
-                      className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                      className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Name on Card</label>
+                  <label className="block text-sm font-medium text-warm-700 mb-2">Name on Card</label>
                   <input
                     type="text"
                     placeholder="John Miller"
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
               </div>
 
-              <div className="p-6 border-t border-slate-200">
+              <div className="p-6 border-t border-warm-200">
                 <button
                   onClick={() => {
                     setShowUpdateCardModal(false);
@@ -903,23 +903,23 @@ export default function SettingsPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteModal(false)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-slate-200">
+              <div className="p-6 border-b border-warm-200">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
                     <AlertTriangle className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <h3 className="text-lg font-semibold text-slate-900">Delete Household</h3>
-                    <p className="text-sm text-slate-500">This action is permanent</p>
+                    <h3 className="text-lg font-semibold text-warm-900">Delete Household</h3>
+                    <p className="text-sm text-warm-500">This action is permanent</p>
                   </div>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
-                <p className="text-slate-600">
-                  This will permanently delete <span className="font-semibold text-slate-900">{homeName}</span> and all associated data including:
+                <p className="text-warm-600">
+                  This will permanently delete <span className="font-semibold text-warm-900">{homeName}</span> and all associated data including:
                 </p>
-                <ul className="space-y-2 text-sm text-slate-600">
+                <ul className="space-y-2 text-sm text-warm-600">
                   <li className="flex items-center gap-2">
                     <Trash2 className="w-4 h-4 text-red-500" />
                     All transaction history
@@ -939,7 +939,7 @@ export default function SettingsPage() {
                 </ul>
 
                 <div className="pt-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label className="block text-sm font-medium text-warm-700 mb-2">
                     Type <span className="font-semibold">{homeName}</span> to confirm
                   </label>
                   <input
@@ -947,18 +947,18 @@ export default function SettingsPage() {
                     value={deleteConfirmText}
                     onChange={(e) => setDeleteConfirmText(e.target.value)}
                     placeholder={homeName}
-                    className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                    className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent"
                   />
                 </div>
               </div>
 
-              <div className="p-6 border-t border-slate-200 flex gap-3">
+              <div className="p-6 border-t border-warm-200 flex gap-3">
                 <button
                   onClick={() => {
                     setShowDeleteModal(false);
                     setDeleteConfirmText('');
                   }}
-                  className="flex-1 py-3 border border-slate-200 text-slate-700 font-semibold rounded-lg hover:bg-slate-50 transition-colors"
+                  className="flex-1 py-3 border border-warm-200 text-warm-700 font-semibold rounded-lg hover:bg-warm-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -967,7 +967,7 @@ export default function SettingsPage() {
                   className={`flex-1 py-3 font-semibold rounded-lg transition-colors ${
                     deleteConfirmText === homeName
                       ? 'bg-red-600 text-white hover:bg-red-700'
-                      : 'bg-slate-100 text-slate-400 cursor-not-allowed'
+                      : 'bg-warm-100 text-warm-400 cursor-not-allowed'
                   }`}
                 >
                   Delete Permanently

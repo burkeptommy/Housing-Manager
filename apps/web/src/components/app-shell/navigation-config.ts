@@ -23,6 +23,7 @@ export interface NavItem {
   href: string;
   icon: LucideIcon;
   roles?: string[];
+  badge?: number;
 }
 
 export interface NavSection {
@@ -48,7 +49,7 @@ export const sidebarNavigation: NavSection[] = [
       { name: 'Project Planning', href: '/app/projects', icon: Wrench },
       { name: 'Maintenance', href: '/app/maintenance', icon: ClipboardList },
       { name: 'Inventory', href: '/app/inventory', icon: Package },
-      { name: 'Requests', href: '/app/requests', icon: FileText },
+      { name: 'Requests', href: '/app/requests', icon: FileText, badge: 4 },
     ],
   },
   {

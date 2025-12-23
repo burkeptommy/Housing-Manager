@@ -546,7 +546,7 @@ export default function TasksPage() {
   const getStatusBadge = (status: TaskStatus) => {
     switch (status) {
       case 'sent':
-        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-700"><Send className="w-3 h-3" /> Sent</span>;
+        return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-warm-100 text-warm-700"><Send className="w-3 h-3" /> Sent</span>;
       case 'viewed':
         return <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700"><Eye className="w-3 h-3" /> Viewed</span>;
       case 'researching':
@@ -577,12 +577,12 @@ export default function TasksPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-warm-50">
       {/* Toast */}
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-slide-down">
           <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
-            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-white'
+            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-warm-800 text-white'
           }`}>
             {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
             <span className="font-medium">{toast.message}</span>
@@ -592,7 +592,7 @@ export default function TasksPage() {
 
       {/* Delegate Confirmation Toast */}
       {showDelegateConfirm && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 animate-slide-down">
+        <div className="fixed top-4 left-1/2 -tranwarm-x-1/2 z-50 animate-slide-down">
           <div className="flex items-center gap-3 px-5 py-3 bg-emerald-600 text-white rounded-xl shadow-lg">
             <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
               <Briefcase className="w-5 h-5" />
@@ -606,29 +606,43 @@ export default function TasksPage() {
       )}
 
       {/* Header */}
-      <div className="bg-white border-b border-slate-200 sticky top-0 z-30">
+      <div className="bg-white border-b border-warm-200 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">Tasks</h1>
-              <p className="text-sm text-slate-500 mt-0.5">Household & Manager Operations</p>
+              <h1 className="text-2xl font-bold text-warm-900">Tasks</h1>
+              <p className="text-sm text-warm-500 mt-0.5">Household & Manager Operations</p>
             </div>
 
-            {/* Streak Badge */}
-            <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full">
-              <Flame className="w-5 h-5 text-orange-500" />
-              <span className="text-sm font-semibold text-orange-700">{weeklyStreak} day streak</span>
+            <div className="flex items-center gap-3">
+              {/* Add Errand Button */}
+              <button
+                onClick={() => {
+                  setNewTaskAssignee('manager');
+                  setShowAddModal(true);
+                }}
+                className="flex items-center gap-2 px-4 py-2 bg-haven-600 text-white font-medium rounded-xl hover:bg-haven-700 transition-colors"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="hidden sm:inline">Add Errand</span>
+              </button>
+
+              {/* Streak Badge */}
+              <div className="flex items-center gap-2 px-3 py-1.5 bg-orange-50 border border-orange-200 rounded-full">
+                <Flame className="w-5 h-5 text-orange-500" />
+                <span className="text-sm font-semibold text-orange-700">{weeklyStreak} day streak</span>
+              </div>
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="mt-4 flex gap-1 bg-slate-100 rounded-lg p-1">
+          <div className="mt-4 flex gap-1 bg-warm-100 rounded-lg p-1">
             <button
               onClick={() => setViewTab('household')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
                 viewTab === 'household'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-warm-900 shadow-sm'
+                  : 'text-warm-600 hover:text-warm-900'
               }`}
             >
               <Users className="w-4 h-4" />
@@ -638,8 +652,8 @@ export default function TasksPage() {
               onClick={() => setViewTab('manager')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
                 viewTab === 'manager'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-warm-900 shadow-sm'
+                  : 'text-warm-600 hover:text-warm-900'
               }`}
             >
               <Briefcase className="w-4 h-4" />
@@ -656,7 +670,7 @@ export default function TasksPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Quick Add Bar */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-6">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4 mb-6">
           <div className="flex flex-col sm:flex-row gap-3">
             <div className="flex-1 relative">
               <input
@@ -665,14 +679,14 @@ export default function TasksPage() {
                 onChange={(e) => setNewTaskInput(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
                 placeholder="What needs to get done?"
-                className="w-full px-4 py-3 pr-24 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-slate-800 placeholder:text-slate-400"
+                className="w-full px-4 py-3 pr-24 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-warm-800 placeholder:text-warm-400"
               />
               {newTaskAssignee === 'manager' && (
                 <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
-                  <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                  <button className="p-1.5 hover:bg-warm-100 rounded-lg transition-colors text-warm-400 hover:text-warm-600">
                     <Camera className="w-5 h-5" />
                   </button>
-                  <button className="p-1.5 hover:bg-slate-100 rounded-lg transition-colors text-slate-400 hover:text-slate-600">
+                  <button className="p-1.5 hover:bg-warm-100 rounded-lg transition-colors text-warm-400 hover:text-warm-600">
                     <Mic className="w-5 h-5" />
                   </button>
                 </div>
@@ -681,13 +695,13 @@ export default function TasksPage() {
 
             {/* Assignee Toggle */}
             <div className="flex gap-2">
-              <div className="flex bg-slate-100 rounded-lg p-1">
+              <div className="flex bg-warm-100 rounded-lg p-1">
                 <button
                   onClick={() => setNewTaskAssignee('family')}
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     newTaskAssignee === 'family'
-                      ? 'bg-white text-slate-900 shadow-sm'
-                      : 'text-slate-600'
+                      ? 'bg-white text-warm-900 shadow-sm'
+                      : 'text-warm-600'
                   }`}
                 >
                   <Users className="w-4 h-4" />
@@ -698,7 +712,7 @@ export default function TasksPage() {
                   className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
                     newTaskAssignee === 'manager'
                       ? 'bg-emerald-600 text-white'
-                      : 'text-slate-600'
+                      : 'text-warm-600'
                   }`}
                 >
                   <Briefcase className="w-4 h-4" />
@@ -730,7 +744,7 @@ export default function TasksPage() {
                 className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
                   suggestion === 'manager'
                     ? 'bg-emerald-600 text-white hover:bg-emerald-700'
-                    : 'bg-slate-800 text-white hover:bg-slate-900'
+                    : 'bg-warm-800 text-white hover:bg-warm-900'
                 }`}
               >
                 {suggestion === 'manager' ? 'Send to Manager' : 'Assign to Family'}
@@ -741,14 +755,14 @@ export default function TasksPage() {
           {/* Family Assignee Selection */}
           {newTaskAssignee === 'family' && !suggestion && (
             <div className="mt-3">
-              <span className="text-sm text-slate-500 block mb-2 sm:inline sm:mb-0 sm:mr-2">Assign to:</span>
+              <span className="text-sm text-warm-500 block mb-2 sm:inline sm:mb-0 sm:mr-2">Assign to:</span>
               <div className="flex overflow-x-auto no-scrollbar gap-2 pb-2 pr-4 -mr-4">
                 <button
                   onClick={() => setNewTaskAssigneeId('')}
                   className={`flex-shrink-0 px-3 py-1 rounded-full text-sm transition-colors ${
                     newTaskAssigneeId === ''
-                      ? 'bg-slate-800 text-white'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      ? 'bg-warm-800 text-white'
+                      : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
                   }`}
                 >
                   Anyone
@@ -759,8 +773,8 @@ export default function TasksPage() {
                     onClick={() => setNewTaskAssigneeId(member.id)}
                     className={`flex-shrink-0 flex items-center gap-1.5 px-3 py-1 rounded-full text-sm transition-colors ${
                       newTaskAssigneeId === member.id
-                        ? 'bg-slate-800 text-white'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        ? 'bg-warm-800 text-white'
+                        : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
                     }`}
                   >
                     <span className={`w-5 h-5 rounded-full ${member.color} flex items-center justify-center text-xs text-white font-medium`}>
@@ -793,10 +807,10 @@ export default function TasksPage() {
                       <button
                         key={template.id}
                         onClick={() => handleTemplateSelect(template)}
-                        className="flex items-center gap-2 p-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg text-left transition-colors"
+                        className="flex items-center gap-2 p-3 bg-warm-50 hover:bg-emerald-50 border border-warm-200 hover:border-emerald-300 rounded-lg text-left transition-colors"
                       >
-                        <Icon className="w-5 h-5 text-slate-500" />
-                        <span className="text-sm text-slate-700">{template.title}</span>
+                        <Icon className="w-5 h-5 text-warm-500" />
+                        <span className="text-sm text-warm-700">{template.title}</span>
                       </button>
                     );
                   })}
@@ -812,15 +826,15 @@ export default function TasksPage() {
             {viewTab === 'household' ? (
               <>
                 {/* Gamification Header */}
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 mb-4">
+                <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4 mb-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-amber-100 rounded-lg">
                         <Trophy className="w-5 h-5 text-amber-600" />
                       </div>
                       <div>
-                        <h3 className="font-semibold text-slate-900">Weekly Leaderboard</h3>
-                        <p className="text-sm text-slate-500">This week&apos;s top contributors</p>
+                        <h3 className="font-semibold text-warm-900">Weekly Leaderboard</h3>
+                        <p className="text-sm text-warm-500">This week&apos;s top contributors</p>
                       </div>
                     </div>
                   </div>
@@ -830,7 +844,7 @@ export default function TasksPage() {
                       <div
                         key={member.id}
                         className={`flex items-center gap-2 p-3 rounded-lg ${
-                          index === 0 ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'
+                          index === 0 ? 'bg-amber-50 border border-amber-200' : 'bg-warm-50'
                         }`}
                       >
                         <div className="relative">
@@ -842,8 +856,8 @@ export default function TasksPage() {
                           )}
                         </div>
                         <div>
-                          <div className="font-medium text-slate-900 text-sm">{member.name}</div>
-                          <div className="text-xs text-slate-500">{member.tasksCompleted} tasks</div>
+                          <div className="font-medium text-warm-900 text-sm">{member.name}</div>
+                          <div className="text-xs text-warm-500">{member.tasksCompleted} tasks</div>
                         </div>
                       </div>
                     ))}
@@ -852,19 +866,19 @@ export default function TasksPage() {
 
                 {/* Today's Tasks */}
                 <div className="mb-4">
-                  <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                    <Clock className="w-5 h-5 text-slate-400" />
+                  <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-warm-400" />
                     Today
-                    <span className="text-sm font-normal text-slate-500">
+                    <span className="text-sm font-normal text-warm-500">
                       ({groupedFamilyTasks.today.filter(t => !t.completed).length} remaining)
                     </span>
                   </h2>
 
                   {groupedFamilyTasks.today.length === 0 ? (
-                    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-8 text-center">
+                    <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-8 text-center">
                       <PartyPopper className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                      <h3 className="text-lg font-medium text-slate-700">All caught up!</h3>
-                      <p className="text-slate-500 mt-1">Relax, you deserve it.</p>
+                      <h3 className="text-lg font-medium text-warm-700">All caught up!</h3>
+                      <p className="text-warm-500 mt-1">Relax, you deserve it.</p>
                     </div>
                   ) : (
                     <div className="space-y-2">
@@ -875,7 +889,7 @@ export default function TasksPage() {
                         return (
                           <div
                             key={task.id}
-                            className={`bg-white rounded-xl shadow-sm border border-slate-200 p-4 transition-all ${
+                            className={`bg-white rounded-xl shadow-sm border border-warm-200 p-4 transition-all ${
                               task.completed ? 'opacity-60' : ''
                             } ${showConfetti === task.id ? 'ring-2 ring-emerald-500 ring-offset-2' : ''}`}
                           >
@@ -886,23 +900,23 @@ export default function TasksPage() {
                                 className={`w-7 h-7 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all ${
                                   task.completed
                                     ? 'bg-emerald-600 border-emerald-600 text-white'
-                                    : 'border-slate-300 hover:border-emerald-500'
+                                    : 'border-warm-300 hover:border-emerald-500'
                                 }`}
                               >
                                 {task.completed && <Check className="w-4 h-4" />}
                               </button>
 
                               {/* Category Icon */}
-                              <div className="p-2 bg-slate-100 rounded-lg flex-shrink-0">
-                                <CategoryIcon className="w-4 h-4 text-slate-600" />
+                              <div className="p-2 bg-warm-100 rounded-lg flex-shrink-0">
+                                <CategoryIcon className="w-4 h-4 text-warm-600" />
                               </div>
 
                               {/* Task Content */}
                               <div className="flex-1 min-w-0">
-                                <div className={`font-medium ${task.completed ? 'line-through text-slate-500' : 'text-slate-800'}`}>
+                                <div className={`font-medium ${task.completed ? 'line-through text-warm-500' : 'text-warm-800'}`}>
                                   {task.title}
                                 </div>
-                                <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <div className="flex items-center gap-2 text-sm text-warm-500">
                                   {task.dueTime && <span>{task.dueTime}</span>}
                                   {task.recurrence !== 'none' && (
                                     <span className="flex items-center gap-1">
@@ -935,7 +949,7 @@ export default function TasksPage() {
                               {/* More */}
                               <button
                                 onClick={() => setShowTaskDetail(task)}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
+                                className="p-2 hover:bg-warm-100 rounded-lg transition-colors text-warm-400"
                               >
                                 <MoreHorizontal className="w-5 h-5" />
                               </button>
@@ -950,8 +964,8 @@ export default function TasksPage() {
                 {/* Upcoming Tasks */}
                 {groupedFamilyTasks.upcoming.length > 0 && (
                   <div>
-                    <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                      <Calendar className="w-5 h-5 text-slate-400" />
+                    <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
+                      <Calendar className="w-5 h-5 text-warm-400" />
                       Upcoming
                     </h2>
 
@@ -963,21 +977,21 @@ export default function TasksPage() {
                         return (
                           <div
                             key={task.id}
-                            className="bg-white rounded-xl shadow-sm border border-slate-200 p-4"
+                            className="bg-white rounded-xl shadow-sm border border-warm-200 p-4"
                           >
                             <div className="flex items-center gap-3">
                               <button
                                 onClick={() => toggleTaskComplete(task.id)}
-                                className="w-7 h-7 rounded-full border-2 border-slate-300 hover:border-emerald-500 flex items-center justify-center flex-shrink-0 transition-colors"
+                                className="w-7 h-7 rounded-full border-2 border-warm-300 hover:border-emerald-500 flex items-center justify-center flex-shrink-0 transition-colors"
                               />
 
-                              <div className="p-2 bg-slate-100 rounded-lg flex-shrink-0">
-                                <CategoryIcon className="w-4 h-4 text-slate-600" />
+                              <div className="p-2 bg-warm-100 rounded-lg flex-shrink-0">
+                                <CategoryIcon className="w-4 h-4 text-warm-600" />
                               </div>
 
                               <div className="flex-1 min-w-0">
-                                <div className="font-medium text-slate-800">{task.title}</div>
-                                <div className="flex items-center gap-2 text-sm text-slate-500">
+                                <div className="font-medium text-warm-800">{task.title}</div>
+                                <div className="flex items-center gap-2 text-sm text-warm-500">
                                   {task.dueDate && (
                                     <span>
                                       {task.dueDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
@@ -1008,7 +1022,7 @@ export default function TasksPage() {
 
                               <button
                                 onClick={() => setShowTaskDetail(task)}
-                                className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
+                                className="p-2 hover:bg-warm-100 rounded-lg transition-colors text-warm-400"
                               >
                                 <MoreHorizontal className="w-5 h-5" />
                               </button>
@@ -1024,16 +1038,16 @@ export default function TasksPage() {
               /* Manager Queue View */
               <>
                 {managerTasks.length === 0 ? (
-                  <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-12 text-center">
-                    <Briefcase className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-slate-700 mb-2">Your Manager is standing by</h3>
-                    <p className="text-slate-500 max-w-sm mx-auto mb-6">
+                  <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-12 text-center">
+                    <Briefcase className="w-16 h-16 text-warm-300 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-warm-700 mb-2">Your Manager is standing by</h3>
+                    <p className="text-warm-500 max-w-sm mx-auto mb-6">
                       Delegate something to free up your time. Just type above and select &quot;Manager&quot;.
                     </p>
 
                     {/* Quick Templates */}
                     <div className="max-w-md mx-auto">
-                      <p className="text-sm text-slate-500 mb-3">Or try a template:</p>
+                      <p className="text-sm text-warm-500 mb-3">Or try a template:</p>
                       <div className="grid grid-cols-2 gap-2">
                         {MANAGER_TEMPLATES.slice(0, 4).map(template => {
                           const Icon = template.icon;
@@ -1044,10 +1058,10 @@ export default function TasksPage() {
                                 handleTemplateSelect(template);
                                 setNewTaskAssignee('manager');
                               }}
-                              className="flex items-center gap-2 p-3 bg-slate-50 hover:bg-emerald-50 border border-slate-200 hover:border-emerald-300 rounded-lg text-left transition-colors"
+                              className="flex items-center gap-2 p-3 bg-warm-50 hover:bg-emerald-50 border border-warm-200 hover:border-emerald-300 rounded-lg text-left transition-colors"
                             >
-                              <Icon className="w-4 h-4 text-slate-500" />
-                              <span className="text-sm text-slate-700 truncate">{template.title}</span>
+                              <Icon className="w-4 h-4 text-warm-500" />
+                              <span className="text-sm text-warm-700 truncate">{template.title}</span>
                             </button>
                           );
                         })}
@@ -1059,7 +1073,7 @@ export default function TasksPage() {
                     {/* Needs Approval */}
                     {managerTasksByStatus.needsApproval.length > 0 && (
                       <div>
-                        <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
                           <AlertCircle className="w-5 h-5 text-orange-500" />
                           Needs Your Approval
                           <span className="ml-1 px-2 py-0.5 text-xs bg-orange-100 text-orange-700 rounded-full">
@@ -1080,10 +1094,10 @@ export default function TasksPage() {
                                       <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium">Priority</span>
                                     )}
                                   </div>
-                                  <h3 className="font-medium text-slate-900">{task.title}</h3>
+                                  <h3 className="font-medium text-warm-900">{task.title}</h3>
                                 </div>
                                 {task.lastUpdate && (
-                                  <span className="text-xs text-slate-500">
+                                  <span className="text-xs text-warm-500">
                                     Updated {formatRelativeTime(task.lastUpdate)}
                                   </span>
                                 )}
@@ -1097,7 +1111,7 @@ export default function TasksPage() {
                                     </div>
                                     <div>
                                       <p className="text-xs text-emerald-700 font-medium mb-1">Sarah says:</p>
-                                      <p className="text-sm text-slate-700">{task.managerNote}</p>
+                                      <p className="text-sm text-warm-700">{task.managerNote}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -1112,7 +1126,7 @@ export default function TasksPage() {
                                 </button>
                                 <button
                                   onClick={() => handleRequestChanges(task.id)}
-                                  className="flex-1 px-4 py-2 border border-slate-300 rounded-lg hover:bg-white transition-colors text-slate-700 text-sm"
+                                  className="flex-1 px-4 py-2 border border-warm-300 rounded-lg hover:bg-white transition-colors text-warm-700 text-sm"
                                 >
                                   Request Changes
                                 </button>
@@ -1126,7 +1140,7 @@ export default function TasksPage() {
                     {/* In Progress */}
                     {managerTasksByStatus.inProgress.length > 0 && (
                       <div>
-                        <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
                           <Loader2 className="w-5 h-5 text-amber-500 animate-spin" />
                           In Progress
                         </h2>
@@ -1151,17 +1165,17 @@ export default function TasksPage() {
                                         <span className="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-medium">Priority</span>
                                       )}
                                       {task.lastUpdate && (
-                                        <span className="text-xs text-slate-500">
+                                        <span className="text-xs text-warm-500">
                                           Updated {formatRelativeTime(task.lastUpdate)}
                                         </span>
                                       )}
                                     </div>
-                                    <h3 className="font-medium text-slate-900">{task.title}</h3>
+                                    <h3 className="font-medium text-warm-900">{task.title}</h3>
                                     {task.managerNote && (
-                                      <p className="text-sm text-slate-600 mt-1 p-2 bg-white/70 rounded-lg">{task.managerNote}</p>
+                                      <p className="text-sm text-warm-600 mt-1 p-2 bg-white/70 rounded-lg">{task.managerNote}</p>
                                     )}
                                     {task.dueDate && (
-                                      <p className="text-sm text-slate-500 mt-2 flex items-center gap-1">
+                                      <p className="text-sm text-warm-500 mt-2 flex items-center gap-1">
                                         <Calendar className="w-4 h-4" />
                                         Due {task.dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                                       </p>
@@ -1196,8 +1210,8 @@ export default function TasksPage() {
                     {/* Pending (Sent/Viewed) */}
                     {managerTasksByStatus.pending.length > 0 && (
                       <div>
-                        <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                          <Send className="w-5 h-5 text-slate-400" />
+                        <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
+                          <Send className="w-5 h-5 text-warm-400" />
                           Recently Sent
                         </h2>
                         <div className="space-y-2">
@@ -1207,30 +1221,30 @@ export default function TasksPage() {
                             return (
                               <div
                                 key={task.id}
-                                className="bg-white rounded-xl border border-slate-200 p-4"
+                                className="bg-white rounded-xl border border-warm-200 p-4"
                               >
                                 <div className="flex items-start gap-3">
-                                  <div className="p-2 bg-slate-100 rounded-lg flex-shrink-0">
-                                    <CategoryIcon className="w-5 h-5 text-slate-600" />
+                                  <div className="p-2 bg-warm-100 rounded-lg flex-shrink-0">
+                                    <CategoryIcon className="w-5 h-5 text-warm-600" />
                                   </div>
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2 mb-1">
                                       {getStatusBadge(task.status)}
                                       {task.recurrence !== 'none' && (
-                                        <span className="flex items-center gap-1 text-xs text-slate-500">
+                                        <span className="flex items-center gap-1 text-xs text-warm-500">
                                           <Repeat className="w-3 h-3" />
                                           {task.recurrence}
                                         </span>
                                       )}
                                     </div>
-                                    <h3 className="font-medium text-slate-900">{task.title}</h3>
+                                    <h3 className="font-medium text-warm-900">{task.title}</h3>
                                     {task.description && (
-                                      <p className="text-sm text-slate-600 mt-1">{task.description}</p>
+                                      <p className="text-sm text-warm-600 mt-1">{task.description}</p>
                                     )}
                                   </div>
                                   <button
                                     onClick={() => setShowTaskDetail(task)}
-                                    className="p-2 hover:bg-slate-100 rounded-lg transition-colors text-slate-400"
+                                    className="p-2 hover:bg-warm-100 rounded-lg transition-colors text-warm-400"
                                   >
                                     <MoreHorizontal className="w-5 h-5" />
                                   </button>
@@ -1245,7 +1259,7 @@ export default function TasksPage() {
                     {/* Completed */}
                     {managerTasksByStatus.completed.length > 0 && (
                       <div>
-                        <h2 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                        <h2 className="font-semibold text-warm-900 mb-3 flex items-center gap-2">
                           <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                           Recently Completed
                         </h2>
@@ -1253,16 +1267,16 @@ export default function TasksPage() {
                           {managerTasksByStatus.completed.map(task => (
                             <div
                               key={task.id}
-                              className="bg-white rounded-xl border border-slate-200 p-4 opacity-75"
+                              className="bg-white rounded-xl border border-warm-200 p-4 opacity-75"
                             >
                               <div className="flex items-center gap-3">
                                 <div className="p-2 bg-emerald-100 rounded-lg flex-shrink-0">
                                   <CheckCircle2 className="w-5 h-5 text-emerald-600" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <h3 className="font-medium text-slate-700 line-through">{task.title}</h3>
+                                  <h3 className="font-medium text-warm-700 line-through">{task.title}</h3>
                                   {task.managerNote && (
-                                    <p className="text-sm text-slate-500 mt-1">{task.managerNote}</p>
+                                    <p className="text-sm text-warm-500 mt-1">{task.managerNote}</p>
                                   )}
                                 </div>
                               </div>
@@ -1279,10 +1293,10 @@ export default function TasksPage() {
 
           {/* Right Sidebar - Activity Feed (Desktop Only) */}
           <div className="hidden lg:block lg:w-[40%]">
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4 sticky top-32">
+            <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4 sticky top-32">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="font-semibold text-slate-900">Manager Activity</h2>
-                <Bell className="w-5 h-5 text-slate-400" />
+                <h2 className="font-semibold text-warm-900">Manager Activity</h2>
+                <Bell className="w-5 h-5 text-warm-400" />
               </div>
 
               <div className="space-y-4">
@@ -1293,7 +1307,7 @@ export default function TasksPage() {
                       item.type === 'started' ? 'bg-amber-100 text-amber-600' :
                       item.type === 'viewed' ? 'bg-blue-100 text-blue-600' :
                       item.type === 'researching' ? 'bg-purple-100 text-purple-600' :
-                      'bg-slate-100 text-slate-600'
+                      'bg-warm-100 text-warm-600'
                     }`}>
                       {item.type === 'completed' && <CheckCircle2 className="w-4 h-4" />}
                       {item.type === 'started' && <Loader2 className="w-4 h-4" />}
@@ -1302,7 +1316,7 @@ export default function TasksPage() {
                       {item.type === 'message' && <MessageCircle className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-800">
+                      <p className="text-sm text-warm-800">
                         <span className="font-medium">{item.managerName}</span>
                         {item.type === 'completed' && ' completed '}
                         {item.type === 'started' && ' started working on '}
@@ -1311,7 +1325,7 @@ export default function TasksPage() {
                         {item.type === 'message' && ' sent an update about '}
                         <span className="font-medium">&quot;{item.taskTitle}&quot;</span>
                       </p>
-                      <p className="text-xs text-slate-500 mt-0.5">{formatRelativeTime(item.timestamp)}</p>
+                      <p className="text-xs text-warm-500 mt-0.5">{formatRelativeTime(item.timestamp)}</p>
                     </div>
                   </div>
                 ))}
@@ -1322,12 +1336,12 @@ export default function TasksPage() {
               </button>
 
               {/* Quick Help */}
-              <div className="mt-4 pt-4 border-t border-slate-200">
-                <div className="flex items-start gap-3 p-3 bg-slate-50 rounded-lg">
-                  <HelpCircle className="w-5 h-5 text-slate-400 flex-shrink-0 mt-0.5" />
+              <div className="mt-4 pt-4 border-t border-warm-200">
+                <div className="flex items-start gap-3 p-3 bg-warm-50 rounded-lg">
+                  <HelpCircle className="w-5 h-5 text-warm-400 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-sm font-medium text-slate-700">Need something done?</p>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-sm font-medium text-warm-700">Need something done?</p>
+                    <p className="text-xs text-warm-500 mt-0.5">
                       Just describe it and Sarah will handle the rest.
                     </p>
                   </div>
@@ -1342,14 +1356,14 @@ export default function TasksPage() {
       {showTaskDetail && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
-            <div className="p-6 border-b border-slate-200">
+            <div className="p-6 border-b border-warm-200">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-slate-900">Task Details</h2>
+                <h2 className="text-xl font-bold text-warm-900">Task Details</h2>
                 <button
                   onClick={() => setShowTaskDetail(null)}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-slate-500" />
+                  <X className="w-5 h-5 text-warm-500" />
                 </button>
               </div>
             </div>
@@ -1363,7 +1377,7 @@ export default function TasksPage() {
                       <CheckCircle2 className="w-4 h-4" /> Completed
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium bg-slate-100 text-slate-700">
+                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-sm font-medium bg-warm-100 text-warm-700">
                       <Circle className="w-4 h-4" /> Pending
                     </span>
                   )
@@ -1378,17 +1392,17 @@ export default function TasksPage() {
               </div>
 
               {/* Title */}
-              <h3 className="text-lg font-semibold text-slate-900">{showTaskDetail.title}</h3>
+              <h3 className="text-lg font-semibold text-warm-900">{showTaskDetail.title}</h3>
 
               {/* Description (Manager tasks) */}
               {showTaskDetail.type === 'manager' && showTaskDetail.description && (
-                <p className="text-slate-600">{showTaskDetail.description}</p>
+                <p className="text-warm-600">{showTaskDetail.description}</p>
               )}
 
               {/* Assignee (Family tasks) */}
               {showTaskDetail.type === 'family' && showTaskDetail.assigneeId && (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-slate-500">Assigned to:</span>
+                  <span className="text-sm text-warm-500">Assigned to:</span>
                   {(() => {
                     const member = getMember(showTaskDetail.assigneeId);
                     if (!member) return null;
@@ -1397,7 +1411,7 @@ export default function TasksPage() {
                         <span className={`w-6 h-6 rounded-full ${member.color} flex items-center justify-center text-xs text-white font-medium`}>
                           {member.initials}
                         </span>
-                        <span className="font-medium text-slate-800">{member.name}</span>
+                        <span className="font-medium text-warm-800">{member.name}</span>
                       </span>
                     );
                   })()}
@@ -1406,7 +1420,7 @@ export default function TasksPage() {
 
               {/* Due Date */}
               {showTaskDetail.dueDate && (
-                <div className="flex items-center gap-2 text-slate-600">
+                <div className="flex items-center gap-2 text-warm-600">
                   <Calendar className="w-4 h-4" />
                   <span>
                     Due {showTaskDetail.dueDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
@@ -1416,8 +1430,8 @@ export default function TasksPage() {
 
               {/* Status Timeline (Manager tasks) */}
               {showTaskDetail.type === 'manager' && showTaskDetail.statusHistory.length > 0 && (
-                <div className="border-t border-slate-200 pt-4 mt-4">
-                  <h4 className="text-sm font-medium text-slate-700 mb-3">Status Timeline</h4>
+                <div className="border-t border-warm-200 pt-4 mt-4">
+                  <h4 className="text-sm font-medium text-warm-700 mb-3">Status Timeline</h4>
                   <div className="space-y-3">
                     {showTaskDetail.statusHistory.map((entry, index) => (
                       <div key={index} className="flex items-start gap-3">
@@ -1427,15 +1441,15 @@ export default function TasksPage() {
                           entry.status === 'in_progress' ? 'bg-amber-500' :
                           entry.status === 'researching' ? 'bg-purple-500' :
                           entry.status === 'viewed' ? 'bg-blue-500' :
-                          'bg-slate-400'
+                          'bg-warm-400'
                         }`} />
                         <div className="flex-1">
                           <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium text-slate-800 capitalize">{entry.status.replace('_', ' ')}</span>
-                            <span className="text-xs text-slate-500">{formatRelativeTime(entry.timestamp)}</span>
+                            <span className="text-sm font-medium text-warm-800 capitalize">{entry.status.replace('_', ' ')}</span>
+                            <span className="text-xs text-warm-500">{formatRelativeTime(entry.timestamp)}</span>
                           </div>
                           {entry.note && (
-                            <p className="text-sm text-slate-600 mt-1">{entry.note}</p>
+                            <p className="text-sm text-warm-600 mt-1">{entry.note}</p>
                           )}
                         </div>
                       </div>
@@ -1445,7 +1459,7 @@ export default function TasksPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-slate-200 bg-slate-50 rounded-b-xl">
+            <div className="p-6 border-t border-warm-200 bg-warm-50 rounded-b-xl">
               <div className="flex gap-3">
                 <button
                   onClick={() => deleteTask(showTaskDetail)}
@@ -1494,14 +1508,14 @@ export default function TasksPage() {
       {showAddModal && (
         <div className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 md:hidden">
           <div className="bg-white rounded-t-xl w-full max-h-[80vh] overflow-y-auto animate-slide-up">
-            <div className="p-4 border-b border-slate-200 sticky top-0 bg-white">
+            <div className="p-4 border-b border-warm-200 sticky top-0 bg-white">
               <div className="flex items-center justify-between">
-                <h2 className="text-lg font-bold text-slate-900">New Task</h2>
+                <h2 className="text-lg font-bold text-warm-900">New Task</h2>
                 <button
                   onClick={() => setShowAddModal(false)}
-                  className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-slate-500" />
+                  <X className="w-5 h-5 text-warm-500" />
                 </button>
               </div>
             </div>
@@ -1513,7 +1527,7 @@ export default function TasksPage() {
                 onChange={(e) => setNewTaskInput(e.target.value)}
                 placeholder="What needs to get done?"
                 autoFocus
-                className="w-full px-4 py-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-lg"
+                className="w-full px-4 py-3 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-lg"
               />
 
               {/* Smart Suggestion */}
@@ -1530,7 +1544,7 @@ export default function TasksPage() {
                     className={`px-3 py-1.5 rounded-lg text-sm font-medium ${
                       suggestion === 'manager'
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-800 text-white'
+                        : 'bg-warm-800 text-white'
                     }`}
                   >
                     Apply
@@ -1539,14 +1553,14 @@ export default function TasksPage() {
               )}
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">Assign to:</label>
+                <label className="block text-sm font-medium text-warm-700 mb-2">Assign to:</label>
                 <div className="flex gap-2">
                   <button
                     onClick={() => setNewTaskAssignee('family')}
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
                       newTaskAssignee === 'family'
-                        ? 'border-slate-800 bg-slate-50'
-                        : 'border-slate-200'
+                        ? 'border-warm-800 bg-warm-50'
+                        : 'border-warm-200'
                     }`}
                   >
                     <Users className="w-5 h-5" />
@@ -1557,7 +1571,7 @@ export default function TasksPage() {
                     className={`flex-1 flex items-center justify-center gap-2 px-4 py-3 rounded-lg border-2 transition-colors ${
                       newTaskAssignee === 'manager'
                         ? 'border-emerald-600 bg-emerald-50 text-emerald-700'
-                        : 'border-slate-200'
+                        : 'border-warm-200'
                     }`}
                   >
                     <Briefcase className="w-5 h-5" />
@@ -1568,17 +1582,17 @@ export default function TasksPage() {
 
               {newTaskAssignee === 'family' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">Family member:</label>
+                  <label className="block text-sm font-medium text-warm-700 mb-2">Family member:</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => setNewTaskAssigneeId('')}
                       className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                         newTaskAssigneeId === ''
-                          ? 'border-slate-800 bg-slate-50'
-                          : 'border-slate-200'
+                          ? 'border-warm-800 bg-warm-50'
+                          : 'border-warm-200'
                       }`}
                     >
-                      <Users className="w-5 h-5 text-slate-500" />
+                      <Users className="w-5 h-5 text-warm-500" />
                       Anyone
                     </button>
                     {family.map(member => (
@@ -1587,8 +1601,8 @@ export default function TasksPage() {
                         onClick={() => setNewTaskAssigneeId(member.id)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-lg border transition-colors ${
                           newTaskAssigneeId === member.id
-                            ? 'border-slate-800 bg-slate-50'
-                            : 'border-slate-200'
+                            ? 'border-warm-800 bg-warm-50'
+                            : 'border-warm-200'
                         }`}
                       >
                         <span className={`w-6 h-6 rounded-full ${member.color} flex items-center justify-center text-xs text-white font-medium`}>
@@ -1604,11 +1618,11 @@ export default function TasksPage() {
               {newTaskAssignee === 'manager' && (
                 <>
                   <div className="flex gap-2">
-                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
+                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-warm-300 rounded-lg hover:bg-warm-50 transition-colors text-warm-700">
                       <Camera className="w-5 h-5" />
                       Add Photo
                     </button>
-                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700">
+                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-3 border border-warm-300 rounded-lg hover:bg-warm-50 transition-colors text-warm-700">
                       <Mic className="w-5 h-5" />
                       Voice Note
                     </button>
@@ -1616,7 +1630,7 @@ export default function TasksPage() {
 
                   {/* Quick Templates */}
                   <div>
-                    <p className="text-sm text-slate-500 mb-2">Quick templates:</p>
+                    <p className="text-sm text-warm-500 mb-2">Quick templates:</p>
                     <div className="grid grid-cols-2 gap-2">
                       {MANAGER_TEMPLATES.slice(0, 4).map(template => {
                         const Icon = template.icon;
@@ -1624,10 +1638,10 @@ export default function TasksPage() {
                           <button
                             key={template.id}
                             onClick={() => handleTemplateSelect(template)}
-                            className="flex items-center gap-2 p-2 bg-slate-50 hover:bg-emerald-50 border border-slate-200 rounded-lg text-left transition-colors"
+                            className="flex items-center gap-2 p-2 bg-warm-50 hover:bg-emerald-50 border border-warm-200 rounded-lg text-left transition-colors"
                           >
-                            <Icon className="w-4 h-4 text-slate-500" />
-                            <span className="text-xs text-slate-700 truncate">{template.title}</span>
+                            <Icon className="w-4 h-4 text-warm-500" />
+                            <span className="text-xs text-warm-700 truncate">{template.title}</span>
                           </button>
                         );
                       })}

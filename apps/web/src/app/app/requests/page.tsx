@@ -272,7 +272,7 @@ function QuickRequestInput({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-warm-200 shadow-sm overflow-hidden">
       <div className="p-4">
         <div className="flex items-center gap-3">
           <input
@@ -282,7 +282,7 @@ function QuickRequestInput({
             onChange={(e) => setDescription(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="What do you need help with?"
-            className="flex-1 text-lg bg-transparent border-none outline-none placeholder:text-slate-400"
+            className="flex-1 text-lg bg-transparent border-none outline-none placeholder:text-warm-400"
             disabled={isSubmitting}
           />
           <button
@@ -290,14 +290,14 @@ function QuickRequestInput({
             className={`p-2 rounded-full transition-colors ${
               isListening
                 ? 'bg-red-100 text-red-600 animate-pulse'
-                : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                : 'bg-warm-100 text-warm-500 hover:bg-warm-200'
             }`}
             disabled={isSubmitting}
           >
             {isListening ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
           </button>
           <button
-            className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition-colors"
+            className="p-2 bg-warm-100 text-warm-500 rounded-full hover:bg-warm-200 transition-colors"
             disabled={isSubmitting}
           >
             <Camera className="w-5 h-5" />
@@ -331,7 +331,7 @@ function QuickRequestInput({
           <button
             key={pick.label}
             onClick={() => setDescription(pick.label)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 text-slate-600 rounded-full text-sm hover:bg-slate-100 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-warm-50 text-warm-600 rounded-full text-sm hover:bg-warm-100 transition-colors"
             disabled={isSubmitting}
           >
             <pick.icon className="w-3.5 h-3.5" />
@@ -431,14 +431,14 @@ function NeedsInputCard({
       case 'info':
         return <MessageSquare className="w-5 h-5 text-indigo-600" />;
       default:
-        return <MessageSquare className="w-5 h-5 text-slate-600" />;
+        return <MessageSquare className="w-5 h-5 text-warm-600" />;
     }
   };
 
   const canSubmit = input.type === 'info' ? textResponse.trim() : selectedOption;
 
   return (
-    <div className={`bg-white rounded-xl border-2 shadow-sm overflow-hidden ${input.urgent ? 'border-amber-400' : 'border-slate-200'}`}>
+    <div className={`bg-white rounded-xl border-2 shadow-sm overflow-hidden ${input.urgent ? 'border-amber-400' : 'border-warm-200'}`}>
       {input.urgent && (
         <div className="bg-amber-50 px-4 py-2 flex items-center gap-2 border-b border-amber-200">
           <AlertCircle className="w-4 h-4 text-amber-600" />
@@ -448,12 +448,12 @@ function NeedsInputCard({
 
       <div className="p-4">
         <div className="flex items-start gap-3 mb-4">
-          <div className="p-2 bg-slate-100 rounded-lg">
+          <div className="p-2 bg-warm-100 rounded-lg">
             {getIcon()}
           </div>
           <div className="flex-1">
-            <p className="text-sm text-slate-500">{input.requestTitle}</p>
-            <h3 className="font-semibold text-slate-900">{input.question}</h3>
+            <p className="text-sm text-warm-500">{input.requestTitle}</p>
+            <h3 className="font-semibold text-warm-900">{input.question}</h3>
           </div>
         </div>
 
@@ -467,10 +467,10 @@ function NeedsInputCard({
                 className={`w-full p-3 rounded-lg border text-left transition-all ${
                   selectedOption === option
                     ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
-                    : 'border-slate-200 hover:border-slate-300'
+                    : 'border-warm-200 hover:border-warm-300'
                 }`}
               >
-                <span className="text-sm font-medium text-slate-900">{option}</span>
+                <span className="text-sm font-medium text-warm-900">{option}</span>
               </button>
             ))}
           </div>
@@ -486,12 +486,12 @@ function NeedsInputCard({
                 className={`w-full p-3 rounded-lg border text-left transition-all ${
                   selectedOption === time.id
                     ? 'border-emerald-500 bg-emerald-50 ring-2 ring-emerald-200'
-                    : 'border-slate-200 hover:border-slate-300'
+                    : 'border-warm-200 hover:border-warm-300'
                 }`}
               >
                 <div className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-900">{time.label}</span>
+                  <Calendar className="w-4 h-4 text-warm-400" />
+                  <span className="text-sm font-medium text-warm-900">{time.label}</span>
                 </div>
               </button>
             ))}
@@ -501,9 +501,9 @@ function NeedsInputCard({
         {/* Approval */}
         {input.type === 'approval' && input.amount && (
           <div className="mb-4">
-            <div className="p-4 bg-slate-50 rounded-lg text-center mb-3">
-              <p className="text-3xl font-bold text-slate-900">${input.amount.toLocaleString()}</p>
-              <p className="text-sm text-slate-500 mt-1">Estimated repair cost</p>
+            <div className="p-4 bg-warm-50 rounded-lg text-center mb-3">
+              <p className="text-3xl font-bold text-warm-900">${input.amount.toLocaleString()}</p>
+              <p className="text-sm text-warm-500 mt-1">Estimated repair cost</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <button
@@ -511,7 +511,7 @@ function NeedsInputCard({
                 className={`p-3 rounded-lg border transition-all flex items-center justify-center gap-2 ${
                   selectedOption === 'decline'
                     ? 'border-red-500 bg-red-50 text-red-700'
-                    : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                    : 'border-warm-200 hover:border-warm-300 text-warm-700'
                 }`}
               >
                 <ThumbsDown className="w-4 h-4" />
@@ -522,7 +522,7 @@ function NeedsInputCard({
                 className={`p-3 rounded-lg border transition-all flex items-center justify-center gap-2 ${
                   selectedOption === 'approve'
                     ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                    : 'border-slate-200 hover:border-slate-300 text-slate-700'
+                    : 'border-warm-200 hover:border-warm-300 text-warm-700'
                 }`}
               >
                 <ThumbsUp className="w-4 h-4" />
@@ -540,7 +540,7 @@ function NeedsInputCard({
               onChange={(e) => setTextResponse(e.target.value)}
               placeholder={input.infoPlaceholder || 'Type your response...'}
               rows={3}
-              className="w-full px-4 py-3 border border-slate-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
+              className="w-full px-4 py-3 border border-warm-200 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent resize-none text-sm"
             />
           </div>
         )}
@@ -601,17 +601,17 @@ function CompletionCard({
       </div>
 
       <div className="p-4">
-        <h3 className="font-semibold text-slate-900 text-lg">{request.title}</h3>
+        <h3 className="font-semibold text-warm-900 text-lg">{request.title}</h3>
 
         {request.summary && (
-          <p className="text-slate-600 text-sm mt-2">{request.summary}</p>
+          <p className="text-warm-600 text-sm mt-2">{request.summary}</p>
         )}
 
         {/* Photos */}
         {request.photos && request.photos.length > 0 && (
           <div className="mt-4 flex gap-2 overflow-x-auto pb-2">
             {request.photos.map((photo, i) => (
-              <div key={i} className="relative w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-slate-100">
+              <div key={i} className="relative w-32 h-24 flex-shrink-0 rounded-lg overflow-hidden bg-warm-100">
                 <Image src={photo} alt="Completion photo" fill className="object-cover" />
               </div>
             ))}
@@ -621,17 +621,17 @@ function CompletionCard({
         {/* Cost & Vendor */}
         <div className="mt-4 flex items-center gap-4 text-sm">
           {request.vendor && (
-            <span className="text-slate-600">By {request.vendor}</span>
+            <span className="text-warm-600">By {request.vendor}</span>
           )}
           {request.cost && (
-            <span className="font-medium text-slate-900">${request.cost.toLocaleString()}</span>
+            <span className="font-medium text-warm-900">${request.cost.toLocaleString()}</span>
           )}
         </div>
 
         {/* Rating */}
         {!request.rating && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-sm text-slate-600 mb-2">How did we do?</p>
+          <div className="mt-4 pt-4 border-t border-warm-100">
+            <p className="text-sm text-warm-600 mb-2">How did we do?</p>
             <div className="flex items-center gap-1">
               {[1, 2, 3, 4, 5].map((star) => (
                 <button
@@ -643,7 +643,7 @@ function CompletionCard({
                     className={`w-7 h-7 transition-colors ${
                       star <= selectedRating
                         ? 'text-amber-400 fill-amber-400'
-                        : 'text-slate-200 hover:text-amber-300'
+                        : 'text-warm-200 hover:text-amber-300'
                     }`}
                   />
                 </button>
@@ -675,10 +675,10 @@ function CompletionCard({
 // Active Request Mini Card - Minimal info
 function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+    <div className="bg-white rounded-xl border border-warm-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="flex-1">
-          <h3 className="font-medium text-slate-900">{request.title}</h3>
+          <h3 className="font-medium text-warm-900">{request.title}</h3>
           <p className="text-sm text-emerald-600 mt-1">{request.statusMessage}</p>
 
           {request.isRecurring && (
@@ -690,7 +690,7 @@ function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
         </div>
 
         {request.vendor && (
-          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-slate-100">
+          <div className="relative w-10 h-10 rounded-full overflow-hidden bg-warm-100">
             <Image src={request.vendor.avatar} alt={request.vendor.name} fill className="object-cover" />
           </div>
         )}
@@ -702,21 +702,21 @@ function ActiveRequestMiniCard({ request }: { request: ActiveRequest }) {
 // Completed Request Card - For history
 function CompletedHistoryCard({ request }: { request: CompletedRequest }) {
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+    <div className="bg-white rounded-xl border border-warm-200 p-4 shadow-sm">
       <div className="flex items-start gap-3">
         <div className="p-2 bg-emerald-100 rounded-lg">
           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
         </div>
         <div className="flex-1">
-          <h3 className="font-medium text-slate-900">{request.title}</h3>
-          <p className="text-sm text-slate-500">{formatDate(request.completedAt)}</p>
+          <h3 className="font-medium text-warm-900">{request.title}</h3>
+          <p className="text-sm text-warm-500">{formatDate(request.completedAt)}</p>
 
           {request.vendor && (
-            <p className="text-sm text-slate-600 mt-1">By {request.vendor}</p>
+            <p className="text-sm text-warm-600 mt-1">By {request.vendor}</p>
           )}
 
           {request.cost && (
-            <p className="text-sm font-medium text-slate-900 mt-1">${request.cost.toLocaleString()}</p>
+            <p className="text-sm font-medium text-warm-900 mt-1">${request.cost.toLocaleString()}</p>
           )}
 
           {request.addedToMaintenance && (
@@ -732,7 +732,7 @@ function CompletedHistoryCard({ request }: { request: CompletedRequest }) {
             {[1, 2, 3, 4, 5].map((star) => (
               <Star
                 key={star}
-                className={`w-4 h-4 ${star <= request.rating! ? 'text-amber-400 fill-amber-400' : 'text-slate-200'}`}
+                className={`w-4 h-4 ${star <= request.rating! ? 'text-amber-400 fill-amber-400' : 'text-warm-200'}`}
               />
             ))}
           </div>
@@ -765,24 +765,24 @@ function DetailsModal({
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative w-full h-[85vh] sm:max-w-lg sm:h-auto sm:max-h-[80vh] bg-white rounded-t-2xl sm:rounded-2xl shadow-xl overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-900">Request Details</h2>
+        <div className="flex items-center justify-between px-6 py-4 border-b border-warm-200">
+          <h2 className="text-lg font-semibold text-warm-900">Request Details</h2>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-slate-500" />
+            <X className="w-5 h-5 text-warm-500" />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex bg-slate-100 m-4 rounded-lg p-1">
+        <div className="flex bg-warm-100 m-4 rounded-lg p-1">
           <button
             onClick={() => setViewMode('active')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               viewMode === 'active'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-warm-900 shadow-sm'
+                : 'text-warm-600 hover:text-warm-900'
             }`}
           >
             <Clock className="w-4 h-4" />
@@ -793,8 +793,8 @@ function DetailsModal({
             onClick={() => setViewMode('history')}
             className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               viewMode === 'history'
-                ? 'bg-white text-slate-900 shadow-sm'
-                : 'text-slate-600 hover:text-slate-900'
+                ? 'bg-white text-warm-900 shadow-sm'
+                : 'text-warm-600 hover:text-warm-900'
             }`}
           >
             <Archive className="w-4 h-4" />
@@ -810,9 +810,9 @@ function DetailsModal({
                 <ActiveRequestMiniCard key={request.id} request={request} />
               ))}
               {activeRequests.length === 0 && (
-                <div className="text-center py-8 text-slate-500">
+                <div className="text-center py-8 text-warm-500">
                   <CheckCircle2 className="w-12 h-12 mx-auto mb-3 text-emerald-600" />
-                  <p className="font-medium text-slate-900">All caught up!</p>
+                  <p className="font-medium text-warm-900">All caught up!</p>
                   <p className="text-sm">No active requests right now</p>
                 </div>
               )}
@@ -821,13 +821,13 @@ function DetailsModal({
             <>
               {/* Search */}
               <div className="relative mb-4">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search history..."
-                  className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2 border border-warm-200 rounded-lg text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
                 />
               </div>
 
@@ -836,9 +836,9 @@ function DetailsModal({
                   <CompletedHistoryCard key={request.id} request={request} />
                 ))}
                 {filteredHistory.length === 0 && (
-                  <div className="text-center py-8 text-slate-500">
-                    <Archive className="w-12 h-12 mx-auto mb-3 text-slate-400" />
-                    <p className="font-medium text-slate-900">
+                  <div className="text-center py-8 text-warm-500">
+                    <Archive className="w-12 h-12 mx-auto mb-3 text-warm-400" />
+                    <p className="font-medium text-warm-900">
                       {searchQuery ? 'No matching requests' : 'No history yet'}
                     </p>
                     <p className="text-sm">
@@ -863,7 +863,7 @@ function SuccessToast({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-2">
+    <div className="fixed top-4 left-1/2 -tranwarm-x-1/2 z-[60] animate-in slide-in-from-top-2">
       <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg">
         <CheckCircle2 className="w-5 h-5" />
         <span className="font-medium">Got it! {HOUSING_MANAGER.name} is on it.</span>
@@ -929,8 +929,8 @@ export default function RequestsPage() {
     <div className="pb-32 lg:pb-8 max-w-2xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Help Requests</h1>
-        <p className="text-slate-500 mt-1">Tell us what you need. {HOUSING_MANAGER.name} handles the rest.</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-warm-900">Help Requests</h1>
+        <p className="text-warm-500 mt-1">Tell us what you need. {HOUSING_MANAGER.name} handles the rest.</p>
       </div>
 
       {/* Quick Request Input - Always visible at top */}
@@ -952,7 +952,7 @@ export default function RequestsPage() {
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Bell className="w-5 h-5 text-amber-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Needs Your Input</h2>
+            <h2 className="text-lg font-semibold text-warm-900">Needs Your Input</h2>
             <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-sm font-medium rounded-full">
               {needsInput.length}
             </span>
@@ -970,7 +970,7 @@ export default function RequestsPage() {
         <div className="mt-6">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5 text-emerald-600" />
-            <h2 className="text-lg font-semibold text-slate-900">Just Finished</h2>
+            <h2 className="text-lg font-semibold text-warm-900">Just Finished</h2>
           </div>
           <div className="space-y-4">
             {unacknowledgedCompletions.map((request) => (

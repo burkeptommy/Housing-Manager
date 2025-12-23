@@ -167,17 +167,17 @@ export default function NewProjectWizardPage() {
       <div className="mb-8">
         <button
           onClick={() => router.push('/app/projects')}
-          className="flex items-center gap-2 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white mb-4"
+          className="flex items-center gap-2 text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-white mb-4"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
           Back to Projects
         </button>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold text-warm-900 dark:text-white">
           {STEPS[currentStep - 1]?.title}
         </h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">
+        <p className="text-warm-600 dark:text-warm-400 mt-1">
           Step {currentStep} of {STEPS.length}
         </p>
       </div>
@@ -194,7 +194,7 @@ export default function NewProjectWizardPage() {
                 className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
                   step.id <= currentStep
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-slate-200 dark:bg-slate-700 text-slate-500 dark:text-slate-400'
+                    : 'bg-warm-200 dark:bg-warm-700 text-warm-500 dark:text-warm-400'
                 }`}
               >
                 {step.id < currentStep ? (
@@ -210,14 +210,14 @@ export default function NewProjectWizardPage() {
                   className={`flex-1 h-1 mx-2 rounded ${
                     step.id < currentStep
                       ? 'bg-emerald-600'
-                      : 'bg-slate-200 dark:bg-slate-700'
+                      : 'bg-warm-200 dark:bg-warm-700'
                   }`}
                 />
               )}
             </div>
           ))}
         </div>
-        <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400">
+        <div className="flex justify-between text-xs text-warm-500 dark:text-warm-400">
           {STEPS.map((step) => (
             <span key={step.id} className="w-8 text-center">
               {step.name}

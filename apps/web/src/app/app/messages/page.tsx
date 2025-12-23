@@ -13,6 +13,7 @@ import {
   CheckCheck,
   Circle,
   ChevronRight,
+  ChevronLeft,
   Plus,
   Filter,
   Users,
@@ -25,6 +26,8 @@ import {
   FolderOpen,
   Hash,
   ArrowRight,
+  X,
+  Send,
 } from 'lucide-react';
 import { getUserAvatar, getVendorAvatar } from '@/lib/avatars';
 import { InitialsAvatar, VendorAvatar } from '@/components/ui/avatar';
@@ -284,6 +287,8 @@ export default function MessagesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<CategoryType | 'all'>('all');
   const [projectFilter, setProjectFilter] = useState<'all' | 'active' | 'pending' | 'resolved'>('all');
+  const [showNewMessageModal, setShowNewMessageModal] = useState(false);
+  const [newMessageRecipient, setNewMessageRecipient] = useState<Contact | null>(null);
 
   // Filter contacts
   const filteredContacts = contacts.filter(contact => {
@@ -327,7 +332,10 @@ export default function MessagesPage() {
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <h1 className="text-2xl font-bold text-warm-900">Messages</h1>
-            <button className="p-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors">
+            <button
+              onClick={() => setShowNewMessageModal(true)}
+              className="p-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors"
+            >
               <Plus className="w-5 h-5" />
             </button>
           </div>
@@ -489,6 +497,148 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
+
+      {/* New Message Modal */}
+      {showNewMessageModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => {
+              setShowNewMessageModal(false);
+              setNewMessageRecipient(null);
+            }} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
+              <div className="p-4 border-b border-warm-200">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-warm-900">New Message</h3>
+                  <button
+                    onClick={() => {
+                      setShowNewMessageModal(false);
+                      setNewMessageRecipient(null);
+                    }}
+                    className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+                  >
+                    <X className="w-5 h-5 text-warm-400" />
+                  </button>
+                </div>
+              </div>
+
+              {!newMessageRecipient ? (
+                <>
+                  {/* Search */}
+                  <div className="p-4 border-b border-warm-100">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400" />
+                      <input
+                        type="text"
+                        placeholder="Search contacts..."
+                        className="w-full pl-9 pr-4 py-2 border border-warm-200 rounded-lg text-sm focus:ring-2 focus:ring-haven-500 focus:border-transparent"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Contact List */}
+                  <div className="max-h-[400px] overflow-y-auto">
+                    {/* Your Team */}
+                    <div className="px-4 py-2 bg-warm-50">
+                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Your Team</span>
+                    </div>
+                    {contacts.filter(c => c.category === 'team').map(contact => (
+                      <button
+                        key={contact.id}
+                        onClick={() => setNewMessageRecipient(contact)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                      >
+                        <InitialsAvatar name={contact.name} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                        </div>
+                        {contact.isOnline && (
+                          <div className="w-2 h-2 bg-green-500 rounded-full" />
+                        )}
+                      </button>
+                    ))}
+
+                    {/* Vendors */}
+                    <div className="px-4 py-2 bg-warm-50">
+                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Vendors</span>
+                    </div>
+                    {contacts.filter(c => c.category === 'vendors').map(contact => (
+                      <button
+                        key={contact.id}
+                        onClick={() => setNewMessageRecipient(contact)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                      >
+                        <VendorAvatar name={contact.name} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                        </div>
+                      </button>
+                    ))}
+
+                    {/* Community */}
+                    <div className="px-4 py-2 bg-warm-50">
+                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Community</span>
+                    </div>
+                    {contacts.filter(c => c.category === 'community').map(contact => (
+                      <button
+                        key={contact.id}
+                        onClick={() => setNewMessageRecipient(contact)}
+                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                      >
+                        <InitialsAvatar name={contact.name} size="md" />
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                /* Message Compose View */
+                <div className="flex flex-col h-[400px]">
+                  {/* Recipient Header */}
+                  <div className="p-3 border-b border-warm-100 flex items-center gap-3">
+                    <button
+                      onClick={() => setNewMessageRecipient(null)}
+                      className="p-1 hover:bg-warm-100 rounded"
+                    >
+                      <ChevronLeft className="w-5 h-5 text-warm-400" />
+                    </button>
+                    <InitialsAvatar name={newMessageRecipient.name} size="sm" />
+                    <div>
+                      <p className="font-medium text-warm-900 text-sm">{newMessageRecipient.name}</p>
+                      <p className="text-xs text-warm-500">{newMessageRecipient.role}</p>
+                    </div>
+                  </div>
+
+                  {/* Message Area */}
+                  <div className="flex-1 p-4 bg-warm-50">
+                    <p className="text-sm text-warm-400 text-center mt-8">Start a conversation with {newMessageRecipient.name.split(' ')[0]}</p>
+                  </div>
+
+                  {/* Input */}
+                  <div className="p-3 border-t border-warm-200 bg-white">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        placeholder="Type a message..."
+                        className="flex-1 px-4 py-2 border border-warm-200 rounded-xl text-sm focus:ring-2 focus:ring-haven-500 focus:border-transparent"
+                        autoFocus
+                      />
+                      <button className="px-4 py-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors">
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

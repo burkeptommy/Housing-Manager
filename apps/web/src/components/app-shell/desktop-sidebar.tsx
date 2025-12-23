@@ -54,6 +54,11 @@ export function DesktopSidebar() {
                       strokeWidth={active ? 2.5 : 2}
                     />
                     {item.name}
+                    {item.badge && item.badge > 0 && (
+                      <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
                   </Link>
                 );
               })}

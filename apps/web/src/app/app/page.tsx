@@ -215,8 +215,8 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-haven-600 via-haven-500 to-emerald-500 p-8 text-white mb-8">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full tranwarm-y-1/2 -tranwarm-x-1/2" />
       </div>
 
       <div className="relative">
@@ -701,7 +701,7 @@ function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
     <div className="relative overflow-hidden bg-gradient-to-br from-warm-900 via-warm-800 to-warm-900 rounded-2xl p-6 text-white">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
       </div>
 
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">

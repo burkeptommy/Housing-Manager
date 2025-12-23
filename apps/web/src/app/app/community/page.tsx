@@ -956,54 +956,55 @@ export default function VendorDiscoveryPage() {
 
 function VendorPopup({ vendor }: { vendor: Vendor }) {
   return (
-    <div className="w-[280px] max-w-[calc(100vw-48px)]">
+    <div className="w-[320px] max-w-[calc(100vw-32px)]">
       <div className="bg-white rounded-xl overflow-hidden shadow-lg">
         {/* Header */}
-        <div className="p-3">
+        <div className="p-4">
           <div className="flex items-start gap-3">
-            <VendorAvatarComponent name={vendor.name} size="lg" />
+            <VendorAvatarComponent name={vendor.name} size="lg" className="flex-shrink-0" />
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-warm-900 text-sm leading-tight break-words">
+              {/* Name - allow wrap, no truncate */}
+              <h3 className="font-semibold text-warm-900 text-sm leading-snug">
                 {vendor.name}
               </h3>
               {vendor.havenTrusted && (
-                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded">
+                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full">
                   <Shield className="w-3 h-3 flex-shrink-0" />
-                  Trusted
+                  Haven Trusted
                 </span>
               )}
             </div>
           </div>
 
           {/* Rating */}
-          <div className="mt-2 flex items-center gap-1.5 text-xs">
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <Star className="w-4 h-4 text-amber-500 fill-current flex-shrink-0" />
             <span className="font-medium text-warm-900">{vendor.rating}</span>
             <span className="text-warm-400">•</span>
             <span className="text-warm-500">{vendor.reviewCount} reviews</span>
           </div>
 
           {/* Stats */}
-          <div className="mt-2 flex items-center gap-3 text-xs text-warm-600">
-            <div className="flex items-center gap-1">
-              <Users className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+          <div className="mt-2 flex items-center gap-4 text-sm text-warm-600">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-warm-400 flex-shrink-0" />
               <span>{vendor.neighborsUsed} neighbors</span>
             </div>
-            <div className="flex items-center gap-1">
-              <MapPin className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-warm-400 flex-shrink-0" />
               <span>{vendor.distance} mi</span>
             </div>
           </div>
         </div>
 
-        {/* Buttons - INSIDE card */}
-        <div className="px-3 pb-3 flex gap-2">
-          <button className="flex-1 py-2 bg-haven-600 text-white text-xs font-medium rounded-lg hover:bg-haven-700 transition-colors">
+        {/* Buttons */}
+        <div className="px-4 pb-4 flex gap-2">
+          <button className="flex-1 py-2.5 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors">
             Request Quote
           </button>
           <a
             href={`tel:${vendor.phone}`}
-            className="px-3 py-2 border border-warm-200 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center flex-shrink-0"
+            className="px-4 py-2.5 border border-warm-200 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center flex-shrink-0"
           >
             <Phone className="w-4 h-4 text-warm-600" />
           </a>

@@ -502,13 +502,13 @@ function Confetti({ active }: { active: boolean }) {
 // View Mode Toggle
 function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (mode: ViewMode) => void }) {
   return (
-    <div className="flex bg-slate-100 rounded-lg p-1">
+    <div className="flex bg-warm-100 rounded-lg p-1">
       <button
         onClick={() => onChange('active')}
         className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
           mode === 'active'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-600 hover:text-slate-900'
+            ? 'bg-white text-warm-900 shadow-sm'
+            : 'text-warm-600 hover:text-warm-900'
         }`}
       >
         <Hammer className="w-4 h-4" />
@@ -518,8 +518,8 @@ function ViewModeToggle({ mode, onChange }: { mode: ViewMode; onChange: (mode: V
         onClick={() => onChange('wishlist')}
         className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
           mode === 'wishlist'
-            ? 'bg-white text-slate-900 shadow-sm'
-            : 'text-slate-600 hover:text-slate-900'
+            ? 'bg-white text-warm-900 shadow-sm'
+            : 'text-warm-600 hover:text-warm-900'
         }`}
       >
         <Lightbulb className="w-4 h-4" />
@@ -539,7 +539,7 @@ function ProgressRing({ progress, size = 48, strokeWidth = 4 }: { progress: numb
     <div className="relative" style={{ width: size, height: size }}>
       <svg className="transform -rotate-90" width={size} height={size}>
         <circle
-          className="stroke-slate-200"
+          className="stroke-warm-200"
           strokeWidth={strokeWidth}
           fill="transparent"
           r={radius}
@@ -558,7 +558,7 @@ function ProgressRing({ progress, size = 48, strokeWidth = 4 }: { progress: numb
         />
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
-        <span className="text-xs font-bold text-slate-900">{progress}%</span>
+        <span className="text-xs font-bold text-warm-900">{progress}%</span>
       </div>
     </div>
   );
@@ -601,10 +601,10 @@ function BeforeAfterSlider({ beforeImage, afterImage }: { beforeImage: string; a
         className="absolute top-0 bottom-0 w-1 bg-white shadow-lg"
         style={{ left: `${sliderPosition}%`, transform: 'translateX(-50%)' }}
       >
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
+        <div className="absolute top-1/2 left-1/2 -tranwarm-x-1/2 -translate-y-1/2 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center">
           <div className="flex">
-            <ArrowLeft className="w-3 h-3 text-slate-600" />
-            <ArrowRight className="w-3 h-3 text-slate-600" />
+            <ArrowLeft className="w-3 h-3 text-warm-600" />
+            <ArrowRight className="w-3 h-3 text-warm-600" />
           </div>
         </div>
       </div>
@@ -631,7 +631,7 @@ function ProjectCard({
   return (
     <div
       onClick={onClick}
-      className="group bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all"
+      className="group bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden cursor-pointer hover:shadow-md hover:border-emerald-300 transition-all"
     >
       {/* Cover Image */}
       <div className="relative h-48 overflow-hidden">
@@ -645,7 +645,7 @@ function ProjectCard({
 
         {/* Overlays */}
         <div className="absolute top-3 left-3 right-3 flex items-start justify-between">
-          <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-xs font-medium text-slate-700">
+          <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-xs font-medium text-warm-700">
             {project.category}
           </span>
           {!isWishlist && (
@@ -657,7 +657,7 @@ function ProjectCard({
         {!isWishlist && (
           <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
             {daysUntil !== null && (
-              <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-xs font-medium text-slate-700 flex items-center gap-1">
+              <span className="px-2 py-1 bg-white/90 backdrop-blur-sm rounded-md text-xs font-medium text-warm-700 flex items-center gap-1">
                 <Clock className="w-3 h-3" />
                 {daysUntil > 0 ? `${daysUntil} days left` : daysUntil === 0 ? 'Due today' : `${Math.abs(daysUntil)} days overdue`}
               </span>
@@ -678,19 +678,19 @@ function ProjectCard({
 
       {/* Content */}
       <div className="p-4">
-        <h3 className="font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors">
+        <h3 className="font-semibold text-warm-900 group-hover:text-emerald-600 transition-colors">
           {project.title}
         </h3>
-        <p className="text-sm text-slate-500 mt-1 line-clamp-2">{project.description}</p>
+        <p className="text-sm text-warm-500 mt-1 line-clamp-2">{project.description}</p>
 
         {!isWishlist && (
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-slate-100">
+          <div className="flex items-center justify-between mt-4 pt-4 border-t border-warm-100">
             <div>
-              <p className="text-xs text-slate-500">Budget</p>
-              <p className="font-semibold text-slate-900">{formatCurrency(project.estimatedBudget)}</p>
+              <p className="text-xs text-warm-500">Budget</p>
+              <p className="font-semibold text-warm-900">{formatCurrency(project.estimatedBudget)}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-slate-500">Spent</p>
+              <p className="text-xs text-warm-500">Spent</p>
               <p className={`font-semibold ${
                 budgetStatus === 'over' ? 'text-red-600' : 'text-emerald-600'
               }`}>
@@ -701,9 +701,9 @@ function ProjectCard({
         )}
 
         {isWishlist && (
-          <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="text-xs text-slate-500">Estimated Budget</p>
-            <p className="font-semibold text-slate-900">{formatCurrency(project.estimatedBudget)}</p>
+          <div className="mt-4 pt-4 border-t border-warm-100">
+            <p className="text-xs text-warm-500">Estimated Budget</p>
+            <p className="font-semibold text-warm-900">{formatCurrency(project.estimatedBudget)}</p>
           </div>
         )}
       </div>
@@ -718,7 +718,7 @@ function MasonryGrid({ images, onAddImage }: { images: InspirationImage[]; onAdd
       {images.map((image) => (
         <div
           key={image.id}
-          className="break-inside-avoid relative rounded-xl overflow-hidden group cursor-pointer bg-slate-100"
+          className="break-inside-avoid relative rounded-xl overflow-hidden group cursor-pointer bg-warm-100"
         >
           <Image
             src={image.url}
@@ -731,10 +731,10 @@ function MasonryGrid({ images, onAddImage }: { images: InspirationImage[]; onAdd
             <div className="absolute bottom-0 left-0 right-0 p-3 opacity-0 group-hover:opacity-100 transition-opacity">
               <div className="flex items-center gap-2">
                 <button className="p-2 bg-white/90 rounded-lg hover:bg-white transition-colors">
-                  <Heart className="w-4 h-4 text-slate-700" />
+                  <Heart className="w-4 h-4 text-warm-700" />
                 </button>
                 <button className="p-2 bg-white/90 rounded-lg hover:bg-white transition-colors">
-                  <Share2 className="w-4 h-4 text-slate-700" />
+                  <Share2 className="w-4 h-4 text-warm-700" />
                 </button>
                 {image.source && (
                   <span className="ml-auto text-xs text-white font-medium">{image.source}</span>
@@ -748,10 +748,10 @@ function MasonryGrid({ images, onAddImage }: { images: InspirationImage[]; onAdd
       {/* Add Image Card */}
       <div
         onClick={onAddImage}
-        className="break-inside-avoid flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-colors aspect-square"
+        className="break-inside-avoid flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-warm-300 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-colors aspect-square"
       >
-        <ImagePlus className="w-8 h-8 text-slate-400" />
-        <p className="text-sm text-slate-500 mt-2">Add Inspiration</p>
+        <ImagePlus className="w-8 h-8 text-warm-400" />
+        <p className="text-sm text-warm-500 mt-2">Add Inspiration</p>
       </div>
     </div>
   );
@@ -773,7 +773,7 @@ function SmartSuggestions({ items, onAdd }: { items: string[]; onAdd: (item: str
           <button
             key={item}
             onClick={() => onAdd(item)}
-            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white rounded-full text-sm font-medium text-slate-700 border border-amber-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+            className="inline-flex items-center gap-1 px-3 py-1.5 bg-white rounded-full text-sm font-medium text-warm-700 border border-amber-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
           >
             <Plus className="w-3 h-3" />
             {item}
@@ -809,16 +809,16 @@ function TaskCard({
     <div
       draggable
       onDragStart={handleDragStart}
-      className={`bg-white rounded-lg border border-slate-200 p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${
+      className={`bg-white rounded-lg border border-warm-200 p-3 shadow-sm hover:shadow-md transition-all cursor-grab active:cursor-grabbing ${
         isDragging ? 'opacity-50 scale-95' : ''
       }`}
     >
       <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-slate-300 mt-1" />
+        <GripVertical className="w-4 h-4 text-warm-300 mt-1" />
         <div className="flex-1 min-w-0">
-          <p className="font-medium text-slate-900 text-sm">{task.title}</p>
+          <p className="font-medium text-warm-900 text-sm">{task.title}</p>
           {task.dueDate && (
-            <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
+            <p className="text-xs text-warm-500 mt-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               {formatDate(task.dueDate)}
             </p>
@@ -829,17 +829,17 @@ function TaskCard({
 
           {/* Recommended Vendor */}
           {task.recommendedVendor && (
-            <div className="mt-3 p-2 bg-slate-50 rounded-lg">
-              <p className="text-xs text-slate-500 mb-1.5">Recommended Pro</p>
+            <div className="mt-3 p-2 bg-warm-50 rounded-lg">
+              <p className="text-xs text-warm-500 mb-1.5">Recommended Pro</p>
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
                   <Wrench className="w-4 h-4 text-emerald-600" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900 truncate">{task.recommendedVendor.name}</p>
+                  <p className="text-sm font-medium text-warm-900 truncate">{task.recommendedVendor.name}</p>
                   <div className="flex items-center gap-1">
                     <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
-                    <span className="text-xs text-slate-600">{task.recommendedVendor.rating}</span>
+                    <span className="text-xs text-warm-600">{task.recommendedVendor.rating}</span>
                     {task.recommendedVendor.verified && (
                       <Shield className="w-3 h-3 text-amber-500" />
                     )}
@@ -863,8 +863,8 @@ function TaskCard({
             </div>
           )}
         </div>
-        <button className="p-1 hover:bg-slate-100 rounded">
-          <MoreVertical className="w-4 h-4 text-slate-400" />
+        <button className="p-1 hover:bg-warm-100 rounded">
+          <MoreVertical className="w-4 h-4 text-warm-400" />
         </button>
       </div>
     </div>
@@ -944,7 +944,7 @@ function KanbanColumn({
           />
         ))}
         {tasks.length === 0 && (
-          <div className="flex items-center justify-center h-20 text-slate-400 text-sm">
+          <div className="flex items-center justify-center h-20 text-warm-400 text-sm">
             {isDragOver ? 'Drop here' : 'No tasks'}
           </div>
         )}
@@ -959,20 +959,20 @@ function BurnDownChart({ estimated, actual }: { estimated: number; actual: numbe
   const remaining = estimated - actual;
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="font-semibold text-slate-900">Budget Overview</h3>
-          <p className="text-sm text-slate-500">Estimated vs Actual Spend</p>
+          <h3 className="font-semibold text-warm-900">Budget Overview</h3>
+          <p className="text-sm text-warm-500">Estimated vs Actual Spend</p>
         </div>
         <div className="text-right">
-          <p className="text-2xl font-bold text-slate-900">{formatCurrency(actual)}</p>
-          <p className="text-sm text-slate-500">of {formatCurrency(estimated)}</p>
+          <p className="text-2xl font-bold text-warm-900">{formatCurrency(actual)}</p>
+          <p className="text-sm text-warm-500">of {formatCurrency(estimated)}</p>
         </div>
       </div>
 
       {/* Progress Bar */}
-      <div className="relative h-8 bg-slate-100 rounded-lg overflow-hidden mb-4">
+      <div className="relative h-8 bg-warm-100 rounded-lg overflow-hidden mb-4">
         <div
           className={`absolute inset-y-0 left-0 ${getBurnDownColor(percentage)} transition-all duration-500`}
           style={{ width: `${Math.min(percentage, 100)}%` }}
@@ -987,15 +987,15 @@ function BurnDownChart({ estimated, actual }: { estimated: number; actual: numbe
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded bg-emerald-500" />
-            <span className="text-slate-600">0-80% Healthy</span>
+            <span className="text-warm-600">0-80% Healthy</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded bg-amber-500" />
-            <span className="text-slate-600">81-99% Caution</span>
+            <span className="text-warm-600">81-99% Caution</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-3 h-3 rounded bg-red-500" />
-            <span className="text-slate-600">100%+ Over</span>
+            <span className="text-warm-600">100%+ Over</span>
           </div>
         </div>
         <div className={`font-semibold ${remaining >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
@@ -1025,9 +1025,9 @@ function ExpenseTable({ expenses }: { expenses: Expense[] }) {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-slate-200">
-        <h3 className="font-semibold text-slate-900">Expense Breakdown</h3>
+    <div className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
+      <div className="px-6 py-4 border-b border-warm-200">
+        <h3 className="font-semibold text-warm-900">Expense Breakdown</h3>
       </div>
 
       {Object.entries(groupedExpenses).map(([category, items]) => {
@@ -1037,27 +1037,27 @@ function ExpenseTable({ expenses }: { expenses: Expense[] }) {
         const categoryTotal = items.reduce((sum, e) => sum + (e.actualAmount || e.estimatedAmount), 0);
 
         return (
-          <div key={category} className="border-b border-slate-100 last:border-0">
-            <div className="px-6 py-3 bg-slate-50 flex items-center gap-2">
-              <Icon className="w-4 h-4 text-slate-500" />
-              <span className="font-medium text-slate-700">{label}</span>
-              <span className="ml-auto font-semibold text-slate-900">{formatCurrency(categoryTotal)}</span>
+          <div key={category} className="border-b border-warm-100 last:border-0">
+            <div className="px-6 py-3 bg-warm-50 flex items-center gap-2">
+              <Icon className="w-4 h-4 text-warm-500" />
+              <span className="font-medium text-warm-700">{label}</span>
+              <span className="ml-auto font-semibold text-warm-900">{formatCurrency(categoryTotal)}</span>
             </div>
-            <div className="divide-y divide-slate-100">
+            <div className="divide-y divide-warm-100">
               {items.map((expense) => (
                 <div key={expense.id} className="px-6 py-3 flex items-center">
                   <div className="flex-1">
-                    <p className="text-sm text-slate-900">{expense.description}</p>
+                    <p className="text-sm text-warm-900">{expense.description}</p>
                     {expense.vendor && (
-                      <p className="text-xs text-slate-500">{expense.vendor}</p>
+                      <p className="text-xs text-warm-500">{expense.vendor}</p>
                     )}
                   </div>
                   <div className="text-right">
-                    <p className="text-sm font-medium text-slate-900">
+                    <p className="text-sm font-medium text-warm-900">
                       {formatCurrency(expense.actualAmount || expense.estimatedAmount)}
                     </p>
                     {expense.actualAmount && expense.actualAmount !== expense.estimatedAmount && (
-                      <p className="text-xs text-slate-500 line-through">
+                      <p className="text-xs text-warm-500 line-through">
                         {formatCurrency(expense.estimatedAmount)}
                       </p>
                     )}
@@ -1127,23 +1127,23 @@ function ProjectDetailView({
   }, {} as Record<TaskStatus, ProjectTask[]>);
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-50 overflow-y-auto">
+    <div className="fixed inset-0 z-50 bg-warm-50 overflow-y-auto">
       <Confetti active={showConfetti} />
 
       {/* Header */}
-      <div className="sticky top-0 z-10 bg-white border-b border-slate-200">
+      <div className="sticky top-0 z-10 bg-white border-b border-warm-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between py-4">
             <div className="flex items-center gap-4">
               <button
                 onClick={onClose}
-                className="p-2 hover:bg-slate-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
               >
-                <ArrowLeft className="w-5 h-5 text-slate-600" />
+                <ArrowLeft className="w-5 h-5 text-warm-600" />
               </button>
               <div>
-                <h1 className="text-xl font-bold text-slate-900">{project.title}</h1>
-                <p className="text-sm text-slate-500">{project.category}</p>
+                <h1 className="text-xl font-bold text-warm-900">{project.title}</h1>
+                <p className="text-sm text-warm-500">{project.category}</p>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1171,7 +1171,7 @@ function ProjectDetailView({
           )}
 
           {/* Tabs */}
-          <div className="flex gap-1 border-b border-slate-200 -mb-px">
+          <div className="flex gap-1 border-b border-warm-200 -mb-px">
             {[
               { id: 'inspiration', label: 'Inspiration', icon: Lightbulb },
               { id: 'plan', label: 'The Plan', icon: Layers },
@@ -1183,7 +1183,7 @@ function ProjectDetailView({
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-colors ${
                   activeTab === tab.id
                     ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-600 hover:text-slate-900'
+                    : 'border-transparent text-warm-600 hover:text-warm-900'
                 }`}
               >
                 <tab.icon className="w-4 h-4" />
@@ -1202,11 +1202,11 @@ function ProjectDetailView({
             {/* Add from Pinterest */}
             <div className="flex items-center gap-4 mb-6">
               <div className="flex-1 relative">
-                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+                <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
                 <input
                   type="url"
                   placeholder="Paste a Pinterest or Houzz URL..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-warm-300 rounded-lg text-sm focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                 />
               </div>
               <button className="px-4 py-2.5 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2">
@@ -1234,7 +1234,7 @@ function ProjectDetailView({
               status="todo"
               projectId={project.id}
               icon={Circle}
-              color="bg-slate-100 text-slate-700"
+              color="bg-warm-100 text-warm-700"
               onDrop={handleDrop}
               onDragStart={handleDragStart}
               draggedTaskId={draggedTaskId}
@@ -1473,8 +1473,8 @@ export default function ProjectsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">Project Planning</h1>
-          <p className="text-slate-500 mt-1">Dream, plan, and build your home improvements</p>
+          <h1 className="text-2xl lg:text-3xl font-bold text-warm-900">Project Planning</h1>
+          <p className="text-warm-500 mt-1">Dream, plan, and build your home improvements</p>
         </div>
         <div className="flex items-center gap-3">
           <ViewModeToggle mode={viewMode} onChange={setViewMode} />
@@ -1491,29 +1491,29 @@ export default function ProjectsPage() {
       {/* Stats Banner (Active Mode Only) */}
       {viewMode === 'active' && activeProjects.length > 0 && (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div className="flex items-center gap-2 text-slate-500 mb-1">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+            <div className="flex items-center gap-2 text-warm-500 mb-1">
               <Hammer className="w-4 h-4" />
               <span className="text-sm">Active Projects</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{activeProjects.length}</p>
+            <p className="text-2xl font-bold text-warm-900">{activeProjects.length}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div className="flex items-center gap-2 text-slate-500 mb-1">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+            <div className="flex items-center gap-2 text-warm-500 mb-1">
               <TrendingUp className="w-4 h-4" />
               <span className="text-sm">Avg. Progress</span>
             </div>
             <p className="text-2xl font-bold text-emerald-600">{avgProgress}%</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div className="flex items-center gap-2 text-slate-500 mb-1">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+            <div className="flex items-center gap-2 text-warm-500 mb-1">
               <DollarSign className="w-4 h-4" />
               <span className="text-sm">Total Budget</span>
             </div>
-            <p className="text-2xl font-bold text-slate-900">{formatCurrency(totalBudget)}</p>
+            <p className="text-2xl font-bold text-warm-900">{formatCurrency(totalBudget)}</p>
           </div>
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-            <div className="flex items-center gap-2 text-slate-500 mb-1">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-4">
+            <div className="flex items-center gap-2 text-warm-500 mb-1">
               <Receipt className="w-4 h-4" />
               <span className="text-sm">Total Spent</span>
             </div>
@@ -1532,8 +1532,8 @@ export default function ProjectsPage() {
               <Lightbulb className="w-6 h-6 text-purple-600" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Your Dream Board</h2>
-              <p className="text-slate-600 mt-1">
+              <h2 className="text-lg font-semibold text-warm-900">Your Dream Board</h2>
+              <p className="text-warm-600 mt-1">
                 Capture ideas for future projects. No budgets, no deadlines - just inspiration.
                 When you're ready to build, promote a wishlist item to Active Builds.
               </p>
@@ -1556,30 +1556,30 @@ export default function ProjectsPage() {
           {/* Add New Card */}
           <Link
             href="/app/projects/new"
-            className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-slate-300 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-colors min-h-[300px]"
+            className="flex flex-col items-center justify-center p-8 rounded-xl border-2 border-dashed border-warm-300 hover:border-emerald-500 hover:bg-emerald-50 cursor-pointer transition-colors min-h-[300px]"
           >
-            <div className="p-4 bg-slate-100 rounded-full mb-4">
-              <Plus className="w-8 h-8 text-slate-400" />
+            <div className="p-4 bg-warm-100 rounded-full mb-4">
+              <Plus className="w-8 h-8 text-warm-400" />
             </div>
-            <p className="font-medium text-slate-600">Add New {viewMode === 'active' ? 'Project' : 'Idea'}</p>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="font-medium text-warm-600">Add New {viewMode === 'active' ? 'Project' : 'Idea'}</p>
+            <p className="text-sm text-warm-400 mt-1">
               {viewMode === 'active' ? 'Start a new home improvement' : 'Capture your inspiration'}
             </p>
           </Link>
         </div>
       ) : (
         <div className="text-center py-16">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-slate-100 rounded-full mb-4">
+          <div className="inline-flex items-center justify-center w-16 h-16 bg-warm-100 rounded-full mb-4">
             {viewMode === 'active' ? (
-              <Hammer className="w-8 h-8 text-slate-400" />
+              <Hammer className="w-8 h-8 text-warm-400" />
             ) : (
-              <Lightbulb className="w-8 h-8 text-slate-400" />
+              <Lightbulb className="w-8 h-8 text-warm-400" />
             )}
           </div>
-          <h3 className="text-lg font-semibold text-slate-900 mb-2">
+          <h3 className="text-lg font-semibold text-warm-900 mb-2">
             {viewMode === 'active' ? 'No active projects' : 'Your wishlist is empty'}
           </h3>
-          <p className="text-slate-500 mb-6 max-w-md mx-auto">
+          <p className="text-warm-500 mb-6 max-w-md mx-auto">
             {viewMode === 'active'
               ? 'Start your first home improvement project and track it from inspiration to completion.'
               : 'Start capturing your dream home improvements. Snap photos, save ideas, plan for the future.'}

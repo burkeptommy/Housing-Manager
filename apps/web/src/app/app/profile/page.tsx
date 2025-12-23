@@ -138,7 +138,7 @@ function HeroCard({
   const isAdmin = user.role === 'admin';
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
       {/* Cover Photo */}
       <div className="h-32 bg-gradient-to-br from-emerald-600 via-emerald-500 to-teal-400 relative">
         <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmZmZmYiIGZpbGwtb3BhY2l0eT0iMC4xIj48cGF0aCBkPSJNMzYgMzRjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTRtMC0xNmMwLTIuMjA5LTEuNzkxLTQtNC00cy00IDEuNzkxLTQgNCAxLjc5MSA0IDQgNCA0LTEuNzkxIDQtNG0tMTYgMTZjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTRtMTYgMTZjMC0yLjIwOS0xLjc5MS00LTQtNHMtNCAxLjc5MS00IDQgMS43OTEgNCA0IDQgNC0xLjc5MSA0LTQiLz48L2c+PC9nPjwvc3ZnPg==')] opacity-30" />
@@ -151,11 +151,11 @@ function HeroCard({
       <div className="px-6 pb-6">
         <div className="flex items-end -mt-12 mb-4">
           <div className="relative">
-            <div className="w-24 h-24 rounded-full border-4 border-white bg-slate-200 flex items-center justify-center overflow-hidden shadow-lg">
+            <div className="w-24 h-24 rounded-full border-4 border-white bg-warm-200 flex items-center justify-center overflow-hidden shadow-lg">
               {user.avatarUrl ? (
                 <Image src={user.avatarUrl} alt="" fill className="object-cover" />
               ) : (
-                <span className="text-4xl font-bold text-slate-400">
+                <span className="text-4xl font-bold text-warm-400">
                   {user.firstName[0]}{user.lastName[0]}
                 </span>
               )}
@@ -176,7 +176,7 @@ function HeroCard({
                 Head of Household
               </span>
             ) : (
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 rounded-full text-sm font-medium">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-warm-100 text-warm-700 rounded-full text-sm font-medium">
                 <Users className="w-4 h-4" />
                 Family Member
               </span>
@@ -184,8 +184,8 @@ function HeroCard({
           </div>
         </div>
 
-        <h2 className="text-xl font-bold text-slate-900">{user.displayName}</h2>
-        <p className="text-slate-500 text-sm mt-0.5">{user.householdName}</p>
+        <h2 className="text-xl font-bold text-warm-900">{user.displayName}</h2>
+        <p className="text-warm-500 text-sm mt-0.5">{user.householdName}</p>
 
         {/* Gamification Stats */}
         <div className="grid grid-cols-2 gap-4 mt-6">
@@ -194,10 +194,10 @@ function HeroCard({
               <div className="p-2 bg-emerald-100 rounded-lg">
                 <Trophy className="w-5 h-5 text-emerald-600" />
               </div>
-              <span className="text-sm font-medium text-slate-600">Contribution Score</span>
+              <span className="text-sm font-medium text-warm-600">Contribution Score</span>
             </div>
             <p className="text-3xl font-bold text-emerald-600">{user.contributionScore}</p>
-            <p className="text-xs text-slate-500 mt-1">{user.tasksCompleted} tasks completed</p>
+            <p className="text-xs text-warm-500 mt-1">{user.tasksCompleted} tasks completed</p>
           </div>
 
           <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl p-4 border border-amber-100">
@@ -205,10 +205,10 @@ function HeroCard({
               <div className="p-2 bg-amber-100 rounded-lg">
                 <Flame className="w-5 h-5 text-amber-600" />
               </div>
-              <span className="text-sm font-medium text-slate-600">Active Streak</span>
+              <span className="text-sm font-medium text-warm-600">Active Streak</span>
             </div>
             <p className="text-3xl font-bold text-amber-600">{user.weekStreak} weeks</p>
-            <p className="text-xs text-slate-500 mt-1">Keep it going!</p>
+            <p className="text-xs text-warm-500 mt-1">Keep it going!</p>
           </div>
         </div>
       </div>
@@ -230,12 +230,12 @@ function ToggleSwitch({
     <button
       onClick={() => !disabled && onChange(!enabled)}
       className={`relative w-11 h-6 rounded-full transition-colors ${
-        enabled ? 'bg-emerald-600' : 'bg-slate-300'
+        enabled ? 'bg-emerald-600' : 'bg-warm-300'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
     >
       <span
         className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-sm transition-transform ${
-          enabled ? 'translate-x-5' : 'translate-x-0'
+          enabled ? 'tranwarm-x-5' : 'tranwarm-x-0'
         }`}
       />
     </button>
@@ -263,7 +263,7 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold text-slate-900">Personal Information</h3>
+        <h3 className="text-lg font-semibold text-warm-900">Personal Information</h3>
         {!isEditing ? (
           <button
             onClick={() => setIsEditing(true)}
@@ -276,7 +276,7 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
           <div className="flex gap-2">
             <button
               onClick={() => setIsEditing(false)}
-              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+              className="inline-flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-warm-600 hover:bg-warm-100 rounded-lg transition-colors"
             >
               <X className="w-4 h-4" />
               Cancel
@@ -295,42 +295,42 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
       <div className="space-y-4">
         {/* Display Name */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Display Name</label>
+          <label className="block text-sm font-medium text-warm-700 mb-1.5">Display Name</label>
           {isEditing ? (
             <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
               <input
                 type="text"
                 value={formData.displayName}
                 onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
             </div>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
-              <User className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-900">{user.displayName}</span>
+            <div className="flex items-center gap-3 px-4 py-3 bg-warm-50 rounded-lg">
+              <User className="w-5 h-5 text-warm-400" />
+              <span className="text-warm-900">{user.displayName}</span>
             </div>
           )}
         </div>
 
         {/* Email */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Email Address</label>
+          <label className="block text-sm font-medium text-warm-700 mb-1.5">Email Address</label>
           {isEditing ? (
             <div className="relative">
-              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
               <input
                 type="email"
                 value={formData.email}
                 onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
             </div>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
-              <Mail className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-900">{user.email}</span>
+            <div className="flex items-center gap-3 px-4 py-3 bg-warm-50 rounded-lg">
+              <Mail className="w-5 h-5 text-warm-400" />
+              <span className="text-warm-900">{user.email}</span>
               <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
                 <CheckCircle2 className="w-3 h-3" />
                 Verified
@@ -341,21 +341,21 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
 
         {/* Phone */}
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone Number</label>
+          <label className="block text-sm font-medium text-warm-700 mb-1.5">Phone Number</label>
           {isEditing ? (
             <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" />
+              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
               <input
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                className="w-full pl-10 pr-4 py-2.5 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               />
             </div>
           ) : (
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-50 rounded-lg">
-              <Phone className="w-5 h-5 text-slate-400" />
-              <span className="text-slate-900">{user.phone}</span>
+            <div className="flex items-center gap-3 px-4 py-3 bg-warm-50 rounded-lg">
+              <Phone className="w-5 h-5 text-warm-400" />
+              <span className="text-warm-900">{user.phone}</span>
               <span className="ml-auto inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
                 <CheckCircle2 className="w-3 h-3" />
                 Verified
@@ -370,8 +370,8 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/50" onClick={() => setShowVerifyPhone(false)} />
           <div className="relative bg-white rounded-xl shadow-xl p-6 max-w-sm w-full">
-            <h4 className="text-lg font-semibold text-slate-900 mb-2">Verify Your Phone</h4>
-            <p className="text-sm text-slate-500 mb-4">
+            <h4 className="text-lg font-semibold text-warm-900 mb-2">Verify Your Phone</h4>
+            <p className="text-sm text-warm-500 mb-4">
               We sent a 6-digit code to {formData.phone}
             </p>
             <div className="flex gap-2 mb-4">
@@ -380,7 +380,7 @@ function PersonalDetailsTab({ user }: { user: typeof mockUserData }) {
                   key={i}
                   type="text"
                   maxLength={1}
-                  className="w-10 h-12 text-center text-xl font-bold border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-10 h-12 text-center text-xl font-bold border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                 />
               ))}
             </div>
@@ -430,8 +430,8 @@ function NotificationsTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-1">Notification Preferences</h3>
-        <p className="text-sm text-slate-500">Control how and when Haven notifies you</p>
+        <h3 className="text-lg font-semibold text-warm-900 mb-1">Notification Preferences</h3>
+        <p className="text-sm text-warm-500">Control how and when Haven notifies you</p>
       </div>
 
       {Object.entries(notifications).map(([category, settings]) => {
@@ -439,27 +439,27 @@ function NotificationsTab() {
         const isSystem = category === 'system';
 
         return (
-          <div key={category} className="bg-slate-50 rounded-xl overflow-hidden">
-            <div className="flex items-center gap-3 px-4 py-3 bg-slate-100">
-              <Icon className="w-5 h-5 text-slate-600" />
-              <span className="font-medium text-slate-700">{categoryLabels[category]}</span>
+          <div key={category} className="bg-warm-50 rounded-xl overflow-hidden">
+            <div className="flex items-center gap-3 px-4 py-3 bg-warm-100">
+              <Icon className="w-5 h-5 text-warm-600" />
+              <span className="font-medium text-warm-700">{categoryLabels[category]}</span>
               {isSystem && (
-                <span className="ml-auto text-xs text-slate-500 flex items-center gap-1">
+                <span className="ml-auto text-xs text-warm-500 flex items-center gap-1">
                   <Lock className="w-3 h-3" />
                   Always On
                 </span>
               )}
             </div>
-            <div className="divide-y divide-slate-200">
+            <div className="divide-y divide-warm-200">
               {settings.map((setting) => (
                 <div key={setting.id} className="px-4 py-4 bg-white">
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
-                      <p className="font-medium text-slate-900">{setting.label}</p>
-                      <p className="text-sm text-slate-500 mt-0.5">{setting.description}</p>
+                      <p className="font-medium text-warm-900">{setting.label}</p>
+                      <p className="text-sm text-warm-500 mt-0.5">{setting.description}</p>
                       {setting.threshold !== undefined && setting.enabled && (
                         <div className="mt-3">
-                          <label className="text-sm text-slate-600 block mb-2">
+                          <label className="text-sm text-warm-600 block mb-2">
                             Notify when spending exceeds: <span className="font-semibold">${billThreshold}</span>
                           </label>
                           <input
@@ -469,9 +469,9 @@ function NotificationsTab() {
                             step={100}
                             value={billThreshold}
                             onChange={(e) => setBillThreshold(Number(e.target.value))}
-                            className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                            className="w-full h-2 bg-warm-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                           />
-                          <div className="flex justify-between text-xs text-slate-400 mt-1">
+                          <div className="flex justify-between text-xs text-warm-400 mt-1">
                             <span>$100</span>
                             <span>$2,000</span>
                           </div>
@@ -512,14 +512,14 @@ function WalletTab() {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-1">Digital Wallet</h3>
-        <p className="text-sm text-slate-500">Manage payment methods for reimbursements and split expenses</p>
+        <h3 className="text-lg font-semibold text-warm-900 mb-1">Digital Wallet</h3>
+        <p className="text-sm text-warm-500">Manage payment methods for reimbursements and split expenses</p>
       </div>
 
       {/* Linked Accounts */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <h4 className="font-medium text-slate-700">Linked Accounts</h4>
+          <h4 className="font-medium text-warm-700">Linked Accounts</h4>
           <button
             onClick={() => setShowAddAccount(true)}
             className="text-sm font-medium text-emerald-600 hover:text-emerald-700"
@@ -533,12 +533,12 @@ function WalletTab() {
             {accounts.map((account) => (
               <div
                 key={account.id}
-                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200"
+                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-warm-200"
               >
                 <div className="text-2xl">{accountIcons[account.type]}</div>
                 <div className="flex-1">
-                  <p className="font-medium text-slate-900 capitalize">{account.type}</p>
-                  <p className="text-sm text-slate-500">{account.username}</p>
+                  <p className="font-medium text-warm-900 capitalize">{account.type}</p>
+                  <p className="text-sm text-warm-500">{account.username}</p>
                 </div>
                 {account.isDefault ? (
                   <span className="px-2 py-1 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
@@ -547,7 +547,7 @@ function WalletTab() {
                 ) : (
                   <button
                     onClick={() => setDefault(account.id)}
-                    className="text-sm text-slate-500 hover:text-slate-700"
+                    className="text-sm text-warm-500 hover:text-warm-700"
                   >
                     Set as Default
                   </button>
@@ -556,43 +556,43 @@ function WalletTab() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-8 bg-slate-50 rounded-xl">
-            <Wallet className="w-10 h-10 text-slate-300 mx-auto mb-2" />
-            <p className="text-slate-500">No accounts linked yet</p>
+          <div className="text-center py-8 bg-warm-50 rounded-xl">
+            <Wallet className="w-10 h-10 text-warm-300 mx-auto mb-2" />
+            <p className="text-warm-500">No accounts linked yet</p>
           </div>
         )}
       </div>
 
       {/* Connect Account Buttons */}
       <div className="space-y-3">
-        <h4 className="font-medium text-slate-700">Connect a New Account</h4>
+        <h4 className="font-medium text-warm-700">Connect a New Account</h4>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {['venmo', 'zelle', 'paypal'].map((type) => (
             <button
               key={type}
-              className="flex items-center justify-center gap-2 p-4 bg-white border border-slate-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+              className="flex items-center justify-center gap-2 p-4 bg-white border border-warm-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
             >
               <span className="text-xl">{accountIcons[type]}</span>
-              <span className="font-medium text-slate-700 capitalize">Connect {type}</span>
+              <span className="font-medium text-warm-700 capitalize">Connect {type}</span>
             </button>
           ))}
         </div>
       </div>
 
       {/* Default Payment Method */}
-      <div className="p-4 bg-slate-50 rounded-xl">
+      <div className="p-4 bg-warm-50 rounded-xl">
         <div className="flex items-center gap-3 mb-3">
-          <CreditCard className="w-5 h-5 text-slate-500" />
-          <h4 className="font-medium text-slate-700">Default Payment Method</h4>
+          <CreditCard className="w-5 h-5 text-warm-500" />
+          <h4 className="font-medium text-warm-700">Default Payment Method</h4>
         </div>
-        <p className="text-sm text-slate-500 mb-3">
+        <p className="text-sm text-warm-500 mb-3">
           Select which account receives reimbursements from household expenses
         </p>
-        <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-slate-200">
+        <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-warm-200">
           <span className="text-xl">💳</span>
           <div className="flex-1">
-            <p className="font-medium text-slate-900">Venmo</p>
-            <p className="text-sm text-slate-500">@bobchen</p>
+            <p className="font-medium text-warm-900">Venmo</p>
+            <p className="text-sm text-warm-500">@bobchen</p>
           </div>
           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
         </div>
@@ -631,8 +631,8 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
     <div className="space-y-8">
       {/* Social Privacy */}
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-1">Social Privacy</h3>
-        <p className="text-sm text-slate-500 mb-4">Control who can see your project posts</p>
+        <h3 className="text-lg font-semibold text-warm-900 mb-1">Social Privacy</h3>
+        <p className="text-sm text-warm-500 mb-4">Control who can see your project posts</p>
 
         <div className="space-y-2">
           {[
@@ -646,15 +646,15 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
               className={`w-full flex items-center gap-4 p-4 rounded-xl border transition-colors ${
                 visibility === option.value
                   ? 'border-emerald-500 bg-emerald-50'
-                  : 'border-slate-200 bg-white hover:bg-slate-50'
+                  : 'border-warm-200 bg-white hover:bg-warm-50'
               }`}
             >
-              <option.icon className={`w-5 h-5 ${visibility === option.value ? 'text-emerald-600' : 'text-slate-400'}`} />
+              <option.icon className={`w-5 h-5 ${visibility === option.value ? 'text-emerald-600' : 'text-warm-400'}`} />
               <div className="flex-1 text-left">
-                <p className={`font-medium ${visibility === option.value ? 'text-emerald-900' : 'text-slate-900'}`}>
+                <p className={`font-medium ${visibility === option.value ? 'text-emerald-900' : 'text-warm-900'}`}>
                   {option.label}
                 </p>
-                <p className="text-sm text-slate-500">{option.description}</p>
+                <p className="text-sm text-warm-500">{option.description}</p>
               </div>
               {visibility === option.value && <CheckCircle2 className="w-5 h-5 text-emerald-600" />}
             </button>
@@ -664,32 +664,32 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
 
       {/* Security Settings */}
       <div>
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Security</h3>
+        <h3 className="text-lg font-semibold text-warm-900 mb-4">Security</h3>
 
         <div className="space-y-3">
           {/* Change Password */}
           <button
             onClick={() => setShowChangePassword(true)}
-            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:bg-slate-50 transition-colors"
+            className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-warm-200 hover:bg-warm-50 transition-colors"
           >
-            <div className="p-2 bg-slate-100 rounded-lg">
-              <Key className="w-5 h-5 text-slate-600" />
+            <div className="p-2 bg-warm-100 rounded-lg">
+              <Key className="w-5 h-5 text-warm-600" />
             </div>
             <div className="flex-1 text-left">
-              <p className="font-medium text-slate-900">Change Password</p>
-              <p className="text-sm text-slate-500">Update your account password</p>
+              <p className="font-medium text-warm-900">Change Password</p>
+              <p className="text-sm text-warm-500">Update your account password</p>
             </div>
-            <ChevronRight className="w-5 h-5 text-slate-400" />
+            <ChevronRight className="w-5 h-5 text-warm-400" />
           </button>
 
           {/* Two-Factor Auth */}
-          <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200">
-            <div className="p-2 bg-slate-100 rounded-lg">
-              <Shield className="w-5 h-5 text-slate-600" />
+          <div className="flex items-center gap-4 p-4 bg-white rounded-xl border border-warm-200">
+            <div className="p-2 bg-warm-100 rounded-lg">
+              <Shield className="w-5 h-5 text-warm-600" />
             </div>
             <div className="flex-1">
-              <p className="font-medium text-slate-900">Two-Factor Authentication</p>
-              <p className="text-sm text-slate-500">Add an extra layer of security</p>
+              <p className="font-medium text-warm-900">Two-Factor Authentication</p>
+              <p className="text-sm text-warm-500">Add an extra layer of security</p>
             </div>
             <ToggleSwitch enabled={twoFactorEnabled} onChange={setTwoFactorEnabled} />
           </div>
@@ -699,7 +699,7 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
       {/* Active Sessions */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-slate-900">Active Sessions</h3>
+          <h3 className="text-lg font-semibold text-warm-900">Active Sessions</h3>
           {sessions.length > 1 && (
             <button
               onClick={logOutAll}
@@ -716,28 +716,28 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
             return (
               <div
                 key={session.id}
-                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200"
+                className="flex items-center gap-4 p-4 bg-white rounded-xl border border-warm-200"
               >
-                <div className="p-2 bg-slate-100 rounded-lg">
-                  <DeviceIcon className="w-5 h-5 text-slate-600" />
+                <div className="p-2 bg-warm-100 rounded-lg">
+                  <DeviceIcon className="w-5 h-5 text-warm-600" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-slate-900">{session.device}</p>
+                    <p className="font-medium text-warm-900">{session.device}</p>
                     {session.isCurrent && (
                       <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
                         Current
                       </span>
                     )}
                   </div>
-                  <p className="text-sm text-slate-500">
+                  <p className="text-sm text-warm-500">
                     {session.location} • {session.lastActive}
                   </p>
                 </div>
                 {!session.isCurrent && (
                   <button
                     onClick={() => logOutSession(session.id)}
-                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    className="p-2 text-warm-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                   >
                     <LogOut className="w-5 h-5" />
                   </button>
@@ -749,20 +749,20 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
       </div>
 
       {/* Danger Zone */}
-      <div className="border-t border-slate-200 pt-8">
+      <div className="border-t border-warm-200 pt-8">
         <h3 className="text-lg font-semibold text-red-600 mb-4">Danger Zone</h3>
 
         <div className="space-y-3">
           {isAdmin && (
-            <button className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-slate-200 hover:bg-amber-50 hover:border-amber-300 transition-colors">
+            <button className="w-full flex items-center gap-4 p-4 bg-white rounded-xl border border-warm-200 hover:bg-amber-50 hover:border-amber-300 transition-colors">
               <div className="p-2 bg-amber-100 rounded-lg">
                 <Crown className="w-5 h-5 text-amber-600" />
               </div>
               <div className="flex-1 text-left">
-                <p className="font-medium text-slate-900">Transfer Admin Rights</p>
-                <p className="text-sm text-slate-500">Give Head of Household role to another adult</p>
+                <p className="font-medium text-warm-900">Transfer Admin Rights</p>
+                <p className="text-sm text-warm-500">Give Head of Household role to another adult</p>
               </div>
-              <ChevronRight className="w-5 h-5 text-slate-400" />
+              <ChevronRight className="w-5 h-5 text-warm-400" />
             </button>
           )}
 
@@ -790,15 +790,15 @@ function SecurityTab({ user }: { user: typeof mockUserData }) {
               <div className="p-2 bg-red-100 rounded-lg">
                 <AlertTriangle className="w-6 h-6 text-red-600" />
               </div>
-              <h4 className="text-lg font-semibold text-slate-900">Leave Household?</h4>
+              <h4 className="text-lg font-semibold text-warm-900">Leave Household?</h4>
             </div>
-            <p className="text-sm text-slate-600 mb-6">
+            <p className="text-sm text-warm-600 mb-6">
               You will lose access to all household data, shared projects, and billing history. This action cannot be undone.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => setShowLeaveHousehold(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-300 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors"
+                className="flex-1 px-4 py-2.5 border border-warm-300 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
               >
                 Cancel
               </button>
@@ -828,20 +828,20 @@ function MobileAccordionItem({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+    <div className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
       <button
         onClick={onToggle}
         className="w-full flex items-center gap-3 p-4 text-left"
       >
-        <div className="p-2 bg-slate-100 rounded-lg">
-          <Icon className="w-5 h-5 text-slate-600" />
+        <div className="p-2 bg-warm-100 rounded-lg">
+          <Icon className="w-5 h-5 text-warm-600" />
         </div>
-        <span className="flex-1 font-medium text-slate-900">{title}</span>
+        <span className="flex-1 font-medium text-warm-900">{title}</span>
         <ChevronDown
-          className={`w-5 h-5 text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+          className={`w-5 h-5 text-warm-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
         />
       </button>
-      {isOpen && <div className="px-4 pb-4 border-t border-slate-100 pt-4">{children}</div>}
+      {isOpen && <div className="px-4 pb-4 border-t border-warm-100 pt-4">{children}</div>}
     </div>
   );
 }
@@ -875,8 +875,8 @@ export default function ProfilePage() {
     <div className="pb-32 lg:pb-8">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl lg:text-3xl font-bold text-slate-900">My Profile</h1>
-        <p className="text-slate-500 mt-1">Manage your personal settings and preferences</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-warm-900">My Profile</h1>
+        <p className="text-warm-500 mt-1">Manage your personal settings and preferences</p>
       </div>
 
       {/* Desktop Layout */}
@@ -890,9 +890,9 @@ export default function ProfilePage() {
 
         {/* Right Column - Tabbed Interface */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+          <div className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
             {/* Tab Navigation */}
-            <div className="flex border-b border-slate-200">
+            <div className="flex border-b border-warm-200">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -900,7 +900,7 @@ export default function ProfilePage() {
                   className={`flex items-center gap-2 px-6 py-4 text-sm font-medium border-b-2 -mb-px transition-colors ${
                     activeTab === tab.id
                       ? 'border-emerald-600 text-emerald-600'
-                      : 'border-transparent text-slate-600 hover:text-slate-900'
+                      : 'border-transparent text-warm-600 hover:text-warm-900'
                   }`}
                 >
                   <tab.icon className="w-4 h-4" />

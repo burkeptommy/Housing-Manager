@@ -560,13 +560,13 @@ function CopyButton({ value, className = '' }: { value: string; className?: stri
   return (
     <button
       onClick={handleCopy}
-      className={`p-2 rounded-lg hover:bg-slate-100 transition-colors ${className}`}
+      className={`p-2 rounded-lg hover:bg-warm-100 transition-colors ${className}`}
       title="Copy to clipboard"
     >
       {copied ? (
         <Check className="w-4 h-4 text-emerald-600" />
       ) : (
-        <Copy className="w-4 h-4 text-slate-400" />
+        <Copy className="w-4 h-4 text-warm-400" />
       )}
     </button>
   );
@@ -576,22 +576,22 @@ function MaskedValue({ value, masked }: { value: string; masked: boolean }) {
   const [revealed, setRevealed] = useState(false);
 
   if (!masked) {
-    return <span className="font-mono text-slate-900">{value}</span>;
+    return <span className="font-mono text-warm-900">{value}</span>;
   }
 
   return (
     <div className="flex items-center gap-2">
-      <span className="font-mono text-slate-900">
+      <span className="font-mono text-warm-900">
         {revealed ? value : '••••••••'}
       </span>
       <button
         onClick={() => setRevealed(!revealed)}
-        className="p-1 rounded hover:bg-slate-100 transition-colors"
+        className="p-1 rounded hover:bg-warm-100 transition-colors"
       >
         {revealed ? (
-          <EyeOff className="w-4 h-4 text-slate-400" />
+          <EyeOff className="w-4 h-4 text-warm-400" />
         ) : (
-          <Eye className="w-4 h-4 text-slate-400" />
+          <Eye className="w-4 h-4 text-warm-400" />
         )}
       </button>
     </div>
@@ -608,7 +608,7 @@ function WarrantyBadge({ expiresDate }: { expiresDate: string }) {
     <span
       className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
         isExpired
-          ? 'bg-slate-100 text-slate-600'
+          ? 'bg-warm-100 text-warm-600'
           : 'bg-emerald-100 text-emerald-700'
       }`}
     >
@@ -654,7 +654,7 @@ function RegistrationBadge({ expiresDate }: { expiresDate: string }) {
   }
 
   return (
-    <span className="text-sm text-slate-500">
+    <span className="text-sm text-warm-500">
       Expires {new Date(expiresDate).toLocaleDateString()}
     </span>
   );
@@ -682,7 +682,7 @@ function HeroSection({ property }: { property: PropertyData }) {
             />
           ) : (
             // Fallback gradient when no image
-            <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-slate-800 to-slate-900" />
+            <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-warm-800 to-warm-900" />
           )}
         </div>
 
@@ -709,24 +709,24 @@ function HeroSection({ property }: { property: PropertyData }) {
                   Haven Managed
                 </span>
               </div>
-              <p className="text-slate-200 mb-4 drop-shadow">{property.city}, {property.state}</p>
+              <p className="text-warm-200 mb-4 drop-shadow">{property.city}, {property.state}</p>
 
               {/* Property Stats */}
               <div className="flex flex-wrap gap-3">
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
-                  <p className="text-xs text-slate-300">Year Built</p>
+                  <p className="text-xs text-warm-300">Year Built</p>
                   <p className="font-semibold text-white">{property.yearBuilt}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
-                  <p className="text-xs text-slate-300">Square Feet</p>
+                  <p className="text-xs text-warm-300">Square Feet</p>
                   <p className="font-semibold text-white">{property.sqft.toLocaleString()}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
-                  <p className="text-xs text-slate-300">Lot Size</p>
+                  <p className="text-xs text-warm-300">Lot Size</p>
                   <p className="font-semibold text-white">{property.lotSize}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2 border border-white/10">
-                  <p className="text-xs text-slate-300">Zoning</p>
+                  <p className="text-xs text-warm-300">Zoning</p>
                   <p className="font-semibold text-white">{property.zoning}</p>
                 </div>
               </div>
@@ -771,7 +771,7 @@ function HeroSection({ property }: { property: PropertyData }) {
                 priority
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-slate-800 to-slate-900" />
+              <div className="w-full h-full bg-gradient-to-br from-emerald-900 via-warm-800 to-warm-900" />
             )}
           </div>
 
@@ -791,7 +791,7 @@ function HeroSection({ property }: { property: PropertyData }) {
               </h1>
             </div>
             <div className="flex items-center gap-2">
-              <p className="text-slate-200 text-sm">{property.city}, {property.state}</p>
+              <p className="text-warm-200 text-sm">{property.city}, {property.state}</p>
               <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/90 backdrop-blur-sm rounded-full text-xs font-semibold text-white">
                 <Shield className="w-3 h-3" />
                 Haven Managed
@@ -802,44 +802,44 @@ function HeroSection({ property }: { property: PropertyData }) {
 
         {/* Property Stats - Mobile */}
         <div className="grid grid-cols-4 gap-2 mb-4">
-          <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-slate-500">Built</p>
-            <p className="font-semibold text-slate-900 text-sm">{property.yearBuilt}</p>
+          <div className="bg-warm-100 rounded-lg px-3 py-2 text-center">
+            <p className="text-xs text-warm-500">Built</p>
+            <p className="font-semibold text-warm-900 text-sm">{property.yearBuilt}</p>
           </div>
-          <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-slate-500">Sq Ft</p>
-            <p className="font-semibold text-slate-900 text-sm">{property.sqft.toLocaleString()}</p>
+          <div className="bg-warm-100 rounded-lg px-3 py-2 text-center">
+            <p className="text-xs text-warm-500">Sq Ft</p>
+            <p className="font-semibold text-warm-900 text-sm">{property.sqft.toLocaleString()}</p>
           </div>
-          <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-slate-500">Lot</p>
-            <p className="font-semibold text-slate-900 text-sm">{property.lotSize}</p>
+          <div className="bg-warm-100 rounded-lg px-3 py-2 text-center">
+            <p className="text-xs text-warm-500">Lot</p>
+            <p className="font-semibold text-warm-900 text-sm">{property.lotSize}</p>
           </div>
-          <div className="bg-slate-100 rounded-lg px-3 py-2 text-center">
-            <p className="text-xs text-slate-500">Zone</p>
-            <p className="font-semibold text-slate-900 text-sm">{property.zoning}</p>
+          <div className="bg-warm-100 rounded-lg px-3 py-2 text-center">
+            <p className="text-xs text-warm-500">Zone</p>
+            <p className="font-semibold text-warm-900 text-sm">{property.zoning}</p>
           </div>
         </div>
 
         {/* Quick Access Dock - Mobile (Below Image) */}
         <div className="flex justify-center">
-          <div className="flex bg-white rounded-2xl shadow-sm border border-slate-200 p-2 gap-2">
-            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
-                <Wifi className="w-5 h-5 text-slate-600 group-hover:text-emerald-600" />
+          <div className="flex bg-white rounded-2xl shadow-sm border border-warm-200 p-2 gap-2">
+            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-warm-50 transition-colors group">
+              <div className="p-2 bg-warm-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                <Wifi className="w-5 h-5 text-warm-600 group-hover:text-emerald-600" />
               </div>
-              <span className="text-xs text-slate-600 font-medium">WiFi</span>
+              <span className="text-xs text-warm-600 font-medium">WiFi</span>
             </button>
-            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
-                <DoorOpen className="w-5 h-5 text-slate-600 group-hover:text-emerald-600" />
+            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-warm-50 transition-colors group">
+              <div className="p-2 bg-warm-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                <DoorOpen className="w-5 h-5 text-warm-600 group-hover:text-emerald-600" />
               </div>
-              <span className="text-xs text-slate-600 font-medium">Gate</span>
+              <span className="text-xs text-warm-600 font-medium">Gate</span>
             </button>
-            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-slate-50 transition-colors group">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
-                <Bell className="w-5 h-5 text-slate-600 group-hover:text-emerald-600" />
+            <button className="flex flex-col items-center gap-1 p-3 rounded-xl hover:bg-warm-50 transition-colors group">
+              <div className="p-2 bg-warm-100 rounded-lg group-hover:bg-emerald-100 transition-colors">
+                <Bell className="w-5 h-5 text-warm-600 group-hover:text-emerald-600" />
               </div>
-              <span className="text-xs text-slate-600 font-medium">Alarm</span>
+              <span className="text-xs text-warm-600 font-medium">Alarm</span>
             </button>
           </div>
         </div>
@@ -851,11 +851,11 @@ function HeroSection({ property }: { property: PropertyData }) {
 // The Vault - Quick Access Credentials
 function VaultSection() {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6">
+    <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6 mb-6">
       <div className="flex items-center gap-2 mb-4">
         <Key className="w-5 h-5 text-emerald-600" />
-        <h2 className="text-lg font-semibold text-slate-900">The Vault</h2>
-        <span className="text-sm text-slate-500">Quick Access Credentials</span>
+        <h2 className="text-lg font-semibold text-warm-900">The Vault</h2>
+        <span className="text-sm text-warm-500">Quick Access Credentials</span>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -864,13 +864,13 @@ function VaultSection() {
           return (
             <div
               key={item.id}
-              className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
+              className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg"
             >
               <div className="p-2 bg-white rounded-lg shadow-sm">
-                <Icon className="w-4 h-4 text-slate-600" />
+                <Icon className="w-4 h-4 text-warm-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-slate-500">{item.label}</p>
+                <p className="text-xs text-warm-500">{item.label}</p>
                 <MaskedValue value={item.value} masked={item.masked || false} />
               </div>
               <CopyButton value={item.value} />
@@ -891,7 +891,7 @@ function SystemsTab({ systems }: { systems: SystemAsset[] }) {
         return (
           <div
             key={asset.id}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
+            className="bg-white rounded-xl shadow-sm border border-warm-200 p-6"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -899,9 +899,9 @@ function SystemsTab({ systems }: { systems: SystemAsset[] }) {
                   <Icon className="w-5 h-5 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">{asset.name}</h3>
+                  <h3 className="font-semibold text-warm-900">{asset.name}</h3>
                   {asset.location && (
-                    <p className="text-sm text-slate-500">{asset.location}</p>
+                    <p className="text-sm text-warm-500">{asset.location}</p>
                   )}
                 </div>
               </div>
@@ -910,30 +910,30 @@ function SystemsTab({ systems }: { systems: SystemAsset[] }) {
 
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Make</p>
-                <p className="font-medium text-slate-900">{asset.make}</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Make</p>
+                <p className="font-medium text-warm-900">{asset.make}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Model</p>
-                <p className="font-medium text-slate-900">{asset.model}</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Model</p>
+                <p className="font-medium text-warm-900">{asset.model}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Serial Number</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Serial Number</p>
                 <div className="flex items-center gap-1">
-                  <p className="font-mono text-sm text-slate-900">{asset.serialNumber}</p>
+                  <p className="font-mono text-sm text-warm-900">{asset.serialNumber}</p>
                   <CopyButton value={asset.serialNumber} className="p-1" />
                 </div>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Install Date</p>
-                <p className="font-medium text-slate-900">
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Install Date</p>
+                <p className="font-medium text-warm-900">
                   {asset.installDate ? new Date(asset.installDate).toLocaleDateString() : 'N/A'}
                 </p>
               </div>
             </div>
 
             {asset.notes && (
-              <p className="text-sm text-slate-600 mb-4 p-3 bg-slate-50 rounded-lg">
+              <p className="text-sm text-warm-600 mb-4 p-3 bg-warm-50 rounded-lg">
                 {asset.notes}
               </p>
             )}
@@ -964,22 +964,22 @@ function SpacesTab() {
         return (
           <div
             key={room.id}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+            className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden"
           >
             <button
               onClick={() => setExpandedRoom(isExpanded ? null : room.id)}
-              className="w-full flex items-center justify-between p-6 hover:bg-slate-50 transition-colors"
+              className="w-full flex items-center justify-between p-6 hover:bg-warm-50 transition-colors"
             >
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-emerald-50 rounded-lg">
                   <Home className="w-5 h-5 text-emerald-600" />
                 </div>
-                <h3 className="font-semibold text-slate-900">{room.name}</h3>
+                <h3 className="font-semibold text-warm-900">{room.name}</h3>
               </div>
               {isExpanded ? (
-                <ChevronDown className="w-5 h-5 text-slate-400" />
+                <ChevronDown className="w-5 h-5 text-warm-400" />
               ) : (
-                <ChevronRight className="w-5 h-5 text-slate-400" />
+                <ChevronRight className="w-5 h-5 text-warm-400" />
               )}
             </button>
 
@@ -988,22 +988,22 @@ function SpacesTab() {
                 {/* Paint Colors */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Palette className="w-4 h-4 text-slate-500" />
-                    <h4 className="font-medium text-slate-900">Paint Colors</h4>
+                    <Palette className="w-4 h-4 text-warm-500" />
+                    <h4 className="font-medium text-warm-900">Paint Colors</h4>
                   </div>
                   <div className="flex flex-wrap gap-3">
                     {room.paint.map((color, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center gap-3 p-3 bg-slate-50 rounded-lg"
+                        className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg"
                       >
                         <div
-                          className="w-10 h-10 rounded-lg shadow-inner border border-slate-200"
+                          className="w-10 h-10 rounded-lg shadow-inner border border-warm-200"
                           style={{ backgroundColor: color.hex }}
                         />
                         <div>
-                          <p className="font-medium text-slate-900">{color.name}</p>
-                          <p className="text-sm text-slate-500">
+                          <p className="font-medium text-warm-900">{color.name}</p>
+                          <p className="text-sm text-warm-500">
                             {color.brand} - {color.code}
                           </p>
                         </div>
@@ -1016,12 +1016,12 @@ function SpacesTab() {
                 {/* Flooring */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Layers className="w-4 h-4 text-slate-500" />
-                    <h4 className="font-medium text-slate-900">Flooring</h4>
+                    <Layers className="w-4 h-4 text-warm-500" />
+                    <h4 className="font-medium text-warm-900">Flooring</h4>
                   </div>
-                  <div className="p-3 bg-slate-50 rounded-lg">
-                    <p className="font-medium text-slate-900">{room.flooring.material}</p>
-                    <p className="text-sm text-slate-500">
+                  <div className="p-3 bg-warm-50 rounded-lg">
+                    <p className="font-medium text-warm-900">{room.flooring.material}</p>
+                    <p className="text-sm text-warm-500">
                       {room.flooring.brand} - SKU: {room.flooring.sku}
                     </p>
                   </div>
@@ -1030,14 +1030,14 @@ function SpacesTab() {
                 {/* Lighting */}
                 <div>
                   <div className="flex items-center gap-2 mb-3">
-                    <Lightbulb className="w-4 h-4 text-slate-500" />
-                    <h4 className="font-medium text-slate-900">Lighting</h4>
+                    <Lightbulb className="w-4 h-4 text-warm-500" />
+                    <h4 className="font-medium text-warm-900">Lighting</h4>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {room.lighting.map((light, idx) => (
-                      <div key={idx} className="p-3 bg-slate-50 rounded-lg">
-                        <p className="font-medium text-slate-900">{light.type}</p>
-                        <p className="text-sm text-slate-500">{light.bulb}</p>
+                      <div key={idx} className="p-3 bg-warm-50 rounded-lg">
+                        <p className="font-medium text-warm-900">{light.type}</p>
+                        <p className="text-sm text-warm-500">{light.bulb}</p>
                       </div>
                     ))}
                   </div>
@@ -1047,15 +1047,15 @@ function SpacesTab() {
                 {room.filters && room.filters.length > 0 && (
                   <div>
                     <div className="flex items-center gap-2 mb-3">
-                      <Filter className="w-4 h-4 text-slate-500" />
-                      <h4 className="font-medium text-slate-900">Air Filters</h4>
+                      <Filter className="w-4 h-4 text-warm-500" />
+                      <h4 className="font-medium text-warm-900">Air Filters</h4>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {room.filters.map((filter, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                        <div key={idx} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
                           <div>
-                            <p className="font-mono font-medium text-slate-900">{filter.size}</p>
-                            <p className="text-sm text-slate-500">{filter.location}</p>
+                            <p className="font-mono font-medium text-warm-900">{filter.size}</p>
+                            <p className="text-sm text-warm-500">{filter.location}</p>
                           </div>
                           <CopyButton value={filter.size} />
                         </div>
@@ -1081,7 +1081,7 @@ function UtilitiesTab({ utilities }: { utilities: UtilityProvider[] }) {
         return (
           <div
             key={utility.id}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6"
+            className="bg-white rounded-xl shadow-sm border border-warm-200 p-6"
           >
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-center gap-3">
@@ -1089,8 +1089,8 @@ function UtilitiesTab({ utilities }: { utilities: UtilityProvider[] }) {
                   <Icon className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900">{utility.type}</h3>
-                  <p className="text-sm text-slate-500">{utility.provider}</p>
+                  <h3 className="font-semibold text-warm-900">{utility.type}</h3>
+                  <p className="text-sm text-warm-500">{utility.provider}</p>
                 </div>
               </div>
               {utility.managedByHaven && (
@@ -1103,25 +1103,25 @@ function UtilitiesTab({ utilities }: { utilities: UtilityProvider[] }) {
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Account Number</span>
+                <span className="text-sm text-warm-500">Account Number</span>
                 <div className="flex items-center gap-1">
-                  <span className="font-mono text-sm text-slate-900">{utility.accountNumber}</span>
+                  <span className="font-mono text-sm text-warm-900">{utility.accountNumber}</span>
                   <CopyButton value={utility.accountNumber} className="p-1" />
                 </div>
               </div>
 
               {utility.meterNumber && (
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-slate-500">Meter Number</span>
+                  <span className="text-sm text-warm-500">Meter Number</span>
                   <div className="flex items-center gap-1">
-                    <span className="font-mono text-sm text-slate-900">{utility.meterNumber}</span>
+                    <span className="font-mono text-sm text-warm-900">{utility.meterNumber}</span>
                     <CopyButton value={utility.meterNumber} className="p-1" />
                   </div>
                 </div>
               )}
 
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Support</span>
+                <span className="text-sm text-warm-500">Support</span>
                 <a
                   href={`tel:${utility.supportPhone}`}
                   className="inline-flex items-center gap-1 text-sm text-emerald-600 hover:text-emerald-700"
@@ -1145,10 +1145,10 @@ function VehiclesTab({ vehicles }: { vehicles: VehicleData[] }) {
       {vehicles.map((vehicle) => (
         <div
           key={vehicle.id}
-          className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden"
+          className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden"
         >
           {/* Vehicle Header */}
-          <div className="p-6 bg-gradient-to-br from-slate-800 to-slate-900 text-white">
+          <div className="p-6 bg-gradient-to-br from-warm-800 to-warm-900 text-white">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-white/10 rounded-lg">
                 <Car className="w-6 h-6" />
@@ -1157,7 +1157,7 @@ function VehiclesTab({ vehicles }: { vehicles: VehicleData[] }) {
                 <h3 className="text-xl font-bold">
                   {vehicle.year} {vehicle.make} {vehicle.model}
                 </h3>
-                <p className="text-slate-300">{vehicle.color}</p>
+                <p className="text-warm-300">{vehicle.color}</p>
               </div>
             </div>
           </div>
@@ -1166,16 +1166,16 @@ function VehiclesTab({ vehicles }: { vehicles: VehicleData[] }) {
           <div className="p-6 space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">VIN</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">VIN</p>
                 <div className="flex items-center gap-1">
-                  <p className="font-mono text-sm text-slate-900">{vehicle.vin}</p>
+                  <p className="font-mono text-sm text-warm-900">{vehicle.vin}</p>
                   <CopyButton value={vehicle.vin} className="p-1" />
                 </div>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">License Plate</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">License Plate</p>
                 <div className="flex items-center gap-1">
-                  <p className="font-mono text-lg font-bold text-slate-900">{vehicle.licensePlate}</p>
+                  <p className="font-mono text-lg font-bold text-warm-900">{vehicle.licensePlate}</p>
                   <CopyButton value={vehicle.licensePlate} className="p-1" />
                 </div>
               </div>
@@ -1183,33 +1183,33 @@ function VehiclesTab({ vehicles }: { vehicles: VehicleData[] }) {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Tire Size (Front)</p>
-                <p className="font-mono text-slate-900">{vehicle.tireSizeFront}</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Tire Size (Front)</p>
+                <p className="font-mono text-warm-900">{vehicle.tireSizeFront}</p>
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wide">Tire Size (Rear)</p>
-                <p className="font-mono text-slate-900">{vehicle.tireSizeRear}</p>
+                <p className="text-xs text-warm-500 uppercase tracking-wide">Tire Size (Rear)</p>
+                <p className="font-mono text-warm-900">{vehicle.tireSizeRear}</p>
               </div>
             </div>
 
             <div>
-              <p className="text-xs text-slate-500 uppercase tracking-wide">Oil Type</p>
-              <p className="font-medium text-slate-900">{vehicle.oilType}</p>
+              <p className="text-xs text-warm-500 uppercase tracking-wide">Oil Type</p>
+              <p className="font-medium text-warm-900">{vehicle.oilType}</p>
             </div>
 
-            <div className="pt-4 border-t border-slate-200">
+            <div className="pt-4 border-t border-warm-200">
               <div className="flex items-center justify-between mb-2">
                 <div>
-                  <p className="text-xs text-slate-500 uppercase tracking-wide">Insurance</p>
-                  <p className="font-medium text-slate-900">{vehicle.insuranceCarrier}</p>
+                  <p className="text-xs text-warm-500 uppercase tracking-wide">Insurance</p>
+                  <p className="font-medium text-warm-900">{vehicle.insuranceCarrier}</p>
                 </div>
                 <div className="flex items-center gap-1">
-                  <span className="font-mono text-sm text-slate-600">{vehicle.insurancePolicy}</span>
+                  <span className="font-mono text-sm text-warm-600">{vehicle.insurancePolicy}</span>
                   <CopyButton value={vehicle.insurancePolicy} className="p-1" />
                 </div>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-sm text-slate-500">Registration</span>
+                <span className="text-sm text-warm-500">Registration</span>
                 <RegistrationBadge expiresDate={vehicle.registrationExpires} />
               </div>
             </div>
@@ -1230,15 +1230,15 @@ function DocumentsTab() {
           <Link
             key={category.id}
             href={`/app/documents?category=${category.id}`}
-            className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 hover:border-emerald-300 hover:shadow-md transition-all group"
+            className="bg-white rounded-xl shadow-sm border border-warm-200 p-6 hover:border-emerald-300 hover:shadow-md transition-all group"
           >
             <div className="flex items-start justify-between mb-3">
-              <div className="p-2 bg-slate-50 rounded-lg group-hover:bg-emerald-50 transition-colors">
-                <Icon className="w-5 h-5 text-slate-600 group-hover:text-emerald-600 transition-colors" />
+              <div className="p-2 bg-warm-50 rounded-lg group-hover:bg-emerald-50 transition-colors">
+                <Icon className="w-5 h-5 text-warm-600 group-hover:text-emerald-600 transition-colors" />
               </div>
-              <span className="text-sm text-slate-500">{category.count} files</span>
+              <span className="text-sm text-warm-500">{category.count} files</span>
             </div>
-            <h3 className="font-semibold text-slate-900 group-hover:text-emerald-600 transition-colors">
+            <h3 className="font-semibold text-warm-900 group-hover:text-emerald-600 transition-colors">
               {category.name}
             </h3>
             <div className="flex items-center gap-1 mt-2 text-sm text-emerald-600 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1286,8 +1286,8 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
         </div>
 
         {/* Spend Power Summary */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4 flex items-center gap-2">
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+          <h3 className="text-lg font-semibold text-warm-900 mb-4 flex items-center gap-2">
             <Wallet className="w-5 h-5 text-emerald-600" />
             Spend Power
           </h3>
@@ -1304,7 +1304,7 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
                   fill="none"
                   stroke="currentColor"
                   strokeWidth="8"
-                  className="text-slate-200"
+                  className="text-warm-200"
                 />
                 {/* Progress circle */}
                 <circle
@@ -1322,28 +1322,28 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
                 <span className={`text-2xl font-bold ${getUtilizationColor()}`}>
                   {Math.round(utilization)}%
                 </span>
-                <span className="text-xs text-slate-500">Used</span>
+                <span className="text-xs text-warm-500">Used</span>
               </div>
             </div>
 
             {/* Stats */}
             <div className="space-y-4 flex-1">
               <div>
-                <p className="text-sm text-slate-500">Available</p>
+                <p className="text-sm text-warm-500">Available</p>
                 <p className="text-2xl font-bold text-emerald-600">
                   ${available.toLocaleString()}
                 </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-slate-500">Monthly Limit</p>
-                  <p className="font-semibold text-slate-900">
+                  <p className="text-xs text-warm-500">Monthly Limit</p>
+                  <p className="font-semibold text-warm-900">
                     ${financials.spendingLimit.toLocaleString()}
                   </p>
                 </div>
                 <div>
-                  <p className="text-xs text-slate-500">Current Spend</p>
-                  <p className="font-semibold text-slate-900">
+                  <p className="text-xs text-warm-500">Current Spend</p>
+                  <p className="font-semibold text-warm-900">
                     ${financials.currentSpend.toLocaleString()}
                   </p>
                 </div>
@@ -1352,7 +1352,7 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
           </div>
 
           {/* Quick Actions */}
-          <div className="mt-6 pt-4 border-t border-slate-200 flex gap-3">
+          <div className="mt-6 pt-4 border-t border-warm-200 flex gap-3">
             <Link
               href="/app/billing"
               className="flex-1 px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition-colors text-center"
@@ -1361,7 +1361,7 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
             </Link>
             <Link
               href="/app/billing?tab=statements"
-              className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-200 transition-colors text-center"
+              className="flex-1 px-4 py-2 bg-warm-100 text-warm-700 text-sm font-medium rounded-lg hover:bg-warm-200 transition-colors text-center"
             >
               Pay Statement
             </Link>
@@ -1370,19 +1370,19 @@ function WalletTab({ financials, onToggleLock }: { financials: FinancialsData; o
       </div>
 
       {/* Card Info */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-        <h3 className="text-lg font-semibold text-slate-900 mb-4">Card Details</h3>
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <h3 className="text-lg font-semibold text-warm-900 mb-4">Card Details</h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Card Name</p>
-            <p className="font-medium text-slate-900">{financials.cardName}</p>
+            <p className="text-xs text-warm-500 uppercase tracking-wide">Card Name</p>
+            <p className="font-medium text-warm-900">{financials.cardName}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Cardholder</p>
-            <p className="font-medium text-slate-900">{financials.cardHolder}</p>
+            <p className="text-xs text-warm-500 uppercase tracking-wide">Cardholder</p>
+            <p className="font-medium text-warm-900">{financials.cardHolder}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wide">Status</p>
+            <p className="text-xs text-warm-500 uppercase tracking-wide">Status</p>
             <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
               financials.isLocked
                 ? 'bg-red-100 text-red-700'
@@ -1494,7 +1494,7 @@ export default function HomeProfilePage() {
       <VaultSection />
 
       {/* Tabbed Interface */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 mb-6 sticky top-14 lg:top-0 z-30">
+      <div className="bg-white rounded-xl shadow-sm border border-warm-200 mb-6 sticky top-14 lg:top-0 z-30">
         <div className="flex overflow-x-auto scrollbar-hide">
           {tabs.map((tab) => {
             const Icon = tab.icon;
@@ -1506,7 +1506,7 @@ export default function HomeProfilePage() {
                 className={`flex items-center gap-2 px-6 py-4 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
                   isActive
                     ? 'border-emerald-600 text-emerald-600'
-                    : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+                    : 'border-transparent text-warm-500 hover:text-warm-700 hover:border-warm-300'
                 }`}
               >
                 <Icon className="w-4 h-4" />

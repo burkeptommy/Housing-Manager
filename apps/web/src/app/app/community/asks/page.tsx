@@ -89,23 +89,23 @@ export default function CommunityAsksPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
+        <h1 className="text-2xl font-bold text-warm-900 dark:text-white">
           Community Asks
         </h1>
-        <p className="text-slate-600 dark:text-slate-400 mt-1">
+        <p className="text-warm-600 dark:text-warm-400 mt-1">
           Help your neighbors find great contractors by sharing your recommendations
         </p>
       </div>
 
       {/* Tabs */}
-      <div className="border-b border-slate-200 dark:border-slate-700">
+      <div className="border-b border-warm-200 dark:border-warm-700">
         <nav className="flex gap-6">
           <button
             onClick={() => setActiveTab('nearby')}
             className={`pb-3 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'nearby'
                 ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'border-transparent text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-white'
             }`}
           >
             Neighbors&apos; Asks
@@ -120,12 +120,12 @@ export default function CommunityAsksPage() {
             className={`pb-3 border-b-2 font-medium text-sm transition-colors ${
               activeTab === 'mine'
                 ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                : 'border-transparent text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                : 'border-transparent text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-white'
             }`}
           >
             My Requests
             {myRequests.length > 0 && (
-              <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-slate-100 dark:bg-slate-800">
+              <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-warm-100 dark:bg-warm-800">
                 {myRequests.length}
               </span>
             )}
@@ -139,10 +139,10 @@ export default function CommunityAsksPage() {
           {nearbyRequests.length === 0 ? (
             <div className="card text-center py-12">
               <div className="text-5xl mb-4">🏘️</div>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-warm-900 dark:text-white mb-2">
                 No nearby asks yet
               </h3>
-              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto">
+              <p className="text-warm-600 dark:text-warm-400 max-w-md mx-auto">
                 When your neighbors are looking for contractor recommendations, their requests will appear here.
               </p>
             </div>
@@ -157,7 +157,7 @@ export default function CommunityAsksPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-medium text-slate-900 dark:text-white">
+                        <h3 className="font-medium text-warm-900 dark:text-white">
                           {request.title}
                         </h3>
                         <span className="px-2 py-0.5 rounded-full text-xs bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400">
@@ -166,28 +166,28 @@ export default function CommunityAsksPage() {
                       </div>
 
                       {request.description && (
-                        <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">
+                        <p className="text-sm text-warm-600 dark:text-warm-400 mb-3 line-clamp-2">
                           {request.description}
                         </p>
                       )}
 
                       <div className="flex flex-wrap gap-3 text-sm">
                         {request.projectIdea && (
-                          <span className="text-slate-500 dark:text-slate-400">
+                          <span className="text-warm-500 dark:text-warm-400">
                             {request.projectIdea.category.replace(/_/g, ' ')}
                           </span>
                         )}
                         {getBudgetLabel(request.budget) && (
-                          <span className="text-slate-500 dark:text-slate-400">
+                          <span className="text-warm-500 dark:text-warm-400">
                             Budget: {getBudgetLabel(request.budget)}
                           </span>
                         )}
                         {getTimelineLabel(request.timeline) && (
-                          <span className="text-slate-500 dark:text-slate-400">
+                          <span className="text-warm-500 dark:text-warm-400">
                             {getTimelineLabel(request.timeline)}
                           </span>
                         )}
-                        <span className="text-slate-400 dark:text-slate-500">
+                        <span className="text-warm-400 dark:text-warm-500">
                           {formatDate(request.createdAt)}
                         </span>
                       </div>
@@ -197,14 +197,14 @@ export default function CommunityAsksPage() {
                       <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
                         {request.suggestionCount}
                       </div>
-                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                      <div className="text-xs text-warm-500 dark:text-warm-400">
                         suggestions
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex items-center justify-between">
-                    <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400">
+                  <div className="mt-4 pt-4 border-t border-warm-100 dark:border-warm-700 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm text-warm-600 dark:text-warm-400">
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
@@ -227,10 +227,10 @@ export default function CommunityAsksPage() {
           {myRequests.length === 0 ? (
             <div className="card text-center py-12">
               <div className="text-5xl mb-4">📝</div>
-              <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-warm-900 dark:text-white mb-2">
                 No requests yet
               </h3>
-              <p className="text-slate-600 dark:text-slate-400 max-w-md mx-auto mb-6">
+              <p className="text-warm-600 dark:text-warm-400 max-w-md mx-auto mb-6">
                 Start a project and ask your neighbors for contractor recommendations.
               </p>
               <Link href="/app/projects/new" className="btn btn-primary">
@@ -244,7 +244,7 @@ export default function CommunityAsksPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-medium text-slate-900 dark:text-white">
+                        <h3 className="font-medium text-warm-900 dark:text-white">
                           {request.title}
                         </h3>
                         <span className={`px-2 py-0.5 rounded-full text-xs ${
@@ -252,13 +252,13 @@ export default function CommunityAsksPage() {
                             ? 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
                             : request.status === 'REVIEWING'
                             ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400'
-                            : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                            : 'bg-warm-100 dark:bg-warm-800 text-warm-600 dark:text-warm-400'
                         }`}>
                           {request.status}
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap gap-3 text-sm text-slate-500 dark:text-slate-400">
+                      <div className="flex flex-wrap gap-3 text-sm text-warm-500 dark:text-warm-400">
                         <span>{request.viewCount} views</span>
                         <span>{request.suggestionCount} suggestions</span>
                         <span>{formatDate(request.createdAt)}</span>
@@ -346,12 +346,12 @@ function SuggestVendorModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
 
-        <div className="relative w-full max-w-lg bg-white dark:bg-slate-800 rounded-xl shadow-xl">
-          <div className="flex items-center justify-between p-6 border-b border-slate-200 dark:border-slate-700">
-            <h2 className="text-lg font-semibold text-slate-900 dark:text-white">
+        <div className="relative w-full max-w-lg bg-white dark:bg-warm-800 rounded-xl shadow-xl">
+          <div className="flex items-center justify-between p-6 border-b border-warm-200 dark:border-warm-700">
+            <h2 className="text-lg font-semibold text-warm-900 dark:text-white">
               Suggest a Contractor
             </h2>
-            <button onClick={onClose} className="p-1 text-slate-400 hover:text-slate-500">
+            <button onClick={onClose} className="p-1 text-warm-400 hover:text-warm-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -360,12 +360,12 @@ function SuggestVendorModal({
 
           <form onSubmit={handleSubmit} className="p-6 space-y-4">
             {/* Request Info */}
-            <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-              <h4 className="font-medium text-slate-900 dark:text-white text-sm mb-1">
+            <div className="p-3 rounded-lg bg-warm-50 dark:bg-warm-900/50">
+              <h4 className="font-medium text-warm-900 dark:text-white text-sm mb-1">
                 {request.title}
               </h4>
               {request.description && (
-                <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">
+                <p className="text-sm text-warm-600 dark:text-warm-400 line-clamp-2">
                   {request.description}
                 </p>
               )}
@@ -417,7 +417,7 @@ function SuggestVendorModal({
                     className={`p-1 transition-colors ${
                       rating && star <= rating
                         ? 'text-yellow-400'
-                        : 'text-slate-300 dark:text-slate-600 hover:text-yellow-300'
+                        : 'text-warm-300 dark:text-warm-600 hover:text-yellow-300'
                     }`}
                   >
                     <svg className="w-8 h-8 fill-current" viewBox="0 0 20 20">
