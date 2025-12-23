@@ -2,7 +2,7 @@
 
 import { createApiClient, ApiClient } from '@haven/core';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
 
 // Singleton API client instance
 let apiClient: ApiClient | null = null;

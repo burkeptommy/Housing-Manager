@@ -13,6 +13,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { getIdToken } from '@/lib/firebase';
 
 // ============================================================================
 // TYPES
@@ -101,7 +102,7 @@ function getManagerName(conversation: Conversation): string {
 // ============================================================================
 
 export default function MessagesPage() {
-  const { getIdToken } = useAuth();
+  useAuth(); // Ensure user is authenticated
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messageInput, setMessageInput] = useState('');
