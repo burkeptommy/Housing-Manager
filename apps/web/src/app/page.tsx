@@ -799,32 +799,54 @@ function PricingSection() {
           ))}
         </div>
 
-        {/* Estate Tier */}
+        {/* Haven Estate */}
         <div className="mt-12 max-w-4xl mx-auto">
-          <div className="bg-slate-900 rounded-2xl p-8 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-              <div>
-                <div className="flex items-center gap-3 mb-2">
-                  <Building2 className="w-6 h-6 text-amber-400" />
-                  <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
-                </div>
-                <p className="text-slate-300 mb-2">White glove service for estates & multiple properties</p>
-                <p className="text-3xl font-bold text-white">$3,499<span className="text-lg text-slate-400">+/month</span></p>
-              </div>
-              <div className="flex flex-col gap-3">
-                <ul className="text-sm text-slate-300 space-y-1">
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated home manager (2:1 or 1:1)</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Dedicated handyman access</li>
-                  <li className="flex items-center gap-2"><Check className="w-4 h-4 text-emerald-400" /> Full concierge & multiple properties</li>
-                </ul>
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-slate-900 font-semibold rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  Contact Us
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
-              </div>
+          <div className="relative bg-gradient-to-br from-forest-900 to-forest-950 rounded-2xl p-8 text-white">
+            <div className="absolute top-4 right-4">
+              <span className="px-3 py-1 bg-gold-500/20 text-gold-400 text-xs font-medium rounded-full border border-gold-500/30">
+                White Glove
+              </span>
+            </div>
+
+            <div className="flex items-center gap-3 mb-1">
+              <Building2 className="w-6 h-6 text-gold-400" />
+              <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
+            </div>
+            <p className="text-white/60">For estates & multiple properties</p>
+
+            <div className="mt-6">
+              <span className="text-4xl font-bold">$3,499+</span>
+              <span className="text-white/60">/month</span>
+            </div>
+
+            {/* Elegant tagline instead of feature bullets */}
+            <p className="mt-6 text-white/80 text-lg leading-relaxed max-w-2xl">
+              Your personal estate manager anticipating needs, coordinating staff, and ensuring every detail of your properties is handled with discretion and excellence.
+            </p>
+
+            <div className="mt-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+              <ul className="space-y-3 text-white/70">
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-gold-400" />
+                  Multiple properties supported
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-gold-400" />
+                  Priority 24/7 concierge access
+                </li>
+                <li className="flex items-center gap-2">
+                  <Check className="w-4 h-4 text-gold-400" />
+                  Custom service agreements
+                </li>
+              </ul>
+
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-gold-500 hover:bg-gold-400 text-forest-950 font-semibold rounded-xl transition-colors"
+              >
+                Contact Us
+                <ArrowRight className="w-4 h-4" />
+              </Link>
             </div>
           </div>
         </div>
