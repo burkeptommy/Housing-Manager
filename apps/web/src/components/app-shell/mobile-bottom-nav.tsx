@@ -35,7 +35,14 @@ export function MobileBottomNav() {
                   active ? 'text-haven-600' : 'text-warm-400'
                 }`}
               >
-                <Icon className="w-6 h-6" strokeWidth={active ? 2.5 : 2} />
+                <div className="relative">
+                  <Icon className="w-6 h-6" strokeWidth={active ? 2.5 : 2} />
+                  {item.badge && item.badge > 0 && (
+                    <span className="absolute -top-1.5 -right-2 min-w-[16px] h-4 px-1 bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center">
+                      {item.badge > 9 ? '9+' : item.badge}
+                    </span>
+                  )}
+                </div>
                 <span className={`text-xs mt-1 ${active ? 'font-medium' : 'font-normal'}`}>
                   {item.name}
                 </span>

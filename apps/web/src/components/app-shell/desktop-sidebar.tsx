@@ -39,6 +39,31 @@ export function DesktopSidebar() {
                 const active = isActive(item.href);
                 const Icon = item.icon;
 
+                // Special highlight styling for Sarah
+                if (item.highlight) {
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
+                        active
+                          ? 'bg-haven-500/30 text-white'
+                          : 'bg-haven-500/20 text-haven-200 hover:bg-haven-500/30 hover:text-white'
+                      }`}
+                    >
+                      <div className="w-8 h-8 rounded-lg bg-haven-500/40 flex items-center justify-center">
+                        <Icon className="w-4 h-4 text-haven-200" strokeWidth={2} />
+                      </div>
+                      <span className="font-medium">{item.name}</span>
+                      {item.badge && item.badge > 0 && (
+                        <span className="ml-auto px-2 py-0.5 bg-red-500 text-white text-xs font-bold rounded-full">
+                          {item.badge}
+                        </span>
+                      )}
+                    </Link>
+                  );
+                }
+
                 return (
                   <Link
                     key={item.name}

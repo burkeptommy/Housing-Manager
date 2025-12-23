@@ -24,6 +24,7 @@ export interface NavItem {
   icon: LucideIcon;
   roles?: string[];
   badge?: number;
+  highlight?: boolean;
 }
 
 export interface NavSection {
@@ -37,27 +38,26 @@ export const sidebarNavigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
+      { name: 'Sarah', href: '/app/manager', icon: User, badge: 5, highlight: true },
+      { name: 'Messages', href: '/app/messages', icon: MessageSquare },
       { name: 'Calendar', href: '/app/calendar', icon: Calendar },
-      { name: 'Messages', href: '/app/concierge', icon: MessageSquare },
+    ],
+  },
+  {
+    title: 'Your Home',
+    items: [
+      { name: 'Family', href: '/app/family', icon: UserCircle },
+      { name: 'Projects', href: '/app/projects', icon: Wrench },
+      { name: 'Maintenance', href: '/app/maintenance', icon: ClipboardList },
       { name: 'Find Pros', href: '/app/community', icon: Search },
     ],
   },
   {
-    title: 'Property',
+    title: 'Financial',
     items: [
-      { name: 'Home Profile', href: '/app/home', icon: Home },
-      { name: 'Project Planning', href: '/app/projects', icon: Wrench },
-      { name: 'Maintenance', href: '/app/maintenance', icon: ClipboardList },
-      { name: 'Inventory', href: '/app/inventory', icon: Package },
-      { name: 'Requests', href: '/app/requests', icon: FileText, badge: 4 },
-    ],
-  },
-  {
-    title: 'Family',
-    items: [
-      { name: 'Family', href: '/app/family', icon: UserCircle },
-      { name: 'Tasks', href: '/app/tasks', icon: ListTodo },
       { name: 'Money', href: '/app/billing', icon: DollarSign },
+      { name: 'Tasks', href: '/app/tasks', icon: ListTodo },
+      { name: 'Inventory', href: '/app/inventory', icon: Package },
     ],
   },
 ];
@@ -68,12 +68,12 @@ export const sidebarBottomNav: NavItem[] = [
   { name: 'Settings', href: '/app/settings', icon: Settings },
 ];
 
-// Mobile bottom nav - 5 items max (last one opens drawer)
+// Mobile bottom nav - 5 items: Home | Sarah | Messages | Money | Menu
 export const mobileNavigation: NavItem[] = [
   { name: 'Home', href: '/app', icon: LayoutDashboard },
-  { name: 'Calendar', href: '/app/calendar', icon: Calendar },
-  { name: 'Tasks', href: '/app/tasks', icon: ListTodo },
-  { name: 'Messages', href: '/app/concierge', icon: MessageSquare },
+  { name: 'Sarah', href: '/app/manager', icon: User, badge: 5 },
+  { name: 'Messages', href: '/app/messages', icon: MessageSquare },
+  { name: 'Money', href: '/app/billing', icon: DollarSign },
   { name: 'Menu', href: '#menu', icon: Menu },
 ];
 
