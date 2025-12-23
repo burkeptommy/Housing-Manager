@@ -954,56 +954,67 @@ export default function VendorDiscoveryPage() {
 // ============================================================================
 
 function VendorPopup({ vendor }: { vendor: Vendor }) {
+  // Determine if name is long (needs smaller font)
+  const isLongName = vendor.name.length > 20;
+
   return (
-    <div className="w-72 p-0">
-      {/* Card container with proper overflow handling */}
-      <div className="bg-white rounded-lg overflow-hidden">
-        {/* Vendor info */}
-        <div className="p-3">
+    <div className="w-80 p-0">
+      <div className="bg-white rounded-xl overflow-hidden shadow-xl">
+        {/* Header with avatar and name */}
+        <div className="p-4">
           <div className="flex items-start gap-3">
             <img
               src={getVendorAvatar(vendor.name)}
               alt={vendor.name}
-              className="w-11 h-11 rounded-lg flex-shrink-0"
+              className="w-12 h-12 rounded-xl flex-shrink-0"
             />
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-warm-900 text-sm leading-tight">{vendor.name}</h3>
+              {/* Name with dynamic sizing */}
+              <h3 className={`font-semibold text-warm-900 leading-tight ${
+                isLongName ? 'text-sm' : 'text-base'
+              }`}>
+                {vendor.name}
+              </h3>
+
+              {/* Haven Trusted badge */}
               {vendor.havenTrusted && (
-                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded">
+                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full">
                   <Shield className="w-3 h-3" />
                   Haven Trusted
                 </span>
               )}
-              <div className="flex items-center gap-1.5 text-xs text-warm-500 mt-1">
-                <Star className="w-3 h-3 text-amber-500 fill-current" />
-                <span>{vendor.rating}</span>
-                <span>•</span>
-                <span>{vendor.reviewCount} reviews</span>
-              </div>
             </div>
           </div>
 
-          {/* Stats */}
-          <div className="mt-3 flex items-center gap-4 text-xs text-warm-600">
-            <div className="flex items-center gap-1">
-              <Users className="w-3 h-3" />
+          {/* Rating row */}
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <Star className="w-4 h-4 text-amber-500 fill-current" />
+            <span className="font-medium text-warm-900">{vendor.rating}</span>
+            <span className="text-warm-400">•</span>
+            <span className="text-warm-500">{vendor.reviewCount} reviews</span>
+          </div>
+
+          {/* Stats row */}
+          <div className="mt-2 flex items-center gap-4 text-sm text-warm-600">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-warm-400" />
               <span>{vendor.neighborsUsed} neighbors</span>
             </div>
-            <div className="flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-warm-400" />
               <span>{vendor.distance} mi</span>
             </div>
           </div>
         </div>
 
-        {/* Buttons - inside the card with proper containment */}
-        <div className="px-3 pb-3 flex gap-2">
-          <button className="flex-1 px-3 py-2 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors">
+        {/* Action buttons - contained in card */}
+        <div className="px-4 pb-4 flex gap-2">
+          <button className="flex-1 py-2.5 bg-haven-600 text-white text-sm font-medium rounded-xl hover:bg-haven-700 transition-colors">
             Request Quote
           </button>
           <a
             href={`tel:${vendor.phone}`}
-            className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center"
+            className="px-4 py-2.5 border border-warm-200 rounded-xl hover:bg-warm-50 transition-colors flex items-center justify-center"
           >
             <Phone className="w-4 h-4 text-warm-600" />
           </a>

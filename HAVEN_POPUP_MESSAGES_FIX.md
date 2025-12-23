@@ -1,10 +1,133 @@
+# Haven UI Fixes - Popup Card & Messages Page Redesign
+
+## Run in Claude Code:
+```bash
+cd /Users/tomburke/Projects/Housing-Manager
+claude --dangerously-skip-permissions
+```
+
+Then paste this entire prompt.
+
+---
+
+# FIX 1: VENDOR POPUP CARD - Handle Long Names
+
+**File:** `apps/web/src/app/app/community/page.tsx`
+
+## Problem
+- Vendor names like "Estate Grounds Maintenance" get cut off
+- Card width is too narrow for longer business names
+- Need to accommodate full names while keeping card compact
+
+## Solution
+
+Find the `VendorPopup` component and **replace entirely** with:
+
+```tsx
+function VendorPopup({ vendor }: { vendor: Vendor }) {
+  // Determine if name is long (needs smaller font)
+  const isLongName = vendor.name.length > 20;
+  
+  return (
+    <div className="w-80 p-0">
+      <div className="bg-white rounded-xl overflow-hidden shadow-xl">
+        {/* Header with avatar and name */}
+        <div className="p-4">
+          <div className="flex items-start gap-3">
+            <img
+              src={getVendorAvatar(vendor.name)}
+              alt={vendor.name}
+              className="w-12 h-12 rounded-xl flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              {/* Name with dynamic sizing */}
+              <h3 className={`font-semibold text-warm-900 leading-tight ${
+                isLongName ? 'text-sm' : 'text-base'
+              }`}>
+                {vendor.name}
+              </h3>
+              
+              {/* Haven Trusted badge */}
+              {vendor.havenTrusted && (
+                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full">
+                  <Shield className="w-3 h-3" />
+                  Haven Trusted
+                </span>
+              )}
+            </div>
+          </div>
+          
+          {/* Rating row */}
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <Star className="w-4 h-4 text-amber-500 fill-current" />
+            <span className="font-medium text-warm-900">{vendor.rating}</span>
+            <span className="text-warm-400">•</span>
+            <span className="text-warm-500">{vendor.reviewCount} reviews</span>
+          </div>
+          
+          {/* Stats row */}
+          <div className="mt-2 flex items-center gap-4 text-sm text-warm-600">
+            <div className="flex items-center gap-1.5">
+              <Users className="w-4 h-4 text-warm-400" />
+              <span>{vendor.neighborsUsed} neighbors</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <MapPin className="w-4 h-4 text-warm-400" />
+              <span>{vendor.distance} mi</span>
+            </div>
+          </div>
+        </div>
+        
+        {/* Action buttons - contained in card */}
+        <div className="px-4 pb-4 flex gap-2">
+          <button className="flex-1 py-2.5 bg-haven-600 text-white text-sm font-medium rounded-xl hover:bg-haven-700 transition-colors">
+            Request Quote
+          </button>
+          <a
+            href={`tel:${vendor.phone}`}
+            className="px-4 py-2.5 border border-warm-200 rounded-xl hover:bg-warm-50 transition-colors flex items-center justify-center"
+          >
+            <Phone className="w-4 h-4 text-warm-600" />
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+## Key Changes
+- Card width increased from `w-72` to `w-80` (320px)
+- Dynamic font size: `text-sm` for names > 20 chars, `text-base` otherwise
+- Full name displayed without truncation
+- Better spacing and visual hierarchy
+- Rounded corners increased to `rounded-xl` for premium feel
+
+---
+
+# FIX 2: MESSAGES PAGE REDESIGN
+
+**File:** `apps/web/src/app/app/messages/page.tsx`
+
+## Current State
+Basic messages list without organization
+
+## New Design
+- **Tabs**: "Conversations" (persistent) | "Projects" (task-based)
+- **Categories**: Your Team, Vendors, Community, Schools
+- **Pinned Contacts**: Home Manager & Handyman always at top
+- **Project Conversations**: Organized by case/project with status
+
+## Replace the entire file with:
+
+```tsx
 'use client';
 
 import { useState } from 'react';
-import {
-  Search,
-  MessageSquare,
-  Phone,
+import { 
+  Search, 
+  MessageSquare, 
+  Phone, 
   Video,
   MoreVertical,
   Pin,
@@ -106,7 +229,7 @@ const contacts: Contact[] = [
     category: 'team',
     isHavenTeam: true,
   },
-
+  
   // Vendors
   {
     id: 'mikes-plumbing',
@@ -144,7 +267,7 @@ const contacts: Contact[] = [
     unreadCount: 0,
     category: 'vendors',
   },
-
+  
   // Community
   {
     id: 'bob-neighbor',
@@ -170,7 +293,7 @@ const contacts: Contact[] = [
     unreadCount: 0,
     category: 'community',
   },
-
+  
   // Schools
   {
     id: 'greenwich-academy',
@@ -288,7 +411,7 @@ export default function MessagesPage() {
   const filteredContacts = contacts.filter(contact => {
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
-      return contact.name.toLowerCase().includes(query) ||
+      return contact.name.toLowerCase().includes(query) || 
              contact.role.toLowerCase().includes(query);
     }
     if (selectedCategory !== 'all' && contact.category !== selectedCategory) {
@@ -432,10 +555,10 @@ export default function MessagesPage() {
             {Object.entries(groupedContacts).map(([category, categoryContacts]) => {
               if (categoryContacts.length === 0) return null;
               if (selectedCategory !== 'all' && selectedCategory !== category) return null;
-
+              
               const config = categoryConfig[category as CategoryType];
               const Icon = config.icon;
-
+              
               return (
                 <div key={category} className="px-4 mb-2">
                   <div className="flex items-center gap-2 py-2 mt-2">
@@ -478,7 +601,7 @@ export default function MessagesPage() {
               {filteredProjects.map(project => (
                 <ProjectRow key={project.id} project={project} />
               ))}
-
+              
               {filteredProjects.length === 0 && (
                 <div className="text-center py-12 text-warm-500">
                   No projects found
@@ -602,3 +725,36 @@ function ProjectRow({ project }: { project: ProjectConversation }) {
     </div>
   );
 }
+```
+
+---
+
+## SUMMARY
+
+### Popup Card Fix
+- Wider card (320px vs 288px)
+- Dynamic font sizing for long names
+- Proper button containment
+- No text truncation
+
+### Messages Page Redesign
+- **Two tabs**: Conversations (persistent) | Projects (task-based)
+- **Pinned section**: Home Manager, Handyman, AI Concierge always at top
+- **Categories**: Your Team, Vendors, Community, Schools
+- **Project conversations**: Organized by status (Active, Pending, Resolved)
+- **Visual indicators**: Online status, Haven team badge, unread counts
+
+### Categories
+| Category | Icon | Content |
+|----------|------|---------|
+| Your Team | Shield | Home Manager (pinned), Handyman (pinned), Concierge |
+| Vendors | Wrench | Contractors you've worked with |
+| Community | Users | Neighbors |
+| Schools | Graduation Cap | School admissions, athletics contacts |
+
+### Project Conversations
+- Title + Category + Status badge
+- Participant avatars
+- Associated vendor
+- Last message preview
+- Filter by: All, Active, Pending, Resolved
