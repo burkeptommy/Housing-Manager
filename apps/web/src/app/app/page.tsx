@@ -223,7 +223,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
         <div className="flex items-start justify-between">
           <div>
             <p className="text-haven-100 text-sm font-medium mb-1">{today}</p>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight mb-2">
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight mb-2 text-white">
               {greeting}, {userName}
             </h1>
             {note && <p className="text-haven-100 text-lg">{note}</p>}
@@ -708,7 +708,7 @@ function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
         <div className="flex items-center gap-4">
           <Avatar name={manager.name} src={manager.avatar} size="xl" status="online" />
           <div>
-            <h3 className="text-lg font-bold">{manager.name}</h3>
+            <h3 className="text-lg font-bold text-white">{manager.name}</h3>
             <p className="text-warm-400">Your Home Manager</p>
           </div>
         </div>
