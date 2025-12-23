@@ -16,12 +16,29 @@ export default function LoginPage() {
   // Redirect when user becomes authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
-      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
-        router.push('/manager');
-      } else if (needsOnboarding) {
-        router.push('/onboarding');
-      } else {
-        router.push('/app');
+      // Route based on user role to appropriate portal
+      switch (user.role) {
+        case 'ADMIN':
+          router.push('/admin');
+          break;
+        case 'MANAGER':
+          router.push('/manager');
+          break;
+        case 'HANDYMAN':
+          router.push('/handyman');
+          break;
+        case 'VENDOR':
+          router.push('/vendor');
+          break;
+        case 'HOMEOWNER':
+        default:
+          // Only homeowners need onboarding (household setup)
+          if (needsOnboarding) {
+            router.push('/onboarding');
+          } else {
+            router.push('/app');
+          }
+          break;
       }
     }
   }, [isAuthenticated, user, needsOnboarding, router]);

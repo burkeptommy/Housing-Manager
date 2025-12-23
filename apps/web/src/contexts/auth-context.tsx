@@ -91,8 +91,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const api = getApiClient();
 
-  // Check if user needs onboarding (no households)
-  const needsOnboarding = !!user && !householdInfo;
+  // Check if user needs onboarding (only homeowners need households)
+  // Staff, vendors, managers, and admins don't need household setup
+  const needsOnboarding = !!user && user.role === 'HOMEOWNER' && !householdInfo;
 
   // Fetch user profile and household data from /api/me
   const fetchMe = useCallback(async (): Promise<MeResponse | null> => {
@@ -395,24 +396,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Helper function to get the correct portal path for a user role
+    const getPortalPath = (role: string): string => {
+      switch (role) {
+        case 'ADMIN':
+          return '/admin';
+        case 'MANAGER':
+          return '/manager';
+        case 'HANDYMAN':
+          return '/handyman';
+        case 'VENDOR':
+          return '/vendor';
+        case 'HOMEOWNER':
+        default:
+          return needsOnboarding ? '/onboarding' : '/app';
+      }
+    };
+
+    const userPortal = getPortalPath(user.role);
+
     // User is authenticated - handle redirects
     if (path === '/login' || path === '/register') {
-      // Redirect authenticated users away from login/register
-      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
-        router.push('/manager');
-      } else if (needsOnboarding) {
-        router.push('/onboarding');
-      } else {
-        router.push('/app');
-      }
+      // Redirect authenticated users away from login/register to their portal
+      router.push(userPortal);
       return;
     }
 
-    // Handle role-based and onboarding routing for other pages
-    if (path.startsWith('/app') || path.startsWith('/onboarding')) {
-      if (user.role === 'MANAGER' || user.role === 'ADMIN') {
-        router.push('/manager');
-      } else if (needsOnboarding && !path.startsWith('/onboarding')) {
+    // Handle role-based routing - ensure users are in their correct portal
+    const isInWrongPortal = (
+      (user.role === 'ADMIN' && !path.startsWith('/admin')) ||
+      (user.role === 'MANAGER' && !path.startsWith('/manager')) ||
+      (user.role === 'HANDYMAN' && !path.startsWith('/handyman')) ||
+      (user.role === 'VENDOR' && !path.startsWith('/vendor')) ||
+      (user.role === 'HOMEOWNER' && !path.startsWith('/app') && !path.startsWith('/onboarding'))
+    );
+
+    // Only redirect if user is trying to access a protected portal area that's not theirs
+    if (isInWrongPortal && (
+      path.startsWith('/app') ||
+      path.startsWith('/admin') ||
+      path.startsWith('/manager') ||
+      path.startsWith('/handyman') ||
+      path.startsWith('/vendor') ||
+      path.startsWith('/onboarding')
+    )) {
+      router.push(userPortal);
+      return;
+    }
+
+    // Handle onboarding for homeowners
+    if (user.role === 'HOMEOWNER') {
+      if (needsOnboarding && path.startsWith('/app')) {
         router.push('/onboarding');
       } else if (!needsOnboarding && path.startsWith('/onboarding')) {
         router.push('/app');
