@@ -701,57 +701,7 @@ function ServicesSection() {
 // PRICING SECTION
 // ============================================================================
 function PricingSection() {
-  const plans = [
-    {
-      name: 'Lite',
-      price: 349,
-      description: 'Essential home management',
-      popular: false,
-      features: [
-        'Bill consolidation (up to 15 accounts)',
-        'Vendor coordination (reactive)',
-        'Text-based home manager',
-        'Document vault & home manual',
-        'Same-day response',
-      ],
-      cta: 'Get Started',
-      best: 'Best for condos & apartments',
-    },
-    {
-      name: 'Haven',
-      price: 749,
-      description: 'Complete home management',
-      popular: true,
-      features: [
-        'Everything in Lite',
-        'Proactive home manager',
-        'Monthly handyman visit (2 hrs)',
-        'Vendor oversight & negotiation',
-        'Maintenance scheduling',
-        'Grocery coordination',
-        '12-hour response time',
-      ],
-      cta: 'Get Started',
-      best: 'Best for most homeowners',
-    },
-    {
-      name: 'Haven+',
-      price: 1499,
-      description: 'Home + life management',
-      popular: false,
-      features: [
-        'Everything in Haven',
-        'Personal assistant services',
-        'Errands, shopping & returns',
-        'Travel coordination',
-        'Event planning',
-        '4-hour priority response',
-        'Enhanced handyman (4 hrs/mo)',
-      ],
-      cta: 'Get Started',
-      best: 'Best for busy executives',
-    },
-  ];
+  const [showPremiumTiers, setShowPremiumTiers] = useState(false);
 
   return (
     <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
@@ -762,129 +712,216 @@ function PricingSection() {
             <span className="text-sm font-semibold text-emerald-800">Transparent Pricing</span>
           </div>
           <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            Plans That Fit Real Life
+            Start Simple. Upgrade Anytime.
           </h2>
           <p className="text-xl text-slate-600 max-w-2xl mx-auto">
             No hidden fees. No setup costs. No annual contracts.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {plans.map((plan) => (
-            <div
-              key={plan.name}
-              className={`relative rounded-2xl p-8 ${
-                plan.popular
-                  ? 'bg-emerald-900 text-white shadow-2xl shadow-emerald-900/20 lg:-mt-4 lg:mb-[-1rem]'
-                  : 'bg-white border-2 border-slate-200 shadow-sm'
-              }`}
-            >
-              {plan.popular && (
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <span className="inline-flex items-center gap-1 px-4 py-1.5 bg-amber-400 text-slate-900 text-sm font-bold rounded-full shadow-lg">
-                    <Star className="w-4 h-4" />
-                    Most Popular
-                  </span>
-                </div>
-              )}
-
-              <div className={`mb-6 ${plan.popular ? 'pt-4' : ''}`}>
-                <h3 className={`text-2xl font-bold mb-1 ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
-                  {plan.name}
-                </h3>
-                <p className={plan.popular ? 'text-emerald-300' : 'text-slate-500'}>
-                  {plan.description}
-                </p>
-              </div>
-
-              <div className="mb-6">
-                <span className={`text-5xl font-bold ${plan.popular ? 'text-white' : 'text-slate-900'}`}>
-                  ${plan.price}
-                </span>
-                <span className={plan.popular ? 'text-emerald-300' : 'text-slate-500'}>/month</span>
-              </div>
-
-              <ul className="space-y-3 mb-8">
-                {plan.features.map((feature, i) => (
-                  <li key={i} className="flex items-start gap-3">
-                    <Check className={`w-5 h-5 mt-0.5 flex-shrink-0 ${
-                      plan.popular ? 'text-emerald-400' : 'text-emerald-600'
-                    }`} />
-                    <span className={plan.popular ? 'text-emerald-50' : 'text-slate-600'}>
-                      {feature}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-
-              <Link
-                href={`/register?plan=${plan.name.toLowerCase()}`}
-                className={`block w-full text-center px-6 py-3 font-semibold rounded-xl transition-colors ${
-                  plan.popular
-                    ? 'bg-white text-emerald-900 hover:bg-emerald-50'
-                    : 'bg-slate-100 text-slate-900 hover:bg-slate-200'
-                }`}
-              >
-                {plan.cta}
-              </Link>
-
-              <p className={`text-center text-sm mt-4 ${plan.popular ? 'text-emerald-300' : 'text-slate-500'}`}>
-                {plan.best}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Haven Estate */}
-        <div className="mt-12 max-w-4xl mx-auto">
-          <div className="relative bg-gradient-to-br from-forest-900 to-forest-950 rounded-2xl p-8 text-white">
-            <div className="absolute top-4 right-4">
-              <span className="px-3 py-1 bg-gold-500/20 text-gold-400 text-xs font-medium rounded-full border border-gold-500/30">
-                White Glove
+        {/* Essentials - Primary Featured Plan */}
+        <div className="max-w-2xl mx-auto mb-12">
+          <div className="relative bg-emerald-900 text-white rounded-2xl p-8 shadow-2xl shadow-emerald-900/20">
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <span className="inline-flex items-center gap-1 px-4 py-1.5 bg-amber-400 text-slate-900 text-sm font-bold rounded-full shadow-lg">
+                <Star className="w-4 h-4" />
+                Start Here
               </span>
             </div>
 
-            <div className="flex items-center gap-3 mb-1">
-              <Building2 className="w-6 h-6 text-gold-400" />
-              <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
+            <div className="pt-4 mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <h3 className="text-2xl font-bold text-white">Haven Essentials</h3>
+                <span className="px-3 py-1 bg-emerald-800 text-emerald-200 text-sm font-medium rounded-full">
+                  All subscription tiers
+                </span>
+              </div>
+              <p className="text-emerald-300">Everything you need to get started</p>
             </div>
-            <p className="text-white/60">For estates & multiple properties</p>
 
-            <div className="mt-6">
-              <span className="text-4xl font-bold">$3,499+</span>
-              <span className="text-white/60">/month</span>
+            <div className="mb-6">
+              <span className="text-5xl font-bold text-white">$349</span>
+              <span className="text-emerald-300">/month</span>
             </div>
 
-            {/* Elegant tagline instead of feature bullets */}
-            <p className="mt-6 text-white/80 text-lg leading-relaxed max-w-2xl">
-              Your personal estate manager anticipating needs, coordinating staff, and ensuring every detail of your properties is handled with discretion and excellence.
+            <div className="grid sm:grid-cols-2 gap-4 mb-8">
+              {[
+                'Your complete home profile',
+                'Bill consolidation (up to 15 accounts)',
+                'Vendor coordination (reactive)',
+                'Text-based home manager',
+                'Document vault & home manual',
+                'Same-day response',
+              ].map((feature, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0 text-emerald-400" />
+                  <span className="text-emerald-50">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/register?plan=essentials"
+              className="block w-full text-center px-6 py-4 bg-white text-emerald-900 font-bold text-lg rounded-xl hover:bg-emerald-50 transition-colors"
+            >
+              Get Started with Essentials
+            </Link>
+
+            <p className="text-center text-sm mt-4 text-emerald-300">
+              Perfect for condos, apartments & single-family homes
             </p>
-
-            <div className="mt-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
-              <ul className="space-y-3 text-white/70">
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-gold-400" />
-                  Multiple properties supported
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-gold-400" />
-                  Priority 24/7 concierge access
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-gold-400" />
-                  Custom service agreements
-                </li>
-              </ul>
-
-              <Link
-                href="/contact"
-                className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-gold-500 hover:bg-gold-400 text-forest-950 font-semibold rounded-xl transition-colors"
-              >
-                Contact Us
-                <ArrowRight className="w-4 h-4" />
-              </Link>
-            </div>
           </div>
+        </div>
+
+        {/* Haven Standard - Secondary Option */}
+        <div className="max-w-2xl mx-auto mb-8">
+          <div className="relative bg-white border-2 border-slate-200 rounded-2xl p-8 shadow-sm">
+            <div className="mb-6">
+              <h3 className="text-2xl font-bold text-slate-900 mb-1">Haven</h3>
+              <p className="text-slate-500">Complete home management with proactive care</p>
+            </div>
+
+            <div className="mb-6">
+              <span className="text-5xl font-bold text-slate-900">$749</span>
+              <span className="text-slate-500">/month</span>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3 mb-8">
+              {[
+                'Everything in Essentials',
+                'Proactive home manager',
+                'Monthly handyman visit (2 hrs)',
+                'Vendor oversight & negotiation',
+                'Maintenance scheduling',
+                '12-hour response time',
+              ].map((feature, i) => (
+                <div key={i} className="flex items-start gap-3">
+                  <Check className="w-5 h-5 mt-0.5 flex-shrink-0 text-emerald-600" />
+                  <span className="text-slate-600">{feature}</span>
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/register?plan=haven"
+              className="block w-full text-center px-6 py-3 bg-slate-100 text-slate-900 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+            >
+              Upgrade to Haven
+            </Link>
+
+            <p className="text-center text-sm mt-4 text-slate-500">
+              Best for homeowners who want hands-free maintenance
+            </p>
+          </div>
+        </div>
+
+        {/* Expandable Premium Tiers */}
+        <div className="max-w-2xl mx-auto">
+          <button
+            onClick={() => setShowPremiumTiers(!showPremiumTiers)}
+            className="w-full flex items-center justify-center gap-2 py-4 text-slate-600 hover:text-slate-900 transition-colors"
+          >
+            <span className="font-medium">
+              {showPremiumTiers ? 'Hide premium tiers' : 'View Haven+ & Estate tiers'}
+            </span>
+            <ChevronDown className={`w-5 h-5 transition-transform ${showPremiumTiers ? 'rotate-180' : ''}`} />
+          </button>
+
+          {showPremiumTiers && (
+            <div className="space-y-6 mt-4">
+              {/* Haven+ */}
+              <div className="bg-white border-2 border-slate-200 rounded-2xl p-8 shadow-sm">
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-slate-900 mb-1">Haven+</h3>
+                    <p className="text-slate-500">Home + life management</p>
+                  </div>
+                  <span className="px-3 py-1 bg-rose-100 text-rose-700 text-xs font-semibold rounded-full">
+                    Concierge
+                  </span>
+                </div>
+
+                <div className="mb-6">
+                  <span className="text-4xl font-bold text-slate-900">$1,499</span>
+                  <span className="text-slate-500">/month</span>
+                </div>
+
+                <div className="grid sm:grid-cols-2 gap-3 mb-6">
+                  {[
+                    'Everything in Haven',
+                    'Personal assistant services',
+                    'Errands, shopping & returns',
+                    'Travel coordination',
+                    'Event planning',
+                    '4-hour priority response',
+                    'Enhanced handyman (4 hrs/mo)',
+                  ].map((feature, i) => (
+                    <div key={i} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 mt-0.5 flex-shrink-0 text-emerald-600" />
+                      <span className="text-slate-600">{feature}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <Link
+                  href="/register?plan=haven-plus"
+                  className="block w-full text-center px-6 py-3 bg-slate-100 text-slate-900 font-semibold rounded-xl hover:bg-slate-200 transition-colors"
+                >
+                  Get Haven+
+                </Link>
+                <p className="text-center text-sm mt-3 text-slate-500">Best for busy executives</p>
+              </div>
+
+              {/* Haven Estate */}
+              <div className="relative bg-gradient-to-br from-forest-900 to-forest-950 rounded-2xl p-8 text-white">
+                <div className="absolute top-4 right-4">
+                  <span className="px-3 py-1 bg-gold-500/20 text-gold-400 text-xs font-medium rounded-full border border-gold-500/30">
+                    White Glove
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 mb-1">
+                  <Building2 className="w-6 h-6 text-gold-400" />
+                  <h3 className="text-2xl font-bold text-white">Haven Estate</h3>
+                </div>
+                <p className="text-white/60">For estates & multiple properties</p>
+
+                <div className="mt-6">
+                  <span className="text-4xl font-bold">$3,499+</span>
+                  <span className="text-white/60">/month</span>
+                </div>
+
+                <p className="mt-6 text-white/80 text-lg leading-relaxed max-w-2xl">
+                  Your personal estate manager anticipating needs, coordinating staff, and ensuring every detail of your properties is handled with discretion and excellence.
+                </p>
+
+                <div className="mt-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6">
+                  <ul className="space-y-3 text-white/70">
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-gold-400" />
+                      Multiple properties supported
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-gold-400" />
+                      Priority 24/7 concierge access
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <Check className="w-4 h-4 text-gold-400" />
+                      Custom service agreements
+                    </li>
+                  </ul>
+
+                  <Link
+                    href="/contact"
+                    className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-gold-500 hover:bg-gold-400 text-forest-950 font-semibold rounded-xl transition-colors"
+                  >
+                    Contact Us
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* How Billing Works */}
@@ -897,7 +934,7 @@ function PricingSection() {
             <div className="bg-white rounded-xl p-4 border border-amber-100">
               <p className="text-sm font-medium text-slate-600 mb-1">Haven Membership</p>
               <p className="text-2xl font-bold text-emerald-600">$349–$3,499</p>
-              <p className="text-xs text-slate-500 mt-1">Your manager, platform, handyman visits</p>
+              <p className="text-xs text-slate-500 mt-1">Your manager, platform, home profile & more</p>
             </div>
             <div className="bg-white rounded-xl p-4 border border-amber-100">
               <p className="text-sm font-medium text-slate-600 mb-1">Your Household Bills</p>
@@ -906,7 +943,7 @@ function PricingSection() {
             </div>
           </div>
           <p className="text-sm text-slate-600">
-            <strong>Example:</strong> $3,200 in monthly bills + $749 Haven = <strong>$3,949 total</strong>. One payment to Haven. We pay everyone else.
+            <strong>Example:</strong> $3,200 in monthly bills + $349 Essentials = <strong>$3,549 total</strong>. One payment to Haven. We pay everyone else.
           </p>
         </div>
 

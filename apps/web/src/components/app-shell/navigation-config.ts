@@ -46,6 +46,7 @@ export const sidebarNavigation: NavSection[] = [
   {
     title: 'Your Home',
     items: [
+      { name: 'Your Home', href: '/app/home', icon: Home },
       { name: 'Family', href: '/app/family', icon: UserCircle },
       { name: 'Projects', href: '/app/projects', icon: Wrench },
       { name: 'Maintenance', href: '/app/maintenance', icon: ClipboardList },
