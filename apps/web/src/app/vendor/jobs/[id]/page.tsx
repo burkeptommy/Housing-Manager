@@ -34,8 +34,8 @@ const mockJobDetail: VendorJobDetail = {
       createdAt: '2024-12-16T10:00:00Z',
       author: {
         id: 'manager-1',
-        firstName: 'Steve',
-        lastName: 'Manager',
+        firstName: 'Sarah',
+        lastName: 'Harrison',
       },
     },
   ],

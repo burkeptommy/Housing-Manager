@@ -1888,6 +1888,135 @@ async function main() {
   console.log(`✅ Created ASSIGNED work order: ${assignedWorkOrder.title}`);
 
   // ============================================================================
+  // HANDYMAN (CONCIERGE) WORK ORDERS - Assigned to Mike Rodriguez
+  // These are small tasks included in the monthly concierge service
+  // ============================================================================
+
+  console.log('');
+  console.log('🔧 Setting up Handyman work orders for Mike...');
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // Handyman Task 1: ASSIGNED - Smoke detector batteries (today)
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-handyman-smoke-detectors' },
+    update: {},
+    create: {
+      id: 'wo-handyman-smoke-detectors',
+      householdId: demoHousehold.id,
+      createdByUserId: managerSarah.id,
+      handymanId: handymanMike.id,
+      title: 'Replace smoke detector batteries',
+      description: 'Replace batteries in all 6 smoke detectors throughout the house. Test each detector after replacement.',
+      status: WorkOrderStatus.ASSIGNED,
+      isConciergeRequest: true,
+      billingType: 'INCLUSIVE',
+      scheduledStart: new Date(today.getTime() + 9 * 60 * 60 * 1000), // Today at 9am
+      scheduledEnd: new Date(today.getTime() + 10 * 60 * 60 * 1000), // 1 hour
+      estimatedCost: 0, // Included in monthly fee
+      serviceArea: 'Greenwich',
+    },
+  });
+  console.log('  ✓ Created ASSIGNED handyman work order: Smoke detector batteries');
+
+  // Handyman Task 2: ASSIGNED - Squeaky door (today)
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-handyman-squeaky-door' },
+    update: {},
+    create: {
+      id: 'wo-handyman-squeaky-door',
+      householdId: demoHousehold.id,
+      createdByUserId: managerSarah.id,
+      handymanId: handymanMike.id,
+      title: 'Fix squeaky door - master bedroom',
+      description: 'Master bedroom door squeaks when opening. Try WD-40 first, if that does not work may need to adjust hinges.',
+      status: WorkOrderStatus.ASSIGNED,
+      isConciergeRequest: true,
+      billingType: 'INCLUSIVE',
+      scheduledStart: new Date(today.getTime() + 10.5 * 60 * 60 * 1000), // Today at 10:30am
+      scheduledEnd: new Date(today.getTime() + 11 * 60 * 60 * 1000), // 30 min
+      estimatedCost: 0,
+      serviceArea: 'Greenwich',
+    },
+  });
+  console.log('  ✓ Created ASSIGNED handyman work order: Squeaky door');
+
+  // Handyman Task 3: IN_PROGRESS - Cabinet handles (currently working on)
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-handyman-cabinet-handles' },
+    update: {},
+    create: {
+      id: 'wo-handyman-cabinet-handles',
+      householdId: demoHousehold.id,
+      createdByUserId: managerSarah.id,
+      handymanId: handymanMike.id,
+      title: 'Tighten loose cabinet handles - kitchen',
+      description: 'Several cabinet handles in the kitchen are loose. Tighten all handles and check for any that need replacement.',
+      status: WorkOrderStatus.IN_PROGRESS,
+      isConciergeRequest: true,
+      billingType: 'INCLUSIVE',
+      scheduledStart: new Date(today.getTime() + 11.5 * 60 * 60 * 1000), // Today at 11:30am
+      scheduledEnd: new Date(today.getTime() + 12.5 * 60 * 60 * 1000), // 1 hour
+      checkInAt: new Date(today.getTime() + 11.5 * 60 * 60 * 1000), // Checked in at start
+      checkInLatitude: 41.0534,
+      checkInLongitude: -73.5387,
+      estimatedCost: 0,
+      serviceArea: 'Greenwich',
+    },
+  });
+  console.log('  ✓ Created IN_PROGRESS handyman work order: Cabinet handles');
+
+  // Handyman Task 4: COMPLETED - Filter change (yesterday)
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-handyman-hvac-filter' },
+    update: {},
+    create: {
+      id: 'wo-handyman-hvac-filter',
+      householdId: demoHousehold.id,
+      createdByUserId: managerSarah.id,
+      handymanId: handymanMike.id,
+      title: 'Replace HVAC filter',
+      description: 'Quarterly HVAC filter replacement. Use 20x25x4 MERV 11 filters.',
+      status: WorkOrderStatus.COMPLETED,
+      isConciergeRequest: true,
+      billingType: 'INCLUSIVE',
+      scheduledStart: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+      scheduledEnd: new Date(Date.now() - 24 * 60 * 60 * 1000 + 30 * 60 * 1000),
+      checkInAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      checkInLatitude: 41.0534,
+      checkInLongitude: -73.5387,
+      checkOutAt: new Date(Date.now() - 24 * 60 * 60 * 1000 + 25 * 60 * 1000),
+      completedAt: new Date(Date.now() - 24 * 60 * 60 * 1000 + 25 * 60 * 1000),
+      estimatedCost: 0,
+      serviceArea: 'Greenwich',
+    },
+  });
+  console.log('  ✓ Created COMPLETED handyman work order: HVAC filter');
+
+  // Handyman Task 5: ASSIGNED - Next week task
+  await prisma.workOrder.upsert({
+    where: { id: 'wo-handyman-weatherstrip' },
+    update: {},
+    create: {
+      id: 'wo-handyman-weatherstrip',
+      householdId: demoHousehold.id,
+      createdByUserId: managerSarah.id,
+      handymanId: handymanMike.id,
+      title: 'Replace weatherstripping - front door',
+      description: 'Weatherstripping on front door is worn. Cold air leaking in. Replace with new foam weatherstrip.',
+      status: WorkOrderStatus.ASSIGNED,
+      isConciergeRequest: true,
+      billingType: 'INCLUSIVE',
+      scheduledStart: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000), // 5 days from now
+      scheduledEnd: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000 + 45 * 60 * 1000),
+      estimatedCost: 0,
+      serviceArea: 'Greenwich',
+    },
+  });
+  console.log('  ✓ Created ASSIGNED handyman work order: Weatherstripping (next week)');
+
+  // ============================================================================
   // TRAVEL CONCIERGE DEMO DATA
   // ============================================================================
 

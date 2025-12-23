@@ -532,9 +532,9 @@ function LogExpenseModal({
       } : null,
       manager: {
         id: 'current-user',
-        firstName: 'Steve',
-        lastName: 'Manager',
-        email: 'steve@haven.app',
+        firstName: 'Sarah',
+        lastName: 'Harrison',
+        email: 'sarah@haven.app',
       },
       household: {
         id: householdId,

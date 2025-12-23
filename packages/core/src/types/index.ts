@@ -1956,17 +1956,26 @@ export interface HandymanInfo {
   email: string;
 }
 
+export interface HandymanTask {
+  id: string;
+  title: string;
+  householdName: string;
+  householdAddress: string;
+  address?: string | null;  // Alias for householdAddress (backward compat)
+  scheduledStart: string | null;
+  status: string;
+  billingType: 'INCLUSIVE' | 'BILLABLE' | 'QUOTED';
+  estimatedMinutes: number;
+  taskType?: string;
+  checkedInAt?: string;
+  location?: { lat: number; lng: number };
+}
+
 export interface HandymanDashboard {
   handymanId: string;
   handymanName: string;
-  todaysTasks: {
-    id: string;
-    title: string;
-    householdName: string;
-    scheduledStart: string | null;
-    status: string;
-    address: string | null;
-  }[];
+  todaysTasks: HandymanTask[];
+  activeTask: HandymanTask | null;
   upcomingTasks: {
     id: string;
     title: string;
@@ -1977,14 +1986,20 @@ export interface HandymanDashboard {
   assignedHouseholds: {
     id: string;
     name: string;
-    address: string | null;
-    monthlyVisitDay: number | null;
-    conciergeEnabled: boolean;
+    address: string;
+    nextVisitDate: string;
+    monthlyVisitDay?: number | null;
+    conciergeEnabled?: boolean;
   }[];
   stats: {
+    completedToday: number;
+    completedThisWeek: number;
     completedThisMonth: number;
+    hoursLoggedToday: number;
+    hoursThisWeek: number;
     hoursThisMonth: number;
     pendingTasks: number;
+    assignedHouseholds: number;
   };
 }
 

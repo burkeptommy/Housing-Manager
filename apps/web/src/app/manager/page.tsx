@@ -392,7 +392,7 @@ export default function ManagerDashboardPage() {
             <div className="flex items-center gap-2">
               <button className="text-xs text-slate-500 hover:text-slate-700 font-medium">Add Block</button>
               <span className="text-slate-300">|</span>
-              <Link href="/manager/schedule" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
+              <Link href="/manager/calendar" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
                 View Week
               </Link>
             </div>

@@ -19,10 +19,12 @@ interface ScheduleDay {
   tasks: ScheduledTask[];
 }
 
+const getDateString = (d: Date): string => d.toISOString().split('T')[0]!;
+
 // Mock data
 const mockSchedule: ScheduleDay[] = [
   {
-    date: new Date().toISOString().split('T')[0],
+    date: getDateString(new Date()),
     tasks: [
       {
         id: 'wo-101',
@@ -49,7 +51,7 @@ const mockSchedule: ScheduleDay[] = [
     ],
   },
   {
-    date: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    date: getDateString(new Date(Date.now() + 24 * 60 * 60 * 1000)),
     tasks: [
       {
         id: 'wo-103',
@@ -76,7 +78,7 @@ const mockSchedule: ScheduleDay[] = [
     ],
   },
   {
-    date: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+    date: getDateString(new Date(Date.now() + 2 * 24 * 60 * 60 * 1000)),
     tasks: [
       {
         id: 'wo-105',
@@ -102,7 +104,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function HandymanSchedulePage() {
   const [schedule, setSchedule] = useState<ScheduleDay[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState<string>(getDateString(new Date()));
 
   const loadSchedule = useCallback(async () => {
     setIsLoading(true);
@@ -121,9 +123,9 @@ export default function HandymanSchedulePage() {
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
 
-    if (dateStr === today.toISOString().split('T')[0]) {
+    if (dateStr === getDateString(today)) {
       return 'Today';
-    } else if (dateStr === tomorrow.toISOString().split('T')[0]) {
+    } else if (dateStr === getDateString(tomorrow)) {
       return 'Tomorrow';
     }
     return date.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' });
@@ -137,13 +139,13 @@ export default function HandymanSchedulePage() {
   };
 
   // Generate week dates for date picker
-  const getWeekDates = () => {
-    const dates = [];
+  const getWeekDates = (): string[] => {
+    const dates: string[] = [];
     const today = new Date();
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
       date.setDate(date.getDate() + i);
-      dates.push(date.toISOString().split('T')[0]);
+      dates.push(getDateString(date));
     }
     return dates;
   };
@@ -172,7 +174,7 @@ export default function HandymanSchedulePage() {
           const dateObj = new Date(date);
           const hasTasksday = schedule.some(d => d.date === date);
           const isSelected = date === selectedDate;
-          const isToday = date === new Date().toISOString().split('T')[0];
+          const isToday = date === getDateString(new Date());
 
           return (
             <button

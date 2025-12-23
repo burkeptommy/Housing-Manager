@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import type { HandymanDashboard } from '@haven/core';
+import type { HandymanDashboard, HandymanTask } from '@haven/core';
+import { getApiClient } from '@/lib/api';
 
 // Status colors for work orders
 const STATUS_COLORS: Record<string, string> = {
@@ -13,65 +14,11 @@ const STATUS_COLORS: Record<string, string> = {
   VERIFIED: 'bg-emerald-100 text-emerald-700',
 };
 
-// Mock data for demo
-const mockDashboard: HandymanDashboard = {
-  handymanId: 'hm-steve',
-  handymanName: 'Steve Martinez',
-  todaysTasks: [
-    {
-      id: 'wo-101',
-      title: 'Change HVAC Filter',
-      householdName: 'The Johnson Residence',
-      householdAddress: '123 Maple Street, Beverly Hills',
-      status: 'ASSIGNED',
-      billingType: 'INCLUSIVE',
-      scheduledStart: new Date(Date.now() + 2 * 60 * 60 * 1000).toISOString(),
-      estimatedMinutes: 30,
-      taskType: 'FILTER_CHANGE',
-    },
-    {
-      id: 'wo-102',
-      title: 'Fix Loose Cabinet Hinge',
-      householdName: 'The Johnson Residence',
-      householdAddress: '123 Maple Street, Beverly Hills',
-      status: 'ASSIGNED',
-      billingType: 'INCLUSIVE',
-      scheduledStart: new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString(),
-      estimatedMinutes: 20,
-      taskType: 'LOOSE_HINGE',
-    },
-    {
-      id: 'wo-103',
-      title: 'Replace Light Bulbs (High Ceiling)',
-      householdName: 'Smith Family Home',
-      householdAddress: '456 Oak Avenue, Malibu',
-      status: 'ASSIGNED',
-      billingType: 'INCLUSIVE',
-      scheduledStart: new Date(Date.now() + 5 * 60 * 60 * 1000).toISOString(),
-      estimatedMinutes: 45,
-      taskType: 'LIGHT_BULB',
-    },
-  ],
-  activeTask: null,
-  stats: {
-    completedToday: 2,
-    completedThisWeek: 12,
-    hoursLoggedToday: 2.5,
-    hoursLoggedThisWeek: 18.5,
-    assignedHouseholds: 8,
-    pendingTasks: 5,
-  },
-  assignedHouseholds: [
-    { id: 'h-johnson', name: 'The Johnson Residence', address: '123 Maple Street, Beverly Hills', nextVisitDate: '2024-12-20' },
-    { id: 'h-smith', name: 'Smith Family Home', address: '456 Oak Avenue, Malibu', nextVisitDate: '2024-12-22' },
-    { id: 'h-wilson', name: 'Wilson Estate', address: '789 Palm Drive, Pacific Palisades', nextVisitDate: '2024-12-25' },
-  ],
-};
-
 export default function HandymanDashboardPage() {
   const [dashboard, setDashboard] = useState<HandymanDashboard | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTask, setActiveTask] = useState<HandymanDashboard['activeTask']>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [activeTask, setActiveTask] = useState<HandymanTask | null>(null);
   const [checkInTime, setCheckInTime] = useState<Date | null>(null);
   const [isCheckingIn, setIsCheckingIn] = useState(false);
   const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -81,10 +28,24 @@ export default function HandymanDashboardPage() {
 
   const loadDashboard = useCallback(async () => {
     setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 500));
-    setDashboard(mockDashboard);
-    setIsLoading(false);
+    setError(null);
+    try {
+      const api = getApiClient();
+      const data = await api.getHandymanDashboard();
+      setDashboard(data);
+      // If there's an active task from the API, set it
+      if (data.activeTask) {
+        setActiveTask(data.activeTask);
+        if (data.activeTask.checkedInAt) {
+          setCheckInTime(new Date(data.activeTask.checkedInAt));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to load handyman dashboard:', err);
+      setError('Failed to load dashboard. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -98,78 +59,114 @@ export default function HandymanDashboardPage() {
     if ('geolocation' in navigator) {
       navigator.geolocation.getCurrentPosition(
         async (position) => {
-          // Simulate API call with location
-          await new Promise((resolve) => setTimeout(resolve, 1000));
-
-          const task = dashboard?.todaysTasks.find(t => t.id === taskId);
-          if (task) {
-            setActiveTask({
-              ...task,
-              status: 'IN_PROGRESS',
-              checkedInAt: new Date().toISOString(),
-              location: {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              },
+          try {
+            const api = getApiClient();
+            await api.handymanCheckIn({
+              workOrderId: taskId,
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
             });
-            setCheckInTime(new Date());
-            // Remove from today's tasks
-            setDashboard(prev => prev ? {
-              ...prev,
-              todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
-            } : null);
+
+            const task = dashboard?.todaysTasks.find(t => t.id === taskId);
+            if (task) {
+              setActiveTask({
+                ...task,
+                status: 'IN_PROGRESS',
+                checkedInAt: new Date().toISOString(),
+                location: {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                },
+              });
+              setCheckInTime(new Date());
+              // Remove from today's tasks
+              setDashboard(prev => prev ? {
+                ...prev,
+                todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
+              } : null);
+            }
+          } catch (err) {
+            console.error('Check-in failed:', err);
+            // Still update UI optimistically on error for demo
+            const task = dashboard?.todaysTasks.find(t => t.id === taskId);
+            if (task) {
+              setActiveTask({
+                ...task,
+                status: 'IN_PROGRESS',
+                checkedInAt: new Date().toISOString(),
+                location: {
+                  lat: position.coords.latitude,
+                  lng: position.coords.longitude,
+                },
+              });
+              setCheckInTime(new Date());
+              setDashboard(prev => prev ? {
+                ...prev,
+                todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
+              } : null);
+            }
           }
           setIsCheckingIn(false);
         },
-        (error) => {
-          console.error('Geolocation error:', error);
+        (geoError) => {
+          console.error('Geolocation error:', geoError);
           // Still allow check-in without location
-          const task = dashboard?.todaysTasks.find(t => t.id === taskId);
-          if (task) {
-            setActiveTask({
-              ...task,
-              status: 'IN_PROGRESS',
-              checkedInAt: new Date().toISOString(),
-            });
-            setCheckInTime(new Date());
-            setDashboard(prev => prev ? {
-              ...prev,
-              todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
-            } : null);
-          }
-          setIsCheckingIn(false);
+          handleCheckInWithoutLocation(taskId);
         }
       );
     } else {
       // Fallback without geolocation
-      const task = dashboard?.todaysTasks.find(t => t.id === taskId);
-      if (task) {
-        setActiveTask({
-          ...task,
-          status: 'IN_PROGRESS',
-          checkedInAt: new Date().toISOString(),
-        });
-        setCheckInTime(new Date());
-        setDashboard(prev => prev ? {
-          ...prev,
-          todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
-        } : null);
-      }
-      setIsCheckingIn(false);
+      handleCheckInWithoutLocation(taskId);
     }
+  };
+
+  const handleCheckInWithoutLocation = async (taskId: string) => {
+    try {
+      const api = getApiClient();
+      await api.handymanCheckIn({
+        workOrderId: taskId,
+        latitude: 0,
+        longitude: 0,
+      });
+    } catch (err) {
+      console.error('Check-in failed:', err);
+    }
+
+    const task = dashboard?.todaysTasks.find(t => t.id === taskId);
+    if (task) {
+      setActiveTask({
+        ...task,
+        status: 'IN_PROGRESS',
+        checkedInAt: new Date().toISOString(),
+      });
+      setCheckInTime(new Date());
+      setDashboard(prev => prev ? {
+        ...prev,
+        todaysTasks: prev.todaysTasks.filter(t => t.id !== taskId),
+      } : null);
+    }
+    setIsCheckingIn(false);
   };
 
   const handleCheckOut = async () => {
     if (!activeTask) return;
     setIsCheckingOut(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    // Update stats
     const hoursWorked = checkOutHours ? parseFloat(checkOutHours) :
       checkInTime ? (Date.now() - checkInTime.getTime()) / (1000 * 60 * 60) : 0;
 
+    try {
+      const api = getApiClient();
+      await api.handymanCheckOut({
+        workOrderId: activeTask.id,
+        hoursWorked,
+        notes: checkOutNotes || undefined,
+      });
+    } catch (err) {
+      console.error('Check-out failed:', err);
+    }
+
+    // Update stats
     setDashboard(prev => prev ? {
       ...prev,
       stats: {
@@ -213,10 +210,24 @@ export default function HandymanDashboardPage() {
     return () => clearInterval(interval);
   }, [activeTask]);
 
-  if (isLoading || !dashboard) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+      </div>
+    );
+  }
+
+  if (error || !dashboard) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64">
+        <p className="text-red-600 mb-4">{error || 'Failed to load dashboard'}</p>
+        <button
+          onClick={loadDashboard}
+          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
+        >
+          Retry
+        </button>
       </div>
     );
   }
