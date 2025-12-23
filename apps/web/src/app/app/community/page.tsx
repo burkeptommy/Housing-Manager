@@ -35,6 +35,7 @@ import {
 } from 'lucide-react';
 import { getDemoImage, getVendorWorkImage } from '@/lib/imageUtils';
 import { getVendorAvatar } from '@/lib/avatars';
+import { InitialsAvatar, VendorAvatar as VendorAvatarComponent } from '@/components/ui/avatar';
 
 // ============================================================================
 // TYPES
@@ -954,67 +955,55 @@ export default function VendorDiscoveryPage() {
 // ============================================================================
 
 function VendorPopup({ vendor }: { vendor: Vendor }) {
-  // Determine if name is long (needs smaller font)
-  const isLongName = vendor.name.length > 20;
-
   return (
-    <div className="w-80 p-0">
-      <div className="bg-white rounded-xl overflow-hidden shadow-xl">
-        {/* Header with avatar and name */}
-        <div className="p-4">
+    <div className="w-[280px] max-w-[calc(100vw-48px)]">
+      <div className="bg-white rounded-xl overflow-hidden shadow-lg">
+        {/* Header */}
+        <div className="p-3">
           <div className="flex items-start gap-3">
-            <img
-              src={getVendorAvatar(vendor.name)}
-              alt={vendor.name}
-              className="w-12 h-12 rounded-xl flex-shrink-0"
-            />
+            <VendorAvatarComponent name={vendor.name} size="lg" />
             <div className="flex-1 min-w-0">
-              {/* Name with dynamic sizing */}
-              <h3 className={`font-semibold text-warm-900 leading-tight ${
-                isLongName ? 'text-sm' : 'text-base'
-              }`}>
+              <h3 className="font-semibold text-warm-900 text-sm leading-tight break-words">
                 {vendor.name}
               </h3>
-
-              {/* Haven Trusted badge */}
               {vendor.havenTrusted && (
-                <span className="inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full">
-                  <Shield className="w-3 h-3" />
-                  Haven Trusted
+                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded">
+                  <Shield className="w-3 h-3 flex-shrink-0" />
+                  Trusted
                 </span>
               )}
             </div>
           </div>
 
-          {/* Rating row */}
-          <div className="mt-3 flex items-center gap-2 text-sm">
-            <Star className="w-4 h-4 text-amber-500 fill-current" />
+          {/* Rating */}
+          <div className="mt-2 flex items-center gap-1.5 text-xs">
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />
             <span className="font-medium text-warm-900">{vendor.rating}</span>
             <span className="text-warm-400">•</span>
             <span className="text-warm-500">{vendor.reviewCount} reviews</span>
           </div>
 
-          {/* Stats row */}
-          <div className="mt-2 flex items-center gap-4 text-sm text-warm-600">
-            <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-warm-400" />
+          {/* Stats */}
+          <div className="mt-2 flex items-center gap-3 text-xs text-warm-600">
+            <div className="flex items-center gap-1">
+              <Users className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
               <span>{vendor.neighborsUsed} neighbors</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-warm-400" />
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3.5 h-3.5 text-warm-400 flex-shrink-0" />
               <span>{vendor.distance} mi</span>
             </div>
           </div>
         </div>
 
-        {/* Action buttons - contained in card */}
-        <div className="px-4 pb-4 flex gap-2">
-          <button className="flex-1 py-2.5 bg-haven-600 text-white text-sm font-medium rounded-xl hover:bg-haven-700 transition-colors">
+        {/* Buttons - INSIDE card */}
+        <div className="px-3 pb-3 flex gap-2">
+          <button className="flex-1 py-2 bg-haven-600 text-white text-xs font-medium rounded-lg hover:bg-haven-700 transition-colors">
             Request Quote
           </button>
           <a
             href={`tel:${vendor.phone}`}
-            className="px-4 py-2.5 border border-warm-200 rounded-xl hover:bg-warm-50 transition-colors flex items-center justify-center"
+            className="px-3 py-2 border border-warm-200 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center flex-shrink-0"
           >
             <Phone className="w-4 h-4 text-warm-600" />
           </a>
@@ -1036,34 +1025,30 @@ function VendorListItem({
   return (
     <div
       onClick={onClick}
-      className={`p-4 cursor-pointer transition-colors ${
+      className={`p-3 cursor-pointer transition-colors ${
         isSelected ? 'bg-haven-50' : 'hover:bg-warm-50'
       }`}
     >
       <div className="flex gap-3">
-        <img
-          src={getVendorAvatar(vendor.name)}
-          alt={vendor.name}
-          className="w-14 h-14 rounded-lg object-cover"
-        />
+        <VendorAvatarComponent name={vendor.name} size="lg" className="rounded-lg" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-warm-900 truncate">{vendor.name}</h3>
+            <h3 className="font-medium text-warm-900 text-sm truncate">{vendor.name}</h3>
             {vendor.havenTrusted && (
-              <Shield className="w-4 h-4 text-haven-600 flex-shrink-0" />
+              <Shield className="w-3.5 h-3.5 text-haven-600 flex-shrink-0" />
             )}
           </div>
-          <div className="flex items-center gap-2 text-sm text-warm-500">
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-current" />
+          <div className="flex items-center gap-1.5 text-xs text-warm-500">
+            <Star className="w-3 h-3 text-amber-500 fill-current flex-shrink-0" />
             <span>{vendor.rating}</span>
-            <span>•</span>
+            <span className="text-warm-300">•</span>
             <span>{vendor.priceTier}</span>
-            <span>•</span>
+            <span className="text-warm-300">•</span>
             <span>{vendor.distance} mi</span>
           </div>
-          <div className="mt-1 flex items-center gap-1 text-xs text-haven-600">
-            <Users className="w-3.5 h-3.5" />
-            <span>{vendor.neighborsUsed} neighbors used this pro</span>
+          <div className="mt-0.5 flex items-center gap-1 text-xs text-haven-600">
+            <Users className="w-3 h-3 flex-shrink-0" />
+            <span className="truncate">{vendor.neighborsUsed} neighbors</span>
           </div>
         </div>
       </div>
@@ -1072,21 +1057,20 @@ function VendorListItem({
 }
 
 function VendorCard({ vendor }: { vendor: Vendor }) {
-  const recentProject = vendor.recentProjects[0];
-
   return (
     <div className="bg-white rounded-xl border border-warm-200 overflow-hidden hover:shadow-lg transition-shadow">
-      {/* Cover/Project Image */}
-      <div className="relative h-40">
+      {/* Cover Image */}
+      <div className="relative h-32 sm:h-40">
         <img
-          src={recentProject?.afterImage || vendor.coverUrl}
+          src={vendor.coverUrl}
           alt={vendor.name}
           className="w-full h-full object-cover"
         />
         {vendor.havenTrusted && (
           <div className="absolute top-2 left-2 px-2 py-1 bg-haven-600 text-white text-xs font-medium rounded-full flex items-center gap-1">
-            <Shield className="w-3 h-3" />
-            Haven Trusted
+            <Shield className="w-3 h-3 flex-shrink-0" />
+            <span className="hidden sm:inline">Haven Trusted</span>
+            <span className="sm:hidden">Trusted</span>
           </div>
         )}
         <div className="absolute bottom-2 right-2 px-2 py-1 bg-black/60 text-white text-xs rounded-full">
@@ -1095,54 +1079,55 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
       </div>
 
       {/* Content */}
-      <div className="p-4">
-        <div className="flex items-start gap-3">
-          <img
-            src={getVendorAvatar(vendor.name)}
-            alt={vendor.name}
-            className="w-12 h-12 rounded-lg object-cover"
-          />
-          <div className="flex-1">
-            <h3 className="font-semibold text-warm-900 leading-tight">{vendor.name}</h3>
-            <div className="flex items-center gap-2 text-sm text-warm-500">
-              <Star className="w-4 h-4 text-amber-500 fill-current flex-shrink-0" />
+      <div className="p-3">
+        <div className="flex items-start gap-2">
+          <VendorAvatarComponent name={vendor.name} size="lg" className="rounded-lg" />
+          <div className="flex-1 min-w-0">
+            <h3 className="font-semibold text-warm-900 text-sm truncate">{vendor.name}</h3>
+            <div className="flex items-center gap-1.5 text-xs text-warm-500">
+              <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />
               <span>{vendor.rating}</span>
-              <span>({vendor.reviewCount})</span>
+              <span className="text-warm-300">({vendor.reviewCount})</span>
             </div>
           </div>
         </div>
 
         {/* Stats */}
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-          <div className="py-2 bg-warm-50 rounded-lg">
-            <div className="text-lg font-semibold text-warm-900">{vendor.neighborsUsed}</div>
+        <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
+          <div className="py-1.5 bg-warm-50 rounded-lg">
+            <div className="text-sm font-semibold text-warm-900">{vendor.neighborsUsed}</div>
             <div className="text-xs text-warm-500">Neighbors</div>
           </div>
-          <div className="py-2 bg-warm-50 rounded-lg">
-            <div className="text-lg font-semibold text-warm-900">{vendor.totalProjects}</div>
+          <div className="py-1.5 bg-warm-50 rounded-lg">
+            <div className="text-sm font-semibold text-warm-900">{vendor.totalProjects}</div>
             <div className="text-xs text-warm-500">Projects</div>
           </div>
-          <div className="py-2 bg-warm-50 rounded-lg">
-            <div className="text-lg font-semibold text-warm-900">{vendor.onTimeRate}%</div>
+          <div className="py-1.5 bg-warm-50 rounded-lg">
+            <div className="text-sm font-semibold text-warm-900">{vendor.onTimeRate}%</div>
             <div className="text-xs text-warm-500">On Time</div>
           </div>
         </div>
 
         {/* Specialties */}
-        <div className="mt-3 flex flex-wrap gap-1">
-          {vendor.specialties.slice(0, 3).map(specialty => (
-            <span key={specialty} className="px-2 py-1 bg-warm-100 text-warm-600 text-xs rounded-full">
+        <div className="mt-2 flex flex-wrap gap-1">
+          {vendor.specialties.slice(0, 2).map(specialty => (
+            <span key={specialty} className="px-2 py-0.5 bg-warm-100 text-warm-600 text-xs rounded-full truncate max-w-[100px]">
               {specialty}
             </span>
           ))}
+          {vendor.specialties.length > 2 && (
+            <span className="px-2 py-0.5 bg-warm-100 text-warm-400 text-xs rounded-full">
+              +{vendor.specialties.length - 2}
+            </span>
+          )}
         </div>
 
         {/* Actions */}
-        <div className="mt-4 flex gap-2">
-          <button className="flex-1 px-3 py-2 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700">
+        <div className="mt-3 flex gap-2">
+          <button className="flex-1 py-2 bg-haven-600 text-white text-xs font-medium rounded-lg hover:bg-haven-700">
             Request Quote
           </button>
-          <button className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50">
+          <button className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50 flex-shrink-0">
             <Heart className="w-4 h-4 text-warm-600" />
           </button>
         </div>

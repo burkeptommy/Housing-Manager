@@ -88,3 +88,89 @@ export function AvatarGroup({
     </div>
   );
 }
+
+// ============================================================================
+// INITIALS AVATARS - Consistent colored circles with initials
+// ============================================================================
+
+type InitialsSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
+type InitialsVariant = 'emerald' | 'blue' | 'purple' | 'amber' | 'rose' | 'haven' | 'warm';
+
+interface InitialsAvatarProps {
+  name: string;
+  size?: InitialsSize;
+  variant?: InitialsVariant;
+  className?: string;
+}
+
+const initialsSizeClasses: Record<InitialsSize, string> = {
+  xs: 'w-6 h-6 text-xs',
+  sm: 'w-8 h-8 text-xs',
+  md: 'w-10 h-10 text-sm',
+  lg: 'w-12 h-12 text-base',
+  xl: 'w-14 h-14 text-lg',
+};
+
+const initialsVariantClasses: Record<InitialsVariant, string> = {
+  emerald: 'bg-emerald-100 text-emerald-600',
+  blue: 'bg-blue-100 text-blue-600',
+  purple: 'bg-purple-100 text-purple-600',
+  amber: 'bg-amber-100 text-amber-600',
+  rose: 'bg-rose-100 text-rose-600',
+  haven: 'bg-haven-100 text-haven-600',
+  warm: 'bg-warm-100 text-warm-600',
+};
+
+function getInitialsFromName(name: string): string {
+  return name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+// Deterministic color based on name
+function getVariantFromName(name: string): InitialsVariant {
+  const variants: InitialsVariant[] = ['emerald', 'blue', 'purple', 'amber', 'rose', 'haven'];
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return variants[Math.abs(hash) % variants.length];
+}
+
+export function InitialsAvatar({
+  name,
+  size = 'md',
+  variant,
+  className = ''
+}: InitialsAvatarProps) {
+  const initials = getInitialsFromName(name);
+  const colorVariant = variant || getVariantFromName(name);
+
+  return (
+    <div
+      className={`rounded-full flex items-center justify-center font-semibold flex-shrink-0 ${initialsSizeClasses[size]} ${initialsVariantClasses[colorVariant]} ${className}`}
+    >
+      {initials}
+    </div>
+  );
+}
+
+// For vendors - use a slightly different style with rounded corners
+export function VendorAvatar({
+  name,
+  size = 'md',
+  className = ''
+}: Omit<InitialsAvatarProps, 'variant'>) {
+  const initials = getInitialsFromName(name);
+
+  return (
+    <div
+      className={`rounded-xl flex items-center justify-center font-semibold flex-shrink-0 bg-warm-100 text-warm-600 ${initialsSizeClasses[size]} ${className}`}
+    >
+      {initials}
+    </div>
+  );
+}

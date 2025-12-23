@@ -811,9 +811,32 @@ export default function FamilyPage() {
           }
         });
 
-        if (newAdults.length > 0) setAdults(newAdults);
-        if (newChildren.length > 0) setChildren(newChildren);
-        if (newStaff.length > 0) setStaff(newStaff);
+        // MERGE with mock data instead of replacing completely
+        // This ensures demo data (like Alice) always shows
+        if (newAdults.length > 0) {
+          const apiAdultIds = new Set(newAdults.map(a => a.id));
+          const mockAdultsToKeep = MOCK_ADULTS.filter(a => !apiAdultIds.has(a.id));
+          setAdults([...newAdults, ...mockAdultsToKeep]);
+        } else {
+          // If no API adults, use all mock adults
+          setAdults(MOCK_ADULTS);
+        }
+
+        if (newChildren.length > 0) {
+          const apiChildIds = new Set(newChildren.map(c => c.id));
+          const mockChildrenToKeep = MOCK_CHILDREN.filter(c => !apiChildIds.has(c.id));
+          setChildren([...newChildren, ...mockChildrenToKeep]);
+        } else {
+          setChildren(MOCK_CHILDREN);
+        }
+
+        if (newStaff.length > 0) {
+          const apiStaffIds = new Set(newStaff.map(s => s.id));
+          const mockStaffToKeep = MOCK_STAFF.filter(s => !apiStaffIds.has(s.id));
+          setStaff([...newStaff, ...mockStaffToKeep]);
+        } else {
+          setStaff(MOCK_STAFF);
+        }
       }
 
       if (petsResult.status === 'fulfilled' && petsResult.value.length > 0) {

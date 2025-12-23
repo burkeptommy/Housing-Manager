@@ -377,8 +377,44 @@ function CompetitorSection() {
           </p>
         </div>
 
-        {/* Main Comparison Table */}
-        <div className="bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mb-12">
+        {/* Mobile: Stacked Cards (shown on screens smaller than lg) */}
+        <div className="lg:hidden space-y-3 mb-12">
+          {[
+            { feature: 'Monthly Cost', them: '$375/month', us: '$349/month' },
+            { feature: 'Setup Fee', them: '$3K - $5K', us: '$0' },
+            { feature: 'First Year Total', them: '$7,500+', us: '$4,188' },
+            { feature: 'Contract', them: '12-mo prepaid', us: 'Month-to-month' },
+            { feature: 'Bills Paid For You', them: 'No', us: 'Yes, one payment', usBetter: true },
+            { feature: 'Vendor Coordination', them: 'No', us: 'Yes, we handle it', usBetter: true },
+            { feature: 'Handyman Visits', them: 'No', us: 'Yes, monthly', usBetter: true },
+            { feature: 'Home Manager', them: 'No', us: 'Yes, dedicated', usBetter: true },
+          ].map((row, idx) => (
+            <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <div className="bg-slate-100 px-4 py-2">
+                <span className="font-medium text-slate-700 text-sm">{row.feature}</span>
+              </div>
+              <div className="grid grid-cols-2">
+                <div className="p-3 border-r border-slate-100">
+                  <div className="text-xs text-slate-400 mb-1">Others</div>
+                  <div className="text-sm text-slate-500">
+                    {row.usBetter && <span className="text-red-500 mr-1">✗</span>}
+                    {row.them}
+                  </div>
+                </div>
+                <div className="p-3 bg-emerald-50/50">
+                  <div className="text-xs text-emerald-600 mb-1">Haven</div>
+                  <div className="text-sm font-medium text-emerald-700">
+                    {row.usBetter && <span className="text-green-500 mr-1">✓</span>}
+                    {row.us}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop: Traditional Table (shown on lg screens and up) */}
+        <div className="hidden lg:block bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mb-12">
           {/* Header */}
           <div className="grid grid-cols-3 divide-x divide-slate-200">
             <div className="p-6 bg-slate-50">

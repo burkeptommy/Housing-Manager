@@ -27,6 +27,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { getUserAvatar, getVendorAvatar } from '@/lib/avatars';
+import { InitialsAvatar, VendorAvatar } from '@/components/ui/avatar';
 
 // ============================================================================
 // TYPES
@@ -501,13 +502,13 @@ function ContactRow({ contact }: { contact: Contact }) {
     <div className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-warm-50 cursor-pointer transition-colors">
       {/* Avatar with online indicator */}
       <div className="relative">
-        <img
-          src={contact.avatar}
-          alt={contact.name}
-          className="w-12 h-12 rounded-full object-cover"
-        />
+        {contact.category === 'vendors' ? (
+          <VendorAvatar name={contact.name} size="lg" />
+        ) : (
+          <InitialsAvatar name={contact.name} size="lg" />
+        )}
         {contact.isOnline && (
-          <div className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-white" />
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
         )}
         {contact.isHavenTeam && (
           <div className="absolute -top-1 -right-1 w-5 h-5 bg-haven-600 rounded-full flex items-center justify-center">
@@ -580,13 +581,12 @@ function ProjectRow({ project }: { project: ProjectConversation }) {
       <div className="flex items-center gap-2 mb-3">
         <div className="flex -space-x-2">
           {project.participants.map((participant, idx) => (
-            <img
-              key={idx}
-              src={participant.avatar}
-              alt={participant.name}
-              className="w-7 h-7 rounded-full border-2 border-white"
-              title={`${participant.name} (${participant.role})`}
-            />
+            <div key={idx} className="border-2 border-white rounded-full">
+              <InitialsAvatar
+                name={participant.name}
+                size="sm"
+              />
+            </div>
           ))}
         </div>
         <span className="text-xs text-warm-500">
