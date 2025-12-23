@@ -20,7 +20,16 @@ type ImageCategory =
   | 'map'
   | 'vendor-portrait'
   | 'team'
-  | 'office';
+  | 'office'
+  | 'vendor-logo'
+  | 'plumbing-work'
+  | 'electrical-work'
+  | 'landscaping'
+  | 'hvac-work'
+  | 'painting-work'
+  | 'handyman-work'
+  | 'roofing-work'
+  | 'cleaning-work';
 
 // Curated Unsplash photo IDs for each category
 // Multiple options per category for variety
@@ -110,6 +119,57 @@ const imageLibrary: Record<ImageCategory, string[]> = {
     'photo-1497366216548-37526070297c', // Modern office
     'photo-1497215728101-856f4ea42174', // Office interior
     'photo-1604328698692-f76ea9498e76', // Contemporary workspace
+  ],
+  // Vendor-specific categories
+  'vendor-logo': [
+    'photo-1560250097-0b93528c311a', // Professional in hard hat
+    'photo-1507003211169-0a1dd7228f2d', // Tradesperson portrait
+    'photo-1519085360753-af0119f7cbe7', // Service professional
+    'photo-1472099645785-5658abf4ff4e', // Business owner
+    'photo-1500648767791-00dcc994a43e', // Friendly contractor
+    'photo-1556157382-97edd2d9e772', // Professional worker
+  ],
+  'plumbing-work': [
+    'photo-1585704032915-c3400ca199e7', // Plumbing repair
+    'photo-1607472586893-edb57bdc0e39', // Pipe work
+    'photo-1504328345606-18bbc8c9d7d1', // Bathroom plumbing
+    'photo-1558618666-fcd25c85cd64', // Modern bathroom
+  ],
+  'electrical-work': [
+    'photo-1621905251189-08b45d6a269e', // Electrical panel
+    'photo-1558618047-3c8c76ca7d13', // Wiring work
+    'photo-1555963966-b7ae5404b6ed', // Electrical installation
+  ],
+  'landscaping': [
+    'photo-1558904541-efa843a96f01', // Garden design
+    'photo-1416879595882-3373a0480b5b', // Beautiful garden
+    'photo-1585320806297-9794b3e4eeae', // Lawn care
+    'photo-1558618666-fcd25c85cd64', // Outdoor space
+  ],
+  'hvac-work': [
+    'photo-1585771724684-38269d6639fd', // HVAC unit
+    'photo-1631545806609-6578aa86e36c', // Air conditioning
+    'photo-1635048424329-a9bfb146d7aa', // Heating system
+  ],
+  'painting-work': [
+    'photo-1562259949-e8e7689d7828', // Painting supplies
+    'photo-1589939705384-5185137a7f0f', // House painting
+    'photo-1558618666-fcd25c85cd64', // Wall painting
+  ],
+  'handyman-work': [
+    'photo-1504307651254-35680f356dfd', // Tool work
+    'photo-1581578731548-c64695cc6952', // Home repair
+    'photo-1621905252507-b35492cc74b4', // Handyman tools
+  ],
+  'roofing-work': [
+    'photo-1632759145351-1d592919f522', // Roofing
+    'photo-1607400201889-565b1ee75f8e', // Roof repair
+    'photo-1558618666-fcd25c85cd64', // House roof
+  ],
+  'cleaning-work': [
+    'photo-1581578731548-c64695cc6952', // House cleaning
+    'photo-1563453392212-326f5e854473', // Cleaning service
+    'photo-1628177142898-93e36e4e3a50', // Professional cleaning
   ],
 };
 
@@ -232,6 +292,33 @@ export function getProjectImage(
   height: number = 800
 ): string {
   return getDemoImage(type, width, height, seed);
+}
+
+/**
+ * Get vendor work/cover image based on their trade
+ *
+ * @param trade - The vendor's trade type
+ * @param seed - Optional seed for consistency
+ */
+export function getVendorWorkImage(
+  trade: 'plumber' | 'electrician' | 'landscaper' | 'painter' | 'hvac' | 'handyman' | 'roofer' | 'cleaner' | string,
+  seed?: string,
+  width: number = 400,
+  height: number = 200
+): string {
+  const tradeToCategory: Record<string, ImageCategory> = {
+    'plumber': 'plumbing-work',
+    'electrician': 'electrical-work',
+    'landscaper': 'landscaping',
+    'painter': 'painting-work',
+    'hvac': 'hvac-work',
+    'handyman': 'handyman-work',
+    'roofer': 'roofing-work',
+    'cleaner': 'cleaning-work',
+  };
+
+  const category = tradeToCategory[trade] || 'construction';
+  return getDemoImage(category, width, height, seed);
 }
 
 // Export types for consumers
