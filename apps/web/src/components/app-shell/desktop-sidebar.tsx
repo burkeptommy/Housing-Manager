@@ -14,11 +14,11 @@ export function DesktopSidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-[260px] lg:fixed lg:inset-y-0 bg-slate-900">
+    <aside className="hidden lg:flex lg:flex-col lg:w-[260px] lg:fixed lg:inset-y-0 bg-gradient-to-b from-forest-900 to-forest-950">
       {/* Logo */}
-      <div className="flex items-center h-16 px-6 border-b border-slate-800">
+      <div className="flex items-center h-16 px-6 border-b border-white/10">
         <Link href="/app" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-emerald-600 flex items-center justify-center">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-haven-400 to-haven-600 flex items-center justify-center shadow-lg shadow-haven-500/20">
             <Leaf className="w-5 h-5 text-white" />
           </div>
           <span className="text-xl font-bold tracking-tight text-white">Haven</span>
@@ -30,7 +30,7 @@ export function DesktopSidebar() {
         {sidebarNavigation.map((section) => (
           <div key={section.title}>
             {/* Section Title */}
-            <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
               {section.title}
             </h3>
             {/* Section Items */}
@@ -43,14 +43,14 @@ export function DesktopSidebar() {
                   <Link
                     key={item.name}
                     href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                       active
-                        ? 'bg-emerald-600/10 text-emerald-400'
-                        : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-white/15 text-white'
+                        : 'text-white/70 hover:bg-white/10 hover:text-white'
                     }`}
                   >
                     <Icon
-                      className={`w-5 h-5 ${active ? 'text-emerald-400' : 'text-slate-400'}`}
+                      className={`w-5 h-5 ${active ? 'text-haven-400' : 'text-white/50'}`}
                       strokeWidth={active ? 2.5 : 2}
                     />
                     {item.name}
@@ -63,7 +63,7 @@ export function DesktopSidebar() {
       </nav>
 
       {/* Bottom Section */}
-      <div className="px-3 py-4 border-t border-slate-800 space-y-1">
+      <div className="px-3 py-4 border-t border-white/10 space-y-1">
         {sidebarBottomNav.map((item) => {
           const active = isActive(item.href);
           const Icon = item.icon;
@@ -72,14 +72,14 @@ export function DesktopSidebar() {
             <Link
               key={item.name}
               href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 active
-                  ? 'bg-emerald-600/10 text-emerald-400'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-white/15 text-white'
+                  : 'text-white/70 hover:bg-white/10 hover:text-white'
               }`}
             >
               <Icon
-                className={`w-5 h-5 ${active ? 'text-emerald-400' : 'text-slate-400'}`}
+                className={`w-5 h-5 ${active ? 'text-haven-400' : 'text-white/50'}`}
                 strokeWidth={active ? 2.5 : 2}
               />
               {item.name}

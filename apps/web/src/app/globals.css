@@ -560,3 +560,45 @@ body, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, labe
 .bg-slate-900 h3 {
   color: white;
 }
+
+/* ============================================================================
+   MAPBOX POPUP STYLES - Find Pros Page
+   ============================================================================ */
+
+/* Custom vendor popup - remove default Mapbox styling */
+.vendor-popup .mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+.vendor-popup .mapboxgl-popup-close-button {
+  display: none; /* Hide default close button */
+}
+
+.vendor-popup .mapboxgl-popup-tip {
+  border-top-color: white;
+}
+
+/* Default Mapbox popup improvements */
+.mapboxgl-popup-content {
+  padding: 0;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+}
+
+.mapboxgl-popup-close-button {
+  font-size: 18px;
+  color: #78716c; /* warm-500 */
+  right: 8px;
+  top: 8px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: background-color 0.2s;
+}
+
+.mapboxgl-popup-close-button:hover {
+  background-color: rgba(120, 113, 108, 0.1);
+  color: #44403c; /* warm-700 */
+}
