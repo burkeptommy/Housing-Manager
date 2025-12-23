@@ -15,6 +15,8 @@ export const demoAvatars = {
   max: 'max-dog-haven',
 
   // Staff
+  sarah: 'sarah-harrison-haven',
+  mike: 'mike-rodriguez-haven',
   maria: 'maria-garcia-haven',
   carlos: 'carlos-reyes-haven',
 
@@ -61,6 +63,10 @@ export function getUserAvatar(name: string, fallbackToInitials: boolean = false)
     'jack morrison': demoAvatars.jack,
     'jack': demoAvatars.jack,
     'max': demoAvatars.max,
+    'sarah harrison': demoAvatars.sarah,
+    'sarah': demoAvatars.sarah,
+    'mike rodriguez': demoAvatars.mike,
+    'mike': demoAvatars.mike,
     'maria garcia': demoAvatars.maria,
     'maria': demoAvatars.maria,
     'carlos reyes': demoAvatars.carlos,

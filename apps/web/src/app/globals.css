@@ -20,8 +20,14 @@
     @apply bg-warm-900 text-warm-100;
   }
 
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-serif text-warm-900 tracking-tight;
+  /* ONLY h1 gets serif font - main page titles only */
+  h1 {
+    @apply font-serif tracking-tight text-warm-900;
+  }
+
+  /* All other headings use sans-serif for consistency */
+  h2, h3, h4, h5, h6 {
+    @apply font-sans font-semibold tracking-tight text-warm-900;
   }
 
   .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
@@ -78,6 +84,106 @@
 
   .card-interactive {
     @apply card card-hover cursor-pointer active:scale-[0.99];
+  }
+
+  /* ===== DARK CARDS - WHITE TEXT ALWAYS ===== */
+
+  /* Page title - serif only for main page headings */
+  .page-title {
+    @apply font-serif text-2xl sm:text-3xl font-bold text-warm-900;
+  }
+
+  /* Green gradient cards - white text */
+  .card-green {
+    @apply bg-gradient-to-br from-haven-500 to-haven-600 rounded-2xl border-0 text-white;
+  }
+
+  .card-green h1,
+  .card-green h2,
+  .card-green h3,
+  .card-green h4,
+  .card-green .card-title,
+  .card-green .stat-value {
+    @apply text-white;
+  }
+
+  .card-green p,
+  .card-green .card-description,
+  .card-green .stat-label {
+    @apply text-white/80;
+  }
+
+  /* Forest dark green cards - white text */
+  .card-forest {
+    @apply bg-gradient-to-br from-forest-800 to-forest-900 rounded-2xl border-0 text-white;
+  }
+
+  .card-forest h1,
+  .card-forest h2,
+  .card-forest h3,
+  .card-forest h4,
+  .card-forest .card-title,
+  .card-forest .stat-value {
+    @apply text-white;
+  }
+
+  .card-forest p,
+  .card-forest .card-description,
+  .card-forest .stat-label {
+    @apply text-white/70;
+  }
+
+  /* Slate/dark gray cards - white text */
+  .card-slate {
+    @apply bg-gradient-to-br from-warm-800 to-warm-900 rounded-2xl border-0 text-white;
+  }
+
+  .card-slate h1,
+  .card-slate h2,
+  .card-slate h3,
+  .card-slate h4,
+  .card-slate .card-title,
+  .card-slate .stat-value {
+    @apply text-white;
+  }
+
+  .card-slate p,
+  .card-slate .card-description,
+  .card-slate .stat-label {
+    @apply text-white/70;
+  }
+
+  /* Sidebar styles for dark backgrounds */
+  .sidebar {
+    @apply bg-gradient-to-b from-forest-900 to-forest-950;
+  }
+
+  .sidebar-nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
+           text-white/70 transition-all duration-200
+           hover:bg-white/10 hover:text-white;
+  }
+
+  .sidebar-nav-item-active {
+    @apply bg-white/15 text-white;
+  }
+
+  /* Button variants for light backgrounds on dark cards */
+  .btn-white {
+    @apply btn px-5 py-2.5 bg-white text-warm-800 shadow-lg hover:bg-warm-50;
+  }
+
+  .btn-outline-light {
+    @apply btn px-5 py-2.5 bg-transparent text-white border border-white/30 hover:bg-white/10;
+  }
+
+  .btn-ghost-light {
+    @apply btn px-4 py-2 text-white/70 hover:bg-white/10 hover:text-white;
+  }
+
+  /* Badge for dark backgrounds */
+  .badge-light {
+    @apply bg-white/20 text-white;
   }
 
   /* Buttons */
