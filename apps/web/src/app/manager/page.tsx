@@ -4,7 +4,9 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
 import { getApiClient } from '@/lib/api';
+import { images } from '@/lib/images';
 import type { ServiceRequestDetail, Household } from '@haven/core';
+import { Card, CardHeader, Badge, Button, Avatar, StatCard } from '@/components/ui';
 import {
   Plus,
   Home,
@@ -21,16 +23,16 @@ import {
   Dog,
   Key,
   Bell,
+  Clock,
+  Users,
+  DollarSign,
+  TrendingUp,
+  ChevronRight,
+  Zap,
 } from 'lucide-react';
 
 // ============================================================================
-// MANAGER DASHBOARD PAGE
-// Primary Color: Indigo (vs Emerald for homeowners)
-// Target: Information-dense, power-user focused, mission control
-// ============================================================================
-
-// ============================================================================
-// MOCK DATA
+// TYPES
 // ============================================================================
 
 interface UrgentItem {
@@ -84,6 +86,10 @@ interface Activity {
   detail: string;
   type: 'request' | 'approval' | 'message' | 'payment';
 }
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 
 const mockUrgentItems: UrgentItem[] = [
   {
@@ -191,6 +197,345 @@ const mockActivities: Activity[] = [
 ];
 
 // ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function getTimeOfDay(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
+function formatCurrentDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+// ============================================================================
+// COMPONENTS - PREMIUM REDESIGN
+// ============================================================================
+
+// Hero Header
+function HeroHeader({ userName, stats }: { userName: string; stats: { householdsManaged: number; urgentItems: number; tasksToday: number; pendingApprovals: number; billsDueThisWeek: number } }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-indigo-500 to-purple-500 p-8 text-white mb-8">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
+      </div>
+
+      <div className="relative">
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <p className="text-indigo-200 text-sm font-medium mb-1">{formatCurrentDate()}</p>
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+              Good {getTimeOfDay()}, {userName}
+            </h1>
+            <p className="text-indigo-200 mt-2">Managing {stats.householdsManaged} households</p>
+          </div>
+          <Avatar name={userName} src={images.avatars.sarah} size="xl" />
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Link href="/manager/requests?priority=urgent" className="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <Zap className="w-4 h-4 text-red-300" />
+              <p className="text-indigo-200 text-xs font-medium uppercase tracking-wider">Urgent</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.urgentItems}</p>
+          </Link>
+          <Link href="/manager/tasks" className="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckSquare className="w-4 h-4 text-indigo-200" />
+              <p className="text-indigo-200 text-xs font-medium uppercase tracking-wider">Tasks Today</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.tasksToday}</p>
+          </Link>
+          <Link href="/manager/requests?status=pending" className="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <Clock className="w-4 h-4 text-amber-300" />
+              <p className="text-indigo-200 text-xs font-medium uppercase tracking-wider">Pending</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.pendingApprovals}</p>
+          </Link>
+          <Link href="/manager/payables" className="bg-white/10 backdrop-blur-sm rounded-xl p-4 hover:bg-white/20 transition-colors">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-4 h-4 text-emerald-300" />
+              <p className="text-indigo-200 text-xs font-medium uppercase tracking-wider">Bills Due</p>
+            </div>
+            <p className="text-3xl font-bold">${(stats.billsDueThisWeek / 1000).toFixed(1)}K</p>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Quick Actions Bar
+function QuickActionsBar() {
+  return (
+    <div className="flex flex-wrap items-center gap-3 mb-8">
+      <Link href="/manager/requests/new">
+        <Button leftIcon={<Plus className="w-4 h-4" />}>New Request</Button>
+      </Link>
+      <Link href="/manager/work-orders/new">
+        <Button variant="secondary" leftIcon={<ClipboardList className="w-4 h-4" />}>Work Order</Button>
+      </Link>
+      <Link href="/manager/payables/new">
+        <Button variant="secondary" leftIcon={<FileText className="w-4 h-4" />}>Log Expense</Button>
+      </Link>
+      <Button variant="ghost" leftIcon={<Phone className="w-4 h-4" />}>Start Call</Button>
+    </div>
+  );
+}
+
+// Urgent Alert Card
+function UrgentAlertCard({ item }: { item: UrgentItem }) {
+  const typeIcons = {
+    emergency: '🚨',
+    approval: '⏰',
+    overdue: '⚠️',
+    contract: '📄',
+  };
+
+  const typeColors = {
+    emergency: 'from-red-500 to-rose-500',
+    approval: 'from-amber-500 to-orange-500',
+    overdue: 'from-red-400 to-rose-400',
+    contract: 'from-blue-500 to-indigo-500',
+  };
+
+  return (
+    <div className="bg-white rounded-xl border border-red-100 shadow-lg shadow-red-500/5 overflow-hidden">
+      <div className={`bg-gradient-to-r ${typeColors[item.type]} px-4 py-2 flex items-center justify-between`}>
+        <div className="flex items-center gap-2">
+          <span className="text-lg">{typeIcons[item.type]}</span>
+          <span className="text-sm font-semibold text-white">{item.household}</span>
+        </div>
+        <span className="text-xs text-white/80">{item.timeAgo}</span>
+      </div>
+      <div className="p-4">
+        <h4 className="font-bold text-warm-900 mb-1">{item.title}</h4>
+        <p className="text-sm text-warm-600 mb-1">{item.description}</p>
+        <p className="text-xs text-warm-400">{item.address}</p>
+        <div className="flex flex-wrap gap-2 mt-4">
+          {item.actions.map((action, index) => (
+            <Button
+              key={action}
+              variant={index === 0 ? 'primary' : 'secondary'}
+              size="sm"
+            >
+              {action}
+            </Button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Urgent Section
+function UrgentSection({ items }: { items: UrgentItem[] }) {
+  if (items.length === 0) return null;
+
+  return (
+    <div className="mb-8">
+      <div className="flex items-center gap-2 mb-4">
+        <span className="flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+        </span>
+        <h2 className="text-lg font-bold text-warm-900">Urgent Attention Required</h2>
+        <Badge variant="error">{items.length}</Badge>
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
+        {items.map((item) => (
+          <UrgentAlertCard key={item.id} item={item} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// Schedule Block Component
+function ScheduleBlockCard({ block }: { block: ScheduleBlock }) {
+  const typeStyles = {
+    site_visit: { border: 'border-l-indigo-500', bg: 'bg-indigo-50', icon: Home },
+    call: { border: 'border-l-blue-500', bg: 'bg-blue-50', icon: Phone },
+    bill_pay: { border: 'border-l-emerald-500', bg: 'bg-emerald-50', icon: DollarSign },
+    handyman: { border: 'border-l-amber-500', bg: 'bg-amber-50', icon: ClipboardList },
+  };
+
+  const style = typeStyles[block.type];
+  const Icon = style.icon;
+
+  return (
+    <div className={`flex items-start gap-4 p-4 hover:bg-warm-50 transition-colors rounded-xl`}>
+      <div className="text-right min-w-[60px]">
+        <p className="text-lg font-bold text-warm-900">{block.time.split(' ')[0]}</p>
+        <p className="text-xs text-warm-500 uppercase">{block.time.split(' ')[1]}</p>
+      </div>
+      <div className={`flex-1 rounded-xl p-4 border-l-4 ${style.border} ${style.bg}`}>
+        <div className="flex items-start justify-between">
+          <div className="flex items-start gap-3">
+            <div className="p-2 bg-white rounded-lg shadow-sm">
+              <Icon className="w-4 h-4 text-warm-600" />
+            </div>
+            <div>
+              <p className="font-semibold text-warm-900">{block.title}</p>
+              <p className="text-sm text-warm-600">{block.household}</p>
+              {block.vendor && (
+                <p className="text-xs text-warm-500 mt-1">Vendor: {block.vendor}</p>
+              )}
+            </div>
+          </div>
+          <Badge variant="neutral" size="sm">{block.duration}</Badge>
+        </div>
+        {block.accessInfo && (
+          <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/50">
+            {block.accessInfo.gate && (
+              <span className="flex items-center gap-1.5 text-xs text-warm-600 bg-white px-2 py-1 rounded-lg">
+                <Key className="w-3 h-3" /> {block.accessInfo.gate}
+              </span>
+            )}
+            {block.accessInfo.dog && (
+              <span className="flex items-center gap-1.5 text-xs text-warm-600 bg-white px-2 py-1 rounded-lg">
+                <Dog className="w-3 h-3" /> {block.accessInfo.dog}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Task Item Component
+function TaskItemCard({
+  task,
+  completed,
+  onToggle,
+}: {
+  task: Task;
+  completed: boolean;
+  onToggle: () => void;
+}) {
+  const statusBadge = {
+    pending: { variant: 'neutral' as const, label: 'Pending' },
+    in_progress: { variant: 'info' as const, label: 'In Progress' },
+    overdue: { variant: 'error' as const, label: 'Overdue' },
+    completed: { variant: 'success' as const, label: 'Done' },
+  };
+
+  const { variant, label } = statusBadge[task.status];
+
+  return (
+    <div className={`flex items-start gap-3 p-4 hover:bg-warm-50 transition-colors rounded-xl ${completed ? 'opacity-50' : ''}`}>
+      <input
+        type="checkbox"
+        checked={completed}
+        onChange={onToggle}
+        className="mt-1 w-4 h-4 rounded border-warm-300 text-indigo-600 focus:ring-indigo-500"
+      />
+      <div className="flex-1 min-w-0">
+        <p className={`font-medium text-warm-900 ${completed ? 'line-through' : ''}`}>
+          {task.title}
+        </p>
+        <p className="text-sm text-warm-500 mt-0.5">
+          {task.household} • Due: <span className={task.status === 'overdue' ? 'text-red-600 font-medium' : ''}>{task.dueDate}</span>
+        </p>
+      </div>
+      <Badge variant={variant} size="sm">{label}</Badge>
+    </div>
+  );
+}
+
+// Household Status Card
+function HouseholdCard({ household }: { household: HouseholdStatus }) {
+  const statusColors = {
+    urgent: { bg: 'bg-red-500', ring: 'ring-red-100' },
+    pending: { bg: 'bg-amber-500', ring: 'ring-amber-100' },
+    good: { bg: 'bg-emerald-500', ring: 'ring-emerald-100' },
+  };
+
+  const statusLabels = {
+    urgent: 'Urgent',
+    pending: 'Pending',
+    good: 'All Good',
+  };
+
+  return (
+    <Link
+      href={`/manager/households/${household.id}`}
+      className="group p-5 rounded-2xl border border-warm-100 hover:border-indigo-200 hover:shadow-lg transition-all bg-white"
+    >
+      <div className="flex items-start justify-between mb-3">
+        <div>
+          <h4 className="font-bold text-warm-900 group-hover:text-indigo-600 transition-colors">{household.name}</h4>
+          <p className="text-sm text-warm-500">{household.address}</p>
+        </div>
+        <span className={`w-3 h-3 rounded-full ${statusColors[household.status].bg} ring-4 ${statusColors[household.status].ring}`} />
+      </div>
+      <div className="flex items-center gap-2 mb-3">
+        <Badge
+          variant={household.status === 'urgent' ? 'error' : household.status === 'pending' ? 'warning' : 'success'}
+          size="sm"
+        >
+          {statusLabels[household.status]}
+        </Badge>
+        {household.taskCount > 0 && (
+          <Badge variant="neutral" size="sm">{household.taskCount} tasks</Badge>
+        )}
+      </div>
+      <div className="flex items-center justify-between text-xs text-warm-500 pt-3 border-t border-warm-50">
+        <span>Last contact: {household.lastContact}</span>
+        {household.unreadMessages > 0 && (
+          <span className="flex items-center gap-1 text-indigo-600">
+            <MessageCircle className="w-3 h-3" /> {household.unreadMessages} new
+          </span>
+        )}
+      </div>
+    </Link>
+  );
+}
+
+// Activity Item
+function ActivityItemCard({ activity }: { activity: Activity }) {
+  const typeStyles = {
+    request: { color: 'bg-indigo-500', icon: ClipboardList },
+    approval: { color: 'bg-emerald-500', icon: CheckSquare },
+    message: { color: 'bg-blue-500', icon: MessageCircle },
+    payment: { color: 'bg-amber-500', icon: DollarSign },
+  };
+
+  const style = typeStyles[activity.type];
+  const Icon = style.icon;
+
+  return (
+    <div className="flex items-start gap-3 p-4 hover:bg-warm-50 transition-colors rounded-xl">
+      <div className={`p-2 rounded-lg ${style.color}`}>
+        <Icon className="w-3 h-3 text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-warm-900">
+          <span className="font-semibold">{activity.household}</span>{' '}
+          <span className="text-warm-600">{activity.action}</span>
+        </p>
+        <p className="text-sm text-warm-500">{activity.detail}</p>
+      </div>
+      <span className="text-xs text-warm-400 whitespace-nowrap">{activity.timeAgo}</span>
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN COMPONENT
 // ============================================================================
 
@@ -263,7 +608,7 @@ export default function ManagerDashboardPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-slate-500">Loading dashboard...</p>
+          <p className="text-warm-500">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -271,82 +616,11 @@ export default function ManagerDashboardPage() {
 
   return (
     <div className="space-y-6 pb-20">
-      {/* ================================================================== */}
-      {/* PAGE HEADER WITH STATS */}
-      {/* ================================================================== */}
-      <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">
-            Good {getTimeOfDay()}, {user?.firstName || 'Sarah'}
-          </h1>
-          <p className="text-slate-600 mt-1">{formatCurrentDate()}</p>
-        </div>
-      </div>
-
-      {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard
-          label="Households"
-          value={stats.householdsManaged}
-          sublabel="managed"
-          href="/manager/households"
-        />
-        <StatCard
-          label="Urgent"
-          value={stats.urgentItems}
-          urgent={stats.urgentItems > 0}
-          href="/manager/requests?priority=urgent"
-        />
-        <StatCard
-          label="Tasks"
-          value={stats.tasksToday}
-          sublabel="today"
-          href="/manager/tasks"
-        />
-        <StatCard
-          label="Pending"
-          value={stats.pendingApprovals}
-          sublabel="Approval"
-          href="/manager/requests?status=pending"
-        />
-        <StatCard
-          label="Bills Due"
-          value={`$${(stats.billsDueThisWeek / 1000).toFixed(1)}K`}
-          sublabel="this week"
-          href="/manager/payables"
-        />
-      </div>
+      {/* Hero Header */}
+      <HeroHeader userName={user?.firstName || 'Sarah'} stats={stats} />
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap items-center gap-2">
-        <Link
-          href="/manager/requests/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-medium rounded-lg hover:bg-indigo-700 transition-colors text-sm"
-        >
-          <Plus className="w-4 h-4" />
-          New Request
-        </Link>
-        <Link
-          href="/manager/work-orders/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors text-sm"
-        >
-          <ClipboardList className="w-4 h-4" />
-          Work Order
-        </Link>
-        <Link
-          href="/manager/payables/new"
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors text-sm"
-        >
-          <FileText className="w-4 h-4" />
-          Log Expense
-        </Link>
-        <button
-          className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 font-medium rounded-lg hover:bg-slate-50 transition-colors text-sm"
-        >
-          <Phone className="w-4 h-4" />
-          Start Call
-        </button>
-      </div>
+      <QuickActionsBar />
 
       {/* Error */}
       {error && (
@@ -356,79 +630,56 @@ export default function ManagerDashboardPage() {
         </div>
       )}
 
-      {/* ================================================================== */}
-      {/* URGENT ATTENTION SECTION */}
-      {/* ================================================================== */}
-      {mockUrgentItems.length > 0 && (
-        <div className="bg-red-50 rounded-xl border border-red-200 p-4">
-          <div className="flex items-center gap-2 mb-4">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-            <h2 className="font-semibold text-red-900 uppercase tracking-wide text-sm">
-              Urgent Attention Required
-            </h2>
-            <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-red-100 text-red-700">
-              {mockUrgentItems.length}
-            </span>
-          </div>
-          <div className="space-y-3">
-            {mockUrgentItems.map((item) => (
-              <UrgentItemCard key={item.id} item={item} />
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Urgent Section */}
+      <UrgentSection items={mockUrgentItems} />
 
-      {/* ================================================================== */}
-      {/* TWO COLUMN LAYOUT: Schedule + Tasks */}
-      {/* ================================================================== */}
+      {/* Two Column Layout: Schedule + Tasks */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Schedule */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-indigo-600" />
-              Today&apos;s Schedule
-            </h3>
+        <Card padding="none">
+          <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button className="text-xs text-slate-500 hover:text-slate-700 font-medium">Add Block</button>
-              <span className="text-slate-300">|</span>
-              <Link href="/manager/calendar" className="text-xs text-indigo-600 hover:text-indigo-700 font-medium">
-                View Week
-              </Link>
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <Calendar className="w-4 h-4 text-indigo-600" />
+              </div>
+              <h3 className="font-bold text-warm-900">Today's Schedule</h3>
             </div>
+            <Link href="/manager/calendar" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
+              View Week <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="p-2 space-y-1">
             {mockSchedule.map((block) => (
-              <ScheduleBlock key={block.id} block={block} />
+              <ScheduleBlockCard key={block.id} block={block} />
             ))}
           </div>
-        </div>
+        </Card>
 
         {/* Task Queue */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-            <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-              <CheckSquare className="w-4 h-4 text-indigo-600" />
-              My Task Queue
-            </h3>
-            <select className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600">
+        <Card padding="none">
+          <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="p-2 bg-indigo-100 rounded-lg">
+                <CheckSquare className="w-4 h-4 text-indigo-600" />
+              </div>
+              <h3 className="font-bold text-warm-900">My Task Queue</h3>
+            </div>
+            <select className="text-sm border border-warm-200 rounded-lg px-3 py-1.5 text-warm-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
               <option>All Tasks</option>
               <option>Due Today</option>
               <option>Overdue</option>
             </select>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="p-2">
             {/* From Homeowners */}
-            <div className="p-3 bg-slate-50/50">
+            <div className="px-4 py-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">From Homeowners</span>
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-indigo-100 text-indigo-700">
-                  {mockTasks.fromHomeowners.length}
-                </span>
+                <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">From Homeowners</span>
+                <Badge variant="info" size="sm">{mockTasks.fromHomeowners.length}</Badge>
               </div>
             </div>
             {mockTasks.fromHomeowners.map((task) => (
-              <TaskItem
+              <TaskItemCard
                 key={task.id}
                 task={task}
                 completed={completedTasks.includes(task.id)}
@@ -437,16 +688,14 @@ export default function ManagerDashboardPage() {
             ))}
 
             {/* System Generated */}
-            <div className="p-3 bg-slate-50/50">
+            <div className="px-4 py-2 mt-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-slate-500 uppercase tracking-wide">System Generated</span>
-                <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-slate-100 text-slate-600">
-                  {mockTasks.systemGenerated.length}
-                </span>
+                <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">System Generated</span>
+                <Badge variant="neutral" size="sm">{mockTasks.systemGenerated.length}</Badge>
               </div>
             </div>
             {mockTasks.systemGenerated.map((task) => (
-              <TaskItem
+              <TaskItemCard
                 key={task.id}
                 task={task}
                 completed={completedTasks.includes(task.id)}
@@ -454,320 +703,60 @@ export default function ManagerDashboardPage() {
               />
             ))}
           </div>
-        </div>
+        </Card>
       </div>
 
-      {/* ================================================================== */}
-      {/* HOUSEHOLD STATUS GRID */}
-      {/* ================================================================== */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Home className="w-4 h-4 text-indigo-600" />
-            My Households
-          </h3>
+      {/* Household Status Grid */}
+      <Card padding="none">
+        <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <Users className="w-4 h-4 text-indigo-600" />
+            </div>
+            <h3 className="font-bold text-warm-900">My Households</h3>
+          </div>
           <Link href="/manager/households" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-            View All <ArrowRight className="w-4 h-4" />
+            View All <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-        <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {mockHouseholds.map((household) => (
-            <HouseholdStatusCard key={household.id} household={household} />
+            <HouseholdCard key={household.id} household={household} />
           ))}
         </div>
-      </div>
+      </Card>
 
-      {/* ================================================================== */}
-      {/* ACTIVITY FEED */}
-      {/* ================================================================== */}
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
-          <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-            <Bell className="w-4 h-4 text-indigo-600" />
-            Recent Activity
-          </h3>
+      {/* Activity Feed */}
+      <Card padding="none">
+        <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <Bell className="w-4 h-4 text-indigo-600" />
+            </div>
+            <h3 className="font-bold text-warm-900">Recent Activity</h3>
+          </div>
           <select
-            className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600"
+            className="text-sm border border-warm-200 rounded-lg px-3 py-1.5 text-warm-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             value={activityFilter}
             onChange={(e) => setActivityFilter(e.target.value as typeof activityFilter)}
           >
-            <option value="all">All</option>
+            <option value="all">All Activity</option>
             <option value="requests">Requests</option>
             <option value="approvals">Approvals</option>
             <option value="messages">Messages</option>
           </select>
         </div>
-        <div className="divide-y divide-slate-100">
+        <div className="p-2 space-y-1">
           {filteredActivities.map((activity) => (
-            <ActivityItem key={activity.id} activity={activity} />
+            <ActivityItemCard key={activity.id} activity={activity} />
           ))}
         </div>
-        <div className="px-4 py-3 border-t border-slate-100 bg-slate-50">
+        <div className="px-6 py-4 border-t border-warm-100">
           <Link href="/manager/activity" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
-            View Full Activity Log <ArrowRight className="w-4 h-4" />
+            View Full Activity Log <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// HELPER FUNCTIONS
-// ============================================================================
-
-function getTimeOfDay(): string {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'morning';
-  if (hour < 17) return 'afternoon';
-  return 'evening';
-}
-
-function formatCurrentDate(): string {
-  return new Date().toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric'
-  });
-}
-
-// ============================================================================
-// COMPONENTS
-// ============================================================================
-
-function StatCard({
-  label,
-  value,
-  sublabel,
-  urgent = false,
-  href,
-}: {
-  label: string;
-  value: string | number;
-  sublabel?: string;
-  urgent?: boolean;
-  href: string;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`bg-white rounded-xl shadow-sm border p-4 text-center hover:shadow-md hover:border-indigo-200 transition-all ${
-        urgent ? 'border-red-200' : 'border-slate-200'
-      }`}
-    >
-      <p className={`text-2xl font-bold ${urgent ? 'text-red-600' : 'text-slate-900'}`}>
-        {value}
-      </p>
-      <p className="text-xs text-slate-500 mt-1">
-        {label}
-        {sublabel && <span className="block">{sublabel}</span>}
-      </p>
-    </Link>
-  );
-}
-
-function UrgentItemCard({ item }: { item: UrgentItem }) {
-  const typeIcons = {
-    emergency: '🚨',
-    approval: '⏰',
-    overdue: '⚠️',
-    contract: '📄',
-  };
-
-  return (
-    <div className="bg-white rounded-lg border border-red-200 p-4">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 min-w-0">
-          <span className="text-xl">{typeIcons[item.type]}</span>
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="font-semibold text-slate-900">{item.household}</span>
-              <span className="text-xs text-red-600 font-medium">{item.timeAgo}</span>
-            </div>
-            <p className="font-medium text-slate-900">{item.title}</p>
-            <p className="text-sm text-slate-500 mt-0.5">{item.description}</p>
-            <p className="text-xs text-slate-400 mt-1">{item.address}</p>
-          </div>
-        </div>
-        <button className="p-1 hover:bg-slate-100 rounded">
-          <MoreVertical className="w-4 h-4 text-slate-400" />
-        </button>
-      </div>
-      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-100">
-        {item.actions.map((action, index) => (
-          <button
-            key={action}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-              index === 0
-                ? 'bg-indigo-600 text-white hover:bg-indigo-700'
-                : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            {action}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function ScheduleBlock({ block }: { block: ScheduleBlock }) {
-  const typeColors = {
-    site_visit: 'border-l-indigo-500',
-    call: 'border-l-blue-500',
-    bill_pay: 'border-l-emerald-500',
-    handyman: 'border-l-amber-500',
-  };
-
-  return (
-    <div className="flex items-start gap-4 p-4 hover:bg-slate-50 transition-colors">
-      <div className="text-right min-w-[70px]">
-        <p className="text-lg font-bold text-slate-900">{block.time.split(' ')[0]}</p>
-        <p className="text-xs text-slate-500">{block.time.split(' ')[1]}</p>
-      </div>
-      <div className={`flex-1 bg-slate-50 rounded-lg p-3 border-l-4 ${typeColors[block.type]}`}>
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="font-medium text-slate-900">{block.title}</p>
-            <p className="text-sm text-slate-600">{block.household}</p>
-            {block.vendor && (
-              <p className="text-xs text-slate-500 mt-1">Vendor: {block.vendor}</p>
-            )}
-          </div>
-          <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
-            {block.duration}
-          </span>
-        </div>
-        {block.accessInfo && (
-          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-200">
-            {block.accessInfo.gate && (
-              <span className="flex items-center gap-1 text-xs text-slate-500">
-                <Key className="w-3 h-3" /> {block.accessInfo.gate}
-              </span>
-            )}
-            {block.accessInfo.dog && (
-              <span className="flex items-center gap-1 text-xs text-slate-500">
-                <Dog className="w-3 h-3" /> {block.accessInfo.dog}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function TaskItem({
-  task,
-  completed,
-  onToggle,
-}: {
-  task: Task;
-  completed: boolean;
-  onToggle: () => void;
-}) {
-  const statusColors: Record<string, string> = {
-    pending: 'text-slate-500',
-    in_progress: 'text-blue-600',
-    overdue: 'text-red-600',
-    completed: 'text-emerald-600',
-  };
-
-  const statusLabels: Record<string, string> = {
-    pending: 'Pending',
-    in_progress: 'In Progress',
-    overdue: 'Overdue',
-    completed: 'Done',
-  };
-
-  return (
-    <div className={`flex items-start gap-3 p-3 hover:bg-slate-50 transition-colors ${completed ? 'opacity-50' : ''}`}>
-      <input
-        type="checkbox"
-        checked={completed}
-        onChange={onToggle}
-        className="mt-1 w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
-      />
-      <div className="flex-1 min-w-0">
-        <p className={`font-medium text-slate-900 text-sm ${completed ? 'line-through' : ''}`}>
-          {task.title}
-        </p>
-        <p className="text-xs text-slate-500 mt-0.5">
-          {task.household} • Due: {task.dueDate}
-        </p>
-      </div>
-      <span className={`text-xs font-medium ${statusColors[task.status]}`}>
-        {statusLabels[task.status]}
-      </span>
-    </div>
-  );
-}
-
-function HouseholdStatusCard({ household }: { household: HouseholdStatus }) {
-  const statusColors = {
-    urgent: 'bg-red-500',
-    pending: 'bg-amber-500',
-    good: 'bg-emerald-500',
-  };
-
-  const statusLabels = {
-    urgent: `🔴 ${household.urgentCount} urgent`,
-    pending: `🟡 ${household.taskCount} pending`,
-    good: '🟢 All good',
-  };
-
-  return (
-    <Link
-      href={`/manager/households/${household.id}`}
-      className="p-4 rounded-xl border border-slate-200 hover:border-indigo-200 hover:shadow-md transition-all bg-white block"
-    >
-      <div className="flex items-start justify-between mb-2">
-        <h4 className="font-semibold text-slate-900">{household.name}</h4>
-        <span className={`w-2 h-2 rounded-full ${statusColors[household.status]}`} />
-      </div>
-      <p className="text-sm text-slate-500 mb-3">{household.address}</p>
-      <div className="border-t border-slate-100 pt-3">
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-600">{statusLabels[household.status]}</span>
-        </div>
-        <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
-          {household.taskCount > 0 && (
-            <span>{household.taskCount} tasks</span>
-          )}
-          {household.unreadMessages > 0 && (
-            <span className="flex items-center gap-1">
-              <MessageCircle className="w-3 h-3" /> {household.unreadMessages}
-            </span>
-          )}
-        </div>
-        <p className="text-xs text-slate-400 mt-2">Last contact: {household.lastContact}</p>
-      </div>
-    </Link>
-  );
-}
-
-function ActivityItem({ activity }: { activity: Activity }) {
-  const typeColors = {
-    request: 'bg-indigo-400',
-    approval: 'bg-emerald-400',
-    message: 'bg-blue-400',
-    payment: 'bg-amber-400',
-  };
-
-  return (
-    <div className="flex items-start gap-3 px-4 py-3">
-      <div className="flex flex-col items-center">
-        <span className={`w-2 h-2 rounded-full ${typeColors[activity.type]} mt-2`} />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-slate-900">
-          <span className="font-medium">{activity.household}</span>{' '}
-          <span className="text-slate-600">{activity.action}</span>
-        </p>
-        <p className="text-sm text-slate-500">{activity.detail}</p>
-      </div>
-      <span className="text-xs text-slate-400 whitespace-nowrap">{activity.timeAgo}</span>
+      </Card>
     </div>
   );
 }

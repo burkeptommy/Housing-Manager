@@ -3,8 +3,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { VendorJobBoardItem, VendorWorkOrderStatus } from '@haven/core';
+import { Card, Badge, Button, Avatar, EmptyState } from '@/components/ui';
+import { images } from '@/lib/images';
+import {
+  ClipboardList,
+  DollarSign,
+  MapPin,
+  Calendar,
+  Clock,
+  Home,
+  ChevronRight,
+  Loader2,
+  Briefcase,
+  TrendingUp,
+} from 'lucide-react';
 
-// Mock data for demo
+// ============================================================================
+// MOCK DATA
+// ============================================================================
+
 const mockJobs: VendorJobBoardItem[] = [
   {
     id: 'wo-001',
@@ -54,17 +71,238 @@ const mockJobs: VendorJobBoardItem[] = [
   },
 ];
 
-const STATUS_COLORS: Record<VendorWorkOrderStatus, string> = {
-  DRAFT: 'bg-slate-100 text-slate-600',
-  REQUESTED: 'bg-emerald-100 text-emerald-700',
-  SCHEDULED: 'bg-purple-100 text-purple-700',
-  OPEN: 'bg-green-100 text-green-700',
-  ASSIGNED: 'bg-yellow-100 text-yellow-700',
-  IN_PROGRESS: 'bg-orange-100 text-orange-700',
-  COMPLETED: 'bg-emerald-100 text-emerald-700',
-  VERIFIED: 'bg-emerald-100 text-emerald-700',
-  CANCELLED: 'bg-red-100 text-red-700',
+const STATUS_STYLES: Record<VendorWorkOrderStatus, { variant: 'success' | 'warning' | 'info' | 'error' | 'neutral'; label: string }> = {
+  DRAFT: { variant: 'neutral', label: 'Draft' },
+  REQUESTED: { variant: 'info', label: 'Requested' },
+  SCHEDULED: { variant: 'info', label: 'Scheduled' },
+  OPEN: { variant: 'success', label: 'Open' },
+  ASSIGNED: { variant: 'warning', label: 'Assigned' },
+  IN_PROGRESS: { variant: 'warning', label: 'In Progress' },
+  COMPLETED: { variant: 'success', label: 'Completed' },
+  VERIFIED: { variant: 'success', label: 'Verified' },
+  CANCELLED: { variant: 'error', label: 'Cancelled' },
 };
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return 'Flexible';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function formatTimeWindow(start: string | null, end: string | null): string {
+  if (!start) return 'TBD';
+  const startDate = new Date(start);
+  const startTime = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (end) {
+    const endDate = new Date(end);
+    const endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+    return `${startTime} - ${endTime}`;
+  }
+  return startTime;
+}
+
+function formatCurrency(amount: number | null): string {
+  if (amount === null) return 'Quote Required';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(amount);
+}
+
+function formatCurrentDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+// Hero Header for Vendor
+function HeroHeader({ stats }: { stats: { openJobs: number; totalValue: number; serviceAreas: number } }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-orange-600 via-orange-500 to-amber-500 p-8 text-white mb-8">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
+      </div>
+
+      <div className="relative">
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <p className="text-orange-200 text-sm font-medium mb-1">{formatCurrentDate()}</p>
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+              Job Board
+            </h1>
+            <p className="text-orange-200 mt-2">Available jobs in your service area</p>
+          </div>
+          <Avatar name="Ace Roofing" size="xl" />
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Briefcase className="w-4 h-4 text-orange-200" />
+              <p className="text-orange-200 text-xs font-medium uppercase tracking-wider">Open Jobs</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.openJobs}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <DollarSign className="w-4 h-4 text-emerald-300" />
+              <p className="text-orange-200 text-xs font-medium uppercase tracking-wider">Total Value</p>
+            </div>
+            <p className="text-3xl font-bold">{formatCurrency(stats.totalValue)}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-purple-300" />
+              <p className="text-orange-200 text-xs font-medium uppercase tracking-wider">Service Areas</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.serviceAreas}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Area Filter
+function AreaFilter({ areas, selected, onSelect }: { areas: string[]; selected: string; onSelect: (area: string) => void }) {
+  return (
+    <div className="flex gap-2 flex-wrap mb-6">
+      <button
+        onClick={() => onSelect('all')}
+        className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+          selected === 'all'
+            ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
+            : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+        }`}
+      >
+        All Areas
+      </button>
+      {areas.map((area) => (
+        <button
+          key={area}
+          onClick={() => onSelect(area)}
+          className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
+            selected === area
+              ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
+              : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+          }`}
+        >
+          {area}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Job Card
+function JobCard({ job, onClaim, isClaiming }: { job: VendorJobBoardItem; onClaim: () => void; isClaiming: boolean }) {
+  const status = STATUS_STYLES[job.status] || STATUS_STYLES.OPEN;
+
+  return (
+    <Card hover className="overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-start gap-4">
+        {/* Job Info */}
+        <div className="flex-1">
+          <div className="flex items-start justify-between gap-4 mb-3">
+            <div>
+              <Link
+                href={`/vendor/jobs/${job.id}`}
+                className="text-lg font-bold text-warm-900 hover:text-orange-600 transition-colors"
+              >
+                {job.title}
+              </Link>
+              <div className="flex items-center gap-2 mt-2">
+                <Badge variant={status.variant} size="sm">{status.label}</Badge>
+                {job.serviceArea && (
+                  <Badge variant="neutral" size="sm" icon={<MapPin className="w-3 h-3" />}>
+                    {job.serviceArea}
+                  </Badge>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-xl font-bold text-warm-900">
+                {formatCurrency(job.estimatedCost)}
+              </p>
+              <p className="text-xs text-warm-500">Estimated</p>
+            </div>
+          </div>
+
+          <p className="text-warm-600 text-sm mb-4 line-clamp-2">
+            {job.description}
+          </p>
+
+          <div className="flex items-center gap-4 text-sm text-warm-500">
+            <span className="flex items-center gap-1.5">
+              <Home className="w-4 h-4" />
+              {job.household.name}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Calendar className="w-4 h-4" />
+              {formatDate(job.scheduledStart)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              {formatTimeWindow(job.scheduledStart, job.scheduledEnd)}
+            </span>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex lg:flex-col gap-2">
+          <Link href={`/vendor/jobs/${job.id}`} className="flex-1 lg:flex-none">
+            <Button variant="secondary" className="w-full">
+              View Details
+            </Button>
+          </Link>
+          <Button
+            onClick={onClaim}
+            isLoading={isClaiming}
+            className="flex-1 lg:flex-none"
+          >
+            Claim Job
+          </Button>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Empty Jobs State
+function EmptyJobs() {
+  return (
+    <Card className="text-center py-12">
+      <div className="w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mx-auto mb-4">
+        <ClipboardList className="w-8 h-8 text-warm-400" />
+      </div>
+      <h3 className="text-lg font-bold text-warm-900 mb-2">No open jobs</h3>
+      <p className="text-warm-600">
+        Check back later for new job opportunities in your area.
+      </p>
+    </Card>
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function JobBoardPage() {
   const [jobs, setJobs] = useState<VendorJobBoardItem[]>([]);
@@ -94,289 +332,62 @@ export default function JobBoardPage() {
     // In production, would redirect to /vendor/schedule
   };
 
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return 'Flexible';
-    const date = new Date(dateStr);
-    return date.toLocaleDateString('en-US', {
-      weekday: 'short',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
-
-  const formatTimeWindow = (start: string | null, end: string | null) => {
-    if (!start) return 'TBD';
-    const startDate = new Date(start);
-    const startTime = startDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-    if (end) {
-      const endDate = new Date(end);
-      const endTime = endDate.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-      return `${startTime} - ${endTime}`;
-    }
-    return startTime;
-  };
-
-  const formatCurrency = (amount: number | null) => {
-    if (amount === null) return 'Quote Required';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
   // Get unique service areas for filter
   const serviceAreas = [...new Set(jobs.map((j) => j.serviceArea).filter(Boolean))] as string[];
 
   const filteredJobs = selectedArea === 'all' ? jobs : jobs.filter((j) => j.serviceArea === selectedArea);
 
+  const stats = {
+    openJobs: filteredJobs.length,
+    totalValue: filteredJobs.reduce((sum, j) => sum + (j.estimatedCost || 0), 0),
+    serviceAreas: serviceAreas.length,
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-orange-600"></div>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
+          <p className="text-warm-500">Loading job board...</p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Job Board</h1>
-        <p className="text-slate-600 dark:text-slate-400">Available jobs in your service area</p>
-      </div>
+    <div className="space-y-6 pb-20">
+      {/* Hero Header */}
+      <HeroHeader stats={stats} />
 
-      {/* Filter */}
+      {/* Area Filter */}
       {serviceAreas.length > 0 && (
-        <div className="flex gap-2 flex-wrap">
-          <button
-            onClick={() => setSelectedArea('all')}
-            className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-              selectedArea === 'all'
-                ? 'bg-orange-600 text-white'
-                : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-            }`}
-          >
-            All Areas
-          </button>
-          {serviceAreas.map((area) => (
-            <button
-              key={area}
-              onClick={() => setSelectedArea(area)}
-              className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                selectedArea === area
-                  ? 'bg-orange-600 text-white'
-                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700'
-              }`}
-            >
-              {area}
-            </button>
-          ))}
-        </div>
+        <AreaFilter
+          areas={serviceAreas}
+          selected={selectedArea}
+          onSelect={setSelectedArea}
+        />
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-green-600 dark:text-green-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{filteredJobs.length}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Open Jobs</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-orange-600 dark:text-orange-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">
-                {formatCurrency(filteredJobs.reduce((sum, j) => sum + (j.estimatedCost || 0), 0))}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Total Value</p>
-            </div>
-          </div>
-        </div>
-        <div className="card hidden lg:block">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg
-                className="w-6 h-6 text-emerald-600 dark:text-emerald-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"
-                />
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{serviceAreas.length}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Service Areas</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Job List */}
-      <div className="space-y-4">
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-warm-900">Available Jobs</h2>
+          <span className="text-sm text-warm-500">{filteredJobs.length} jobs</span>
+        </div>
+
         {filteredJobs.length === 0 ? (
-          <div className="card text-center py-12">
-            <svg
-              className="w-12 h-12 mx-auto text-slate-400 mb-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-              />
-            </svg>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">No open jobs</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Check back later for new job opportunities in your area.
-            </p>
-          </div>
+          <EmptyJobs />
         ) : (
-          filteredJobs.map((job) => (
-            <div key={job.id} className="card hover:shadow-lg transition-shadow">
-              <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                {/* Job Info */}
-                <div className="flex-1">
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <div>
-                      <Link
-                        href={`/vendor/jobs/${job.id}`}
-                        className="text-lg font-semibold text-slate-900 dark:text-white hover:text-orange-600 transition-colors"
-                      >
-                        {job.title}
-                      </Link>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[job.status]}`}>
-                          {job.status}
-                        </span>
-                        {job.serviceArea && (
-                          <span className="text-sm text-slate-500 dark:text-slate-400">
-                            {job.serviceArea}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-lg font-bold text-slate-900 dark:text-white">
-                        {formatCurrency(job.estimatedCost)}
-                      </p>
-                      <p className="text-xs text-slate-500 dark:text-slate-400">Estimated</p>
-                    </div>
-                  </div>
-
-                  <p className="text-slate-600 dark:text-slate-300 text-sm mb-3 line-clamp-2">
-                    {job.description}
-                  </p>
-
-                  <div className="flex items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
-                    <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
-                        />
-                      </svg>
-                      <span>{job.household.name}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
-                        />
-                      </svg>
-                      <span>{formatDate(job.scheduledStart)}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                        />
-                      </svg>
-                      <span>{formatTimeWindow(job.scheduledStart, job.scheduledEnd)}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex lg:flex-col gap-2">
-                  <Link
-                    href={`/vendor/jobs/${job.id}`}
-                    className="flex-1 lg:flex-none px-4 py-2 text-sm font-medium text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-lg text-center transition-colors"
-                  >
-                    View Details
-                  </Link>
-                  <button
-                    onClick={() => handleClaimJob(job.id)}
-                    disabled={claimingId === job.id}
-                    className="flex-1 lg:flex-none px-4 py-2 text-sm font-medium text-white bg-orange-600 hover:bg-orange-700 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {claimingId === job.id ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Claiming...
-                      </>
-                    ) : (
-                      'Claim Job'
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
+          <div className="space-y-4">
+            {filteredJobs.map((job) => (
+              <JobCard
+                key={job.id}
+                job={job}
+                onClaim={() => handleClaimJob(job.id)}
+                isClaiming={claimingId === job.id}
+              />
+            ))}
+          </div>
         )}
       </div>
     </div>

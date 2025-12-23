@@ -4,15 +4,274 @@ import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import type { HandymanDashboard, HandymanTask } from '@haven/core';
 import { getApiClient } from '@/lib/api';
+import { images } from '@/lib/images';
+import { Card, Badge, Button, Avatar, Modal } from '@/components/ui';
+import {
+  CheckCircle,
+  Clock,
+  ClipboardList,
+  Home,
+  MapPin,
+  Loader2,
+  ChevronRight,
+  Zap,
+  Calendar,
+  Timer,
+  Check,
+  X,
+} from 'lucide-react';
 
 // Status colors for work orders
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: 'bg-yellow-100 text-yellow-700',
-  ASSIGNED: 'bg-purple-100 text-purple-700',
-  IN_PROGRESS: 'bg-orange-100 text-orange-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  VERIFIED: 'bg-emerald-100 text-emerald-700',
+const STATUS_STYLES: Record<string, { variant: 'success' | 'warning' | 'info' | 'error' | 'neutral'; label: string }> = {
+  OPEN: { variant: 'warning', label: 'Open' },
+  ASSIGNED: { variant: 'info', label: 'Assigned' },
+  IN_PROGRESS: { variant: 'warning', label: 'In Progress' },
+  COMPLETED: { variant: 'success', label: 'Completed' },
+  VERIFIED: { variant: 'success', label: 'Verified' },
 };
+
+// ============================================================================
+// HELPER FUNCTIONS
+// ============================================================================
+
+function getTimeOfDay(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'morning';
+  if (hour < 17) return 'afternoon';
+  return 'evening';
+}
+
+function formatCurrentDate(): string {
+  return new Date().toLocaleDateString('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+
+function formatTime(dateStr: string | null): string {
+  if (!dateStr) return 'TBD';
+  return new Date(dateStr).toLocaleTimeString('en-US', {
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+// ============================================================================
+// COMPONENTS
+// ============================================================================
+
+// Hero Header for Handyman
+function HeroHeader({ name, stats }: { name: string; stats: { completedToday: number; hoursLoggedToday: number; pendingTasks: number; assignedHouseholds: number } }) {
+  return (
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-teal-600 via-teal-500 to-cyan-500 p-8 text-white mb-8">
+      {/* Background Pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
+      </div>
+
+      <div className="relative">
+        <div className="flex items-start justify-between mb-8">
+          <div>
+            <p className="text-teal-200 text-sm font-medium mb-1">{formatCurrentDate()}</p>
+            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight">
+              Good {getTimeOfDay()}, {name}!
+            </h1>
+            <p className="text-teal-200 mt-2">Ready to tackle today's tasks</p>
+          </div>
+          <Avatar name={name} src={images.avatars.mike} size="xl" />
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <CheckCircle className="w-4 h-4 text-emerald-300" />
+              <p className="text-teal-200 text-xs font-medium uppercase tracking-wider">Done Today</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.completedToday}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Timer className="w-4 h-4 text-teal-200" />
+              <p className="text-teal-200 text-xs font-medium uppercase tracking-wider">Hours Today</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.hoursLoggedToday.toFixed(1)}h</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <ClipboardList className="w-4 h-4 text-amber-300" />
+              <p className="text-teal-200 text-xs font-medium uppercase tracking-wider">Pending</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.pendingTasks}</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Home className="w-4 h-4 text-purple-300" />
+              <p className="text-teal-200 text-xs font-medium uppercase tracking-wider">Households</p>
+            </div>
+            <p className="text-3xl font-bold">{stats.assignedHouseholds}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Active Task Banner
+function ActiveTaskBanner({ task, checkInTime, onComplete }: { task: HandymanTask; checkInTime: Date | null; onComplete: () => void }) {
+  const formatElapsedTime = () => {
+    if (!checkInTime) return '0:00';
+    const elapsed = Date.now() - checkInTime.getTime();
+    const hours = Math.floor(elapsed / (1000 * 60 * 60));
+    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}:${minutes.toString().padStart(2, '0')}`;
+  };
+
+  return (
+    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-teal-600 via-cyan-600 to-cyan-500 p-6 text-white shadow-xl shadow-teal-500/20 mb-8">
+      {/* Animated Background */}
+      <div className="absolute inset-0 opacity-20">
+        <div className="absolute -top-4 -right-4 w-32 h-32 bg-white rounded-full blur-2xl" />
+        <div className="absolute -bottom-4 -left-4 w-24 h-24 bg-cyan-300 rounded-full blur-2xl" />
+      </div>
+
+      <div className="relative flex items-start justify-between gap-6">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-3">
+            <span className="flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-white opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-white" />
+            </span>
+            <Badge variant="success" className="bg-white/20 text-white border-0">IN PROGRESS</Badge>
+            {task.billingType === 'INCLUSIVE' && (
+              <Badge variant="info" className="bg-emerald-400/30 text-white border-0">CONCIERGE</Badge>
+            )}
+          </div>
+          <h2 className="text-2xl font-bold mb-2">{task.title}</h2>
+          <p className="text-teal-100 mb-1">{task.householdName}</p>
+          <p className="text-teal-200/80 text-sm">{task.householdAddress}</p>
+
+          <div className="flex items-center gap-8 mt-6">
+            <div>
+              <p className="text-xs text-teal-200 uppercase tracking-wider">Checked in at</p>
+              <p className="text-xl font-bold mt-1">{checkInTime ? formatTime(checkInTime.toISOString()) : '--:--'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-teal-200 uppercase tracking-wider">Time elapsed</p>
+              <p className="text-xl font-bold mt-1">{formatElapsedTime()}</p>
+            </div>
+            <div>
+              <p className="text-xs text-teal-200 uppercase tracking-wider">Est. duration</p>
+              <p className="text-xl font-bold mt-1">{task.estimatedMinutes} min</p>
+            </div>
+          </div>
+        </div>
+
+        <Button
+          onClick={onComplete}
+          variant="secondary"
+          size="lg"
+          className="bg-white text-teal-600 hover:bg-teal-50 shadow-lg"
+          leftIcon={<Check className="w-5 h-5" />}
+        >
+          Complete Task
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// Task Card
+function TaskCard({ task, onCheckIn, isCheckingIn, hasActiveTask }: { task: HandymanTask; onCheckIn: () => void; isCheckingIn: boolean; hasActiveTask: boolean }) {
+  const status = STATUS_STYLES[task.status] || STATUS_STYLES.OPEN;
+
+  return (
+    <Card hover className="overflow-hidden">
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h3 className="font-bold text-warm-900">{task.title}</h3>
+            <Badge variant={status.variant} size="sm">{status.label}</Badge>
+            {task.billingType === 'INCLUSIVE' && (
+              <Badge variant="info" size="sm">CONCIERGE</Badge>
+            )}
+          </div>
+          <p className="text-sm text-warm-600">{task.householdName}</p>
+          <p className="text-xs text-warm-500 mt-1">{task.householdAddress}</p>
+
+          <div className="flex items-center gap-4 mt-4 text-sm text-warm-500">
+            <span className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4" />
+              {formatTime(task.scheduledStart)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Zap className="w-4 h-4" />
+              ~{task.estimatedMinutes} min
+            </span>
+          </div>
+        </div>
+
+        <Button
+          onClick={onCheckIn}
+          disabled={isCheckingIn || hasActiveTask}
+          isLoading={isCheckingIn}
+          leftIcon={<MapPin className="w-4 h-4" />}
+        >
+          Check In
+        </Button>
+      </div>
+    </Card>
+  );
+}
+
+// Household Card
+function HouseholdCard({ household }: { household: { id: string; name: string; address: string; nextVisitDate: string } }) {
+  return (
+    <Card hover>
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-teal-100 flex items-center justify-center">
+          <Home className="w-6 h-6 text-teal-600" />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-warm-900">{household.name}</h3>
+          <p className="text-sm text-warm-500">{household.address}</p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-warm-500 uppercase tracking-wider">Next Visit</p>
+          <p className="text-sm font-semibold text-warm-700">
+            {new Date(household.nextVisitDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </p>
+        </div>
+      </div>
+    </Card>
+  );
+}
+
+// Empty State
+function EmptyTasks() {
+  return (
+    <Card className="text-center py-12">
+      <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+        <CheckCircle className="w-8 h-8 text-emerald-600" />
+      </div>
+      <h3 className="text-lg font-bold text-warm-900 mb-2">All done for today!</h3>
+      <p className="text-warm-600">
+        Great work! Check your schedule for upcoming tasks.
+      </p>
+      <Link href="/handyman/schedule">
+        <Button variant="outline" className="mt-6">
+          View Full Schedule
+        </Button>
+      </Link>
+    </Card>
+  );
+}
+
+// ============================================================================
+// MAIN COMPONENT
+// ============================================================================
 
 export default function HandymanDashboardPage() {
   const [dashboard, setDashboard] = useState<HandymanDashboard | null>(null);
@@ -184,14 +443,6 @@ export default function HandymanDashboardPage() {
     setIsCheckingOut(false);
   };
 
-  const formatTime = (dateStr: string | null) => {
-    if (!dateStr) return 'TBD';
-    return new Date(dateStr).toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
-
   const formatElapsedTime = () => {
     if (!checkInTime) return '0:00';
     const elapsed = Date.now() - checkInTime.getTime();
@@ -213,7 +464,10 @@ export default function HandymanDashboardPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div>
+        <div className="flex flex-col items-center gap-3">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
+          <p className="text-warm-500">Loading dashboard...</p>
+        </div>
       </div>
     );
   }
@@ -222,208 +476,49 @@ export default function HandymanDashboardPage() {
     return (
       <div className="flex flex-col items-center justify-center h-64">
         <p className="text-red-600 mb-4">{error || 'Failed to load dashboard'}</p>
-        <button
-          onClick={loadDashboard}
-          className="px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700"
-        >
-          Retry
-        </button>
+        <Button onClick={loadDashboard}>Retry</Button>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">
-          Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {dashboard.handymanName.split(' ')[0]}!
-        </h1>
-        <p className="text-slate-600 dark:text-slate-400">
-          {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        </p>
-      </div>
+    <div className="space-y-6 pb-20">
+      {/* Hero Header */}
+      <HeroHeader name={dashboard.handymanName.split(' ')[0]} stats={dashboard.stats} />
 
       {/* Active Task Banner */}
       {activeTask && (
-        <div className="bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl p-6 text-white shadow-lg">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="px-2 py-0.5 bg-white/20 rounded text-xs font-medium">IN PROGRESS</span>
-                {activeTask.billingType === 'INCLUSIVE' && (
-                  <span className="px-2 py-0.5 bg-green-400/30 rounded text-xs font-medium">CONCIERGE</span>
-                )}
-              </div>
-              <h2 className="text-xl font-bold mb-1">{activeTask.title}</h2>
-              <p className="text-teal-100 text-sm mb-3">{activeTask.householdName}</p>
-              <p className="text-teal-100/80 text-sm">{activeTask.householdAddress}</p>
-
-              <div className="flex items-center gap-6 mt-4">
-                <div>
-                  <p className="text-xs text-teal-200">Checked in at</p>
-                  <p className="text-lg font-semibold">{checkInTime ? formatTime(checkInTime.toISOString()) : '--:--'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-teal-200">Time elapsed</p>
-                  <p className="text-lg font-semibold">{formatElapsedTime()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-teal-200">Est. duration</p>
-                  <p className="text-lg font-semibold">{activeTask.estimatedMinutes} min</p>
-                </div>
-              </div>
-            </div>
-
-            <button
-              onClick={() => setShowCheckOutModal(true)}
-              className="px-6 py-3 bg-white text-teal-600 rounded-lg font-semibold hover:bg-teal-50 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-              Complete Task
-            </button>
-          </div>
-        </div>
+        <ActiveTaskBanner
+          task={activeTask}
+          checkInTime={checkInTime}
+          onComplete={() => setShowCheckOutModal(true)}
+        />
       )}
-
-      {/* Stats Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{dashboard.stats.completedToday}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Done Today</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-emerald-600 dark:text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{dashboard.stats.hoursLoggedToday.toFixed(1)}h</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Hours Today</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{dashboard.stats.pendingTasks}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Pending</p>
-            </div>
-          </div>
-        </div>
-        <div className="card">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-              <svg className="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-2xl font-bold text-slate-900 dark:text-white">{dashboard.stats.assignedHouseholds}</p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">Households</p>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Today's Tasks */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Today's Tasks</h2>
+          <h2 className="text-lg font-bold text-warm-900">Today's Tasks</h2>
           <Link
             href="/handyman/schedule"
-            className="text-sm text-teal-600 hover:text-teal-700 font-medium"
+            className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
           >
-            View All
+            View All <ChevronRight className="w-4 h-4" />
           </Link>
         </div>
 
         {dashboard.todaysTasks.length === 0 && !activeTask ? (
-          <div className="card text-center py-12">
-            <svg className="w-12 h-12 mx-auto text-slate-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <h3 className="text-lg font-medium text-slate-900 dark:text-white mb-2">All done for today!</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              Great work! Check your schedule for upcoming tasks.
-            </p>
-          </div>
+          <EmptyTasks />
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {dashboard.todaysTasks.map((task) => (
-              <div key={task.id} className="card hover:shadow-lg transition-shadow">
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-slate-900 dark:text-white">{task.title}</h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[task.status]}`}>
-                        {task.status}
-                      </span>
-                      {task.billingType === 'INCLUSIVE' && (
-                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-teal-100 text-teal-700">
-                          CONCIERGE
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-slate-600 dark:text-slate-400">{task.householdName}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-500 mt-1">{task.householdAddress}</p>
-
-                    <div className="flex items-center gap-4 mt-3 text-sm text-slate-500 dark:text-slate-400">
-                      <span className="flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        {formatTime(task.scheduledStart)}
-                      </span>
-                      <span className="flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                        </svg>
-                        ~{task.estimatedMinutes} min
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleCheckIn(task.id)}
-                    disabled={isCheckingIn || !!activeTask}
-                    className="px-4 py-2 bg-teal-600 text-white rounded-lg font-medium hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                  >
-                    {isCheckingIn ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Checking In...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Check In
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+              <TaskCard
+                key={task.id}
+                task={task}
+                onCheckIn={() => handleCheckIn(task.id)}
+                isCheckingIn={isCheckingIn}
+                hasActiveTask={!!activeTask}
+              />
             ))}
           </div>
         )}
@@ -431,124 +526,82 @@ export default function HandymanDashboardPage() {
 
       {/* Assigned Households */}
       <div>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">Your Households</h2>
-        </div>
-
-        <div className="grid gap-3 lg:grid-cols-2">
+        <h2 className="text-lg font-bold text-warm-900 mb-4">Your Households</h2>
+        <div className="grid gap-4 lg:grid-cols-2">
           {dashboard.assignedHouseholds.map((household) => (
-            <div key={household.id} className="card">
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
-                  <svg className="w-5 h-5 text-slate-600 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="font-medium text-slate-900 dark:text-white">{household.name}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">{household.address}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500 dark:text-slate-400">Next Visit</p>
-                  <p className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                    {new Date(household.nextVisitDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                  </p>
-                </div>
-              </div>
-            </div>
+            <HouseholdCard key={household.id} household={household} />
           ))}
         </div>
       </div>
 
       {/* Check Out Modal */}
-      {showCheckOutModal && activeTask && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-800 rounded-xl max-w-md w-full">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-slate-900 dark:text-white">Complete Task</h2>
-                <button
-                  onClick={() => setShowCheckOutModal(false)}
-                  className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition-colors"
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+      <Modal
+        isOpen={showCheckOutModal}
+        onClose={() => setShowCheckOutModal(false)}
+        title="Complete Task"
+        size="md"
+      >
+        {activeTask && (
+          <div className="space-y-6">
+            <Card className="bg-warm-50 border-0">
+              <h3 className="font-bold text-warm-900">{activeTask.title}</h3>
+              <p className="text-sm text-warm-500 mt-1">{activeTask.householdName}</p>
+              <div className="flex items-center gap-4 mt-3 text-sm">
+                <span className="text-warm-600">
+                  Time: <span className="font-semibold">{formatElapsedTime()}</span>
+                </span>
               </div>
+            </Card>
 
-              <div className="space-y-4">
-                <div className="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-lg">
-                  <h3 className="font-medium text-slate-900 dark:text-white">{activeTask.title}</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">{activeTask.householdName}</p>
-                  <div className="flex items-center gap-4 mt-3 text-sm">
-                    <span className="text-slate-600 dark:text-slate-400">
-                      Time: <span className="font-medium">{formatElapsedTime()}</span>
-                    </span>
-                  </div>
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-2">
+                Hours Worked (Optional)
+              </label>
+              <input
+                type="number"
+                step="0.25"
+                min="0"
+                value={checkOutHours}
+                onChange={(e) => setCheckOutHours(e.target.value)}
+                placeholder={`Auto-calculated: ${formatElapsedTime()}`}
+                className="w-full px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+              />
+              <p className="text-xs text-warm-500 mt-1">Leave blank to use elapsed time</p>
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Hours Worked (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.25"
-                    min="0"
-                    value={checkOutHours}
-                    onChange={(e) => setCheckOutHours(e.target.value)}
-                    placeholder={`Auto-calculated: ${formatElapsedTime()}`}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Leave blank to use elapsed time</p>
-                </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-2">
+                Completion Notes (Optional)
+              </label>
+              <textarea
+                value={checkOutNotes}
+                onChange={(e) => setCheckOutNotes(e.target.value)}
+                placeholder="Any notes about the completed work..."
+                rows={3}
+                className="w-full px-4 py-3 border border-warm-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-none"
+              />
+            </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-1">
-                    Completion Notes (Optional)
-                  </label>
-                  <textarea
-                    value={checkOutNotes}
-                    onChange={(e) => setCheckOutNotes(e.target.value)}
-                    placeholder="Any notes about the completed work..."
-                    rows={3}
-                    className="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-lg bg-white dark:bg-slate-700 text-slate-900 dark:text-white"
-                  />
-                </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => setShowCheckOutModal(false)}
-                    className="flex-1 px-4 py-2 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleCheckOut}
-                    disabled={isCheckingOut}
-                    className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-lg hover:bg-teal-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                  >
-                    {isCheckingOut ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                        Completing...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        Complete & Check Out
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
+            <div className="flex gap-3">
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={() => setShowCheckOutModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleCheckOut}
+                isLoading={isCheckingOut}
+                className="flex-1"
+                leftIcon={<Check className="w-5 h-5" />}
+              >
+                Complete & Check Out
+              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }
