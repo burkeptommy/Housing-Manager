@@ -111,7 +111,7 @@ export default function MessagesPage() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev';
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
 
   // Fetch conversations
   const fetchConversations = useCallback(async () => {
