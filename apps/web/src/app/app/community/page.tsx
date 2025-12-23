@@ -1091,8 +1091,8 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
             alt={vendor.name}
             className="w-12 h-12 rounded-lg object-cover"
           />
-          <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-warm-900 truncate">{vendor.name}</h3>
+          <div className="flex-1">
+            <h3 className="font-semibold text-warm-900 leading-tight">{vendor.name}</h3>
             <div className="flex items-center gap-2 text-sm text-warm-500">
               <Star className="w-4 h-4 text-amber-500 fill-current flex-shrink-0" />
               <span>{vendor.rating}</span>
