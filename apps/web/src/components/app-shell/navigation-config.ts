@@ -38,7 +38,7 @@ export const sidebarNavigation: NavSection[] = [
     title: 'Overview',
     items: [
       { name: 'Dashboard', href: '/app', icon: LayoutDashboard },
-      { name: 'Sarah', href: '/app/manager', icon: User, badge: 5, highlight: true },
+      { name: 'Sarah', href: '/app/manager', icon: User, badge: 5 },
       { name: 'Messages', href: '/app/messages', icon: MessageSquare },
       { name: 'Calendar', href: '/app/calendar', icon: Calendar },
     ],
