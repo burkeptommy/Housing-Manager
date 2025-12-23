@@ -108,7 +108,7 @@ const tradeFilters: TradeFilter[] = [
 ];
 
 // Greenwich, CT location
-const currentUserLocation = { lat: 41.0534, lng: -73.5387 };
+const currentUserLocation = { lat: 41.0534, lng: -73.6287 };
 
 const mockVendors: Vendor[] = [
   {
@@ -122,9 +122,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'mikes-plumbing-v1'),
     coverUrl: getVendorWorkImage('plumber', 'mikes-cover', 400, 200),
-    location: { lat: 41.0567, lng: -73.5412 },
+    location: { lat: 41.0534, lng: -73.6287 },
     address: 'Greenwich, CT',
-    distance: 0.8,
+    distance: 0.0,
     phone: '(203) 555-0123',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 98,
@@ -158,9 +158,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'country-landscape-v2'),
     coverUrl: getVendorWorkImage('landscaper', 'landscape-cover', 400, 200),
-    location: { lat: 41.0489, lng: -73.5501 },
-    address: 'Old Greenwich, CT',
-    distance: 1.2,
+    location: { lat: 41.1415, lng: -73.3579 },
+    address: 'Westport, CT',
+    distance: 15.2,
     phone: '(203) 555-5296',
     responseTime: 'Usually responds same day',
     onTimeRate: 95,
@@ -193,9 +193,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'elite-electric-v3'),
     coverUrl: getVendorWorkImage('electrician', 'electric-cover', 400, 200),
-    location: { lat: 41.0612, lng: -73.5289 },
-    address: 'Cos Cob, CT',
-    distance: 1.5,
+    location: { lat: 41.0340, lng: -73.7629 },
+    address: 'White Plains, NY',
+    distance: 8.5,
     phone: '(203) 555-7890',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 92,
@@ -215,9 +215,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'comfort-zone-v4'),
     coverUrl: getVendorWorkImage('hvac', 'hvac-cover', 400, 200),
-    location: { lat: 41.0445, lng: -73.5556 },
-    address: 'Riverside, CT',
-    distance: 1.8,
+    location: { lat: 40.9887, lng: -73.7846 },
+    address: 'Scarsdale, NY',
+    distance: 10.2,
     phone: '(203) 555-4567',
     responseTime: 'Usually responds in 30 min',
     onTimeRate: 99,
@@ -237,9 +237,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'perfect-painters-v5'),
     coverUrl: getVendorWorkImage('painter', 'paint-cover', 400, 200),
-    location: { lat: 41.0523, lng: -73.5234 },
-    address: 'Greenwich, CT',
-    distance: 0.9,
+    location: { lat: 41.0787, lng: -73.4698 },
+    address: 'Darien, CT',
+    distance: 9.8,
     phone: '(203) 555-3456',
     responseTime: 'Usually responds same day',
     onTimeRate: 88,
@@ -259,9 +259,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'handy-dan-v6'),
     coverUrl: getVendorWorkImage('handyman', 'handy-cover', 400, 200),
-    location: { lat: 41.0498, lng: -73.5445 },
-    address: 'Greenwich, CT',
-    distance: 0.5,
+    location: { lat: 40.9807, lng: -73.6835 },
+    address: 'Rye, NY',
+    distance: 5.1,
     phone: '(203) 555-8901',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 94,
@@ -282,9 +282,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'ace-roofing-v7'),
     coverUrl: getVendorWorkImage('roofer', 'ace-roof-cover', 400, 200),
-    location: { lat: 41.0589, lng: -73.5378 },
-    address: 'Greenwich, CT',
-    distance: 0.7,
+    location: { lat: 41.0534, lng: -73.5387 },
+    address: 'Stamford, CT',
+    distance: 5.5,
     phone: '(203) 555-7777',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 97,
@@ -304,9 +304,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'top-notch-v8'),
     coverUrl: getVendorWorkImage('roofer', 'topnotch-cover', 400, 200),
-    location: { lat: 41.0412, lng: -73.5612 },
-    address: 'Stamford, CT',
-    distance: 2.3,
+    location: { lat: 41.1468, lng: -73.4948 },
+    address: 'New Canaan, CT',
+    distance: 11.3,
     phone: '(203) 555-8888',
     responseTime: 'Usually responds same day',
     onTimeRate: 91,
@@ -327,9 +327,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'sparkle-clean-v9'),
     coverUrl: getVendorWorkImage('cleaner', 'sparkle-cover', 400, 200),
-    location: { lat: 41.0501, lng: -73.5401 },
-    address: 'Greenwich, CT',
-    distance: 0.4,
+    location: { lat: 41.1265, lng: -73.7140 },
+    address: 'Armonk, NY',
+    distance: 9.8,
     phone: '(203) 555-2222',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 96,
@@ -349,9 +349,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'molly-maid-v10'),
     coverUrl: getVendorWorkImage('cleaner', 'molly-cover', 400, 200),
-    location: { lat: 41.0478, lng: -73.5512 },
-    address: 'Old Greenwich, CT',
-    distance: 1.1,
+    location: { lat: 41.1412, lng: -73.2637 },
+    address: 'Fairfield, CT',
+    distance: 20.5,
     phone: '(203) 555-3333',
     responseTime: 'Usually responds same day',
     onTimeRate: 98,
@@ -372,9 +372,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'quick-fix-v11'),
     coverUrl: getVendorWorkImage('plumber', 'quickfix-cover', 400, 200),
-    location: { lat: 41.0623, lng: -73.5234 },
-    address: 'Cos Cob, CT',
-    distance: 1.8,
+    location: { lat: 41.0762, lng: -73.8587 },
+    address: 'Tarrytown, NY',
+    distance: 15.2,
     phone: '(203) 555-4444',
     responseTime: 'Usually responds in 30 min',
     onTimeRate: 89,
@@ -394,9 +394,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'premium-plumb-v12'),
     coverUrl: getVendorWorkImage('plumber', 'premium-cover', 400, 200),
-    location: { lat: 41.0534, lng: -73.5287 },
-    address: 'Greenwich, CT',
-    distance: 0.6,
+    location: { lat: 41.1177, lng: -73.4082 },
+    address: 'Norwalk, CT',
+    distance: 12.8,
     phone: '(203) 555-5555',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 99,
@@ -417,9 +417,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'bright-spark-v13'),
     coverUrl: getVendorWorkImage('electrician', 'brightspark-cover', 400, 200),
-    location: { lat: 41.0556, lng: -73.5445 },
-    address: 'Greenwich, CT',
-    distance: 0.5,
+    location: { lat: 41.2045, lng: -73.6437 },
+    address: 'Bedford, NY',
+    distance: 11.5,
     phone: '(203) 555-6666',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 95,
@@ -439,9 +439,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'tesla-cert-v14'),
     coverUrl: getVendorWorkImage('electrician', 'tesla-cover', 400, 200),
-    location: { lat: 41.0489, lng: -73.5567 },
-    address: 'Riverside, CT',
-    distance: 1.4,
+    location: { lat: 41.2815, lng: -73.4984 },
+    address: 'Ridgefield, CT',
+    distance: 18.2,
     phone: '(203) 555-9999',
     responseTime: 'Usually responds same day',
     onTimeRate: 100,
@@ -462,9 +462,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'green-thumb-v15'),
     coverUrl: getVendorWorkImage('landscaper', 'greenthumb-cover', 400, 200),
-    location: { lat: 41.0567, lng: -73.5312 },
-    address: 'Greenwich, CT',
-    distance: 0.9,
+    location: { lat: 40.9401, lng: -73.8321 },
+    address: 'Bronxville, NY',
+    distance: 14.5,
     phone: '(203) 555-1234',
     responseTime: 'Usually responds same day',
     onTimeRate: 92,
@@ -484,9 +484,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'estate-grounds-v16'),
     coverUrl: getVendorWorkImage('landscaper', 'estate-cover', 400, 200),
-    location: { lat: 41.0423, lng: -73.5623 },
-    address: 'Old Greenwich, CT',
-    distance: 1.6,
+    location: { lat: 41.1595, lng: -73.7651 },
+    address: 'Chappaqua, NY',
+    distance: 13.8,
     phone: '(203) 555-5678',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 98,
@@ -507,9 +507,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'arctic-air-v17'),
     coverUrl: getVendorWorkImage('hvac', 'arctic-cover', 400, 200),
-    location: { lat: 41.0601, lng: -73.5189 },
-    address: 'Stamford, CT',
-    distance: 2.1,
+    location: { lat: 40.9487, lng: -73.7324 },
+    address: 'Mamaroneck, NY',
+    distance: 9.2,
     phone: '(203) 555-2468',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 93,
@@ -530,9 +530,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'brush-masters-v18'),
     coverUrl: getVendorWorkImage('painter', 'brushmasters-cover', 400, 200),
-    location: { lat: 41.0512, lng: -73.5456 },
-    address: 'Greenwich, CT',
-    distance: 0.3,
+    location: { lat: 41.1954, lng: -73.4379 },
+    address: 'Wilton, CT',
+    distance: 14.5,
     phone: '(203) 555-1357',
     responseTime: 'Usually responds same day',
     onTimeRate: 94,
@@ -552,9 +552,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'fine-finish-v19'),
     coverUrl: getVendorWorkImage('painter', 'finefinish-cover', 400, 200),
-    location: { lat: 41.0478, lng: -73.5523 },
-    address: 'Old Greenwich, CT',
-    distance: 1.0,
+    location: { lat: 40.9276, lng: -73.7518 },
+    address: 'Larchmont, NY',
+    distance: 11.8,
     phone: '(203) 555-7531',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 97,
@@ -575,9 +575,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'mr-fixit-v20'),
     coverUrl: getVendorWorkImage('handyman', 'mrfixit-cover', 400, 200),
-    location: { lat: 41.0545, lng: -73.5389 },
-    address: 'Greenwich, CT',
-    distance: 0.2,
+    location: { lat: 41.0018, lng: -73.6657 },
+    address: 'Port Chester, NY',
+    distance: 3.5,
     phone: '(203) 555-9876',
     responseTime: 'Usually responds in 30 min',
     onTimeRate: 95,
@@ -597,9 +597,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'home-pro-v21'),
     coverUrl: getVendorWorkImage('handyman', 'homepro-cover', 400, 200),
-    location: { lat: 41.0623, lng: -73.5267 },
-    address: 'Cos Cob, CT',
-    distance: 1.7,
+    location: { lat: 40.9115, lng: -73.7824 },
+    address: 'New Rochelle, NY',
+    distance: 12.5,
     phone: '(203) 555-6543',
     responseTime: 'Usually responds same day',
     onTimeRate: 88,
@@ -620,9 +620,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'pool-paradise-v22'),
     coverUrl: getDemoImage('backyard', 400, 200, 'pool-cover'),
-    location: { lat: 41.0456, lng: -73.5534 },
-    address: 'Riverside, CT',
-    distance: 1.3,
+    location: { lat: 41.0154, lng: -73.8726 },
+    address: 'Dobbs Ferry, NY',
+    distance: 16.8,
     phone: '(203) 555-7890',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 99,
@@ -642,9 +642,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'security-plus-v23'),
     coverUrl: getDemoImage('house-exterior', 400, 200, 'security-cover'),
-    location: { lat: 41.0534, lng: -73.5412 },
-    address: 'Greenwich, CT',
-    distance: 0.4,
+    location: { lat: 41.3948, lng: -73.4540 },
+    address: 'Danbury, CT',
+    distance: 25.5,
     phone: '(203) 555-4321',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 96,
@@ -664,9 +664,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'window-world-v24'),
     coverUrl: getDemoImage('house-exterior', 400, 200, 'window-cover'),
-    location: { lat: 41.0589, lng: -73.5289 },
-    address: 'Greenwich, CT',
-    distance: 0.8,
+    location: { lat: 41.2048, lng: -73.7271 },
+    address: 'Mount Kisco, NY',
+    distance: 14.2,
     phone: '(203) 555-8765',
     responseTime: 'Usually responds same day',
     onTimeRate: 91,
@@ -686,9 +686,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: true,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'floor-masters-v25'),
     coverUrl: getDemoImage('living-room', 400, 200, 'floor-cover'),
-    location: { lat: 41.0501, lng: -73.5478 },
-    address: 'Old Greenwich, CT',
-    distance: 1.0,
+    location: { lat: 41.1365, lng: -73.2834 },
+    address: 'Southport, CT',
+    distance: 19.8,
     phone: '(203) 555-3210',
     responseTime: 'Usually responds in 2 hours',
     onTimeRate: 98,
@@ -708,9 +708,9 @@ const mockVendors: Vendor[] = [
     havenTrusted: false,
     logoUrl: getDemoImage('vendor-logo', 80, 80, 'garage-door-v26'),
     coverUrl: getDemoImage('house-exterior', 400, 200, 'garage-cover'),
-    location: { lat: 41.0623, lng: -73.5345 },
-    address: 'Cos Cob, CT',
-    distance: 1.5,
+    location: { lat: 41.0190, lng: -73.7982 },
+    address: 'Hartsdale, NY',
+    distance: 11.5,
     phone: '(203) 555-2109',
     responseTime: 'Usually responds in 1 hour',
     onTimeRate: 93,
@@ -832,12 +832,14 @@ export default function VendorDiscoveryPage() {
                 ref={mapRef}
                 mapboxAccessToken={MAPBOX_TOKEN}
                 initialViewState={{
-                  latitude: currentUserLocation.lat,
-                  longitude: currentUserLocation.lng,
-                  zoom: 13,
+                  latitude: 41.08,
+                  longitude: -73.60,
+                  zoom: 9.5,
+                  pitch: 45,
+                  bearing: -15,
                 }}
                 style={{ width: '100%', height: '100%' }}
-                mapStyle="mapbox://styles/mapbox/light-v11"
+                mapStyle="mapbox://styles/mapbox/standard"
               >
                 <NavigationControl position="top-right" />
 
@@ -953,50 +955,59 @@ export default function VendorDiscoveryPage() {
 
 function VendorPopup({ vendor }: { vendor: Vendor }) {
   return (
-    <div className="w-[280px] max-w-[280px] overflow-hidden">
-      <div className="flex items-start gap-3">
-        <img
-          src={getVendorAvatar(vendor.name)}
-          alt={vendor.name}
-          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-        />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <h3 className="font-semibold text-warm-900 truncate max-w-[140px]">{vendor.name}</h3>
-            {vendor.havenTrusted && (
-              <span className="px-1.5 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded flex-shrink-0">
-                Haven Trusted
-              </span>
-            )}
+    <div className="w-72 p-0">
+      {/* Card container with proper overflow handling */}
+      <div className="bg-white rounded-lg overflow-hidden">
+        {/* Vendor info */}
+        <div className="p-3">
+          <div className="flex items-start gap-3">
+            <img
+              src={getVendorAvatar(vendor.name)}
+              alt={vendor.name}
+              className="w-11 h-11 rounded-lg flex-shrink-0"
+            />
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold text-warm-900 text-sm leading-tight">{vendor.name}</h3>
+              {vendor.havenTrusted && (
+                <span className="inline-flex items-center gap-1 mt-1 px-1.5 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded">
+                  <Shield className="w-3 h-3" />
+                  Haven Trusted
+                </span>
+              )}
+              <div className="flex items-center gap-1.5 text-xs text-warm-500 mt-1">
+                <Star className="w-3 h-3 text-amber-500 fill-current" />
+                <span>{vendor.rating}</span>
+                <span>•</span>
+                <span>{vendor.reviewCount} reviews</span>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 text-sm text-warm-500 mt-0.5">
-            <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />
-            <span>{vendor.rating}</span>
-            <span className="text-warm-300">•</span>
-            <span className="truncate">{vendor.reviewCount} reviews</span>
+
+          {/* Stats */}
+          <div className="mt-3 flex items-center gap-4 text-xs text-warm-600">
+            <div className="flex items-center gap-1">
+              <Users className="w-3 h-3" />
+              <span>{vendor.neighborsUsed} neighbors</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <MapPin className="w-3 h-3" />
+              <span>{vendor.distance} mi</span>
+            </div>
           </div>
         </div>
-      </div>
-      <div className="mt-2.5 flex items-center gap-3 text-xs text-warm-600">
-        <div className="flex items-center gap-1">
-          <Users className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>{vendor.neighborsUsed} neighbors</span>
+
+        {/* Buttons - inside the card with proper containment */}
+        <div className="px-3 pb-3 flex gap-2">
+          <button className="flex-1 px-3 py-2 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors">
+            Request Quote
+          </button>
+          <a
+            href={`tel:${vendor.phone}`}
+            className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center"
+          >
+            <Phone className="w-4 h-4 text-warm-600" />
+          </a>
         </div>
-        <div className="flex items-center gap-1">
-          <MapPin className="w-3.5 h-3.5 flex-shrink-0" />
-          <span>{vendor.distance} mi</span>
-        </div>
-      </div>
-      <div className="mt-2.5 flex gap-2">
-        <button className="flex-1 px-3 py-1.5 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors">
-          Request Quote
-        </button>
-        <a
-          href={`tel:${vendor.phone}`}
-          className="px-2.5 py-1.5 border border-warm-300 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center"
-        >
-          <Phone className="w-4 h-4 text-warm-600" />
-        </a>
       </div>
     </div>
   );
