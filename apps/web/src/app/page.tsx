@@ -122,12 +122,12 @@ function HeroSection() {
             {/* Value Props */}
             <div className="flex flex-wrap gap-3 mb-8">
               {[
-                { icon: Receipt, label: 'One Bill', color: 'amber' },
-                { icon: MessageSquare, label: 'One Contact', color: 'emerald' },
-                { icon: CheckCircle2, label: 'Zero Hassle', color: 'sky' },
-              ].map(({ icon: Icon, label, color }) => (
+                { icon: Receipt, label: 'One Bill', iconColor: 'text-amber-600' },
+                { icon: MessageSquare, label: 'One Contact', iconColor: 'text-emerald-600' },
+                { icon: CheckCircle2, label: 'Zero Hassle', iconColor: 'text-sky-600' },
+              ].map(({ icon: Icon, label, iconColor }) => (
                 <div key={label} className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
-                  <Icon className={`w-4 h-4 text-${color}-600`} />
+                  <Icon className={`w-4 h-4 ${iconColor}`} />
                   <span className="text-sm font-medium text-slate-700">{label}</span>
                 </div>
               ))}
@@ -463,21 +463,27 @@ function HowItWorksSection() {
       icon: ClipboardList,
       title: 'Tell Us About Your Home',
       description: 'Share your vendors, bills, and preferences. We set up auto-pay and take over the relationships.',
-      color: 'amber',
+      badgeBg: 'bg-amber-600',
+      iconBg: 'bg-amber-100',
+      iconColor: 'text-amber-600',
     },
     {
       step: 2,
       icon: PiggyBank,
       title: 'Fund Your Haven Wallet',
       description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
-      color: 'emerald',
+      badgeBg: 'bg-emerald-600',
+      iconBg: 'bg-emerald-100',
+      iconColor: 'text-emerald-600',
     },
     {
       step: 3,
       icon: MessageSquare,
       title: 'Text Your Manager',
       description: "Something need fixing? Question about your home? Text once. Your dedicated manager handles everything.",
-      color: 'sky',
+      badgeBg: 'bg-sky-600',
+      iconBg: 'bg-sky-100',
+      iconColor: 'text-sky-600',
     },
   ];
 
@@ -498,14 +504,14 @@ function HowItWorksSection() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {steps.map(({ step, icon: Icon, title, description, color }) => (
+          {steps.map(({ step, icon: Icon, title, description, badgeBg, iconBg, iconColor }) => (
             <div key={step} className="relative">
-              <div className={`absolute -top-4 -left-4 w-12 h-12 bg-${color}-600 rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
+              <div className={`absolute -top-4 -left-4 w-12 h-12 ${badgeBg} rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
                 {step}
               </div>
               <div className="bg-slate-50 rounded-2xl p-8 pt-12 h-full border border-slate-200 hover:border-slate-300 transition-colors">
-                <div className={`w-14 h-14 bg-${color}-100 rounded-xl flex items-center justify-center mb-6`}>
-                  <Icon className={`w-7 h-7 text-${color}-600`} />
+                <div className={`w-14 h-14 ${iconBg} rounded-xl flex items-center justify-center mb-6`}>
+                  <Icon className={`w-7 h-7 ${iconColor}`} />
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
                 <p className="text-slate-600 leading-relaxed">{description}</p>
@@ -526,25 +532,33 @@ function ServicesSection() {
     {
       icon: Receipt,
       title: 'Bill Management',
-      color: 'amber',
+      iconBg: 'bg-amber-100',
+      iconColor: 'text-amber-600',
+      checkColor: 'text-amber-500',
       items: ['Mortgage & property taxes', 'All utilities (electric, gas, water)', 'Insurance & HOA dues', 'Every vendor invoice, on time'],
     },
     {
       icon: Wrench,
       title: 'Home Maintenance',
-      color: 'emerald',
+      iconBg: 'bg-emerald-100',
+      iconColor: 'text-emerald-600',
+      checkColor: 'text-emerald-500',
       items: ['Monthly handyman visits', 'HVAC service & filter changes', 'Plumbing & electrical coordination', 'Seasonal prep & winterization'],
     },
     {
       icon: Users,
       title: 'Vendor Coordination',
-      color: 'sky',
+      iconBg: 'bg-sky-100',
+      iconColor: 'text-sky-600',
+      checkColor: 'text-sky-500',
       items: ['Find & vet qualified pros', 'Schedule & oversee all work', 'Handle disputes & issues', 'Negotiate on your behalf'],
     },
     {
       icon: Heart,
       title: 'Life Management',
-      color: 'rose',
+      iconBg: 'bg-rose-100',
+      iconColor: 'text-rose-600',
+      checkColor: 'text-rose-500',
       badge: 'Haven+',
       items: ['Errand running & pickups', 'Package handling & returns', 'Travel coordination', 'Event planning'],
     },
@@ -566,8 +580,8 @@ function ServicesSection() {
           {services.map((service) => (
             <div key={service.title} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
               <div className="flex items-start justify-between mb-4">
-                <div className={`w-12 h-12 bg-${service.color}-100 rounded-xl flex items-center justify-center`}>
-                  <service.icon className={`w-6 h-6 text-${service.color}-600`} />
+                <div className={`w-12 h-12 ${service.iconBg} rounded-xl flex items-center justify-center`}>
+                  <service.icon className={`w-6 h-6 ${service.iconColor}`} />
                 </div>
                 {service.badge && (
                   <span className="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-semibold rounded-full">
@@ -579,7 +593,7 @@ function ServicesSection() {
               <ul className="space-y-2">
                 {service.items.map((item, i) => (
                   <li key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                    <Check className={`w-4 h-4 text-${service.color}-500 flex-shrink-0`} />
+                    <Check className={`w-4 h-4 ${service.checkColor} flex-shrink-0`} />
                     {item}
                   </li>
                 ))}

@@ -699,7 +699,7 @@ The `coverUrl` (project/work photos) should remain real Unsplash images - only t
 
 ---
 
-## FIX 14: MAP VIEW - Zoom Out to Show Westchester Region
+## FIX 14: MAP VIEW - Westchester & Fairfield Counties with Premium 3D Style
 
 **File:** `apps/web/src/app/app/community/page.tsx`
 
@@ -707,86 +707,252 @@ The `coverUrl` (project/work photos) should remain real Unsplash images - only t
 - Map is too zoomed in (zoom 13)
 - Only shows immediate Greenwich area
 - Vendors are clustered too tightly
+- Map style doesn't match premium aesthetic
+
+### CIO Decision: Map Style
+
+After evaluating Mapbox options, I recommend using **Mapbox Standard** with 3D buildings enabled. This creates a premium, sophisticated look that matches Haven's luxury positioning:
+
+- 3D buildings give depth and visual interest
+- Clean, modern aesthetic
+- Warm color tones that complement our palette
+- Professional feel like high-end real estate apps
+
+Alternative: If 3D feels too heavy, fall back to `light-v11` which is clean and minimal.
 
 ### Solution:
 
-**Step 1: Update the map center and zoom**
-
-Change the `initialViewState` in the Map component:
+**Step 1: Update map style and initial view**
 
 ```tsx
-// OLD - Too zoomed in on Greenwich
-initialViewState={{
-  latitude: 41.0534,
-  longitude: -73.5387,
-  zoom: 13,
-}}
-
-// NEW - Zoomed out to show Westchester/White Plains area
-initialViewState={{
-  latitude: 41.0800,   // Shifted north slightly
-  longitude: -73.7500, // Shifted west to center on Westchester
-  zoom: 10,            // Zoomed out to see larger area
-}}
+// Update the Map component
+<Map
+  ref={mapRef}
+  mapboxAccessToken={MAPBOX_TOKEN}
+  initialViewState={{
+    latitude: 41.1,      // Centered between Westchester & Fairfield
+    longitude: -73.55,   // Right on the NY/CT border
+    zoom: 9,             // Zoomed out to show both counties
+    pitch: 45,           // Tilt for 3D effect
+    bearing: -10,        // Slight rotation for visual interest
+  }}
+  style={{ width: '100%', height: '100%' }}
+  mapStyle="mapbox://styles/mapbox/standard"  // 3D style
+  terrain={{ source: 'mapbox-dem', exaggeration: 1.2 }}  // Optional: 3D terrain
+>
 ```
 
-**Step 2: Spread out vendor locations**
-
-Update the `mockVendors` array to have more geographically diverse locations across Westchester County:
+**Step 2: Add terrain source for 3D effect (optional but looks great)**
 
 ```tsx
-// Update vendor locations to spread across Westchester
+// Inside the Map component, add a Source for terrain
+import { Source } from 'react-map-gl/mapbox';
+
+<Map ...>
+  {/* 3D Terrain */}
+  <Source
+    id="mapbox-dem"
+    type="raster-dem"
+    url="mapbox://mapbox.mapbox-terrain-dem-v1"
+    tileSize={512}
+    maxzoom={14}
+  />
+  
+  {/* Rest of map content */}
+</Map>
+```
+
+**Step 3: Spread vendors across BOTH Westchester (NY) and Fairfield (CT) Counties**
+
+```tsx
+// Comprehensive vendor locations across both counties
 const vendorLocations = {
-  // Greenwich area (southwest)
+  // =========================================
+  // FAIRFIELD COUNTY, CT (Eastern side)
+  // =========================================
+  
+  // Greenwich area
   greenwich: { lat: 41.0534, lng: -73.6287 },
   oldGreenwich: { lat: 41.0312, lng: -73.5656 },
   cosCob: { lat: 41.0612, lng: -73.6012 },
   riverside: { lat: 41.0345, lng: -73.5789 },
   
-  // Stamford area
+  // Stamford
   stamford: { lat: 41.0534, lng: -73.5387 },
-  darien: { lat: 41.0787, lng: -73.4698 },
+  stamfordDowntown: { lat: 41.0466, lng: -73.5394 },
   
-  // White Plains area (north central)
+  // Darien & Norwalk
+  darien: { lat: 41.0787, lng: -73.4698 },
+  norwalk: { lat: 41.1177, lng: -73.4082 },
+  southNorwalk: { lat: 41.0954, lng: -73.4190 },
+  
+  // Westport & Fairfield
+  westport: { lat: 41.1415, lng: -73.3579 },
+  fairfield: { lat: 41.1412, lng: -73.2637 },
+  southport: { lat: 41.1365, lng: -73.2834 },
+  
+  // Northern Fairfield
+  newCanaan: { lat: 41.1468, lng: -73.4948 },
+  wilton: { lat: 41.1954, lng: -73.4379 },
+  ridgefield: { lat: 41.2815, lng: -73.4984 },
+  danbury: { lat: 41.3948, lng: -73.4540 },
+  
+  // =========================================
+  // WESTCHESTER COUNTY, NY (Western side)
+  // =========================================
+  
+  // Southern Westchester
+  portChester: { lat: 41.0018, lng: -73.6657 },
+  rye: { lat: 40.9807, lng: -73.6835 },
+  ryeBrook: { lat: 41.0290, lng: -73.6835 },
+  mamaroneck: { lat: 40.9487, lng: -73.7324 },
+  larchmont: { lat: 40.9276, lng: -73.7518 },
+  newRochelle: { lat: 40.9115, lng: -73.7824 },
+  
+  // Central Westchester
   whitePlains: { lat: 41.0340, lng: -73.7629 },
   scarsdale: { lat: 40.9887, lng: -73.7846 },
   eastchester: { lat: 40.9526, lng: -73.8085 },
+  bronxville: { lat: 40.9401, lng: -73.8321 },
+  tuckahoe: { lat: 40.9504, lng: -73.8276 },
+  hartsdale: { lat: 41.0190, lng: -73.7982 },
   
   // Northern Westchester
   armonk: { lat: 41.1265, lng: -73.7140 },
   bedford: { lat: 41.2045, lng: -73.6437 },
   chappaqua: { lat: 41.1595, lng: -73.7651 },
+  mountKisco: { lat: 41.2048, lng: -73.7271 },
+  katonah: { lat: 41.2587, lng: -73.6857 },
+  poundRidge: { lat: 41.2070, lng: -73.5743 },
   
-  // Rye/Port Chester area (east)
-  rye: { lat: 40.9807, lng: -73.6835 },
-  portChester: { lat: 41.0018, lng: -73.6657 },
-  mamaroneck: { lat: 40.9487, lng: -73.7324 },
-  
-  // Yonkers/Mt Vernon (south)
-  yonkers: { lat: 40.9312, lng: -73.8987 },
-  mtVernon: { lat: 40.9126, lng: -73.8371 },
-  newRochelle: { lat: 40.9115, lng: -73.7824 },
-  
-  // Tarrytown area (northwest)
+  // Hudson River towns
   tarrytown: { lat: 41.0762, lng: -73.8587 },
   irvington: { lat: 41.0393, lng: -73.8654 },
-  dobbs: { lat: 41.0154, lng: -73.8726 },
+  dobbsFerry: { lat: 41.0154, lng: -73.8726 },
+  hastings: { lat: 41.0001, lng: -73.8790 },
+  yonkers: { lat: 40.9312, lng: -73.8987 },
+  
+  // Sound Shore
+  pelham: { lat: 40.9101, lng: -73.8079 },
+  pelhamManor: { lat: 40.8954, lng: -73.8079 },
+  mtVernon: { lat: 40.9126, lng: -73.8371 },
 };
 
-// Then update each vendor's location property to use these spread-out coordinates
-// For example:
-mockVendors[0].location = vendorLocations.greenwich;
-mockVendors[1].location = vendorLocations.whitePlains;
-mockVendors[2].location = vendorLocations.scarsdale;
-// ... etc, spreading vendors across the region
+// Assign locations to vendors - spread them evenly across both counties
+// Example assignments (update all 26 vendors):
+const vendorLocationAssignments = [
+  'greenwich',      // v1 - Mike's Plumbing Pro
+  'westport',       // v2 - Country Landscape Design
+  'whitePlains',    // v3 - Elite Electric Services
+  'scarsdale',      // v4 - Comfort Zone HVAC
+  'darien',         // v5 - Perfect Painters LLC
+  'rye',            // v6 - Handy Dan Services
+  'stamford',       // v7 - Ace Roofing Co.
+  'newCanaan',      // v8 - Top Notch Roofing
+  'armonk',         // v9 - Sparkle Clean CT
+  'fairfield',      // v10 - Molly Maid Greenwich
+  'tarrytown',      // v11 - Quick Fix Plumbing
+  'norwalk',        // v12 - Premium Plumbing Solutions
+  'bedford',        // v13 - Bright Spark Electric
+  'ridgefield',     // v14 - Tesla Certified Electricians
+  'bronxville',     // v15 - Green Thumb Gardens
+  'chappaqua',      // v16 - Estate Grounds Maintenance
+  'mamaroneck',     // v17 - Arctic Air HVAC
+  'wilton',         // v18 - Brush Masters Painting
+  'larchmont',      // v19 - Fine Finish Painters
+  'portChester',    // v20 - Mr. Fix-It Greenwich
+  'newRochelle',    // v21 - Home Pro Services
+  'dobbsFerry',     // v22 - Pool Paradise CT
+  'danbury',        // v23 - Security Systems Plus
+  'mountKisco',     // v24 - Window World CT
+  'southport',      // v25 - Floor Masters LLC
+  'hartsdale',      // v26 - Garage Door Experts
+];
 ```
 
-**Step 3: Update user location marker**
+**Step 4: Update user location marker**
 
 ```tsx
-// Update to show user in Greenwich
-const currentUserLocation = { lat: 41.0534, lng: -73.6287 }; // Greenwich, CT
+// User is in Greenwich, CT (our demo property at 38 Bedford Rd)
+const currentUserLocation = { lat: 41.0534, lng: -73.6287 };
 ```
+
+**Step 5: Update vendor distances dynamically**
+
+Since vendors are now spread across two counties, calculate real distances:
+
+```tsx
+// Helper function to calculate distance between two points
+function calculateDistance(
+  lat1: number, lng1: number, 
+  lat2: number, lng2: number
+): number {
+  const R = 3959; // Earth's radius in miles
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = 
+    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+    Math.sin(dLng/2) * Math.sin(dLng/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return Math.round(R * c * 10) / 10; // Round to 1 decimal
+}
+
+// Then in each vendor:
+vendor.distance = calculateDistance(
+  currentUserLocation.lat, 
+  currentUserLocation.lng,
+  vendor.location.lat,
+  vendor.location.lng
+);
+```
+
+**Step 6: Add map controls for better UX**
+
+```tsx
+import { NavigationControl, GeolocateControl, ScaleControl } from 'react-map-gl/mapbox';
+
+<Map ...>
+  <NavigationControl position="top-right" visualizePitch={true} />
+  <GeolocateControl position="top-right" />
+  <ScaleControl position="bottom-left" />
+  
+  {/* Rest of markers and popups */}
+</Map>
+```
+
+**Step 7: Style the markers to stand out on 3D map**
+
+```tsx
+{/* Vendor markers with shadows for 3D depth */}
+{sortedVendors.map(vendor => (
+  <Marker
+    key={vendor.id}
+    latitude={vendor.location.lat}
+    longitude={vendor.location.lng}
+    onClick={() => setSelectedVendor(vendor)}
+  >
+    <div className={`
+      w-10 h-10 rounded-full flex items-center justify-center cursor-pointer
+      transition-all duration-200 hover:scale-110
+      shadow-lg shadow-black/20
+      ${vendor.havenTrusted 
+        ? 'bg-gradient-to-br from-haven-500 to-haven-700' 
+        : 'bg-gradient-to-br from-warm-500 to-warm-700'
+      }
+      ${selectedVendor?.id === vendor.id 
+        ? 'ring-4 ring-white scale-110 shadow-xl' 
+        : ''
+      }
+    `}>
+      {vendor.havenTrusted ? (
+        <Shield className="w-5 h-5 text-white drop-shadow" />
+      ) : (
+        <Wrench className="w-5 h-5 text-white drop-shadow" />
+      )}
+    </div>
+  </Marker>
+))}
 
 ---
 
