@@ -566,7 +566,7 @@ export default function ManagerHubPage() {
           </div>
 
           {/* Stats - Mobile */}
-          <div className="lg:hidden grid grid-cols-4 gap-2 mt-4">
+          <div className="lg:hidden grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
             <div className="text-center py-2 bg-warm-50 rounded-lg">
               <p className="text-lg font-bold text-warm-900">{MANAGER.stats.tasksCompletedThisMonth}</p>
               <p className="text-xs text-warm-500">Tasks</p>

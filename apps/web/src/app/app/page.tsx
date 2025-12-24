@@ -214,7 +214,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
   const healthColors = getHealthColors(mockHouseHealth.score);
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-8 text-white mb-8">
+    <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-4 sm:p-8 text-white mb-6 sm:mb-8">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
@@ -222,24 +222,24 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
       </div>
 
       <div className="relative">
-        <div className="flex items-start justify-between">
-          <div>
-            <p className="text-haven-100 text-sm font-medium mb-1">{today}</p>
-            <h1 className="text-3xl lg:text-4xl font-bold tracking-tight mb-2 text-white">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-haven-100 text-xs sm:text-sm font-medium mb-1">{today}</p>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight mb-1 sm:mb-2 text-white truncate">
               {greeting}, {userName}
             </h1>
-            {note && <p className="text-haven-100 text-lg">{note}</p>}
+            {note && <p className="text-haven-100 text-sm sm:text-lg">{note}</p>}
           </div>
-          <div className="flex items-center gap-3 bg-white/20 backdrop-blur-sm rounded-2xl px-4 py-3">
-            <WeatherIcon className="w-8 h-8" />
-            <span className="text-2xl font-bold">{weather.temp}°</span>
+          <div className="flex-shrink-0 flex items-center gap-2 sm:gap-3 bg-white/20 backdrop-blur-sm rounded-xl sm:rounded-2xl px-3 py-2 sm:px-4 sm:py-3">
+            <WeatherIcon className="w-6 h-6 sm:w-8 sm:h-8" />
+            <span className="text-xl sm:text-2xl font-bold">{weather.temp}°</span>
           </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="flex gap-6 mt-8">
-          {/* Home Health - Semantic Colors */}
-          <div className={`${healthColors.bg} ${healthColors.border} border rounded-xl px-4 py-3`}>
+        {/* Quick Stats - Responsive Grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
+          {/* Home Health - Full width on mobile, semantic colors */}
+          <div className={`col-span-2 sm:col-span-1 ${healthColors.bg} ${healthColors.border} border rounded-xl px-4 py-3`}>
             <p className="text-warm-500 text-xs font-medium">Home Health</p>
             <div className="flex items-center gap-2">
               <p className={`text-2xl font-bold ${healthColors.text}`}>{mockHouseHealth.score}%</p>
