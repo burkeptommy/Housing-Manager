@@ -10,18 +10,19 @@ const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
   title: {
-    default: 'Haven | The Operating System for Your Home',
+    default: 'Haven - Full-Service Home Management',
     template: '%s | Haven',
   },
   description:
-    'A dedicated Chief of Staff, a secure wallet for your bills, and a proactive maintenance team. Your home, fully managed.',
+    'Stop managing your home. Start living in it. One payment covers everything. One text handles anything.',
   keywords: [
     'home management',
-    'home concierge',
-    'property management',
+    'bill pay',
     'home maintenance',
+    'handyman',
+    'home manager',
+    'home concierge',
     'household management',
-    'home services',
   ],
   authors: [{ name: 'Haven' }],
   creator: 'Haven',
@@ -32,24 +33,24 @@ export const metadata: Metadata = {
     locale: 'en_US',
     url: 'https://havenhome.dev',
     siteName: 'Haven',
-    title: 'Haven | The Operating System for Your Home',
+    title: 'Haven - Full-Service Home Management',
     description:
-      'A dedicated Chief of Staff, a secure wallet for your bills, and a proactive maintenance team. Your home, fully managed.',
+      'Stop managing your home. Start living in it. One payment covers everything. One text handles anything.',
     images: [
       {
         url: '/opengraph-image',
         width: 1200,
         height: 630,
-        alt: 'Haven - Welcome Home',
+        alt: 'Haven - Full-service home management',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Haven | The Operating System for Your Home',
+    title: 'Haven - Full-Service Home Management',
     description:
-      'A dedicated Chief of Staff, a secure wallet for your bills, and a proactive maintenance team. Your home, fully managed.',
-    images: ['/opengraph-image'],
+      'Stop managing your home. Start living in it. One payment. One text. Everything handled.',
+    images: ['/twitter-image'],
   },
   robots: {
     index: true,

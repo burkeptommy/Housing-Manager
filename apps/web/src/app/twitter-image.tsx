@@ -5,7 +5,7 @@ export const runtime = 'edge';
 export const alt = 'Haven - Full-service home management';
 export const size = {
   width: 1200,
-  height: 630,
+  height: 600, // Twitter uses 2:1 ratio
 };
 export const contentType = 'image/png';
 
@@ -57,7 +57,7 @@ export default async function Image() {
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '60px',
+            padding: '50px',
             position: 'relative',
             zIndex: 1,
           }}
@@ -68,24 +68,24 @@ export default async function Image() {
               display: 'flex',
               alignItems: 'center',
               gap: '16px',
-              marginBottom: '40px',
+              marginBottom: '32px',
             }}
           >
             {/* Logo icon - leaf shape */}
             <div
               style={{
-                width: '56px',
-                height: '56px',
+                width: '48px',
+                height: '48px',
                 background: 'linear-gradient(135deg, #D4C5A9 0%, #C4B393 100%)',
-                borderRadius: '14px',
+                borderRadius: '12px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
               }}
             >
               <svg
-                width="32"
-                height="32"
+                width="28"
+                height="28"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="#1E2A3B"
@@ -100,7 +100,7 @@ export default async function Image() {
             {/* Haven wordmark */}
             <span
               style={{
-                fontSize: '48px',
+                fontSize: '42px',
                 fontWeight: 700,
                 color: 'white',
                 letterSpacing: '-0.02em',
@@ -116,12 +116,12 @@ export default async function Image() {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
-              marginBottom: '24px',
+              marginBottom: '20px',
             }}
           >
             <span
               style={{
-                fontSize: '52px',
+                fontSize: '46px',
                 fontWeight: 700,
                 color: 'white',
                 letterSpacing: '-0.02em',
@@ -132,7 +132,7 @@ export default async function Image() {
             </span>
             <span
               style={{
-                fontSize: '52px',
+                fontSize: '46px',
                 fontWeight: 700,
                 color: '#D4C5A9',
                 letterSpacing: '-0.02em',
@@ -149,7 +149,7 @@ export default async function Image() {
               width: '80px',
               height: '3px',
               background: 'linear-gradient(90deg, transparent, #D4C5A9, transparent)',
-              marginBottom: '24px',
+              marginBottom: '20px',
               borderRadius: '2px',
             }}
           />
@@ -157,9 +157,9 @@ export default async function Image() {
           {/* Subheadline */}
           <span
             style={{
-              fontSize: '24px',
+              fontSize: '22px',
               color: 'rgba(255, 255, 255, 0.8)',
-              marginBottom: '40px',
+              marginBottom: '32px',
               letterSpacing: '0.01em',
             }}
           >
@@ -170,7 +170,7 @@ export default async function Image() {
           <div
             style={{
               display: 'flex',
-              gap: '48px',
+              gap: '40px',
             }}
           >
             {[
@@ -184,7 +184,7 @@ export default async function Image() {
                   display: 'flex',
                   flexDirection: 'column',
                   alignItems: 'center',
-                  padding: '16px 24px',
+                  padding: '14px 20px',
                   background: 'rgba(255, 255, 255, 0.05)',
                   borderRadius: '12px',
                   border: '1px solid rgba(255, 255, 255, 0.1)',
@@ -192,7 +192,7 @@ export default async function Image() {
               >
                 <span
                   style={{
-                    fontSize: '32px',
+                    fontSize: '28px',
                     fontWeight: 700,
                     color: '#D4C5A9',
                   }}
@@ -201,7 +201,7 @@ export default async function Image() {
                 </span>
                 <span
                   style={{
-                    fontSize: '14px',
+                    fontSize: '12px',
                     color: 'rgba(255, 255, 255, 0.6)',
                     textTransform: 'uppercase',
                     letterSpacing: '0.05em',
