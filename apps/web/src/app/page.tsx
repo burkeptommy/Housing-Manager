@@ -2,1426 +2,1263 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
 import {
-  Home,
+  ArrowRight,
   Check,
   X,
-  ArrowRight,
-  DollarSign,
-  MessageSquare,
-  Wrench,
-  Calendar,
-  FileText,
-  Shield,
-  Clock,
-  Users,
-  Zap,
-  Droplets,
-  Wifi,
-  Sparkles,
-  Star,
-  Lock,
-  BadgeCheck,
-  CheckCircle2,
   ChevronDown,
   ChevronUp,
-  ChevronRight,
-  Award,
-  ShieldCheck,
-  Hammer,
-  PiggyBank,
-  Timer,
-  Bot,
-  Laptop,
-  HeartHandshake,
-  Receipt,
-  Heart,
+  Star,
+  Shield,
+  Clock,
+  DollarSign,
+  Home,
+  Wrench,
+  Users,
+  FileText,
+  MessageCircle,
   Phone,
-  Mail,
-  Package,
-  Car,
-  ClipboardList,
-  Flame,
-  Leaf,
-  Building2,
-  MapPin,
+  Calendar,
+  Zap,
+  Heart,
+  Award,
+  Building,
+  Sparkles,
+  CircleDot,
+  BadgeCheck,
+  CreditCard,
+  Banknote,
+  Receipt,
+  ShoppingBag,
+  Plane,
+  PartyPopper,
   Crown,
+  ChevronRight,
+  Play,
+  CheckCircle2,
+  XCircle,
+  Timer,
+  Headphones,
+  HandCoins,
+  ClipboardList,
+  AlertTriangle,
+  Brain,
+  Coffee,
 } from 'lucide-react';
 
-// ============================================================================
-// NAVIGATION
-// ============================================================================
-function Navigation() {
+export default function MarketingPage() {
+  const [showPremiumTiers, setShowPremiumTiers] = useState(false);
+  const [openFaq, setOpenFaq] = useState<number | null>(0);
+
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-sm border-b border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center">
-              <Home className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-slate-900">Haven</span>
-          </Link>
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#how-it-works" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">How It Works</a>
-            <a href="#services" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Services</a>
-            <a href="#pricing" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Pricing</a>
-            <a href="#compare" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Compare</a>
-            <Link href="/login" className="text-slate-600 hover:text-slate-900 text-sm font-medium transition-colors">Login</Link>
-            <Link
-              href="/register"
-              className="px-5 py-2.5 bg-emerald-600 text-white text-sm font-semibold rounded-lg hover:bg-emerald-700 transition-colors shadow-sm"
-            >
-              Get Started
-            </Link>
-          </div>
-          <Link href="/register" className="md:hidden px-4 py-2 bg-emerald-600 text-white text-sm font-semibold rounded-lg">
-            Get Started
-          </Link>
+    <div className="min-h-screen bg-white">
+      {/* ================================================================== */}
+      {/* HERO SECTION */}
+      {/* ================================================================== */}
+      <section className="relative overflow-hidden bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 pt-8 pb-16 sm:pt-12 sm:pb-24">
+        {/* Background decoration */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-500 rounded-full blur-3xl opacity-30" />
+          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-amber-500 rounded-full blur-3xl opacity-20" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-haven-400 rounded-full blur-3xl opacity-20" />
         </div>
-      </div>
-    </nav>
-  );
-}
 
-// ============================================================================
-// HERO SECTION
-// ============================================================================
-function HeroSection() {
-  return (
-    <section className="relative pt-24 pb-16 lg:pb-24 px-4 sm:px-6 lg:px-8 overflow-hidden bg-gradient-to-b from-slate-50 via-white to-white">
-      <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-emerald-50/50 to-transparent pointer-events-none" />
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            {/* Left - Copy */}
+            <div className="text-center lg:text-left">
+              {/* Trust badge */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur border border-white/20 rounded-full mb-6">
+                <span className="flex items-center gap-1">
+                  <Star className="w-4 h-4 text-amber-400 fill-current" />
+                  <span className="text-sm font-medium text-white">4.9/5</span>
+                </span>
+                <span className="text-white/40">|</span>
+                <span className="text-sm text-white/80">500+ families served</span>
+              </div>
 
-      <div className="max-w-7xl mx-auto relative">
-        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
-          {/* Left Column - Content */}
-          <div className="relative z-10">
-            {/* Badge */}
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-full mb-6">
-              <HeartHandshake className="w-4 h-4 text-emerald-600" />
-              <span className="text-sm font-medium text-emerald-800">
-                Full-service home management, not just software
-              </span>
-            </div>
+              {/* Main Headline */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1]">
+                Stop managing your home.
+                <br />
+                <span className="text-amber-400">Start living in it.</span>
+              </h1>
 
-            <h1 className="font-serif text-4xl sm:text-5xl lg:text-6xl font-bold text-slate-900 leading-[1.1] tracking-tight mb-6">
-              Your home, managed.
-              <br />
-              <span className="text-emerald-600">Starting at just $39/month.</span>
-            </h1>
+              {/* Subheadline */}
+              <p className="mt-6 text-lg sm:text-xl text-haven-100 max-w-xl">
+                One payment covers everything. One text handles anything.
+                From paying bills to fixing leaks, we've got it.
+              </p>
 
-            <p className="text-xl lg:text-2xl text-slate-900 font-semibold mb-2">
-              From bill consolidation to full estate management.
-            </p>
+              {/* Value props */}
+              <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
+                <span className="flex items-center gap-2 text-white">
+                  <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  8+ hours saved monthly
+                </span>
+                <span className="flex items-center gap-2 text-white">
+                  <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  No setup fees
+                </span>
+                <span className="flex items-center gap-2 text-white">
+                  <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                  Cancel anytime
+                </span>
+              </div>
 
-            <p className="text-lg text-slate-600 max-w-xl mb-8 leading-relaxed">
-              Choose the level of support that fits your life. Start with self-service tools, or get a dedicated Home Manager who handles everything for you.
-            </p>
+              {/* CTAs */}
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                <Link
+                  href="/register"
+                  className="w-full sm:w-auto px-8 py-4 bg-amber-500 text-warm-900 font-semibold rounded-xl hover:bg-amber-400 transition-all hover:shadow-lg hover:shadow-amber-500/25 text-lg flex items-center justify-center gap-2"
+                >
+                  Get Started for $39/month
+                  <ArrowRight className="w-5 h-5" />
+                </Link>
+                <a
+                  href="#how-it-works"
+                  className="w-full sm:w-auto px-8 py-4 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-lg flex items-center justify-center gap-2"
+                >
+                  <Play className="w-5 h-5" />
+                  See How It Works
+                </a>
+              </div>
 
-            {/* Value Props */}
-            <div className="flex flex-wrap gap-3 mb-8">
-              {[
-                { icon: Receipt, label: 'One Bill', iconColor: 'text-amber-600' },
-                { icon: MessageSquare, label: 'One Contact', iconColor: 'text-emerald-600' },
-                { icon: CheckCircle2, label: 'Zero Hassle', iconColor: 'text-sky-600' },
-              ].map(({ icon: Icon, label, iconColor }) => (
-                <div key={label} className="flex items-center gap-2 px-4 py-2 bg-white rounded-full border border-slate-200 shadow-sm">
-                  <Icon className={`w-4 h-4 ${iconColor}`} />
-                  <span className="text-sm font-medium text-slate-700">{label}</span>
+              {/* Trust elements */}
+              <div className="mt-8 pt-8 border-t border-white/20 flex flex-wrap items-center justify-center lg:justify-start gap-6">
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Shield className="w-4 h-4" />
+                  <span>FDIC Insured</span>
                 </div>
-              ))}
-            </div>
-
-            {/* CTAs */}
-            <div className="flex flex-col sm:flex-row items-start gap-4 mb-10">
-              <a
-                href="#pricing"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-emerald-600 text-white text-lg font-semibold rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/25 hover:shadow-xl hover:shadow-emerald-600/30"
-              >
-                Start for $39/month
-                <ArrowRight className="w-5 h-5" />
-              </a>
-              <a
-                href="#how-it-works"
-                className="inline-flex items-center justify-center gap-2 px-8 py-4 text-slate-700 text-lg font-medium hover:text-emerald-600 transition-colors"
-              >
-                See How It Works
-                <ChevronDown className="w-5 h-5" />
-              </a>
-            </div>
-
-            {/* Trust Bar */}
-            <div className="flex flex-wrap items-center gap-6 pt-8 border-t border-slate-200">
-              {[
-                { icon: Lock, label: 'FDIC-Insured' },
-                { icon: Shield, label: '$2M Coverage' },
-                { icon: ShieldCheck, label: 'SOC 2 Certified' },
-                { icon: Star, label: '4.9/5 Rating', fill: true },
-              ].map(({ icon: Icon, label, fill }) => (
-                <div key={label} className="flex items-center gap-2 text-slate-500">
-                  <Icon className={`w-4 h-4 ${fill ? 'text-amber-400 fill-amber-400' : ''}`} />
-                  <span className="text-sm font-medium">{label}</span>
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <BadgeCheck className="w-4 h-4" />
+                  <span>SOC 2 Certified</span>
                 </div>
-              ))}
+                <div className="flex items-center gap-2 text-sm text-white/70">
+                  <Award className="w-4 h-4" />
+                  <span>Vetted Pros Only</span>
+                </div>
+              </div>
             </div>
-          </div>
 
-          {/* Right Column - Visual */}
-          <div className="relative hidden lg:block">
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-gradient-to-r from-emerald-200/30 to-sky-200/30 rounded-full blur-3xl" />
-
-            {/* Manager Card */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2, duration: 0.6 }}
-              className="relative bg-white rounded-2xl shadow-2xl shadow-slate-900/10 border border-slate-200 overflow-hidden max-w-sm mx-auto"
-            >
-              <div className="p-5 border-b border-slate-100 bg-gradient-to-r from-emerald-50 to-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-full flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                    <span className="text-lg font-bold text-white">SH</span>
+            {/* Right - Sarah Chat Interface */}
+            <div className="relative lg:pl-8">
+              <div className="relative bg-white rounded-2xl shadow-2xl border border-warm-200 overflow-hidden max-w-sm mx-auto lg:max-w-none">
+                {/* Chat Header */}
+                <div className="bg-gradient-to-r from-haven-600 to-haven-700 px-4 py-3 flex items-center gap-3">
+                  <div className="relative">
+                    <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-haven-600 font-semibold">
+                      SH
+                    </div>
+                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-400 border-2 border-haven-600 rounded-full" />
                   </div>
-                  <div className="flex-1">
-                    <p className="font-semibold text-slate-900">Sarah, Your Home Manager</p>
-                    <p className="text-sm text-emerald-600 flex items-center gap-1.5">
-                      <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-                      Active now
+                  <div>
+                    <p className="font-semibold text-white">Sarah, Your Home Manager</p>
+                    <p className="text-haven-200 text-sm">Active now</p>
+                  </div>
+                </div>
+
+                {/* Chat Messages */}
+                <div className="p-4 space-y-3 bg-warm-50">
+                  <div className="bg-white rounded-xl p-3 shadow-sm border border-warm-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                        <Check className="w-4 h-4 text-green-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-warm-900">Furnace service completed</p>
+                        <p className="text-sm text-warm-500">Filter changed, ready for winter</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-3 shadow-sm border border-warm-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                        <DollarSign className="w-4 h-4 text-amber-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-warm-900">December bills paid</p>
+                        <p className="text-sm text-warm-500">Mortgage, utilities, lawn care. All set.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-xl p-3 shadow-sm border border-warm-100">
+                    <div className="flex items-start gap-3">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                        <Calendar className="w-4 h-4 text-blue-600" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-warm-900">Gutter cleaning scheduled</p>
+                        <p className="text-sm text-warm-500">Tuesday 10am. No action needed.</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-haven-50 rounded-xl p-3 border border-haven-200">
+                    <p className="text-sm text-haven-700 flex items-center gap-2">
+                      <CheckCircle2 className="w-4 h-4" />
+                      No action needed from you. We've got it covered.
                     </p>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-5 space-y-3">
-                <div className="flex items-start gap-3 p-3 bg-emerald-50 rounded-xl border border-emerald-100">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">Furnace service completed</p>
-                    <p className="text-xs text-slate-500">Filter changed, ready for winter</p>
+                {/* Stats bar */}
+                <div className="bg-white border-t border-warm-200 px-4 py-3 flex items-center justify-around">
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-haven-600">12 bills</p>
+                    <p className="text-xs text-warm-500">→ 1 payment</p>
                   </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl border border-amber-100">
-                  <DollarSign className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">December bills paid</p>
-                    <p className="text-xs text-slate-500">Mortgage, utilities, lawn care. All set.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-3 p-3 bg-sky-50 rounded-xl border border-sky-100">
-                  <Calendar className="w-5 h-5 text-sky-600 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-slate-900">Gutter cleaning scheduled</p>
-                    <p className="text-xs text-slate-500">Tuesday 10am. No action needed.</p>
+                  <div className="w-px h-8 bg-warm-200" />
+                  <div className="text-center">
+                    <p className="text-lg font-bold text-haven-600">8+ hrs</p>
+                    <p className="text-xs text-warm-500">saved monthly</p>
                   </div>
                 </div>
               </div>
 
-              <div className="p-4 bg-slate-50 border-t border-slate-100">
-                <p className="text-xs text-center text-slate-500 font-medium">
-                  ✨ No action needed from you. We've got it covered.
+              {/* Floating badge */}
+              <div className="absolute -bottom-4 -left-4 bg-white rounded-xl shadow-lg border border-warm-200 p-3 hidden lg:block">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                    <Check className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-warm-900">$400 saved</p>
+                    <p className="text-xs text-warm-500">Caught overcharge</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* PAIN POINT SECTION */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              Owning a home shouldn't feel like a second job.
+            </h2>
+            <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
+              You're juggling a career, family, and life. The last thing you need is to be the unpaid project manager of your own home.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+            {/* Without Haven */}
+            <div className="bg-red-50 rounded-2xl p-6 border border-red-100">
+              <div className="flex items-center gap-2 mb-4">
+                <XCircle className="w-6 h-6 text-red-500" />
+                <h3 className="text-lg font-semibold text-warm-900">Without Haven</h3>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  '12+ vendor relationships to juggle',
+                  'Dozens of bills arriving at random',
+                  'Hours spent on hold with contractors',
+                  'Forgotten maintenance = expensive repairs',
+                  "You're the unpaid project manager",
+                  'Constant mental overhead',
+                ].map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-3 text-warm-700">
+                    <X className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            {/* With Haven */}
+            <div className="bg-gradient-to-br from-haven-600 to-haven-700 rounded-2xl p-6 text-white">
+              <div className="flex items-center gap-2 mb-4">
+                <CheckCircle2 className="w-6 h-6 text-amber-400" />
+                <h3 className="text-lg font-semibold">With Haven</h3>
+              </div>
+              <ul className="space-y-3">
+                {[
+                  '1 dedicated Home Manager',
+                  '1 monthly bill, auto-paid',
+                  'Text your manager, we make the calls',
+                  'Proactive maintenance catches issues early',
+                  'Results, not more to-do lists',
+                  'Complete peace of mind',
+                ].map((item, idx) => (
+                  <li key={idx} className="flex items-start gap-3 text-haven-100">
+                    <Check className="w-5 h-5 text-amber-400 flex-shrink-0 mt-0.5" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          <div className="mt-8 text-center">
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-amber-100 rounded-full">
+              <Clock className="w-5 h-5 text-amber-600" />
+              <p className="text-lg font-semibold text-amber-800">
+                8+ hours per month. That's what our members get back.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* HOW IT WORKS */}
+      {/* ================================================================== */}
+      <section id="how-it-works" className="py-16 sm:py-24 bg-gradient-to-b from-warm-100 to-warm-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold text-haven-600 uppercase tracking-wide mb-2">Simple Setup</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              From Chaos to Calm in 3 Steps
+            </h2>
+            <p className="mt-4 text-lg text-warm-600">
+              Get started in minutes. We handle everything from there.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                step: '1',
+                title: 'Tell Us About Your Home',
+                description: 'Share your vendors, bills, and preferences. We set up auto-pay and take over the relationships.',
+                icon: Home,
+                color: 'bg-haven-100 text-haven-600',
+              },
+              {
+                step: '2',
+                title: 'Fund Your Haven Wallet',
+                description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
+                icon: CreditCard,
+                color: 'bg-amber-100 text-amber-600',
+              },
+              {
+                step: '3',
+                title: 'Text Your Manager',
+                description: 'Something need fixing? Question about your home? Text once. Your dedicated manager handles everything.',
+                icon: MessageCircle,
+                color: 'bg-blue-100 text-blue-600',
+              },
+            ].map((item, idx) => (
+              <div key={idx} className="relative">
+                {idx < 2 && (
+                  <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-warm-300 to-transparent" />
+                )}
+                <div className="text-center">
+                  <div className="relative inline-flex mb-4">
+                    <div className={`w-24 h-24 rounded-2xl ${item.color} flex items-center justify-center shadow-lg`}>
+                      <item.icon className="w-10 h-10" />
+                    </div>
+                    <span className="absolute -top-2 -right-2 w-8 h-8 bg-haven-600 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">
+                      {item.step}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-semibold text-warm-900 mb-2">{item.title}</h3>
+                  <p className="text-warm-600">{item.description}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* SERVICES SECTION */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              Everything Your Home Needs. Handled.
+            </h2>
+            <p className="mt-4 text-lg text-warm-600">
+              From paying your mortgage to changing your furnace filter, we've got it.
+            </p>
+          </div>
+
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {[
+              {
+                title: 'Bill Management',
+                icon: Receipt,
+                color: 'bg-green-500',
+                iconBg: 'bg-green-100 text-green-600',
+                items: [
+                  'Mortgage & property taxes',
+                  'All utilities (electric, gas, water)',
+                  'Insurance & HOA dues',
+                  'Every vendor invoice, on time',
+                ],
+              },
+              {
+                title: 'Home Maintenance',
+                icon: Wrench,
+                color: 'bg-blue-500',
+                iconBg: 'bg-blue-100 text-blue-600',
+                items: [
+                  'Monthly handyman visits',
+                  'HVAC service & filter changes',
+                  'Plumbing & electrical coordination',
+                  'Seasonal prep & winterization',
+                ],
+              },
+              {
+                title: 'Vendor Coordination',
+                icon: Users,
+                color: 'bg-purple-500',
+                iconBg: 'bg-purple-100 text-purple-600',
+                items: [
+                  'Find & vet qualified pros',
+                  'Schedule & oversee all work',
+                  'Handle disputes & issues',
+                  'Negotiate on your behalf',
+                ],
+              },
+              {
+                title: 'Life Management',
+                icon: Sparkles,
+                color: 'bg-amber-500',
+                iconBg: 'bg-amber-100 text-amber-600',
+                badge: 'Haven+',
+                items: [
+                  'Errand running & pickups',
+                  'Package handling & returns',
+                  'Travel coordination',
+                  'Event planning',
+                ],
+              },
+            ].map((service, idx) => (
+              <div key={idx} className="bg-white rounded-2xl border border-warm-200 overflow-hidden hover:shadow-xl transition-all hover:-translate-y-1">
+                <div className={`h-2 ${service.color}`} />
+                <div className="p-6">
+                  <div className={`w-12 h-12 rounded-xl ${service.iconBg} flex items-center justify-center mb-4`}>
+                    <service.icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex items-center gap-2 mb-3">
+                    <h3 className="text-lg font-semibold text-warm-900">{service.title}</h3>
+                    {service.badge && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
+                        {service.badge}
+                      </span>
+                    )}
+                  </div>
+                  <ul className="space-y-2">
+                    {service.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-sm text-warm-600">
+                        <Check className="w-4 h-4 text-haven-500 flex-shrink-0 mt-0.5" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* HANDYMAN SECTION */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-warm-900 via-warm-800 to-warm-900 text-white relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500 rounded-full blur-3xl opacity-10" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-haven-500 rounded-full blur-3xl opacity-10" />
+        </div>
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid lg:grid-cols-2 gap-12 items-center">
+            <div>
+              <p className="text-amber-400 font-semibold mb-2">The Haven Difference</p>
+              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+                Your Own Dedicated Handyman
+              </h2>
+              <p className="text-warm-300 text-lg mb-6">
+                Unlike software that just tracks maintenance, Haven includes a dedicated handyman who physically visits your home monthly. They catch small issues before they become expensive emergencies.
+              </p>
+              <div className="grid sm:grid-cols-2 gap-4">
+                {[
+                  'Monthly preventive visits',
+                  'Same person every time',
+                  'Filter changes included',
+                  'Minor repairs on the spot',
+                ].map((item, idx) => (
+                  <div key={idx} className="flex items-center gap-2">
+                    <CheckCircle2 className="w-5 h-5 text-amber-400" />
+                    <span className="text-warm-200">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 text-warm-900 shadow-2xl">
+              <div className="flex items-center gap-4 mb-4">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-amber-400 to-amber-500 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                  MR
+                </div>
+                <div>
+                  <p className="font-bold text-lg">Mike Rodriguez</p>
+                  <p className="text-warm-500">Your Dedicated Handyman</p>
+                </div>
+              </div>
+              <div className="space-y-3 pt-4 border-t border-warm-200">
+                <div className="flex justify-between">
+                  <span className="text-warm-500">Next visit</span>
+                  <span className="font-medium">Tuesday, 10am</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-warm-500">Issues caught this year</span>
+                  <span className="font-medium text-green-600">12 (saved $3,400+)</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-warm-500">Your home</span>
+                  <span className="font-medium">Knows it inside & out</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* PRICING SECTION */}
+      {/* ================================================================== */}
+      <section id="pricing" className="py-16 sm:py-24 bg-gradient-to-b from-haven-50 to-white">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold text-haven-600 uppercase tracking-wide mb-2">Transparent Pricing</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              Choose Your Level of Support
+            </h2>
+            <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
+              Start with Essentials and upgrade anytime. All plans include unlimited bill consolidation.
+            </p>
+          </div>
+
+          {/* 3 Main Pricing Cards */}
+          <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
+
+            {/* ESSENTIALS - $39 */}
+            <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col hover:border-haven-300 hover:shadow-lg transition-all">
+              <div className="h-2 bg-warm-300" />
+              <div className="p-6 flex-1">
+                <h3 className="text-lg font-semibold text-warm-900">Haven Essentials</h3>
+                <p className="text-sm text-warm-500 mt-1">Self-service home management</p>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold text-warm-900">$39</span>
+                  <span className="text-warm-500">/month</span>
+                </div>
+
+                <ul className="mt-6 space-y-3">
+                  {[
+                    'Bill consolidation (unlimited)',
+                    'Home profile & systems tracking',
+                    'Maintenance reminders',
+                    'Vendor directory',
+                    'Document storage',
+                    'Money dashboard',
+                    'Handyman visits ($99 each)',
+                  ].map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-haven-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-warm-700">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+
+                <p className="mt-4 pt-4 border-t border-warm-100 text-xs text-warm-500 text-center">
+                  Perfect for DIY homeowners who want organization
                 </p>
               </div>
-            </motion.div>
+              <div className="p-6 pt-0">
+                <Link
+                  href="/register?plan=essentials"
+                  className="block w-full py-3 text-center bg-warm-100 text-warm-700 font-semibold rounded-xl hover:bg-warm-200 transition-colors"
+                >
+                  Get Started
+                </Link>
+              </div>
+            </div>
 
-            {/* Floating Badge - Bills */}
-            <motion.div
-              initial={{ opacity: 0, x: -30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              className="absolute top-8 -left-4 bg-white rounded-xl shadow-xl border border-slate-200 p-4"
-            >
-              <div className="flex items-center gap-3 mb-2">
-                <div className="flex -space-x-2">
-                  {[Zap, Droplets, Wifi, Flame].map((Icon, i) => (
-                    <div key={i} className={`w-7 h-7 rounded-full flex items-center justify-center border-2 border-white ${
-                      ['bg-amber-100', 'bg-cyan-100', 'bg-purple-100', 'bg-orange-100'][i]
-                    }`}>
-                      <Icon className={`w-3.5 h-3.5 ${
-                        ['text-amber-600', 'text-cyan-600', 'text-purple-600', 'text-orange-600'][i]
-                      }`} />
-                    </div>
+            {/* LITE - $349 (Most Popular) */}
+            <div className="relative pt-4">
+              {/* Most Popular Badge */}
+              <div className="absolute -top-0 left-1/2 -translate-x-1/2 z-10">
+                <span className="px-4 py-1.5 bg-gradient-to-r from-haven-600 to-haven-700 text-white text-sm font-semibold rounded-full shadow-lg">
+                  Most Popular
+                </span>
+              </div>
+              <div className="bg-white rounded-2xl border-2 border-haven-500 overflow-hidden flex flex-col shadow-xl shadow-haven-100">
+                <div className="h-2 bg-gradient-to-r from-haven-500 to-haven-600" />
+                <div className="p-6 pt-4 flex-1">
+                  <h3 className="text-lg font-semibold text-haven-700">Haven Lite</h3>
+                  <p className="text-sm text-warm-500 mt-1">Light-touch manager support</p>
+                  <div className="mt-4">
+                    <span className="text-4xl font-bold text-warm-900">$349</span>
+                    <span className="text-warm-500">/month</span>
+                  </div>
+
+                  <ul className="mt-6 space-y-3">
+                    {[
+                      'Your complete home profile',
+                      'Bill consolidation (unlimited)',
+                      'Vendor coordination (reactive)',
+                      'Text-based home manager',
+                      'Document vault & home manual',
+                      'Same-day response time',
+                    ].map((feature, idx) => (
+                      <li key={idx} className="flex items-start gap-3">
+                        <Check className="w-5 h-5 text-haven-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-warm-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="mt-4 pt-4 border-t border-warm-100 text-xs text-warm-500 text-center">
+                    For busy professionals who want backup support
+                  </p>
+                </div>
+                <div className="p-6 pt-0">
+                  <Link
+                    href="/register?plan=lite"
+                    className="block w-full py-3 text-center bg-haven-600 text-white font-semibold rounded-xl hover:bg-haven-700 transition-colors"
+                  >
+                    Get Started
+                  </Link>
+                </div>
+              </div>
+            </div>
+
+            {/* HAVEN - $749 */}
+            <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col hover:border-haven-300 hover:shadow-lg transition-all">
+              <div className="h-2 bg-amber-400" />
+              <div className="p-6 flex-1">
+                <h3 className="text-lg font-semibold text-warm-900">Haven</h3>
+                <p className="text-sm text-warm-500 mt-1">Your dedicated home manager</p>
+                <div className="mt-4">
+                  <span className="text-4xl font-bold text-warm-900">$749</span>
+                  <span className="text-warm-500">/month</span>
+                </div>
+
+                <ul className="mt-6 space-y-3">
+                  {[
+                    'Everything in Lite',
+                    'Proactive home manager',
+                    'Monthly handyman visit (2 hrs)',
+                    'Vendor oversight & negotiation',
+                    'Maintenance scheduling',
+                    '12-hour response time',
+                  ].map((feature, idx) => (
+                    <li key={idx} className="flex items-start gap-3">
+                      <Check className="w-5 h-5 text-haven-500 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm text-warm-700">{feature}</span>
+                    </li>
                   ))}
-                </div>
-                <ArrowRight className="w-4 h-4 text-slate-400" />
-                <div className="w-9 h-9 bg-emerald-600 rounded-lg flex items-center justify-center shadow-lg shadow-emerald-500/30">
-                  <Home className="w-5 h-5 text-white" />
-                </div>
-              </div>
-              <p className="text-sm font-semibold text-slate-900">12 bills → 1 payment</p>
-            </motion.div>
+                </ul>
 
-            {/* Floating Badge - Time */}
-            <motion.div
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.7, duration: 0.5 }}
-              className="absolute bottom-24 -right-4 bg-white rounded-xl shadow-xl border border-slate-200 p-4"
+                <p className="mt-4 pt-4 border-t border-warm-100 text-xs text-warm-500 text-center">
+                  For those who want their home truly managed
+                </p>
+              </div>
+              <div className="p-6 pt-0">
+                <Link
+                  href="/register?plan=haven"
+                  className="block w-full py-3 text-center bg-warm-100 text-warm-700 font-semibold rounded-xl hover:bg-warm-200 transition-colors"
+                >
+                  Get Started
+                </Link>
+              </div>
+            </div>
+          </div>
+
+          {/* Premium Tiers - Collapsible */}
+          <div className="mt-8 max-w-5xl mx-auto">
+            <button
+              onClick={() => setShowPremiumTiers(!showPremiumTiers)}
+              className="w-full py-4 px-6 bg-white rounded-xl border border-warm-200 flex items-center justify-between hover:bg-warm-50 hover:border-warm-300 transition-colors shadow-sm"
             >
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-sky-100 rounded-lg flex items-center justify-center">
-                  <Timer className="w-5 h-5 text-sky-600" />
+              <span className="flex items-center gap-2 text-warm-700 font-medium">
+                <Crown className="w-5 h-5 text-amber-500" />
+                Need more? See Haven+ and Estate options
+              </span>
+              {showPremiumTiers ? (
+                <ChevronUp className="w-5 h-5 text-warm-400" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-warm-400" />
+              )}
+            </button>
+
+            {showPremiumTiers && (
+              <div className="mt-4 grid md:grid-cols-2 gap-6">
+                {/* Haven+ */}
+                <div className="bg-white rounded-xl border border-purple-200 p-6 shadow-lg">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center">
+                      <Star className="w-5 h-5 text-purple-600" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold text-warm-900">Haven+</h4>
+                      <p className="text-sm text-warm-500">Personal assistant + enhanced services</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <span className="text-2xl font-bold text-warm-900">$1,499</span>
+                      <span className="text-warm-500">/mo</span>
+                    </div>
+                  </div>
+                  <ul className="space-y-2 mb-4">
+                    {[
+                      'Everything in Haven',
+                      'Personal assistant services',
+                      'Errands, shopping & returns',
+                      'Travel coordination',
+                      'Event planning',
+                      '4-hour priority response',
+                      'Enhanced handyman (4 hrs/mo)',
+                    ].map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-warm-600">
+                        <Check className="w-4 h-4 text-purple-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/register?plan=plus"
+                    className="block w-full py-2.5 text-center bg-purple-100 text-purple-700 font-medium rounded-lg hover:bg-purple-200 transition-colors"
+                  >
+                    Upgrade to Haven+
+                  </Link>
                 </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">8+ hrs</p>
-                  <p className="text-xs text-slate-500 font-medium">saved monthly</p>
+
+                {/* Haven Estate */}
+                <div className="bg-gradient-to-br from-warm-900 to-warm-800 rounded-xl p-6 text-white shadow-lg">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-lg bg-amber-500 flex items-center justify-center">
+                      <Crown className="w-5 h-5 text-white" />
+                    </div>
+                    <div>
+                      <h4 className="font-semibold">Haven Estate</h4>
+                      <p className="text-sm text-warm-400">White-glove estate management</p>
+                    </div>
+                    <div className="ml-auto text-right">
+                      <span className="text-2xl font-bold">$3,499</span>
+                      <span className="text-warm-400">/mo</span>
+                    </div>
+                  </div>
+                  <p className="text-sm text-warm-300 mb-4">
+                    Your personal estate manager anticipating needs, coordinating staff, and ensuring every detail of your properties is handled with discretion and excellence.
+                  </p>
+                  <ul className="space-y-2 mb-4">
+                    {[
+                      'Multiple properties supported',
+                      'Priority 24/7 concierge access',
+                      'Custom service agreements',
+                    ].map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2 text-sm text-warm-300">
+                        <Check className="w-4 h-4 text-amber-500" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href="/contact?plan=estate"
+                    className="block w-full py-2.5 text-center bg-amber-500 text-warm-900 font-medium rounded-lg hover:bg-amber-400 transition-colors"
+                  >
+                    Contact Sales
+                  </Link>
                 </div>
               </div>
-            </motion.div>
+            )}
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
-// ============================================================================
-// PROBLEM SECTION
-// ============================================================================
-function ProblemSection() {
-  return (
-    <section className="py-20 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold mb-4 text-white">
-            Owning a home shouldn't feel like a second job.
-          </h2>
-          <p className="text-xl text-slate-300 max-w-3xl mx-auto">
-            You're juggling a career, family, and life. The last thing you need is to be the unpaid project manager of your own home.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 lg:gap-8">
-          {/* Without Haven */}
-          <div className="bg-slate-800/60 backdrop-blur rounded-2xl p-6 lg:p-8 border border-slate-700">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-red-500/20 rounded-lg flex items-center justify-center">
-                <X className="w-5 h-5 text-red-400" />
+          {/* How Your Bill Works */}
+          <div className="mt-12 max-w-3xl mx-auto">
+            <div className="bg-white rounded-2xl p-6 sm:p-8 border border-warm-200 shadow-lg">
+              <h3 className="text-lg font-semibold text-warm-900 text-center mb-6">How Your Bill Works</h3>
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-haven-100 flex items-center justify-center mx-auto mb-2">
+                    <Sparkles className="w-7 h-7 text-haven-600" />
+                  </div>
+                  <p className="font-semibold text-warm-900">Haven Membership</p>
+                  <p className="text-haven-600 font-bold">$39 to $3,499</p>
+                  <p className="text-xs text-warm-500">Your manager, platform & more</p>
+                </div>
+                <div className="text-3xl text-warm-300 font-light">+</div>
+                <div className="text-center">
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-2">
+                    <Banknote className="w-7 h-7 text-green-600" />
+                  </div>
+                  <p className="font-semibold text-warm-900">Your Household Bills</p>
+                  <p className="text-green-600 font-bold">At Cost</p>
+                  <p className="text-xs text-warm-500">Zero markup on pass-through</p>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-white">Without Haven</h3>
+              <div className="mt-6 p-4 bg-amber-50 rounded-xl border border-amber-200">
+                <p className="text-center text-sm text-amber-800">
+                  <strong>Example:</strong> $3,200 in monthly bills + $39 Essentials = <strong>$3,239 total</strong>.
+                  One payment to Haven. We pay everyone else.
+                </p>
+              </div>
             </div>
-            <ul className="space-y-4">
-              {[
-                '12+ vendor relationships to juggle',
-                'Dozens of bills arriving at random',
-                'Hours spent on hold with contractors',
-                'Forgotten maintenance = expensive repairs',
-                "You're the unpaid project manager",
-                'Constant mental overhead',
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <X className="w-5 h-5 text-red-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-slate-300">{item}</span>
-                </li>
-              ))}
-            </ul>
           </div>
 
-          {/* With Haven */}
-          <div className="bg-emerald-900/40 backdrop-blur rounded-2xl p-6 lg:p-8 border border-emerald-700/50">
-            <div className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-emerald-500/20 rounded-lg flex items-center justify-center">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-              </div>
-              <h3 className="text-xl font-semibold text-white">With Haven</h3>
-            </div>
-            <ul className="space-y-4">
-              {[
-                '1 dedicated Home Manager',
-                '1 monthly bill, auto-paid',
-                'Text your manager, we make the calls',
-                'Proactive maintenance catches issues early',
-                'Results, not more to-do lists',
-                'Complete peace of mind',
-              ].map((item, i) => (
-                <li key={i} className="flex items-start gap-3">
-                  <Check className="w-5 h-5 text-emerald-400 mt-0.5 flex-shrink-0" />
-                  <span className="text-emerald-100">{item}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-
-        <div className="mt-12 text-center">
-          <p className="text-2xl text-white">
-            <span className="font-bold">8+ hours per month</span>
-            <span className="text-slate-300">. That's what our members get back.</span>
+          {/* Trust line */}
+          <p className="mt-8 text-center text-sm text-warm-500">
+            All plans include unlimited bill consolidation • No setup fees • Cancel anytime • 30-day money-back guarantee
           </p>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-// ============================================================================
-// COMPETITOR COMPARISON SECTION
-// ============================================================================
-function CompetitorSection() {
-  return (
-    <section id="compare" className="py-20 px-4 sm:px-6 lg:px-8 bg-amber-50 border-y border-amber-100">
-      <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-100 rounded-full mb-4">
-            <Award className="w-4 h-4 text-amber-700" />
-            <span className="text-sm font-semibold text-amber-800">The Real Difference</span>
-          </div>
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            Software vs. Service
+      {/* ================================================================== */}
+      {/* COMPARE PLANS TABLE */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-warm-900 text-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8">
+            Compare Plans
           </h2>
-          <p className="text-xl text-slate-600 max-w-3xl mx-auto">
-            Other companies give you software to organize your home management chaos.
-            <strong> That's like giving a drowning person a waterproof notebook.</strong>
-          </p>
-        </div>
 
-        {/* Mobile: Stacked Cards (shown on screens smaller than lg) */}
-        <div className="lg:hidden space-y-3 mb-12">
-          {[
-            { feature: 'Monthly Cost', them: '$375/month', us: '$349/month' },
-            { feature: 'Setup Fee', them: '$3K - $5K', us: '$0' },
-            { feature: 'First Year Total', them: '$7,500+', us: '$4,188' },
-            { feature: 'Contract', them: '12-mo prepaid', us: 'Month-to-month' },
-            { feature: 'Bills Paid For You', them: 'No', us: 'Yes, one payment', usBetter: true },
-            { feature: 'Vendor Coordination', them: 'No', us: 'Yes, we handle it', usBetter: true },
-            { feature: 'Handyman Visits', them: 'No', us: 'Yes, monthly', usBetter: true },
-            { feature: 'Home Manager', them: 'No', us: 'Yes, dedicated', usBetter: true },
-          ].map((row, idx) => (
-            <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-              <div className="bg-slate-100 px-4 py-2">
-                <span className="font-medium text-slate-700 text-sm">{row.feature}</span>
-              </div>
-              <div className="grid grid-cols-2">
-                <div className="p-3 border-r border-slate-100">
-                  <div className="text-xs text-slate-400 mb-1">Others</div>
-                  <div className="text-sm text-slate-500">
-                    {row.usBetter && <span className="text-red-500 mr-1">✗</span>}
-                    {row.them}
+          {/* Desktop Table */}
+          <div className="hidden lg:block bg-warm-800 rounded-2xl overflow-hidden">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-warm-700">
+                  <th className="text-left py-4 px-6 font-semibold text-warm-400 w-1/4">Feature</th>
+                  <th className="text-center py-4 px-4">
+                    <div className="font-semibold text-warm-200">Essentials</div>
+                    <div className="text-haven-400 font-bold">$39/mo</div>
+                  </th>
+                  <th className="text-center py-4 px-4 bg-haven-600/20">
+                    <div className="font-semibold text-amber-400">Lite</div>
+                    <div className="text-haven-400 font-bold">$349/mo</div>
+                  </th>
+                  <th className="text-center py-4 px-4">
+                    <div className="font-semibold text-warm-200">Haven</div>
+                    <div className="text-haven-400 font-bold">$749/mo</div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-warm-700">
+                {[
+                  { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
+                  { feature: 'Home Profile & Systems', essentials: true, lite: true, haven: true },
+                  { feature: 'Maintenance Reminders', essentials: true, lite: true, haven: true },
+                  { feature: 'Vendor Directory', essentials: true, lite: true, haven: true },
+                  { feature: 'Document Storage', essentials: true, lite: 'Vault + Manual', haven: 'Vault + Manual' },
+                  { feature: 'Home Manager', essentials: false, lite: 'Text-based', haven: 'Proactive' },
+                  { feature: 'Vendor Coordination', essentials: false, lite: 'Reactive', haven: 'Full oversight' },
+                  { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
+                  { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs/month' },
+                  { feature: 'Vendor Negotiation', essentials: false, lite: false, haven: true },
+                ].map((row, idx) => (
+                  <tr key={idx}>
+                    <td className="py-4 px-6 text-warm-300 font-medium">{row.feature}</td>
+                    <td className="py-4 px-4 text-center">
+                      {row.essentials === true ? (
+                        <Check className="w-5 h-5 text-green-400 mx-auto" />
+                      ) : row.essentials === false ? (
+                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                      ) : (
+                        <span className="text-sm text-warm-400">{row.essentials}</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 text-center bg-haven-600/20">
+                      {row.lite === true ? (
+                        <Check className="w-5 h-5 text-amber-400 mx-auto" />
+                      ) : row.lite === false ? (
+                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                      ) : (
+                        <span className="text-sm font-medium text-amber-400">{row.lite}</span>
+                      )}
+                    </td>
+                    <td className="py-4 px-4 text-center">
+                      {row.haven === true ? (
+                        <Check className="w-5 h-5 text-green-400 mx-auto" />
+                      ) : row.haven === false ? (
+                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                      ) : (
+                        <span className="text-sm text-warm-400">{row.haven}</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile Cards */}
+          <div className="lg:hidden space-y-3">
+            {[
+              { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
+              { feature: 'Home Manager', essentials: 'None', lite: 'Text-based', haven: 'Proactive', highlight: true },
+              { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
+              { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs included', highlight: true },
+              { feature: 'Vendor Coordination', essentials: 'None', lite: 'Reactive', haven: 'Full oversight' },
+            ].map((row, idx) => (
+              <div key={idx} className={`bg-warm-800 rounded-xl border overflow-hidden ${row.highlight ? 'border-haven-500' : 'border-warm-700'}`}>
+                <div className="bg-warm-700 px-4 py-2">
+                  <span className="font-medium text-warm-200 text-sm">{row.feature}</span>
+                </div>
+                <div className="grid grid-cols-3 divide-x divide-warm-700">
+                  <div className="p-3 text-center">
+                    <div className="text-xs text-warm-500 mb-1">$39</div>
+                    <div className="text-sm text-warm-300">{row.essentials}</div>
+                  </div>
+                  <div className="p-3 text-center bg-haven-600/20">
+                    <div className="text-xs text-amber-400 mb-1">$349</div>
+                    <div className="text-sm font-medium text-amber-400">{row.lite}</div>
+                  </div>
+                  <div className="p-3 text-center">
+                    <div className="text-xs text-warm-500 mb-1">$749</div>
+                    <div className="text-sm text-warm-300">{row.haven}</div>
                   </div>
                 </div>
-                <div className="p-3 bg-emerald-50/50">
-                  <div className="text-xs text-emerald-600 mb-1">Haven</div>
-                  <div className="text-sm font-medium text-emerald-700">
-                    {row.usBetter && <span className="text-green-500 mr-1">✓</span>}
-                    {row.us}
-                  </div>
-                </div>
               </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Desktop: Traditional Table (shown on lg screens and up) */}
-        <div className="hidden lg:block bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden mb-12">
-          {/* Header */}
-          <div className="grid grid-cols-3 divide-x divide-slate-200">
-            <div className="p-6 bg-slate-50">
-              <p className="text-sm font-medium text-slate-500 uppercase tracking-wide">Feature</p>
-            </div>
-            <div className="p-6 bg-slate-100">
-              <div className="flex items-center gap-2">
-                <Bot className="w-5 h-5 text-slate-400" />
-                <div>
-                  <p className="text-sm font-semibold text-slate-500">Household Software</p>
-                  <p className="text-xs text-slate-400">$375/mo + $3K setup</p>
-                </div>
-              </div>
-            </div>
-            <div className="p-6 bg-emerald-50">
-              <div className="flex items-center gap-2">
-                <Home className="w-5 h-5 text-emerald-600" />
-                <div>
-                  <p className="text-sm font-semibold text-emerald-700">Haven</p>
-                  <p className="text-xs text-emerald-600">$349/mo, no setup fee</p>
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
 
-          {/* Rows */}
-          {[
-            { feature: 'Monthly Cost', software: '$375/month', haven: '$349/month' },
-            { feature: 'Setup/Onboarding', software: '$3,000 - $5,000', haven: '$0' },
-            { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
-            { feature: 'Contract Required', software: '12-month prepaid', haven: 'Month-to-month' },
-            { feature: 'Bills Paid For You', software: '❌ No (you pay each vendor)', haven: '✅ Yes, one payment covers all' },
-            { feature: 'Vendor Coordination', software: '❌ No (just a contact list)', haven: '✅ Yes, we call, schedule, oversee' },
-            { feature: 'Handyman Visits', software: '❌ No', haven: '✅ Yes, monthly preventive visits' },
-            { feature: 'Humans Doing Work', software: '❌ No (software only)', haven: '✅ Yes, dedicated manager' },
-            { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
-          ].map((row, i) => (
-            <div key={i} className="grid grid-cols-3 divide-x divide-slate-200 border-t border-slate-200">
-              <div className="p-4 md:p-5">
-                <p className="font-medium text-slate-900 text-sm">{row.feature}</p>
-              </div>
-              <div className="p-4 md:p-5 bg-slate-50/50">
-                <p className="text-sm text-slate-600">{row.software}</p>
-              </div>
-              <div className="p-4 md:p-5 bg-emerald-50/50">
-                <p className="text-sm text-slate-900 font-medium">{row.haven}</p>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom Message */}
-        <div className="text-center">
-          <div className="inline-block bg-white rounded-2xl p-8 shadow-lg border border-slate-200">
-            <p className="text-2xl font-bold text-slate-900 mb-2">
-              Why pay more for software that makes YOU do the work?
-            </p>
-            <p className="text-lg text-slate-600 mb-6">
-              Start with Haven Essentials for just <span className="text-emerald-600 font-semibold">$39/month</span> — or get full service at <span className="text-emerald-600 font-semibold">$349/month</span> with no setup fee.
-            </p>
+          <div className="mt-8 text-center">
             <Link
-              href="/register?plan=essentials"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/25"
+              href="/register"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-amber-500 text-warm-900 font-semibold rounded-xl hover:bg-amber-400 transition-colors"
             >
               Start for $39/month
               <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
-      </div>
-    </section>
-  );
-}
+      </section>
 
-// ============================================================================
-// HOW IT WORKS
-// ============================================================================
-function HowItWorksSection() {
-  const steps = [
-    {
-      step: 1,
-      icon: ClipboardList,
-      title: 'Tell Us About Your Home',
-      description: 'Share your vendors, bills, and preferences. We set up auto-pay and take over the relationships.',
-      badgeBg: 'bg-amber-600',
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-    },
-    {
-      step: 2,
-      icon: PiggyBank,
-      title: 'Fund Your Haven Wallet',
-      description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
-      badgeBg: 'bg-emerald-600',
-      iconBg: 'bg-emerald-100',
-      iconColor: 'text-emerald-600',
-    },
-    {
-      step: 3,
-      icon: MessageSquare,
-      title: 'Text Your Manager',
-      description: "Something need fixing? Question about your home? Text once. Your dedicated manager handles everything.",
-      badgeBg: 'bg-sky-600',
-      iconBg: 'bg-sky-100',
-      iconColor: 'text-sky-600',
-    },
-  ];
-
-  return (
-    <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-4">
-            <Sparkles className="w-4 h-4 text-emerald-700" />
-            <span className="text-sm font-semibold text-emerald-800">Simple Setup</span>
+      {/* ================================================================== */}
+      {/* SOFTWARE VS SERVICE */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold text-haven-600 uppercase tracking-wide mb-2">The Real Difference</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              Software vs. Service
+            </h2>
+            <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
+              Other companies give you software to organize your home management chaos.
+              <br />
+              <strong>That's like giving a drowning person a waterproof notebook.</strong>
+            </p>
           </div>
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            From Chaos to Calm in 3 Steps
-          </h2>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Get started in minutes. We handle everything from there.
-          </p>
-        </div>
 
-        <div className="grid md:grid-cols-3 gap-8">
-          {steps.map(({ step, icon: Icon, title, description, badgeBg, iconBg, iconColor }) => (
-            <div key={step} className="relative">
-              <div className={`absolute -top-4 -left-4 w-12 h-12 ${badgeBg} rounded-full flex items-center justify-center text-white text-xl font-bold shadow-lg`}>
-                {step}
+          <div className="bg-warm-50 rounded-2xl overflow-hidden border border-warm-200">
+            <div className="grid sm:grid-cols-3">
+              <div className="p-4 sm:p-6 font-semibold text-warm-600 border-b sm:border-b-0 sm:border-r border-warm-200 bg-warm-100">
+                FEATURE
               </div>
-              <div className="bg-slate-50 rounded-2xl p-8 pt-12 h-full border border-slate-200 hover:border-slate-300 transition-colors">
-                <div className={`w-14 h-14 ${iconBg} rounded-xl flex items-center justify-center mb-6`}>
-                  <Icon className={`w-7 h-7 ${iconColor}`} />
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-                <p className="text-slate-600 leading-relaxed">{description}</p>
+              <div className="p-4 sm:p-6 text-center border-b sm:border-b-0 sm:border-r border-warm-200 bg-red-50">
+                <p className="font-semibold text-red-700">Household Software</p>
+                <p className="text-sm text-red-600">$375/mo + $3K setup</p>
+              </div>
+              <div className="p-4 sm:p-6 text-center bg-haven-100">
+                <p className="font-semibold text-haven-700">Haven</p>
+                <p className="text-sm text-haven-600">$349/mo, no setup fee</p>
               </div>
             </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
 
-// ============================================================================
-// SERVICES SECTION
-// ============================================================================
-function ServicesSection() {
-  const services = [
-    {
-      icon: Receipt,
-      title: 'Bill Management',
-      iconBg: 'bg-amber-100',
-      iconColor: 'text-amber-600',
-      checkColor: 'text-amber-500',
-      items: ['Mortgage & property taxes', 'All utilities (electric, gas, water)', 'Insurance & HOA dues', 'Every vendor invoice, on time'],
-    },
-    {
-      icon: Wrench,
-      title: 'Home Maintenance',
-      iconBg: 'bg-emerald-100',
-      iconColor: 'text-emerald-600',
-      checkColor: 'text-emerald-500',
-      items: ['Monthly handyman visits', 'HVAC service & filter changes', 'Plumbing & electrical coordination', 'Seasonal prep & winterization'],
-    },
-    {
-      icon: Users,
-      title: 'Vendor Coordination',
-      iconBg: 'bg-sky-100',
-      iconColor: 'text-sky-600',
-      checkColor: 'text-sky-500',
-      items: ['Find & vet qualified pros', 'Schedule & oversee all work', 'Handle disputes & issues', 'Negotiate on your behalf'],
-    },
-    {
-      icon: Heart,
-      title: 'Life Management',
-      iconBg: 'bg-rose-100',
-      iconColor: 'text-rose-600',
-      checkColor: 'text-rose-500',
-      badge: 'Haven+',
-      items: ['Errand running & pickups', 'Package handling & returns', 'Travel coordination', 'Event planning'],
-    },
-  ];
-
-  return (
-    <section id="services" className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            Everything Your Home Needs. Handled.
-          </h2>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            From paying your mortgage to changing your furnace filter, we've got it.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {services.map((service) => (
-            <div key={service.title} className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div className={`w-12 h-12 ${service.iconBg} rounded-xl flex items-center justify-center`}>
-                  <service.icon className={`w-6 h-6 ${service.iconColor}`} />
+            {[
+              { feature: 'Monthly Cost', software: '$375/month', haven: '$349/month' },
+              { feature: 'Setup/Onboarding', software: '$3,000 to $5,000', haven: '$0' },
+              { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
+              { feature: 'Contract Required', software: '12-month prepaid', haven: 'Month-to-month' },
+              { feature: 'Bills Paid For You', software: 'No (you pay each vendor)', haven: 'Yes, one payment covers all' },
+              { feature: 'Vendor Coordination', software: 'No (just a contact list)', haven: 'Yes, we call, schedule, oversee' },
+              { feature: 'Handyman Visits', software: 'No', haven: 'Yes, monthly preventive visits' },
+              { feature: 'Humans Doing Work', software: 'No (software only)', haven: 'Yes, dedicated manager' },
+              { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
+            ].map((row, idx) => (
+              <div key={idx} className="grid sm:grid-cols-3 border-t border-warm-200">
+                <div className="p-4 sm:p-5 text-warm-700 font-medium border-b sm:border-b-0 sm:border-r border-warm-200">
+                  {row.feature}
                 </div>
-                {service.badge && (
-                  <span className="px-2 py-1 bg-rose-100 text-rose-700 text-xs font-semibold rounded-full">
-                    {service.badge}
-                  </span>
-                )}
-              </div>
-              <h3 className="text-lg font-bold text-slate-900 mb-4">{service.title}</h3>
-              <ul className="space-y-2">
-                {service.items.map((item, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-slate-600">
-                    <Check className={`w-4 h-4 ${service.checkColor} flex-shrink-0`} />
-                    {item}
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </div>
-
-        {/* Handyman Highlight */}
-        <div className="mt-16 bg-emerald-900 rounded-3xl p-8 lg:p-12 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-emerald-800/50 to-transparent" />
-          <div className="relative grid lg:grid-cols-2 gap-8 items-center">
-            <div>
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-800 rounded-full mb-6">
-                <Hammer className="w-4 h-4 text-emerald-300" />
-                <span className="text-sm font-semibold text-emerald-200">The Haven Difference</span>
-              </div>
-              <h3 className="font-serif text-2xl sm:text-3xl font-bold mb-4 text-white">
-                Your Own Dedicated Handyman
-              </h3>
-              <p className="text-emerald-100 text-lg leading-relaxed mb-6">
-                Unlike software that just tracks maintenance, Haven includes a dedicated handyman who physically visits your home monthly. They catch small issues before they become expensive emergencies.
-              </p>
-              <div className="grid grid-cols-2 gap-4">
-                {[
-                  'Monthly preventive visits',
-                  'Same person every time',
-                  'Filter changes included',
-                  'Minor repairs on the spot',
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" />
-                    <span className="text-sm text-emerald-100">{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="bg-emerald-800/50 rounded-2xl p-6 border border-emerald-700">
-              <div className="flex items-center gap-4 mb-6">
-                <div className="w-16 h-16 bg-emerald-700 rounded-full flex items-center justify-center text-2xl font-bold text-white">
-                  MR
+                <div className="p-4 sm:p-5 text-center border-b sm:border-b-0 sm:border-r border-warm-200 flex items-center justify-center gap-2 bg-red-50/50">
+                  <XCircle className="w-4 h-4 text-red-400 hidden sm:block" />
+                  <span className="text-sm text-red-700">{row.software}</span>
                 </div>
-                <div>
-                  <p className="text-lg font-bold text-white">Mike Rodriguez</p>
-                  <p className="text-emerald-300">Your Dedicated Handyman</p>
+                <div className="p-4 sm:p-5 text-center bg-haven-50 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-haven-600 hidden sm:block" />
+                  <span className="text-sm font-medium text-haven-700">{row.haven}</span>
                 </div>
               </div>
-              <div className="space-y-3">
-                {[
-                  { label: 'Next visit', value: 'Tuesday, 10am' },
-                  { label: 'Issues caught this year', value: '12 (saved $3,400+)' },
-                  { label: 'Your home', value: 'Knows it inside & out' },
-                ].map((stat, i) => (
-                  <div key={i} className="flex items-center justify-between p-3 bg-emerald-900/60 rounded-lg">
-                    <span className="text-emerald-200 text-sm">{stat.label}</span>
-                    <span className="text-white font-semibold text-sm">{stat.value}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+            ))}
           </div>
-        </div>
-      </div>
-    </section>
-  );
-}
 
-// ============================================================================
-// PREMIUM TIER DROPDOWN COMPONENT
-// ============================================================================
-function PremiumTierDropdown({
-  name,
-  price,
-  tagline,
-  description,
-  features,
-  isContact = false,
-}: {
-  name: string;
-  price: number;
-  tagline: string;
-  description?: string;
-  features: string[];
-  isContact?: boolean;
-}) {
-  const [isExpanded, setIsExpanded] = useState(false);
-
-  return (
-    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-4 sm:p-6 flex items-center justify-between hover:bg-slate-50 transition-colors"
-      >
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
-            {name === 'Haven+' ? (
-              <Star className="w-6 h-6 text-amber-600" />
-            ) : (
-              <Crown className="w-6 h-6 text-amber-600" />
-            )}
-          </div>
-          <div className="text-left">
-            <h3 className="text-lg font-semibold text-slate-900">{name}</h3>
-            <p className="text-sm text-slate-500">{tagline}</p>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="text-right">
-            <span className="text-2xl font-bold text-slate-900">${price.toLocaleString()}</span>
-            <span className="text-slate-500 text-sm">/month</span>
-          </div>
-          {isExpanded ? (
-            <ChevronUp className="w-5 h-5 text-slate-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-slate-400" />
-          )}
-        </div>
-      </button>
-
-      {isExpanded && (
-        <div className="px-4 sm:px-6 pb-6 border-t border-slate-100">
-          <div className="pt-6">
-            {description && (
-              <p className="text-slate-600 mb-4">{description}</p>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {features.map((feature, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <Check className="w-4 h-4 text-amber-600 flex-shrink-0" />
-                  <span className="text-sm text-slate-700">{feature}</span>
-                </div>
-              ))}
-            </div>
+          <div className="mt-8 bg-gradient-to-r from-haven-600 to-haven-700 rounded-2xl p-6 sm:p-8 text-center text-white">
+            <p className="text-lg sm:text-xl font-semibold mb-4">
+              Why pay more for software that makes YOU do the work?
+            </p>
+            <p className="text-haven-200 mb-6">
+              Start with Haven Essentials for just $39/month or get full service at $349/month with no setup fee.
+            </p>
             <Link
-              href={isContact ? '/contact' : `/register?plan=${name.toLowerCase().replace('+', '-plus')}`}
-              className={`mt-6 block w-full text-center py-3 font-semibold rounded-xl transition-colors ${
-                isContact
-                  ? 'bg-slate-900 text-white hover:bg-slate-800'
-                  : 'bg-amber-600 text-white hover:bg-amber-700'
-              }`}
+              href="/register"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-amber-500 text-warm-900 font-semibold rounded-xl hover:bg-amber-400 transition-colors"
             >
-              {isContact ? 'Contact Sales' : `Upgrade to ${name}`}
+              Start for $39/month
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </div>
         </div>
-      )}
-    </div>
-  );
-}
+      </section>
 
-// ============================================================================
-// PRICING SECTION
-// ============================================================================
-function PricingSection() {
-  return (
-    <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full mb-4">
-            <DollarSign className="w-4 h-4 text-emerald-700" />
-            <span className="text-sm font-semibold text-emerald-800">Transparent Pricing</span>
-          </div>
-          <h2 className="font-serif text-3xl sm:text-4xl lg:text-5xl font-bold text-slate-900 mb-4">
-            Choose Your Level of Support
-          </h2>
-          <p className="text-xl text-slate-600 max-w-2xl mx-auto">
-            Start with Essentials and upgrade anytime. All plans include unlimited bill consolidation.
-          </p>
-        </div>
-
-        {/* Main 3 Pricing Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          {/* ESSENTIALS - $39 */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 flex-1">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-slate-900">Haven Essentials</h3>
-                <p className="text-sm text-slate-500 mt-1">Self-service home management</p>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-slate-900">$39</span>
-                  <span className="text-slate-500">/month</span>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {[
-                  'Bill consolidation (unlimited)',
-                  'Home profile & systems tracking',
-                  'Maintenance reminders',
-                  'Vendor directory',
-                  'Document storage',
-                  'Money dashboard',
-                  'Handyman visits ($99 each)',
-                ].map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-slate-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 text-center">
-                  Perfect for DIY homeowners who want organization
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 pt-0">
-              <Link
-                href="/register?plan=essentials"
-                className="block w-full py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors text-center"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-
-          {/* LITE - $349 - MOST POPULAR */}
-          <div className="bg-white rounded-2xl border-2 border-emerald-500 shadow-lg overflow-hidden flex flex-col relative">
-            {/* Popular Badge */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2">
-              <span className="px-4 py-1 bg-emerald-600 text-white text-sm font-semibold rounded-full shadow-lg">
-                Most Popular
-              </span>
-            </div>
-
-            <div className="p-6 pt-8 flex-1">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-slate-900">Haven Lite</h3>
-                <p className="text-sm text-slate-500 mt-1">Light-touch manager support</p>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-slate-900">$349</span>
-                  <span className="text-slate-500">/month</span>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {[
-                  'Your complete home profile',
-                  'Bill consolidation (unlimited)',
-                  'Vendor coordination (reactive)',
-                  'Text-based home manager',
-                  'Document vault & home manual',
-                  'Same-day response time',
-                ].map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-slate-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 text-center">
-                  For busy professionals who want backup support
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 pt-0">
-              <Link
-                href="/register?plan=lite"
-                className="block w-full py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors text-center"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-
-          {/* HAVEN - $749 */}
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col">
-            <div className="p-6 flex-1">
-              <div className="text-center">
-                <h3 className="text-lg font-semibold text-slate-900">Haven</h3>
-                <p className="text-sm text-slate-500 mt-1">Your dedicated home manager</p>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold text-slate-900">$749</span>
-                  <span className="text-slate-500">/month</span>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-3">
-                {[
-                  'Everything in Lite',
-                  'Proactive home manager',
-                  'Monthly handyman visit (2 hrs)',
-                  'Vendor oversight & negotiation',
-                  'Maintenance scheduling',
-                  '12-hour response time',
-                ].map((feature, idx) => (
-                  <div key={idx} className="flex items-start gap-3">
-                    <Check className="w-5 h-5 text-emerald-600 flex-shrink-0 mt-0.5" />
-                    <span className="text-sm text-slate-700">{feature}</span>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-slate-100">
-                <p className="text-xs text-slate-500 text-center">
-                  For those who want their home truly managed
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 pt-0">
-              <Link
-                href="/register?plan=haven"
-                className="block w-full py-3 bg-slate-100 text-slate-700 font-semibold rounded-xl hover:bg-slate-200 transition-colors text-center"
-              >
-                Get Started
-              </Link>
-            </div>
-          </div>
-        </div>
-
-        {/* Premium Tiers - Expandable Dropdowns */}
-        <div className="space-y-3 mb-12">
-          <PremiumTierDropdown
-            name="Haven+"
-            price={1499}
-            tagline="Personal assistant + enhanced services"
-            features={[
-              'Everything in Haven',
-              'Personal assistant services',
-              'Errands, shopping & returns',
-              'Travel coordination',
-              'Event planning',
-              '4-hour priority response',
-              'Enhanced handyman (4 hrs/month)',
-            ]}
-          />
-
-          <PremiumTierDropdown
-            name="Haven Estate"
-            price={3499}
-            tagline="White-glove estate management"
-            description="Your personal estate manager anticipating needs, coordinating staff, and ensuring every detail of your properties is handled with discretion and excellence."
-            features={[
-              'Multiple properties supported',
-              'Priority 24/7 concierge access',
-              'Custom service agreements',
-              'Staff coordination',
-              'Dedicated estate manager',
-            ]}
-            isContact={true}
-          />
-        </div>
-
-        {/* How Billing Works */}
-        <div className="max-w-4xl mx-auto bg-amber-50 rounded-2xl p-6 lg:p-8 border border-amber-200">
-          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <DollarSign className="w-5 h-5 text-amber-600" />
-            How Your Bill Works
-          </h3>
-          <div className="grid sm:grid-cols-2 gap-4 mb-4">
-            <div className="bg-white rounded-xl p-4 border border-amber-100">
-              <p className="text-sm font-medium text-slate-600 mb-1">Haven Membership</p>
-              <p className="text-2xl font-bold text-emerald-600">$39–$3,499</p>
-              <p className="text-xs text-slate-500 mt-1">Your manager, platform, home profile & more</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-amber-100">
-              <p className="text-sm font-medium text-slate-600 mb-1">Your Household Bills</p>
-              <p className="text-2xl font-bold text-slate-900">At Cost</p>
-              <p className="text-xs text-slate-500 mt-1">Mortgage, utilities, vendors at zero markup</p>
-            </div>
-          </div>
-          <p className="text-sm text-slate-600">
-            <strong>Example:</strong> $3,200 in monthly bills + $39 Essentials = <strong>$3,239 total</strong>. One payment to Haven. We pay everyone else.
-          </p>
-        </div>
-
-        {/* Trust line */}
-        <div className="mt-8 text-center">
-          <p className="text-sm text-slate-500">
-            All plans include unlimited bill consolidation • No setup fees • Cancel anytime • 30-day money-back guarantee
-          </p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// COMPARISON TABLE SECTION
-// ============================================================================
-function ComparisonTableSection() {
-  const comparisonData = [
-    { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
-    { feature: 'Home Profile & Systems', essentials: true, lite: true, haven: true },
-    { feature: 'Maintenance Reminders', essentials: true, lite: true, haven: true },
-    { feature: 'Vendor Directory', essentials: true, lite: true, haven: true },
-    { feature: 'Document Storage', essentials: true, lite: 'Vault + Manual', haven: 'Vault + Manual' },
-    { feature: 'Home Manager', essentials: false, lite: 'Text-based', haven: 'Proactive' },
-    { feature: 'Vendor Coordination', essentials: false, lite: 'Reactive', haven: 'Full oversight' },
-    { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
-    { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs/month' },
-    { feature: 'Vendor Negotiation', essentials: false, lite: false, haven: true },
-  ];
-
-  const mobileData = [
-    { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
-    { feature: 'Home Manager', essentials: '—', lite: 'Text-based', haven: 'Proactive', highlight: true },
-    { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
-    { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs included', highlight: true },
-    { feature: 'Vendor Coordination', essentials: '—', lite: 'Reactive', haven: 'Full oversight' },
-  ];
-
-  return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-5xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl font-bold text-center text-slate-900 mb-8">
-          Compare Plans
-        </h2>
-
-        {/* Desktop Table */}
-        <div className="hidden lg:block">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200">
-                <th className="text-left py-4 px-4 font-semibold text-slate-600 w-1/4">Feature</th>
-                <th className="text-center py-4 px-4 w-1/4">
-                  <div className="font-semibold text-slate-900">Essentials</div>
-                  <div className="text-2xl font-bold text-slate-900">$39<span className="text-sm font-normal text-slate-500">/mo</span></div>
-                </th>
-                <th className="text-center py-4 px-4 bg-emerald-50 rounded-t-xl w-1/4">
-                  <div className="font-semibold text-emerald-700">Lite</div>
-                  <div className="text-2xl font-bold text-emerald-700">$349<span className="text-sm font-normal text-emerald-600">/mo</span></div>
-                </th>
-                <th className="text-center py-4 px-4 w-1/4">
-                  <div className="font-semibold text-slate-900">Haven</div>
-                  <div className="text-2xl font-bold text-slate-900">$749<span className="text-sm font-normal text-slate-500">/mo</span></div>
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {comparisonData.map((row, idx) => (
-                <tr key={idx}>
-                  <td className="py-4 px-4 text-slate-700">{row.feature}</td>
-                  <td className="py-4 px-4 text-center">
-                    {row.essentials === true ? (
-                      <Check className="w-5 h-5 text-green-500 mx-auto" />
-                    ) : row.essentials === false ? (
-                      <X className="w-5 h-5 text-slate-300 mx-auto" />
-                    ) : (
-                      <span className="text-sm text-slate-600">{row.essentials}</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-center bg-emerald-50">
-                    {row.lite === true ? (
-                      <Check className="w-5 h-5 text-emerald-600 mx-auto" />
-                    ) : row.lite === false ? (
-                      <X className="w-5 h-5 text-slate-300 mx-auto" />
-                    ) : (
-                      <span className="text-sm font-medium text-emerald-700">{row.lite}</span>
-                    )}
-                  </td>
-                  <td className="py-4 px-4 text-center">
-                    {row.haven === true ? (
-                      <Check className="w-5 h-5 text-green-500 mx-auto" />
-                    ) : row.haven === false ? (
-                      <X className="w-5 h-5 text-slate-300 mx-auto" />
-                    ) : (
-                      <span className="text-sm text-slate-600">{row.haven}</span>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Cards */}
-        <div className="lg:hidden space-y-3">
-          {mobileData.map((row, idx) => (
-            <div key={idx} className={`bg-white rounded-xl border overflow-hidden ${row.highlight ? 'border-emerald-300' : 'border-slate-200'}`}>
-              <div className="bg-slate-100 px-4 py-2">
-                <span className="font-medium text-slate-700 text-sm">{row.feature}</span>
-              </div>
-              <div className="grid grid-cols-3 divide-x divide-slate-100">
-                <div className="p-3 text-center">
-                  <div className="text-xs text-slate-400 mb-1">$39</div>
-                  <div className="text-sm text-slate-600">{row.essentials}</div>
-                </div>
-                <div className="p-3 text-center bg-emerald-50/50">
-                  <div className="text-xs text-emerald-600 mb-1">$349</div>
-                  <div className="text-sm font-medium text-emerald-700">{row.lite}</div>
-                </div>
-                <div className="p-3 text-center">
-                  <div className="text-xs text-slate-400 mb-1">$749</div>
-                  <div className="text-sm text-slate-600">{row.haven}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Bottom CTA */}
-        <div className="mt-12 text-center">
-          <Link
-            href="/register?plan=essentials"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/25"
-          >
-            Start for $39/month
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// SOCIAL PROOF
-// ============================================================================
-function SocialProofSection() {
-  const testimonials = [
-    {
-      quote: "I thought this kind of service was only for people with mansions. Turns out it's for anyone tired of being their own property manager. Best money I spend each month.",
-      name: 'Marcus T.',
-      role: 'Software Developer, 3BR Colonial',
-      highlight: 'Worth every penny',
-    },
-    {
-      quote: "Last month Sarah caught an overcharge from our landscaper and saved us $400. The membership has literally paid for itself multiple times over.",
-      name: 'Jennifer L.',
-      role: 'Working Mom, Townhouse',
-      highlight: 'Saved $400',
-    },
-    {
-      quote: "The monthly handyman visit is worth the membership alone. Mike caught a small leak that would've destroyed our basement. Can't imagine going back.",
-      name: 'David S.',
-      role: 'Small Business Owner, 4BR Home',
-      highlight: 'Prevented major repair',
-    },
-  ];
-
-  return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-50">
-      <div className="max-w-7xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-            Real Homeowners. Real Results.
-          </h2>
-          <p className="text-xl text-slate-600">
-            Join hundreds of families who've reclaimed their time.
-          </p>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-8">
-          {testimonials.map((t, i) => (
-            <div key={i} className="bg-white rounded-2xl p-8 shadow-sm border border-slate-200">
-              <div className="flex items-center gap-1 mb-4">
-                {[...Array(5)].map((_, j) => (
-                  <Star key={j} className="w-5 h-5 text-amber-400 fill-amber-400" />
-                ))}
-              </div>
-              <blockquote className="text-slate-700 leading-relaxed mb-6">
-                "{t.quote}"
-              </blockquote>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-bold text-slate-900">{t.name}</p>
-                  <p className="text-sm text-slate-500">{t.role}</p>
-                </div>
-                <span className="px-3 py-1.5 bg-emerald-100 text-emerald-700 text-sm font-semibold rounded-full">
-                  {t.highlight}
-                </span>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Stats */}
-        <div className="mt-16 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-          {[
-            { value: '8+', label: 'Hours saved monthly' },
-            { value: '500+', label: 'Families served' },
-            { value: '4.9', label: 'Average rating' },
-            { value: '$0', label: 'Hidden fees' },
-          ].map((stat, i) => (
-            <div key={i}>
-              <p className="text-4xl font-bold text-emerald-600">{stat.value}</p>
-              <p className="text-slate-600 font-medium">{stat.label}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// FAQ
-// ============================================================================
-function FAQSection() {
-  const [openIndex, setOpenIndex] = useState<number | null>(0);
-
-  const faqs = [
-    {
-      q: 'Is this only for rich people with big estates?',
-      a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Lite plan works perfectly for condos and apartments. The value comes from saving you time and preventing expensive repairs. That's valuable for any homeowner.",
-    },
-    {
-      q: 'How is Haven different from household management software?',
-      a: "Software gives you tools to organize things yourself. You still do all the work. Haven gives you actual humans who handle things for you. We don't give you a better to-do list. We take things off your list entirely. That's why we cost less than software-only solutions while delivering far more value.",
-    },
-    {
-      q: 'Why should I pay for this when I can manage things myself?',
-      a: "You can. The question is whether you want to. If you enjoy tracking down vendors, waiting on hold, and remembering when the furnace filter was last changed, keep doing that. If you'd rather text once and have it handled, that's what we do. Most members say they get 8+ hours back every month.",
-    },
-    {
-      q: 'Do I have to sign an annual contract?',
-      a: 'No. Month-to-month, cancel anytime. Some competitors lock you into 12-month prepaid commitments with thousands in setup fees. We believe if we do a good job, you\'ll stay. No contracts needed.',
-    },
-    {
-      q: 'How does the one-bill system work?',
-      a: 'You make one monthly payment to Haven. We use it to pay your mortgage, utilities, lawn care, cleaning, and every other household expense. Routine bills are automatic. Repairs and one-time expenses require your approval first. You see every transaction in real-time.',
-    },
-    {
-      q: 'Is my money safe?',
-      a: "Yes. Your Haven Wallet is FDIC-insured through our banking partner. You see every transaction in real-time, maintain full visibility, and can withdraw anytime. We never mark up vendor costs. Your bills pass through at exactly what they cost.",
-    },
-  ];
-
-  return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-      <div className="max-w-3xl mx-auto">
-        <div className="text-center mb-16">
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold text-slate-900 mb-4">
-            Questions? We've Got Answers.
-          </h2>
-        </div>
-
-        <div className="space-y-4">
-          {faqs.map((faq, i) => (
-            <div key={i} className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
-              <button
-                onClick={() => setOpenIndex(openIndex === i ? null : i)}
-                className="w-full p-6 text-left flex items-center justify-between gap-4"
-              >
-                <span className="font-semibold text-slate-900">{faq.q}</span>
-                <ChevronRight className={`w-5 h-5 text-slate-400 transition-transform flex-shrink-0 ${openIndex === i ? 'rotate-90' : ''}`} />
-              </button>
-              {openIndex === i && (
-                <div className="px-6 pb-6">
-                  <p className="text-slate-600 leading-relaxed">{faq.a}</p>
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// FINAL CTA
-// ============================================================================
-function FinalCTASection() {
-  return (
-    <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-b from-emerald-900 to-emerald-950 text-white">
-      <div className="max-w-4xl mx-auto text-center">
-        <h2 className="font-serif text-4xl sm:text-5xl font-bold mb-6 text-white">
-          Ready to simplify your home life?
-        </h2>
-        <p className="text-2xl text-emerald-200 mb-4">
-          Start with bill consolidation for just $39/month. Upgrade anytime.
-        </p>
-        <p className="text-lg text-emerald-300 mb-10 max-w-2xl mx-auto">
-          Join hundreds of families who've reclaimed their time and peace of mind.
-          <br />
-          <strong className="text-white">Not another app. Actual help when you need it.</strong>
-        </p>
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/register?plan=essentials"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-emerald-900 text-lg font-bold rounded-xl hover:bg-emerald-50 transition-colors shadow-xl"
-          >
-            Start for $39/month
-            <ArrowRight className="w-5 h-5" />
-          </Link>
-          <a
-            href="#pricing"
-            className="inline-flex items-center gap-2 px-8 py-4 border-2 border-white text-white text-lg font-medium rounded-xl hover:bg-emerald-800 transition-colors"
-          >
-            Compare All Plans
-          </a>
-        </div>
-        <p className="text-emerald-400 text-sm mt-6 font-medium">
-          No contracts. No setup fees. Cancel anytime. 30-day money-back guarantee.
-        </p>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================================
-// FOOTER
-// ============================================================================
-function Footer() {
-  return (
-    <footer className="py-16 px-4 sm:px-6 lg:px-8 bg-slate-900 text-white">
-      <div className="max-w-7xl mx-auto">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-12 mb-12">
-          <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center">
-                <Home className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold">Haven</span>
-            </div>
-            <p className="text-slate-400 text-sm leading-relaxed">
-              Full-service home management for everyone. One bill. One contact. Zero hassle.
+      {/* ================================================================== */}
+      {/* TESTIMONIALS */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-gradient-to-b from-amber-50 to-amber-100/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+              Real Homeowners. Real Results.
+            </h2>
+            <p className="mt-4 text-lg text-warm-600">
+              Join hundreds of families who've reclaimed their time.
             </p>
           </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-white">Product</h4>
-            <ul className="space-y-3 text-slate-400 text-sm">
-              <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
-              <li><a href="#services" className="hover:text-white transition-colors">Services</a></li>
-              <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
-              <li><a href="#compare" className="hover:text-white transition-colors">Compare</a></li>
-            </ul>
+
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                quote: "I thought this kind of service was only for people with mansions. Turns out it's for anyone tired of being their own property manager. Best money I spend each month.",
+                name: 'Marcus T.',
+                title: 'Software Developer, 3BR Colonial',
+                highlight: 'Worth every penny',
+                color: 'bg-haven-100 text-haven-700',
+                avatar: 'MT',
+              },
+              {
+                quote: "Last month Sarah caught an overcharge from our landscaper and saved us $400. The membership has literally paid for itself multiple times over.",
+                name: 'Jennifer L.',
+                title: 'Working Mom, Townhouse',
+                highlight: 'Saved $400',
+                color: 'bg-green-100 text-green-700',
+                avatar: 'JL',
+              },
+              {
+                quote: "The monthly handyman visit is worth the membership alone. Mike caught a small leak that would've destroyed our basement. Can't imagine going back.",
+                name: 'David S.',
+                title: 'Small Business Owner, 4BR Home',
+                highlight: 'Prevented major repair',
+                color: 'bg-amber-100 text-amber-700',
+                avatar: 'DS',
+              },
+            ].map((testimonial, idx) => (
+              <div key={idx} className="bg-white rounded-2xl p-6 border border-warm-200 flex flex-col shadow-lg">
+                <div className="flex gap-1 mb-4">
+                  {[...Array(5)].map((_, i) => (
+                    <Star key={i} className="w-5 h-5 text-amber-400 fill-current" />
+                  ))}
+                </div>
+                <blockquote className="text-warm-700 flex-1">"{testimonial.quote}"</blockquote>
+                <div className="mt-6 pt-4 border-t border-warm-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-haven-600 flex items-center justify-center text-white font-semibold text-sm">
+                      {testimonial.avatar}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-warm-900">{testimonial.name}</p>
+                      <p className="text-sm text-warm-500">{testimonial.title}</p>
+                    </div>
+                  </div>
+                  <span className={`px-2 py-1 ${testimonial.color} text-xs font-medium rounded-full`}>
+                    {testimonial.highlight}
+                  </span>
+                </div>
+              </div>
+            ))}
           </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-white">Company</h4>
-            <ul className="space-y-3 text-slate-400 text-sm">
-              <li><a href="#" className="hover:text-white transition-colors">About</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
-              <li><a href="#" className="hover:text-white transition-colors">Contact</a></li>
-              <li><Link href="/login" className="hover:text-white transition-colors">Member Login</Link></li>
-            </ul>
-          </div>
-          <div>
-            <h4 className="font-semibold mb-4 text-white">Partners</h4>
-            <ul className="space-y-3 text-slate-400 text-sm">
-              <li><Link href="/vendor" className="hover:text-white transition-colors">Vendor Portal</Link></li>
-              <li><Link href="/handyman" className="hover:text-white transition-colors">Handyman Portal</Link></li>
-              <li><a href="#" className="hover:text-white transition-colors">Become a Partner</a></li>
-            </ul>
+
+          {/* Stats */}
+          <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
+            {[
+              { value: '8+', label: 'Hours saved monthly', color: 'text-haven-600' },
+              { value: '500+', label: 'Families served', color: 'text-amber-600' },
+              { value: '4.9', label: 'Average rating', color: 'text-haven-600' },
+              { value: '$0', label: 'Hidden fees', color: 'text-green-600' },
+            ].map((stat, idx) => (
+              <div key={idx} className="text-center bg-white rounded-xl p-4 shadow-md border border-warm-200">
+                <p className={`text-3xl sm:text-4xl font-bold ${stat.color}`}>{stat.value}</p>
+                <p className="text-warm-500">{stat.label}</p>
+              </div>
+            ))}
           </div>
         </div>
+      </section>
 
-        {/* Trust Badges */}
-        <div className="flex flex-wrap items-center justify-center gap-8 py-8 border-t border-slate-800">
-          {[
-            { icon: Lock, label: 'FDIC-Insured' },
-            { icon: Shield, label: '$2M Coverage' },
-            { icon: ShieldCheck, label: 'SOC 2' },
-            { icon: BadgeCheck, label: 'Vetted Pros' },
-          ].map(({ icon: Icon, label }) => (
-            <div key={label} className="flex items-center gap-2 text-slate-400">
-              <Icon className="w-5 h-5" />
-              <span className="text-sm font-medium">{label}</span>
+      {/* ================================================================== */}
+      {/* FAQ */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-white">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center text-warm-900 mb-8">
+            Questions? We've Got Answers.
+          </h2>
+
+          <div className="space-y-3">
+            {[
+              {
+                q: 'Is this only for rich people with big estates?',
+                a: "Not at all. We built Haven because professional home management shouldn't require a trust fund. Our Essentials plan starts at just $39/month and works perfectly for condos and apartments. The value comes from saving you time and preventing expensive repairs. That's valuable for any homeowner.",
+              },
+              {
+                q: 'How is Haven different from household management software?',
+                a: "Software gives you tools to organize your own work. Haven gives you a person who does the work. When your furnace breaks at 10pm, software gives you a contact list. Haven? Text us and go back to bed. We'll handle it.",
+              },
+              {
+                q: 'Why should I pay for this when I can manage things myself?',
+                a: "You absolutely can. The question is: should you? Our members save 8+ hours monthly. If your time is worth $50/hour, that's $400 in value for a $349 membership, before counting the money we save on vendor negotiations and catching issues early.",
+              },
+              {
+                q: 'Do I have to sign an annual contract?',
+                a: "Never. All Haven memberships are month-to-month. No setup fees, no cancellation penalties. We earn your business every month.",
+              },
+              {
+                q: 'How does the one-bill system work?',
+                a: "You fund your Haven Wallet once monthly. We pay every bill on your behalf: mortgage, utilities, landscaper, pool guy, everyone. You see it all in your dashboard, but you never have to think about due dates or writing checks again.",
+              },
+              {
+                q: 'Is my money safe?',
+                a: "Yes. Your Haven Wallet is FDIC-insured up to $2 million through our banking partner. We're also SOC 2 certified, meaning your data and transactions meet the highest security standards.",
+              },
+            ].map((faq, idx) => (
+              <div key={idx} className="border border-warm-200 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-warm-50 transition-colors"
+                >
+                  <span className="font-semibold text-warm-900">{faq.q}</span>
+                  {openFaq === idx ? (
+                    <ChevronUp className="w-5 h-5 text-haven-600 flex-shrink-0" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-warm-400 flex-shrink-0" />
+                  )}
+                </button>
+                {openFaq === idx && (
+                  <div className="px-6 pb-4 text-warm-600 bg-warm-50">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* FINAL CTA */}
+      {/* ================================================================== */}
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 relative overflow-hidden">
+        {/* Background decoration */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 w-96 h-96 bg-amber-500 rounded-full blur-3xl opacity-20" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-haven-400 rounded-full blur-3xl opacity-20" />
+        </div>
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold text-white">
+            Ready to simplify your home life?
+          </h2>
+          <p className="mt-4 text-lg text-haven-100">
+            Start with bill consolidation for just $39/month. Upgrade anytime.
+          </p>
+          <p className="mt-2 text-haven-200">
+            Join hundreds of families who've reclaimed their time and peace of mind.
+          </p>
+          <p className="mt-4 text-amber-400 font-medium">
+            Not another app. Actual help when you need it.
+          </p>
+          <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href="/register"
+              className="w-full sm:w-auto px-8 py-4 bg-amber-500 text-warm-900 font-semibold rounded-xl hover:bg-amber-400 transition-colors text-lg flex items-center justify-center gap-2"
+            >
+              Start for $39/month
+              <ArrowRight className="w-5 h-5" />
+            </Link>
+            <a
+              href="#pricing"
+              className="w-full sm:w-auto px-8 py-4 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-lg"
+            >
+              Compare All Plans
+            </a>
+          </div>
+          <p className="mt-6 text-sm text-haven-200">
+            No contracts. No setup fees. Cancel anytime. 30-day money-back guarantee.
+          </p>
+        </div>
+      </section>
+
+      {/* ================================================================== */}
+      {/* FOOTER */}
+      {/* ================================================================== */}
+      <footer className="bg-warm-900 text-white py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8">
+            <div className="lg:col-span-2">
+              <h3 className="text-xl font-bold">Haven</h3>
+              <p className="mt-2 text-warm-400 text-sm">
+                Full-service home management for everyone. One bill. One contact. Zero hassle.
+              </p>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="flex items-center gap-1 text-xs text-warm-400">
+                  <Shield className="w-4 h-4" />
+                  FDIC-Insured
+                </div>
+                <div className="flex items-center gap-1 text-xs text-warm-400">
+                  <BadgeCheck className="w-4 h-4" />
+                  SOC 2
+                </div>
+              </div>
             </div>
-          ))}
-        </div>
-
-        <div className="pt-8 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-slate-500 text-sm">© {new Date().getFullYear()} Haven. All rights reserved.</p>
-          <div className="flex items-center gap-6 text-slate-500 text-sm">
-            <a href="#" className="hover:text-white transition-colors">Privacy</a>
-            <a href="#" className="hover:text-white transition-colors">Terms</a>
-            <a href="#" className="hover:text-white transition-colors">Security</a>
+            <div>
+              <h4 className="font-semibold mb-3">Product</h4>
+              <ul className="space-y-2 text-sm text-warm-400">
+                <li><a href="#how-it-works" className="hover:text-white">How It Works</a></li>
+                <li><a href="#" className="hover:text-white">Services</a></li>
+                <li><a href="#pricing" className="hover:text-white">Pricing</a></li>
+                <li><a href="#" className="hover:text-white">Compare</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Company</h4>
+              <ul className="space-y-2 text-sm text-warm-400">
+                <li><a href="#" className="hover:text-white">About</a></li>
+                <li><a href="#" className="hover:text-white">Careers</a></li>
+                <li><a href="#" className="hover:text-white">Contact</a></li>
+                <li><Link href="/login" className="hover:text-white">Member Login</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-3">Partners</h4>
+              <ul className="space-y-2 text-sm text-warm-400">
+                <li><Link href="/vendor" className="hover:text-white">Vendor Portal</Link></li>
+                <li><Link href="/handyman" className="hover:text-white">Handyman Portal</Link></li>
+                <li><a href="#" className="hover:text-white">Become a Partner</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t border-warm-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-warm-400">© 2025 Haven. All rights reserved.</p>
+            <div className="flex items-center gap-6 text-sm text-warm-400">
+              <a href="#" className="hover:text-white">Privacy</a>
+              <a href="#" className="hover:text-white">Terms</a>
+              <a href="#" className="hover:text-white">Security</a>
+            </div>
           </div>
         </div>
-      </div>
-    </footer>
-  );
-}
-
-// ============================================================================
-// MAIN PAGE COMPONENT
-// ============================================================================
-export default function HomePage() {
-  return (
-    <div className="min-h-screen bg-white">
-      <Navigation />
-      <HeroSection />
-      <ProblemSection />
-      <HowItWorksSection />
-      <ServicesSection />
-      <PricingSection />
-      <ComparisonTableSection />
-      <CompetitorSection />
-      <SocialProofSection />
-      <FAQSection />
-      <FinalCTASection />
-      <Footer />
+      </footer>
     </div>
   );
 }
