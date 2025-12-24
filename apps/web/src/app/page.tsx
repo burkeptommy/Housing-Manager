@@ -859,7 +859,7 @@ export default function MarketingPage() {
                   { feature: 'Home Manager', essentials: false, lite: 'Text-based', haven: 'Proactive' },
                   { feature: 'Vendor Coordination', essentials: false, lite: 'Reactive', haven: 'Full oversight' },
                   { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
-                  { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs/month' },
+                  { feature: 'Handyman Visits', essentials: '$99/visit', lite: '1 visit/mo', haven: '2 hrs/month' },
                   { feature: 'Vendor Negotiation', essentials: false, lite: false, haven: true },
                 ].map((row, idx) => (
                   <tr key={idx}>
@@ -958,7 +958,8 @@ export default function MarketingPage() {
           </div>
 
           <div className="bg-warm-50 rounded-2xl overflow-hidden border border-warm-200">
-            <div className="grid sm:grid-cols-3">
+            {/* Header - hidden on mobile, shown on desktop */}
+            <div className="hidden sm:grid sm:grid-cols-3">
               <div className="p-4 sm:p-6 font-semibold text-warm-600 border-b sm:border-b-0 sm:border-r border-warm-200 bg-warm-100">
                 FEATURE
               </div>
@@ -966,9 +967,9 @@ export default function MarketingPage() {
                 <p className="font-semibold text-red-700">Household Software</p>
                 <p className="text-sm text-red-600">$375/mo + $3K setup</p>
               </div>
-              <div className="p-4 sm:p-6 text-center bg-haven-100">
-                <p className="font-semibold text-haven-800">Haven</p>
-                <p className="text-sm text-haven-700">$349/mo, no setup fee</p>
+              <div className="p-4 sm:p-6 text-center bg-emerald-100">
+                <p className="font-semibold text-emerald-800">Haven</p>
+                <p className="text-sm text-emerald-700">$349/mo, no setup fee</p>
               </div>
             </div>
 
@@ -983,17 +984,32 @@ export default function MarketingPage() {
               { feature: 'Humans Doing Work', software: 'No (software only)', haven: 'Yes, dedicated manager' },
               { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
             ].map((row, idx) => (
-              <div key={idx} className="grid sm:grid-cols-3 border-t border-warm-200">
-                <div className="p-4 sm:p-5 text-warm-700 font-medium border-b sm:border-b-0 sm:border-r border-warm-200">
+              <div key={idx} className="border-t border-warm-200">
+                {/* Feature name */}
+                <div className="p-4 sm:hidden text-warm-800 font-semibold bg-warm-100">
                   {row.feature}
                 </div>
-                <div className="p-4 sm:p-5 text-center border-b sm:border-b-0 sm:border-r border-warm-200 flex items-center justify-center gap-2 bg-red-50/50">
-                  <XCircle className="w-4 h-4 text-red-400 hidden sm:block" />
-                  <span className="text-sm text-red-700">{row.software}</span>
-                </div>
-                <div className="p-4 sm:p-5 text-center bg-haven-50 flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-haven-700 hidden sm:block" />
-                  <span className="text-sm font-medium text-haven-800">{row.haven}</span>
+                <div className="grid grid-cols-1 sm:grid-cols-3">
+                  {/* Feature - desktop only */}
+                  <div className="hidden sm:block p-4 sm:p-5 text-warm-700 font-medium border-b sm:border-b-0 sm:border-r border-warm-200">
+                    {row.feature}
+                  </div>
+                  {/* Other Services */}
+                  <div className="p-4 sm:p-5 border-b sm:border-b-0 sm:border-r border-warm-200 flex items-center gap-2 bg-red-50/50">
+                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                    <div className="flex-1">
+                      <span className="sm:hidden text-xs font-semibold text-red-600 uppercase tracking-wide">Other Services: </span>
+                      <span className="text-sm text-red-700">{row.software}</span>
+                    </div>
+                  </div>
+                  {/* Haven */}
+                  <div className="p-4 sm:p-5 flex items-center gap-2 bg-emerald-50">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+                    <div className="flex-1">
+                      <span className="sm:hidden text-xs font-semibold text-emerald-700 uppercase tracking-wide">Haven: </span>
+                      <span className="text-sm font-medium text-emerald-800">{row.haven}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
