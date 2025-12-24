@@ -673,7 +673,7 @@ export default function SettingsPage() {
             <span className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <div className="flex-1">
-            <p className="font-semibold text-warm-900">Sarah Harrison</p>
+            <p className="font-semibold text-warm-900">Sarah Chen</p>
             <p className="text-sm text-emerald-700">Online - Available now</p>
           </div>
           <button

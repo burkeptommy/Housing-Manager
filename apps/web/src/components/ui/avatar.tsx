@@ -1,96 +1,255 @@
 'use client';
 
-import Image from 'next/image';
-import { getAvatarUrl, getInitials } from '@/lib/images';
+import React from 'react';
 
-type AvatarSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl';
-type StatusType = 'online' | 'offline' | 'busy' | 'away';
+// Color palette - 12 distinct colors
+const colors = [
+  { bg: '#E8ECF2', fill: '#1E2A3B' },  // Navy
+  { bg: '#CCFBF1', fill: '#0F766E' },  // Teal
+  { bg: '#EDE9FE', fill: '#6D28D9' },  // Violet
+  { bg: '#FFE4E6', fill: '#BE123C' },  // Rose
+  { bg: '#FEF3C7', fill: '#B45309' },  // Amber
+  { bg: '#D1FAE5', fill: '#047857' },  // Emerald
+  { bg: '#E0F2FE', fill: '#0369A1' },  // Sky
+  { bg: '#FFEDD5', fill: '#C2410C' },  // Orange
+  { bg: '#FCE7F3', fill: '#BE185D' },  // Pink
+  { bg: '#E0E7FF', fill: '#4338CA' },  // Indigo
+  { bg: '#ECFCCB', fill: '#4D7C0F' },  // Lime
+  { bg: '#CFFAFE', fill: '#0E7490' },  // Cyan
+];
+
+// Get consistent color from name
+function getColorIndex(name: string): number {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  return Math.abs(hash) % colors.length;
+}
+
+// Size presets
+const sizes = {
+  xs: 24,
+  sm: 32,
+  md: 40,
+  lg: 48,
+  xl: 64,
+  '2xl': 80,
+};
+
+type AvatarSize = keyof typeof sizes;
 
 interface AvatarProps {
   name: string;
-  src?: string | null;
+  type: 'male' | 'female' | 'boy' | 'girl' | 'manager' | 'handyman' | 'pet-dog' | 'pet-cat';
   size?: AvatarSize;
-  status?: StatusType;
+  colorIndex?: number; // Override color
   className?: string;
 }
 
-const sizeClasses: Record<AvatarSize, string> = {
-  sm: 'w-8 h-8 text-xs',
-  md: 'w-10 h-10 text-sm',
-  lg: 'w-12 h-12 text-base',
-  xl: 'w-16 h-16 text-lg',
-  '2xl': 'w-24 h-24 text-2xl',
-};
+// Male Adult Silhouette
+function MaleSilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Head */}
+      <circle cx="20" cy="12" r="7" />
+      {/* Shoulders/Body - broader, more angular */}
+      <path d="M8 40 L12 28 C14 24 17 22 20 22 C23 22 26 24 28 28 L32 40 Z" />
+    </g>
+  );
+}
 
-const statusClasses: Record<StatusType, string> = {
-  online: 'bg-emerald-500',
-  offline: 'bg-warm-400',
-  busy: 'bg-red-500',
-  away: 'bg-amber-500',
-};
+// Female Adult Silhouette
+function FemaleSilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Head */}
+      <circle cx="20" cy="12" r="7" />
+      {/* Hair hint - slightly longer */}
+      <ellipse cx="20" cy="10" rx="8" ry="6" />
+      {/* Shoulders/Body - narrower, softer */}
+      <path d="M10 40 L13 28 C15 24 17 22 20 22 C23 22 25 24 27 28 L30 40 Z" />
+    </g>
+  );
+}
 
-export function Avatar({ name, src, size = 'md', status, className = '' }: AvatarProps) {
-  const imageUrl = src || getAvatarUrl(name);
-  const initials = getInitials(name);
+// Boy Silhouette (smaller, childlike proportions)
+function BoySilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Bigger head relative to body (child proportions) */}
+      <circle cx="20" cy="13" r="8" />
+      {/* Smaller body */}
+      <path d="M12 40 L14 30 C16 26 18 24 20 24 C22 24 24 26 26 30 L28 40 Z" />
+    </g>
+  );
+}
+
+// Girl Silhouette (smaller, childlike proportions with hair)
+function GirlSilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Bigger head relative to body */}
+      <circle cx="20" cy="13" r="8" />
+      {/* Pigtails/hair puffs */}
+      <circle cx="11" cy="11" r="3" />
+      <circle cx="29" cy="11" r="3" />
+      {/* Smaller body */}
+      <path d="M12 40 L14 30 C16 26 18 24 20 24 C22 24 24 26 26 30 L28 40 Z" />
+    </g>
+  );
+}
+
+// Manager silhouette with sparkle badge
+function ManagerSilhouette() {
+  return (
+    <g>
+      {/* Female silhouette base */}
+      <g fill="#8C7D4E">
+        <circle cx="20" cy="12" r="7" />
+        <ellipse cx="20" cy="10" rx="8" ry="6" />
+        <path d="M10 40 L13 28 C15 24 17 22 20 22 C23 22 25 24 27 28 L30 40 Z" />
+      </g>
+      {/* Star badge */}
+      <g transform="translate(28, 2)">
+        <circle cx="6" cy="6" r="6" fill="#FCD34D" />
+        <path d="M6 2 L7 5 L10 5 L8 7 L9 10 L6 8 L3 10 L4 7 L2 5 L5 5 Z" fill="#B45309" />
+      </g>
+    </g>
+  );
+}
+
+// Handyman silhouette with tool badge
+function HandymanSilhouette() {
+  return (
+    <g>
+      {/* Male silhouette base */}
+      <g fill="#C2410C">
+        <circle cx="20" cy="12" r="7" />
+        <path d="M8 40 L12 28 C14 24 17 22 20 22 C23 22 26 24 28 28 L32 40 Z" />
+      </g>
+      {/* Wrench badge */}
+      <g transform="translate(28, 2)">
+        <circle cx="6" cy="6" r="6" fill="#FED7AA" />
+        <path d="M4 4 L8 8 M8 4 L4 8" stroke="#C2410C" strokeWidth="2" strokeLinecap="round" />
+      </g>
+    </g>
+  );
+}
+
+// Dog silhouette
+function DogSilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Body */}
+      <ellipse cx="20" cy="24" rx="12" ry="8" />
+      {/* Head */}
+      <circle cx="20" cy="14" r="7" />
+      {/* Ears */}
+      <ellipse cx="13" cy="10" rx="3" ry="5" />
+      <ellipse cx="27" cy="10" rx="3" ry="5" />
+      {/* Snout */}
+      <ellipse cx="20" cy="17" rx="3" ry="2" />
+    </g>
+  );
+}
+
+// Cat silhouette
+function CatSilhouette({ color }: { color: string }) {
+  return (
+    <g fill={color}>
+      {/* Body */}
+      <ellipse cx="20" cy="26" rx="10" ry="7" />
+      {/* Head */}
+      <circle cx="20" cy="15" r="7" />
+      {/* Pointed ears */}
+      <polygon points="12,12 14,6 17,12" />
+      <polygon points="28,12 26,6 23,12" />
+      {/* Whiskers area */}
+      <ellipse cx="20" cy="17" rx="2" ry="1.5" />
+    </g>
+  );
+}
+
+export function Avatar({ name, type, size = 'md', colorIndex, className = '' }: AvatarProps) {
+  const pixelSize = sizes[size];
+  const color = colors[colorIndex ?? getColorIndex(name)];
+
+  // Manager and Handyman have fixed colors
+  const bgColor = type === 'manager' ? '#F5F0E8' :
+                  type === 'handyman' ? '#FFEDD5' :
+                  color.bg;
 
   return (
-    <div className={`relative inline-flex ${className}`}>
-      {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={name}
-          width={size === '2xl' ? 96 : size === 'xl' ? 64 : size === 'lg' ? 48 : size === 'md' ? 40 : 32}
-          height={size === '2xl' ? 96 : size === 'xl' ? 64 : size === 'lg' ? 48 : size === 'md' ? 40 : 32}
-          className={`rounded-full object-cover ring-2 ring-white shadow-sm ${sizeClasses[size]}`}
-        />
-      ) : (
-        <div
-          className={`rounded-full bg-gradient-to-br from-haven-600 to-haven-800 text-white font-semibold
-                      flex items-center justify-center ring-2 ring-white shadow-sm ${sizeClasses[size]}`}
-        >
-          {initials}
-        </div>
-      )}
-      {status && (
-        <span
-          className={`absolute bottom-0 right-0 w-3 h-3 rounded-full ring-2 ring-white ${statusClasses[status]}`}
-        />
-      )}
+    <svg
+      width={pixelSize}
+      height={pixelSize}
+      viewBox="0 0 40 40"
+      className={`rounded-full flex-shrink-0 ${className}`}
+      style={{ backgroundColor: bgColor }}
+    >
+      {type === 'male' && <MaleSilhouette color={color.fill} />}
+      {type === 'female' && <FemaleSilhouette color={color.fill} />}
+      {type === 'boy' && <BoySilhouette color={color.fill} />}
+      {type === 'girl' && <GirlSilhouette color={color.fill} />}
+      {type === 'manager' && <ManagerSilhouette />}
+      {type === 'handyman' && <HandymanSilhouette />}
+      {type === 'pet-dog' && <DogSilhouette color={color.fill} />}
+      {type === 'pet-cat' && <CatSilhouette color={color.fill} />}
+    </svg>
+  );
+}
+
+// Vendor Avatar - Uses initials with category icon
+interface VendorAvatarProps {
+  name: string;
+  category?: string;
+  size?: AvatarSize;
+  colorIndex?: number;
+  className?: string;
+}
+
+export function VendorAvatar({ name, size = 'md', colorIndex, className = '' }: VendorAvatarProps) {
+  const pixelSize = sizes[size];
+  const color = colors[colorIndex ?? getColorIndex(name)];
+
+  // Get initials (first letter of first two words)
+  const initials = name
+    .split(' ')
+    .slice(0, 2)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase();
+
+  const fontSize = pixelSize * 0.35;
+
+  return (
+    <div
+      className={`rounded-xl flex items-center justify-center font-semibold flex-shrink-0 ${className}`}
+      style={{
+        width: pixelSize,
+        height: pixelSize,
+        backgroundColor: color.bg,
+        color: color.fill,
+        fontSize: fontSize,
+      }}
+    >
+      {initials}
     </div>
   );
 }
 
-export function AvatarGroup({
-  avatars,
-  max = 4,
-  size = 'md'
-}: {
-  avatars: Array<{ name: string; src?: string }>;
-  max?: number;
-  size?: AvatarSize;
-}) {
-  const visible = avatars.slice(0, max);
-  const remaining = avatars.length - max;
+// Convenience exports
+export function ManagerAvatar({ size = 'md', className = '' }: { size?: AvatarSize; className?: string }) {
+  return <Avatar name="Sarah Chen" type="manager" size={size} className={className} />;
+}
 
-  return (
-    <div className="flex -space-x-2">
-      {visible.map((avatar, i) => (
-        <Avatar key={i} name={avatar.name} src={avatar.src} size={size} />
-      ))}
-      {remaining > 0 && (
-        <div
-          className={`rounded-full bg-warm-100 text-warm-600 font-medium
-                      flex items-center justify-center ring-2 ring-white ${sizeClasses[size]}`}
-        >
-          +{remaining}
-        </div>
-      )}
-    </div>
-  );
+export function HandymanAvatar({ size = 'md', className = '' }: { size?: AvatarSize; className?: string }) {
+  return <Avatar name="Mike Rodriguez" type="handyman" size={size} className={className} />;
 }
 
 // ============================================================================
-// INITIALS AVATARS - Consistent colored circles with initials
+// BACKWARD COMPATIBILITY - InitialsAvatar
 // ============================================================================
 
 type InitialsSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
@@ -130,7 +289,6 @@ function getInitialsFromName(name: string): string {
     .slice(0, 2);
 }
 
-// Deterministic color based on name
 function getVariantFromName(name: string): InitialsVariant {
   const variants: InitialsVariant[] = ['emerald', 'blue', 'purple', 'amber', 'rose', 'haven'];
   let hash = 0;
@@ -158,19 +316,4 @@ export function InitialsAvatar({
   );
 }
 
-// For vendors - use a slightly different style with rounded corners
-export function VendorAvatar({
-  name,
-  size = 'md',
-  className = ''
-}: Omit<InitialsAvatarProps, 'variant'>) {
-  const initials = getInitialsFromName(name);
-
-  return (
-    <div
-      className={`rounded-xl flex items-center justify-center font-semibold flex-shrink-0 bg-warm-100 text-warm-600 ${initialsSizeClasses[size]} ${className}`}
-    >
-      {initials}
-    </div>
-  );
-}
+export default Avatar;

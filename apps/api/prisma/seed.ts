@@ -725,7 +725,7 @@ async function main() {
   });
   console.log(`✅ Created admin user: ${adminUser.email} (Platform Owner)`);
 
-  // Create Manager Sarah Harrison (Haven Staff Member - Home Manager)
+  // Create Manager Sarah Chen (Haven Staff Member - Home Manager)
   const managerSarah = await prisma.user.upsert({
     where: { email: 'sarah@haven.app' },
     update: {},
@@ -733,8 +733,8 @@ async function main() {
       email: 'sarah@haven.app',
       passwordHash: managerPassword,
       firstName: 'Sarah',
-      lastName: 'Harrison',
-      displayName: 'Sarah Harrison',
+      lastName: 'Chen',
+      displayName: 'Sarah Chen',
       role: UserRole.MANAGER,
       emailVerified: true,
       emailVerifiedAt: new Date(),
@@ -2749,7 +2749,7 @@ async function main() {
   console.log('    Password: Admin123!');
   console.log('    Role:     Can access ALL records');
   console.log('');
-  console.log('  👔 Manager Sarah Harrison (Haven Staff):');
+  console.log('  👔 Manager Sarah Chen (Haven Staff):');
   console.log('    Email:    sarah@haven.app');
   console.log('    Password: Manager123!');
   console.log('    Role:     Can access households assigned to them');
@@ -2796,7 +2796,7 @@ async function main() {
   console.log("  Inspiration Farm (Greenwich, CT):");
   console.log('    Owner:    Bob Burke (bob@example.com)');
   console.log('    Family:   Alice (spouse), Emma (14), Jack (10), Max (dog)');
-  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
+  console.log('    Manager:  Sarah Chen (sarah@haven.app)');
   console.log('    Handyman: Mike Rodriguez (mike@haven.app)');
   console.log('  - 4 bed, 5.5 bath 1920 Colonial on 4.38 acres at 38 Bedford Rd');
   console.log('  - Features: pool, horse barn, GRTA trails, generator, septic');
@@ -2805,21 +2805,21 @@ async function main() {
   console.log('');
   console.log('  Malibu Mansion (CA - Multi-property demo):');
   console.log('    Owner:    Bob Burke (bob@example.com)');
-  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
+  console.log('    Manager:  Sarah Chen (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 5 bed, 6 bath beachfront estate');
   console.log('  - Work Orders: 1 OPEN (Fix Shingles), 1 ASSIGNED (HVAC)');
   console.log('');
   console.log('  Beverly Hills Estate (CA - Multi-property demo):');
   console.log('    Owner:    Bob Burke (bob@example.com)');
-  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
+  console.log('    Manager:  Sarah Chen (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 6 bed, 7 bath Mediterranean estate');
   console.log('  - Work Orders: 1 COMPLETED (awaiting verification), 1 IN_PROGRESS');
   console.log('');
   console.log('  The Johnson Family Home (Scarsdale, NY):');
   console.log('    Owner:    Alice Johnson (alice@example.com)');
-  console.log('    Manager:  Sarah Harrison (sarah@haven.app)');
+  console.log('    Manager:  Sarah Chen (sarah@haven.app)');
   console.log('    Handyman: Carlos Reyes (carlos@haven.app)');
   console.log('  - 4 bed, 2.5 bath suburban family home on Fox Meadow Road');
   console.log('  - Family Members: Alice, Michael (spouse), Emma (14), Jack (10)');

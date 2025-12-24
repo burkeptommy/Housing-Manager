@@ -159,7 +159,7 @@ const mockHouseHealth = {
 };
 
 const mockManager = {
-  name: 'Sarah Harrison',
+  name: 'Sarah Chen',
   avatar: images.avatars.sarah,
   isOnline: true,
 };

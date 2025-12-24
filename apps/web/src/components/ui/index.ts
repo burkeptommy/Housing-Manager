@@ -1,5 +1,5 @@
 // UI Component Library
-export { Avatar, AvatarGroup } from './avatar';
+export { Avatar, VendorAvatar, ManagerAvatar, HandymanAvatar, InitialsAvatar } from './avatar';
 export { Badge, StatusBadge } from './badge';
 export { Button, IconButton } from './button';
 export { Card, CardHeader, CardContent, CardFooter, PremiumCard, StatCard } from './card';

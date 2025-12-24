@@ -15,10 +15,10 @@ export const DEMO_MANAGER: Manager = {
   id: 'manager-sarah-001',
   email: 'sarah@haven.app',
   firstName: 'Sarah',
-  lastName: 'Harrison',
-  displayName: 'Sarah Harrison',
+  lastName: 'Chen',
+  displayName: 'Sarah Chen',
   role: 'MANAGER',
-  avatar: '/avatars/sarah-harrison.jpg',
+  avatar: '/avatars/sarah-chen.jpg',
   phone: '(203) 555-0100',
   title: 'Home Manager',
   hireDate: parseDate('2023-01-15'),
@@ -443,7 +443,7 @@ export const DEMO_ACCOUNTS = [
     label: 'Demo Manager',
     email: 'sarah@haven.app',
     password: 'demo1234',
-    description: 'Experience the manager portal as Sarah Harrison',
+    description: 'Experience the manager portal as Sarah Chen',
   },
 ];
 

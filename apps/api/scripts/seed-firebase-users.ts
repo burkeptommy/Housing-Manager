@@ -32,7 +32,7 @@ const demoUsers = [
   { email: 'alice@example.com', password: 'Alice123!', displayName: 'Alice Morrison' },
 
   // Manager
-  { email: 'sarah@haven.app', password: 'Manager123!', displayName: 'Sarah Harrison' },
+  { email: 'sarah@haven.app', password: 'Manager123!', displayName: 'Sarah Chen' },
 
   // Handymen
   { email: 'carlos@haven.app', password: 'Handy123!', displayName: 'Carlos Reyes' },

@@ -1,7 +1,7 @@
 // ============================================================================
 // DEMO HOUSEHOLDS DATA
 // ============================================================================
-// All 6 demo households managed by Sarah Harrison
+// All 6 demo households managed by Sarah Chen
 // Market: Fairfield County, CT and Westchester County, NY
 // Morrison Family is the primary demo household that matches homeowner portal
 
@@ -1287,7 +1287,7 @@ export const DEMO_MESSAGES: Message[] = [
     householdId: 'household-morrison-001',
     senderId: 'manager-sarah-001',
     senderType: 'MANAGER',
-    senderName: 'Sarah Harrison',
+    senderName: 'Sarah Chen',
     content: "Thanks for letting me know! I'll have Frank from Hometown Heating come out tomorrow. He's excellent with boiler systems. Does 9am work?",
     sentAt: hoursAgo(3.5),
     readAt: hoursAgo(3),
@@ -1309,7 +1309,7 @@ export const DEMO_MESSAGES: Message[] = [
     householdId: 'household-morrison-001',
     senderId: 'manager-sarah-001',
     senderType: 'MANAGER',
-    senderName: 'Sarah Harrison',
+    senderName: 'Sarah Chen',
     content: "Great! I've scheduled Frank for tomorrow 9am-11am. I'll send you a confirmation once he's on his way. Gate code 1892, right?",
     metadata: { linkedWorkOrder: 'WO-1893' },
     sentAt: hoursAgo(2.5),
@@ -1345,7 +1345,7 @@ export const DEMO_MESSAGES: Message[] = [
     householdId: 'household-nakamura-001',
     senderId: 'manager-sarah-001',
     senderType: 'MANAGER',
-    senderName: 'Sarah Harrison',
+    senderName: 'Sarah Chen',
     content: "Absolutely! Stowe is beautiful that time of year. What dates are you thinking, and how many travelers? Do you need ski lessons for the kids?",
     sentAt: hoursAgo(20),
     readAt: hoursAgo(18),
@@ -1380,7 +1380,7 @@ export const DEMO_MESSAGES: Message[] = [
     householdId: 'household-patel-001',
     senderId: 'manager-sarah-001',
     senderType: 'MANAGER',
-    senderName: 'Sarah Harrison',
+    senderName: 'Sarah Chen',
     content: "I'm on it! Westchester Roofing is sending their slate specialist this Thursday. They're the best with historic homes. I'll confirm the exact time tomorrow.",
     sentAt: daysAgo(2),
     readAt: null,
