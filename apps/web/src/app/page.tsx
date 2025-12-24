@@ -898,34 +898,80 @@ export default function MarketingPage() {
           </div>
 
           {/* Mobile Cards */}
-          <div className="lg:hidden space-y-3">
-            {[
-              { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
-              { feature: 'Home Manager', essentials: 'None', lite: 'Text-based', haven: 'Proactive', highlight: true },
-              { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
-              { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs included', highlight: true },
-              { feature: 'Vendor Coordination', essentials: 'None', lite: 'Reactive', haven: 'Full oversight' },
-            ].map((row, idx) => (
-              <div key={idx} className={`bg-haven-800 rounded-xl border overflow-hidden ${row.highlight ? 'border-haven-600' : 'border-haven-700'}`}>
-                <div className="bg-haven-700 px-4 py-2">
-                  <span className="font-medium text-haven-200 text-sm">{row.feature}</span>
-                </div>
-                <div className="grid grid-cols-3 divide-x divide-haven-700">
-                  <div className="p-3 text-center">
-                    <div className="text-xs text-haven-500 mb-1">$39</div>
-                    <div className="text-sm text-haven-300">{row.essentials}</div>
-                  </div>
-                  <div className="p-3 text-center bg-haven-700/30">
-                    <div className="text-xs text-champagne-300 mb-1">$349</div>
-                    <div className="text-sm font-medium text-champagne-300">{row.lite}</div>
-                  </div>
-                  <div className="p-3 text-center">
-                    <div className="text-xs text-haven-500 mb-1">$749</div>
-                    <div className="text-sm text-haven-300">{row.haven}</div>
-                  </div>
-                </div>
+          <div className="lg:hidden">
+            {/* Plan Headers - Sticky */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div className="bg-haven-800 rounded-xl p-3 text-center border border-haven-700">
+                <p className="text-xs text-haven-400 mb-0.5">Essentials</p>
+                <p className="text-lg font-bold text-white">$39</p>
+                <p className="text-xs text-haven-500">/month</p>
               </div>
-            ))}
+              <div className="bg-gradient-to-b from-haven-700 to-haven-800 rounded-xl p-3 text-center border-2 border-champagne-400 relative">
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2">
+                  <span className="px-2 py-0.5 bg-champagne-400 text-haven-900 text-[10px] font-bold rounded-full">POPULAR</span>
+                </div>
+                <p className="text-xs text-champagne-300 mb-0.5">Lite</p>
+                <p className="text-lg font-bold text-white">$349</p>
+                <p className="text-xs text-haven-400">/month</p>
+              </div>
+              <div className="bg-haven-800 rounded-xl p-3 text-center border border-haven-700">
+                <p className="text-xs text-haven-400 mb-0.5">Haven</p>
+                <p className="text-lg font-bold text-white">$749</p>
+                <p className="text-xs text-haven-500">/month</p>
+              </div>
+            </div>
+
+            {/* Feature Comparison */}
+            <div className="space-y-2">
+              {[
+                { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
+                { feature: 'Home Profile', essentials: true, lite: true, haven: true },
+                { feature: 'Document Storage', essentials: true, lite: 'Vault + Manual', haven: 'Vault + Manual' },
+                { feature: 'Home Manager', essentials: false, lite: 'Text-based', haven: 'Proactive', highlight: true },
+                { feature: 'Vendor Coordination', essentials: false, lite: 'Reactive', haven: 'Full oversight' },
+                { feature: 'Response Time', essentials: 'Self-service', lite: 'Same-day', haven: '12 hours' },
+                { feature: 'Handyman Visits', essentials: '$99/visit', lite: '1 visit/mo', haven: '2 hrs/month', highlight: true },
+                { feature: 'Vendor Negotiation', essentials: false, lite: false, haven: true },
+              ].map((row, idx) => (
+                <div key={idx} className={`bg-haven-800/80 rounded-xl overflow-hidden ${row.highlight ? 'ring-1 ring-champagne-400/30' : ''}`}>
+                  <div className="px-4 py-2 border-b border-haven-700/50">
+                    <span className="font-medium text-haven-200 text-sm">{row.feature}</span>
+                  </div>
+                  <div className="grid grid-cols-3">
+                    {/* Essentials */}
+                    <div className="p-3 text-center border-r border-haven-700/50">
+                      {row.essentials === true ? (
+                        <Check className="w-5 h-5 text-green-400 mx-auto" />
+                      ) : row.essentials === false ? (
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
+                      ) : (
+                        <span className="text-xs text-haven-300">{row.essentials}</span>
+                      )}
+                    </div>
+                    {/* Lite */}
+                    <div className="p-3 text-center bg-haven-700/20 border-r border-haven-700/50">
+                      {row.lite === true ? (
+                        <Check className="w-5 h-5 text-champagne-300 mx-auto" />
+                      ) : row.lite === false ? (
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
+                      ) : (
+                        <span className="text-xs font-medium text-champagne-300">{row.lite}</span>
+                      )}
+                    </div>
+                    {/* Haven */}
+                    <div className="p-3 text-center">
+                      {row.haven === true ? (
+                        <Check className="w-5 h-5 text-green-400 mx-auto" />
+                      ) : row.haven === false ? (
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
+                      ) : (
+                        <span className="text-xs text-haven-300">{row.haven}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-8 text-center">
