@@ -1136,10 +1136,15 @@ export default function MarketingPage() {
                 a: "Yes. Your Haven Wallet is FDIC-insured up to $2 million through our banking partner. We're also SOC 2 certified, meaning your data and transactions meet the highest security standards.",
               },
             ].map((faq, idx) => (
-              <div key={idx} className="border border-warm-200 rounded-xl overflow-hidden">
+              <div
+                key={idx}
+                className={`border border-warm-200 rounded-xl overflow-hidden transition-colors ${
+                  openFaq === idx ? 'bg-warm-50' : 'bg-white hover:bg-warm-50'
+                }`}
+              >
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
-                  className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-warm-50 transition-colors"
+                  className="w-full px-6 py-4 text-left flex items-center justify-between"
                 >
                   <span className="font-semibold text-warm-900">{faq.q}</span>
                   {openFaq === idx ? (
