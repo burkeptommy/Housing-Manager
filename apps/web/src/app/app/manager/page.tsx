@@ -1014,7 +1014,7 @@ export default function ManagerHubPage() {
             <div className="bg-gradient-to-br from-haven-700 to-haven-700 rounded-2xl p-5 text-white">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-5 h-5" />
-                <h3 className="font-semibold">Your Haven Value</h3>
+                <h3 className="font-semibold text-white">Your Haven Value</h3>
               </div>
 
               <div className="space-y-3">

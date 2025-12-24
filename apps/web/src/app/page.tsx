@@ -825,7 +825,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       <section className="py-16 sm:py-24 bg-haven-900 text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
-          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8">
+          <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8 text-white">
             Compare Plans
           </h2>
 
@@ -1210,7 +1210,7 @@ export default function MarketingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-2">
-              <h3 className="text-xl font-bold">Haven</h3>
+              <h3 className="text-xl font-bold text-white">Haven</h3>
               <p className="mt-2 text-warm-400 text-sm">
                 Full-service home management for everyone. One bill. One contact. Zero hassle.
               </p>
@@ -1226,7 +1226,7 @@ export default function MarketingPage() {
               </div>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Product</h4>
+              <h4 className="font-semibold mb-3 text-white">Product</h4>
               <ul className="space-y-2 text-sm text-warm-400">
                 <li><a href="#how-it-works" className="hover:text-white">How It Works</a></li>
                 <li><a href="#" className="hover:text-white">Services</a></li>
@@ -1235,7 +1235,7 @@ export default function MarketingPage() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Company</h4>
+              <h4 className="font-semibold mb-3 text-white">Company</h4>
               <ul className="space-y-2 text-sm text-warm-400">
                 <li><a href="#" className="hover:text-white">About</a></li>
                 <li><a href="#" className="hover:text-white">Careers</a></li>
@@ -1244,7 +1244,7 @@ export default function MarketingPage() {
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-3">Partners</h4>
+              <h4 className="font-semibold mb-3 text-white">Partners</h4>
               <ul className="space-y-2 text-sm text-warm-400">
                 <li><Link href="/vendor" className="hover:text-white">Vendor Portal</Link></li>
                 <li><Link href="/handyman" className="hover:text-white">Handyman Portal</Link></li>

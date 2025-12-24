@@ -132,6 +132,8 @@ interface HomeSystem {
   model?: string;
   serialNumber?: string;
   installDate?: string;
+  installYear?: number;
+  expectedLifespan?: number;
   purchaseDate?: string;
   purchasePrice?: number;
   warrantyExpiry?: string;
@@ -326,6 +328,8 @@ const HOME_SYSTEMS: HomeSystem[] = [
     model: 'Infinity 26',
     serialNumber: 'CAR-2021-INF26-48291',
     installDate: 'March 15, 2021',
+    installYear: 2021,
+    expectedLifespan: 15,
     purchasePrice: 8500,
     warrantyExpiry: 'March 15, 2031',
     warrantyProvider: 'Carrier',
@@ -366,6 +370,8 @@ const HOME_SYSTEMS: HomeSystem[] = [
     location: 'Basement mechanical room',
     brand: 'Carrier',
     model: 'Infinity 98',
+    installYear: 2021,
+    expectedLifespan: 20,
     condition: 'excellent',
     warrantyExpiry: 'March 15, 2031',
     maintenance: {
@@ -386,6 +392,8 @@ const HOME_SYSTEMS: HomeSystem[] = [
     location: 'Basement utility room',
     brand: 'Rinnai',
     model: 'RU199iN',
+    installYear: 2020,
+    expectedLifespan: 20,
     condition: 'good',
     warrantyExpiry: 'August 10, 2032',
     maintenance: {
@@ -405,6 +413,8 @@ const HOME_SYSTEMS: HomeSystem[] = [
     type: 'Whole House Water Softener',
     brand: 'Kinetico',
     model: 'Premier Series S650',
+    installYear: 2022,
+    expectedLifespan: 15,
     condition: 'excellent',
     warrantyExpiry: 'January 15, 2032',
     maintenance: {
@@ -424,6 +434,8 @@ const HOME_SYSTEMS: HomeSystem[] = [
     type: 'Standby Generator',
     brand: 'Generac',
     model: 'Guardian 24kW',
+    installYear: 2019,
+    expectedLifespan: 25,
     condition: 'excellent',
     warrantyExpiry: 'November 10, 2026',
     maintenance: {
@@ -437,10 +449,33 @@ const HOME_SYSTEMS: HomeSystem[] = [
     assignedVendor: { id: 'v-3', name: 'Tesla Certified Electricians', phone: '(203) 555-8658', isPreferred: true },
   },
   {
+    id: 'elec-panel',
+    name: 'Electrical Panel',
+    category: 'electrical',
+    type: 'Main Service Panel',
+    brand: 'Square D',
+    model: 'QO 200A',
+    location: 'Garage',
+    installYear: 2015,
+    expectedLifespan: 40,
+    condition: 'excellent',
+    maintenance: {
+      interval: 'Every 3 years',
+      intervalDays: 1095,
+      lastService: 'December 12, 2023',
+      nextService: 'December 12, 2026',
+      status: 'on-track',
+      daysUntilDue: 718,
+    },
+    assignedVendor: { id: 'v-3', name: 'Tesla Certified Electricians', phone: '(203) 555-8658', isPreferred: true },
+  },
+  {
     id: 'pool-main',
     name: 'Swimming Pool',
     category: 'pool',
     type: 'In-Ground Gunite (Saltwater)',
+    installYear: 2010,
+    expectedLifespan: 50,
     condition: 'excellent',
     maintenance: {
       interval: 'Weekly (in season)',
@@ -453,13 +488,116 @@ const HOME_SYSTEMS: HomeSystem[] = [
     assignedVendor: { id: 'v-4', name: 'Pool Paradise CT', phone: '(203) 555-7665', isPreferred: true },
   },
   {
+    id: 'pool-pump',
+    name: 'Pool Pump & Filter',
+    category: 'pool',
+    type: 'Variable Speed Pump',
+    brand: 'Pentair',
+    model: 'IntelliFlo VSF',
+    location: 'Pool equipment pad',
+    installYear: 2021,
+    expectedLifespan: 10,
+    condition: 'good',
+    maintenance: {
+      interval: 'Monthly (in season)',
+      intervalDays: 30,
+      lastService: 'September 20, 2024',
+      nextService: 'May 1, 2025',
+      status: 'on-track',
+      daysUntilDue: 129,
+    },
+    assignedVendor: { id: 'v-4', name: 'Pool Paradise CT', phone: '(203) 555-7665', isPreferred: true },
+  },
+  {
+    id: 'ext-roof',
+    name: 'Roof System',
+    category: 'exterior',
+    type: 'Asphalt Shingle',
+    brand: 'GAF',
+    model: 'Timberline HDZ',
+    installYear: 2018,
+    expectedLifespan: 30,
+    condition: 'excellent',
+    maintenance: {
+      interval: 'Annually',
+      intervalDays: 365,
+      lastService: 'November 15, 2024',
+      nextService: 'November 15, 2025',
+      status: 'on-track',
+      daysUntilDue: 326,
+    },
+    assignedVendor: { id: 'v-6', name: 'ABC Roofing', phone: '(203) 555-7667', isPreferred: true },
+  },
+  {
+    id: 'ext-gutters',
+    name: 'Gutters & Downspouts',
+    category: 'exterior',
+    type: 'Seamless Aluminum',
+    installYear: 2018,
+    expectedLifespan: 25,
+    condition: 'good',
+    maintenance: {
+      interval: 'Twice yearly',
+      intervalDays: 180,
+      lastService: 'November 10, 2024',
+      nextService: 'April 10, 2025',
+      status: 'on-track',
+      daysUntilDue: 108,
+    },
+  },
+  {
+    id: 'lawn-irrigation',
+    name: 'Irrigation System',
+    category: 'lawn',
+    type: 'In-Ground Sprinkler System',
+    brand: 'Rain Bird',
+    model: 'ESP-TM2',
+    installYear: 2017,
+    expectedLifespan: 20,
+    condition: 'good',
+    maintenance: {
+      interval: 'Spring/Fall',
+      intervalDays: 180,
+      lastService: 'October 28, 2024',
+      nextService: 'April 15, 2025',
+      status: 'on-track',
+      daysUntilDue: 113,
+    },
+    assignedVendor: { id: 'v-5', name: 'Greenwich Landscaping', phone: '(203) 555-5263', isPreferred: true },
+  },
+  {
+    id: 'appl-refrigerator',
+    name: 'Kitchen Refrigerator',
+    category: 'appliance',
+    type: 'Built-In French Door',
+    brand: 'Sub-Zero',
+    model: 'BI-36U',
+    location: 'Kitchen',
+    installYear: 2020,
+    expectedLifespan: 20,
+    condition: 'excellent',
+    warrantyExpiry: 'July 1, 2025',
+    maintenance: {
+      interval: 'Every 6 months',
+      intervalDays: 180,
+      lastService: 'June 15, 2024',
+      nextService: 'December 15, 2024',
+      status: 'overdue',
+      daysUntilDue: -9,
+    },
+  },
+  {
     id: 'appl-washer',
     name: 'Washer',
     category: 'appliance',
     type: 'Front Load',
     brand: 'Miele',
     model: 'W1',
+    location: 'Laundry Room',
+    installYear: 2023,
+    expectedLifespan: 12,
     condition: 'excellent',
+    warrantyExpiry: 'January 20, 2026',
     maintenance: {
       interval: 'Monthly',
       intervalDays: 30,
@@ -467,6 +605,65 @@ const HOME_SYSTEMS: HomeSystem[] = [
       nextService: 'January 1, 2025',
       status: 'due-soon',
       daysUntilDue: 9,
+    },
+  },
+  {
+    id: 'appl-dryer',
+    name: 'Dryer',
+    category: 'appliance',
+    type: 'Heat Pump Dryer',
+    brand: 'Miele',
+    model: 'T1',
+    location: 'Laundry Room',
+    installYear: 2023,
+    expectedLifespan: 12,
+    condition: 'excellent',
+    warrantyExpiry: 'January 20, 2026',
+    maintenance: {
+      interval: 'Every 3 months',
+      intervalDays: 90,
+      lastService: 'November 1, 2024',
+      nextService: 'February 1, 2025',
+      status: 'on-track',
+      daysUntilDue: 40,
+    },
+  },
+  {
+    id: 'sec-alarm',
+    name: 'Security System',
+    category: 'security',
+    type: 'Monitored Alarm System',
+    brand: 'ADT',
+    model: 'Command Panel',
+    installYear: 2019,
+    expectedLifespan: 15,
+    condition: 'excellent',
+    maintenance: {
+      interval: 'Annually',
+      intervalDays: 365,
+      lastService: 'September 10, 2024',
+      nextService: 'September 10, 2025',
+      status: 'on-track',
+      daysUntilDue: 260,
+    },
+  },
+  {
+    id: 'sec-cameras',
+    name: 'Security Cameras',
+    category: 'security',
+    type: 'IP Camera System',
+    brand: 'Ubiquiti',
+    model: 'UniFi Protect',
+    installYear: 2022,
+    expectedLifespan: 10,
+    condition: 'excellent',
+    maintenance: {
+      interval: 'Every 6 months',
+      intervalDays: 180,
+      lastService: 'October 5, 2024',
+      nextService: 'April 5, 2025',
+      status: 'on-track',
+      daysUntilDue: 103,
     },
   },
 ];
@@ -1828,6 +2025,9 @@ export default function YourHomePage() {
           const category = getCategoryColor(system.category);
           const CategoryIcon = getCategoryIcon(system.category);
           const StatusIcon = status.icon;
+          const currentYear = new Date().getFullYear();
+          const ageYears = system.installYear ? currentYear - system.installYear : 0;
+          const lifespanPercent = system.expectedLifespan ? Math.min(100, (ageYears / system.expectedLifespan) * 100) : 0;
           return (
             <div key={system.id} onClick={() => setSelectedSystem(system)} className={`bg-white rounded-xl border-2 overflow-hidden cursor-pointer hover:shadow-md ${status.border}`}>
               <div className={`px-4 py-2 ${status.bg} flex items-center justify-between`}>
@@ -1839,9 +2039,25 @@ export default function YourHomePage() {
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${category.bg}`}><CategoryIcon className={`w-5 h-5 ${category.text}`} /></div>
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold text-warm-900 truncate">{system.name}</h3>
-                    <p className="text-sm text-warm-500">{getCategoryLabel(system.category)}</p>
+                    <p className="text-sm text-warm-500">{system.brand && system.model ? `${system.brand} ${system.model}` : getCategoryLabel(system.category)}</p>
                   </div>
                 </div>
+                {system.installYear && system.expectedLifespan && (
+                  <div className="mt-4">
+                    <div className="flex items-center justify-between text-xs text-warm-500 mb-1">
+                      <span>Lifespan</span>
+                      <span>Year {ageYears} of {system.expectedLifespan}</span>
+                    </div>
+                    <div className="w-full bg-warm-100 rounded-full h-2">
+                      <div
+                        className={`h-2 rounded-full transition-all ${
+                          lifespanPercent > 80 ? 'bg-red-500' : lifespanPercent > 60 ? 'bg-amber-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${lifespanPercent}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
                 <div className="mt-4 space-y-2 text-sm">
                   <div className="flex justify-between"><span className="text-warm-500">Last Service</span><span className="font-medium">{system.maintenance?.lastService}</span></div>
                   <div className="flex justify-between"><span className="text-warm-500">Next Service</span><span className={`font-medium ${status.text}`}>{system.maintenance?.nextService}</span></div>
@@ -1983,29 +2199,46 @@ export default function YourHomePage() {
             <button onClick={() => setActiveTab('systems')} className="text-sm text-haven-700 hover:text-haven-800">View All</button>
           </div>
 
-          <div className="space-y-4">
-            {HOME_SYSTEMS.slice(0, 5).map(system => {
+          <div className="space-y-3">
+            {HOME_SYSTEMS.slice(0, 6).map(system => {
               const status = getStatusConfig(system.maintenance?.status || 'on-track');
               const category = getCategoryColor(system.category);
               const CategoryIcon = getCategoryIcon(system.category);
+              const currentYear = new Date().getFullYear();
+              const ageYears = system.installYear ? currentYear - system.installYear : 0;
+              const lifespanPercent = system.expectedLifespan ? Math.min(100, (ageYears / system.expectedLifespan) * 100) : 0;
               return (
                 <div
                   key={system.id}
-                  className="flex items-center gap-4 p-3 rounded-xl hover:bg-warm-50 cursor-pointer transition-colors"
+                  className="p-3 rounded-xl border border-warm-100 hover:border-warm-200 cursor-pointer transition-colors"
                   onClick={() => setSelectedSystem(system)}
                 >
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${category.bg}`}>
-                    <CategoryIcon className={`w-5 h-5 ${category.text}`} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium text-warm-900 truncate">{system.name}</p>
-                    <p className="text-sm text-warm-500">{system.brand} • {formatDaysUntilDue(system.maintenance?.daysUntilDue || 0)}</p>
-                  </div>
-                  <div className="text-right">
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${category.bg}`}>
+                      <CategoryIcon className={`w-4 h-4 ${category.text}`} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-warm-900 truncate text-sm">{system.name}</p>
+                    </div>
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
                       {status.label}
                     </span>
                   </div>
+                  {system.installYear && system.expectedLifespan && (
+                    <div className="ml-11">
+                      <div className="flex items-center justify-between text-xs text-warm-400 mb-1">
+                        <span>Year {ageYears} of {system.expectedLifespan}</span>
+                      </div>
+                      <div className="w-full bg-warm-100 rounded-full h-1.5">
+                        <div
+                          className={`h-1.5 rounded-full transition-all ${
+                            lifespanPercent > 80 ? 'bg-red-500' : lifespanPercent > 60 ? 'bg-amber-500' : 'bg-green-500'
+                          }`}
+                          style={{ width: `${lifespanPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
