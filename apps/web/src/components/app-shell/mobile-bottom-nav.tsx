@@ -32,7 +32,7 @@ export function MobileBottomNav() {
                 key={item.name}
                 href={item.href}
                 className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors ${
-                  active ? 'text-haven-600' : 'text-warm-400'
+                  active ? 'text-haven-700' : 'text-warm-400'
                 }`}
               >
                 <div className="relative">
@@ -77,7 +77,7 @@ export function MobileBottomNav() {
 
       {/* Drawer */}
       <div
-        className={`lg:hidden fixed inset-y-0 right-0 z-50 w-80 bg-gradient-to-b from-forest-900 to-forest-950 transform transition-transform duration-300 ease-in-out ${
+        className={`lg:hidden fixed inset-y-0 right-0 z-50 w-80 bg-gradient-to-b from-haven-800 to-haven-900 transform transition-transform duration-300 ease-in-out ${
           drawerOpen ? 'translate-x-0' : 'translate-x-full'
         }`}
       >
@@ -134,7 +134,7 @@ export function MobileBottomNav() {
         </nav>
 
         {/* Drawer Bottom Section */}
-        <div className="absolute bottom-0 left-0 right-0 px-3 py-4 border-t border-white/10 bg-forest-950 space-y-1">
+        <div className="absolute bottom-0 left-0 right-0 px-3 py-4 border-t border-white/10 bg-haven-900 space-y-1">
           {sidebarBottomNav.map((item) => {
             const active = isActive(item.href);
             const Icon = item.icon;

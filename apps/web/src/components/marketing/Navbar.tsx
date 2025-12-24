@@ -35,8 +35,8 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <span className={`text-2xl font-bold transition-colors ${
-              isScrolled ? 'text-haven-600' : 'text-white'
+            <span className={`text-2xl font-bold tracking-tight transition-colors ${
+              isScrolled ? 'text-haven-700' : 'text-white'
             }`}>
               Haven
             </span>
@@ -50,7 +50,7 @@ export function Navbar() {
                 href={link.href}
                 className={`text-sm font-medium transition-colors ${
                   isScrolled
-                    ? 'text-warm-600 hover:text-haven-600'
+                    ? 'text-warm-600 hover:text-haven-700'
                     : 'text-white/90 hover:text-white'
                 }`}
               >
@@ -64,7 +64,7 @@ export function Navbar() {
             <Link
               href="/login"
               className={`text-sm font-medium transition-colors ${
-                isScrolled ? 'text-warm-600 hover:text-haven-600' : 'text-white/90 hover:text-white'
+                isScrolled ? 'text-warm-600 hover:text-haven-700' : 'text-white/90 hover:text-white'
               }`}
             >
               Sign In
@@ -73,8 +73,8 @@ export function Navbar() {
               href="/register"
               className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all ${
                 isScrolled
-                  ? 'bg-haven-600 text-white hover:bg-haven-700 shadow-sm hover:shadow-md'
-                  : 'bg-white text-haven-700 hover:bg-white/90 shadow-lg shadow-black/10'
+                  ? 'bg-haven-700 text-white hover:bg-haven-800 shadow-sm hover:shadow-md'
+                  : 'bg-white text-haven-700 hover:bg-champagne-50 shadow-lg shadow-black/10'
               }`}
             >
               Get Started
@@ -117,7 +117,7 @@ export function Navbar() {
                 </Link>
                 <Link
                   href="/register"
-                  className="block mt-2 px-4 py-3 bg-haven-600 text-white font-semibold rounded-xl text-center hover:bg-haven-700 transition-colors"
+                  className="block mt-2 px-4 py-3 bg-haven-700 text-white font-semibold rounded-xl text-center hover:bg-haven-800 transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Get Started

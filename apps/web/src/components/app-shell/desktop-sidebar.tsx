@@ -14,7 +14,7 @@ export function DesktopSidebar() {
   };
 
   return (
-    <aside className="hidden lg:flex lg:flex-col lg:w-[260px] lg:fixed lg:inset-y-0 bg-gradient-to-b from-forest-900 to-forest-950">
+    <aside className="hidden lg:flex lg:flex-col lg:w-[260px] lg:fixed lg:inset-y-0 bg-gradient-to-b from-haven-800 to-haven-900">
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-white/10">
         <Link href="/app" className="flex items-center gap-3">

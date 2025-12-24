@@ -58,12 +58,12 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* HERO SECTION */}
       {/* ================================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 pt-24 sm:pt-32 pb-16 sm:pb-24">
+      <section className="relative overflow-hidden bg-gradient-to-br from-haven-700 via-haven-800 to-haven-900 pt-24 sm:pt-32 pb-16 sm:pb-24">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-500 rounded-full blur-3xl opacity-30" />
-          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-champagne-300/30 rounded-full blur-3xl opacity-40" />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-haven-400 rounded-full blur-3xl opacity-20" />
+          <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-600 rounded-full blur-3xl opacity-20" />
+          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-champagne-300/20 rounded-full blur-3xl opacity-30" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-haven-500 rounded-full blur-3xl opacity-15" />
         </div>
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
@@ -277,7 +277,7 @@ export default function MarketingPage() {
             </div>
 
             {/* With Haven */}
-            <div className="bg-gradient-to-br from-haven-600 to-haven-700 rounded-2xl p-6 text-white">
+            <div className="bg-gradient-to-br from-haven-700 to-haven-800 rounded-2xl p-6 text-white">
               <div className="flex items-center gap-2 mb-4">
                 <CheckCircle2 className="w-6 h-6 text-champagne-300" />
                 <h3 className="text-lg font-semibold text-white">With Haven</h3>
@@ -534,10 +534,10 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* PRICING SECTION */}
       {/* ================================================================== */}
-      <section id="pricing" className="py-16 sm:py-24 bg-gradient-to-b from-haven-50 to-white">
+      <section id="pricing" className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold text-haven-600 uppercase tracking-wide mb-2">Transparent Pricing</p>
+            <p className="text-sm font-semibold text-haven-700 uppercase tracking-wide mb-2">Transparent Pricing</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
               Choose Your Level of Support
             </h2>
@@ -595,14 +595,14 @@ export default function MarketingPage() {
             <div className="relative pt-4">
               {/* Most Popular Badge */}
               <div className="absolute -top-0 left-1/2 -translate-x-1/2 z-10">
-                <span className="px-4 py-1.5 bg-gradient-to-r from-haven-600 to-haven-700 text-white text-sm font-semibold rounded-full shadow-lg">
+                <span className="px-4 py-1.5 bg-gradient-to-r from-haven-700 to-haven-800 text-white text-sm font-semibold rounded-full shadow-lg">
                   Most Popular
                 </span>
               </div>
-              <div className="bg-white rounded-2xl border-2 border-haven-500 overflow-hidden flex flex-col shadow-xl shadow-haven-100">
-                <div className="h-2 bg-gradient-to-r from-haven-500 to-haven-600" />
+              <div className="bg-white rounded-2xl border-2 border-haven-600 overflow-hidden flex flex-col shadow-xl shadow-haven-100">
+                <div className="h-2 bg-gradient-to-r from-haven-600 to-haven-700" />
                 <div className="p-6 pt-4 flex-1">
-                  <h3 className="text-lg font-semibold text-haven-700">Haven Lite</h3>
+                  <h3 className="text-lg font-semibold text-haven-800">Haven Lite</h3>
                   <p className="text-sm text-warm-500 mt-1">Light-touch manager support</p>
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-warm-900">$349</span>
@@ -632,7 +632,7 @@ export default function MarketingPage() {
                 <div className="p-6 pt-0">
                   <Link
                     href="/register?plan=lite"
-                    className="block w-full py-3 text-center bg-haven-600 text-white font-semibold rounded-xl hover:bg-haven-700 transition-colors"
+                    className="block w-full py-3 text-center bg-haven-700 text-white font-semibold rounded-xl hover:bg-haven-800 transition-colors"
                   >
                     Get Started
                   </Link>
@@ -743,7 +743,7 @@ export default function MarketingPage() {
                 {/* Haven Estate */}
                 <div className="bg-gradient-to-br from-warm-900 to-warm-800 rounded-xl p-6 text-white shadow-lg">
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-haven-600 flex items-center justify-center">
+                    <div className="w-10 h-10 rounded-lg bg-haven-700 flex items-center justify-center">
                       <Crown className="w-5 h-5 text-white" />
                     </div>
                     <div>
@@ -772,7 +772,7 @@ export default function MarketingPage() {
                   </ul>
                   <Link
                     href="/contact?plan=estate"
-                    className="block w-full py-2.5 text-center bg-haven-600 text-white font-medium rounded-lg hover:bg-haven-500 transition-colors"
+                    className="block w-full py-2.5 text-center bg-haven-700 text-white font-medium rounded-lg hover:bg-haven-600 transition-colors"
                   >
                     Contact Sales
                   </Link>
@@ -788,10 +788,10 @@ export default function MarketingPage() {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-4 sm:gap-8">
                 <div className="text-center">
                   <div className="w-16 h-16 rounded-full bg-haven-100 flex items-center justify-center mx-auto mb-2">
-                    <Sparkles className="w-7 h-7 text-haven-600" />
+                    <Sparkles className="w-7 h-7 text-haven-700" />
                   </div>
                   <p className="font-semibold text-warm-900">Haven Membership</p>
-                  <p className="text-haven-600 font-bold">$39 to $3,499</p>
+                  <p className="text-haven-700 font-bold">$39 to $3,499</p>
                   <p className="text-xs text-warm-500">Your manager, platform & more</p>
                 </div>
                 <div className="text-3xl text-warm-300 font-light">+</div>
@@ -823,23 +823,23 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* COMPARE PLANS TABLE */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-warm-900 text-white">
+      <section className="py-16 sm:py-24 bg-haven-900 text-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-8">
             Compare Plans
           </h2>
 
           {/* Desktop Table */}
-          <div className="hidden lg:block bg-warm-800 rounded-2xl overflow-hidden">
+          <div className="hidden lg:block bg-haven-800 rounded-2xl overflow-hidden">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-warm-700">
-                  <th className="text-left py-4 px-6 font-semibold text-warm-400 w-1/4">Feature</th>
+                <tr className="border-b border-haven-700">
+                  <th className="text-left py-4 px-6 font-semibold text-haven-400 w-1/4">Feature</th>
                   <th className="text-center py-4 px-4">
                     <div className="font-semibold text-warm-200">Essentials</div>
                     <div className="text-haven-400 font-bold">$39/mo</div>
                   </th>
-                  <th className="text-center py-4 px-4 bg-haven-600/20">
+                  <th className="text-center py-4 px-4 bg-haven-700/30">
                     <div className="font-semibold text-champagne-300">Lite</div>
                     <div className="text-haven-400 font-bold">$349/mo</div>
                   </th>
@@ -849,7 +849,7 @@ export default function MarketingPage() {
                   </th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-warm-700">
+              <tbody className="divide-y divide-haven-700">
                 {[
                   { feature: 'Bill Consolidation', essentials: 'Unlimited', lite: 'Unlimited', haven: 'Unlimited' },
                   { feature: 'Home Profile & Systems', essentials: true, lite: true, haven: true },
@@ -863,21 +863,21 @@ export default function MarketingPage() {
                   { feature: 'Vendor Negotiation', essentials: false, lite: false, haven: true },
                 ].map((row, idx) => (
                   <tr key={idx}>
-                    <td className="py-4 px-6 text-warm-300 font-medium">{row.feature}</td>
+                    <td className="py-4 px-6 text-haven-300 font-medium">{row.feature}</td>
                     <td className="py-4 px-4 text-center">
                       {row.essentials === true ? (
                         <Check className="w-5 h-5 text-green-400 mx-auto" />
                       ) : row.essentials === false ? (
-                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
                       ) : (
-                        <span className="text-sm text-warm-400">{row.essentials}</span>
+                        <span className="text-sm text-haven-400">{row.essentials}</span>
                       )}
                     </td>
-                    <td className="py-4 px-4 text-center bg-haven-600/20">
+                    <td className="py-4 px-4 text-center bg-haven-700/30">
                       {row.lite === true ? (
                         <Check className="w-5 h-5 text-champagne-300 mx-auto" />
                       ) : row.lite === false ? (
-                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
                       ) : (
                         <span className="text-sm font-medium text-champagne-300">{row.lite}</span>
                       )}
@@ -886,9 +886,9 @@ export default function MarketingPage() {
                       {row.haven === true ? (
                         <Check className="w-5 h-5 text-green-400 mx-auto" />
                       ) : row.haven === false ? (
-                        <X className="w-5 h-5 text-warm-600 mx-auto" />
+                        <X className="w-5 h-5 text-haven-600 mx-auto" />
                       ) : (
-                        <span className="text-sm text-warm-400">{row.haven}</span>
+                        <span className="text-sm text-haven-400">{row.haven}</span>
                       )}
                     </td>
                   </tr>
@@ -906,22 +906,22 @@ export default function MarketingPage() {
               { feature: 'Handyman Visits', essentials: '$99/visit', lite: 'Add-on', haven: '2 hrs included', highlight: true },
               { feature: 'Vendor Coordination', essentials: 'None', lite: 'Reactive', haven: 'Full oversight' },
             ].map((row, idx) => (
-              <div key={idx} className={`bg-warm-800 rounded-xl border overflow-hidden ${row.highlight ? 'border-haven-500' : 'border-warm-700'}`}>
-                <div className="bg-warm-700 px-4 py-2">
-                  <span className="font-medium text-warm-200 text-sm">{row.feature}</span>
+              <div key={idx} className={`bg-haven-800 rounded-xl border overflow-hidden ${row.highlight ? 'border-haven-600' : 'border-haven-700'}`}>
+                <div className="bg-haven-700 px-4 py-2">
+                  <span className="font-medium text-haven-200 text-sm">{row.feature}</span>
                 </div>
-                <div className="grid grid-cols-3 divide-x divide-warm-700">
+                <div className="grid grid-cols-3 divide-x divide-haven-700">
                   <div className="p-3 text-center">
-                    <div className="text-xs text-warm-500 mb-1">$39</div>
-                    <div className="text-sm text-warm-300">{row.essentials}</div>
+                    <div className="text-xs text-haven-500 mb-1">$39</div>
+                    <div className="text-sm text-haven-300">{row.essentials}</div>
                   </div>
-                  <div className="p-3 text-center bg-haven-600/20">
+                  <div className="p-3 text-center bg-haven-700/30">
                     <div className="text-xs text-champagne-300 mb-1">$349</div>
                     <div className="text-sm font-medium text-champagne-300">{row.lite}</div>
                   </div>
                   <div className="p-3 text-center">
-                    <div className="text-xs text-warm-500 mb-1">$749</div>
-                    <div className="text-sm text-warm-300">{row.haven}</div>
+                    <div className="text-xs text-haven-500 mb-1">$749</div>
+                    <div className="text-sm text-haven-300">{row.haven}</div>
                   </div>
                 </div>
               </div>
@@ -946,7 +946,7 @@ export default function MarketingPage() {
       <section className="py-16 sm:py-24 bg-white">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold text-haven-600 uppercase tracking-wide mb-2">The Real Difference</p>
+            <p className="text-sm font-semibold text-haven-700 uppercase tracking-wide mb-2">The Real Difference</p>
             <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
               Software vs. Service
             </h2>
@@ -967,8 +967,8 @@ export default function MarketingPage() {
                 <p className="text-sm text-red-600">$375/mo + $3K setup</p>
               </div>
               <div className="p-4 sm:p-6 text-center bg-haven-100">
-                <p className="font-semibold text-haven-700">Haven</p>
-                <p className="text-sm text-haven-600">$349/mo, no setup fee</p>
+                <p className="font-semibold text-haven-800">Haven</p>
+                <p className="text-sm text-haven-700">$349/mo, no setup fee</p>
               </div>
             </div>
 
@@ -992,14 +992,14 @@ export default function MarketingPage() {
                   <span className="text-sm text-red-700">{row.software}</span>
                 </div>
                 <div className="p-4 sm:p-5 text-center bg-haven-50 flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-haven-600 hidden sm:block" />
-                  <span className="text-sm font-medium text-haven-700">{row.haven}</span>
+                  <CheckCircle2 className="w-4 h-4 text-haven-700 hidden sm:block" />
+                  <span className="text-sm font-medium text-haven-800">{row.haven}</span>
                 </div>
               </div>
             ))}
           </div>
 
-          <div className="mt-8 bg-gradient-to-r from-haven-600 to-haven-700 rounded-2xl p-6 sm:p-8 text-center text-white">
+          <div className="mt-8 bg-gradient-to-r from-haven-700 to-haven-800 rounded-2xl p-6 sm:p-8 text-center text-white">
             <p className="text-lg sm:text-xl font-semibold mb-4">
               Why pay more for software that makes YOU do the work?
             </p>
@@ -1067,7 +1067,7 @@ export default function MarketingPage() {
                 <blockquote className="text-warm-700 flex-1">"{testimonial.quote}"</blockquote>
                 <div className="mt-6 pt-4 border-t border-warm-100 flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-haven-600 flex items-center justify-center text-white font-semibold text-sm">
+                    <div className="w-10 h-10 rounded-full bg-haven-700 flex items-center justify-center text-white font-semibold text-sm">
                       {testimonial.avatar}
                     </div>
                     <div>
@@ -1086,9 +1086,9 @@ export default function MarketingPage() {
           {/* Stats */}
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
             {[
-              { value: '8+', label: 'Hours saved monthly', color: 'text-haven-600' },
+              { value: '8+', label: 'Hours saved monthly', color: 'text-haven-700' },
               { value: '500+', label: 'Families served', color: 'text-champagne-500' },
-              { value: '4.9', label: 'Average rating', color: 'text-haven-600' },
+              { value: '4.9', label: 'Average rating', color: 'text-haven-700' },
               { value: '$0', label: 'Hidden fees', color: 'text-green-600' },
             ].map((stat, idx) => (
               <div key={idx} className="text-center bg-white rounded-xl p-4 shadow-md border border-warm-200">
@@ -1143,7 +1143,7 @@ export default function MarketingPage() {
                 >
                   <span className="font-semibold text-warm-900">{faq.q}</span>
                   {openFaq === idx ? (
-                    <ChevronUp className="w-5 h-5 text-haven-600 flex-shrink-0" />
+                    <ChevronUp className="w-5 h-5 text-haven-700 flex-shrink-0" />
                   ) : (
                     <ChevronDown className="w-5 h-5 text-warm-400 flex-shrink-0" />
                   )}
@@ -1162,7 +1162,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* FINAL CTA */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 relative overflow-hidden">
+      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-700 via-haven-800 to-haven-900 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute top-0 right-0 w-96 h-96 bg-champagne-300 rounded-full blur-3xl opacity-15" />
@@ -1206,7 +1206,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* FOOTER */}
       {/* ================================================================== */}
-      <footer className="bg-warm-900 text-white py-12">
+      <footer className="bg-haven-900 text-white py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-8">
             <div className="lg:col-span-2">

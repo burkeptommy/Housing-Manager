@@ -25,7 +25,7 @@
     @apply font-serif tracking-tight text-warm-900;
   }
 
-  /* All other headings use sans-serif for consistency */
+  /* All other headings use sans-serif */
   h2, h3, h4, h5, h6 {
     @apply font-sans font-semibold tracking-tight text-warm-900;
   }
@@ -71,7 +71,7 @@
 @layer components {
   /* Cards */
   .card {
-    @apply bg-white rounded-2xl border border-warm-100 shadow-soft p-6 transition-all duration-300;
+    @apply bg-white rounded-2xl border border-warm-200 shadow-soft p-6 transition-all duration-300;
   }
 
   .dark .card {
@@ -79,83 +79,66 @@
   }
 
   .card-hover {
-    @apply hover:shadow-soft-lg hover:border-warm-200 hover:-translate-y-0.5;
+    @apply hover:shadow-soft-lg hover:border-warm-300 hover:-translate-y-0.5;
   }
 
   .card-interactive {
     @apply card card-hover cursor-pointer active:scale-[0.99];
   }
 
-  /* ===== DARK CARDS - WHITE TEXT ALWAYS ===== */
-
   /* Page title - serif only for main page headings */
   .page-title {
     @apply font-serif text-2xl sm:text-3xl font-bold text-warm-900;
   }
 
-  /* Green gradient cards - white text */
-  .card-green {
-    @apply bg-gradient-to-br from-haven-500 to-haven-600 rounded-2xl border-0 text-white;
+  /* Navy gradient cards - white text */
+  .card-navy {
+    @apply bg-gradient-to-br from-haven-700 to-haven-800 rounded-2xl border-0 text-white;
   }
 
-  .card-green h1,
-  .card-green h2,
-  .card-green h3,
-  .card-green h4,
-  .card-green .card-title,
-  .card-green .stat-value {
+  .card-navy h1,
+  .card-navy h2,
+  .card-navy h3,
+  .card-navy h4,
+  .card-navy .card-title,
+  .card-navy .stat-value {
     @apply text-white;
   }
 
-  .card-green p,
-  .card-green .card-description,
-  .card-green .stat-label {
+  .card-navy p,
+  .card-navy .card-description,
+  .card-navy .stat-label {
     @apply text-white/80;
   }
 
-  /* Forest dark green cards - white text */
-  .card-forest {
-    @apply bg-gradient-to-br from-forest-800 to-forest-900 rounded-2xl border-0 text-white;
-  }
-
-  .card-forest h1,
-  .card-forest h2,
-  .card-forest h3,
-  .card-forest h4,
-  .card-forest .card-title,
-  .card-forest .stat-value {
-    @apply text-white;
-  }
-
-  .card-forest p,
-  .card-forest .card-description,
-  .card-forest .stat-label {
-    @apply text-white/70;
-  }
-
-  /* Slate/dark gray cards - white text */
-  .card-slate {
+  /* Dark charcoal cards - white text */
+  .card-dark {
     @apply bg-gradient-to-br from-warm-800 to-warm-900 rounded-2xl border-0 text-white;
   }
 
-  .card-slate h1,
-  .card-slate h2,
-  .card-slate h3,
-  .card-slate h4,
-  .card-slate .card-title,
-  .card-slate .stat-value {
+  .card-dark h1,
+  .card-dark h2,
+  .card-dark h3,
+  .card-dark h4,
+  .card-dark .card-title,
+  .card-dark .stat-value {
     @apply text-white;
   }
 
-  .card-slate p,
-  .card-slate .card-description,
-  .card-slate .stat-label {
+  .card-dark p,
+  .card-dark .card-description,
+  .card-dark .stat-label {
     @apply text-white/70;
   }
 
-  /* Sidebar styles for dark backgrounds */
+  /* Champagne accent card */
+  .card-champagne {
+    @apply bg-gradient-to-br from-champagne-100 to-champagne-200 rounded-2xl border border-champagne-300;
+  }
+
+  /* Sidebar styles */
   .sidebar {
-    @apply bg-gradient-to-b from-forest-900 to-forest-950;
+    @apply bg-gradient-to-b from-haven-800 to-haven-900;
   }
 
   .sidebar-nav-item {
@@ -168,25 +151,7 @@
     @apply bg-white/15 text-white;
   }
 
-  /* Button variants for light backgrounds on dark cards */
-  .btn-white {
-    @apply btn px-5 py-2.5 bg-white text-warm-800 shadow-lg hover:bg-warm-50;
-  }
-
-  .btn-outline-light {
-    @apply btn px-5 py-2.5 bg-transparent text-white border border-white/30 hover:bg-white/10;
-  }
-
-  .btn-ghost-light {
-    @apply btn px-4 py-2 text-white/70 hover:bg-white/10 hover:text-white;
-  }
-
-  /* Badge for dark backgrounds */
-  .badge-light {
-    @apply bg-white/20 text-white;
-  }
-
-  /* Buttons */
+  /* Button variants */
   .btn {
     @apply inline-flex items-center justify-center gap-2 font-medium rounded-xl
            transition-all duration-200 active:scale-[0.98]
@@ -194,9 +159,9 @@
   }
 
   .btn-primary {
-    @apply btn px-5 py-2.5 bg-gradient-to-b from-haven-500 to-haven-600 text-white
-           shadow-[0_1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]
-           hover:from-haven-600 hover:to-haven-700 hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.1)];
+    @apply btn px-5 py-2.5 bg-haven-700 text-white
+           shadow-[0_1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)]
+           hover:bg-haven-800 hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.1)];
   }
 
   .btn-secondary {
@@ -217,9 +182,21 @@
   }
 
   .btn-danger {
-    @apply btn px-5 py-2.5 bg-gradient-to-b from-red-500 to-red-600 text-white
-           shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]
-           hover:from-red-600 hover:to-red-700;
+    @apply btn px-5 py-2.5 bg-red-600 text-white
+           shadow-[0_1px_2px_rgba(0,0,0,0.1)]
+           hover:bg-red-700;
+  }
+
+  .btn-white {
+    @apply btn px-5 py-2.5 bg-white text-haven-700 shadow-lg hover:bg-champagne-50;
+  }
+
+  .btn-outline-light {
+    @apply btn px-5 py-2.5 bg-transparent text-white border border-white/30 hover:bg-white/10;
+  }
+
+  .btn-ghost-light {
+    @apply btn px-4 py-2 text-white/70 hover:bg-white/10 hover:text-white;
   }
 
   .btn-sm {
@@ -236,7 +213,7 @@
            text-warm-800 placeholder:text-warm-400
            transition-all duration-200
            hover:border-warm-300
-           focus:border-haven-500 focus:ring-2 focus:ring-haven-500/20;
+           focus:border-haven-600 focus:ring-2 focus:ring-haven-600/20;
   }
 
   .dark .input {
@@ -274,35 +251,22 @@
   }
 
   .badge-premium {
-    @apply bg-gradient-to-r from-gold-50 to-gold-100 text-gold-800
-           ring-1 ring-inset ring-gold-400/30;
+    @apply bg-gradient-to-r from-champagne-100 to-champagne-200 text-champagne-700
+           ring-1 ring-inset ring-champagne-400/30;
   }
 
-  /* Legacy badge classes for compatibility */
-  .badge-blue {
-    @apply badge-info;
+  .badge-navy {
+    @apply bg-haven-100 text-haven-700 ring-1 ring-inset ring-haven-600/20;
   }
 
-  .badge-green {
-    @apply badge-success;
-  }
-
-  .badge-yellow {
-    @apply badge-warning;
-  }
-
-  .badge-red {
-    @apply badge-error;
-  }
-
-  .badge-gray {
-    @apply badge-neutral;
+  .badge-light {
+    @apply bg-white/20 text-white;
   }
 
   /* Avatars */
   .avatar {
     @apply relative inline-flex items-center justify-center rounded-full
-           bg-gradient-to-br from-haven-400 to-haven-600 text-white font-semibold
+           bg-gradient-to-br from-haven-600 to-haven-700 text-white font-semibold
            ring-2 ring-white shadow-sm;
   }
 
@@ -333,7 +297,7 @@
     @apply max-w-7xl mx-auto px-4 sm:px-6 lg:px-8;
   }
 
-  /* Sidebar Nav Item */
+  /* Nav Items */
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
            text-warm-600 transition-all duration-200
@@ -371,7 +335,7 @@
 
   /* Tables */
   .table-container {
-    @apply overflow-x-auto rounded-xl border border-warm-100;
+    @apply overflow-x-auto rounded-xl border border-warm-200;
   }
 
   .dark .table-container {
@@ -383,7 +347,7 @@
   }
 
   .table th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wider bg-warm-50 border-b border-warm-100;
+    @apply px-4 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wider bg-warm-50 border-b border-warm-200;
   }
 
   .dark .table th {
@@ -439,7 +403,7 @@
   }
 
   .modal-header {
-    @apply px-6 py-4 border-b border-warm-100;
+    @apply px-6 py-4 border-b border-warm-200;
   }
 
   .dark .modal-header {
@@ -451,7 +415,7 @@
   }
 
   .modal-footer {
-    @apply px-6 py-4 border-t border-warm-100 flex items-center justify-end gap-3;
+    @apply px-6 py-4 border-t border-warm-200 flex items-center justify-end gap-3;
   }
 
   .dark .modal-footer {
@@ -470,21 +434,21 @@
 
 @layer utilities {
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-haven-600 to-haven-500;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-haven-700 to-haven-600;
   }
 
-  .text-gradient-gold {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-gold-600 to-gold-500;
+  .text-gradient-champagne {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-champagne-500 to-champagne-400;
   }
 
-  /* Staggered animations for lists */
+  /* Staggered animations */
   .stagger-1 { animation-delay: 50ms; }
   .stagger-2 { animation-delay: 100ms; }
   .stagger-3 { animation-delay: 150ms; }
   .stagger-4 { animation-delay: 200ms; }
   .stagger-5 { animation-delay: 250ms; }
 
-  /* Hide scrollbar but allow scroll */
+  /* Hide scrollbar */
   .scrollbar-hide {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -493,7 +457,6 @@
     display: none;
   }
 
-  /* Legacy class */
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
@@ -512,60 +475,25 @@
   }
 }
 
-/* ============================================================================
-   PART 4: TYPOGRAPHY & CONTRAST FIXES (from HAVEN_MASTER_PROMPT)
-   ============================================================================ */
-
-/* Typography Rules */
+/* Typography */
 .font-serif {
   font-family: 'Playfair Display', Georgia, serif;
 }
 
-/* Page titles - ONLY h1 elements with this class get serif */
 h1.page-title,
 .page-title {
   font-family: 'Playfair Display', Georgia, serif;
 }
 
-/* Everything else uses Inter */
 body, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-/* Override for explicit serif usage */
 .font-serif {
   font-family: 'Playfair Display', Georgia, serif !important;
 }
 
-/* Contrast Fixes - White text on dark backgrounds */
-.bg-emerald-900 *,
-.bg-emerald-950 *,
-.bg-slate-900 *,
-.bg-slate-800 *,
-[class*="bg-emerald-9"] *,
-[class*="bg-slate-9"] *,
-[class*="bg-slate-8"] * {
-  --tw-text-opacity: 1;
-}
-
-/* Ensure headings in dark sections are white */
-.bg-emerald-900 h1,
-.bg-emerald-900 h2,
-.bg-emerald-900 h3,
-.bg-emerald-950 h1,
-.bg-emerald-950 h2,
-.bg-emerald-950 h3,
-.bg-slate-900 h1,
-.bg-slate-900 h2,
-.bg-slate-900 h3 {
-  color: white;
-}
-
-/* ============================================================================
-   MAPBOX POPUP STYLES - Find Pros Page
-   ============================================================================ */
-
-/* Fix Mapbox popup styling */
+/* Mapbox Popup Styles */
 .mapboxgl-popup-content {
   padding: 0 !important;
   border-radius: 12px !important;
