@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MessageCircle, X, Send, Minimize2, Phone, Paperclip, Sparkles } from 'lucide-react';
+import { MessageCircle, X, Send, Minimize2, Phone, Paperclip } from 'lucide-react';
+import { ConciergeAvatar } from '@/components/ui/avatar';
 
 interface Message {
   id: string;
@@ -83,10 +84,8 @@ export function ConciergeFab() {
           <div className="bg-gradient-to-r from-haven-700 to-haven-800 px-4 py-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                {/* Concierge Avatar - Champagne with Sparkles */}
-                <div className="w-10 h-10 rounded-full bg-champagne-200 flex items-center justify-center ring-2 ring-champagne-300/50">
-                  <Sparkles className="w-5 h-5 text-champagne-600" />
-                </div>
+                {/* Concierge Avatar - Navy with Bot icon */}
+                <ConciergeAvatar size="lg" />
                 <div>
                   <h3 className="font-semibold text-white text-sm">Haven Concierge</h3>
                   <p className="text-xs text-haven-200">Here to help 24/7</p>
@@ -128,9 +127,7 @@ export function ConciergeFab() {
                 {/* Concierge messages */}
                 {message.sender === 'concierge' && (
                   <div className="flex items-start gap-2 max-w-[85%]">
-                    <div className="w-8 h-8 rounded-full bg-champagne-100 flex items-center justify-center flex-shrink-0">
-                      <Sparkles className="w-4 h-4 text-champagne-600" />
-                    </div>
+                    <ConciergeAvatar size="sm" showPulse={false} />
                     <div>
                       <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-warm-100">
                         <p className="text-warm-800 text-sm leading-relaxed">{message.content}</p>

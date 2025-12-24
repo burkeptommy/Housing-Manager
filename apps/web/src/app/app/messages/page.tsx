@@ -30,7 +30,7 @@ import {
   Send,
 } from 'lucide-react';
 import { getUserAvatar, getVendorAvatar } from '@/lib/avatars';
-import { InitialsAvatar, VendorAvatar } from '@/components/ui/avatar';
+import { InitialsAvatar, VendorAvatar, ManagerAvatar, HandymanAvatar, ConciergeAvatar, PersonAvatar } from '@/components/ui/avatar';
 
 // ============================================================================
 // TYPES
@@ -548,14 +548,19 @@ export default function MessagesPage() {
                         onClick={() => setNewMessageRecipient(contact)}
                         className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
                       >
-                        <InitialsAvatar name={contact.name} size="md" />
+                        {contact.id === 'sarah-chen' ? (
+                          <ManagerAvatar size="md" />
+                        ) : contact.id === 'marcus-johnson' ? (
+                          <HandymanAvatar size="md" />
+                        ) : contact.id === 'haven-concierge' ? (
+                          <ConciergeAvatar size="md" />
+                        ) : (
+                          <InitialsAvatar name={contact.name} size="md" />
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
                           <p className="text-xs text-warm-500 truncate">{contact.role}</p>
                         </div>
-                        {contact.isOnline && (
-                          <div className="w-2 h-2 bg-green-500 rounded-full" />
-                        )}
                       </button>
                     ))}
 
@@ -648,22 +653,34 @@ export default function MessagesPage() {
 // ============================================================================
 
 function ContactRow({ contact }: { contact: Contact }) {
+  // Determine the proper avatar for each contact type
+  const renderAvatar = () => {
+    if (contact.id === 'sarah-chen') {
+      return <ManagerAvatar size="lg" />;
+    }
+    if (contact.id === 'marcus-johnson') {
+      return <HandymanAvatar size="lg" />;
+    }
+    if (contact.id === 'haven-concierge') {
+      return <ConciergeAvatar size="lg" />;
+    }
+    if (contact.category === 'vendors' || contact.category === 'schools') {
+      return <VendorAvatar name={contact.name} size="lg" />;
+    }
+    // Community neighbors get person avatars
+    if (contact.category === 'community') {
+      return <PersonAvatar name={contact.name} type={contact.name.includes('Alice') ? 'female' : 'male'} size="lg" />;
+    }
+    return <InitialsAvatar name={contact.name} size="lg" />;
+  };
+
   return (
     <div className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-warm-50 cursor-pointer transition-colors">
       {/* Avatar with online indicator */}
       <div className="relative">
-        {contact.category === 'vendors' ? (
-          <VendorAvatar name={contact.name} size="lg" />
-        ) : (
-          <InitialsAvatar name={contact.name} size="lg" />
-        )}
-        {contact.isOnline && (
+        {renderAvatar()}
+        {contact.isOnline && !contact.isHavenTeam && (
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
-        )}
-        {contact.isHavenTeam && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-haven-700 rounded-full flex items-center justify-center">
-            <Shield className="w-3 h-3 text-white" />
-          </div>
         )}
       </div>
 
@@ -732,10 +749,15 @@ function ProjectRow({ project }: { project: ProjectConversation }) {
         <div className="flex -space-x-2">
           {project.participants.map((participant, idx) => (
             <div key={idx} className="border-2 border-white rounded-full">
-              <InitialsAvatar
-                name={participant.name}
-                size="sm"
-              />
+              {participant.role === 'Home Manager' ? (
+                <ManagerAvatar size="sm" showBadge={false} />
+              ) : participant.role === 'Handyman' ? (
+                <HandymanAvatar size="sm" showBadge={false} />
+              ) : participant.role === 'Vendor' ? (
+                <VendorAvatar name={participant.name} size="sm" />
+              ) : (
+                <InitialsAvatar name={participant.name} size="sm" />
+              )}
             </div>
           ))}
         </div>

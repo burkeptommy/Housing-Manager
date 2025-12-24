@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { Sparkles, Wrench, Bot, Star, Dog, Cat } from 'lucide-react';
 
 // Color palette - 12 distinct colors
 const colors = [
@@ -27,23 +28,153 @@ function getColorIndex(name: string): number {
   return Math.abs(hash) % colors.length;
 }
 
-// Size presets
+// Size presets with icon and badge sizes
 const sizes = {
-  xs: 24,
-  sm: 32,
-  md: 40,
-  lg: 48,
-  xl: 64,
-  '2xl': 80,
+  xs: { container: 24, icon: 12, badge: 10, text: 10 },
+  sm: { container: 32, icon: 16, badge: 12, text: 12 },
+  md: { container: 40, icon: 20, badge: 14, text: 14 },
+  lg: { container: 48, icon: 24, badge: 16, text: 16 },
+  xl: { container: 64, icon: 32, badge: 20, text: 20 },
+  '2xl': { container: 80, icon: 40, badge: 24, text: 24 },
 };
 
 type AvatarSize = keyof typeof sizes;
 
-interface AvatarProps {
-  name: string;
-  type: 'male' | 'female' | 'boy' | 'girl' | 'manager' | 'handyman' | 'pet-dog' | 'pet-cat';
+// ===========================================
+// HOME MANAGER AVATAR (Sarah Chen)
+// Champagne gradient + Sparkles icon + Star badge
+// ===========================================
+interface ManagerAvatarProps {
   size?: AvatarSize;
-  colorIndex?: number; // Override color
+  className?: string;
+  showBadge?: boolean;
+}
+
+export function ManagerAvatar({ size = 'md', className = '', showBadge = true }: ManagerAvatarProps) {
+  const s = sizes[size];
+
+  return (
+    <div
+      className={`relative flex-shrink-0 ${className}`}
+      style={{ width: s.container, height: s.container }}
+    >
+      {/* Main circle - Champagne gradient */}
+      <div
+        className="w-full h-full rounded-full bg-gradient-to-br from-champagne-200 to-champagne-300 flex items-center justify-center"
+      >
+        <Sparkles
+          style={{ width: s.icon, height: s.icon }}
+          className="text-champagne-700"
+        />
+      </div>
+
+      {/* Star badge */}
+      {showBadge && (
+        <div
+          className="absolute -top-0.5 -right-0.5 bg-amber-400 rounded-full flex items-center justify-center ring-2 ring-white"
+          style={{ width: s.badge, height: s.badge }}
+        >
+          <Star
+            style={{ width: s.badge * 0.6, height: s.badge * 0.6 }}
+            className="text-amber-700 fill-current"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===========================================
+// HANDYMAN AVATAR (Marcus Johnson)
+// Orange gradient + Wrench icon + Tool badge
+// ===========================================
+interface HandymanAvatarProps {
+  size?: AvatarSize;
+  className?: string;
+  showBadge?: boolean;
+}
+
+export function HandymanAvatar({ size = 'md', className = '', showBadge = true }: HandymanAvatarProps) {
+  const s = sizes[size];
+
+  return (
+    <div
+      className={`relative flex-shrink-0 ${className}`}
+      style={{ width: s.container, height: s.container }}
+    >
+      {/* Main circle - Orange gradient */}
+      <div
+        className="w-full h-full rounded-full bg-gradient-to-br from-orange-200 to-orange-300 flex items-center justify-center"
+      >
+        <Wrench
+          style={{ width: s.icon, height: s.icon }}
+          className="text-orange-700"
+        />
+      </div>
+
+      {/* Tool badge */}
+      {showBadge && (
+        <div
+          className="absolute -top-0.5 -right-0.5 bg-orange-500 rounded-full flex items-center justify-center ring-2 ring-white"
+          style={{ width: s.badge, height: s.badge }}
+        >
+          <Wrench
+            style={{ width: s.badge * 0.6, height: s.badge * 0.6 }}
+            className="text-white"
+          />
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ===========================================
+// CONCIERGE AVATAR (AI Assistant)
+// Navy gradient + Bot icon + Pulse indicator
+// ===========================================
+interface ConciergeAvatarProps {
+  size?: AvatarSize;
+  className?: string;
+  showPulse?: boolean;
+}
+
+export function ConciergeAvatar({ size = 'md', className = '', showPulse = true }: ConciergeAvatarProps) {
+  const s = sizes[size];
+
+  return (
+    <div
+      className={`relative flex-shrink-0 ${className}`}
+      style={{ width: s.container, height: s.container }}
+    >
+      {/* Main circle - Navy gradient */}
+      <div
+        className="w-full h-full rounded-full bg-gradient-to-br from-haven-600 to-haven-700 flex items-center justify-center"
+      >
+        <Bot
+          style={{ width: s.icon, height: s.icon }}
+          className="text-white"
+        />
+      </div>
+
+      {/* Online pulse indicator */}
+      {showPulse && (
+        <div
+          className="absolute bottom-0 right-0 bg-emerald-500 rounded-full ring-2 ring-white animate-pulse"
+          style={{ width: s.badge * 0.6, height: s.badge * 0.6 }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ===========================================
+// PERSON AVATAR (Family Members)
+// Silhouettes for male/female/boy/girl
+// ===========================================
+interface PersonAvatarProps {
+  name: string;
+  type: 'male' | 'female' | 'boy' | 'girl';
+  size?: AvatarSize;
   className?: string;
 }
 
@@ -51,9 +182,7 @@ interface AvatarProps {
 function MaleSilhouette({ color }: { color: string }) {
   return (
     <g fill={color}>
-      {/* Head */}
       <circle cx="20" cy="12" r="7" />
-      {/* Shoulders/Body - broader, more angular */}
       <path d="M8 40 L12 28 C14 24 17 22 20 22 C23 22 26 24 28 28 L32 40 Z" />
     </g>
   );
@@ -63,157 +192,97 @@ function MaleSilhouette({ color }: { color: string }) {
 function FemaleSilhouette({ color }: { color: string }) {
   return (
     <g fill={color}>
-      {/* Head */}
       <circle cx="20" cy="12" r="7" />
-      {/* Hair hint - slightly longer */}
       <ellipse cx="20" cy="10" rx="8" ry="6" />
-      {/* Shoulders/Body - narrower, softer */}
       <path d="M10 40 L13 28 C15 24 17 22 20 22 C23 22 25 24 27 28 L30 40 Z" />
     </g>
   );
 }
 
-// Boy Silhouette (smaller, childlike proportions)
+// Boy Silhouette
 function BoySilhouette({ color }: { color: string }) {
   return (
     <g fill={color}>
-      {/* Bigger head relative to body (child proportions) */}
       <circle cx="20" cy="13" r="8" />
-      {/* Smaller body */}
       <path d="M12 40 L14 30 C16 26 18 24 20 24 C22 24 24 26 26 30 L28 40 Z" />
     </g>
   );
 }
 
-// Girl Silhouette (smaller, childlike proportions with hair)
+// Girl Silhouette
 function GirlSilhouette({ color }: { color: string }) {
   return (
     <g fill={color}>
-      {/* Bigger head relative to body */}
       <circle cx="20" cy="13" r="8" />
-      {/* Pigtails/hair puffs */}
       <circle cx="11" cy="11" r="3" />
       <circle cx="29" cy="11" r="3" />
-      {/* Smaller body */}
       <path d="M12 40 L14 30 C16 26 18 24 20 24 C22 24 24 26 26 30 L28 40 Z" />
     </g>
   );
 }
 
-// Manager silhouette with sparkle badge
-function ManagerSilhouette() {
-  return (
-    <g>
-      {/* Female silhouette base */}
-      <g fill="#8C7D4E">
-        <circle cx="20" cy="12" r="7" />
-        <ellipse cx="20" cy="10" rx="8" ry="6" />
-        <path d="M10 40 L13 28 C15 24 17 22 20 22 C23 22 25 24 27 28 L30 40 Z" />
-      </g>
-      {/* Star badge */}
-      <g transform="translate(28, 2)">
-        <circle cx="6" cy="6" r="6" fill="#FCD34D" />
-        <path d="M6 2 L7 5 L10 5 L8 7 L9 10 L6 8 L3 10 L4 7 L2 5 L5 5 Z" fill="#B45309" />
-      </g>
-    </g>
-  );
-}
-
-// Handyman silhouette with tool badge
-function HandymanSilhouette() {
-  return (
-    <g>
-      {/* Male silhouette base */}
-      <g fill="#C2410C">
-        <circle cx="20" cy="12" r="7" />
-        <path d="M8 40 L12 28 C14 24 17 22 20 22 C23 22 26 24 28 28 L32 40 Z" />
-      </g>
-      {/* Wrench badge */}
-      <g transform="translate(28, 2)">
-        <circle cx="6" cy="6" r="6" fill="#FED7AA" />
-        <path d="M4 4 L8 8 M8 4 L4 8" stroke="#C2410C" strokeWidth="2" strokeLinecap="round" />
-      </g>
-    </g>
-  );
-}
-
-// Dog silhouette
-function DogSilhouette({ color }: { color: string }) {
-  return (
-    <g fill={color}>
-      {/* Body */}
-      <ellipse cx="20" cy="24" rx="12" ry="8" />
-      {/* Head */}
-      <circle cx="20" cy="14" r="7" />
-      {/* Ears */}
-      <ellipse cx="13" cy="10" rx="3" ry="5" />
-      <ellipse cx="27" cy="10" rx="3" ry="5" />
-      {/* Snout */}
-      <ellipse cx="20" cy="17" rx="3" ry="2" />
-    </g>
-  );
-}
-
-// Cat silhouette
-function CatSilhouette({ color }: { color: string }) {
-  return (
-    <g fill={color}>
-      {/* Body */}
-      <ellipse cx="20" cy="26" rx="10" ry="7" />
-      {/* Head */}
-      <circle cx="20" cy="15" r="7" />
-      {/* Pointed ears */}
-      <polygon points="12,12 14,6 17,12" />
-      <polygon points="28,12 26,6 23,12" />
-      {/* Whiskers area */}
-      <ellipse cx="20" cy="17" rx="2" ry="1.5" />
-    </g>
-  );
-}
-
-export function Avatar({ name, type, size = 'md', colorIndex, className = '' }: AvatarProps) {
-  const pixelSize = sizes[size];
-  const color = colors[colorIndex ?? getColorIndex(name)];
-
-  // Manager and Handyman have fixed colors
-  const bgColor = type === 'manager' ? '#F5F0E8' :
-                  type === 'handyman' ? '#FFEDD5' :
-                  color.bg;
+export function PersonAvatar({ name, type, size = 'md', className = '' }: PersonAvatarProps) {
+  const s = sizes[size];
+  const color = colors[getColorIndex(name)];
 
   return (
     <svg
-      width={pixelSize}
-      height={pixelSize}
+      width={s.container}
+      height={s.container}
       viewBox="0 0 40 40"
       className={`rounded-full flex-shrink-0 ${className}`}
-      style={{ backgroundColor: bgColor }}
+      style={{ backgroundColor: color.bg }}
     >
       {type === 'male' && <MaleSilhouette color={color.fill} />}
       {type === 'female' && <FemaleSilhouette color={color.fill} />}
       {type === 'boy' && <BoySilhouette color={color.fill} />}
       {type === 'girl' && <GirlSilhouette color={color.fill} />}
-      {type === 'manager' && <ManagerSilhouette />}
-      {type === 'handyman' && <HandymanSilhouette />}
-      {type === 'pet-dog' && <DogSilhouette color={color.fill} />}
-      {type === 'pet-cat' && <CatSilhouette color={color.fill} />}
     </svg>
   );
 }
 
-// Vendor Avatar - Uses initials with category icon
-interface VendorAvatarProps {
+// ===========================================
+// PET AVATAR
+// ===========================================
+interface PetAvatarProps {
   name: string;
-  category?: string;
+  type: 'dog' | 'cat';
   size?: AvatarSize;
-  colorIndex?: number;
   className?: string;
 }
 
-export function VendorAvatar({ name, size = 'md', colorIndex, className = '' }: VendorAvatarProps) {
-  const pixelSize = sizes[size];
-  const color = colors[colorIndex ?? getColorIndex(name)];
+export function PetAvatar({ name, type, size = 'md', className = '' }: PetAvatarProps) {
+  const s = sizes[size];
+  const color = colors[getColorIndex(name)];
+  const Icon = type === 'dog' ? Dog : Cat;
 
-  // Get initials (first letter of first two words)
+  return (
+    <div
+      className={`rounded-full flex items-center justify-center flex-shrink-0 ${className}`}
+      style={{
+        width: s.container,
+        height: s.container,
+        backgroundColor: color.bg,
+      }}
+    >
+      <Icon style={{ width: s.icon, height: s.icon, color: color.fill }} />
+    </div>
+  );
+}
+
+// ===========================================
+// VENDOR AVATAR (Initials with color)
+// ===========================================
+interface VendorAvatarProps {
+  name: string;
+  size?: AvatarSize;
+  className?: string;
+}
+
+export function VendorAvatar({ name, size = 'md', className = '' }: VendorAvatarProps) {
+  const s = sizes[size];
+  const color = colors[getColorIndex(name)];
+
   const initials = name
     .split(' ')
     .slice(0, 2)
@@ -221,17 +290,15 @@ export function VendorAvatar({ name, size = 'md', colorIndex, className = '' }: 
     .join('')
     .toUpperCase();
 
-  const fontSize = pixelSize * 0.35;
-
   return (
     <div
       className={`rounded-xl flex items-center justify-center font-semibold flex-shrink-0 ${className}`}
       style={{
-        width: pixelSize,
-        height: pixelSize,
+        width: s.container,
+        height: s.container,
         backgroundColor: color.bg,
         color: color.fill,
-        fontSize: fontSize,
+        fontSize: s.text,
       }}
     >
       {initials}
@@ -239,19 +306,32 @@ export function VendorAvatar({ name, size = 'md', colorIndex, className = '' }: 
   );
 }
 
-// Convenience exports
-export function ManagerAvatar({ size = 'md', className = '' }: { size?: AvatarSize; className?: string }) {
-  return <Avatar name="Sarah Chen" type="manager" size={size} className={className} />;
+// ===========================================
+// GENERIC AVATAR (Backward compatible)
+// ===========================================
+interface AvatarProps {
+  name: string;
+  type: 'male' | 'female' | 'boy' | 'girl' | 'pet-dog' | 'pet-cat';
+  size?: AvatarSize;
+  className?: string;
 }
 
-export function HandymanAvatar({ size = 'md', className = '' }: { size?: AvatarSize; className?: string }) {
-  return <Avatar name="Mike Rodriguez" type="handyman" size={size} className={className} />;
+export function Avatar({ name, type, size = 'md', className = '' }: AvatarProps) {
+  // Map pet types to PetAvatar
+  if (type === 'pet-dog') {
+    return <PetAvatar name={name} type="dog" size={size} className={className} />;
+  }
+  if (type === 'pet-cat') {
+    return <PetAvatar name={name} type="cat" size={size} className={className} />;
+  }
+
+  // Use PersonAvatar for people types
+  return <PersonAvatar name={name} type={type} size={size} className={className} />;
 }
 
-// ============================================================================
-// BACKWARD COMPATIBILITY - InitialsAvatar
-// ============================================================================
-
+// ===========================================
+// INITIALS AVATAR (Legacy support)
+// ===========================================
 type InitialsSize = 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 type InitialsVariant = 'emerald' | 'blue' | 'purple' | 'amber' | 'rose' | 'haven' | 'warm';
 
