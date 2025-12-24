@@ -91,6 +91,7 @@ import {
   Heart,
 } from 'lucide-react';
 import { VendorAvatar } from '@/components/ui/avatar';
+import { VehicleAvatar } from '@/components/ui/vehicle-avatar';
 import { getHealthColors } from '@/lib/utils/healthColors';
 
 // Shared home health score - same value as Dashboard for consistency
@@ -1489,11 +1490,21 @@ export default function YourHomePage() {
         return (
           <div key={vehicle.id} className="bg-white rounded-2xl border border-warm-200 overflow-hidden">
             <div className="flex flex-col sm:flex-row">
-              {vehicle.photoUrl && (
-                <div className="sm:w-64 h-48 sm:h-auto overflow-hidden flex-shrink-0">
+              {/* Vehicle Image or Avatar */}
+              <div className="sm:w-64 h-48 sm:h-auto overflow-hidden flex-shrink-0">
+                {vehicle.photoUrl ? (
                   <img src={vehicle.photoUrl} alt={vehicle.nickname} className="w-full h-full object-cover" />
-                </div>
-              )}
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-warm-50">
+                    <VehicleAvatar
+                      make={vehicle.make}
+                      model={vehicle.model}
+                      isElectric={vehicle.fuelType === 'Electric'}
+                      size="xl"
+                    />
+                  </div>
+                )}
+              </div>
               <div className="flex-1 p-4 sm:p-6">
                 <div className="flex items-start justify-between">
                   <div>

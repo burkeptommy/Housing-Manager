@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sparkles, Wrench, Bot, Star, Dog, Cat } from 'lucide-react';
+import { Wrench, Bot, Star, Dog, Cat } from 'lucide-react';
 
 // Color palette - 12 distinct colors
 const colors = [
@@ -41,8 +41,8 @@ const sizes = {
 type AvatarSize = keyof typeof sizes;
 
 // ===========================================
-// HOME MANAGER AVATAR (Sarah Chen)
-// Champagne gradient + Sparkles icon + Star badge
+// HOME MANAGER AVATAR (Sarah Chen) - HUMAN
+// Champagne gradient + Female silhouette + Star badge
 // ===========================================
 interface ManagerAvatarProps {
   size?: AvatarSize;
@@ -60,23 +60,31 @@ export function ManagerAvatar({ size = 'md', className = '', showBadge = true }:
     >
       {/* Main circle - Champagne gradient */}
       <div
-        className="w-full h-full rounded-full bg-gradient-to-br from-champagne-200 to-champagne-300 flex items-center justify-center"
+        className="w-full h-full rounded-full bg-gradient-to-br from-champagne-200 to-champagne-300 flex items-center justify-center overflow-hidden"
       >
-        <Sparkles
-          style={{ width: s.icon, height: s.icon }}
-          className="text-champagne-700"
-        />
+        {/* Female human silhouette */}
+        <svg
+          viewBox="0 0 40 40"
+          style={{ width: s.icon * 1.3, height: s.icon * 1.3 }}
+        >
+          {/* Hair - longer, feminine style */}
+          <ellipse cx="20" cy="10" rx="10" ry="7" fill="#6B5D3A" />
+          {/* Head */}
+          <circle cx="20" cy="13" r="7" fill="#6B5D3A" />
+          {/* Shoulders/body - narrower, feminine */}
+          <path d="M10 40 L13 27 C15 23 17 21 20 21 C23 21 25 23 27 27 L30 40 Z" fill="#6B5D3A" />
+        </svg>
       </div>
 
-      {/* Star badge */}
+      {/* Star badge - indicates Home Manager role */}
       {showBadge && (
         <div
-          className="absolute -top-0.5 -right-0.5 bg-amber-400 rounded-full flex items-center justify-center ring-2 ring-white"
+          className="absolute -top-0.5 -right-0.5 bg-amber-400 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm"
           style={{ width: s.badge, height: s.badge }}
         >
           <Star
-            style={{ width: s.badge * 0.6, height: s.badge * 0.6 }}
-            className="text-amber-700 fill-current"
+            style={{ width: s.badge * 0.55, height: s.badge * 0.55 }}
+            className="text-amber-800 fill-current"
           />
         </div>
       )}
@@ -85,8 +93,8 @@ export function ManagerAvatar({ size = 'md', className = '', showBadge = true }:
 }
 
 // ===========================================
-// HANDYMAN AVATAR (Marcus Johnson)
-// Orange gradient + Wrench icon + Tool badge
+// HANDYMAN AVATAR (Marcus Johnson) - HUMAN
+// Orange gradient + Male silhouette + Wrench badge
 // ===========================================
 interface HandymanAvatarProps {
   size?: AvatarSize;
@@ -104,22 +112,28 @@ export function HandymanAvatar({ size = 'md', className = '', showBadge = true }
     >
       {/* Main circle - Orange gradient */}
       <div
-        className="w-full h-full rounded-full bg-gradient-to-br from-orange-200 to-orange-300 flex items-center justify-center"
+        className="w-full h-full rounded-full bg-gradient-to-br from-orange-200 to-orange-300 flex items-center justify-center overflow-hidden"
       >
-        <Wrench
-          style={{ width: s.icon, height: s.icon }}
-          className="text-orange-700"
-        />
+        {/* Male human silhouette */}
+        <svg
+          viewBox="0 0 40 40"
+          style={{ width: s.icon * 1.3, height: s.icon * 1.3 }}
+        >
+          {/* Head */}
+          <circle cx="20" cy="12" r="7" fill="#9A3412" />
+          {/* Shoulders/body - broader, masculine */}
+          <path d="M7 40 L11 26 C14 22 17 20 20 20 C23 20 26 22 29 26 L33 40 Z" fill="#9A3412" />
+        </svg>
       </div>
 
-      {/* Tool badge */}
+      {/* Wrench badge - indicates Handyman role */}
       {showBadge && (
         <div
-          className="absolute -top-0.5 -right-0.5 bg-orange-500 rounded-full flex items-center justify-center ring-2 ring-white"
+          className="absolute -top-0.5 -right-0.5 bg-orange-500 rounded-full flex items-center justify-center ring-2 ring-white shadow-sm"
           style={{ width: s.badge, height: s.badge }}
         >
           <Wrench
-            style={{ width: s.badge * 0.6, height: s.badge * 0.6 }}
+            style={{ width: s.badge * 0.55, height: s.badge * 0.55 }}
             className="text-white"
           />
         </div>
