@@ -5,7 +5,8 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
 import { images, getAvatarUrl } from '@/lib/images';
-import { Card, CardHeader, CardContent, Badge, Button, Avatar } from '@/components/ui';
+import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui';
+import { Avatar, ManagerAvatar } from '@/components/ui/avatar';
 import {
   Sun,
   Cloud,
@@ -71,8 +72,7 @@ interface ActionItem {
 interface FamilyMemberStatus {
   id: string;
   name: string;
-  avatar?: string;
-  isPet?: boolean;
+  avatarType: 'male' | 'female' | 'boy' | 'girl' | 'pet-dog' | 'pet-cat';
   location: FamilyLocationStatus;
   locationLabel: string;
   until?: string;
@@ -136,11 +136,11 @@ const mockActionItems: ActionItem[] = [
 ];
 
 const mockFamilyStatus: FamilyMemberStatus[] = [
-  { id: 'bob', name: 'Bob', avatar: images.avatars.bob, location: 'work', locationLabel: 'At Work', until: 'Home 5:30pm', vehicle: 'Tesla' },
-  { id: 'alice', name: 'Alice', avatar: images.avatars.alice, location: 'home', locationLabel: 'Home', vehicle: 'Highlander' },
-  { id: 'emma', name: 'Emma', location: 'activity', locationLabel: 'Soccer', until: 'until 4pm', pickupBy: 'Alice pickup' },
-  { id: 'jake', name: 'Jake', location: 'school', locationLabel: 'School', until: 'until 3:15pm', pickupBy: 'Maria pickup' },
-  { id: 'max', name: 'Max', isPet: true, location: 'home', locationLabel: 'Home' },
+  { id: 'bob', name: 'Bob', avatarType: 'male', location: 'work', locationLabel: 'At Work', until: 'Home 5:30pm', vehicle: 'Tesla' },
+  { id: 'alice', name: 'Alice', avatarType: 'female', location: 'home', locationLabel: 'Home', vehicle: 'Highlander' },
+  { id: 'emma', name: 'Emma', avatarType: 'girl', location: 'activity', locationLabel: 'Soccer', until: 'until 4pm', pickupBy: 'Alice pickup' },
+  { id: 'jake', name: 'Jake', avatarType: 'boy', location: 'school', locationLabel: 'School', until: 'until 3:15pm', pickupBy: 'Maria pickup' },
+  { id: 'max', name: 'Max', avatarType: 'pet-dog', location: 'home', locationLabel: 'Home' },
 ];
 
 const mockManagerTasks: ManagerTask[] = [
@@ -313,7 +313,7 @@ function DecisionCard({ item, onDismiss }: { item: ActionItem; onDismiss: (id: s
         {/* Manager Note */}
         <div className="bg-warm-50 rounded-xl p-4 mb-5">
           <div className="flex items-start gap-3">
-            <Avatar name={mockManager.name} src={mockManager.avatar} size="sm" />
+            <ManagerAvatar size="sm" />
             <div>
               <span className="text-xs font-medium text-warm-500">Sarah says:</span>
               <p className="text-sm text-warm-700 mt-0.5">{item.managerNote}</p>
@@ -360,7 +360,7 @@ function RespondCard({ item, onDismiss }: { item: ActionItem; onDismiss: (id: st
 
       {/* Manager Note */}
       <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl mb-4">
-        <Avatar name={mockManager.name} src={mockManager.avatar} size="sm" />
+        <ManagerAvatar size="sm" />
         <p className="text-sm text-amber-800 italic">"{item.managerNote}"</p>
       </div>
 
@@ -418,7 +418,8 @@ function ManagerStatusCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <Avatar name={manager.name} src={manager.avatar} size="lg" status="online" />
+            <ManagerAvatar size="lg" />
+            <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <div>
             <h3 className="font-bold text-warm-900">{manager.name}</h3>
@@ -478,15 +479,7 @@ function FamilyLogisticsCard({ members }: { members: FamilyMemberStatus[] }) {
           return (
             <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-warm-50 transition-colors">
               {/* Avatar */}
-              <div className="w-10 h-10 rounded-full bg-warm-100 flex items-center justify-center overflow-hidden">
-                {member.isPet ? (
-                  <Dog className="w-5 h-5 text-amber-600" />
-                ) : member.avatar ? (
-                  <Image src={member.avatar} alt="" width={40} height={40} className="object-cover" />
-                ) : (
-                  <span className="text-sm font-semibold text-warm-600">{member.name[0]}</span>
-                )}
-              </div>
+              <Avatar name={member.name} type={member.avatarType} size="md" />
 
               {/* Name & Status */}
               <div className="flex-1 min-w-0">
@@ -706,7 +699,10 @@ function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
 
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
-          <Avatar name={manager.name} src={manager.avatar} size="xl" status="online" />
+          <div className="relative">
+            <ManagerAvatar size="xl" />
+            <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-warm-900" />
+          </div>
           <div>
             <h3 className="text-lg font-bold text-white">{manager.name}</h3>
             <p className="text-warm-400">Your Home Manager</p>

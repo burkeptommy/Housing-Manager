@@ -29,6 +29,7 @@ import {
   ExternalLink,
   ListChecks,
 } from 'lucide-react';
+import { ManagerAvatar } from '@/components/ui/avatar';
 
 // ============================================================================
 // TYPES
@@ -498,9 +499,7 @@ export default function ManagerHubPage() {
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Manager Avatar & Status */}
             <div className="relative">
-              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-haven-100 flex items-center justify-center">
-                <span className="text-2xl sm:text-3xl font-bold text-haven-700">SC</span>
-              </div>
+              <ManagerAvatar size="2xl" />
               {MANAGER.isOnline && (
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-3 border-white flex items-center justify-center">
                   <div className="w-2 h-2 bg-white rounded-full" />
