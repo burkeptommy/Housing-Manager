@@ -957,17 +957,17 @@ export default function MarketingPage() {
             </p>
           </div>
 
-          <div className="bg-warm-50 rounded-2xl overflow-hidden border border-warm-200">
-            {/* Header - hidden on mobile, shown on desktop */}
-            <div className="hidden sm:grid sm:grid-cols-3">
-              <div className="p-4 sm:p-6 font-semibold text-warm-600 border-b sm:border-b-0 sm:border-r border-warm-200 bg-warm-100">
+          {/* Desktop Table View */}
+          <div className="hidden sm:block bg-warm-50 rounded-2xl overflow-hidden border border-warm-200">
+            <div className="grid sm:grid-cols-3">
+              <div className="p-6 font-semibold text-warm-600 border-r border-warm-200 bg-warm-100">
                 FEATURE
               </div>
-              <div className="p-4 sm:p-6 text-center border-b sm:border-b-0 sm:border-r border-warm-200 bg-red-50">
+              <div className="p-6 text-center border-r border-warm-200 bg-red-50">
                 <p className="font-semibold text-red-700">Household Software</p>
                 <p className="text-sm text-red-600">$375/mo + $3K setup</p>
               </div>
-              <div className="p-4 sm:p-6 text-center bg-emerald-100">
+              <div className="p-6 text-center bg-emerald-100">
                 <p className="font-semibold text-emerald-800">Haven</p>
                 <p className="text-sm text-emerald-700">$349/mo, no setup fee</p>
               </div>
@@ -984,30 +984,66 @@ export default function MarketingPage() {
               { feature: 'Humans Doing Work', software: 'No (software only)', haven: 'Yes, dedicated manager' },
               { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
             ].map((row, idx) => (
-              <div key={idx} className="border-t border-warm-200">
-                {/* Feature name */}
-                <div className="p-4 sm:hidden text-warm-800 font-semibold bg-warm-100">
+              <div key={idx} className="grid sm:grid-cols-3 border-t border-warm-200">
+                <div className="p-5 text-warm-700 font-medium border-r border-warm-200">
                   {row.feature}
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3">
-                  {/* Feature - desktop only */}
-                  <div className="hidden sm:block p-4 sm:p-5 text-warm-700 font-medium border-b sm:border-b-0 sm:border-r border-warm-200">
-                    {row.feature}
-                  </div>
-                  {/* Other Services */}
-                  <div className="p-4 sm:p-5 border-b sm:border-b-0 sm:border-r border-warm-200 flex items-center gap-2 bg-red-50/50">
-                    <XCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                    <div className="flex-1">
-                      <span className="sm:hidden text-xs font-semibold text-red-600 uppercase tracking-wide">Other Services: </span>
-                      <span className="text-sm text-red-700">{row.software}</span>
+                <div className="p-5 text-center border-r border-warm-200 flex items-center justify-center gap-2 bg-red-50/50">
+                  <XCircle className="w-4 h-4 text-red-400" />
+                  <span className="text-sm text-red-700">{row.software}</span>
+                </div>
+                <div className="p-5 text-center bg-emerald-50 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span className="text-sm font-medium text-emerald-800">{row.haven}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Mobile Card View - Elegant stacked cards */}
+          <div className="sm:hidden space-y-4">
+            {/* Mobile Header */}
+            <div className="grid grid-cols-2 gap-3 mb-2">
+              <div className="text-center">
+                <p className="text-xs font-medium text-warm-500 uppercase tracking-wide">Other Software</p>
+                <p className="text-xs text-warm-400">$375/mo + setup</p>
+              </div>
+              <div className="text-center">
+                <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Haven</p>
+                <p className="text-xs text-emerald-500">$349/mo, no setup</p>
+              </div>
+            </div>
+
+            {[
+              { feature: 'Monthly Cost', software: '$375/month', haven: '$349/month' },
+              { feature: 'Setup/Onboarding', software: '$3K–$5K', haven: '$0' },
+              { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
+              { feature: 'Contract Required', software: '12-mo prepaid', haven: 'Month-to-month' },
+              { feature: 'Bills Paid For You', software: 'No', haven: 'Yes, one payment' },
+              { feature: 'Vendor Coordination', software: 'No', haven: 'Yes, full oversight' },
+              { feature: 'Handyman Visits', software: 'No', haven: 'Yes, monthly' },
+              { feature: 'Humans Doing Work', software: 'No', haven: 'Yes, dedicated manager' },
+              { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. Done.' },
+            ].map((row, idx) => (
+              <div key={idx} className="bg-white rounded-xl shadow-sm border border-warm-100 overflow-hidden">
+                {/* Feature Header */}
+                <div className="px-4 py-3 bg-warm-50 border-b border-warm-100">
+                  <p className="text-sm font-semibold text-warm-800">{row.feature}</p>
+                </div>
+                {/* Comparison Cards */}
+                <div className="grid grid-cols-2 divide-x divide-warm-100">
+                  {/* Other Software */}
+                  <div className="p-4 bg-red-50/30">
+                    <div className="flex items-start gap-2">
+                      <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-red-700 leading-tight">{row.software}</span>
                     </div>
                   </div>
                   {/* Haven */}
-                  <div className="p-4 sm:p-5 flex items-center gap-2 bg-emerald-50">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
-                    <div className="flex-1">
-                      <span className="sm:hidden text-xs font-semibold text-emerald-700 uppercase tracking-wide">Haven: </span>
-                      <span className="text-sm font-medium text-emerald-800">{row.haven}</span>
+                  <div className="p-4 bg-emerald-50/50">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm font-medium text-emerald-800 leading-tight">{row.haven}</span>
                     </div>
                   </div>
                 </div>
