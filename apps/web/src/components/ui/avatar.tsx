@@ -45,7 +45,7 @@ export function Avatar({ name, src, size = 'md', status, className = '' }: Avata
         />
       ) : (
         <div
-          className={`rounded-full bg-gradient-to-br from-haven-400 to-haven-600 text-white font-semibold
+          className={`rounded-full bg-gradient-to-br from-haven-600 to-haven-800 text-white font-semibold
                       flex items-center justify-center ring-2 ring-white shadow-sm ${sizeClasses[size]}`}
         >
           {initials}
@@ -117,7 +117,7 @@ const initialsVariantClasses: Record<InitialsVariant, string> = {
   purple: 'bg-purple-100 text-purple-600',
   amber: 'bg-amber-100 text-amber-600',
   rose: 'bg-rose-100 text-rose-600',
-  haven: 'bg-haven-100 text-haven-600',
+  haven: 'bg-haven-100 text-haven-700',
   warm: 'bg-warm-100 text-warm-600',
 };
 

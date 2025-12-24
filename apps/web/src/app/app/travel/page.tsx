@@ -91,7 +91,7 @@ export default function TravelPage() {
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Travel</h1>
           <Link
             href="/app/travel/profile"
-            className="text-sm text-emerald-600 dark:text-emerald-400 hover:underline"
+            className="text-sm text-haven-700 dark:text-haven-400 hover:underline"
           >
             Travel Profile
           </Link>
@@ -100,16 +100,16 @@ export default function TravelPage() {
         {/* Active/Upcoming Trip Card */}
         {activeTrip && (
           <Link href={`/app/travel/trips/${activeTrip.id}`}>
-            <div className="bg-gradient-to-r from-emerald-600 to-purple-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
+            <div className="bg-gradient-to-r from-haven-700 to-purple-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-shadow">
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="text-emerald-100 text-sm">
+                  <p className="text-haven-100 text-sm">
                     {daysUntilDeparture(activeTrip.startDate) > 0
                       ? `${daysUntilDeparture(activeTrip.startDate)} days until departure`
                       : 'Trip in progress'}
                   </p>
                   <h2 className="text-2xl font-bold mt-1 text-white">{activeTrip.destination}</h2>
-                  <p className="text-emerald-100 mt-2">
+                  <p className="text-haven-100 mt-2">
                     {new Date(activeTrip.startDate).toLocaleDateString()} -{' '}
                     {new Date(activeTrip.endDate).toLocaleDateString()}
                   </p>
@@ -174,8 +174,8 @@ export default function TravelPage() {
             href="/app/travel/trips/new"
             className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow hover:shadow-md transition-shadow flex items-center space-x-3"
           >
-            <div className="p-2 bg-emerald-100 dark:bg-emerald-900 rounded-lg">
-              <PlusIcon className="h-6 w-6 text-emerald-600 dark:text-emerald-400" />
+            <div className="p-2 bg-haven-100 dark:bg-haven-900 rounded-lg">
+              <PlusIcon className="h-6 w-6 text-haven-700 dark:text-haven-400" />
             </div>
             <div>
               <p className="font-medium text-gray-900 dark:text-white">Plan a Trip</p>
@@ -209,7 +209,7 @@ export default function TravelPage() {
                 <p className="text-gray-500 dark:text-gray-400">No trips yet</p>
                 <Link
                   href="/app/travel/trips/new"
-                  className="mt-3 inline-block text-emerald-600 dark:text-emerald-400 hover:underline"
+                  className="mt-3 inline-block text-haven-700 dark:text-haven-400 hover:underline"
                 >
                   Plan your first trip
                 </Link>

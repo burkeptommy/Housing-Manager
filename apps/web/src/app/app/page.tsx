@@ -212,7 +212,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-haven-600 via-haven-500 to-emerald-500 p-8 text-white mb-8">
+    <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-8 text-white mb-8">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
@@ -437,7 +437,7 @@ function ManagerStatusCard({
           <div className="space-y-2">
             {tasks.map((task) => (
               <div key={task.id} className="flex items-center gap-2 text-sm">
-                <Clock className="w-4 h-4 text-haven-500" />
+                <Clock className="w-4 h-4 text-haven-700" />
                 <span className="text-warm-700">{task.task}</span>
                 <span className="text-warm-400">• {task.progress}</span>
               </div>
@@ -529,12 +529,12 @@ function HouseHealthCard({
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="p-2 bg-haven-100 rounded-lg">
-            <Heart className="w-5 h-5 text-haven-600" />
+            <Heart className="w-5 h-5 text-haven-700" />
           </div>
           <h3 className="font-bold text-warm-900">House Health</h3>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-bold text-haven-600">{health.score}%</span>
+          <span className="text-2xl font-bold text-haven-700">{health.score}%</span>
           <p className="text-xs text-warm-500">Healthy</p>
         </div>
       </div>
@@ -542,7 +542,7 @@ function HouseHealthCard({
       {/* Progress Bar */}
       <div className="h-2 bg-warm-100 rounded-full mb-4 overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-haven-500 to-emerald-500 rounded-full transition-all duration-500"
+          className="h-full bg-gradient-to-r from-haven-700 to-haven-800 rounded-full transition-all duration-500"
           style={{ width: `${health.score}%` }}
         />
       </div>
@@ -565,7 +565,7 @@ function HouseHealthCard({
       </div>
 
       <div className="flex items-center gap-2 p-3 bg-haven-50 rounded-xl">
-        <Wrench className="w-4 h-4 text-haven-600" />
+        <Wrench className="w-4 h-4 text-haven-700" />
         <span className="text-sm text-haven-700">
           Next handyman visit: <span className="font-semibold">{health.nextService}</span>
         </span>
@@ -573,7 +573,7 @@ function HouseHealthCard({
 
       <Link
         href="/app/maintenance"
-        className="mt-4 text-sm text-haven-600 hover:text-haven-700 font-medium flex items-center gap-1"
+        className="mt-4 text-sm text-haven-700 hover:text-haven-800 font-medium flex items-center gap-1"
       >
         View full report
         <ChevronRight className="w-4 h-4" />
@@ -591,7 +591,7 @@ function QuickActionsCard({ onOpenRequest }: { onOpenRequest: () => void }) {
       {/* Primary Action */}
       <button
         onClick={onOpenRequest}
-        className="w-full mt-4 flex items-center gap-4 p-4 bg-gradient-to-r from-haven-600 to-emerald-600 text-white rounded-xl hover:from-haven-700 hover:to-emerald-700 transition-all shadow-lg shadow-haven-500/20 group"
+        className="w-full mt-4 flex items-center gap-4 p-4 bg-gradient-to-r from-haven-700 to-haven-700 text-white rounded-xl hover:from-haven-800 hover:to-haven-800 transition-all shadow-lg shadow-haven-700/20 group"
       >
         <div className="p-2 bg-white/20 rounded-lg group-hover:bg-white/30 transition-colors">
           <Plus className="w-5 h-5" />
@@ -683,9 +683,9 @@ function RequestModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
             <input
               type="text"
               placeholder="Or just tell me what you need..."
-              className="w-full px-4 py-3 pr-12 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-500/20 focus:border-haven-500 transition-all"
+              className="w-full px-4 py-3 pr-12 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600/20 focus:border-haven-700 transition-all"
             />
-            <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-haven-600 rounded-lg text-white hover:bg-haven-700 transition-colors">
+            <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-haven-700 rounded-lg text-white hover:bg-haven-800 transition-colors">
               <Mic className="w-4 h-4" />
             </button>
           </div>
@@ -723,7 +723,7 @@ function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
           </a>
           <Link
             href="/app/messages"
-            className="flex items-center gap-2 px-4 py-2.5 bg-haven-600 hover:bg-haven-700 rounded-xl font-medium transition-colors"
+            className="flex items-center gap-2 px-4 py-2.5 bg-haven-700 hover:bg-haven-800 rounded-xl font-medium transition-colors"
           >
             <MessageCircle className="w-4 h-4" />
             Chat

@@ -74,14 +74,14 @@ export function ConciergeFab() {
       {isOpen && (
         <div className="fixed bottom-36 lg:bottom-24 right-4 lg:right-6 w-[calc(100vw-2rem)] sm:w-[360px] h-[400px] lg:h-[480px] bg-white rounded-2xl shadow-2xl border border-slate-200 flex flex-col z-50 overflow-hidden">
           {/* Header */}
-          <div className="flex items-center justify-between px-4 py-3 bg-emerald-600 text-white">
+          <div className="flex items-center justify-between px-4 py-3 bg-haven-700 text-white">
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
                 <MessageCircle className="w-4 h-4" />
               </div>
               <div>
                 <h3 className="font-semibold text-sm">Haven Concierge</h3>
-                <p className="text-xs text-emerald-100">Always here to help</p>
+                <p className="text-xs text-haven-100">Always here to help</p>
               </div>
             </div>
             <div className="flex items-center gap-1">
@@ -112,7 +112,7 @@ export function ConciergeFab() {
                 <div
                   className={`max-w-[80%] px-4 py-2.5 rounded-2xl text-sm ${
                     message.sender === 'user'
-                      ? 'bg-emerald-600 text-white rounded-br-md'
+                      ? 'bg-haven-700 text-white rounded-br-md'
                       : 'bg-white text-slate-800 border border-slate-200 rounded-bl-md'
                   }`}
                 >
@@ -133,12 +133,12 @@ export function ConciergeFab() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-2.5 text-sm bg-slate-100 rounded-full border-0 focus:ring-2 focus:ring-emerald-600 focus:bg-white transition-colors"
+                className="flex-1 px-4 py-2.5 text-sm bg-slate-100 rounded-full border-0 focus:ring-2 focus:ring-haven-600 focus:bg-white transition-colors"
               />
               <button
                 onClick={handleSend}
                 disabled={!inputValue.trim()}
-                className="p-2.5 bg-emerald-600 text-white rounded-full hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="p-2.5 bg-haven-700 text-white rounded-full hover:bg-haven-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 aria-label="Send message"
               >
                 <Send className="w-4 h-4" />
@@ -154,7 +154,7 @@ export function ConciergeFab() {
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 w-14 h-14 rounded-full shadow-lg transition-all z-50 flex items-center justify-center ${
           isOpen
             ? 'bg-slate-900 hover:bg-slate-800'
-            : 'bg-emerald-600 hover:bg-emerald-700'
+            : 'bg-haven-700 hover:bg-haven-800'
         }`}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
       >

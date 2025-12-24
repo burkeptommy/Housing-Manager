@@ -150,7 +150,7 @@ export default function HandymanPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-haven-700"></div>
       </div>
     );
   }
@@ -161,7 +161,7 @@ export default function HandymanPage() {
         <p className="text-red-600 dark:text-red-400">{error}</p>
         <button
           onClick={loadDashboard}
-          className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+          className="px-4 py-2 bg-haven-700 text-white rounded-lg hover:bg-haven-800 transition-colors"
         >
           Retry
         </button>
@@ -193,7 +193,7 @@ export default function HandymanPage() {
         </div>
         <div className="card">
           <p className="text-sm text-warm-500 dark:text-warm-400">Hours This Month</p>
-          <p className="text-3xl font-bold text-emerald-600">{dashboard.stats.hoursThisMonth.toFixed(1)}</p>
+          <p className="text-3xl font-bold text-haven-700">{dashboard.stats.hoursThisMonth.toFixed(1)}</p>
         </div>
       </div>
 
@@ -318,8 +318,8 @@ export default function HandymanPage() {
             {dashboard.assignedHouseholds.map((household) => (
               <div key={household.id} className="card">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/50 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-10 h-10 rounded-full bg-haven-100 dark:bg-haven-900/50 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-haven-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
                     </svg>
                   </div>
@@ -329,7 +329,7 @@ export default function HandymanPage() {
                       <p className="text-sm text-warm-500 dark:text-warm-400">{household.address}</p>
                     )}
                     {household.monthlyVisitDay && household.conciergeEnabled && (
-                      <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-1">
+                      <p className="text-xs text-haven-700 dark:text-haven-400 mt-1">
                         Monthly visit: Day {household.monthlyVisitDay}
                       </p>
                     )}

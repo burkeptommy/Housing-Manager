@@ -15,16 +15,16 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: `bg-gradient-to-b from-haven-500 to-haven-600 text-white
-            shadow-[0_1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]
-            hover:from-haven-600 hover:to-haven-700 hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.1)]`,
+  primary: `bg-haven-700 text-white
+            shadow-[0_1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)]
+            hover:bg-haven-800 hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.1)]`,
   secondary: `bg-white text-warm-700 border border-warm-200 shadow-sm
               hover:bg-warm-50 hover:border-warm-300 hover:text-warm-900`,
   ghost: `text-warm-600 hover:bg-warm-100 hover:text-warm-900`,
   danger: `bg-gradient-to-b from-red-500 to-red-600 text-white
            shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]
            hover:from-red-600 hover:to-red-700`,
-  outline: `bg-transparent text-haven-600 border border-haven-300
+  outline: `bg-transparent text-haven-700 border border-haven-300
             hover:bg-haven-50 hover:border-haven-400`,
 };
 

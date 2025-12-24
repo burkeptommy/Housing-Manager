@@ -499,7 +499,7 @@ export default function ManagerHubPage() {
             {/* Manager Avatar & Status */}
             <div className="relative">
               <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-haven-100 flex items-center justify-center">
-                <span className="text-2xl sm:text-3xl font-bold text-haven-600">SC</span>
+                <span className="text-2xl sm:text-3xl font-bold text-haven-700">SC</span>
               </div>
               {MANAGER.isOnline && (
                 <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-3 border-white flex items-center justify-center">
@@ -527,7 +527,7 @@ export default function ManagerHubPage() {
 
               {/* Quick Contact Buttons */}
               <div className="flex items-center gap-2 mt-3">
-                <button className="flex items-center gap-2 px-4 py-2 bg-haven-600 text-white text-sm font-medium rounded-xl hover:bg-haven-700 transition-colors">
+                <button className="flex items-center gap-2 px-4 py-2 bg-haven-700 text-white text-sm font-medium rounded-xl hover:bg-haven-800 transition-colors">
                   <MessageCircle className="w-4 h-4" />
                   Message
                 </button>
@@ -560,7 +560,7 @@ export default function ManagerHubPage() {
                 <p className="text-xs text-warm-500">Vendors Coordinated</p>
               </div>
               <div className="text-center px-4 py-2 bg-warm-50 rounded-xl">
-                <p className="text-2xl font-bold text-haven-600">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
+                <p className="text-2xl font-bold text-haven-700">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
                 <p className="text-xs text-warm-500">Money Managed</p>
               </div>
             </div>
@@ -581,7 +581,7 @@ export default function ManagerHubPage() {
               <p className="text-xs text-warm-500">Vendors</p>
             </div>
             <div className="text-center py-2 bg-warm-50 rounded-lg">
-              <p className="text-lg font-bold text-haven-600">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
+              <p className="text-lg font-bold text-haven-700">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
               <p className="text-xs text-warm-500">Managed</p>
             </div>
           </div>
@@ -682,7 +682,7 @@ export default function ManagerHubPage() {
                                     e.stopPropagation();
                                     handleApprove(request.id);
                                   }}
-                                  className="flex items-center gap-1.5 px-4 py-2 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors"
+                                  className="flex items-center gap-1.5 px-4 py-2 bg-haven-700 text-white text-sm font-medium rounded-lg hover:bg-haven-800 transition-colors"
                                 >
                                   <Check className="w-4 h-4" />
                                   Approve
@@ -740,7 +740,7 @@ export default function ManagerHubPage() {
                                       e.stopPropagation();
                                       setSelectedRequest(request);
                                     }}
-                                    className="w-full text-sm text-haven-600 font-medium hover:text-haven-700 py-2"
+                                    className="w-full text-sm text-haven-700 font-medium hover:text-haven-800 py-2"
                                   >
                                     View all {request.options.length} options
                                   </button>
@@ -835,7 +835,7 @@ export default function ManagerHubPage() {
                 </div>
                 <button
                   onClick={() => setShowAllCompleted(!showAllCompleted)}
-                  className="text-sm text-haven-600 font-medium hover:text-haven-700"
+                  className="text-sm text-haven-700 font-medium hover:text-haven-800"
                 >
                   {showAllCompleted ? 'Show Less' : 'View All'}
                 </button>
@@ -934,7 +934,7 @@ export default function ManagerHubPage() {
               </div>
 
               <div className="p-3 border-t border-warm-100">
-                <button className="w-full text-sm text-haven-600 font-medium hover:text-haven-700 py-2">
+                <button className="w-full text-sm text-haven-700 font-medium hover:text-haven-800 py-2">
                   View Full Calendar
                 </button>
               </div>
@@ -946,14 +946,14 @@ export default function ManagerHubPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-haven-100 flex items-center justify-center">
-                      <MessageCircle className="w-5 h-5 text-haven-600" />
+                      <MessageCircle className="w-5 h-5 text-haven-700" />
                     </div>
                     <div>
                       <h2 className="font-semibold text-warm-900">Quick Message</h2>
                       <p className="text-sm text-warm-500">Chat with {MANAGER.firstName}</p>
                     </div>
                   </div>
-                  <button className="text-sm text-haven-600 font-medium hover:text-haven-700">
+                  <button className="text-sm text-haven-700 font-medium hover:text-haven-800">
                     Full Chat
                   </button>
                 </div>
@@ -968,7 +968,7 @@ export default function ManagerHubPage() {
                   >
                     <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${
                       msg.sender === 'homeowner'
-                        ? 'bg-haven-600 text-white rounded-br-md'
+                        ? 'bg-haven-700 text-white rounded-br-md'
                         : 'bg-white text-warm-900 rounded-bl-md shadow-sm'
                     }`}>
                       <p className="text-sm">{msg.content}</p>
@@ -993,7 +993,7 @@ export default function ManagerHubPage() {
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     placeholder={`Message ${MANAGER.firstName}...`}
-                    className="flex-1 px-4 py-2 bg-warm-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-haven-500"
+                    className="flex-1 px-4 py-2 bg-warm-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-haven-600"
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   />
                   <button className="p-2 text-warm-400 hover:text-warm-600 transition-colors">
@@ -1002,7 +1002,7 @@ export default function ManagerHubPage() {
                   <button
                     onClick={handleSendMessage}
                     disabled={!messageInput.trim()}
-                    className="p-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="p-2 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Send className="w-5 h-5" />
                   </button>
@@ -1011,7 +1011,7 @@ export default function ManagerHubPage() {
             </div>
 
             {/* VALUE SUMMARY */}
-            <div className="bg-gradient-to-br from-haven-600 to-haven-700 rounded-2xl p-5 text-white">
+            <div className="bg-gradient-to-br from-haven-700 to-haven-700 rounded-2xl p-5 text-white">
               <div className="flex items-center gap-2 mb-4">
                 <Sparkles className="w-5 h-5" />
                 <h3 className="font-semibold">Your Haven Value</h3>
@@ -1030,7 +1030,7 @@ export default function ManagerHubPage() {
                   <span className="text-haven-200">Tasks handled</span>
                   <span className="font-bold">{MANAGER.stats.tasksCompletedThisMonth}</span>
                 </div>
-                <div className="h-px bg-haven-500 my-2" />
+                <div className="h-px bg-haven-600 my-2" />
                 <div className="flex items-center justify-between">
                   <span className="text-haven-200">Money managed</span>
                   <span className="font-bold text-lg">${MANAGER.stats.moneyManaged.toLocaleString()}</span>
@@ -1171,7 +1171,7 @@ export default function ManagerHubPage() {
                   </button>
                   <button
                     onClick={() => handleApprove(selectedRequest.id)}
-                    className="flex-1 py-3 bg-haven-600 text-white font-medium rounded-xl hover:bg-haven-700 transition-colors"
+                    className="flex-1 py-3 bg-haven-700 text-white font-medium rounded-xl hover:bg-haven-800 transition-colors"
                   >
                     Approve
                   </button>

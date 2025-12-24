@@ -75,7 +75,7 @@ export function MobileSidebar() {
       {/* Mobile menu button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="lg:hidden p-2 -ml-2 text-slate-600 hover:text-emerald-700 hover:bg-slate-100 rounded-lg transition-colors"
+        className="lg:hidden p-2 -ml-2 text-slate-600 hover:text-haven-700 hover:bg-slate-100 rounded-lg transition-colors"
         aria-label="Open menu"
       >
         <Menu className="w-6 h-6" />
@@ -98,10 +98,10 @@ export function MobileSidebar() {
         {/* Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-200 dark:border-slate-700">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-emerald-950 flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-haven-700 flex items-center justify-center">
               <Home className="w-5 h-5 text-white" />
             </div>
-            <span className="text-lg font-semibold text-emerald-950 dark:text-white">Haven</span>
+            <span className="text-lg font-semibold text-haven-700 dark:text-white">Haven</span>
           </div>
           <button
             onClick={() => setIsOpen(false)}
@@ -123,7 +123,7 @@ export function MobileSidebar() {
                 onClick={() => setIsOpen(false)}
                 className={`flex items-center gap-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
                   isActive
-                    ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-400'
+                    ? 'bg-haven-50 text-haven-700 dark:bg-haven-900/20 dark:text-haven-400'
                     : 'text-slate-600 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700/50'
                 }`}
               >

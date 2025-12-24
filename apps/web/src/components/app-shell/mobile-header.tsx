@@ -69,7 +69,7 @@ export function MobileHeader() {
                   >
                     <span className="truncate">{household.name}</span>
                     {currentHousehold?.id === household.id && (
-                      <div className="w-2 h-2 rounded-full bg-haven-600" />
+                      <div className="w-2 h-2 rounded-full bg-haven-700" />
                     )}
                   </button>
                 ))
@@ -97,7 +97,7 @@ export function MobileHeader() {
           <div ref={userMenuRef} className="relative">
             <button
               onClick={() => setUserMenuOpen(!userMenuOpen)}
-              className="w-8 h-8 rounded-full bg-haven-600 flex items-center justify-center text-white text-sm font-medium hover:bg-haven-700 transition-colors"
+              className="w-8 h-8 rounded-full bg-haven-700 flex items-center justify-center text-white text-sm font-medium hover:bg-haven-800 transition-colors"
             >
               {initials}
             </button>

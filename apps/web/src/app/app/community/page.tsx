@@ -799,7 +799,7 @@ export default function VendorDiscoveryPage() {
               placeholder="Search by name or specialty..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-xl focus:ring-2 focus:ring-haven-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
             />
           </div>
 
@@ -811,7 +811,7 @@ export default function VendorDiscoveryPage() {
                 onClick={() => setSelectedTrade(trade.id)}
                 className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
                   selectedTrade === trade.id
-                    ? 'bg-haven-600 text-white'
+                    ? 'bg-haven-700 text-white'
                     : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
                 }`}
               >
@@ -860,7 +860,7 @@ export default function VendorDiscoveryPage() {
                     <div className={`
                       w-10 h-10 rounded-full flex items-center justify-center cursor-pointer
                       transition-transform hover:scale-110
-                      ${vendor.havenTrusted ? 'bg-haven-600' : 'bg-warm-600'}
+                      ${vendor.havenTrusted ? 'bg-haven-700' : 'bg-warm-600'}
                       ${selectedVendor?.id === vendor.id ? 'ring-4 ring-haven-300 scale-110' : ''}
                     `}>
                       {vendor.havenTrusted && (
@@ -899,7 +899,7 @@ export default function VendorDiscoveryPage() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortOption)}
-                    className="text-sm border-none bg-transparent text-haven-600 font-medium focus:ring-0"
+                    className="text-sm border-none bg-transparent text-haven-700 font-medium focus:ring-0"
                   >
                     <option value="neighbors">Most Used by Neighbors</option>
                     <option value="rating">Highest Rated</option>
@@ -930,7 +930,7 @@ export default function VendorDiscoveryPage() {
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm border border-warm-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-haven-500"
+                className="text-sm border border-warm-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-haven-600"
               >
                 <option value="neighbors">Most Used by Neighbors</option>
                 <option value="rating">Highest Rated</option>
@@ -999,7 +999,7 @@ function VendorPopup({ vendor }: { vendor: Vendor }) {
 
         {/* Buttons */}
         <div className="px-4 pb-4 flex gap-2">
-          <button className="flex-1 py-2.5 bg-haven-600 text-white text-sm font-medium rounded-lg hover:bg-haven-700 transition-colors">
+          <button className="flex-1 py-2.5 bg-haven-700 text-white text-sm font-medium rounded-lg hover:bg-haven-800 transition-colors">
             Request Quote
           </button>
           <a
@@ -1036,7 +1036,7 @@ function VendorListItem({
           <div className="flex items-center gap-2">
             <h3 className="font-medium text-warm-900 text-sm truncate">{vendor.name}</h3>
             {vendor.havenTrusted && (
-              <Shield className="w-3.5 h-3.5 text-haven-600 flex-shrink-0" />
+              <Shield className="w-3.5 h-3.5 text-haven-700 flex-shrink-0" />
             )}
           </div>
           <div className="flex items-center gap-1.5 text-xs text-warm-500">
@@ -1047,7 +1047,7 @@ function VendorListItem({
             <span className="text-warm-300">•</span>
             <span>{vendor.distance} mi</span>
           </div>
-          <div className="mt-0.5 flex items-center gap-1 text-xs text-haven-600">
+          <div className="mt-0.5 flex items-center gap-1 text-xs text-haven-700">
             <Users className="w-3 h-3 flex-shrink-0" />
             <span className="truncate">{vendor.neighborsUsed} neighbors</span>
           </div>
@@ -1068,7 +1068,7 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
           className="w-full h-full object-cover"
         />
         {vendor.havenTrusted && (
-          <div className="absolute top-2 left-2 px-2 py-1 bg-haven-600 text-white text-xs font-medium rounded-full flex items-center gap-1">
+          <div className="absolute top-2 left-2 px-2 py-1 bg-haven-700 text-white text-xs font-medium rounded-full flex items-center gap-1">
             <Shield className="w-3 h-3 flex-shrink-0" />
             <span className="hidden sm:inline">Haven Trusted</span>
             <span className="sm:hidden">Trusted</span>
@@ -1125,7 +1125,7 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
 
         {/* Actions */}
         <div className="mt-3 flex gap-2">
-          <button className="flex-1 py-2 bg-haven-600 text-white text-xs font-medium rounded-lg hover:bg-haven-700">
+          <button className="flex-1 py-2 bg-haven-700 text-white text-xs font-medium rounded-lg hover:bg-haven-800">
             Request Quote
           </button>
           <button className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50 flex-shrink-0">

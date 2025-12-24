@@ -272,7 +272,7 @@ const projectConversations: ProjectConversation[] = [
 ];
 
 const categoryConfig = {
-  team: { label: 'Your Team', icon: Shield, color: 'text-haven-600' },
+  team: { label: 'Your Team', icon: Shield, color: 'text-haven-700' },
   vendors: { label: 'Vendors', icon: Wrench, color: 'text-amber-600' },
   community: { label: 'Community', icon: Users, color: 'text-blue-600' },
   schools: { label: 'Schools', icon: GraduationCap, color: 'text-purple-600' },
@@ -334,7 +334,7 @@ export default function MessagesPage() {
             <h1 className="text-2xl font-bold text-warm-900">Messages</h1>
             <button
               onClick={() => setShowNewMessageModal(true)}
-              className="p-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors"
+              className="p-2 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors"
             >
               <Plus className="w-5 h-5" />
             </button>
@@ -348,7 +348,7 @@ export default function MessagesPage() {
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-500 focus:border-transparent bg-warm-50"
+              className="w-full pl-10 pr-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent bg-warm-50"
             />
           </div>
 
@@ -395,7 +395,7 @@ export default function MessagesPage() {
                 onClick={() => setSelectedCategory('all')}
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                   selectedCategory === 'all'
-                    ? 'bg-haven-600 text-white'
+                    ? 'bg-haven-700 text-white'
                     : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
                 }`}
               >
@@ -409,7 +409,7 @@ export default function MessagesPage() {
                     onClick={() => setSelectedCategory(key as CategoryType)}
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                       selectedCategory === key
-                        ? 'bg-haven-600 text-white'
+                        ? 'bg-haven-700 text-white'
                         : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
                     }`}
                   >
@@ -424,7 +424,7 @@ export default function MessagesPage() {
             {pinnedContacts.length > 0 && selectedCategory === 'all' && (
               <div className="px-4 mb-2">
                 <div className="flex items-center gap-2 py-2">
-                  <Pin className="w-4 h-4 text-haven-600" />
+                  <Pin className="w-4 h-4 text-haven-700" />
                   <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">
                     Pinned
                   </span>
@@ -473,7 +473,7 @@ export default function MessagesPage() {
                   onClick={() => setProjectFilter(filter as typeof projectFilter)}
                   className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                     projectFilter === filter
-                      ? 'bg-haven-600 text-white'
+                      ? 'bg-haven-700 text-white'
                       : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
                   }`}
                 >
@@ -531,7 +531,7 @@ export default function MessagesPage() {
                       <input
                         type="text"
                         placeholder="Search contacts..."
-                        className="w-full pl-9 pr-4 py-2 border border-warm-200 rounded-lg text-sm focus:ring-2 focus:ring-haven-500 focus:border-transparent"
+                        className="w-full pl-9 pr-4 py-2 border border-warm-200 rounded-lg text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -625,10 +625,10 @@ export default function MessagesPage() {
                       <input
                         type="text"
                         placeholder="Type a message..."
-                        className="flex-1 px-4 py-2 border border-warm-200 rounded-xl text-sm focus:ring-2 focus:ring-haven-500 focus:border-transparent"
+                        className="flex-1 px-4 py-2 border border-warm-200 rounded-xl text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
                         autoFocus
                       />
-                      <button className="px-4 py-2 bg-haven-600 text-white rounded-xl hover:bg-haven-700 transition-colors">
+                      <button className="px-4 py-2 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
@@ -661,7 +661,7 @@ function ContactRow({ contact }: { contact: Contact }) {
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
         )}
         {contact.isHavenTeam && (
-          <div className="absolute -top-1 -right-1 w-5 h-5 bg-haven-600 rounded-full flex items-center justify-center">
+          <div className="absolute -top-1 -right-1 w-5 h-5 bg-haven-700 rounded-full flex items-center justify-center">
             <Shield className="w-3 h-3 text-white" />
           </div>
         )}
@@ -672,7 +672,7 @@ function ContactRow({ contact }: { contact: Contact }) {
         <div className="flex items-center gap-2">
           <h3 className="font-medium text-warm-900 truncate">{contact.name}</h3>
           {contact.isPinned && (
-            <Pin className="w-3 h-3 text-haven-500 flex-shrink-0" />
+            <Pin className="w-3 h-3 text-haven-700 flex-shrink-0" />
           )}
         </div>
         <p className="text-xs text-warm-500 truncate">{contact.role}</p>
@@ -683,7 +683,7 @@ function ContactRow({ contact }: { contact: Contact }) {
       <div className="flex flex-col items-end gap-1">
         <span className="text-xs text-warm-400">{contact.lastMessageTime}</span>
         {contact.unreadCount > 0 && (
-          <span className="px-2 py-0.5 bg-haven-600 text-white text-xs font-medium rounded-full">
+          <span className="px-2 py-0.5 bg-haven-700 text-white text-xs font-medium rounded-full">
             {contact.unreadCount}
           </span>
         )}
@@ -721,7 +721,7 @@ function ProjectRow({ project }: { project: ProjectConversation }) {
           </div>
         </div>
         {project.unreadCount > 0 && (
-          <span className="px-2 py-0.5 bg-haven-600 text-white text-xs font-medium rounded-full">
+          <span className="px-2 py-0.5 bg-haven-700 text-white text-xs font-medium rounded-full">
             {project.unreadCount}
           </span>
         )}

@@ -128,7 +128,7 @@ export function ConfirmDialog({
             className={`flex-1 px-4 py-2.5 text-sm font-medium text-white rounded-xl transition-colors
                        ${variant === 'danger'
                          ? 'bg-red-500 hover:bg-red-600'
-                         : 'bg-haven-500 hover:bg-haven-600'}`}
+                         : 'bg-haven-700 hover:bg-haven-800'}`}
           >
             {confirmLabel}
           </button>

@@ -107,7 +107,7 @@ export function TabUnderline({
     <button
       onClick={() => setActiveTab(id)}
       className={`relative pb-3 text-sm font-medium transition-colors
-                  ${isActive ? 'text-haven-600' : 'text-warm-500 hover:text-warm-700'}`}
+                  ${isActive ? 'text-haven-700' : 'text-warm-500 hover:text-warm-700'}`}
     >
       <span className="flex items-center gap-2">
         {children}
@@ -121,7 +121,7 @@ export function TabUnderline({
         )}
       </span>
       {isActive && (
-        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-haven-500 rounded-full" />
+        <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-haven-700 rounded-full" />
       )}
     </button>
   );
