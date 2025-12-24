@@ -91,6 +91,10 @@ import {
   Heart,
 } from 'lucide-react';
 import { VendorAvatar } from '@/components/ui/avatar';
+import { getHealthColors } from '@/lib/utils/healthColors';
+
+// Shared home health score - same value as Dashboard for consistency
+const HOME_HEALTH_SCORE = 94;
 
 // ============================================================================
 // TYPES
@@ -2079,16 +2083,9 @@ export default function YourHomePage() {
   // ============================================================================
   // RENDER OTHER TABS
   // ============================================================================
-  // Calculate home health score (0-100 based on maintenance status)
-  const homeHealthScore = useMemo(() => {
-    const total = maintenanceStats.overdue + maintenanceStats.dueSoon + maintenanceStats.upcoming + maintenanceStats.onTrack;
-    if (total === 0) return 100;
-    const overdueWeight = maintenanceStats.overdue * 0;
-    const dueSoonWeight = maintenanceStats.dueSoon * 50;
-    const upcomingWeight = maintenanceStats.upcoming * 80;
-    const onTrackWeight = maintenanceStats.onTrack * 100;
-    return Math.round((overdueWeight + dueSoonWeight + upcomingWeight + onTrackWeight) / total);
-  }, [maintenanceStats]);
+  // Use shared home health score for consistency with Dashboard
+  const homeHealthScore = HOME_HEALTH_SCORE;
+  const healthColors = getHealthColors(homeHealthScore);
 
   // Mock upcoming maintenance data
   const upcomingMaintenance = useMemo(() => {
@@ -2117,7 +2114,7 @@ export default function YourHomePage() {
       {/* Left Column - Home Health + Quick Stats */}
       <div className="space-y-6">
         {/* Home Health Score Card */}
-        <div className="bg-white rounded-2xl border border-warm-200 p-6 shadow-soft">
+        <div className={`rounded-2xl p-6 shadow-soft border ${healthColors.bg} ${healthColors.border}`}>
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-semibold text-warm-900">Home Health</h2>
             <button onClick={() => setActiveTab('maintenance')} className="text-sm text-haven-700 hover:text-haven-800">View Details</button>
@@ -2139,7 +2136,7 @@ export default function YourHomePage() {
                   cx="64"
                   cy="64"
                   r="56"
-                  stroke={homeHealthScore >= 70 ? '#22C55E' : homeHealthScore >= 40 ? '#F59E0B' : '#EF4444'}
+                  stroke={healthColors.progressHex}
                   strokeWidth="12"
                   fill="none"
                   strokeLinecap="round"
@@ -2147,10 +2144,17 @@ export default function YourHomePage() {
                 />
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <span className="text-4xl font-bold text-warm-900">{homeHealthScore}</span>
+                <span className={`text-4xl font-bold ${healthColors.text}`}>{homeHealthScore}</span>
                 <span className="text-sm text-warm-500">/ 100</span>
               </div>
             </div>
+          </div>
+
+          {/* Status Badge */}
+          <div className="text-center mb-4">
+            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${healthColors.badge}`}>
+              {healthColors.label}
+            </span>
           </div>
 
           {/* Health Breakdown */}

@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { images, getAvatarUrl } from '@/lib/images';
 import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui';
 import { Avatar, ManagerAvatar } from '@/components/ui/avatar';
+import { getHealthColors } from '@/lib/utils/healthColors';
 import {
   Sun,
   Cloud,
@@ -210,6 +211,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
   const { greeting, note } = useMemo(() => getGreeting(), []);
   const WeatherIcon = WEATHER_ICONS[weather.condition];
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+  const healthColors = getHealthColors(mockHouseHealth.score);
 
   return (
     <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-8 text-white mb-8">
@@ -236,17 +238,25 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
 
         {/* Quick Stats */}
         <div className="flex gap-6 mt-8">
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
-            <p className="text-haven-100 text-xs font-medium">Home Health</p>
-            <p className="text-2xl font-bold">{mockHouseHealth.score}%</p>
+          {/* Home Health - Semantic Colors */}
+          <div className={`${healthColors.bg} ${healthColors.border} border rounded-xl px-4 py-3`}>
+            <p className="text-warm-500 text-xs font-medium">Home Health</p>
+            <div className="flex items-center gap-2">
+              <p className={`text-2xl font-bold ${healthColors.text}`}>{mockHouseHealth.score}%</p>
+              <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${healthColors.badge}`}>
+                {healthColors.label}
+              </span>
+            </div>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
-            <p className="text-haven-100 text-xs font-medium">Items Handled</p>
-            <p className="text-2xl font-bold">{mockHouseHealth.itemsHandled}</p>
+          {/* Items Handled - Champagne */}
+          <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
+            <p className="text-champagne-600 text-xs font-medium">Items Handled</p>
+            <p className="text-2xl font-bold text-haven-700">{mockHouseHealth.itemsHandled}</p>
           </div>
-          <div className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3">
-            <p className="text-haven-100 text-xs font-medium">Next Service</p>
-            <p className="text-lg font-semibold">Jan 7</p>
+          {/* Next Service - Champagne */}
+          <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
+            <p className="text-champagne-600 text-xs font-medium">Next Service</p>
+            <p className="text-lg font-semibold text-haven-700">Jan 7</p>
           </div>
         </div>
       </div>
@@ -517,25 +527,27 @@ function HouseHealthCard({
 }: {
   health: typeof mockHouseHealth;
 }) {
+  const healthColors = getHealthColors(health.score);
+
   return (
     <Card>
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-2 bg-haven-100 rounded-lg">
-            <Heart className="w-5 h-5 text-haven-700" />
+          <div className={`p-2 rounded-lg ${healthColors.bg}`}>
+            <Heart className={`w-5 h-5 ${healthColors.icon}`} />
           </div>
           <h3 className="font-bold text-warm-900">House Health</h3>
         </div>
         <div className="text-right">
-          <span className="text-2xl font-bold text-haven-700">{health.score}%</span>
-          <p className="text-xs text-warm-500">Healthy</p>
+          <span className={`text-2xl font-bold ${healthColors.text}`}>{health.score}%</span>
+          <p className={`text-xs font-medium ${healthColors.badge} px-2 py-0.5 rounded mt-0.5`}>{healthColors.label}</p>
         </div>
       </div>
 
       {/* Progress Bar */}
       <div className="h-2 bg-warm-100 rounded-full mb-4 overflow-hidden">
         <div
-          className="h-full bg-gradient-to-r from-haven-700 to-haven-800 rounded-full transition-all duration-500"
+          className={`h-full ${healthColors.progress} rounded-full transition-all duration-500`}
           style={{ width: `${health.score}%` }}
         />
       </div>
