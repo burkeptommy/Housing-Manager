@@ -131,7 +131,7 @@ export default function MarketingPage() {
               <div className="mt-8 pt-8 border-t border-white/20 flex flex-wrap items-center justify-center lg:justify-start gap-6">
                 <div className="flex items-center gap-2 text-sm text-white/70">
                   <Shield className="w-4 h-4" />
-                  <span>FDIC Insured</span>
+                  <span>Bank-Level Security</span>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-white/70">
                   <BadgeCheck className="w-4 h-4" />
@@ -338,7 +338,7 @@ export default function MarketingPage() {
               {
                 step: '2',
                 title: 'Fund Your Haven Wallet',
-                description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
+                description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor on your behalf.',
                 icon: CreditCard,
                 color: 'bg-champagne-200 text-champagne-600',
               },
@@ -1132,8 +1132,8 @@ export default function MarketingPage() {
                 a: "You fund your Haven Wallet once monthly. We pay every bill on your behalf: mortgage, utilities, landscaper, pool guy, everyone. You see it all in your dashboard, but you never have to think about due dates or writing checks again.",
               },
               {
-                q: 'Is my money safe?',
-                a: "Yes. Your Haven Wallet is FDIC-insured up to $2 million through our banking partner. We're also SOC 2 certified, meaning your data and transactions meet the highest security standards.",
+                q: 'Is my payment information secure?',
+                a: "Absolutely. We use bank-level encryption and partner with trusted payment processors. We're SOC 2 certified, meaning your data and transactions meet the highest security standards.",
               },
             ].map((faq, idx) => (
               <div
@@ -1222,7 +1222,7 @@ export default function MarketingPage() {
               <div className="mt-4 flex items-center gap-4">
                 <div className="flex items-center gap-1 text-xs text-warm-400">
                   <Shield className="w-4 h-4" />
-                  FDIC-Insured
+                  Secure Payments
                 </div>
                 <div className="flex items-center gap-1 text-xs text-warm-400">
                   <BadgeCheck className="w-4 h-4" />
