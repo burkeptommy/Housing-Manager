@@ -2413,7 +2413,7 @@ export default function YourHomePage() {
             </div>
           </div>
           <div className="px-4 sm:px-6">
-            <div className="flex gap-1 overflow-x-auto pb-px -mb-px">
+            <div className="flex gap-1 overflow-x-auto overscroll-x-contain touch-pan-x pb-px -mb-px scrollbar-hide">
               {TABS.map(tab => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;

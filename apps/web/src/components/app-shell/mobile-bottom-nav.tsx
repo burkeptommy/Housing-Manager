@@ -98,7 +98,7 @@ export function MobileBottomNav() {
         </div>
 
         {/* Drawer Navigation */}
-        <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto max-h-[calc(100vh-8rem)]">
+        <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto overscroll-contain max-h-[calc(100vh-10rem)] touch-pan-y">
           {sidebarNavigation.map((section) => (
             <div key={section.title}>
               <h3 className="px-3 mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">

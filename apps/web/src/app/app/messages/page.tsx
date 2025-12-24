@@ -289,6 +289,9 @@ export default function MessagesPage() {
   const [projectFilter, setProjectFilter] = useState<'all' | 'active' | 'pending' | 'resolved'>('all');
   const [showNewMessageModal, setShowNewMessageModal] = useState(false);
   const [newMessageRecipient, setNewMessageRecipient] = useState<Contact | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<Contact | null>(null);
+  const [selectedProject, setSelectedProject] = useState<ProjectConversation | null>(null);
+  const [messageInput, setMessageInput] = useState('');
 
   // Filter contacts
   const filteredContacts = contacts.filter(contact => {
@@ -324,6 +327,160 @@ export default function MessagesPage() {
     }
     return true;
   });
+
+  // Mock conversation history for demo
+  const getConversationHistory = (contactId: string) => {
+    const histories: Record<string, { sender: 'user' | 'other'; text: string; time: string }[]> = {
+      'sarah-chen': [
+        { sender: 'other', text: "Good morning! Just wanted to let you know I've scheduled the landscaper for Thursday at 9am.", time: '9:15 AM' },
+        { sender: 'user', text: 'Perfect, thank you Sarah!', time: '9:20 AM' },
+        { sender: 'other', text: "You're welcome! Also, I got quotes back for the roof repair. Ace Roofing came in at $1,200 which is the best value.", time: '9:45 AM' },
+        { sender: 'other', text: 'They did great work on the Johnsons\' house last month. I can approve if you give me the go-ahead.', time: '9:46 AM' },
+        { sender: 'user', text: 'That sounds good. Please go ahead and approve it.', time: '10:02 AM' },
+        { sender: 'other', text: 'Done! They can start next Tuesday. I\'ll be there to supervise.', time: '10:05 AM' },
+        { sender: 'other', text: 'The landscaper confirmed for Thursday at 9am', time: '2m ago' },
+      ],
+      'marcus-johnson': [
+        { sender: 'other', text: 'Hey! I\'m heading over now to look at that cabinet hinge you mentioned.', time: 'Yesterday 2:30 PM' },
+        { sender: 'user', text: 'Great, the front door code is 1234', time: 'Yesterday 2:32 PM' },
+        { sender: 'other', text: 'Got it, thanks!', time: 'Yesterday 2:33 PM' },
+        { sender: 'other', text: 'Fixed the cabinet hinge, all set! Also tightened up a few other hinges while I was at it.', time: 'Yesterday 3:15 PM' },
+        { sender: 'user', text: 'You\'re the best, Marcus! Thank you!', time: 'Yesterday 3:20 PM' },
+        { sender: 'other', text: 'Fixed the cabinet hinge, all set!', time: '1h ago' },
+      ],
+      'haven-concierge': [
+        { sender: 'other', text: 'Hello! I\'m your Haven Concierge. I can help you with questions about your home, schedule services, or connect you with your home manager.', time: 'Now' },
+        { sender: 'other', text: 'How can I help you today?', time: 'Now' },
+      ],
+      'mikes-plumbing': [
+        { sender: 'other', text: 'Hi there! Sarah mentioned you need a quote for the bathroom repair.', time: 'Yesterday 10:00 AM' },
+        { sender: 'user', text: 'Yes, the faucet in the master bath is leaking.', time: 'Yesterday 10:15 AM' },
+        { sender: 'other', text: 'I can come take a look tomorrow. Based on what you\'ve described, it\'s likely just a cartridge replacement - around $150-200.', time: 'Yesterday 10:20 AM' },
+        { sender: 'other', text: 'Quote sent for the bathroom repair', time: 'Yesterday' },
+      ],
+    };
+    return histories[contactId] || [
+      { sender: 'other', text: 'Hello! How can I help you today?', time: 'Just now' },
+    ];
+  };
+
+  // Show conversation detail view
+  if (selectedConversation) {
+    const messages = getConversationHistory(selectedConversation.id);
+    return (
+      <div className="min-h-screen bg-warm-50 flex flex-col">
+        {/* Conversation Header */}
+        <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setSelectedConversation(null)}
+              className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-warm-600" />
+            </button>
+            <div className="flex-1 flex items-center gap-3">
+              {selectedConversation.id === 'sarah-chen' && <ManagerAvatar size="md" />}
+              {selectedConversation.id === 'marcus-johnson' && <HandymanAvatar size="md" />}
+              {selectedConversation.id === 'haven-concierge' && <ConciergeAvatar size="md" />}
+              {!['sarah-chen', 'marcus-johnson', 'haven-concierge'].includes(selectedConversation.id) && (
+                <VendorAvatar name={selectedConversation.name} size="md" />
+              )}
+              <div>
+                <h2 className="font-semibold text-warm-900">{selectedConversation.name}</h2>
+                <p className="text-xs text-warm-500">{selectedConversation.role}</p>
+              </div>
+            </div>
+            <button className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
+              <Phone className="w-5 h-5 text-warm-600" />
+            </button>
+          </div>
+        </div>
+
+        {/* Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-4xl mx-auto w-full">
+          {messages.map((msg, idx) => (
+            <div key={idx} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+              <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                msg.sender === 'user'
+                  ? 'bg-haven-700 text-white'
+                  : 'bg-white border border-warm-200 text-warm-900'
+              }`}>
+                <p className="text-sm">{msg.text}</p>
+                <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-haven-200' : 'text-warm-400'}`}>
+                  {msg.time}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Message Input */}
+        <div className="bg-white border-t border-warm-200 p-4 safe-area-pb">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <input
+              type="text"
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+            />
+            <button className="p-3 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show project detail view
+  if (selectedProject) {
+    return (
+      <div className="min-h-screen bg-warm-50 flex flex-col">
+        {/* Project Header */}
+        <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+          <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
+            <button
+              onClick={() => setSelectedProject(null)}
+              className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-5 h-5 text-warm-600" />
+            </button>
+            <div className="flex-1">
+              <h2 className="font-semibold text-warm-900">{selectedProject.title}</h2>
+              <p className="text-xs text-warm-500">{selectedProject.category} • {selectedProject.vendor}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Project Messages */}
+        <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-4xl mx-auto w-full">
+          <div className="flex justify-start">
+            <div className="max-w-[80%] rounded-2xl px-4 py-2.5 bg-white border border-warm-200 text-warm-900">
+              <p className="text-sm">{selectedProject.lastMessage}</p>
+              <p className="text-xs mt-1 text-warm-400">{selectedProject.lastMessageTime}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Message Input */}
+        <div className="bg-white border-t border-warm-200 p-4 safe-area-pb">
+          <div className="max-w-4xl mx-auto flex items-center gap-3">
+            <input
+              type="text"
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              placeholder="Type a message..."
+              className="flex-1 px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+            />
+            <button className="p-3 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-warm-50">
@@ -431,7 +588,7 @@ export default function MessagesPage() {
                 </div>
                 <div className="space-y-1">
                   {pinnedContacts.map(contact => (
-                    <ContactRow key={contact.id} contact={contact} />
+                    <ContactRow key={contact.id} contact={contact} onClick={() => setSelectedConversation(contact)} />
                   ))}
                 </div>
               </div>
@@ -455,7 +612,7 @@ export default function MessagesPage() {
                   </div>
                   <div className="space-y-1">
                     {categoryContacts.map(contact => (
-                      <ContactRow key={contact.id} contact={contact} />
+                      <ContactRow key={contact.id} contact={contact} onClick={() => setSelectedConversation(contact)} />
                     ))}
                   </div>
                 </div>
@@ -485,7 +642,7 @@ export default function MessagesPage() {
             {/* Project List */}
             <div className="px-4 space-y-3">
               {filteredProjects.map(project => (
-                <ProjectRow key={project.id} project={project} />
+                <ProjectRow key={project.id} project={project} onClick={() => setSelectedProject(project)} />
               ))}
 
               {filteredProjects.length === 0 && (
@@ -652,7 +809,7 @@ export default function MessagesPage() {
 // SUB-COMPONENTS
 // ============================================================================
 
-function ContactRow({ contact }: { contact: Contact }) {
+function ContactRow({ contact, onClick }: { contact: Contact; onClick?: () => void }) {
   // Determine the proper avatar for each contact type
   const renderAvatar = () => {
     if (contact.id === 'sarah-chen') {
@@ -675,7 +832,7 @@ function ContactRow({ contact }: { contact: Contact }) {
   };
 
   return (
-    <div className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-warm-50 cursor-pointer transition-colors">
+    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-warm-50 cursor-pointer transition-colors active:bg-warm-100">
       {/* Avatar with online indicator */}
       <div className="relative">
         {renderAvatar()}
@@ -709,7 +866,7 @@ function ContactRow({ contact }: { contact: Contact }) {
   );
 }
 
-function ProjectRow({ project }: { project: ProjectConversation }) {
+function ProjectRow({ project, onClick }: { project: ProjectConversation; onClick?: () => void }) {
   const statusColors = {
     active: 'bg-green-100 text-green-700',
     pending: 'bg-amber-100 text-amber-700',
@@ -717,7 +874,7 @@ function ProjectRow({ project }: { project: ProjectConversation }) {
   };
 
   return (
-    <div className="bg-white rounded-xl p-4 hover:shadow-md cursor-pointer transition-all border border-warm-100">
+    <div onClick={onClick} className="bg-white rounded-xl p-4 hover:shadow-md cursor-pointer transition-all border border-warm-100 active:bg-warm-50">
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="flex items-center gap-2">

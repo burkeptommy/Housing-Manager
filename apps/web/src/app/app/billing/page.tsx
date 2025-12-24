@@ -753,6 +753,7 @@ export default function BillingPage() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
+  const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
   const [trustThreshold, setTrustThreshold] = useState(200);
   const [tempThreshold, setTempThreshold] = useState(200);
 
@@ -1191,7 +1192,7 @@ export default function BillingPage() {
                 </div>
               </div>
               <button
-                onClick={() => showToast('Opening guide...', 'info')}
+                onClick={() => setShowHowItWorksModal(true)}
                 className="w-full px-4 py-2 bg-white text-emerald-700 rounded-lg text-sm font-medium hover:bg-emerald-50 transition-colors"
               >
                 Learn How It Works
@@ -1357,6 +1358,87 @@ export default function BillingPage() {
                 className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
               >
                 Save Threshold
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* How It Works Modal */}
+      {showHowItWorksModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden shadow-xl">
+            <div className="flex items-center justify-between p-5 border-b border-warm-200 bg-gradient-to-r from-emerald-600 to-emerald-700">
+              <h2 className="text-lg font-bold text-white">How Haven Billing Works</h2>
+              <button
+                onClick={() => setShowHowItWorksModal(false)}
+                className="p-1.5 hover:bg-white/20 rounded-lg transition-colors"
+              >
+                <X className="w-5 h-5 text-white" />
+              </button>
+            </div>
+            <div className="p-5 space-y-5 overflow-y-auto">
+              {/* Step 1 */}
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-emerald-700">1</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-warm-900 mb-1">We Pay Your Bills</h4>
+                  <p className="text-sm text-warm-600">Haven pays all your household bills on your behalf - mortgage, utilities, insurance, services, kids activities, everything.</p>
+                </div>
+              </div>
+
+              {/* Step 2 */}
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-emerald-700">2</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-warm-900 mb-1">One Monthly Statement</h4>
+                  <p className="text-sm text-warm-600">At the end of each month, you receive a single itemized statement showing everything we paid.</p>
+                </div>
+              </div>
+
+              {/* Step 3 */}
+              <div className="flex gap-4">
+                <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-sm font-bold text-emerald-700">3</span>
+                </div>
+                <div>
+                  <h4 className="font-semibold text-warm-900 mb-1">You Pay Haven</h4>
+                  <p className="text-sm text-warm-600">Make one payment to Haven that covers all your household expenses. No more juggling 15+ different bills.</p>
+                </div>
+              </div>
+
+              {/* Benefits */}
+              <div className="bg-warm-50 rounded-xl p-4 mt-4">
+                <h4 className="font-semibold text-warm-900 mb-3">Why This Works</h4>
+                <ul className="space-y-2">
+                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span>Never miss a payment or late fee again</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span>See all household spending in one place</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span>Set approval thresholds for larger expenses</span>
+                  </li>
+                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
+                    <span>Bank-level security for all transactions</span>
+                  </li>
+                </ul>
+              </div>
+
+              <button
+                onClick={() => setShowHowItWorksModal(false)}
+                className="w-full py-3 bg-emerald-600 text-white rounded-xl font-semibold hover:bg-emerald-700 transition-colors"
+              >
+                Got It
               </button>
             </div>
           </div>
