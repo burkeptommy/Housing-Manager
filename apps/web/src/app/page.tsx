@@ -1149,7 +1149,7 @@ export default function MarketingPage() {
                   )}
                 </button>
                 {openFaq === idx && (
-                  <div className="px-6 pb-4 text-warm-600 bg-warm-50">
+                  <div className="px-6 pb-4 text-warm-600">
                     {faq.a}
                   </div>
                 )}
