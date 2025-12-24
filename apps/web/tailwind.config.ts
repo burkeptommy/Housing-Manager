@@ -63,6 +63,15 @@ const config: Config = {
           900: '#1e3d1e',
           950: '#0f230f',
         },
+        champagne: {
+          50: '#FAF8F5',
+          100: '#F5F0E8',
+          200: '#E8E0D0',
+          300: '#D4C5A9',
+          400: '#C4B393',
+          500: '#A89968',
+          600: '#8C7D4E',
+        },
       },
       fontFamily: {
         serif: ['Playfair Display', 'Georgia', 'serif'],

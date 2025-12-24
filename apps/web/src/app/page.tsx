@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Navbar } from '@/components/marketing/Navbar';
 import {
   ArrowRight,
   Check,
@@ -52,15 +53,17 @@ export default function MarketingPage() {
 
   return (
     <div className="min-h-screen bg-white">
+      <Navbar />
+
       {/* ================================================================== */}
       {/* HERO SECTION */}
       {/* ================================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 pt-8 pb-16 sm:pt-12 sm:pb-24">
+      <section className="relative overflow-hidden bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 pt-24 sm:pt-32 pb-16 sm:pb-24">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-500 rounded-full blur-3xl opacity-30" />
-          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-haven-400 rounded-full blur-3xl opacity-20" />
-          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-haven-300 rounded-full blur-3xl opacity-20" />
+          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-champagne-300/30 rounded-full blur-3xl opacity-40" />
+          <div className="absolute bottom-0 right-1/4 w-64 h-64 bg-haven-400 rounded-full blur-3xl opacity-20" />
         </div>
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
@@ -70,7 +73,7 @@ export default function MarketingPage() {
               {/* Trust badge */}
               <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur border border-white/20 rounded-full mb-6">
                 <span className="flex items-center gap-1">
-                  <Star className="w-4 h-4 text-amber-400 fill-current" />
+                  <Star className="w-4 h-4 text-champagne-300 fill-current" />
                   <span className="text-sm font-medium text-white">4.9/5</span>
                 </span>
                 <span className="text-white/40">|</span>
@@ -81,7 +84,7 @@ export default function MarketingPage() {
               <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1]">
                 Stop managing your home.
                 <br />
-                <span className="text-haven-200">Start living in it.</span>
+                <span className="text-champagne-300">Start living in it.</span>
               </h1>
 
               {/* Subheadline */}
@@ -93,15 +96,15 @@ export default function MarketingPage() {
               {/* Value props */}
               <div className="mt-6 flex flex-wrap justify-center lg:justify-start gap-4 text-sm">
                 <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-haven-300" />
+                  <CheckCircle2 className="w-5 h-5 text-champagne-300" />
                   8+ hours saved monthly
                 </span>
                 <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-haven-300" />
+                  <CheckCircle2 className="w-5 h-5 text-champagne-300" />
                   No setup fees
                 </span>
                 <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-haven-300" />
+                  <CheckCircle2 className="w-5 h-5 text-champagne-300" />
                   Cancel anytime
                 </span>
               </div>
@@ -110,7 +113,7 @@ export default function MarketingPage() {
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                 <Link
                   href="/register"
-                  className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-haven-50 transition-all hover:shadow-lg hover:shadow-white/25 text-lg flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-all hover:shadow-lg text-lg flex items-center justify-center gap-2"
                 >
                   Get Started for $39/month
                   <ArrowRight className="w-5 h-5" />
@@ -276,7 +279,7 @@ export default function MarketingPage() {
             {/* With Haven */}
             <div className="bg-gradient-to-br from-haven-600 to-haven-700 rounded-2xl p-6 text-white">
               <div className="flex items-center gap-2 mb-4">
-                <CheckCircle2 className="w-6 h-6 text-haven-200" />
+                <CheckCircle2 className="w-6 h-6 text-champagne-300" />
                 <h3 className="text-lg font-semibold text-white">With Haven</h3>
               </div>
               <ul className="space-y-3">
@@ -289,7 +292,7 @@ export default function MarketingPage() {
                   'Complete peace of mind',
                 ].map((item, idx) => (
                   <li key={idx} className="flex items-start gap-3 text-haven-100">
-                    <Check className="w-5 h-5 text-haven-200 flex-shrink-0 mt-0.5" />
+                    <Check className="w-5 h-5 text-champagne-300 flex-shrink-0 mt-0.5" />
                     <span>{item}</span>
                   </li>
                 ))}
@@ -298,9 +301,9 @@ export default function MarketingPage() {
           </div>
 
           <div className="mt-8 text-center">
-            <div className="inline-flex items-center gap-3 px-6 py-3 bg-haven-100 rounded-full">
-              <Clock className="w-5 h-5 text-haven-600" />
-              <p className="text-lg font-semibold text-haven-800">
+            <div className="inline-flex items-center gap-3 px-6 py-3 bg-champagne-100 rounded-full">
+              <Clock className="w-5 h-5 text-champagne-600" />
+              <p className="text-lg font-semibold text-champagne-600">
                 8+ hours per month. That's what our members get back.
               </p>
             </div>
@@ -337,7 +340,7 @@ export default function MarketingPage() {
                 title: 'Fund Your Haven Wallet',
                 description: 'One monthly payment covers everything. We pay your mortgage, utilities, and every vendor. FDIC-insured.',
                 icon: CreditCard,
-                color: 'bg-green-100 text-green-600',
+                color: 'bg-champagne-200 text-champagne-600',
               },
               {
                 step: '3',
@@ -372,7 +375,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* SERVICES SECTION */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-white">
+      <section id="services" className="py-16 sm:py-24 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
@@ -424,8 +427,8 @@ export default function MarketingPage() {
               {
                 title: 'Life Management',
                 icon: Sparkles,
-                color: 'bg-haven-400',
-                iconBg: 'bg-haven-100 text-haven-600',
+                color: 'bg-champagne-400',
+                iconBg: 'bg-champagne-100 text-champagne-600',
                 badge: 'Haven+',
                 items: [
                   'Errand running & pickups',
@@ -470,14 +473,14 @@ export default function MarketingPage() {
       <section className="py-16 sm:py-24 bg-gradient-to-br from-warm-900 via-warm-800 to-warm-900 text-white relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-haven-500 rounded-full blur-3xl opacity-10" />
-          <div className="absolute bottom-0 left-0 w-72 h-72 bg-haven-400 rounded-full blur-3xl opacity-10" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-champagne-300 rounded-full blur-3xl opacity-10" />
+          <div className="absolute bottom-0 left-0 w-72 h-72 bg-haven-500 rounded-full blur-3xl opacity-10" />
         </div>
 
         <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <p className="text-haven-300 font-semibold mb-2">The Haven Difference</p>
+              <p className="text-champagne-300 font-semibold mb-2">The Haven Difference</p>
               <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
                 Your Own Dedicated Handyman
               </h2>
@@ -492,7 +495,7 @@ export default function MarketingPage() {
                   'Minor repairs on the spot',
                 ].map((item, idx) => (
                   <div key={idx} className="flex items-center gap-2">
-                    <CheckCircle2 className="w-5 h-5 text-haven-300" />
+                    <CheckCircle2 className="w-5 h-5 text-champagne-300" />
                     <span className="text-warm-200">{item}</span>
                   </div>
                 ))}
@@ -501,7 +504,7 @@ export default function MarketingPage() {
 
             <div className="bg-white rounded-2xl p-6 text-warm-900 shadow-2xl">
               <div className="flex items-center gap-4 mb-4">
-                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-haven-500 to-haven-600 flex items-center justify-center text-white font-bold text-xl shadow-lg">
+                <div className="w-16 h-16 rounded-full bg-gradient-to-br from-champagne-300 to-champagne-400 flex items-center justify-center text-warm-800 font-bold text-xl shadow-lg">
                   MR
                 </div>
                 <div>
@@ -516,7 +519,7 @@ export default function MarketingPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-warm-500">Issues caught this year</span>
-                  <span className="font-medium text-green-600">12 (saved $3,400+)</span>
+                  <span className="font-medium text-haven-600">12 (saved $3,400+)</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-warm-500">Your home</span>
@@ -639,7 +642,7 @@ export default function MarketingPage() {
 
             {/* HAVEN - $749 */}
             <div className="bg-white rounded-2xl border border-warm-200 overflow-hidden flex flex-col hover:border-haven-300 hover:shadow-lg transition-all">
-              <div className="h-2 bg-haven-500" />
+              <div className="h-2 bg-champagne-400" />
               <div className="p-6 flex-1">
                 <h3 className="text-lg font-semibold text-warm-900">Haven</h3>
                 <p className="text-sm text-warm-500 mt-1">Your dedicated home manager</p>
@@ -801,8 +804,8 @@ export default function MarketingPage() {
                   <p className="text-xs text-warm-500">Zero markup on pass-through</p>
                 </div>
               </div>
-              <div className="mt-6 p-4 bg-haven-50 rounded-xl border border-haven-200">
-                <p className="text-center text-sm text-haven-800">
+              <div className="mt-6 p-4 bg-champagne-100 rounded-xl border border-champagne-200">
+                <p className="text-center text-sm text-champagne-600">
                   <strong>Example:</strong> $3,200 in monthly bills + $39 Essentials = <strong>$3,239 total</strong>.
                   One payment to Haven. We pay everyone else.
                 </p>
@@ -837,7 +840,7 @@ export default function MarketingPage() {
                     <div className="text-haven-400 font-bold">$39/mo</div>
                   </th>
                   <th className="text-center py-4 px-4 bg-haven-600/20">
-                    <div className="font-semibold text-haven-300">Lite</div>
+                    <div className="font-semibold text-champagne-300">Lite</div>
                     <div className="text-haven-400 font-bold">$349/mo</div>
                   </th>
                   <th className="text-center py-4 px-4">
@@ -872,11 +875,11 @@ export default function MarketingPage() {
                     </td>
                     <td className="py-4 px-4 text-center bg-haven-600/20">
                       {row.lite === true ? (
-                        <Check className="w-5 h-5 text-haven-300 mx-auto" />
+                        <Check className="w-5 h-5 text-champagne-300 mx-auto" />
                       ) : row.lite === false ? (
                         <X className="w-5 h-5 text-warm-600 mx-auto" />
                       ) : (
-                        <span className="text-sm font-medium text-haven-300">{row.lite}</span>
+                        <span className="text-sm font-medium text-champagne-300">{row.lite}</span>
                       )}
                     </td>
                     <td className="py-4 px-4 text-center">
@@ -913,8 +916,8 @@ export default function MarketingPage() {
                     <div className="text-sm text-warm-300">{row.essentials}</div>
                   </div>
                   <div className="p-3 text-center bg-haven-600/20">
-                    <div className="text-xs text-haven-300 mb-1">$349</div>
-                    <div className="text-sm font-medium text-haven-300">{row.lite}</div>
+                    <div className="text-xs text-champagne-300 mb-1">$349</div>
+                    <div className="text-sm font-medium text-champagne-300">{row.lite}</div>
                   </div>
                   <div className="p-3 text-center">
                     <div className="text-xs text-warm-500 mb-1">$749</div>
@@ -928,7 +931,7 @@ export default function MarketingPage() {
           <div className="mt-8 text-center">
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-haven-50 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors"
             >
               Start for $39/month
               <ArrowRight className="w-5 h-5" />
@@ -1005,7 +1008,7 @@ export default function MarketingPage() {
             </p>
             <Link
               href="/register"
-              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-haven-50 transition-colors"
+              className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors"
             >
               Start for $39/month
               <ArrowRight className="w-5 h-5" />
@@ -1017,7 +1020,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* TESTIMONIALS */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-b from-haven-50 to-haven-100/50">
+      <section className="py-16 sm:py-24 bg-gradient-to-b from-champagne-50 to-champagne-100/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <div className="text-center mb-12">
             <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
@@ -1051,7 +1054,7 @@ export default function MarketingPage() {
                 name: 'David S.',
                 title: 'Small Business Owner, 4BR Home',
                 highlight: 'Prevented major repair',
-                color: 'bg-warm-100 text-warm-700',
+                color: 'bg-champagne-200 text-champagne-600',
                 avatar: 'DS',
               },
             ].map((testimonial, idx) => (
@@ -1084,7 +1087,7 @@ export default function MarketingPage() {
           <div className="mt-12 grid grid-cols-2 sm:grid-cols-4 gap-6">
             {[
               { value: '8+', label: 'Hours saved monthly', color: 'text-haven-600' },
-              { value: '500+', label: 'Families served', color: 'text-haven-600' },
+              { value: '500+', label: 'Families served', color: 'text-champagne-500' },
               { value: '4.9', label: 'Average rating', color: 'text-haven-600' },
               { value: '$0', label: 'Hidden fees', color: 'text-green-600' },
             ].map((stat, idx) => (
@@ -1100,7 +1103,7 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* FAQ */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-white">
+      <section id="faq" className="py-16 sm:py-24 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
           <h2 className="text-3xl sm:text-4xl font-bold text-center text-warm-900 mb-8">
             Questions? We've Got Answers.
@@ -1162,7 +1165,7 @@ export default function MarketingPage() {
       <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-600 via-haven-700 to-haven-800 relative overflow-hidden">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-haven-300 rounded-full blur-3xl opacity-20" />
+          <div className="absolute top-0 right-0 w-96 h-96 bg-champagne-300 rounded-full blur-3xl opacity-15" />
           <div className="absolute bottom-0 left-0 w-72 h-72 bg-haven-400 rounded-full blur-3xl opacity-20" />
         </div>
 
@@ -1176,13 +1179,13 @@ export default function MarketingPage() {
           <p className="mt-2 text-haven-200">
             Join hundreds of families who've reclaimed their time and peace of mind.
           </p>
-          <p className="mt-4 text-haven-200 font-medium">
+          <p className="mt-4 text-champagne-300 font-medium">
             Not another app. Actual help when you need it.
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
               href="/register"
-              className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-haven-50 transition-colors text-lg flex items-center justify-center gap-2"
+              className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors text-lg flex items-center justify-center gap-2"
             >
               Start for $39/month
               <ArrowRight className="w-5 h-5" />
