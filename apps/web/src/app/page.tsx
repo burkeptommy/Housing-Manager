@@ -1000,51 +1000,41 @@ export default function MarketingPage() {
             ))}
           </div>
 
-          {/* Mobile Card View - Elegant stacked cards */}
-          <div className="sm:hidden space-y-4">
-            {/* Mobile Header */}
-            <div className="grid grid-cols-2 gap-3 mb-2">
-              <div className="text-center">
-                <p className="text-xs font-medium text-warm-500 uppercase tracking-wide">Other Software</p>
-                <p className="text-xs text-warm-400">$375/mo + setup</p>
-              </div>
-              <div className="text-center">
-                <p className="text-xs font-medium text-emerald-600 uppercase tracking-wide">Haven</p>
-                <p className="text-xs text-emerald-500">$349/mo, no setup</p>
-              </div>
-            </div>
-
+          {/* Mobile View - Elegant flowing cards */}
+          <div className="sm:hidden space-y-3">
             {[
               { feature: 'Monthly Cost', software: '$375/month', haven: '$349/month' },
-              { feature: 'Setup/Onboarding', software: '$3K–$5K', haven: '$0' },
+              { feature: 'Setup Fee', software: '$3,000–$5,000', haven: 'Free' },
               { feature: 'First Year Total', software: '$7,500+', haven: '$4,188' },
-              { feature: 'Contract Required', software: '12-mo prepaid', haven: 'Month-to-month' },
-              { feature: 'Bills Paid For You', software: 'No', haven: 'Yes, one payment' },
-              { feature: 'Vendor Coordination', software: 'No', haven: 'Yes, full oversight' },
-              { feature: 'Handyman Visits', software: 'No', haven: 'Yes, monthly' },
-              { feature: 'Humans Doing Work', software: 'No', haven: 'Yes, dedicated manager' },
-              { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. Done.' },
+              { feature: 'Contract', software: '12-month prepaid', haven: 'Month-to-month' },
+              { feature: 'Bill Pay', software: 'You pay each vendor', haven: 'One payment covers all' },
+              { feature: 'Vendor Coordination', software: 'Just a contact list', haven: 'We call, schedule, oversee' },
+              { feature: 'Handyman Visits', software: 'Not included', haven: 'Monthly preventive visits' },
+              { feature: 'Human Support', software: 'Software only', haven: 'Dedicated manager' },
+              { feature: 'When Something Breaks', software: 'You figure it out', haven: 'Text us. We fix it.' },
             ].map((row, idx) => (
-              <div key={idx} className="bg-white rounded-xl shadow-sm border border-warm-100 overflow-hidden">
-                {/* Feature Header */}
-                <div className="px-4 py-3 bg-warm-50 border-b border-warm-100">
-                  <p className="text-sm font-semibold text-warm-800">{row.feature}</p>
-                </div>
-                {/* Comparison Cards */}
-                <div className="grid grid-cols-2 divide-x divide-warm-100">
-                  {/* Other Software */}
-                  <div className="p-4 bg-red-50/30">
-                    <div className="flex items-start gap-2">
-                      <XCircle className="w-4 h-4 text-red-400 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm text-red-700 leading-tight">{row.software}</span>
-                    </div>
+              <div key={idx} className="bg-white rounded-2xl p-5 shadow-sm">
+                <p className="text-xs font-medium text-warm-500 uppercase tracking-wider mb-3">{row.feature}</p>
+
+                {/* Others - crossed out / faded */}
+                <div className="flex items-center gap-3 mb-3 pb-3 border-b border-warm-100">
+                  <div className="w-6 h-6 rounded-full bg-warm-100 flex items-center justify-center flex-shrink-0">
+                    <X className="w-3.5 h-3.5 text-warm-400" />
                   </div>
-                  {/* Haven */}
-                  <div className="p-4 bg-emerald-50/50">
-                    <div className="flex items-start gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                      <span className="text-sm font-medium text-emerald-800 leading-tight">{row.haven}</span>
-                    </div>
+                  <div>
+                    <p className="text-xs text-warm-400 mb-0.5">Others</p>
+                    <p className="text-sm text-warm-500 line-through decoration-warm-300">{row.software}</p>
+                  </div>
+                </div>
+
+                {/* Haven - prominent */}
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-xs text-emerald-600 font-medium mb-0.5">Haven</p>
+                    <p className="text-sm font-semibold text-warm-900">{row.haven}</p>
                   </div>
                 </div>
               </div>
