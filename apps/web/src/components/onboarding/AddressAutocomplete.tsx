@@ -42,7 +42,7 @@ export function AddressAutocomplete({
   const [isSelected, setIsSelected] = useState(!!defaultValue);
   const [isGoogleLoaded, setIsGoogleLoaded] = useState(false);
 
-  // Check if Google Maps is loaded
+  // Load Google Maps script and check if it's ready
   useEffect(() => {
     const checkGoogle = () => {
       if (typeof window !== 'undefined' && window.google?.maps?.places) {
@@ -52,16 +52,50 @@ export function AddressAutocomplete({
       return false;
     };
 
-    if (!checkGoogle()) {
-      // Poll for Google Maps to load
+    // If already loaded, we're done
+    if (checkGoogle()) {
+      return;
+    }
+
+    // Check if script is already being loaded
+    const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+    if (existingScript) {
+      // Wait for existing script to load
       const interval = setInterval(() => {
         if (checkGoogle()) {
           clearInterval(interval);
         }
       }, 100);
-
       return () => clearInterval(interval);
     }
+
+    // Load the Google Maps script
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_PLACES_API_KEY;
+    if (!apiKey) {
+      console.error('Google Places API key not configured');
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => {
+      // Poll until places library is ready
+      const interval = setInterval(() => {
+        if (checkGoogle()) {
+          clearInterval(interval);
+        }
+      }, 50);
+    };
+    script.onerror = () => {
+      console.error('Failed to load Google Maps script');
+    };
+    document.head.appendChild(script);
+
+    return () => {
+      // Don't remove script as other components may use it
+    };
   }, []);
 
   // Parse Google Place result into our format

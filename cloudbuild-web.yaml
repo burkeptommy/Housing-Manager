@@ -30,6 +30,7 @@ steps:
           --build-arg NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=421884826038 \
           --build-arg NEXT_PUBLIC_FIREBASE_APP_ID=1:421884826038:web:3267d85f24adfc6a117117 \
           --build-arg NEXT_PUBLIC_MAPBOX_TOKEN=pk.eyJ1IjoiY2hlemJ1cmsiLCJhIjoiY21qYXptZmY2MGJheDNob2owazVuMnptNyJ9.ps0hAY3PdffJUM9J2GIYQA \
+          --build-arg NEXT_PUBLIC_GOOGLE_PLACES_API_KEY=AIzaSyDeJGjktaIHmcybrOV4LZyBHiRS0G_BUaA \
           -f apps/web/Dockerfile \
           .
 
