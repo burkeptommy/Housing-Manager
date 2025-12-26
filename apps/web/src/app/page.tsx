@@ -112,7 +112,7 @@ export default function MarketingPage() {
               {/* CTAs */}
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
                 <Link
-                  href="/register"
+                  href="/onboarding/welcome"
                   className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-all hover:shadow-lg text-lg flex items-center justify-center gap-2"
                 >
                   Get Started for $39/month
@@ -976,7 +976,7 @@ export default function MarketingPage() {
 
           <div className="mt-8 text-center">
             <Link
-              href="/register"
+              href="/onboarding/welcome"
               className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors"
             >
               Start for $39/month
@@ -1013,9 +1013,9 @@ export default function MarketingPage() {
                 <p className="font-semibold text-red-700">Household Software</p>
                 <p className="text-sm text-red-600">$375/mo + $3K setup</p>
               </div>
-              <div className="p-6 text-center bg-emerald-100">
-                <p className="font-semibold text-emerald-800">Haven</p>
-                <p className="text-sm text-emerald-700">$349/mo, no setup fee</p>
+              <div className="p-6 text-center bg-haven-champagne-100">
+                <p className="font-semibold text-haven-navy-900">Haven</p>
+                <p className="text-sm text-haven-navy-700">$349/mo, no setup fee</p>
               </div>
             </div>
 
@@ -1038,9 +1038,9 @@ export default function MarketingPage() {
                   <XCircle className="w-4 h-4 text-red-400" />
                   <span className="text-sm text-red-700">{row.software}</span>
                 </div>
-                <div className="p-5 text-center bg-emerald-50 flex items-center justify-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span className="text-sm font-medium text-emerald-800">{row.haven}</span>
+                <div className="p-5 text-center bg-haven-champagne-50 flex items-center justify-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-haven-champagne-600" />
+                  <span className="text-sm font-medium text-haven-navy-900">{row.haven}</span>
                 </div>
               </div>
             ))}
@@ -1075,11 +1075,11 @@ export default function MarketingPage() {
 
                 {/* Haven - prominent */}
                 <div className="flex items-center gap-3">
-                  <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <Check className="w-3.5 h-3.5 text-emerald-600" />
+                  <div className="w-6 h-6 rounded-full bg-haven-champagne-100 flex items-center justify-center flex-shrink-0">
+                    <Check className="w-3.5 h-3.5 text-haven-champagne-600" />
                   </div>
                   <div>
-                    <p className="text-xs text-emerald-600 font-medium mb-0.5">Haven</p>
+                    <p className="text-xs text-haven-champagne-600 font-medium mb-0.5">Haven</p>
                     <p className="text-sm font-semibold text-warm-900">{row.haven}</p>
                   </div>
                 </div>
@@ -1095,7 +1095,7 @@ export default function MarketingPage() {
               Start with Haven Essentials for just $39/month or get full service at $349/month with no setup fee.
             </p>
             <Link
-              href="/register"
+              href="/onboarding/welcome"
               className="inline-flex items-center gap-2 px-8 py-3 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors"
             >
               Start for $39/month
@@ -1277,7 +1277,7 @@ export default function MarketingPage() {
           </p>
           <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
             <Link
-              href="/register"
+              href="/onboarding/welcome"
               className="w-full sm:w-auto px-8 py-4 bg-white text-haven-700 font-semibold rounded-xl hover:bg-champagne-50 transition-colors text-lg flex items-center justify-center gap-2"
             >
               Start for $39/month

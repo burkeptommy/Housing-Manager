@@ -388,13 +388,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const path = window.location.pathname;
 
+    // Allow public pages without any auth
+    const publicPaths = ['/', '/login', '/register', '/forgot-password', '/terms', '/privacy'];
+    const isPublicPath = publicPaths.some(p => path === p || path.startsWith('/pricing'));
+
+    // Allow onboarding welcome page for unauthenticated users (registration)
+    const isOnboardingWelcome = path.startsWith('/onboarding/welcome');
+
     if (!user) {
-      // Not authenticated - only redirect if on protected pages
-      if (path.startsWith('/app') || path.startsWith('/onboarding') || path.startsWith('/manager') || path.startsWith('/admin')) {
-        router.push('/login');
+      // Not authenticated
+      // Allow public paths and onboarding welcome (registration)
+      if (!isPublicPath && !isOnboardingWelcome) {
+        // Redirect protected pages to login
+        if (path.startsWith('/app') || path.startsWith('/manager') || path.startsWith('/admin') || path.startsWith('/handyman') || path.startsWith('/vendor')) {
+          router.push('/login');
+        }
+        // For other onboarding pages, redirect to welcome to register
+        if (path.startsWith('/onboarding') && !isOnboardingWelcome) {
+          router.push('/onboarding/welcome');
+        }
       }
       return;
     }
+
+    // User is authenticated from here on
 
     // Helper function to get the correct portal path for a user role
     const getPortalPath = (role: string): string => {
@@ -409,16 +426,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return '/vendor';
         case 'HOMEOWNER':
         default:
-          return needsOnboarding ? '/onboarding' : '/app';
+          return needsOnboarding ? '/onboarding/choose-path' : '/app';
       }
     };
 
     const userPortal = getPortalPath(user.role);
 
-    // User is authenticated - handle redirects
+    // Redirect authenticated users away from login/register to their portal
     if (path === '/login' || path === '/register') {
-      // Redirect authenticated users away from login/register to their portal
       router.push(userPortal);
+      return;
+    }
+
+    // If authenticated user is on welcome page, skip to choose-path
+    if (isOnboardingWelcome) {
+      router.push('/onboarding/choose-path');
+      return;
+    }
+
+    // Allow users to stay in onboarding flow if they need it
+    if (user.role === 'HOMEOWNER' && path.startsWith('/onboarding')) {
+      // If user needs onboarding, let them continue
+      if (needsOnboarding) {
+        return; // Stay in onboarding
+      }
+      // If user doesn't need onboarding but is on complete page, let them finish
+      if (path.startsWith('/onboarding/complete')) {
+        return; // Stay on complete page
+      }
+      // Otherwise redirect to app
+      router.push('/app');
       return;
     }
 
@@ -437,20 +474,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       path.startsWith('/admin') ||
       path.startsWith('/manager') ||
       path.startsWith('/handyman') ||
-      path.startsWith('/vendor') ||
-      path.startsWith('/onboarding')
+      path.startsWith('/vendor')
     )) {
       router.push(userPortal);
       return;
     }
 
-    // Handle onboarding for homeowners
-    if (user.role === 'HOMEOWNER') {
-      if (needsOnboarding && path.startsWith('/app')) {
-        router.push('/onboarding');
-      } else if (!needsOnboarding && path.startsWith('/onboarding')) {
-        router.push('/app');
-      }
+    // Handle homeowners trying to access /app when they need onboarding
+    if (user.role === 'HOMEOWNER' && needsOnboarding && path.startsWith('/app')) {
+      router.push('/onboarding/choose-path');
     }
   }, [isInitialized, isLoading, user, needsOnboarding, router]);
 

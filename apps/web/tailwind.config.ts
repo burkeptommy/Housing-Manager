@@ -25,6 +25,20 @@ const config: Config = {
           900: '#111827',
           950: '#0B1120',
         },
+        // Alias for onboarding pages
+        'haven-navy': {
+          50: '#F5F7FA',
+          100: '#E8ECF2',
+          200: '#CBD5E1',
+          300: '#94A3B8',
+          400: '#64748B',
+          500: '#475569',
+          600: '#334155',
+          700: '#1E2A3B',
+          800: '#172032',
+          900: '#102a43',
+          950: '#0a1929',
+        },
         // ACCENT: Champagne - warm elegance, subtle luxury
         champagne: {
           50: '#FAF8F5',
@@ -34,6 +48,19 @@ const config: Config = {
           400: '#C4B393',
           500: '#A89968',
           600: '#8C7D4E',
+          700: '#6B5D3A',
+          800: '#4A4028',
+          900: '#2E2819',
+        },
+        // Alias for onboarding pages
+        'haven-champagne': {
+          50: '#faf6ed',
+          100: '#faf6ed',
+          200: '#E8E0D0',
+          300: '#D4C5A9',
+          400: '#d4c4a5',
+          500: '#c4a574',
+          600: '#b08d5b',
           700: '#6B5D3A',
           800: '#4A4028',
           900: '#2E2819',
