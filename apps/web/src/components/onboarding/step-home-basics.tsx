@@ -66,7 +66,7 @@ const featureOptions: { name: keyof PropertyFeatures; label: string; description
 
 export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHomeBasicsProps) {
   const [enrichedFields, setEnrichedFields] = useState<Set<string>>(new Set());
-  const { enrichProperty, isLoading: isEnriching, error: enrichError } = usePropertyEnrichment();
+  const { fetchPropertyDetails, isLoading: isEnriching, error: enrichError } = usePropertyEnrichment();
 
   const {
     register,
@@ -109,54 +109,61 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
       setValue('state', address.state);
       setValue('postalCode', address.zipCode);
 
-      // Enrich property data
-      const result = await enrichProperty(
+      // Fetch property details from ATTOM API
+      const details = await fetchPropertyDetails(
         address.street,
         address.city,
         address.state,
         address.zipCode,
       );
 
-      if (result.success && result.data) {
+      if (details) {
         const newEnrichedFields = new Set<string>();
-        const { property } = result.data;
 
         // Auto-fill property details
-        if (property.yearBuilt) {
-          setValue('yearBuilt', property.yearBuilt);
+        if (details.yearBuilt) {
+          setValue('yearBuilt', details.yearBuilt);
           newEnrichedFields.add('yearBuilt');
         }
-        if (property.squareFeet) {
-          setValue('squareFeet', property.squareFeet);
+        if (details.squareFeet) {
+          setValue('squareFeet', details.squareFeet);
           newEnrichedFields.add('squareFeet');
         }
-        if (property.bedrooms) {
-          setValue('bedrooms', property.bedrooms);
+        if (details.bedrooms) {
+          setValue('bedrooms', details.bedrooms);
           newEnrichedFields.add('bedrooms');
         }
-        if (property.bathrooms) {
-          setValue('bathrooms', property.bathrooms);
+        if (details.bathrooms) {
+          setValue('bathrooms', details.bathrooms);
           newEnrichedFields.add('bathrooms');
         }
 
-        // Auto-fill features
-        if (property.pool) {
+        // Auto-fill features from ATTOM data
+        if (details.pool) {
           setValue('hasPool', true);
           newEnrichedFields.add('hasPool');
         }
-        if (property.hvacType?.toLowerCase().includes('central')) {
+        if (details.coolingType?.toLowerCase().includes('central') || details.coolingType?.toLowerCase() === 'yes') {
           setValue('hasCentralAc', true);
           newEnrichedFields.add('hasCentralAc');
         }
-        if (property.hvacType?.toLowerCase().includes('gas') || property.hvacType?.toLowerCase().includes('forced air')) {
+        if (details.heatingFuel?.toLowerCase().includes('gas') || details.heatingType?.toLowerCase().includes('forced air')) {
           setValue('hasGasHeat', true);
           newEnrichedFields.add('hasGasHeat');
+        }
+        if (details.heatingFuel?.toLowerCase().includes('oil')) {
+          setValue('hasOilHeat', true);
+          newEnrichedFields.add('hasOilHeat');
+        }
+        if (details.fireplaces && details.fireplaces > 0) {
+          setValue('hasFireplace', true);
+          newEnrichedFields.add('hasFireplace');
         }
 
         setEnrichedFields(newEnrichedFields);
       }
     },
-    [setValue, enrichProperty],
+    [setValue, fetchPropertyDetails],
   );
 
   return (

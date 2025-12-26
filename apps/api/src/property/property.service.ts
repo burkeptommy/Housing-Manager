@@ -3,186 +3,240 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { firstValueFrom } from 'rxjs';
 
-export interface PropertyEnrichmentResult {
+export interface PropertyDetails {
+  // Basic Info
+  bedrooms: number | null;
+  bathrooms: number | null;
+  bathsFull: number | null;
+  bathsHalf: number | null;
+  squareFeet: number | null;
+  lotSizeSquareFeet: number | null;
+  lotSizeAcres: number | null;
+  yearBuilt: number | null;
+
+  // Property Type
+  propertyType: string | null;
+  propertySubType: string | null;
+
+  // Building Details
+  stories: number | null;
+  constructionType: string | null;
+  foundationType: string | null;
+  roofType: string | null;
+  roofMaterial: string | null;
+  exteriorWalls: string | null;
+
+  // Systems (HVAC)
+  heatingType: string | null;
+  heatingFuel: string | null;
+  coolingType: string | null;
+
+  // Utilities
+  waterType: string | null;
+  sewerType: string | null;
+
+  // Features
+  fireplaces: number | null;
+  garage: string | null;
+  garageSpaces: number | null;
+  pool: boolean | null;
+  poolType: string | null;
+
+  // Additional Rooms
+  totalRooms: number | null;
+  basementType: string | null;
+
+  // Valuation
+  assessedValue: number | null;
+  marketValue: number | null;
+  taxAmount: number | null;
+
+  // Sale Info
+  lastSalePrice: number | null;
+  lastSaleDate: string | null;
+
+  // Location
+  verifiedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+export interface PropertyLookupResult {
   success: boolean;
-  data?: {
-    address: {
-      addressLine1: string;
-      city: string;
-      state: string;
-      zipCode: string;
-      plus4: string;
-      formattedAddress: string;
-    };
-    property: {
-      bedrooms: number | null;
-      bathrooms: number | null;
-      squareFeet: number | null;
-      yearBuilt: number | null;
-      lotSizeAcres: number | null;
-      lotSizeSqFt: number | null;
-      propertyType: string | null;
-      stories: number | null;
-      pool: boolean;
-      garage: string | null;
-      garageSqFt: number | null;
-      roofType: string | null;
-      hvacType: string | null;
-      foundation: string | null;
-      exteriorWalls: string | null;
-    };
-    valuation: {
-      estimatedValue: number | null;
-      assessedValue: number | null;
-      taxAmount: number | null;
-      taxYear: number | null;
-    };
-    parcel: {
-      apn: string | null;
-      fipsCode: string | null;
-      county: string | null;
-      legalDescription: string | null;
-    };
-  };
+  data: PropertyDetails | null;
   error?: string;
-  rawResponse?: unknown;
 }
 
 @Injectable()
 export class PropertyService {
   private readonly logger = new Logger(PropertyService.name);
-  private readonly melissaApiKey: string;
-  private readonly melissaBaseUrl = 'https://property.melissadata.net/v4/WEB/LookupProperty';
+  private readonly attomApiKey: string;
+  private readonly baseUrl = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.melissaApiKey = this.configService.get<string>('MELISSA_API_KEY') || '';
+    this.attomApiKey = this.configService.get<string>('ATTOM_API_KEY') || '';
+    if (!this.attomApiKey) {
+      this.logger.warn('ATTOM_API_KEY not configured - property lookup disabled');
+    }
   }
 
-  async enrichProperty(
-    addressLine1: string,
-    city?: string,
-    state?: string,
-    zip?: string,
-  ): Promise<PropertyEnrichmentResult> {
-    if (!this.melissaApiKey) {
-      this.logger.warn('Melissa API key not configured');
-      return {
-        success: false,
-        error: 'Property enrichment service not configured',
-      };
+  async lookupByAddress(
+    street: string,
+    city: string,
+    state: string,
+    zip: string,
+  ): Promise<PropertyLookupResult> {
+    if (!this.attomApiKey) {
+      return { success: false, data: null, error: 'Property lookup not configured' };
     }
 
     try {
-      const params: Record<string, string> = {
-        id: this.melissaApiKey,
-        format: 'json',
-        addressline1: addressLine1,
-      };
+      // Format address for ATTOM API
+      const address1 = encodeURIComponent(street);
+      const address2 = encodeURIComponent(`${city}, ${state} ${zip}`);
 
-      if (city) params.city = city;
-      if (state) params.state = state;
-      if (zip) params.zip = zip;
+      const url = `${this.baseUrl}/property/expandedprofile?address1=${address1}&address2=${address2}`;
 
-      this.logger.debug(`Fetching property data for: ${addressLine1}`);
+      this.logger.log(`Looking up property: ${street}, ${city}, ${state} ${zip}`);
 
       const response = await firstValueFrom(
-        this.httpService.get(this.melissaBaseUrl, { params }),
+        this.httpService.get(url, {
+          headers: {
+            'Accept': 'application/json',
+            'APIKey': this.attomApiKey,
+          },
+          timeout: 15000,
+        })
       );
 
       const data = response.data;
 
-      // Log raw response for debugging
-      this.logger.debug(`Melissa API response: ${JSON.stringify(data)}`);
+      // Check for ATTOM status
+      if (!data || data.status?.code !== 0) {
+        const errorMsg = data?.status?.msg || 'Property not found';
+        this.logger.warn(`ATTOM API returned: ${errorMsg}`);
+        return { success: false, data: null, error: errorMsg };
+      }
 
-      // Check for API errors
-      if (!data || data.TransmissionResults?.includes('GE')) {
+      // Extract property from response
+      const property = data.property?.[0];
+      if (!property) {
+        return { success: false, data: null, error: 'No property data returned' };
+      }
+
+      // Parse the ATTOM response into our format
+      const propertyDetails = this.parseAttomProperty(property);
+
+      this.logger.log(`Property found: ${propertyDetails.bedrooms} bed, ${propertyDetails.bathrooms} bath, ${propertyDetails.squareFeet} sqft`);
+
+      return { success: true, data: propertyDetails };
+    } catch (error: any) {
+      this.logger.error('ATTOM property lookup failed:', error.message);
+
+      // Check for specific ATTOM error responses
+      if (error.response?.data?.status) {
         return {
           success: false,
-          error: 'Failed to fetch property data',
-          rawResponse: data,
+          data: null,
+          error: error.response.data.status.msg || 'ATTOM API error'
         };
       }
 
-      // Check if we have property records
-      const records = data.Records;
-      if (!records || records.length === 0) {
-        return {
-          success: false,
-          error: 'No property data found for this address',
-          rawResponse: data,
-        };
-      }
-
-      const record = records[0];
-      const parsedAddress = record.ParsedAddress || {};
-      const propertyData = record.PropertyInfo || {};
-      const parcelData = record.ParcelInfo || {};
-      const taxData = record.TaxInfo || {};
-
-      return {
-        success: true,
-        data: {
-          address: {
-            addressLine1: parsedAddress.AddressLine1 || addressLine1,
-            city: parsedAddress.City || city || '',
-            state: parsedAddress.State || state || '',
-            zipCode: parsedAddress.Zip || zip || '',
-            plus4: parsedAddress.Plus4 || '',
-            formattedAddress: record.FormattedAddress || addressLine1,
-          },
-          property: {
-            bedrooms: this.parseNumber(propertyData.Bedrooms),
-            bathrooms: this.parseFloat(propertyData.Bathrooms),
-            squareFeet: this.parseNumber(propertyData.BuildingSquareFeet || propertyData.LivingArea),
-            yearBuilt: this.parseNumber(propertyData.YearBuilt),
-            lotSizeAcres: this.parseFloat(propertyData.LotSizeAcres),
-            lotSizeSqFt: this.parseNumber(propertyData.LotSizeSqFt),
-            propertyType: propertyData.PropertyType || null,
-            stories: this.parseNumber(propertyData.Stories),
-            pool: propertyData.Pool === 'Y' || propertyData.Pool === 'Yes',
-            garage: propertyData.GarageType || null,
-            garageSqFt: this.parseNumber(propertyData.GarageSqFt),
-            roofType: propertyData.RoofType || null,
-            hvacType: propertyData.HvacType || propertyData.HeatingType || null,
-            foundation: propertyData.FoundationType || null,
-            exteriorWalls: propertyData.ExteriorWalls || null,
-          },
-          valuation: {
-            estimatedValue: this.parseNumber(propertyData.EstimatedValue || taxData.MarketValue),
-            assessedValue: this.parseNumber(taxData.AssessedValue),
-            taxAmount: this.parseFloat(taxData.TaxAmount),
-            taxYear: this.parseNumber(taxData.TaxYear),
-          },
-          parcel: {
-            apn: parcelData.APN || null,
-            fipsCode: parcelData.FipsCode || null,
-            county: parcelData.County || null,
-            legalDescription: parcelData.LegalDescription || null,
-          },
-        },
-        rawResponse: data,
-      };
-    } catch (error) {
-      this.logger.error(`Error fetching property data: ${error}`);
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
+        data: null,
+        error: error.message || 'Property lookup failed'
       };
     }
   }
 
-  private parseNumber(value: string | number | undefined | null): number | null {
-    if (value === undefined || value === null || value === '') return null;
-    const num = typeof value === 'number' ? value : parseInt(value, 10);
-    return isNaN(num) ? null : num;
-  }
+  private parseAttomProperty(property: any): PropertyDetails {
+    const building = property.building || {};
+    const lot = property.lot || {};
+    const utilities = property.utilities || {};
+    const summary = property.summary || {};
+    const rooms = building.rooms || {};
+    const interior = building.interior || {};
+    const construction = building.construction || {};
+    const parking = building.parking || {};
+    const assessment = property.assessment || {};
+    const sale = property.sale || {};
+    const location = property.location || {};
+    const address = property.address || {};
+    const buildingSize = building.size || {};
+    const buildingSummary = building.summary || {};
 
-  private parseFloat(value: string | number | undefined | null): number | null {
-    if (value === undefined || value === null || value === '') return null;
-    const num = typeof value === 'number' ? value : parseFloat(value);
-    return isNaN(num) ? null : num;
+    const parsedInt = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const num = parseInt(String(val), 10);
+      return isNaN(num) ? null : num;
+    };
+
+    const parsedFloat = (val: any): number | null => {
+      if (val === undefined || val === null || val === '') return null;
+      const num = parseFloat(String(val));
+      return isNaN(num) ? null : num;
+    };
+
+    return {
+      // Basic Info
+      bedrooms: parsedInt(rooms.beds),
+      bathrooms: parsedFloat(rooms.bathsTotal),
+      bathsFull: parsedInt(rooms.bathsFull),
+      bathsHalf: parsedInt(rooms.bathsPartial),
+      squareFeet: parsedInt(buildingSize.livingSize) || parsedInt(buildingSize.universalSize),
+      lotSizeSquareFeet: parsedInt(lot.lotSize2),
+      lotSizeAcres: parsedFloat(lot.lotSize1),
+      yearBuilt: parsedInt(summary.yearBuilt),
+
+      // Property Type
+      propertyType: summary.propType || summary.propertyType || null,
+      propertySubType: summary.propSubType || null,
+
+      // Building Details
+      stories: parsedFloat(buildingSummary.levels),
+      constructionType: construction.condition || null,
+      foundationType: null, // Not in this response
+      roofType: null, // Not in this response
+      roofMaterial: null,
+      exteriorWalls: construction.wallType || null,
+
+      // Systems (HVAC)
+      heatingType: utilities.heatingType || null,
+      heatingFuel: utilities.heatingFuel || null,
+      coolingType: utilities.coolingType || null,
+
+      // Utilities
+      waterType: null,
+      sewerType: null,
+
+      // Features
+      fireplaces: parsedInt(interior.fplcCount),
+      garage: parking.garageType || null,
+      garageSpaces: parsedInt(parking.garageSize),
+      pool: lot.poolType ? !lot.poolType.toLowerCase().includes('no pool') : null,
+      poolType: lot.poolType || null,
+
+      // Additional Rooms
+      totalRooms: parsedInt(rooms.roomsTotal),
+      basementType: null,
+
+      // Valuation
+      assessedValue: parsedInt(assessment.assessed?.assdTtlValue),
+      marketValue: parsedInt(assessment.market?.mktTtlValue),
+      taxAmount: parsedInt(assessment.tax?.taxAmt),
+
+      // Sale Info
+      lastSalePrice: parsedInt(sale.amount?.saleAmt),
+      lastSaleDate: sale.saleTransDate || null,
+
+      // Location
+      verifiedAddress: address.oneLine || null,
+      latitude: parsedFloat(location.latitude),
+      longitude: parsedFloat(location.longitude),
+    };
   }
 }
