@@ -14,9 +14,12 @@ import {
   Loader2,
   FileText,
   AlertCircle,
+  Sparkles,
 } from 'lucide-react';
 import { SkipToHumanBanner } from '@/components/onboarding/SkipToHumanBanner';
 import { FormInput, FormSelect } from '@/components/onboarding/forms';
+import { AddressAutocomplete } from '@/components/onboarding/AddressAutocomplete';
+import { usePropertyEnrichment } from '@/hooks/usePropertyEnrichment';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { getServiceAreaName, PropertyDetails } from '@/types/onboarding';
 import { cn } from '@/lib/utils';
@@ -32,6 +35,7 @@ const PROPERTY_TYPES = [
 export default function PropertyPage() {
   const router = useRouter();
   const { data, setProperty, completeStep } = useOnboarding();
+  const { fetchPropertyDetails, isLoading: isEnrichingProperty } = usePropertyEnrichment();
 
   // Form state
   const [street, setStreet] = useState(data.property?.address?.street || '');
@@ -52,6 +56,44 @@ export default function PropertyPage() {
   const [isOutOfArea, setIsOutOfArea] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [wasAutoEnriched, setWasAutoEnriched] = useState(false);
+
+  // Handle address selection from autocomplete
+  const handleAddressSelect = async (address: {
+    street: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  }) => {
+    console.log('Address selected:', address);
+
+    // Update form fields with selected address
+    setStreet(address.street);
+    setCity(address.city);
+    setState(address.state);
+    setZipCode(address.zipCode);
+
+    // Fetch property details from ATTOM
+    if (address.street && address.city && address.state && address.zipCode) {
+      console.log('Fetching property details from ATTOM...');
+      const details = await fetchPropertyDetails(
+        address.street,
+        address.city,
+        address.state,
+        address.zipCode
+      );
+
+      if (details) {
+        console.log('Property details received:', details);
+        // Auto-fill property details
+        if (details.bedrooms) setBedrooms(details.bedrooms.toString());
+        if (details.bathrooms) setBathrooms(details.bathrooms.toString());
+        if (details.squareFeet) setSquareFeet(details.squareFeet.toString());
+        if (details.yearBuilt) setYearBuilt(details.yearBuilt.toString());
+        setWasAutoEnriched(true);
+      }
+    }
+  };
 
   // Validate ZIP code when it changes
   useEffect(() => {
@@ -147,16 +189,21 @@ export default function PropertyPage() {
 
         {/* Address Section */}
         <div className="space-y-4">
-          <h3 className="font-medium text-haven-navy-900">Address</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-haven-navy-900">Address</h3>
+            {isEnrichingProperty && (
+              <div className="flex items-center gap-2 text-sm text-haven-champagne-600">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Looking up property details...
+              </div>
+            )}
+          </div>
 
-          <FormInput
-            label="Street Address"
-            placeholder="123 Main Street"
-            value={street}
-            onChange={(e) => setStreet(e.target.value)}
+          <AddressAutocomplete
+            onAddressSelect={handleAddressSelect}
+            defaultValue={street}
             error={errors.street}
-            icon={<MapPin className="w-5 h-5" />}
-            required
+            placeholder="Start typing your address..."
           />
 
           <FormInput
@@ -242,7 +289,15 @@ export default function PropertyPage() {
 
         {/* Property Details */}
         <div className="space-y-4">
-          <h3 className="font-medium text-haven-navy-900">Property Details</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="font-medium text-haven-navy-900">Property Details</h3>
+            {wasAutoEnriched && (
+              <div className="flex items-center gap-2 text-sm text-emerald-600">
+                <Sparkles className="w-4 h-4" />
+                Auto-filled from public records
+              </div>
+            )}
+          </div>
 
           <FormSelect
             label="Property Type"
