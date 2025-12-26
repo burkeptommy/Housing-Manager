@@ -1,5 +1,5 @@
 import { Controller, Get, Query, UseGuards } from '@nestjs/common';
-import { FirebaseAuthGuard } from '../auth/guards/firebase-auth.guard';
+import { FirebaseAuthGuard } from '../firebase';
 import { PropertyService, PropertyEnrichmentResult } from './property.service';
 
 @Controller('property')
