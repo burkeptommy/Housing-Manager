@@ -15,6 +15,7 @@ import {
   signIn as firebaseSignIn,
   signUp as firebaseSignUp,
   signOut as firebaseSignOut,
+  signInWithGoogle as firebaseSignInWithGoogle,
   onAuthChange,
   getIdToken,
   type FirebaseUser,
@@ -67,6 +68,7 @@ interface AuthContextValue {
   needsOnboarding: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, displayName?: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   selectHousehold: (household: Household) => void;
   refreshHouseholds: () => Promise<void>;
@@ -294,6 +296,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const signInWithGoogle = useCallback(async () => {
+    setIsLoading(true);
+
+    try {
+      const fbUser = await firebaseSignInWithGoogle();
+
+      // Get the token and set it immediately so API calls work
+      if (fbUser) {
+        const token = await fbUser.getIdToken();
+        setFirebaseToken(token);
+      }
+
+      // Wait for the auth state callback to complete
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Google sign-in timeout - please try again'));
+        }, 10000);
+
+        const checkReady = setInterval(() => {
+          const tokenSet = sessionStorage.getItem('haven_firebase_token');
+          if (tokenSet) {
+            clearInterval(checkReady);
+            clearTimeout(timeout);
+            resolve();
+          }
+        }, 50);
+      });
+    } catch (error) {
+      setIsLoading(false);
+      throw error;
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await firebaseSignOut();
     clearTokens();
@@ -499,6 +534,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         needsOnboarding,
         login,
         register,
+        signInWithGoogle,
         logout,
         selectHousehold,
         refreshHouseholds,

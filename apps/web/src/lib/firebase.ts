@@ -9,6 +9,8 @@ import {
   sendPasswordResetEmail,
   updateProfile,
   onAuthStateChanged,
+  signInWithPopup,
+  GoogleAuthProvider,
   User as FirebaseUser,
 } from 'firebase/auth';
 
@@ -102,6 +104,21 @@ export async function signOut() {
 export async function resetPassword(email: string) {
   const auth = getFirebaseAuth();
   await sendPasswordResetEmail(auth, email);
+}
+
+/**
+ * Sign in with Google using popup
+ */
+export async function signInWithGoogle() {
+  const auth = getFirebaseAuth();
+  const provider = new GoogleAuthProvider();
+
+  // Request additional scopes if needed
+  provider.addScope('email');
+  provider.addScope('profile');
+
+  const result = await signInWithPopup(auth, provider);
+  return result.user;
 }
 
 /**
