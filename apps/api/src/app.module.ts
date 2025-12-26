@@ -34,6 +34,7 @@ import { SocialModule } from './social/social.module';
 import { ProjectPlannerModule } from './project-planner/project-planner.module';
 import { FamilyModule } from './family/family.module';
 import { TravelModule } from './travel/travel.module';
+import { PropertyModule } from './property';
 
 @Module({
   imports: [
@@ -72,6 +73,7 @@ import { TravelModule } from './travel/travel.module';
     ProjectPlannerModule,
     FamilyModule,
     TravelModule,
+    PropertyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

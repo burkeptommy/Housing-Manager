@@ -3,8 +3,12 @@
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { useState, useCallback } from 'react';
+import { Sparkles, Loader2, AlertCircle } from 'lucide-react';
 import type { PropertyFeatures } from '@haven/core';
 import { propertyTypeOptions, usStates } from '@/lib/validations/onboarding';
+import { AddressAutocomplete } from './AddressAutocomplete';
+import { usePropertyEnrichment } from '@/hooks/usePropertyEnrichment';
 
 const homeBasicsSchema = z.object({
   name: z.string().min(1, 'Home name is required').max(100),
@@ -61,9 +65,14 @@ const featureOptions: { name: keyof PropertyFeatures; label: string; description
 ];
 
 export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHomeBasicsProps) {
+  const [enrichedFields, setEnrichedFields] = useState<Set<string>>(new Set());
+  const { enrichProperty, isLoading: isEnriching, error: enrichError } = usePropertyEnrichment();
+
   const {
     register,
     handleSubmit,
+    setValue,
+    watch,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(homeBasicsSchema),
@@ -88,6 +97,67 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
       ...defaultValues,
     },
   });
+
+  const addressLine1Value = watch('addressLine1');
+
+  // Handle address selection from autocomplete
+  const handleAddressSelect = useCallback(
+    async (address: { street: string; city: string; state: string; zipCode: string }) => {
+      // Update form with selected address
+      setValue('addressLine1', address.street);
+      setValue('city', address.city);
+      setValue('state', address.state);
+      setValue('postalCode', address.zipCode);
+
+      // Enrich property data
+      const result = await enrichProperty(
+        address.street,
+        address.city,
+        address.state,
+        address.zipCode,
+      );
+
+      if (result.success && result.data) {
+        const newEnrichedFields = new Set<string>();
+        const { property } = result.data;
+
+        // Auto-fill property details
+        if (property.yearBuilt) {
+          setValue('yearBuilt', property.yearBuilt);
+          newEnrichedFields.add('yearBuilt');
+        }
+        if (property.squareFeet) {
+          setValue('squareFeet', property.squareFeet);
+          newEnrichedFields.add('squareFeet');
+        }
+        if (property.bedrooms) {
+          setValue('bedrooms', property.bedrooms);
+          newEnrichedFields.add('bedrooms');
+        }
+        if (property.bathrooms) {
+          setValue('bathrooms', property.bathrooms);
+          newEnrichedFields.add('bathrooms');
+        }
+
+        // Auto-fill features
+        if (property.pool) {
+          setValue('hasPool', true);
+          newEnrichedFields.add('hasPool');
+        }
+        if (property.hvacType?.toLowerCase().includes('central')) {
+          setValue('hasCentralAc', true);
+          newEnrichedFields.add('hasCentralAc');
+        }
+        if (property.hvacType?.toLowerCase().includes('gas') || property.hvacType?.toLowerCase().includes('forced air')) {
+          setValue('hasGasHeat', true);
+          newEnrichedFields.add('hasGasHeat');
+        }
+
+        setEnrichedFields(newEnrichedFields);
+      }
+    },
+    [setValue, enrichProperty],
+  );
 
   return (
     <form onSubmit={handleSubmit((data) => onSubmit(data as HomeBasicsData))} className="space-y-6">
@@ -135,25 +205,38 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
 
       {/* Address */}
       <div className="space-y-4">
-        <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 border-b border-slate-200 dark:border-slate-700 pb-2">
-          Address
-        </h3>
-
-        <div>
-          <label htmlFor="addressLine1" className="label block mb-1.5">
-            Street address
-          </label>
-          <input
-            {...register('addressLine1')}
-            id="addressLine1"
-            type="text"
-            className="input"
-            placeholder="123 Main Street"
-          />
-          {errors.addressLine1 && (
-            <p className="text-sm text-red-500 mt-1">{errors.addressLine1.message}</p>
+        <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-700 pb-2">
+          <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300">
+            Address
+          </h3>
+          {isEnriching && (
+            <div className="flex items-center gap-2 text-xs text-haven-champagne-600">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>Looking up property details...</span>
+            </div>
           )}
         </div>
+
+        <AddressAutocomplete
+          onAddressSelect={handleAddressSelect}
+          defaultValue={addressLine1Value}
+          error={errors.addressLine1?.message}
+          placeholder="Start typing your address..."
+        />
+
+        {enrichedFields.size > 0 && (
+          <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-900/20 rounded-lg text-sm text-emerald-700 dark:text-emerald-400">
+            <Sparkles className="w-4 h-4" />
+            <span>Property details auto-filled from public records</span>
+          </div>
+        )}
+
+        {enrichError && (
+          <div className="flex items-center gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg text-sm text-amber-700 dark:text-amber-400">
+            <AlertCircle className="w-4 h-4" />
+            <span>Could not load property details - please fill in manually</span>
+          </div>
+        )}
 
         <div>
           <label htmlFor="addressLine2" className="label block mb-1.5">
@@ -209,14 +292,17 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             )}
           </div>
           <div>
-            <label htmlFor="yearBuilt" className="label block mb-1.5">
+            <label htmlFor="yearBuilt" className="label block mb-1.5 flex items-center gap-1">
               Year built (optional)
+              {enrichedFields.has('yearBuilt') && (
+                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+              )}
             </label>
             <input
               {...register('yearBuilt')}
               id="yearBuilt"
               type="number"
-              className="input"
+              className={`input ${enrichedFields.has('yearBuilt') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
               placeholder="1990"
             />
             {errors.yearBuilt && (
@@ -234,39 +320,48 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
 
         <div className="grid grid-cols-3 gap-4">
           <div>
-            <label htmlFor="squareFeet" className="label block mb-1.5">
+            <label htmlFor="squareFeet" className="label block mb-1.5 flex items-center gap-1">
               Square feet
+              {enrichedFields.has('squareFeet') && (
+                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+              )}
             </label>
             <input
               {...register('squareFeet')}
               id="squareFeet"
               type="number"
-              className="input"
+              className={`input ${enrichedFields.has('squareFeet') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
               placeholder="2000"
             />
           </div>
           <div>
-            <label htmlFor="bedrooms" className="label block mb-1.5">
+            <label htmlFor="bedrooms" className="label block mb-1.5 flex items-center gap-1">
               Bedrooms
+              {enrichedFields.has('bedrooms') && (
+                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+              )}
             </label>
             <input
               {...register('bedrooms')}
               id="bedrooms"
               type="number"
-              className="input"
+              className={`input ${enrichedFields.has('bedrooms') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
               placeholder="3"
             />
           </div>
           <div>
-            <label htmlFor="bathrooms" className="label block mb-1.5">
+            <label htmlFor="bathrooms" className="label block mb-1.5 flex items-center gap-1">
               Bathrooms
+              {enrichedFields.has('bathrooms') && (
+                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+              )}
             </label>
             <input
               {...register('bathrooms')}
               id="bathrooms"
               type="number"
               step="0.5"
-              className="input"
+              className={`input ${enrichedFields.has('bathrooms') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
               placeholder="2"
             />
           </div>
