@@ -777,6 +777,56 @@ model RefreshToken {
 }
 
 // ============================================================================
+// ACTIVITY LOG ENUMS
+// ============================================================================
+
+enum ActorType {
+  HOMEOWNER
+  HOME_MANAGER
+  HANDYMAN
+  VENDOR
+  SYSTEM
+}
+
+enum ActivityAction {
+  // Bills
+  BILL_PAID
+  BILL_SCHEDULED
+  BILL_ADDED
+  // Service
+  SERVICE_COMPLETED
+  SERVICE_SCHEDULED
+  SERVICE_REQUESTED
+  // Property
+  ASSET_ADDED
+  ASSET_UPDATED
+  ZONE_ADDED
+  // Vendor
+  VENDOR_ADDED
+  VENDOR_CONTACTED
+  // Approval
+  APPROVAL_REQUESTED
+  APPROVAL_GRANTED
+  APPROVAL_DENIED
+  // Communication
+  MESSAGE_SENT
+  NOTE_ADDED
+  // System
+  REMINDER_SENT
+  DOCUMENT_UPLOADED
+}
+
+enum ActivityCategory {
+  BILLING
+  SERVICE
+  MAINTENANCE
+  COMMUNICATION
+  PROPERTY
+  FAMILY
+  SYSTEM
+}
+
+// ============================================================================
 // HOUSEHOLD & MEMBERS
 // ============================================================================
 
@@ -882,6 +932,9 @@ model Household {
   // Comprehensive Bills & Payments
   comprehensiveBills ComprehensiveBill[]
   kidActivities      KidActivity[]
+
+  // Activity Log
+  activityLogs ActivityLog[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -4268,4 +4321,49 @@ model OnboardingProgress {
   handyman    User?     @relation("OnboardingHandyman", fields: [handymanId], references: [id], onDelete: SetNull)
 
   @@map("onboarding_progress")
+}
+
+// ============================================================================
+// ACTIVITY LOG - Tracks all actions for homeowner visibility
+// ============================================================================
+
+model ActivityLog {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Who did this
+  actorId   String    @map("actor_id")
+  actorType ActorType @map("actor_type")
+  actorName String    @map("actor_name")
+
+  // What happened
+  action      ActivityAction   @map("action")
+  category    ActivityCategory @map("category")
+  title       String
+  description String?          @db.Text
+
+  // Links to related records
+  billId   String? @map("bill_id")
+  vendorId String? @map("vendor_id")
+  assetId  String? @map("asset_id")
+  zoneId   String? @map("zone_id")
+  taskId   String? @map("task_id")
+
+  // Metadata
+  amount   Float?
+  metadata Json?
+
+  // Visibility
+  visibleToHomeowner Boolean @default(true) @map("visible_to_homeowner")
+  visibleToHandyman  Boolean @default(false) @map("visible_to_handyman")
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId, createdAt])
+  @@index([householdId, category])
+  @@index([householdId, visibleToHomeowner])
+  @@map("activity_logs")
 }

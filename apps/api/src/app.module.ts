@@ -37,6 +37,8 @@ import { TravelModule } from './travel/travel.module';
 import { PropertyModule } from './property';
 import { IntakeModule } from './intake';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { ActivityModule } from './activity';
+import { DashboardModule } from './dashboard';
 
 @Module({
   imports: [
@@ -78,6 +80,8 @@ import { OnboardingModule } from './onboarding/onboarding.module';
     PropertyModule,
     IntakeModule,
     OnboardingModule,
+    ActivityModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],
