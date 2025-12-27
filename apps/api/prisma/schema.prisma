@@ -748,6 +748,9 @@ model User {
   // Intake checklist completions (Home Manager)
   completedChecklists HomeChecklist[] @relation("ChecklistCompletedBy")
 
+  // Household Intake / Onboarding Workbench
+  intakesManaged HouseholdIntake[] @relation("IntakeManager")
+
   @@map("users")
 }
 
@@ -860,6 +863,11 @@ model Household {
 
   // Intake checklist for Home Manager
   intakeChecklist HomeChecklist?
+
+  // Household Intake / Onboarding Workbench
+  householdIntake  HouseholdIntake?
+  familyMembers    FamilyMember[]
+  familyActivities FamilyActivity[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -3479,4 +3487,179 @@ model HomeChecklist {
   completedBy User?     @relation("ChecklistCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
 
   @@map("home_checklists")
+}
+
+// ============================================================================
+// HOUSEHOLD INTAKE - Comprehensive Onboarding Workbench
+// ============================================================================
+
+// Status of the intake process
+enum IntakeStatus {
+  PENDING      // Not started
+  SCHEDULED    // Call scheduled
+  IN_PROGRESS  // Currently on call
+  PAUSED       // Partially completed, will resume
+  COMPLETED    // All sections done
+  ARCHIVED     // Intake archived
+}
+
+// Family member types (NOT pets - use Pet model for pets)
+enum FamilyMemberType {
+  ADULT        // Adult household member (spouse, partner, parent)
+  CHILD        // Child in household
+  STAFF        // Household staff (nanny, housekeeper, caretaker)
+}
+
+// HouseholdIntake - Main intake session record for Home Manager calls
+model HouseholdIntake {
+  id            String       @id @default(cuid())
+  householdId   String       @unique @map("household_id")
+
+  // Status tracking
+  status        IntakeStatus @default(PENDING)
+  progress      Int          @default(0) // 0-100 percentage
+
+  // Scheduling
+  scheduledAt   DateTime?    @map("scheduled_at")
+  startedAt     DateTime?    @map("started_at")
+  completedAt   DateTime?    @map("completed_at")
+
+  // Manager handling the intake
+  managerId     String?      @map("manager_id")
+
+  // Section completion tracking (JSON object mapping section ids to completion status)
+  sectionsCompleted Json?    @map("sections_completed")
+
+  // Call notes and observations
+  callNotes     String?      @map("call_notes") @db.Text
+  managerNotes  String?      @map("manager_notes") @db.Text
+
+  // Calculated monthly funding recommendation
+  calculatedMonthlyFunding Decimal? @map("calculated_monthly_funding") @db.Decimal(10, 2)
+  fundingBreakdown         Json?    @map("funding_breakdown")
+
+  // Next steps and follow-ups
+  nextSteps     String?      @map("next_steps") @db.Text
+  followUpDate  DateTime?    @map("follow_up_date")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  manager   User?     @relation("IntakeManager", fields: [managerId], references: [id], onDelete: SetNull)
+
+  @@map("household_intakes")
+}
+
+// FamilyMember - Non-user household members (adults, children, staff)
+// Note: Pets should use the Pet model, not FamilyMember
+model FamilyMember {
+  id          String           @id @default(cuid())
+  householdId String           @map("household_id")
+
+  // Basic Info
+  firstName   String           @map("first_name")
+  lastName    String?          @map("last_name")
+  nickname    String?
+  type        FamilyMemberType @default(ADULT)
+
+  // Contact (for adults/staff)
+  email       String?
+  phone       String?
+
+  // Demographics
+  birthdate   DateTime?        @db.Date
+  relationship String?         // e.g., "Spouse", "Son", "Daughter", "Nanny", "Housekeeper"
+
+  // School/Work info (for children)
+  school          String?
+  schoolGrade     String?          @map("school_grade")
+  teacher         String?
+  schoolPickup    String?          @map("school_pickup") // "Bus", "Parent", "Carpool", etc.
+  schoolDropoff   String?          @map("school_dropoff")
+
+  // Staff info
+  workSchedule    String?          @map("work_schedule") // e.g., "M-F 8am-6pm"
+  responsibilities String?         @db.Text
+  startDate       DateTime?        @map("start_date") @db.Date
+  paymentMethod   String?          @map("payment_method") // For staff pay tracking
+
+  // Medical (optional for emergency)
+  allergies       String[]         @default([])
+  medications     String[]         @default([])
+  specialNeeds    String?          @map("special_needs") @db.Text
+
+  // Emergency contacts
+  emergencyContact      String?    @map("emergency_contact")
+  emergencyContactPhone String?    @map("emergency_contact_phone")
+
+  // Photo
+  photoUrl        String?          @map("photo_url")
+
+  notes           String?          @db.Text
+  isActive        Boolean          @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household  Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  activities FamilyActivity[]
+
+  @@index([householdId, type])
+  @@map("family_members")
+}
+
+// FamilyActivity - Recurring activities and subscriptions for family members
+model FamilyActivity {
+  id              String    @id @default(cuid())
+  householdId     String    @map("household_id")
+  familyMemberId  String?   @map("family_member_id")
+
+  // Activity details
+  name            String    // e.g., "Soccer Practice", "Piano Lessons"
+  category        String    // Sports, Music, Art, Tutoring, Camp, etc.
+  description     String?   @db.Text
+  location        String?
+
+  // Schedule
+  schedule        String?   // e.g., "Tuesdays and Thursdays 4-5pm"
+  startDate       DateTime? @map("start_date") @db.Date
+  endDate         DateTime? @map("end_date") @db.Date
+  isSeasonal      Boolean   @default(false) @map("is_seasonal")
+  season          String?   // "Fall", "Spring", "Summer", "Year-round"
+
+  // Organization/Provider
+  organizationName  String?   @map("organization_name")
+  contactName       String?   @map("contact_name")
+  contactPhone      String?   @map("contact_phone")
+  contactEmail      String?   @map("contact_email")
+  websiteUrl        String?   @map("website_url")
+
+  // Cost
+  costAmount        Decimal?  @map("cost_amount") @db.Decimal(10, 2)
+  costFrequency     BillingFrequency? @map("cost_frequency")
+  paymentMethod     String?   @map("payment_method")
+  paymentDueDay     Int?      @map("payment_due_day") // Day of month
+
+  // Equipment/supplies needed
+  equipmentNeeded   String[]  @default([]) @map("equipment_needed")
+
+  // Transportation
+  transportation    String?   // "Parent drives", "Carpool", "Walk", etc.
+
+  notes             String?   @db.Text
+  isActive          Boolean   @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household     Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyMember  FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+
+  @@index([householdId])
+  @@index([familyMemberId])
+  @@map("family_activities")
 }

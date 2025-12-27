@@ -35,6 +35,7 @@ import { ProjectPlannerModule } from './project-planner/project-planner.module';
 import { FamilyModule } from './family/family.module';
 import { TravelModule } from './travel/travel.module';
 import { PropertyModule } from './property';
+import { IntakeModule } from './intake';
 
 @Module({
   imports: [
@@ -74,6 +75,7 @@ import { PropertyModule } from './property';
     FamilyModule,
     TravelModule,
     PropertyModule,
+    IntakeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
