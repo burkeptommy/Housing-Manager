@@ -6,14 +6,45 @@ Haven is a full-service home management platform that provides dedicated Home Ma
 
 ---
 
-## ⚠️ Current Priority (December 27, 2024)
+## 🚀 Current Priority (December 27, 2024)
 
-**RUN THIS FIRST in Claude Code:**
+**Making Haven production-ready with real data flow.**
+
+Run in Claude Code:
 ```
-Read the prompt at prompts/000-RESTORE-polished-pages.md and execute all phases in order.
+Read the prompt at prompts/003-production-ready-real-data.md and implement all phases in order.
 ```
 
-This restores the polished Dashboard, Your Home, and Family pages that were accidentally overwritten.
+This will:
+1. Add database models for onboarding, activity logging, payments
+2. Seed Morrison demo data (for bob@example.com only)
+3. Build all API endpoints
+4. Connect frontend to real APIs
+5. Enable full signup → onboarding → usage flow
+
+---
+
+## Architecture
+
+```
+NEW USER FLOW:
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│ User Signup │ ──> │ Onboarding   │ ──> │ HM Sees in      │
+│ + Address   │     │ Session      │     │ Queue           │
+└─────────────┘     │ Created      │     └────────┬────────┘
+                    └──────────────┘              │
+                                                  ▼
+┌─────────────┐     ┌──────────────┐     ┌─────────────────┐
+│ User Sees   │ <── │ Data Saved   │ <── │ HM Calls User   │
+│ Real Data   │     │ to Database  │     │ Uses Workbench  │
+└─────────────┘     └──────────────┘     └─────────────────┘
+
+DEMO ACCOUNT (bob@example.com):
+┌─────────────┐     ┌──────────────┐
+│ Login as    │ ──> │ See Morrison │
+│ Bob         │     │ Demo Data    │
+└─────────────┘     └──────────────┘
+```
 
 ---
 
@@ -25,67 +56,33 @@ This restores the polished Dashboard, Your Home, and Family pages that were acci
 | **Production Web** | https://havenhome.dev |
 | **Production API** | https://api.havenhome.dev |
 | **GCP Project** | home-manager-480616 |
-| **Development Prompts** | `/prompts/` |
+| **Prompts** | `/prompts/` |
 
 ---
 
-## Current Status
+## Tech Stack
 
-### 🚨 Needs Immediate Fix
-- Dashboard, Your Home, Family pages were overwritten - **Run prompt 000 to restore**
-
-### ✅ Completed
-- Firebase Auth (Email/Password + Google Sign-In)
-- Cloud SQL database
-- Cloud Run services
-- ATTOM Property API integration
-- Google Places autocomplete
-- Design system (Navy + Champagne)
-- Polished demo pages (need restore)
-
-### ⏳ After Restore
-- Home Manager intake workbench (prompt 002)
-- Approval system
-- Handyman portal
-- Messaging
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 15, React 18, Tailwind CSS |
+| Backend | NestJS 10, Prisma ORM, PostgreSQL |
+| Auth | Firebase Authentication |
+| Payments | Stripe (planned) |
+| Property Data | ATTOM API |
+| Deploy | Google Cloud Run |
 
 ---
 
-## Canonical Demo Data (Morrison Family)
+## Demo Account
 
-**ALL pages and seed data MUST use this exact data:**
+**Bob Morrison (demo user with pre-populated data):**
+- Email: `bob@example.com`
+- Property: Inspiration Farm, 38 Bedford Road, Greenwich, CT 06831
+- Family: Alice (spouse), Emma (12), Jack (8), Max (dog), Maria Garcia (nanny)
+- Vehicles: Tesla Model Y, Toyota Highlander, Mercedes GLE 450
+- Home Manager: Sarah Chen
 
-### Property
-```
-Name: Inspiration Farm
-Address: 38 Bedford Road, Greenwich, CT 06831
-Specs: 5 bed, 5.5 bath, 5,765 sqft, 2.0 acres
-Year Built: 1998
-Home Health: 94/100 (Excellent)
-```
-
-### Family
-| Person | Role | Key Details |
-|--------|------|-------------|
-| Bob Morrison | Head of Household | bob@example.com, (203) 555-0101 |
-| Alice Morrison | Spouse | alice@example.com, (203) 555-0102 |
-| Emma Morrison | Daughter, 12 | 7th Grade, Greenwich Country Day, Allergies: Peanuts/Tree nuts |
-| Jack Morrison | Son, 8 | 3rd Grade, North Street School |
-| Max | Golden Retriever | 4 years, Vet: Dr. Williams |
-| Maria Garcia | Nanny | $1,500/week, Mon-Fri |
-
-### Vehicles
-| Vehicle | Driver | Monthly Cost |
-|---------|--------|--------------|
-| 2023 Tesla Model Y | Bob | $895 |
-| 2022 Toyota Highlander | Alice | $775 |
-| 2024 Mercedes GLE 450 | Alice | $1,082 |
-
-### Haven Team
-| Role | Name | Email |
-|------|------|-------|
-| Home Manager | Sarah Chen | sarah@haven.app |
-| Handyman | Mike Rodriguez | mike@haven.app |
+**All other users** get real data captured through onboarding.
 
 ---
 
@@ -98,40 +95,15 @@ pnpm dev:api          # localhost:4000
 
 # Database
 cd apps/api
-pnpm prisma:migrate:dev
-pnpm prisma:seed
-pnpm prisma:studio
+pnpm prisma migrate dev    # Run migrations
+pnpm prisma db seed        # Seed demo data
+pnpm prisma studio         # Database GUI
 
 # Build & Deploy
 pnpm build
-gcloud builds submit --config=cloudbuild-web.yaml --project=home-manager-480616
 gcloud builds submit --config=cloudbuild-api.yaml --project=home-manager-480616
+gcloud builds submit --config=cloudbuild-web.yaml --project=home-manager-480616
 ```
-
----
-
-## Architecture
-
-```
-/apps
-  /api          # NestJS backend
-  /web          # Next.js frontend
-  /mobile       # Expo (future)
-/packages
-  /config       # Shared configs
-  /core         # Shared types
-  /ui           # Shared components
-/prompts        # Claude Code implementation prompts
-```
-
----
-
-## Design System
-
-**Colors (NO BRIGHT GREEN):**
-- Navy: #0a1929 (sidebar), #102a43 (headings)
-- Champagne: #c4a574 (accents, CTAs)
-- White/Gray: backgrounds, cards
 
 ---
 
@@ -141,18 +113,77 @@ gcloud builds submit --config=cloudbuild-api.yaml --project=home-manager-480616
 |------|-------|----------|
 | Essentials | $39/mo | Bill tracking |
 | Lite | $349/mo | + Text-based manager |
-| Haven | $749/mo | + Proactive manager, handyman |
+| **Haven** | $749/mo | + Proactive manager, handyman |
 | Haven+ | $1,499/mo | + Lifestyle services |
 | Estate | $3,499/mo | + Multi-property |
 
 ---
 
-## Next Session Checklist
+## Project Structure
 
-1. Run `prompts/000-RESTORE-polished-pages.md` first
-2. Verify pages show correct Morrison data
-3. Continue with `prompts/002-home-manager-intake-workbench.md`
-4. Then build approval system, handyman portal
+```
+/apps
+  /api              # NestJS backend
+    /src
+      /auth         # Firebase auth
+      /dashboard    # Dashboard API
+      /property     # Property + zones API
+      /family       # Family members API  
+      /onboarding   # Onboarding flow API
+      /activity     # Activity logging
+    /prisma         # Schema + migrations + seed
+  /web              # Next.js frontend
+    /src/app
+      /app          # Homeowner portal
+      /manager      # Home Manager portal
+      /onboarding   # Signup flow
+/prompts            # Claude Code implementation prompts
+```
+
+---
+
+## API Endpoints
+
+### Homeowner Portal
+| Endpoint | Description |
+|----------|-------------|
+| `GET /dashboard/household/:id` | Dashboard summary |
+| `GET /property/household/:id` | Property + zones + assets |
+| `GET /family/household/:id` | Family members, vehicles |
+| `GET /bills/household/:id` | Bills and payments |
+
+### Onboarding
+| Endpoint | Description |
+|----------|-------------|
+| `POST /onboarding` | Create session on signup |
+| `GET /onboarding/queue` | HM queue of pending users |
+| `GET /onboarding/:id` | Get session for intake |
+| `PUT /onboarding/:id/intake` | Save intake data |
+| `POST /onboarding/:id/complete` | Complete intake |
+
+---
+
+## Status
+
+### ✅ Completed
+- Firebase Auth (Email + Google)
+- User signup flow with address capture
+- ATTOM property enrichment
+- Polished demo pages (Dashboard, Your Home, Family)
+- Design system (Navy + Champagne)
+
+### 🚀 In Progress (Prompt 003)
+- Database schema for onboarding/activity
+- Morrison seed data
+- API endpoints for all pages
+- Frontend ↔ API connection
+- Onboarding queue and intake workbench
+
+### ⏳ Next
+- Approval system (HM requests → Homeowner approves)
+- Handyman portal
+- Messaging system
+- Calendar integration
 
 ---
 

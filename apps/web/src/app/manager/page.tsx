@@ -3,10 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/auth-context';
-import { getApiClient } from '@/lib/api';
-import { images } from '@/lib/images';
-import type { ServiceRequestDetail, Household } from '@haven/core';
-import { Card, CardHeader, Badge, Button, Avatar, StatCard } from '@/components/ui';
+import { Card, Badge, Button, Avatar } from '@/components/ui';
 import {
   Plus,
   Home,
@@ -18,17 +15,14 @@ import {
   Phone,
   FileText,
   CheckSquare,
-  ArrowRight,
-  MoreVertical,
   Dog,
   Key,
   Bell,
-  Clock,
   Users,
   DollarSign,
-  TrendingUp,
   ChevronRight,
   Zap,
+  Clock,
 } from 'lucide-react';
 
 // ============================================================================
@@ -216,6 +210,29 @@ function formatCurrentDate(): string {
   });
 }
 
+function formatTimeAgo(date: Date): string {
+  const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+  if (seconds < 60) return 'Just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hr ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+function mapCategoryToType(category: string): 'request' | 'approval' | 'message' | 'payment' {
+  const map: Record<string, 'request' | 'approval' | 'message' | 'payment'> = {
+    BILLING: 'payment',
+    SERVICE: 'request',
+    MAINTENANCE: 'request',
+    PROPERTY: 'request',
+    COMMUNICATION: 'message',
+    APPROVAL: 'approval',
+  };
+  return map[category] || 'request';
+}
+
 // ============================================================================
 // COMPONENTS - PREMIUM REDESIGN
 // ============================================================================
@@ -239,7 +256,7 @@ function HeroHeader({ userName, stats }: { userName: string; stats: { households
             </h1>
             <p className="text-indigo-200 mt-2">Managing {stats.householdsManaged} households</p>
           </div>
-          <Avatar name={userName} src={images.avatars.sarah} size="xl" />
+          <Avatar name={userName} type="female" size="xl" />
         </div>
 
         {/* Quick Stats */}
@@ -540,24 +557,34 @@ function ActivityItemCard({ activity }: { activity: Activity }) {
 // ============================================================================
 
 export default function ManagerDashboardPage() {
-  const { user } = useAuth();
-  const [requests, setRequests] = useState<ServiceRequestDetail[]>([]);
-  const [households, setHouseholds] = useState<Household[]>([]);
+  const { user, getIdToken } = useAuth();
+  const [dashboardData, setDashboardData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [activityFilter, setActivityFilter] = useState<'all' | 'requests' | 'approvals' | 'messages'>('all');
 
-  const api = getApiClient();
-
   const loadData = useCallback(async () => {
     try {
-      const [requestsData, householdsData] = await Promise.all([
-        api.getManagerRequests(),
-        api.getHouseholds(),
-      ]);
-      setRequests(requestsData);
-      setHouseholds(householdsData);
+      const token = await getIdToken();
+      if (!token) {
+        setError('Not authenticated');
+        setIsLoading(false);
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
+
+      const response = await fetch(`${apiUrl}/manager/dashboard`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setDashboardData(data);
+      } else {
+        console.error('Failed to load dashboard:', response.status);
+      }
     } catch (err: unknown) {
       const message =
         err && typeof err === 'object' && 'message' in err
@@ -567,35 +594,76 @@ export default function ManagerDashboardPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [api]);
+  }, [getIdToken]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  // Calculate stats from real data + mock
+  // Calculate stats from real data or fallback to mock
   const stats = useMemo(() => {
-    const realHouseholds = households.length || mockHouseholds.length;
-    const urgentFromRequests = requests.filter((r) => r.priority === 'URGENT' && r.status !== 'COMPLETED').length;
+    if (dashboardData?.stats) {
+      return {
+        householdsManaged: dashboardData.stats.householdsManaged,
+        urgentItems: dashboardData.stats.urgentItems,
+        tasksToday: dashboardData.stats.tasksToday || mockTasks.fromHomeowners.length + mockTasks.systemGenerated.length,
+        pendingApprovals: dashboardData.stats.pendingOnboarding,
+        billsDueThisWeek: dashboardData.stats.billsDueThisWeek,
+      };
+    }
+
     return {
-      householdsManaged: realHouseholds,
-      urgentItems: Math.max(urgentFromRequests, mockUrgentItems.length),
+      householdsManaged: mockHouseholds.length,
+      urgentItems: mockUrgentItems.length,
       tasksToday: mockTasks.fromHomeowners.length + mockTasks.systemGenerated.length,
       pendingApprovals: 4,
       billsDueThisWeek: 12847.23,
     };
-  }, [requests, households]);
+  }, [dashboardData]);
+
+  // Get households from API or fallback to mock
+  const displayHouseholds = useMemo(() => {
+    if (dashboardData?.households?.length > 0) {
+      return dashboardData.households.map((h: any) => ({
+        id: h.id,
+        name: h.name,
+        address: h.address || 'No address',
+        status: h.status || 'good',
+        urgentCount: h.urgentCount || 0,
+        taskCount: h.taskCount || 0,
+        unreadMessages: h.unreadMessages || 0,
+        lastContact: h.lastContact || 'Recently',
+      }));
+    }
+    return mockHouseholds;
+  }, [dashboardData]);
+
+  // Get activity from API or fallback to mock
+  const displayActivity = useMemo(() => {
+    if (dashboardData?.recentActivity?.length > 0) {
+      return dashboardData.recentActivity.map((a: any) => ({
+        id: a.id,
+        timeAgo: formatTimeAgo(new Date(a.createdAt)),
+        household: a.householdName,
+        action: a.title,
+        detail: a.description || '',
+        type: mapCategoryToType(a.category),
+      }));
+    }
+    return mockActivities;
+  }, [dashboardData]);
 
   // Filter activities
   const filteredActivities = useMemo(() => {
-    if (activityFilter === 'all') return mockActivities;
-    return mockActivities.filter(a => {
+    const activities = displayActivity;
+    if (activityFilter === 'all') return activities;
+    return activities.filter((a: Activity) => {
       if (activityFilter === 'requests') return a.type === 'request';
       if (activityFilter === 'approvals') return a.type === 'approval';
       if (activityFilter === 'messages') return a.type === 'message';
       return true;
     });
-  }, [activityFilter]);
+  }, [activityFilter, displayActivity]);
 
   const handleTaskComplete = (taskId: string) => {
     setCompletedTasks(prev =>
@@ -720,7 +788,7 @@ export default function ManagerDashboardPage() {
           </Link>
         </div>
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mockHouseholds.map((household) => (
+          {displayHouseholds.map((household: HouseholdStatus) => (
             <HouseholdCard key={household.id} household={household} />
           ))}
         </div>
@@ -747,7 +815,7 @@ export default function ManagerDashboardPage() {
           </select>
         </div>
         <div className="p-2 space-y-1">
-          {filteredActivities.map((activity) => (
+          {filteredActivities.map((activity: Activity) => (
             <ActivityItemCard key={activity.id} activity={activity} />
           ))}
         </div>

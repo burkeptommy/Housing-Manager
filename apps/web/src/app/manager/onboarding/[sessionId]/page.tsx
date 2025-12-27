@@ -179,13 +179,34 @@ export default function IntakeWorkbenchPage() {
   const [data, setData] = useState<SessionData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['quickStart']));
   const [formData, setFormData] = useState<Record<string, any>>({});
   const [callNotes, setCallNotes] = useState('');
+  const [activeSection, setActiveSection] = useState<string | null>(null);
 
   useEffect(() => {
     fetchSession();
   }, [sessionId]);
+
+  // Auto-save when form data changes
+  useEffect(() => {
+    if (!activeSection || !formData[activeSection]) return;
+
+    const timer = setTimeout(() => {
+      saveSection(activeSection);
+    }, 2000); // Save 2 seconds after last change
+
+    return () => clearTimeout(timer);
+  }, [formData, activeSection, saveSection]);
+
+  const formatSavedTime = (date: Date): string => {
+    const seconds = Math.floor((new Date().getTime() - date.getTime()) / 1000);
+    if (seconds < 60) return 'just now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
 
   const fetchSession = async () => {
     try {
@@ -217,7 +238,7 @@ export default function IntakeWorkbenchPage() {
       const token = await getIdToken();
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
 
-      await fetch(`${apiUrl}/manager/onboarding/${sessionId}/intake`, {
+      const response = await fetch(`${apiUrl}/manager/onboarding/${sessionId}/intake`, {
         method: 'PUT',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -229,6 +250,10 @@ export default function IntakeWorkbenchPage() {
           progress: calculateSectionProgress(sectionId),
         }),
       });
+
+      if (response.ok) {
+        setLastSaved(new Date());
+      }
     } catch (error) {
       console.error('Failed to save:', error);
     } finally {
@@ -296,6 +321,7 @@ export default function IntakeWorkbenchPage() {
   };
 
   const updateField = (sectionId: string, fieldId: string, value: any) => {
+    setActiveSection(sectionId);
     setFormData((prev) => ({
       ...prev,
       [sectionId]: {
@@ -371,6 +397,21 @@ export default function IntakeWorkbenchPage() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* Save Status Indicator */}
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                {saving ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : lastSaved ? (
+                  <>
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <span>Saved {formatSavedTime(lastSaved)}</span>
+                  </>
+                ) : null}
+              </div>
+
               {data.session.status === 'PENDING_CALL' && (
                 <button
                   onClick={startCall}

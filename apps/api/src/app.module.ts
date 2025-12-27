@@ -37,6 +37,7 @@ import { TravelModule } from './travel/travel.module';
 import { PropertyModule } from './property';
 import { IntakeModule } from './intake';
 import { OnboardingModule } from './onboarding/onboarding.module';
+import { ManagerModule } from './manager';
 import { ManagerOnboardingModule } from './manager/onboarding';
 import { ActivityModule } from './activity';
 import { DashboardModule } from './dashboard';
@@ -81,6 +82,7 @@ import { DashboardModule } from './dashboard';
     PropertyModule,
     IntakeModule,
     OnboardingModule,
+    ManagerModule,
     ManagerOnboardingModule,
     ActivityModule,
     DashboardModule,

@@ -4,11 +4,13 @@ This folder contains implementation prompts for Claude Code.
 
 ---
 
-## ⚠️ CRITICAL: Read Before Running Any Prompt
+## Current Priority (December 27, 2024)
 
-1. **Always run `000-RESTORE-polished-pages.md` first** if pages are broken
-2. **Never overwrite polished frontend pages** with API-connected versions until APIs work
-3. **Always use Morrison demo data** - see canonical data below
+**004 running → Next: Connect Manager Portal**
+
+```
+Read the prompt at prompts/005-connect-manager-portal.md and implement all phases in order.
+```
 
 ---
 
@@ -16,88 +18,76 @@ This folder contains implementation prompts for Claude Code.
 
 | # | File | Description | Status |
 |---|------|-------------|--------|
-| **000** | `000-RESTORE-polished-pages.md` | **RUN FIRST** - Restores Dashboard, Your Home, Family pages | 🚨 Run if pages broken |
-| 001 | `001-homeowner-portal-production-ready.md` | Backend APIs only (ignore frontend sections) | ⚠️ Backend Only |
-| 002 | `002-home-manager-intake-workbench.md` | Home Manager intake tool | ⏳ After 000 |
+| 000 | `000-RESTORE-polished-pages.md` | Restore pages if broken | ✅ Done |
+| 001 | `001-homeowner-portal-production-ready.md` | (Deprecated) | ⛔ Skip |
+| 002 | `002-home-manager-intake-workbench.md` | (Merged into 003) | ⛔ Skip |
+| 003 | `003-production-ready-real-data.md` | APIs, seed data, onboarding | ✅ Done |
+| 004 | `004-admin-portal.md` | Admin portal + Tom's account | 🔄 Running |
+| **005** | `005-connect-manager-portal.md` | **Wire up Manager Portal to APIs** | 🚀 Next |
 
 ---
 
-## How to Run in Claude Code
+## What Prompt 005 Does
 
-```
-Read the prompt at prompts/000-RESTORE-polished-pages.md and execute all phases in order.
-```
+**This is NOT a rebuild** - the Manager Portal already exists with great UI. This prompt just connects it to real APIs.
 
----
+### New API Endpoints
+| Endpoint | Description |
+|----------|-------------|
+| `GET /manager/dashboard` | Dashboard data for logged-in manager |
+| `GET /manager/households` | Manager's assigned households |
+| `GET /manager/households/:id` | Full household detail |
+| `GET /manager/onboarding/queue` | Onboarding queue for this manager |
+| `GET /manager/activity` | Activity across managed households |
+| `POST /manager/activity` | Log new activity |
 
-## Canonical Morrison Demo Data
+### Frontend Updates
+| Page | Change |
+|------|--------|
+| `/manager` | Fetch real stats, households, activity |
+| `/manager/onboarding` | Already fetching - verify endpoint |
+| `/manager/onboarding/[id]` | Save intake data on field changes |
+| `/manager/households` | Fetch from `/manager/households` API |
 
-**ALWAYS use this exact data in all pages and seed files:**
-
-### Property
-- **Name:** Inspiration Farm
-- **Address:** 38 Bedford Road, Greenwich, CT 06831
-- **Specs:** 5 bed, 5.5 bath, 5,765 sqft, 2.0 acres, Built 1998
-- **Home Health:** 94/100 (Excellent)
-
-### Family
-| Person | Role | Details |
-|--------|------|---------|
-| Bob Morrison | Head of Household | bob@example.com, (203) 555-0101 |
-| Alice Morrison | Spouse | alice@example.com, (203) 555-0102 |
-| Emma Morrison | Daughter, 12 | 7th Grade, Greenwich Country Day, Allergies: Peanuts/Tree nuts |
-| Jack Morrison | Son, 8 | 3rd Grade, North Street School |
-| Max | Pet | Golden Retriever, 4 years, Dr. Williams vet |
-| Maria Garcia | Nanny | (203) 555-0199, $1,500/week |
-
-### Vehicles
-| Vehicle | Driver | Monthly Cost |
-|---------|--------|--------------|
-| 2023 Tesla Model Y (GRN 1234) | Bob | $895 |
-| 2022 Toyota Highlander (XYZ 5678) | Alice | $775 |
-| 2024 Mercedes GLE 450 (EF-11111) | Alice | $1,082 |
-
-### Haven Team
-| Role | Name | Email |
-|------|------|-------|
-| Home Manager | Sarah Chen | sarah@haven.app |
-| Handyman | Mike Rodriguez | mike@haven.app |
-
-### Monthly Lifestyle Costs: $17,422
-- Club Memberships: $2,550
-- Education & Activities: $5,475
-- Childcare: $6,495
-- Pet Care: $150
-- Auto: $2,752
+### Sarah's Login
+- Creates Firebase Auth account for sarah@haven.app
+- Password: SarahManager2024!
+- Links to existing database user
 
 ---
 
-## What Each Page Should Show
+## After 005 Completes
 
-### Dashboard (`/app`)
-- Greeting with Bob's name
-- Weather (68°)
-- Home Health 94%
-- Today's Notes (3 items)
-- Approval cards (roof repair, nanny contract)
-- Sarah Chen card with current tasks
-- Today's Logistics (family locations)
-- Quick Actions
+**Sarah can login at:** https://havenhome.dev/manager
+- Email: sarah@haven.app
+- Password: SarahManager2024!
 
-### Your Home (`/app/home`)
-- Header: "38 Bedford Road" (NOT "Bob's Villa")
-- Tabs: Overview, Maintenance, Systems, Vendors, Vehicles, Financial, Documents
-- Home Health donut chart (94/100)
-- Systems Status list
-- Upcoming services
-- Recent Activity
+She'll see:
+- Her dashboard with the Morrison household
+- Any pending onboarding sessions
+- Real activity from the database
 
-### Family (`/app/family`)
-- Smart Alerts (5 items)
-- Today's Logistics
-- Monthly Lifestyle Costs ($17,422)
-- Adults, Children, Pets, Staff, Vehicles sections
-- All data matches canonical above
+---
+
+## Build Order
+
+| # | Prompt | What | Status |
+|---|--------|------|--------|
+| 003 | Production Ready | APIs + seed data | ✅ |
+| 004 | Admin Portal | Tom's control center | 🔄 |
+| 005 | Manager Portal | Sarah's tools | 🚀 |
+| 006 | (Planned) | Approval system | ⏳ |
+| 007 | (Planned) | Handyman portal | ⏳ |
+
+---
+
+## Key Credentials
+
+| User | Email | Password | Portal |
+|------|-------|----------|--------|
+| Tom (Admin) | tom@havenhome.dev | HavenAdmin2024! | /admin |
+| Sarah (HM) | sarah@haven.app | SarahManager2024! | /manager |
+| Bob (Demo) | bob@example.com | Bob123! | /app |
 
 ---
 

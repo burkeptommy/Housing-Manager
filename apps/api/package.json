@@ -25,7 +25,8 @@
     "prisma:seed:social": "ts-node prisma/seed-social.ts",
     "prisma:seed:demo": "ts-node prisma/seed-comprehensive-demo.ts",
     "db:reset": "prisma migrate reset --force",
-    "setup-admin": "ts-node scripts/setup-admin.ts"
+    "setup-admin": "ts-node scripts/setup-admin.ts",
+    "setup-sarah": "ts-node scripts/setup-sarah.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.18.0",
