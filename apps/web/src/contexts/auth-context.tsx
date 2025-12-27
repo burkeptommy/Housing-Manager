@@ -63,6 +63,7 @@ interface AuthContextValue {
   households: Household[];
   currentHousehold: HouseholdDetail | null;
   householdInfo: HouseholdInfo | null;
+  householdId: string | null;
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
@@ -75,6 +76,7 @@ interface AuthContextValue {
   refreshCurrentHousehold: () => Promise<void>;
   refreshMe: () => Promise<void>;
   completeOnboarding: (householdId: string) => Promise<void>;
+  getIdToken: (forceRefresh?: boolean) => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -529,6 +531,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         households,
         currentHousehold,
         householdInfo,
+        householdId: currentHousehold?.id || householdInfo?.id || null,
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding,
@@ -541,6 +544,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refreshCurrentHousehold,
         refreshMe,
         completeOnboarding,
+        getIdToken,
       }}
     >
       {children}
