@@ -1,172 +1,302 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { getApiClient } from '@/lib/api';
-import type { AdminUser, UserRole } from '@haven/core';
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useAuth } from '@/contexts/auth-context';
+import {
+  Search,
+  Plus,
+  MoreVertical,
+  Key,
+  Trash2,
+  Edit,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 
-const roleColors: Record<UserRole, string> = {
-  ADMIN: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
-  MANAGER: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
-  HOMEOWNER: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
-  VENDOR: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  HANDYMAN: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  role: string;
+  householdId: string | null;
+  householdName: string | null;
+  createdAt: string;
+}
+
+interface UsersResponse {
+  users: User[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+const roleColors: Record<string, string> = {
+  ADMIN: 'bg-red-100 text-red-700',
+  MANAGER: 'bg-purple-100 text-purple-700',
+  HANDYMAN: 'bg-blue-100 text-blue-700',
+  HOMEOWNER: 'bg-green-100 text-green-700',
+  VENDOR: 'bg-orange-100 text-orange-700',
 };
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AdminUser[]>([]);
+  const { getIdToken } = useAuth();
+  const [data, setData] = useState<UsersResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [page, setPage] = useState(1);
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
 
-  const fetchUsers = async () => {
+  useEffect(() => {
+    fetchUsers();
+  }, [page, roleFilter]);
+
+  const fetchUsers = async (searchQuery?: string) => {
     try {
-      const api = getApiClient();
-      const data = await api.getAdminUsers();
-      setUsers(data);
-    } catch (err) {
-      setError('Failed to load users');
-      console.error(err);
+      const token = await getIdToken();
+      const params = new URLSearchParams();
+      params.set('page', page.toString());
+      params.set('limit', '20');
+      if (roleFilter) params.set('role', roleFilter);
+      if (searchQuery || search) params.set('search', searchQuery || search);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api'}/admin/users?${params}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.ok) {
+        setData(await response.json());
+      }
+    } catch (e) {
+      console.error('Failed to load users:', e);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    fetchUsers();
-  }, []);
-
-  const handleRoleChange = async (userId: string, newRole: UserRole) => {
-    setUpdatingId(userId);
-    try {
-      const api = getApiClient();
-      const updated = await api.updateUserRole(userId, { role: newRole });
-      setUsers(users.map(u => u.id === userId ? updated : u));
-    } catch (err) {
-      console.error('Failed to update role:', err);
-    } finally {
-      setUpdatingId(null);
-    }
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPage(1);
+    fetchUsers(search);
   };
 
-  const handleToggleActive = async (userId: string) => {
-    setUpdatingId(userId);
+  const resetPassword = async (userId: string) => {
+    if (!confirm('Send password reset email to this user?')) return;
+
     try {
-      const api = getApiClient();
-      const updated = await api.toggleUserActive(userId);
-      setUsers(users.map(u => u.id === userId ? updated : u));
-    } catch (err) {
-      console.error('Failed to toggle active status:', err);
-    } finally {
-      setUpdatingId(null);
+      const token = await getIdToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api'}/admin/users/${userId}/reset-password`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.ok) {
+        alert('Password reset email sent!');
+      } else {
+        alert('Failed to send reset email');
+      }
+    } catch (e) {
+      alert('Error sending reset email');
     }
+    setSelectedUser(null);
+  };
+
+  const deleteUser = async (userId: string) => {
+    if (!confirm('Are you sure you want to delete this user? This cannot be undone.')) return;
+
+    try {
+      const token = await getIdToken();
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api'}/admin/users/${userId}`,
+        {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      if (response.ok) {
+        fetchUsers();
+      } else {
+        alert('Failed to delete user');
+      }
+    } catch (e) {
+      alert('Error deleting user');
+    }
+    setSelectedUser(null);
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-red-600"></div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
-        <p className="text-red-600 dark:text-red-400">{error}</p>
-      </div>
-    );
+    return <div className="animate-pulse h-96 bg-gray-200 rounded-xl" />;
   }
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Users</h1>
-        <p className="text-slate-600 dark:text-slate-400">Manage system users and their roles</p>
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Users</h1>
+          <p className="text-gray-500">{data?.pagination.total || 0} total users</p>
+        </div>
+        <Link
+          href="/admin/users/new"
+          className="flex items-center gap-2 px-4 py-2 bg-haven-navy-900 text-white rounded-lg hover:bg-haven-navy-800 transition"
+        >
+          <Plus className="w-4 h-4" />
+          Add User
+        </Link>
       </div>
 
-      <div className="bg-white dark:bg-slate-800 rounded-lg shadow overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-slate-50 dark:bg-slate-700">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Households
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {users.map((user) => (
-                <tr key={user.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-600 flex items-center justify-center">
-                        <span className="text-sm font-medium text-slate-600 dark:text-slate-300">
-                          {user.firstName?.[0]}{user.lastName?.[0]}
-                        </span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-medium text-slate-900 dark:text-white">
-                          {user.firstName} {user.lastName}
-                        </p>
-                        <p className="text-sm text-slate-500 dark:text-slate-400">{user.email}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <select
-                      value={user.role}
-                      onChange={(e) => handleRoleChange(user.id, e.target.value as UserRole)}
-                      disabled={updatingId === user.id}
-                      className={`text-xs font-medium px-2.5 py-1 rounded-full border-0 ${roleColors[user.role]} disabled:opacity-50`}
+      {/* Filters */}
+      <div className="bg-white rounded-xl p-4 shadow-sm flex flex-wrap gap-4">
+        <form onSubmit={handleSearch} className="flex-1 min-w-[200px]">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or email..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+            />
+          </div>
+        </form>
+
+        <select
+          value={roleFilter}
+          onChange={(e) => {
+            setRoleFilter(e.target.value);
+            setPage(1);
+          }}
+          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+        >
+          <option value="">All Roles</option>
+          <option value="ADMIN">Admin</option>
+          <option value="MANAGER">Manager</option>
+          <option value="HANDYMAN">Handyman</option>
+          <option value="HOMEOWNER">Homeowner</option>
+          <option value="VENDOR">Vendor</option>
+        </select>
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-200">
+            <tr>
+              <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">User</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Role</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Household</th>
+              <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">Created</th>
+              <th className="px-6 py-3"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-100">
+            {data?.users.map((u) => (
+              <tr key={u.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4">
+                  <div>
+                    <p className="font-medium text-gray-900">{u.name}</p>
+                    <p className="text-sm text-gray-500">{u.email}</p>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${roleColors[u.role] || 'bg-gray-100'}`}>
+                    {u.role.replace('_', ' ')}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  {u.householdName ? (
+                    <Link
+                      href={`/admin/households/${u.householdId}`}
+                      className="text-haven-champagne-600 hover:underline"
                     >
-                      <option value="ADMIN">Admin</option>
-                      <option value="MANAGER">Manager</option>
-                      <option value="HOMEOWNER">Homeowner</option>
-                      <option value="VENDOR">Vendor</option>
-                    </select>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      user.isActive
-                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-400'
-                    }`}>
-                      {user.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600 dark:text-slate-400">
-                    {user._count?.households ?? 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                      {u.householdName}
+                    </Link>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-500">
+                  {new Date(u.createdAt).toLocaleDateString()}
+                </td>
+                <td className="px-6 py-4">
+                  <div className="relative">
                     <button
-                      onClick={() => handleToggleActive(user.id)}
-                      disabled={updatingId === user.id}
-                      className={`text-sm font-medium disabled:opacity-50 ${
-                        user.isActive
-                          ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300'
-                          : 'text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300'
-                      }`}
+                      onClick={() => setSelectedUser(selectedUser === u.id ? null : u.id)}
+                      className="p-2 hover:bg-gray-100 rounded-lg"
                     >
-                      {user.isActive ? 'Deactivate' : 'Activate'}
+                      <MoreVertical className="w-4 h-4 text-gray-400" />
                     </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+
+                    {selectedUser === u.id && (
+                      <div className="absolute right-0 top-full mt-1 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                        >
+                          <Edit className="w-4 h-4" />
+                          Edit User
+                        </Link>
+                        <button
+                          onClick={() => resetPassword(u.id)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 w-full text-left"
+                        >
+                          <Key className="w-4 h-4" />
+                          Reset Password
+                        </button>
+                        <button
+                          onClick={() => deleteUser(u.id)}
+                          className="flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50 w-full text-left"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                          Delete User
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {data?.users.length === 0 && (
+          <div className="py-12 text-center text-gray-500">No users found</div>
+        )}
+
+        {/* Pagination */}
+        {data && data.pagination.pages > 1 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between">
+            <p className="text-sm text-gray-500">
+              Showing {(page - 1) * 20 + 1} to {Math.min(page * 20, data.pagination.total)} of{' '}
+              {data.pagination.total}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setPage(page - 1)}
+                disabled={page === 1}
+                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              <button
+                onClick={() => setPage(page + 1)}
+                disabled={page >= data.pagination.pages}
+                className="p-2 border border-gray-200 rounded-lg disabled:opacity-50 hover:bg-gray-50"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
