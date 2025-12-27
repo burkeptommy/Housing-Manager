@@ -1,20 +1,14 @@
 # Haven Development Prompts
 
-This folder contains comprehensive prompts for Claude Code to implement features.
+This folder contains implementation prompts for Claude Code.
 
-## How to Use with Claude Code
+---
 
-Point Claude Code to a prompt file:
+## ⚠️ CRITICAL: Read Before Running Any Prompt
 
-```
-Read the prompt at prompts/001-homeowner-portal-production-ready.md and implement it phase by phase. Start with Phase 1.
-```
-
-Or for a specific phase:
-
-```
-Read prompts/002-home-manager-intake-workbench.md and implement Phase 3: Intake Workbench UI.
-```
+1. **Always run `000-RESTORE-polished-pages.md` first** if pages are broken
+2. **Never overwrite polished frontend pages** with API-connected versions until APIs work
+3. **Always use Morrison demo data** - see canonical data below
 
 ---
 
@@ -22,92 +16,93 @@ Read prompts/002-home-manager-intake-workbench.md and implement Phase 3: Intake 
 
 | # | File | Description | Status |
 |---|------|-------------|--------|
-| 001 | `001-homeowner-portal-production-ready.md` | Activity logging, Dashboard, Your Home (zones), Money/Bills, Family pages | 🔄 Running |
-| 002 | `002-home-manager-intake-workbench.md` | Onboarding queue, zone-based intake workbench, monthly funding calculator | ⏳ Next |
+| **000** | `000-RESTORE-polished-pages.md` | **RUN FIRST** - Restores Dashboard, Your Home, Family pages | 🚨 Run if pages broken |
+| 001 | `001-homeowner-portal-production-ready.md` | Backend APIs only (ignore frontend sections) | ⚠️ Backend Only |
+| 002 | `002-home-manager-intake-workbench.md` | Home Manager intake tool | ⏳ After 000 |
 
 ---
 
-## Naming Convention
+## How to Run in Claude Code
 
-Files are numbered sequentially:
-- `001-[feature-name].md`
-- `002-[feature-name].md`
-- etc.
-
----
-
-## Prompt Structure
-
-Each prompt follows this format:
-
-1. **Goal** - What we're building and why
-2. **Context** - Background and dependencies
-3. **Phases** - Numbered implementation phases
-   - Task X.1, X.2, etc.
-   - Prisma schema changes
-   - API endpoints
-   - Frontend pages
-4. **Build & Deploy** - Commands to ship
-5. **Testing Checklist** - Verification steps
+```
+Read the prompt at prompts/000-RESTORE-polished-pages.md and execute all phases in order.
+```
 
 ---
 
-## Adding New Prompts
+## Canonical Morrison Demo Data
 
-When creating new prompts:
+**ALWAYS use this exact data in all pages and seed files:**
 
-1. Use next sequential number
-2. Include clear phase breakdowns
-3. Put Prisma schema changes first
-4. Include both API and frontend code
-5. End with build/deploy instructions
-6. Add testing checklist
-7. Update this README
+### Property
+- **Name:** Inspiration Farm
+- **Address:** 38 Bedford Road, Greenwich, CT 06831
+- **Specs:** 5 bed, 5.5 bath, 5,765 sqft, 2.0 acres, Built 1998
+- **Home Health:** 94/100 (Excellent)
+
+### Family
+| Person | Role | Details |
+|--------|------|---------|
+| Bob Morrison | Head of Household | bob@example.com, (203) 555-0101 |
+| Alice Morrison | Spouse | alice@example.com, (203) 555-0102 |
+| Emma Morrison | Daughter, 12 | 7th Grade, Greenwich Country Day, Allergies: Peanuts/Tree nuts |
+| Jack Morrison | Son, 8 | 3rd Grade, North Street School |
+| Max | Pet | Golden Retriever, 4 years, Dr. Williams vet |
+| Maria Garcia | Nanny | (203) 555-0199, $1,500/week |
+
+### Vehicles
+| Vehicle | Driver | Monthly Cost |
+|---------|--------|--------------|
+| 2023 Tesla Model Y (GRN 1234) | Bob | $895 |
+| 2022 Toyota Highlander (XYZ 5678) | Alice | $775 |
+| 2024 Mercedes GLE 450 (EF-11111) | Alice | $1,082 |
+
+### Haven Team
+| Role | Name | Email |
+|------|------|-------|
+| Home Manager | Sarah Chen | sarah@haven.app |
+| Handyman | Mike Rodriguez | mike@haven.app |
+
+### Monthly Lifestyle Costs: $17,422
+- Club Memberships: $2,550
+- Education & Activities: $5,475
+- Childcare: $6,495
+- Pet Care: $150
+- Auto: $2,752
+
+---
+
+## What Each Page Should Show
+
+### Dashboard (`/app`)
+- Greeting with Bob's name
+- Weather (68°)
+- Home Health 94%
+- Today's Notes (3 items)
+- Approval cards (roof repair, nanny contract)
+- Sarah Chen card with current tasks
+- Today's Logistics (family locations)
+- Quick Actions
+
+### Your Home (`/app/home`)
+- Header: "38 Bedford Road" (NOT "Bob's Villa")
+- Tabs: Overview, Maintenance, Systems, Vendors, Vehicles, Financial, Documents
+- Home Health donut chart (94/100)
+- Systems Status list
+- Upcoming services
+- Recent Activity
+
+### Family (`/app/family`)
+- Smart Alerts (5 items)
+- Today's Logistics
+- Monthly Lifestyle Costs ($17,422)
+- Adults, Children, Pets, Staff, Vehicles sections
+- All data matches canonical above
 
 ---
 
 ## Project Location
 
-All prompts assume the project is at:
 ```
 /Users/tomburke/Projects/Housing-Manager/
 ```
-
----
-
-## Dependencies Between Prompts
-
-```
-001 (Homeowner Portal)
- └── Requires: Activity logging foundation
- └── Creates: Dashboard, Your Home, Money, Family pages
- 
-002 (HM Intake Workbench)
- └── Requires: 001 complete (data must have somewhere to go)
- └── Creates: Onboarding queue, intake tool, data processing
- 
-003 (Approval System) - PLANNED
- └── Requires: 001 + 002
- └── Creates: Approval requests, homeowner approve/deny flow
- 
-004 (Handyman Portal) - PLANNED
- └── Requires: 001 + 002
- └── Creates: Task list, completion flow, photo upload
-```
-
----
-
-## Quick Reference
-
-**Run a prompt:**
-```
-Read prompts/002-home-manager-intake-workbench.md and implement it.
-```
-
-**Check current status:**
-See `/README.md` in project root
-
-**After completing a prompt:**
-1. Update status in this file
-2. Update project README.md
-3. Commit changes
