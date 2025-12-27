@@ -497,6 +497,13 @@ export default function HouseholdProfileBuilder() {
               <span className="text-sm text-gray-500">
                 {zones.length} zones • {assets.length} assets
               </span>
+              <button
+                onClick={() => router.push(`/manager/households/${householdId}/bills`)}
+                className="flex items-center gap-2 px-3 py-2 bg-haven-champagne-100 hover:bg-haven-champagne-200 text-haven-champagne-700 rounded-lg text-sm font-medium transition"
+              >
+                <FileText className="w-4 h-4" />
+                Bills
+              </button>
               {household?.owner?.phone && (
                 <a
                   href={`tel:${household.owner.phone}`}

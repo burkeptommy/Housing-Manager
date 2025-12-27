@@ -4,14 +4,17 @@ import {
   Post,
   Put,
   Patch,
+  Delete,
   Body,
   Param,
   Query,
   UseGuards,
   Request,
+  HttpCode,
+  HttpStatus,
 } from '@nestjs/common';
 import { IntakeService, UpdateIntakeDto, IntakeAnswerDto } from './intake.service';
-import { IntakeGeneratorService } from './intake-generator.service';
+import { IntakeGeneratorService, BillCategoryType } from './intake-generator.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('intake')
@@ -180,5 +183,136 @@ export class IntakeController {
   @Post('calculate-funding')
   async calculateFunding(@Body() data: { answers: Record<string, any> }) {
     return this.intakeGenerator.calculateMonthlyFunding(data.answers);
+  }
+
+  // ===========================================================================
+  // COMPREHENSIVE BILL ENDPOINTS
+  // ===========================================================================
+
+  /**
+   * Get bill intake sections for a household
+   */
+  @Get('household/:householdId/bill-sections')
+  async getBillSections(@Param('householdId') householdId: string) {
+    return this.intakeService.getBillIntakeSections(householdId);
+  }
+
+  /**
+   * Get all bills for a household
+   */
+  @Get('household/:householdId/bills')
+  async getHouseholdBills(@Param('householdId') householdId: string) {
+    return this.intakeService.getHouseholdBills(householdId);
+  }
+
+  /**
+   * Get bill summary with monthly funding calculation
+   */
+  @Get('household/:householdId/bills/summary')
+  async getBillSummary(@Param('householdId') householdId: string) {
+    return this.intakeService.getBillSummary(householdId);
+  }
+
+  /**
+   * Calculate monthly funding for a household
+   */
+  @Get('household/:householdId/bills/funding')
+  async calculateHouseholdFunding(@Param('householdId') householdId: string) {
+    return this.intakeService.calculateHouseholdFunding(householdId);
+  }
+
+  /**
+   * Create a new bill
+   */
+  @Post('household/:householdId/bills')
+  async createBill(
+    @Param('householdId') householdId: string,
+    @Body() data: {
+      category: BillCategoryType;
+      name: string;
+      payeeName?: string;
+      accountNumber?: string;
+      amount: number;
+      frequency: string;
+      dueDay?: number;
+      amountType?: string;
+      paymentMethod?: string;
+      currentAutopay?: boolean;
+      portalUrl?: string;
+      portalUsername?: string;
+      portalNotes?: string;
+      notes?: string;
+      // Loan fields
+      principalBalance?: number;
+      interestRate?: number;
+      loanTerm?: string;
+      maturityDate?: string;
+      escrowIncluded?: boolean;
+      // Insurance fields
+      policyNumber?: string;
+      coverageAmount?: number;
+      deductible?: number;
+      renewalDate?: string;
+      // Linked entities
+      vendorId?: string;
+      vehicleId?: string;
+      familyMemberId?: string;
+      assetId?: string;
+    },
+  ) {
+    return this.intakeService.createBill(householdId, {
+      ...data,
+      maturityDate: data.maturityDate ? new Date(data.maturityDate) : undefined,
+      renewalDate: data.renewalDate ? new Date(data.renewalDate) : undefined,
+    });
+  }
+
+  /**
+   * Update a bill
+   */
+  @Patch('household/:householdId/bills/:billId')
+  async updateBill(
+    @Param('householdId') householdId: string,
+    @Param('billId') billId: string,
+    @Body() data: Partial<{
+      name: string;
+      payeeName: string;
+      accountNumber: string;
+      amount: number;
+      frequency: string;
+      dueDay: number;
+      amountType: string;
+      paymentMethod: string;
+      currentAutopay: boolean;
+      portalUrl: string;
+      portalUsername: string;
+      portalNotes: string;
+      notes: string;
+      status: string;
+      havenManaged: boolean;
+      verified: boolean;
+    }>,
+  ) {
+    return this.intakeService.updateBill(householdId, billId, data);
+  }
+
+  /**
+   * Delete a bill
+   */
+  @Delete('household/:householdId/bills/:billId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async deleteBill(
+    @Param('householdId') householdId: string,
+    @Param('billId') billId: string,
+  ) {
+    return this.intakeService.deleteBill(householdId, billId);
+  }
+
+  /**
+   * Get all bill types for dropdown
+   */
+  @Get('bill-types')
+  async getBillTypes() {
+    return this.intakeGenerator.getAllBillTypes();
   }
 }

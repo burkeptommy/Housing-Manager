@@ -879,6 +879,10 @@ model Household {
   propertyDocuments  PropertyDocument[]
   onboardingProgress OnboardingProgress?
 
+  // Comprehensive Bills & Payments
+  comprehensiveBills ComprehensiveBill[]
+  kidActivities      KidActivity[]
+
   @@index([managerId])
   @@index([assignedHandymanId])
   @@index([h3Index])
@@ -1030,10 +1034,11 @@ model Vehicle {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  primaryDriver HouseholdMember? @relation("PrimaryDriver", fields: [primaryDriverId], references: [id], onDelete: SetNull)
+  household     Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  primaryDriver HouseholdMember?    @relation("PrimaryDriver", fields: [primaryDriverId], references: [id], onDelete: SetNull)
   services      VehicleService[]
   events        FamilyEvent[]
+  bills         ComprehensiveBill[]
 
   @@index([householdId])
   @@map("vehicles")
@@ -1216,6 +1221,9 @@ model Vendor {
   servicedAssets    PropertyAsset[]    @relation("AssetServiceVendor")
   serviceLogs       ServiceLog[]       @relation("ServiceLogVendor")
   propertyDocuments PropertyDocument[] @relation("DocumentVendor")
+
+  // Comprehensive Bills
+  bills ComprehensiveBill[] @relation("BillVendor")
 
   @@index([householdId, category])
   @@index([userId])
@@ -3620,8 +3628,10 @@ model FamilyMember {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household  Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  activities FamilyActivity[]
+  household     Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  activities    FamilyActivity[]
+  bills         ComprehensiveBill[]
+  kidActivities KidActivity[]
 
   @@index([householdId, type])
   @@map("family_members")
@@ -3749,6 +3759,301 @@ enum OnboardingStatus {
   ACTIVE // Fully onboarded
 }
 
+// ============================================================================
+// COMPREHENSIVE BILLS & ACCOUNTS
+// ============================================================================
+
+enum BillCategory {
+  // Housing
+  MORTGAGE
+  RENT
+  PROPERTY_TAX
+  HOA
+  HOME_INSURANCE
+
+  // Utilities
+  ELECTRIC
+  GAS
+  WATER_SEWER
+  OIL_PROPANE
+  TRASH
+
+  // Telecom
+  INTERNET
+  CABLE_TV
+  CELL_PHONE
+  LANDLINE
+
+  // Vehicles
+  CAR_PAYMENT
+  AUTO_INSURANCE
+  CAR_REGISTRATION
+  PARKING
+  TOLLS
+
+  // Family & Kids
+  SCHOOL_TUITION
+  CHILDCARE
+  NANNY
+  KIDS_ACTIVITY
+  SCHOOL_LUNCH
+  TUTORING
+
+  // Loans & Debt
+  STUDENT_LOAN
+  PERSONAL_LOAN
+  HELOC
+  CREDIT_CARD
+
+  // Insurance
+  LIFE_INSURANCE
+  HEALTH_INSURANCE
+  UMBRELLA_INSURANCE
+  PET_INSURANCE
+  DISABILITY_INSURANCE
+  LONG_TERM_CARE
+
+  // Home Services
+  LAWN_LANDSCAPE
+  POOL_SERVICE
+  PEST_CONTROL
+  SECURITY_MONITORING
+  HOUSE_CLEANING
+  SNOW_REMOVAL
+
+  // Memberships & Subscriptions
+  GYM_FITNESS
+  CLUB_MEMBERSHIP
+  STREAMING_SERVICE
+  SOFTWARE_SUBSCRIPTION
+  NEWSPAPER_MAGAZINE
+  MEAL_KIT
+  AMAZON_PRIME
+  WAREHOUSE_CLUB
+
+  // Other
+  STORAGE
+  PET_CARE
+  CHARITY_DONATION
+  CHILD_SUPPORT
+  ALIMONY
+  OTHER_BILL
+}
+
+enum PayeeType {
+  COMPANY
+  INDIVIDUAL
+  GOVERNMENT
+  SCHOOL
+  ORGANIZATION
+}
+
+enum AmountType {
+  FIXED // Same every time
+  VARIABLE // Changes (like electric)
+  ESTIMATED // Best guess
+}
+
+enum PaymentFrequency {
+  WEEKLY
+  BIWEEKLY
+  TWICE_MONTHLY // 1st and 15th
+  MONTHLY
+  QUARTERLY
+  SEMI_ANNUAL
+  ANNUAL
+  ONE_TIME
+  AS_NEEDED // Like oil delivery
+}
+
+enum BillPaymentMethod {
+  HAVEN_PAYS // Haven will pay this
+  OWNER_AUTOPAY // Owner keeps their autopay
+  OWNER_MANUAL // Owner pays manually
+  PAYROLL // Deducted from paycheck
+  ESCROW // Included in mortgage
+}
+
+enum BillStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  PAID_OFF // For loans
+  PENDING_SETUP // Haven taking over
+}
+
+enum ActivityType {
+  SPORTS
+  MUSIC
+  ARTS
+  ACADEMIC
+  RELIGIOUS
+  SOCIAL
+  CAMP
+  OTHER_ACTIVITY
+}
+
+// ComprehensiveBill - Every recurring payment a household makes
+model ComprehensiveBill {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Categorization
+  category    BillCategory
+  subcategory String?
+
+  // What is this bill for?
+  name        String // "Eversource Electric", "Toyota Financial - Model Y"
+  description String? @db.Text
+
+  // Who do we pay?
+  payeeName String?   @map("payee_name")
+  payeeType PayeeType @default(COMPANY) @map("payee_type")
+
+  // Account Information (CRITICAL for Haven to pay)
+  accountNumber String? @map("account_number")
+  accountName   String? @map("account_name") // Name on account if different
+  policyNumber  String? @map("policy_number") // For insurance
+  memberNumber  String? @map("member_number") // For memberships
+  studentId     String? @map("student_id") // For school payments
+
+  // Login/Portal Access (for Haven to manage)
+  portalUrl      String? @map("portal_url")
+  portalUsername String? @map("portal_username")
+  portalNotes    String? @map("portal_notes") @db.Text // "Password in 1Password"
+
+  // Payment Details
+  amount     Decimal          @db.Decimal(10, 2)
+  amountType AmountType       @default(FIXED) @map("amount_type")
+  frequency  PaymentFrequency
+  dueDay     Int?             @map("due_day") // Day of month (1-31)
+  dueDate    DateTime?        @map("due_date") // For non-monthly
+
+  // Payment Method
+  paymentMethod  BillPaymentMethod @default(HAVEN_PAYS) @map("payment_method")
+  currentAutopay Boolean           @default(false) @map("current_autopay")
+  autopayAccount String?           @map("autopay_account") // Which account is it autopaying from?
+
+  // For Loans/Mortgages
+  isLoan           Boolean   @default(false) @map("is_loan")
+  principalBalance Decimal?  @map("principal_balance") @db.Decimal(12, 2)
+  interestRate     Decimal?  @map("interest_rate") @db.Decimal(5, 3) // e.g., 6.875%
+  loanTerm         String?   @map("loan_term") // "30 years", "5 years"
+  maturityDate     DateTime? @map("maturity_date")
+  escrowIncluded   Boolean?  @map("escrow_included") // For mortgage - includes taxes/insurance?
+
+  // For Insurance
+  isInsurance    Boolean   @default(false) @map("is_insurance")
+  coverageAmount Decimal?  @map("coverage_amount") @db.Decimal(12, 2)
+  deductible     Decimal?  @map("deductible") @db.Decimal(10, 2)
+  renewalDate    DateTime? @map("renewal_date")
+
+  // Linked Items
+  vendorId       String? @map("vendor_id")
+  vehicleId      String? @map("vehicle_id") // For car payments/insurance
+  familyMemberId String? @map("family_member_id") // For kid-specific bills
+  assetId        String? @map("asset_id") // For equipment warranties
+
+  // Status
+  status         BillStatus @default(ACTIVE)
+  havenManaged   Boolean    @default(false) @map("haven_managed")
+  havenStartDate DateTime?  @map("haven_start_date")
+
+  // Verification
+  verified   Boolean   @default(false)
+  verifiedAt DateTime? @map("verified_at")
+  verifiedBy String?   @map("verified_by")
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household    Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor       Vendor?             @relation("BillVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+  vehicle      Vehicle?            @relation(fields: [vehicleId], references: [id], onDelete: SetNull)
+  familyMember FamilyMember?       @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  asset        PropertyAsset?      @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  payments     BillPaymentRecord[]
+
+  @@index([householdId, category])
+  @@index([householdId, status])
+  @@index([vendorId])
+  @@map("comprehensive_bills")
+}
+
+// BillPaymentRecord - History of payments made
+model BillPaymentRecord {
+  id                  String @id @default(cuid())
+  comprehensiveBillId String @map("comprehensive_bill_id")
+
+  amount             Decimal  @db.Decimal(10, 2)
+  paidDate           DateTime @map("paid_date")
+  paidBy             String   @map("paid_by") // "Haven", "Owner", etc.
+  method             String? // "Virtual Card", "ACH", etc.
+  confirmationNumber String?  @map("confirmation_number")
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  bill ComprehensiveBill @relation(fields: [comprehensiveBillId], references: [id], onDelete: Cascade)
+
+  @@index([comprehensiveBillId, paidDate])
+  @@map("bill_payment_records")
+}
+
+// KidActivity - Detailed tracking of children's activities
+model KidActivity {
+  id             String @id @default(cuid())
+  familyMemberId String @map("family_member_id")
+  householdId    String @map("household_id")
+
+  name String // "Soccer", "Piano Lessons"
+  type ActivityType
+
+  // Organization
+  organization String?
+  location     String?
+
+  // Schedule
+  schedule    String? // "Tuesdays 4-5pm"
+  seasonStart DateTime? @map("season_start")
+  seasonEnd   DateTime? @map("season_end")
+
+  // Cost
+  cost            Decimal?          @db.Decimal(10, 2)
+  costFrequency   PaymentFrequency? @map("cost_frequency")
+  registrationFee Decimal?          @map("registration_fee") @db.Decimal(10, 2)
+  equipmentCost   Decimal?          @map("equipment_cost") @db.Decimal(10, 2)
+
+  // Contact
+  coachName    String? @map("coach_name")
+  contactPhone String? @map("contact_phone")
+  contactEmail String? @map("contact_email")
+
+  // Payment
+  paymentMethod String? @map("payment_method")
+  accountNumber String? @map("account_number")
+  portalUrl     String? @map("portal_url")
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  familyMember FamilyMember @relation(fields: [familyMemberId], references: [id], onDelete: Cascade)
+  household    Household    @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@index([familyMemberId])
+  @@map("kid_activities")
+}
+
 // Zone - A distinct area of the property (Kitchen, Master Bath, Garage, etc.)
 model Zone {
   id          String @id @default(cuid())
@@ -3823,11 +4128,12 @@ model PropertyAsset {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household     Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  zone          Zone?              @relation(fields: [zoneId], references: [id], onDelete: SetNull)
-  serviceVendor Vendor?            @relation("AssetServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
+  household     Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  zone          Zone?               @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  serviceVendor Vendor?             @relation("AssetServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
   serviceLogs   ServiceLog[]
   documents     PropertyDocument[]
+  bills         ComprehensiveBill[]
 
   @@index([householdId, category])
   @@index([zoneId])

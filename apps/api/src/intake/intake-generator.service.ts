@@ -17,7 +17,18 @@ export type IntakeZone =
   | 'utilities'
   | 'housing'
   | 'bills'
-  | 'vendors';
+  | 'vendors'
+  // Comprehensive bill zones
+  | 'bills_housing'
+  | 'bills_utilities'
+  | 'bills_telecom'
+  | 'bills_vehicles'
+  | 'bills_loans'
+  | 'bills_family'
+  | 'bills_insurance'
+  | 'bills_home_services'
+  | 'bills_memberships'
+  | 'bills_other';
 
 export type IntakeCategory =
   | 'family_info'
@@ -28,7 +39,69 @@ export type IntakeCategory =
   | 'vendors'
   | 'maintenance';
 
-export type InputType = 'text' | 'select' | 'date' | 'number' | 'phone' | 'currency' | 'boolean' | 'multi_select';
+export type InputType = 'text' | 'select' | 'date' | 'number' | 'phone' | 'currency' | 'boolean' | 'multi_select' | 'url' | 'percentage';
+
+// Bill category from schema
+export type BillCategoryType =
+  | 'MORTGAGE' | 'RENT' | 'PROPERTY_TAX' | 'HOA' | 'HOME_INSURANCE'
+  | 'ELECTRIC' | 'GAS' | 'WATER_SEWER' | 'OIL_PROPANE' | 'TRASH'
+  | 'INTERNET' | 'CABLE_TV' | 'CELL_PHONE' | 'LANDLINE'
+  | 'CAR_PAYMENT' | 'AUTO_INSURANCE' | 'CAR_REGISTRATION' | 'PARKING' | 'TOLLS'
+  | 'SCHOOL_TUITION' | 'CHILDCARE' | 'NANNY' | 'KIDS_ACTIVITY' | 'SCHOOL_LUNCH' | 'TUTORING'
+  | 'STUDENT_LOAN' | 'PERSONAL_LOAN' | 'HELOC' | 'CREDIT_CARD'
+  | 'LIFE_INSURANCE' | 'HEALTH_INSURANCE' | 'UMBRELLA_INSURANCE' | 'PET_INSURANCE' | 'DISABILITY_INSURANCE' | 'LONG_TERM_CARE'
+  | 'LAWN_LANDSCAPE' | 'POOL_SERVICE' | 'PEST_CONTROL' | 'SECURITY_MONITORING' | 'HOUSE_CLEANING' | 'SNOW_REMOVAL'
+  | 'GYM_FITNESS' | 'CLUB_MEMBERSHIP' | 'STREAMING_SERVICE' | 'SOFTWARE_SUBSCRIPTION' | 'NEWSPAPER_MAGAZINE' | 'MEAL_KIT' | 'AMAZON_PRIME' | 'WAREHOUSE_CLUB'
+  | 'STORAGE' | 'PET_CARE' | 'CHARITY_DONATION' | 'CHILD_SUPPORT' | 'ALIMONY' | 'OTHER_BILL';
+
+// Comprehensive Bill Intake Item - extends standard with bill-specific fields
+export interface BillIntakeItem {
+  id: string;
+  billCategory: BillCategoryType;
+  label: string;
+  description?: string;
+  icon?: string;
+  // Field configuration
+  fields: BillFieldConfig[];
+  // Conditional display
+  showIf?: (context: BillIntakeContext) => boolean;
+  // Pre-fill from property data
+  prefillFrom?: string;
+}
+
+export interface BillFieldConfig {
+  id: string;
+  label: string;
+  inputType: InputType;
+  required: boolean;
+  options?: string[];
+  placeholder?: string;
+  helpText?: string;
+  conditional?: (values: Record<string, any>) => boolean;
+}
+
+export interface BillIntakeContext {
+  hasPool: boolean;
+  hasChildren: boolean;
+  hasVehicles: boolean;
+  vehicleCount: number;
+  hasGasService: boolean;
+  hasMortgage: boolean;
+  hasPets: boolean;
+  hasStaff: boolean;
+  state?: string;
+  propertyData?: PropertyDetails | null;
+  previousAnswers: Record<string, any>;
+}
+
+export interface BillIntakeSection {
+  id: IntakeZone;
+  title: string;
+  description: string;
+  icon: string;
+  bills: BillIntakeItem[];
+  showIf?: (context: BillIntakeContext) => boolean;
+}
 
 export interface IntakeItem {
   id: string;
@@ -1295,6 +1368,1085 @@ export class IntakeGeneratorService {
       totalSections: sections.length,
       totalQuestions,
       highlights,
+    };
+  }
+
+  // ===========================================================================
+  // COMPREHENSIVE BILL INTAKE GENERATOR
+  // ===========================================================================
+
+  /**
+   * Standard fields for all bill types
+   */
+  private getStandardBillFields(): BillFieldConfig[] {
+    return [
+      { id: 'payee_name', label: 'Payee Name', inputType: 'text', required: true, placeholder: 'e.g., Con Edison' },
+      { id: 'account_number', label: 'Account Number', inputType: 'text', required: true, placeholder: 'Account or policy number' },
+      { id: 'amount', label: 'Amount', inputType: 'currency', required: true, placeholder: '$0.00' },
+      { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Monthly', 'Quarterly', 'Semi-Annual', 'Annual', 'Weekly', 'Bi-Weekly', 'As Needed'] },
+      { id: 'due_day', label: 'Due Day of Month', inputType: 'number', required: false, placeholder: '1-28' },
+      { id: 'amount_type', label: 'Amount Type', inputType: 'select', required: false, options: ['Fixed', 'Variable', 'Estimated'] },
+      { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Current Autopay', 'Manual Payment', 'Payroll Deduction', 'Escrow'] },
+      { id: 'current_autopay', label: 'Currently on Autopay?', inputType: 'boolean', required: false },
+      { id: 'portal_url', label: 'Online Portal URL', inputType: 'url', required: false, placeholder: 'https://...' },
+      { id: 'portal_username', label: 'Portal Username/Email', inputType: 'text', required: false },
+      { id: 'portal_notes', label: 'Portal Notes', inputType: 'text', required: false, placeholder: 'Login hints, security questions, etc.' },
+      { id: 'notes', label: 'Additional Notes', inputType: 'text', required: false },
+    ];
+  }
+
+  /**
+   * Extra fields for loan-type bills
+   */
+  private getLoanFields(): BillFieldConfig[] {
+    return [
+      { id: 'principal_balance', label: 'Principal Balance', inputType: 'currency', required: false, placeholder: 'Remaining balance' },
+      { id: 'interest_rate', label: 'Interest Rate (%)', inputType: 'percentage', required: false, placeholder: '4.5' },
+      { id: 'loan_term', label: 'Loan Term', inputType: 'text', required: false, placeholder: '30 years, 60 months, etc.' },
+      { id: 'maturity_date', label: 'Payoff Date', inputType: 'date', required: false },
+      { id: 'escrow_included', label: 'Escrow Included?', inputType: 'boolean', required: false, helpText: 'Does payment include property tax/insurance?' },
+    ];
+  }
+
+  /**
+   * Extra fields for insurance-type bills
+   */
+  private getInsuranceFields(): BillFieldConfig[] {
+    return [
+      { id: 'policy_number', label: 'Policy Number', inputType: 'text', required: true },
+      { id: 'coverage_amount', label: 'Coverage Amount', inputType: 'currency', required: false },
+      { id: 'deductible', label: 'Deductible', inputType: 'currency', required: false },
+      { id: 'renewal_date', label: 'Renewal Date', inputType: 'date', required: false },
+    ];
+  }
+
+  /**
+   * Generate comprehensive bill intake sections
+   */
+  generateBillIntakeSections(context: BillIntakeContext): BillIntakeSection[] {
+    const sections: BillIntakeSection[] = [];
+
+    // ===========================================================================
+    // 1. HOUSING COSTS
+    // ===========================================================================
+    sections.push({
+      id: 'bills_housing',
+      title: 'Housing Costs',
+      description: 'Mortgage, rent, property tax, HOA, and home insurance',
+      icon: '🏠',
+      bills: [
+        {
+          id: 'mortgage',
+          billCategory: 'MORTGAGE',
+          label: 'Mortgage',
+          description: 'Primary mortgage payment',
+          icon: '🏦',
+          showIf: (ctx) => ctx.hasMortgage,
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getLoanFields(),
+            { id: 'lender_name', label: 'Lender/Servicer', inputType: 'text', required: true, placeholder: 'e.g., Wells Fargo, Rocket Mortgage' },
+          ],
+        },
+        {
+          id: 'rent',
+          billCategory: 'RENT',
+          label: 'Rent',
+          description: 'Monthly rent payment',
+          icon: '🔑',
+          showIf: (ctx) => !ctx.hasMortgage,
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'landlord_name', label: 'Landlord/Management Company', inputType: 'text', required: true },
+            { id: 'landlord_phone', label: 'Landlord Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'property_tax',
+          billCategory: 'PROPERTY_TAX',
+          label: 'Property Tax',
+          description: 'Annual property taxes (if not in escrow)',
+          icon: '📋',
+          showIf: (ctx) => ctx.hasMortgage, // Only show if owned
+          fields: [
+            { id: 'payee_name', label: 'Tax Collector', inputType: 'text', required: true, placeholder: 'County/Town name' },
+            { id: 'account_number', label: 'Parcel/Tax ID', inputType: 'text', required: true },
+            { id: 'amount', label: 'Annual Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Payment Frequency', inputType: 'select', required: true, options: ['Annual', 'Semi-Annual', 'Quarterly', 'Included in Escrow'] },
+            { id: 'due_date', label: 'Due Date(s)', inputType: 'text', required: false, placeholder: 'e.g., Jan 1, Jul 1' },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Escrow', 'Owner Pays Directly'] },
+            { id: 'portal_url', label: 'Online Portal URL', inputType: 'url', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'hoa',
+          billCategory: 'HOA',
+          label: 'HOA Dues',
+          description: 'Homeowners association fees',
+          icon: '🏘️',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'hoa_name', label: 'HOA Name', inputType: 'text', required: true },
+            { id: 'contact_phone', label: 'HOA Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'home_insurance',
+          billCategory: 'HOME_INSURANCE',
+          label: 'Home Insurance',
+          description: 'Homeowners or renters insurance',
+          icon: '🛡️',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'agent_name', label: 'Agent Name', inputType: 'text', required: false },
+            { id: 'agent_phone', label: 'Agent Phone', inputType: 'phone', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 2. UTILITIES
+    // ===========================================================================
+    sections.push({
+      id: 'bills_utilities',
+      title: 'Utilities',
+      description: 'Electric, gas, water, and trash services',
+      icon: '💡',
+      bills: [
+        {
+          id: 'electric',
+          billCategory: 'ELECTRIC',
+          label: 'Electric',
+          description: 'Electricity provider',
+          icon: '⚡',
+          fields: this.getStandardBillFields(),
+        },
+        {
+          id: 'gas',
+          billCategory: 'GAS',
+          label: 'Natural Gas',
+          description: 'Gas utility (if applicable)',
+          icon: '🔥',
+          showIf: (ctx) => ctx.hasGasService,
+          fields: this.getStandardBillFields(),
+        },
+        {
+          id: 'oil_propane',
+          billCategory: 'OIL_PROPANE',
+          label: 'Oil/Propane',
+          description: 'Heating oil or propane delivery',
+          icon: '🛢️',
+          showIf: (ctx) => {
+            const fuel = ctx.propertyData?.heatingFuel?.toLowerCase() || '';
+            return fuel.includes('oil') || fuel.includes('propane');
+          },
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'tank_size', label: 'Tank Size (gallons)', inputType: 'number', required: false },
+            { id: 'last_delivery', label: 'Last Delivery Date', inputType: 'date', required: false },
+          ],
+        },
+        {
+          id: 'water_sewer',
+          billCategory: 'WATER_SEWER',
+          label: 'Water/Sewer',
+          description: 'Municipal water and sewer',
+          icon: '💧',
+          showIf: (ctx) => !ctx.propertyData?.waterType?.toLowerCase().includes('well'),
+          fields: this.getStandardBillFields(),
+        },
+        {
+          id: 'trash',
+          billCategory: 'TRASH',
+          label: 'Trash/Recycling',
+          description: 'Waste collection service',
+          icon: '🗑️',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'pickup_days', label: 'Pickup Days', inputType: 'text', required: false, placeholder: 'e.g., Tuesday, Friday' },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 3. TELECOM & INTERNET
+    // ===========================================================================
+    sections.push({
+      id: 'bills_telecom',
+      title: 'Internet & Phone',
+      description: 'Internet, cable, and phone services',
+      icon: '📱',
+      bills: [
+        {
+          id: 'internet',
+          billCategory: 'INTERNET',
+          label: 'Internet',
+          description: 'Home internet service',
+          icon: '🌐',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'speed_tier', label: 'Speed/Plan', inputType: 'text', required: false, placeholder: 'e.g., 500 Mbps' },
+          ],
+        },
+        {
+          id: 'cable_tv',
+          billCategory: 'CABLE_TV',
+          label: 'Cable/Streaming TV',
+          description: 'Television service',
+          icon: '📺',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'package', label: 'Package/Tier', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'cell_phone',
+          billCategory: 'CELL_PHONE',
+          label: 'Cell Phone',
+          description: 'Mobile phone plan',
+          icon: '📱',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'lines', label: 'Number of Lines', inputType: 'number', required: false },
+            { id: 'device_payments', label: 'Includes Device Payments?', inputType: 'boolean', required: false },
+          ],
+        },
+        {
+          id: 'landline',
+          billCategory: 'LANDLINE',
+          label: 'Landline',
+          description: 'Home phone service',
+          icon: '☎️',
+          fields: this.getStandardBillFields(),
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 4. VEHICLES
+    // ===========================================================================
+    sections.push({
+      id: 'bills_vehicles',
+      title: 'Vehicle Expenses',
+      description: 'Car payments, insurance, and registration',
+      icon: '🚗',
+      showIf: (ctx) => ctx.hasVehicles,
+      bills: [
+        {
+          id: 'car_payment',
+          billCategory: 'CAR_PAYMENT',
+          label: 'Car Payment',
+          description: 'Auto loan or lease payment',
+          icon: '🚙',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getLoanFields(),
+            { id: 'vehicle_description', label: 'Vehicle', inputType: 'text', required: true, placeholder: 'e.g., 2023 Tesla Model Y' },
+            { id: 'is_lease', label: 'Is this a lease?', inputType: 'boolean', required: false },
+            { id: 'lease_end', label: 'Lease End Date', inputType: 'date', required: false },
+          ],
+        },
+        {
+          id: 'auto_insurance',
+          billCategory: 'AUTO_INSURANCE',
+          label: 'Auto Insurance',
+          description: 'Vehicle insurance policy',
+          icon: '🛡️',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'vehicles_covered', label: 'Vehicles Covered', inputType: 'text', required: false, placeholder: 'All family vehicles' },
+            { id: 'agent_name', label: 'Agent Name', inputType: 'text', required: false },
+            { id: 'agent_phone', label: 'Agent Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'car_registration',
+          billCategory: 'CAR_REGISTRATION',
+          label: 'Vehicle Registration',
+          description: 'Annual DMV registration',
+          icon: '📝',
+          fields: [
+            { id: 'vehicle_description', label: 'Vehicle', inputType: 'text', required: true },
+            { id: 'amount', label: 'Registration Fee', inputType: 'currency', required: true },
+            { id: 'due_date', label: 'Expiration Date', inputType: 'date', required: true },
+            { id: 'plate_number', label: 'Plate Number', inputType: 'text', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Owner Pays'] },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'parking',
+          billCategory: 'PARKING',
+          label: 'Parking',
+          description: 'Monthly parking fee',
+          icon: '🅿️',
+          fields: this.getStandardBillFields(),
+        },
+        {
+          id: 'tolls',
+          billCategory: 'TOLLS',
+          label: 'Toll Account',
+          description: 'EZ-Pass or toll transponder',
+          icon: '🛣️',
+          fields: [
+            { id: 'payee_name', label: 'Toll Authority', inputType: 'text', required: true, placeholder: 'e.g., EZ-Pass, FasTrak' },
+            { id: 'account_number', label: 'Account Number', inputType: 'text', required: true },
+            { id: 'amount_type', label: 'Funding Type', inputType: 'select', required: true, options: ['Auto-Replenish', 'Manual Top-up'] },
+            { id: 'replenish_amount', label: 'Replenish Amount', inputType: 'currency', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Credit Card on File'] },
+            { id: 'portal_url', label: 'Online Portal URL', inputType: 'url', required: false },
+            { id: 'portal_username', label: 'Portal Username', inputType: 'text', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 5. LOANS & DEBT
+    // ===========================================================================
+    sections.push({
+      id: 'bills_loans',
+      title: 'Loans & Debt',
+      description: 'Student loans, personal loans, and credit lines',
+      icon: '💳',
+      bills: [
+        {
+          id: 'student_loan',
+          billCategory: 'STUDENT_LOAN',
+          label: 'Student Loan',
+          description: 'Education loan payments',
+          icon: '🎓',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getLoanFields(),
+            { id: 'borrower_name', label: 'Borrower Name', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'personal_loan',
+          billCategory: 'PERSONAL_LOAN',
+          label: 'Personal Loan',
+          description: 'Personal or signature loan',
+          icon: '📄',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getLoanFields(),
+          ],
+        },
+        {
+          id: 'heloc',
+          billCategory: 'HELOC',
+          label: 'HELOC',
+          description: 'Home equity line of credit',
+          icon: '🏡',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getLoanFields(),
+            { id: 'credit_limit', label: 'Credit Limit', inputType: 'currency', required: false },
+            { id: 'draw_period_end', label: 'Draw Period Ends', inputType: 'date', required: false },
+          ],
+        },
+        {
+          id: 'credit_card',
+          billCategory: 'CREDIT_CARD',
+          label: 'Credit Card',
+          description: 'Credit card payment (if Haven manages)',
+          icon: '💳',
+          fields: [
+            { id: 'payee_name', label: 'Card Issuer', inputType: 'text', required: true, placeholder: 'e.g., Chase, Amex' },
+            { id: 'card_name', label: 'Card Name', inputType: 'text', required: false, placeholder: 'e.g., Sapphire Reserve' },
+            { id: 'account_number', label: 'Last 4 Digits', inputType: 'text', required: true, placeholder: '1234' },
+            { id: 'amount', label: 'Typical Monthly Payment', inputType: 'currency', required: true },
+            { id: 'amount_type', label: 'Payment Type', inputType: 'select', required: true, options: ['Statement Balance', 'Minimum Payment', 'Fixed Amount'] },
+            { id: 'due_day', label: 'Due Day', inputType: 'number', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Current Autopay', 'Owner Pays'] },
+            { id: 'portal_url', label: 'Online Portal URL', inputType: 'url', required: false },
+            { id: 'portal_username', label: 'Portal Username', inputType: 'text', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 6. FAMILY & CHILDREN
+    // ===========================================================================
+    sections.push({
+      id: 'bills_family',
+      title: 'Family & Children',
+      description: 'School, childcare, and kids activities',
+      icon: '👨‍👩‍👧‍👦',
+      showIf: (ctx) => ctx.hasChildren || ctx.hasStaff,
+      bills: [
+        {
+          id: 'school_tuition',
+          billCategory: 'SCHOOL_TUITION',
+          label: 'School Tuition',
+          description: 'Private school or college tuition',
+          icon: '🏫',
+          showIf: (ctx) => ctx.hasChildren,
+          fields: [
+            { id: 'payee_name', label: 'School Name', inputType: 'text', required: true },
+            { id: 'student_name', label: 'Student Name', inputType: 'text', required: true },
+            { id: 'student_id', label: 'Student ID', inputType: 'text', required: false },
+            { id: 'account_number', label: 'Family Account Number', inputType: 'text', required: false },
+            { id: 'amount', label: 'Payment Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Monthly', 'Quarterly', 'Semester', 'Annual'] },
+            { id: 'due_day', label: 'Due Day', inputType: 'number', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Current Autopay', 'Owner Pays'] },
+            { id: 'portal_url', label: 'Parent Portal URL', inputType: 'url', required: false },
+            { id: 'portal_username', label: 'Portal Username', inputType: 'text', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'childcare',
+          billCategory: 'CHILDCARE',
+          label: 'Daycare/Childcare',
+          description: 'Daycare or preschool',
+          icon: '👶',
+          showIf: (ctx) => ctx.hasChildren,
+          fields: [
+            { id: 'payee_name', label: 'Provider Name', inputType: 'text', required: true },
+            { id: 'child_name', label: 'Child Name', inputType: 'text', required: true },
+            { id: 'account_number', label: 'Account Number', inputType: 'text', required: false },
+            { id: 'amount', label: 'Weekly/Monthly Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Weekly', 'Bi-Weekly', 'Monthly'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Current Autopay', 'Owner Pays'] },
+            { id: 'portal_url', label: 'Portal URL', inputType: 'url', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false, placeholder: 'Drop-off/pickup times, allergies, etc.' },
+          ],
+        },
+        {
+          id: 'nanny',
+          billCategory: 'NANNY',
+          label: 'Nanny/Au Pair',
+          description: 'Nanny or au pair salary',
+          icon: '👩‍🍼',
+          showIf: (ctx) => ctx.hasStaff,
+          fields: [
+            { id: 'payee_name', label: 'Nanny Name', inputType: 'text', required: true },
+            { id: 'amount', label: 'Payment Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Weekly', 'Bi-Weekly', 'Monthly'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Direct Deposit', 'Payroll Service', 'Check'] },
+            { id: 'payroll_service', label: 'Payroll Service', inputType: 'text', required: false, placeholder: 'e.g., GTM Payroll, SurePayroll' },
+            { id: 'payroll_account', label: 'Payroll Account Number', inputType: 'text', required: false },
+            { id: 'schedule', label: 'Work Schedule', inputType: 'text', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'kids_activity',
+          billCategory: 'KIDS_ACTIVITY',
+          label: 'Kids Activities',
+          description: 'Sports, lessons, camps, etc.',
+          icon: '⚽',
+          showIf: (ctx) => ctx.hasChildren,
+          fields: [
+            { id: 'activity_name', label: 'Activity Name', inputType: 'text', required: true, placeholder: 'e.g., Soccer, Piano Lessons' },
+            { id: 'payee_name', label: 'Organization/Provider', inputType: 'text', required: true },
+            { id: 'child_name', label: 'Child Name', inputType: 'text', required: true },
+            { id: 'account_number', label: 'Registration/Account Number', inputType: 'text', required: false },
+            { id: 'amount', label: 'Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Monthly', 'Per Session', 'Seasonal', 'Annual'] },
+            { id: 'season', label: 'Season/Term', inputType: 'text', required: false, placeholder: 'e.g., Fall 2024' },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Current Autopay', 'Owner Pays'] },
+            { id: 'portal_url', label: 'Portal URL', inputType: 'url', required: false },
+            { id: 'schedule', label: 'Schedule', inputType: 'text', required: false, placeholder: 'e.g., Tuesdays 4-5pm' },
+            { id: 'location', label: 'Location', inputType: 'text', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'school_lunch',
+          billCategory: 'SCHOOL_LUNCH',
+          label: 'School Lunch Account',
+          description: 'School cafeteria account',
+          icon: '🍎',
+          showIf: (ctx) => ctx.hasChildren,
+          fields: [
+            { id: 'payee_name', label: 'School/District', inputType: 'text', required: true },
+            { id: 'student_name', label: 'Student Name', inputType: 'text', required: true },
+            { id: 'account_number', label: 'Lunch Account Number', inputType: 'text', required: true },
+            { id: 'amount', label: 'Auto-Replenish Amount', inputType: 'currency', required: false },
+            { id: 'replenish_threshold', label: 'Replenish When Below', inputType: 'currency', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Auto-Replenish on File'] },
+            { id: 'portal_url', label: 'Portal URL', inputType: 'url', required: false, placeholder: 'e.g., MySchoolBucks' },
+            { id: 'portal_username', label: 'Portal Username', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'tutoring',
+          billCategory: 'TUTORING',
+          label: 'Tutoring',
+          description: 'Academic tutoring services',
+          icon: '📚',
+          showIf: (ctx) => ctx.hasChildren,
+          fields: [
+            { id: 'payee_name', label: 'Tutor/Company Name', inputType: 'text', required: true },
+            { id: 'student_name', label: 'Student Name', inputType: 'text', required: true },
+            { id: 'subject', label: 'Subject(s)', inputType: 'text', required: false },
+            { id: 'amount', label: 'Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Per Session', 'Weekly', 'Monthly'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Owner Pays Directly'] },
+            { id: 'schedule', label: 'Schedule', inputType: 'text', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 7. INSURANCE
+    // ===========================================================================
+    sections.push({
+      id: 'bills_insurance',
+      title: 'Insurance',
+      description: 'Life, health, umbrella, and other insurance',
+      icon: '🛡️',
+      bills: [
+        {
+          id: 'life_insurance',
+          billCategory: 'LIFE_INSURANCE',
+          label: 'Life Insurance',
+          description: 'Life insurance premiums',
+          icon: '💝',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'insured_name', label: 'Insured Person', inputType: 'text', required: false },
+            { id: 'policy_type', label: 'Policy Type', inputType: 'select', required: false, options: ['Term', 'Whole Life', 'Universal'] },
+          ],
+        },
+        {
+          id: 'health_insurance',
+          billCategory: 'HEALTH_INSURANCE',
+          label: 'Health Insurance',
+          description: 'Health insurance premiums (if not through employer)',
+          icon: '🏥',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'plan_name', label: 'Plan Name', inputType: 'text', required: false },
+            { id: 'covered_members', label: 'Covered Family Members', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'umbrella_insurance',
+          billCategory: 'UMBRELLA_INSURANCE',
+          label: 'Umbrella Insurance',
+          description: 'Excess liability coverage',
+          icon: '☂️',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+          ],
+        },
+        {
+          id: 'pet_insurance',
+          billCategory: 'PET_INSURANCE',
+          label: 'Pet Insurance',
+          description: 'Pet health insurance',
+          icon: '🐾',
+          showIf: (ctx) => ctx.hasPets,
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'pet_name', label: 'Pet Name', inputType: 'text', required: true },
+            { id: 'pet_type', label: 'Pet Type/Breed', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'disability_insurance',
+          billCategory: 'DISABILITY_INSURANCE',
+          label: 'Disability Insurance',
+          description: 'Long or short-term disability',
+          icon: '🦽',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'coverage_type', label: 'Type', inputType: 'select', required: false, options: ['Short-Term', 'Long-Term', 'Both'] },
+          ],
+        },
+        {
+          id: 'long_term_care',
+          billCategory: 'LONG_TERM_CARE',
+          label: 'Long-Term Care Insurance',
+          description: 'LTC insurance premiums',
+          icon: '🏠',
+          fields: [
+            ...this.getStandardBillFields(),
+            ...this.getInsuranceFields(),
+            { id: 'insured_name', label: 'Insured Person', inputType: 'text', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 8. HOME SERVICES
+    // ===========================================================================
+    sections.push({
+      id: 'bills_home_services',
+      title: 'Home Services',
+      description: 'Recurring maintenance and service contracts',
+      icon: '🔧',
+      bills: [
+        {
+          id: 'lawn_landscape',
+          billCategory: 'LAWN_LANDSCAPE',
+          label: 'Lawn/Landscaping',
+          description: 'Regular lawn care service',
+          icon: '🌿',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'services_included', label: 'Services Included', inputType: 'text', required: false, placeholder: 'Mowing, edging, leaf cleanup, etc.' },
+            { id: 'contact_name', label: 'Contact Name', inputType: 'text', required: false },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'pool_service',
+          billCategory: 'POOL_SERVICE',
+          label: 'Pool Service',
+          description: 'Pool maintenance and cleaning',
+          icon: '🏊',
+          showIf: (ctx) => ctx.hasPool,
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'service_day', label: 'Service Day', inputType: 'text', required: false, placeholder: 'e.g., Wednesdays' },
+            { id: 'contact_name', label: 'Contact Name', inputType: 'text', required: false },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'pest_control',
+          billCategory: 'PEST_CONTROL',
+          label: 'Pest Control',
+          description: 'Regular pest control service',
+          icon: '🐜',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'service_frequency', label: 'Service Frequency', inputType: 'text', required: false, placeholder: 'e.g., Quarterly' },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'security_monitoring',
+          billCategory: 'SECURITY_MONITORING',
+          label: 'Security Monitoring',
+          description: 'Alarm monitoring service',
+          icon: '🔐',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'system_type', label: 'System Type', inputType: 'text', required: false, placeholder: 'e.g., ADT, Ring, SimpliSafe' },
+            { id: 'passcode_location', label: 'Passcode Info', inputType: 'text', required: false, placeholder: 'Where is master code documented?' },
+          ],
+        },
+        {
+          id: 'house_cleaning',
+          billCategory: 'HOUSE_CLEANING',
+          label: 'House Cleaning',
+          description: 'Regular cleaning service',
+          icon: '🧹',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'cleaning_day', label: 'Cleaning Day(s)', inputType: 'text', required: false },
+            { id: 'contact_name', label: 'Contact Name', inputType: 'text', required: false },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+            { id: 'access_method', label: 'How Do They Access Home?', inputType: 'text', required: false, placeholder: 'Key, code, etc.' },
+          ],
+        },
+        {
+          id: 'snow_removal',
+          billCategory: 'SNOW_REMOVAL',
+          label: 'Snow Removal',
+          description: 'Winter snow plowing/shoveling',
+          icon: '❄️',
+          showIf: (ctx) => {
+            const snowStates = ['CT', 'MA', 'NH', 'ME', 'VT', 'RI', 'NY', 'NJ', 'PA', 'OH', 'MI', 'WI', 'MN', 'IL', 'IN', 'CO', 'UT'];
+            return ctx.state ? snowStates.includes(ctx.state.toUpperCase()) : false;
+          },
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'trigger_amount', label: 'Trigger Amount (inches)', inputType: 'number', required: false },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 9. MEMBERSHIPS & SUBSCRIPTIONS
+    // ===========================================================================
+    sections.push({
+      id: 'bills_memberships',
+      title: 'Memberships & Subscriptions',
+      description: 'Gym, clubs, streaming, and other subscriptions',
+      icon: '🎬',
+      bills: [
+        {
+          id: 'gym_fitness',
+          billCategory: 'GYM_FITNESS',
+          label: 'Gym/Fitness',
+          description: 'Gym or fitness membership',
+          icon: '🏋️',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'member_names', label: 'Member Name(s)', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'club_membership',
+          billCategory: 'CLUB_MEMBERSHIP',
+          label: 'Club Membership',
+          description: 'Country club, social club, etc.',
+          icon: '🏌️',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'club_type', label: 'Club Type', inputType: 'text', required: false, placeholder: 'Country club, tennis club, etc.' },
+            { id: 'member_number', label: 'Member Number', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'streaming_service',
+          billCategory: 'STREAMING_SERVICE',
+          label: 'Streaming Services',
+          description: 'Netflix, Spotify, etc.',
+          icon: '📺',
+          fields: [
+            { id: 'service_name', label: 'Service Name', inputType: 'text', required: true, placeholder: 'e.g., Netflix, Spotify, Disney+' },
+            { id: 'amount', label: 'Monthly Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Billing Frequency', inputType: 'select', required: true, options: ['Monthly', 'Annual'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: false, options: ['Credit Card on File', 'Haven Pays'] },
+            { id: 'account_email', label: 'Account Email', inputType: 'text', required: false },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false, placeholder: 'Plan tier, family sharing, etc.' },
+          ],
+        },
+        {
+          id: 'software_subscription',
+          billCategory: 'SOFTWARE_SUBSCRIPTION',
+          label: 'Software Subscriptions',
+          description: 'Microsoft 365, Adobe, etc.',
+          icon: '💻',
+          fields: [
+            { id: 'service_name', label: 'Software/Service', inputType: 'text', required: true },
+            { id: 'amount', label: 'Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Billing Frequency', inputType: 'select', required: true, options: ['Monthly', 'Annual'] },
+            { id: 'account_email', label: 'Account Email', inputType: 'text', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: false, options: ['Credit Card on File', 'Haven Pays'] },
+          ],
+        },
+        {
+          id: 'amazon_prime',
+          billCategory: 'AMAZON_PRIME',
+          label: 'Amazon Prime',
+          description: 'Amazon Prime membership',
+          icon: '📦',
+          fields: [
+            { id: 'amount', label: 'Annual Cost', inputType: 'currency', required: true },
+            { id: 'renewal_date', label: 'Renewal Date', inputType: 'date', required: false },
+            { id: 'account_email', label: 'Account Email', inputType: 'text', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: false, options: ['Credit Card on File', 'Haven Pays'] },
+          ],
+        },
+        {
+          id: 'warehouse_club',
+          billCategory: 'WAREHOUSE_CLUB',
+          label: 'Warehouse Club',
+          description: 'Costco, Sam\'s Club, etc.',
+          icon: '🛒',
+          fields: [
+            { id: 'payee_name', label: 'Club Name', inputType: 'text', required: true, placeholder: 'Costco, Sam\'s Club, BJ\'s' },
+            { id: 'member_number', label: 'Member Number', inputType: 'text', required: false },
+            { id: 'amount', label: 'Annual Fee', inputType: 'currency', required: true },
+            { id: 'renewal_date', label: 'Renewal Date', inputType: 'date', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: false, options: ['Auto-Renew on File', 'Haven Pays'] },
+          ],
+        },
+        {
+          id: 'newspaper_magazine',
+          billCategory: 'NEWSPAPER_MAGAZINE',
+          label: 'News/Magazine',
+          description: 'Newspaper or magazine subscriptions',
+          icon: '📰',
+          fields: [
+            { id: 'publication_name', label: 'Publication', inputType: 'text', required: true },
+            { id: 'amount', label: 'Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Billing Frequency', inputType: 'select', required: true, options: ['Monthly', 'Annual', 'Quarterly'] },
+            { id: 'account_email', label: 'Account Email', inputType: 'text', required: false },
+            { id: 'delivery_type', label: 'Delivery Type', inputType: 'select', required: false, options: ['Digital Only', 'Print', 'Both'] },
+          ],
+        },
+        {
+          id: 'meal_kit',
+          billCategory: 'MEAL_KIT',
+          label: 'Meal Kit Service',
+          description: 'HelloFresh, Blue Apron, etc.',
+          icon: '🍽️',
+          fields: [
+            { id: 'payee_name', label: 'Service Name', inputType: 'text', required: true },
+            { id: 'amount', label: 'Weekly Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Delivery Frequency', inputType: 'select', required: true, options: ['Weekly', 'Bi-Weekly', 'Paused'] },
+            { id: 'account_email', label: 'Account Email', inputType: 'text', required: false },
+            { id: 'delivery_day', label: 'Delivery Day', inputType: 'text', required: false },
+          ],
+        },
+      ],
+    });
+
+    // ===========================================================================
+    // 10. OTHER BILLS
+    // ===========================================================================
+    sections.push({
+      id: 'bills_other',
+      title: 'Other Bills',
+      description: 'Storage, pet care, donations, and other recurring payments',
+      icon: '📋',
+      bills: [
+        {
+          id: 'storage',
+          billCategory: 'STORAGE',
+          label: 'Storage Unit',
+          description: 'Self-storage rental',
+          icon: '📦',
+          fields: [
+            ...this.getStandardBillFields(),
+            { id: 'unit_number', label: 'Unit Number', inputType: 'text', required: false },
+            { id: 'unit_size', label: 'Unit Size', inputType: 'text', required: false },
+            { id: 'access_code', label: 'Gate/Access Code', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'pet_care',
+          billCategory: 'PET_CARE',
+          label: 'Pet Care',
+          description: 'Dog walker, groomer, vet plans',
+          icon: '🐕',
+          showIf: (ctx) => ctx.hasPets,
+          fields: [
+            { id: 'service_type', label: 'Service Type', inputType: 'text', required: true, placeholder: 'Dog walking, grooming, vet care' },
+            { id: 'payee_name', label: 'Provider Name', inputType: 'text', required: true },
+            { id: 'pet_name', label: 'Pet Name', inputType: 'text', required: false },
+            { id: 'amount', label: 'Cost', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Per Visit', 'Weekly', 'Monthly'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Owner Pays'] },
+            { id: 'contact_phone', label: 'Contact Phone', inputType: 'phone', required: false },
+          ],
+        },
+        {
+          id: 'charity_donation',
+          billCategory: 'CHARITY_DONATION',
+          label: 'Recurring Donations',
+          description: 'Charitable giving',
+          icon: '❤️',
+          fields: [
+            { id: 'organization', label: 'Organization Name', inputType: 'text', required: true },
+            { id: 'amount', label: 'Donation Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Monthly', 'Quarterly', 'Annual'] },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Auto-Debit on File'] },
+            { id: 'donor_account', label: 'Donor ID/Account', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'child_support',
+          billCategory: 'CHILD_SUPPORT',
+          label: 'Child Support',
+          description: 'Child support payments',
+          icon: '👶',
+          fields: [
+            { id: 'payee_name', label: 'Payee Name', inputType: 'text', required: true },
+            { id: 'amount', label: 'Payment Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Weekly', 'Bi-Weekly', 'Monthly'] },
+            { id: 'case_number', label: 'Case Number', inputType: 'text', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'State Disbursement Unit', 'Direct Payment'] },
+            { id: 'notes', label: 'Notes', inputType: 'text', required: false },
+          ],
+        },
+        {
+          id: 'alimony',
+          billCategory: 'ALIMONY',
+          label: 'Alimony/Spousal Support',
+          description: 'Spousal support payments',
+          icon: '💍',
+          fields: [
+            { id: 'payee_name', label: 'Payee Name', inputType: 'text', required: true },
+            { id: 'amount', label: 'Payment Amount', inputType: 'currency', required: true },
+            { id: 'frequency', label: 'Frequency', inputType: 'select', required: true, options: ['Monthly'] },
+            { id: 'end_date', label: 'End Date (if known)', inputType: 'date', required: false },
+            { id: 'payment_method', label: 'Payment Method', inputType: 'select', required: true, options: ['Haven Pays', 'Direct Payment'] },
+          ],
+        },
+        {
+          id: 'other_bill',
+          billCategory: 'OTHER_BILL',
+          label: 'Other Recurring Bill',
+          description: 'Any other recurring payment',
+          icon: '📄',
+          fields: [
+            { id: 'bill_description', label: 'Bill Description', inputType: 'text', required: true, placeholder: 'What is this payment for?' },
+            ...this.getStandardBillFields(),
+          ],
+        },
+      ],
+    });
+
+    return sections;
+  }
+
+  /**
+   * Get a flattened list of all bill types for dropdown selection
+   */
+  getAllBillTypes(): { category: BillCategoryType; label: string; icon: string }[] {
+    const types: { category: BillCategoryType; label: string; icon: string }[] = [
+      // Housing
+      { category: 'MORTGAGE', label: 'Mortgage', icon: '🏦' },
+      { category: 'RENT', label: 'Rent', icon: '🔑' },
+      { category: 'PROPERTY_TAX', label: 'Property Tax', icon: '📋' },
+      { category: 'HOA', label: 'HOA Dues', icon: '🏘️' },
+      { category: 'HOME_INSURANCE', label: 'Home Insurance', icon: '🛡️' },
+      // Utilities
+      { category: 'ELECTRIC', label: 'Electric', icon: '⚡' },
+      { category: 'GAS', label: 'Natural Gas', icon: '🔥' },
+      { category: 'WATER_SEWER', label: 'Water/Sewer', icon: '💧' },
+      { category: 'OIL_PROPANE', label: 'Oil/Propane', icon: '🛢️' },
+      { category: 'TRASH', label: 'Trash/Recycling', icon: '🗑️' },
+      // Telecom
+      { category: 'INTERNET', label: 'Internet', icon: '🌐' },
+      { category: 'CABLE_TV', label: 'Cable/Streaming TV', icon: '📺' },
+      { category: 'CELL_PHONE', label: 'Cell Phone', icon: '📱' },
+      { category: 'LANDLINE', label: 'Landline', icon: '☎️' },
+      // Vehicles
+      { category: 'CAR_PAYMENT', label: 'Car Payment', icon: '🚙' },
+      { category: 'AUTO_INSURANCE', label: 'Auto Insurance', icon: '🛡️' },
+      { category: 'CAR_REGISTRATION', label: 'Vehicle Registration', icon: '📝' },
+      { category: 'PARKING', label: 'Parking', icon: '🅿️' },
+      { category: 'TOLLS', label: 'Toll Account', icon: '🛣️' },
+      // Loans
+      { category: 'STUDENT_LOAN', label: 'Student Loan', icon: '🎓' },
+      { category: 'PERSONAL_LOAN', label: 'Personal Loan', icon: '📄' },
+      { category: 'HELOC', label: 'HELOC', icon: '🏡' },
+      { category: 'CREDIT_CARD', label: 'Credit Card', icon: '💳' },
+      // Family
+      { category: 'SCHOOL_TUITION', label: 'School Tuition', icon: '🏫' },
+      { category: 'CHILDCARE', label: 'Daycare/Childcare', icon: '👶' },
+      { category: 'NANNY', label: 'Nanny/Au Pair', icon: '👩‍🍼' },
+      { category: 'KIDS_ACTIVITY', label: 'Kids Activities', icon: '⚽' },
+      { category: 'SCHOOL_LUNCH', label: 'School Lunch Account', icon: '🍎' },
+      { category: 'TUTORING', label: 'Tutoring', icon: '📚' },
+      // Insurance
+      { category: 'LIFE_INSURANCE', label: 'Life Insurance', icon: '💝' },
+      { category: 'HEALTH_INSURANCE', label: 'Health Insurance', icon: '🏥' },
+      { category: 'UMBRELLA_INSURANCE', label: 'Umbrella Insurance', icon: '☂️' },
+      { category: 'PET_INSURANCE', label: 'Pet Insurance', icon: '🐾' },
+      { category: 'DISABILITY_INSURANCE', label: 'Disability Insurance', icon: '🦽' },
+      { category: 'LONG_TERM_CARE', label: 'Long-Term Care Insurance', icon: '🏠' },
+      // Home Services
+      { category: 'LAWN_LANDSCAPE', label: 'Lawn/Landscaping', icon: '🌿' },
+      { category: 'POOL_SERVICE', label: 'Pool Service', icon: '🏊' },
+      { category: 'PEST_CONTROL', label: 'Pest Control', icon: '🐜' },
+      { category: 'SECURITY_MONITORING', label: 'Security Monitoring', icon: '🔐' },
+      { category: 'HOUSE_CLEANING', label: 'House Cleaning', icon: '🧹' },
+      { category: 'SNOW_REMOVAL', label: 'Snow Removal', icon: '❄️' },
+      // Memberships
+      { category: 'GYM_FITNESS', label: 'Gym/Fitness', icon: '🏋️' },
+      { category: 'CLUB_MEMBERSHIP', label: 'Club Membership', icon: '🏌️' },
+      { category: 'STREAMING_SERVICE', label: 'Streaming Services', icon: '📺' },
+      { category: 'SOFTWARE_SUBSCRIPTION', label: 'Software Subscriptions', icon: '💻' },
+      { category: 'AMAZON_PRIME', label: 'Amazon Prime', icon: '📦' },
+      { category: 'WAREHOUSE_CLUB', label: 'Warehouse Club', icon: '🛒' },
+      { category: 'NEWSPAPER_MAGAZINE', label: 'News/Magazine', icon: '📰' },
+      { category: 'MEAL_KIT', label: 'Meal Kit Service', icon: '🍽️' },
+      // Other
+      { category: 'STORAGE', label: 'Storage Unit', icon: '📦' },
+      { category: 'PET_CARE', label: 'Pet Care', icon: '🐕' },
+      { category: 'CHARITY_DONATION', label: 'Recurring Donations', icon: '❤️' },
+      { category: 'CHILD_SUPPORT', label: 'Child Support', icon: '👶' },
+      { category: 'ALIMONY', label: 'Alimony/Spousal Support', icon: '💍' },
+      { category: 'OTHER_BILL', label: 'Other Recurring Bill', icon: '📄' },
+    ];
+    return types;
+  }
+
+  /**
+   * Calculate monthly funding from comprehensive bills
+   */
+  calculateComprehensiveMonthlyFunding(bills: Array<{
+    amount: number;
+    frequency: string;
+    status?: string;
+  }>): {
+    total: number;
+    breakdown: {
+      housing: number;
+      utilities: number;
+      telecom: number;
+      vehicles: number;
+      loans: number;
+      family: number;
+      insurance: number;
+      homeServices: number;
+      memberships: number;
+      other: number;
+    };
+    havenServiceFee: number;
+    recommendedBuffer: number;
+    recommendedMonthlyFunding: number;
+  } {
+    // Normalize all amounts to monthly
+    const normalizeToMonthly = (amount: number, frequency: string): number => {
+      switch (frequency.toUpperCase()) {
+        case 'WEEKLY': return amount * 4.33;
+        case 'BI-WEEKLY':
+        case 'BIWEEKLY': return amount * 2.17;
+        case 'TWICE_MONTHLY': return amount * 2;
+        case 'MONTHLY': return amount;
+        case 'QUARTERLY': return amount / 3;
+        case 'SEMI-ANNUAL':
+        case 'SEMI_ANNUAL': return amount / 6;
+        case 'ANNUAL': return amount / 12;
+        default: return amount;
+      }
+    };
+
+    const breakdown = {
+      housing: 0,
+      utilities: 0,
+      telecom: 0,
+      vehicles: 0,
+      loans: 0,
+      family: 0,
+      insurance: 0,
+      homeServices: 0,
+      memberships: 0,
+      other: 0,
+    };
+
+    let total = 0;
+    for (const bill of bills) {
+      if (bill.status === 'CANCELLED' || bill.status === 'PAID_OFF') continue;
+      const monthly = normalizeToMonthly(bill.amount, bill.frequency);
+      total += monthly;
+    }
+
+    // Calculate Haven service fee (e.g., 3% of total managed bills)
+    const havenServiceFee = total * 0.03;
+
+    // Recommend a 10% buffer for variable bills
+    const recommendedBuffer = total * 0.10;
+
+    const recommendedMonthlyFunding = total + havenServiceFee + recommendedBuffer;
+
+    return {
+      total,
+      breakdown,
+      havenServiceFee,
+      recommendedBuffer,
+      recommendedMonthlyFunding,
     };
   }
 }

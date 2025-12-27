@@ -1,8 +1,8 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { IntakeGeneratorService } from './intake-generator.service';
+import { IntakeGeneratorService, BillIntakeContext, BillCategoryType } from './intake-generator.service';
 import { PropertyService } from '../property/property.service';
-import { IntakeStatus, Prisma } from '@prisma/client';
+import { IntakeStatus, Prisma, BillCategory, PaymentFrequency, BillPaymentMethod, AmountType, BillStatus, PayeeType } from '@prisma/client';
 
 export interface CreateIntakeDto {
   householdId: string;
@@ -379,5 +379,371 @@ export class IntakeService {
         managerId,
       },
     });
+  }
+
+  // ===========================================================================
+  // COMPREHENSIVE BILL METHODS
+  // ===========================================================================
+
+  /**
+   * Get bill intake sections with context from household data
+   */
+  async getBillIntakeSections(householdId: string) {
+    const household = await this.prisma.household.findUnique({
+      where: { id: householdId },
+      include: {
+        homeProfile: true,
+        vehicles: { where: { isActive: true } },
+        pets: { where: { isActive: true } },
+        familyMembers: { where: { isActive: true } },
+      },
+    });
+
+    if (!household) {
+      throw new NotFoundException('Household not found');
+    }
+
+    const propertyData = household.enrichmentData as any || null;
+    const hasChildren = household.familyMembers.some(m => m.type === 'CHILD');
+    const hasStaff = household.familyMembers.some(m => m.type === 'STAFF');
+    const heatingFuel = propertyData?.heatingFuel?.toLowerCase() || '';
+
+    const context: BillIntakeContext = {
+      hasPool: propertyData?.pool || false,
+      hasChildren,
+      hasVehicles: household.vehicles.length > 0,
+      vehicleCount: household.vehicles.length,
+      hasGasService: heatingFuel.includes('gas') || heatingFuel.includes('natural'),
+      hasMortgage: true, // Default to true, can be set by intake
+      hasPets: household.pets.length > 0,
+      hasStaff,
+      state: household.homeProfile?.state,
+      propertyData,
+      previousAnswers: {},
+    };
+
+    const sections = this.intakeGenerator.generateBillIntakeSections(context);
+    const billTypes = this.intakeGenerator.getAllBillTypes();
+
+    return {
+      sections,
+      billTypes,
+      context,
+    };
+  }
+
+  /**
+   * Create a comprehensive bill from intake
+   */
+  async createBill(
+    householdId: string,
+    data: {
+      category: BillCategoryType;
+      name: string;
+      payeeName?: string;
+      accountNumber?: string;
+      amount: number;
+      frequency: string;
+      dueDay?: number;
+      amountType?: string;
+      paymentMethod?: string;
+      currentAutopay?: boolean;
+      portalUrl?: string;
+      portalUsername?: string;
+      portalNotes?: string;
+      notes?: string;
+      // Loan fields
+      principalBalance?: number;
+      interestRate?: number;
+      loanTerm?: string;
+      maturityDate?: Date;
+      escrowIncluded?: boolean;
+      // Insurance fields
+      policyNumber?: string;
+      coverageAmount?: number;
+      deductible?: number;
+      renewalDate?: Date;
+      // Linked entities
+      vendorId?: string;
+      vehicleId?: string;
+      familyMemberId?: string;
+      assetId?: string;
+    },
+  ) {
+    const isLoan = ['MORTGAGE', 'CAR_PAYMENT', 'STUDENT_LOAN', 'PERSONAL_LOAN', 'HELOC', 'CREDIT_CARD'].includes(data.category);
+    const isInsurance = ['HOME_INSURANCE', 'AUTO_INSURANCE', 'LIFE_INSURANCE', 'HEALTH_INSURANCE', 'UMBRELLA_INSURANCE', 'PET_INSURANCE', 'DISABILITY_INSURANCE', 'LONG_TERM_CARE'].includes(data.category);
+
+    // Map frequency string to enum
+    const frequencyMap: Record<string, PaymentFrequency> = {
+      'WEEKLY': 'WEEKLY',
+      'BI-WEEKLY': 'BIWEEKLY',
+      'BIWEEKLY': 'BIWEEKLY',
+      'TWICE_MONTHLY': 'TWICE_MONTHLY',
+      'MONTHLY': 'MONTHLY',
+      'QUARTERLY': 'QUARTERLY',
+      'SEMI-ANNUAL': 'SEMI_ANNUAL',
+      'SEMI_ANNUAL': 'SEMI_ANNUAL',
+      'ANNUAL': 'ANNUAL',
+      'ONE_TIME': 'ONE_TIME',
+      'AS NEEDED': 'AS_NEEDED',
+      'AS_NEEDED': 'AS_NEEDED',
+    };
+
+    // Map payment method string to enum
+    const paymentMethodMap: Record<string, BillPaymentMethod> = {
+      'HAVEN PAYS': 'HAVEN_PAYS',
+      'HAVEN_PAYS': 'HAVEN_PAYS',
+      'CURRENT AUTOPAY': 'OWNER_AUTOPAY',
+      'OWNER_AUTOPAY': 'OWNER_AUTOPAY',
+      'MANUAL PAYMENT': 'OWNER_MANUAL',
+      'OWNER PAYS': 'OWNER_MANUAL',
+      'OWNER_MANUAL': 'OWNER_MANUAL',
+      'PAYROLL DEDUCTION': 'PAYROLL',
+      'PAYROLL': 'PAYROLL',
+      'ESCROW': 'ESCROW',
+    };
+
+    // Map amount type string to enum
+    const amountTypeMap: Record<string, AmountType> = {
+      'FIXED': 'FIXED',
+      'VARIABLE': 'VARIABLE',
+      'ESTIMATED': 'ESTIMATED',
+    };
+
+    const bill = await this.prisma.comprehensiveBill.create({
+      data: {
+        householdId,
+        category: data.category as BillCategory,
+        name: data.name,
+        payeeName: data.payeeName,
+        accountNumber: data.accountNumber,
+        amount: data.amount,
+        frequency: frequencyMap[data.frequency.toUpperCase()] || 'MONTHLY',
+        dueDay: data.dueDay,
+        amountType: data.amountType ? (amountTypeMap[data.amountType.toUpperCase()] || 'FIXED') : 'FIXED',
+        paymentMethod: data.paymentMethod ? (paymentMethodMap[data.paymentMethod.toUpperCase()] || 'HAVEN_PAYS') : 'HAVEN_PAYS',
+        currentAutopay: data.currentAutopay || false,
+        portalUrl: data.portalUrl,
+        portalUsername: data.portalUsername,
+        portalNotes: data.portalNotes,
+        notes: data.notes,
+        // Loan fields
+        isLoan,
+        principalBalance: data.principalBalance,
+        interestRate: data.interestRate,
+        loanTerm: data.loanTerm,
+        maturityDate: data.maturityDate,
+        escrowIncluded: data.escrowIncluded,
+        // Insurance fields
+        isInsurance,
+        policyNumber: data.policyNumber,
+        coverageAmount: data.coverageAmount,
+        deductible: data.deductible,
+        renewalDate: data.renewalDate,
+        // Linked entities
+        vendorId: data.vendorId,
+        vehicleId: data.vehicleId,
+        familyMemberId: data.familyMemberId,
+        assetId: data.assetId,
+        // Status
+        status: 'ACTIVE',
+        havenManaged: data.paymentMethod?.toUpperCase().includes('HAVEN') || false,
+      },
+    });
+
+    return bill;
+  }
+
+  /**
+   * Get all bills for a household
+   */
+  async getHouseholdBills(householdId: string) {
+    const bills = await this.prisma.comprehensiveBill.findMany({
+      where: {
+        householdId,
+        status: { not: 'CANCELLED' },
+      },
+      include: {
+        vendor: {
+          select: { id: true, displayName: true },
+        },
+        vehicle: {
+          select: { id: true, name: true, make: true, model: true },
+        },
+        familyMember: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+      orderBy: [
+        { category: 'asc' },
+        { name: 'asc' },
+      ],
+    });
+
+    return bills;
+  }
+
+  /**
+   * Update a bill
+   */
+  async updateBill(
+    householdId: string,
+    billId: string,
+    data: Partial<{
+      name: string;
+      payeeName: string;
+      accountNumber: string;
+      amount: number;
+      frequency: string;
+      dueDay: number;
+      amountType: string;
+      paymentMethod: string;
+      currentAutopay: boolean;
+      portalUrl: string;
+      portalUsername: string;
+      portalNotes: string;
+      notes: string;
+      status: string;
+      havenManaged: boolean;
+      verified: boolean;
+    }>,
+  ) {
+    const updateData: any = { ...data };
+
+    // Map enums if provided
+    if (data.frequency) {
+      const frequencyMap: Record<string, PaymentFrequency> = {
+        'WEEKLY': 'WEEKLY',
+        'BI-WEEKLY': 'BIWEEKLY',
+        'BIWEEKLY': 'BIWEEKLY',
+        'TWICE_MONTHLY': 'TWICE_MONTHLY',
+        'MONTHLY': 'MONTHLY',
+        'QUARTERLY': 'QUARTERLY',
+        'SEMI-ANNUAL': 'SEMI_ANNUAL',
+        'SEMI_ANNUAL': 'SEMI_ANNUAL',
+        'ANNUAL': 'ANNUAL',
+        'ONE_TIME': 'ONE_TIME',
+        'AS_NEEDED': 'AS_NEEDED',
+      };
+      updateData.frequency = frequencyMap[data.frequency.toUpperCase()] || 'MONTHLY';
+    }
+
+    if (data.status) {
+      updateData.status = data.status as BillStatus;
+    }
+
+    return this.prisma.comprehensiveBill.update({
+      where: { id: billId, householdId },
+      data: updateData,
+    });
+  }
+
+  /**
+   * Delete a bill (soft delete by setting status to CANCELLED)
+   */
+  async deleteBill(householdId: string, billId: string) {
+    return this.prisma.comprehensiveBill.update({
+      where: { id: billId, householdId },
+      data: { status: 'CANCELLED' },
+    });
+  }
+
+  /**
+   * Calculate monthly funding for a household
+   */
+  async calculateHouseholdFunding(householdId: string) {
+    const bills = await this.prisma.comprehensiveBill.findMany({
+      where: {
+        householdId,
+        status: 'ACTIVE',
+        havenManaged: true,
+      },
+    });
+
+    const billData = bills.map(b => ({
+      amount: Number(b.amount),
+      frequency: b.frequency,
+      status: b.status,
+    }));
+
+    return this.intakeGenerator.calculateComprehensiveMonthlyFunding(billData);
+  }
+
+  /**
+   * Get bill summary by category for a household
+   */
+  async getBillSummary(householdId: string) {
+    const bills = await this.prisma.comprehensiveBill.findMany({
+      where: {
+        householdId,
+        status: 'ACTIVE',
+      },
+    });
+
+    // Normalize to monthly
+    const normalizeToMonthly = (amount: number, frequency: PaymentFrequency): number => {
+      switch (frequency) {
+        case 'WEEKLY': return amount * 4.33;
+        case 'BIWEEKLY': return amount * 2.17;
+        case 'TWICE_MONTHLY': return amount * 2;
+        case 'MONTHLY': return amount;
+        case 'QUARTERLY': return amount / 3;
+        case 'SEMI_ANNUAL': return amount / 6;
+        case 'ANNUAL': return amount / 12;
+        default: return amount;
+      }
+    };
+
+    // Category groups
+    const categoryGroups: Record<string, string[]> = {
+      housing: ['MORTGAGE', 'RENT', 'PROPERTY_TAX', 'HOA', 'HOME_INSURANCE'],
+      utilities: ['ELECTRIC', 'GAS', 'WATER_SEWER', 'OIL_PROPANE', 'TRASH'],
+      telecom: ['INTERNET', 'CABLE_TV', 'CELL_PHONE', 'LANDLINE'],
+      vehicles: ['CAR_PAYMENT', 'AUTO_INSURANCE', 'CAR_REGISTRATION', 'PARKING', 'TOLLS'],
+      loans: ['STUDENT_LOAN', 'PERSONAL_LOAN', 'HELOC', 'CREDIT_CARD'],
+      family: ['SCHOOL_TUITION', 'CHILDCARE', 'NANNY', 'KIDS_ACTIVITY', 'SCHOOL_LUNCH', 'TUTORING'],
+      insurance: ['LIFE_INSURANCE', 'HEALTH_INSURANCE', 'UMBRELLA_INSURANCE', 'PET_INSURANCE', 'DISABILITY_INSURANCE', 'LONG_TERM_CARE'],
+      homeServices: ['LAWN_LANDSCAPE', 'POOL_SERVICE', 'PEST_CONTROL', 'SECURITY_MONITORING', 'HOUSE_CLEANING', 'SNOW_REMOVAL'],
+      memberships: ['GYM_FITNESS', 'CLUB_MEMBERSHIP', 'STREAMING_SERVICE', 'SOFTWARE_SUBSCRIPTION', 'NEWSPAPER_MAGAZINE', 'MEAL_KIT', 'AMAZON_PRIME', 'WAREHOUSE_CLUB'],
+      other: ['STORAGE', 'PET_CARE', 'CHARITY_DONATION', 'CHILD_SUPPORT', 'ALIMONY', 'OTHER_BILL'],
+    };
+
+    const summary: Record<string, { count: number; monthlyTotal: number; bills: any[] }> = {};
+    let totalMonthly = 0;
+    let havenManagedTotal = 0;
+
+    for (const [group, categories] of Object.entries(categoryGroups)) {
+      const groupBills = bills.filter(b => categories.includes(b.category));
+      const monthlyTotal = groupBills.reduce((sum, b) => sum + normalizeToMonthly(Number(b.amount), b.frequency), 0);
+      summary[group] = {
+        count: groupBills.length,
+        monthlyTotal,
+        bills: groupBills.map(b => ({
+          id: b.id,
+          name: b.name,
+          category: b.category,
+          payeeName: b.payeeName,
+          amount: Number(b.amount),
+          frequency: b.frequency,
+          monthlyAmount: normalizeToMonthly(Number(b.amount), b.frequency),
+          havenManaged: b.havenManaged,
+        })),
+      };
+      totalMonthly += monthlyTotal;
+      havenManagedTotal += groupBills.filter(b => b.havenManaged).reduce((sum, b) => sum + normalizeToMonthly(Number(b.amount), b.frequency), 0);
+    }
+
+    const havenServiceFee = havenManagedTotal * 0.03;
+    const recommendedBuffer = havenManagedTotal * 0.10;
+
+    return {
+      summary,
+      totalBills: bills.length,
+      totalMonthly,
+      havenManagedTotal,
+      havenServiceFee,
+      recommendedBuffer,
+      recommendedMonthlyFunding: havenManagedTotal + havenServiceFee + recommendedBuffer,
+    };
   }
 }
