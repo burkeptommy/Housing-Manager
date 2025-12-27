@@ -3592,9 +3592,13 @@ model HouseholdIntake {
   id          String @id @default(cuid())
   householdId String @unique @map("household_id")
 
-  // Status tracking
-  status   IntakeStatus @default(PENDING)
-  progress Int          @default(0) // 0-100 percentage
+  // Status tracking (using OnboardingStatus for full lifecycle)
+  status   OnboardingStatus @default(PENDING_CALL)
+  progress Int              @default(0) // 0-100 percentage
+
+  // User's initial input from signup
+  biggestChallenge String? @map("biggest_challenge")
+  selectedTier     String? @map("selected_tier")
 
   // Scheduling
   scheduledAt DateTime? @map("scheduled_at")
@@ -3607,6 +3611,17 @@ model HouseholdIntake {
   // Section completion tracking (JSON object mapping section ids to completion status)
   sectionsCompleted Json? @map("sections_completed")
 
+  // Intake progress by section (0-100 each)
+  progressFamily   Int @default(0) @map("progress_family")
+  progressProperty Int @default(0) @map("progress_property")
+  progressZones    Int @default(0) @map("progress_zones")
+  progressSystems  Int @default(0) @map("progress_systems")
+  progressVendors  Int @default(0) @map("progress_vendors")
+  progressBills    Int @default(0) @map("progress_bills")
+
+  // Flexible data during intake
+  intakeData Json? @map("intake_data")
+
   // Call notes and observations
   callNotes    String? @map("call_notes") @db.Text
   managerNotes String? @map("manager_notes") @db.Text
@@ -3616,8 +3631,14 @@ model HouseholdIntake {
   fundingBreakdown         Json?    @map("funding_breakdown")
 
   // Next steps and follow-ups
-  nextSteps    String?   @map("next_steps") @db.Text
-  followUpDate DateTime? @map("follow_up_date")
+  nextSteps      String?   @map("next_steps") @db.Text
+  followUpDate   DateTime? @map("follow_up_date")
+  followUpNeeded Boolean   @default(false) @map("follow_up_needed")
+  followUpNotes  String?   @map("follow_up_notes") @db.Text
+
+  // Milestones
+  profileDeliveredAt DateTime? @map("profile_delivered_at")
+  firstBillPaidAt    DateTime? @map("first_bill_paid_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
