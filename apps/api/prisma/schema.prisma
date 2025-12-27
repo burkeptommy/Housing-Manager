@@ -78,19 +78,19 @@ enum ServiceRequestPriority {
 }
 
 enum HomeownerInputType {
-  NONE         // No input needed
-  CHOICE       // Select from options (e.g., faucet style)
-  SCHEDULE     // Pick a time (Tuesday 9am or Thursday 2pm)
-  APPROVAL     // Approve a cost ($450 - approve?)
-  INFORMATION  // Need more info from homeowner
+  NONE // No input needed
+  CHOICE // Select from options (e.g., faucet style)
+  SCHEDULE // Pick a time (Tuesday 9am or Thursday 2pm)
+  APPROVAL // Approve a cost ($450 - approve?)
+  INFORMATION // Need more info from homeowner
 }
 
 enum RequestQuickCategory {
-  FIX       // Something's broken
-  SCHEDULE  // Need to schedule a service
-  BUY       // Purchase something
-  RESEARCH  // Look into something
-  OTHER     // Other request
+  FIX // Something's broken
+  SCHEDULE // Need to schedule a service
+  BUY // Purchase something
+  RESEARCH // Look into something
+  OTHER // Other request
 }
 
 enum TaskStatus {
@@ -203,19 +203,19 @@ enum VendorCategory {
   HELOC
 
   // Kids & Activities
-  TUITION            // School tuition
-  CHILDCARE          // Nanny, babysitter, daycare
-  SPORTS_ACTIVITIES  // Sports leagues, lessons
-  MUSIC_LESSONS      // Piano, guitar, etc.
-  TUTORING           // Academic tutoring
-  CAMPS              // Summer/winter camps
-  EXTRACURRICULAR    // Other activities
+  TUITION // School tuition
+  CHILDCARE // Nanny, babysitter, daycare
+  SPORTS_ACTIVITIES // Sports leagues, lessons
+  MUSIC_LESSONS // Piano, guitar, etc.
+  TUTORING // Academic tutoring
+  CAMPS // Summer/winter camps
+  EXTRACURRICULAR // Other activities
 
   // Pet Care
-  PET_FOOD           // Auto-ship pet food
-  PET_GROOMING       // Grooming services
-  VET_CARE           // Veterinary services
-  PET_DAYCARE        // Pet daycare/boarding
+  PET_FOOD // Auto-ship pet food
+  PET_GROOMING // Grooming services
+  VET_CARE // Veterinary services
+  PET_DAYCARE // Pet daycare/boarding
 
   // Subscriptions & Services
   STREAMING
@@ -263,7 +263,6 @@ enum PaymentMethodType {
   CARD
   BANK_ACCOUNT
 }
-
 
 enum MaintenanceCategory {
   HVAC
@@ -751,6 +750,10 @@ model User {
   // Household Intake / Onboarding Workbench
   intakesManaged HouseholdIntake[] @relation("IntakeManager")
 
+  // Zone-based onboarding progress
+  onboardingManagedAs   OnboardingProgress[] @relation("OnboardingHomeManager")
+  onboardingHandymanFor OnboardingProgress[] @relation("OnboardingHandyman")
+
   @@map("users")
 }
 
@@ -869,6 +872,13 @@ model Household {
   familyMembers    FamilyMember[]
   familyActivities FamilyActivity[]
 
+  // Zone-based property structure
+  zones              Zone[]
+  propertyAssets     PropertyAsset[]
+  serviceLogs        ServiceLog[]
+  propertyDocuments  PropertyDocument[]
+  onboardingProgress OnboardingProgress?
+
   @@index([managerId])
   @@index([assignedHandymanId])
   @@index([h3Index])
@@ -900,24 +910,24 @@ model HouseholdMember {
   profilePhotoUrl     String?   @map("profile_photo_url")
 
   // Work/Employment Info (for adults)
-  employer            String?   // Company name
-  jobTitle            String?   @map("job_title")
-  workAddress         String?   @map("work_address")
-  workPhone           String?   @map("work_phone")
-  workSchedule        String?   @map("work_schedule") // e.g., "Mon-Fri 9am-5pm"
-  commuteMiles        Float?    @map("commute_miles")
+  employer     String? // Company name
+  jobTitle     String? @map("job_title")
+  workAddress  String? @map("work_address")
+  workPhone    String? @map("work_phone")
+  workSchedule String? @map("work_schedule") // e.g., "Mon-Fri 9am-5pm"
+  commuteMiles Float?  @map("commute_miles")
 
   // Extended Health Info
-  primaryPhysician    String?   @map("primary_physician")
-  physicianPhone      String?   @map("physician_phone")
-  dentist             String?
-  dentistPhone        String?   @map("dentist_phone")
-  bloodType           String?   @map("blood_type")
-  insuranceProvider   String?   @map("insurance_provider")
-  insuranceNumber     String?   @map("insurance_number")
+  primaryPhysician  String? @map("primary_physician")
+  physicianPhone    String? @map("physician_phone")
+  dentist           String?
+  dentistPhone      String? @map("dentist_phone")
+  bloodType         String? @map("blood_type")
+  insuranceProvider String? @map("insurance_provider")
+  insuranceNumber   String? @map("insurance_number")
 
   // Relationship (for family hierarchy)
-  relationship        String?   // HEAD_OF_HOUSEHOLD, SPOUSE, CHILD, etc.
+  relationship String? // HEAD_OF_HOUSEHOLD, SPOUSE, CHILD, etc.
 
   // Granular Permissions (replaces simple role-based access)
   permissions MemberPermissionType[] @default([VIEW_CALENDAR, VIEW_ASSETS, VIEW_MEMBERS])
@@ -968,60 +978,60 @@ model HouseholdInvite {
 // ============================================================================
 
 model Vehicle {
-  id              String      @id @default(cuid())
-  householdId     String      @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
 
   // Basic Info
-  name            String      // Display name (e.g., "Bob's Tesla", "Family SUV")
-  make            String      // Tesla, Toyota, Honda
-  model           String      // Model Y, Highlander, Accord
-  year            Int
-  vehicleType     VehicleType @default(SUV) @map("vehicle_type")
-  color           String?
-  vin             String?
-  licensePlate    String?     @map("license_plate")
+  name         String // Display name (e.g., "Bob's Tesla", "Family SUV")
+  make         String // Tesla, Toyota, Honda
+  model        String // Model Y, Highlander, Accord
+  year         Int
+  vehicleType  VehicleType @default(SUV) @map("vehicle_type")
+  color        String?
+  vin          String?
+  licensePlate String?     @map("license_plate")
 
   // Ownership
-  primaryDriverId String?     @map("primary_driver_id")
-  isOwned         Boolean     @default(true) @map("is_owned") // vs leased
-  isActive        Boolean     @default(true) @map("is_active")
+  primaryDriverId String? @map("primary_driver_id")
+  isOwned         Boolean @default(true) @map("is_owned") // vs leased
+  isActive        Boolean @default(true) @map("is_active")
 
   // Tracking
-  currentMileage  Int?        @map("current_mileage")
-  mileageUpdatedAt DateTime?  @map("mileage_updated_at")
-  annualMiles     Int?        @map("annual_miles") // Estimated annual mileage
+  currentMileage   Int?      @map("current_mileage")
+  mileageUpdatedAt DateTime? @map("mileage_updated_at")
+  annualMiles      Int?      @map("annual_miles") // Estimated annual mileage
 
   // Registration & Insurance
-  registrationExpiry   DateTime? @map("registration_expiry")
-  registrationState    String?   @map("registration_state")
-  insuranceProvider    String?   @map("insurance_provider")
-  insurancePolicyNum   String?   @map("insurance_policy_num")
-  insuranceExpiry      DateTime? @map("insurance_expiry")
-  insuranceMonthly     Decimal?  @map("insurance_monthly") @db.Decimal(10, 2)
+  registrationExpiry DateTime? @map("registration_expiry")
+  registrationState  String?   @map("registration_state")
+  insuranceProvider  String?   @map("insurance_provider")
+  insurancePolicyNum String?   @map("insurance_policy_num")
+  insuranceExpiry    DateTime? @map("insurance_expiry")
+  insuranceMonthly   Decimal?  @map("insurance_monthly") @db.Decimal(10, 2)
 
   // Loan/Lease Info
-  hasLoan             Boolean   @default(false) @map("has_loan")
-  lender              String?
-  monthlyPayment      Decimal?  @map("monthly_payment") @db.Decimal(10, 2)
-  loanBalance         Decimal?  @map("loan_balance") @db.Decimal(12, 2)
-  loanMaturityDate    DateTime? @map("loan_maturity_date")
+  hasLoan          Boolean   @default(false) @map("has_loan")
+  lender           String?
+  monthlyPayment   Decimal?  @map("monthly_payment") @db.Decimal(10, 2)
+  loanBalance      Decimal?  @map("loan_balance") @db.Decimal(12, 2)
+  loanMaturityDate DateTime? @map("loan_maturity_date")
 
   // Service Info
-  lastOilChange       DateTime? @map("last_oil_change")
-  oilChangeMileage    Int?      @map("oil_change_mileage")
-  nextServiceDue      DateTime? @map("next_service_due")
-  nextServiceMileage  Int?      @map("next_service_mileage")
-  preferredServiceShop String?  @map("preferred_service_shop")
+  lastOilChange        DateTime? @map("last_oil_change")
+  oilChangeMileage     Int?      @map("oil_change_mileage")
+  nextServiceDue       DateTime? @map("next_service_due")
+  nextServiceMileage   Int?      @map("next_service_mileage")
+  preferredServiceShop String?   @map("preferred_service_shop")
 
   // Photo
-  photoUrl            String?   @map("photo_url")
+  photoUrl String? @map("photo_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household     Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  primaryDriver HouseholdMember?  @relation("PrimaryDriver", fields: [primaryDriverId], references: [id], onDelete: SetNull)
+  household     Household        @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  primaryDriver HouseholdMember? @relation("PrimaryDriver", fields: [primaryDriverId], references: [id], onDelete: SetNull)
   services      VehicleService[]
   events        FamilyEvent[]
 
@@ -1030,29 +1040,29 @@ model Vehicle {
 }
 
 model VehicleService {
-  id          String            @id @default(cuid())
-  vehicleId   String            @map("vehicle_id")
+  id        String @id @default(cuid())
+  vehicleId String @map("vehicle_id")
 
   // Service Details
   serviceType VehicleServiceType @map("service_type")
   description String?
-  serviceDate DateTime          @map("service_date")
-  mileageAt   Int?              @map("mileage_at")
+  serviceDate DateTime           @map("service_date")
+  mileageAt   Int?               @map("mileage_at")
 
   // Cost
-  cost        Decimal?          @db.Decimal(10, 2)
+  cost Decimal? @db.Decimal(10, 2)
 
   // Provider
-  shopName    String?           @map("shop_name")
-  shopAddress String?           @map("shop_address")
+  shopName    String? @map("shop_name")
+  shopAddress String? @map("shop_address")
 
   // Next Service
-  nextServiceDate    DateTime?  @map("next_service_date")
-  nextServiceMileage Int?       @map("next_service_mileage")
+  nextServiceDate    DateTime? @map("next_service_date")
+  nextServiceMileage Int?      @map("next_service_mileage")
 
   // Notes & Docs
-  notes       String?           @db.Text
-  receiptUrl  String?           @map("receipt_url")
+  notes      String? @db.Text
+  receiptUrl String? @map("receipt_url")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1199,8 +1209,13 @@ model Vendor {
   vendorSuggestions VendorSuggestion[]
 
   // Family Assets relations
-  homeSystemsServiced   HomeSystem[]           @relation("SystemServiceVendor")
-  homeSystemServices    HomeSystemService[]    @relation("HomeSystemServiceVendor")
+  homeSystemsServiced HomeSystem[]        @relation("SystemServiceVendor")
+  homeSystemServices  HomeSystemService[] @relation("HomeSystemServiceVendor")
+
+  // Zone-based property relations
+  servicedAssets    PropertyAsset[]    @relation("AssetServiceVendor")
+  serviceLogs       ServiceLog[]       @relation("ServiceLogVendor")
+  propertyDocuments PropertyDocument[] @relation("DocumentVendor")
 
   @@index([householdId, category])
   @@index([userId])
@@ -1263,19 +1278,19 @@ model ServiceRequest {
   inputRespondedAt       DateTime?          @map("input_responded_at")
 
   // Recurring detection
-  similarRequestId  String?   @map("similar_request_id") // Links to previous similar request
-  recurringIssue    Boolean   @default(false) @map("recurring_issue")
-  previousFixDate   DateTime? @map("previous_fix_date")
-  previousVendorId  String?   @map("previous_vendor_id")
+  similarRequestId String?   @map("similar_request_id") // Links to previous similar request
+  recurringIssue   Boolean   @default(false) @map("recurring_issue")
+  previousFixDate  DateTime? @map("previous_fix_date")
+  previousVendorId String?   @map("previous_vendor_id")
 
   // Photo/voice input
   voiceTranscript String? @map("voice_transcript")
   photoUrls       Json?   @map("photo_urls") // Array of photo URLs
 
   // Auto-status updates tracking
-  managerNote       String?   @map("manager_note") // Internal note from manager
-  lastStatusUpdate  String?   @map("last_status_update") // Last update message
-  statusUpdatedAt   DateTime? @map("status_updated_at")
+  managerNote      String?   @map("manager_note") // Internal note from manager
+  lastStatusUpdate String?   @map("last_status_update") // Last update message
+  statusUpdatedAt  DateTime? @map("status_updated_at")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1633,6 +1648,7 @@ model BillAccount {
   vendor                Vendor                 @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   autopayPaymentMethod  PaymentMethod?         @relation(fields: [paymentMethodId], references: [id], onDelete: SetNull)
   householdInvoiceItems HouseholdInvoiceItem[]
+  propertyDocuments     PropertyDocument[]
 
   @@index([householdId, category])
   @@index([householdId, nextDueDate])
@@ -2905,17 +2921,17 @@ model FamilyEvent {
   managerNote   String?          @map("manager_note") // Note from manager when they add an event
 
   // Requires homeowner attention/action
-  requiresAction     Boolean @default(false) @map("requires_action")
-  actionDescription  String? @map("action_description") // "Confirm access code" or "Approve pickup person"
-  actionCompletedAt  DateTime? @map("action_completed_at")
+  requiresAction    Boolean   @default(false) @map("requires_action")
+  actionDescription String?   @map("action_description") // "Confirm access code" or "Approve pickup person"
+  actionCompletedAt DateTime? @map("action_completed_at")
 
   // Smart reminders (manager sets up)
-  reminderText    String? @map("reminder_text") // Custom reminder message like "Emma's soccer snacks - your turn"
-  reminderSentAt  DateTime? @map("reminder_sent_at")
+  reminderText   String?   @map("reminder_text") // Custom reminder message like "Emma's soccer snacks - your turn"
+  reminderSentAt DateTime? @map("reminder_sent_at")
 
   // Conflict detection
-  hasConflict       Boolean @default(false) @map("has_conflict")
-  conflictReason    String? @map("conflict_reason") // "You'll be out of town" or "Overlaps with dentist"
+  hasConflict        Boolean   @default(false) @map("has_conflict")
+  conflictReason     String?   @map("conflict_reason") // "You'll be out of town" or "Overlaps with dentist"
   conflictResolvedAt DateTime? @map("conflict_resolved_at")
 
   // External calendar sync
@@ -3459,21 +3475,21 @@ model HomeSystemService {
 // HomeChecklist - Smart intake checklist generated from ATTOM property data
 // Used by Home Managers to gather comprehensive info during intro calls
 model HomeChecklist {
-  id          String   @id @default(cuid())
-  householdId String   @unique @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @unique @map("household_id")
 
   // Checklist items (JSON array of ChecklistItem)
   // Each item has: id, category, priority, question, context, dataField, inputType, options, answered, answer
   items Json
 
   // Summary stats (denormalized for quick access)
-  totalItems     Int @default(0) @map("total_items")
-  completedItems Int @default(0) @map("completed_items")
+  totalItems            Int @default(0) @map("total_items")
+  completedItems        Int @default(0) @map("completed_items")
   highPriorityRemaining Int @default(0) @map("high_priority_remaining")
 
   // Status
-  status    String   @default("pending") // pending, in_progress, completed
-  startedAt DateTime? @map("started_at")
+  status      String    @default("pending") // pending, in_progress, completed
+  startedAt   DateTime? @map("started_at")
   completedAt DateTime? @map("completed_at")
 
   // Who completed it
@@ -3495,52 +3511,52 @@ model HomeChecklist {
 
 // Status of the intake process
 enum IntakeStatus {
-  PENDING      // Not started
-  SCHEDULED    // Call scheduled
-  IN_PROGRESS  // Currently on call
-  PAUSED       // Partially completed, will resume
-  COMPLETED    // All sections done
-  ARCHIVED     // Intake archived
+  PENDING // Not started
+  SCHEDULED // Call scheduled
+  IN_PROGRESS // Currently on call
+  PAUSED // Partially completed, will resume
+  COMPLETED // All sections done
+  ARCHIVED // Intake archived
 }
 
 // Family member types (NOT pets - use Pet model for pets)
 enum FamilyMemberType {
-  ADULT        // Adult household member (spouse, partner, parent)
-  CHILD        // Child in household
-  STAFF        // Household staff (nanny, housekeeper, caretaker)
+  ADULT // Adult household member (spouse, partner, parent)
+  CHILD // Child in household
+  STAFF // Household staff (nanny, housekeeper, caretaker)
 }
 
 // HouseholdIntake - Main intake session record for Home Manager calls
 model HouseholdIntake {
-  id            String       @id @default(cuid())
-  householdId   String       @unique @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @unique @map("household_id")
 
   // Status tracking
-  status        IntakeStatus @default(PENDING)
-  progress      Int          @default(0) // 0-100 percentage
+  status   IntakeStatus @default(PENDING)
+  progress Int          @default(0) // 0-100 percentage
 
   // Scheduling
-  scheduledAt   DateTime?    @map("scheduled_at")
-  startedAt     DateTime?    @map("started_at")
-  completedAt   DateTime?    @map("completed_at")
+  scheduledAt DateTime? @map("scheduled_at")
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
 
   // Manager handling the intake
-  managerId     String?      @map("manager_id")
+  managerId String? @map("manager_id")
 
   // Section completion tracking (JSON object mapping section ids to completion status)
-  sectionsCompleted Json?    @map("sections_completed")
+  sectionsCompleted Json? @map("sections_completed")
 
   // Call notes and observations
-  callNotes     String?      @map("call_notes") @db.Text
-  managerNotes  String?      @map("manager_notes") @db.Text
+  callNotes    String? @map("call_notes") @db.Text
+  managerNotes String? @map("manager_notes") @db.Text
 
   // Calculated monthly funding recommendation
   calculatedMonthlyFunding Decimal? @map("calculated_monthly_funding") @db.Decimal(10, 2)
   fundingBreakdown         Json?    @map("funding_breakdown")
 
   // Next steps and follow-ups
-  nextSteps     String?      @map("next_steps") @db.Text
-  followUpDate  DateTime?    @map("follow_up_date")
+  nextSteps    String?   @map("next_steps") @db.Text
+  followUpDate DateTime? @map("follow_up_date")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3555,50 +3571,50 @@ model HouseholdIntake {
 // FamilyMember - Non-user household members (adults, children, staff)
 // Note: Pets should use the Pet model, not FamilyMember
 model FamilyMember {
-  id          String           @id @default(cuid())
-  householdId String           @map("household_id")
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
 
   // Basic Info
-  firstName   String           @map("first_name")
-  lastName    String?          @map("last_name")
-  nickname    String?
-  type        FamilyMemberType @default(ADULT)
+  firstName String           @map("first_name")
+  lastName  String?          @map("last_name")
+  nickname  String?
+  type      FamilyMemberType @default(ADULT)
 
   // Contact (for adults/staff)
-  email       String?
-  phone       String?
+  email String?
+  phone String?
 
   // Demographics
-  birthdate   DateTime?        @db.Date
-  relationship String?         // e.g., "Spouse", "Son", "Daughter", "Nanny", "Housekeeper"
+  birthdate    DateTime? @db.Date
+  relationship String? // e.g., "Spouse", "Son", "Daughter", "Nanny", "Housekeeper"
 
   // School/Work info (for children)
-  school          String?
-  schoolGrade     String?          @map("school_grade")
-  teacher         String?
-  schoolPickup    String?          @map("school_pickup") // "Bus", "Parent", "Carpool", etc.
-  schoolDropoff   String?          @map("school_dropoff")
+  school        String?
+  schoolGrade   String? @map("school_grade")
+  teacher       String?
+  schoolPickup  String? @map("school_pickup") // "Bus", "Parent", "Carpool", etc.
+  schoolDropoff String? @map("school_dropoff")
 
   // Staff info
-  workSchedule    String?          @map("work_schedule") // e.g., "M-F 8am-6pm"
-  responsibilities String?         @db.Text
-  startDate       DateTime?        @map("start_date") @db.Date
-  paymentMethod   String?          @map("payment_method") // For staff pay tracking
+  workSchedule     String?   @map("work_schedule") // e.g., "M-F 8am-6pm"
+  responsibilities String?   @db.Text
+  startDate        DateTime? @map("start_date") @db.Date
+  paymentMethod    String?   @map("payment_method") // For staff pay tracking
 
   // Medical (optional for emergency)
-  allergies       String[]         @default([])
-  medications     String[]         @default([])
-  specialNeeds    String?          @map("special_needs") @db.Text
+  allergies    String[] @default([])
+  medications  String[] @default([])
+  specialNeeds String?  @map("special_needs") @db.Text
 
   // Emergency contacts
-  emergencyContact      String?    @map("emergency_contact")
-  emergencyContactPhone String?    @map("emergency_contact_phone")
+  emergencyContact      String? @map("emergency_contact")
+  emergencyContactPhone String? @map("emergency_contact_phone")
 
   // Photo
-  photoUrl        String?          @map("photo_url")
+  photoUrl String? @map("photo_url")
 
-  notes           String?          @db.Text
-  isActive        Boolean          @default(true) @map("is_active")
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3613,53 +3629,337 @@ model FamilyMember {
 
 // FamilyActivity - Recurring activities and subscriptions for family members
 model FamilyActivity {
-  id              String    @id @default(cuid())
-  householdId     String    @map("household_id")
-  familyMemberId  String?   @map("family_member_id")
+  id             String  @id @default(cuid())
+  householdId    String  @map("household_id")
+  familyMemberId String? @map("family_member_id")
 
   // Activity details
-  name            String    // e.g., "Soccer Practice", "Piano Lessons"
-  category        String    // Sports, Music, Art, Tutoring, Camp, etc.
-  description     String?   @db.Text
-  location        String?
+  name        String // e.g., "Soccer Practice", "Piano Lessons"
+  category    String // Sports, Music, Art, Tutoring, Camp, etc.
+  description String? @db.Text
+  location    String?
 
   // Schedule
-  schedule        String?   // e.g., "Tuesdays and Thursdays 4-5pm"
-  startDate       DateTime? @map("start_date") @db.Date
-  endDate         DateTime? @map("end_date") @db.Date
-  isSeasonal      Boolean   @default(false) @map("is_seasonal")
-  season          String?   // "Fall", "Spring", "Summer", "Year-round"
+  schedule   String? // e.g., "Tuesdays and Thursdays 4-5pm"
+  startDate  DateTime? @map("start_date") @db.Date
+  endDate    DateTime? @map("end_date") @db.Date
+  isSeasonal Boolean   @default(false) @map("is_seasonal")
+  season     String? // "Fall", "Spring", "Summer", "Year-round"
 
   // Organization/Provider
-  organizationName  String?   @map("organization_name")
-  contactName       String?   @map("contact_name")
-  contactPhone      String?   @map("contact_phone")
-  contactEmail      String?   @map("contact_email")
-  websiteUrl        String?   @map("website_url")
+  organizationName String? @map("organization_name")
+  contactName      String? @map("contact_name")
+  contactPhone     String? @map("contact_phone")
+  contactEmail     String? @map("contact_email")
+  websiteUrl       String? @map("website_url")
 
   // Cost
-  costAmount        Decimal?  @map("cost_amount") @db.Decimal(10, 2)
-  costFrequency     BillingFrequency? @map("cost_frequency")
-  paymentMethod     String?   @map("payment_method")
-  paymentDueDay     Int?      @map("payment_due_day") // Day of month
+  costAmount    Decimal?          @map("cost_amount") @db.Decimal(10, 2)
+  costFrequency BillingFrequency? @map("cost_frequency")
+  paymentMethod String?           @map("payment_method")
+  paymentDueDay Int?              @map("payment_due_day") // Day of month
 
   // Equipment/supplies needed
-  equipmentNeeded   String[]  @default([]) @map("equipment_needed")
+  equipmentNeeded String[] @default([]) @map("equipment_needed")
 
   // Transportation
-  transportation    String?   // "Parent drives", "Carpool", "Walk", etc.
+  transportation String? // "Parent drives", "Carpool", "Walk", etc.
 
-  notes             String?   @db.Text
-  isActive          Boolean   @default(true) @map("is_active")
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household     Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  familyMember  FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
+  household    Household     @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  familyMember FamilyMember? @relation(fields: [familyMemberId], references: [id], onDelete: SetNull)
 
   @@index([householdId])
   @@index([familyMemberId])
   @@map("family_activities")
+}
+
+// ============================================================================
+// ZONE-BASED PROPERTY STRUCTURE (Nines-style)
+// ============================================================================
+
+enum ZoneType {
+  KITCHEN
+  LIVING_ROOM
+  DINING_ROOM
+  BEDROOM
+  BATHROOM
+  GARAGE
+  BASEMENT
+  ATTIC
+  LAUNDRY
+  OFFICE
+  MUDROOM
+  PANTRY
+  OUTDOOR_FRONT
+  OUTDOOR_BACK
+  POOL_AREA
+  MECHANICAL
+  OTHER
+}
+
+enum AssetCategory {
+  APPLIANCE
+  HVAC
+  PLUMBING
+  ELECTRICAL
+  STRUCTURAL
+  FURNITURE
+  ELECTRONICS
+  OUTDOOR
+  VEHICLE
+  SAFETY
+  OTHER
+}
+
+enum ServiceLogType {
+  MAINTENANCE
+  REPAIR
+  REPLACEMENT
+  INSPECTION
+  INSTALLATION
+  CLEANING
+  OTHER
+}
+
+enum DocumentType {
+  CONTRACT
+  WARRANTY
+  MANUAL
+  RECEIPT
+  INVOICE
+  INSURANCE
+  TAX
+  PHOTO
+  OTHER
+}
+
+enum OnboardingStatus {
+  SIGNUP_COMPLETE // Just signed up
+  CALL_SCHEDULED // Intro call scheduled
+  CALL_IN_PROGRESS // Currently on call
+  PROFILE_BUILDING // HM building profile
+  PROFILE_DELIVERED // Sent to homeowner
+  ACTIVE // Fully onboarded
+}
+
+// Zone - A distinct area of the property (Kitchen, Master Bath, Garage, etc.)
+model Zone {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  name  String // "Kitchen", "Master Bathroom", "Garage", etc.
+  type  ZoneType
+  floor String? // "1st Floor", "Basement", etc.
+
+  // Photos
+  photos String[] @default([])
+
+  // Notes and procedures for this zone
+  notes      String? @db.Text
+  procedures String? @db.Text // How to care for this zone
+
+  // Sort order for display
+  sortOrder Int @default(0) @map("sort_order")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household   Household       @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  assets      PropertyAsset[]
+  serviceLogs ServiceLog[]
+
+  @@index([householdId, type])
+  @@map("zones")
+}
+
+// PropertyAsset - An appliance, system, or item in the home
+model PropertyAsset {
+  id          String  @id @default(cuid())
+  householdId String  @map("household_id")
+  zoneId      String? @map("zone_id")
+
+  name     String // "Refrigerator", "Furnace", "Washer"
+  category AssetCategory
+
+  // Details
+  brand        String?
+  model        String?
+  serialNumber String? @map("serial_number")
+  color        String?
+
+  // Purchase/Warranty
+  purchaseDate    DateTime? @map("purchase_date")
+  purchasePrice   Decimal?  @map("purchase_price") @db.Decimal(10, 2)
+  purchaseVendor  String?   @map("purchase_vendor")
+  warrantyExpires DateTime? @map("warranty_expires")
+  warrantyNotes   String?   @map("warranty_notes") @db.Text
+
+  // Condition
+  condition      String? // "Excellent", "Good", "Fair", "Needs Service"
+  conditionNotes String? @map("condition_notes") @db.Text
+
+  // Service
+  serviceVendorId String?   @map("service_vendor_id")
+  lastServiceDate DateTime? @map("last_service_date")
+  nextServiceDate DateTime? @map("next_service_date")
+  serviceInterval String?   @map("service_interval") // "annual", "6 months", etc.
+
+  // Documents/Photos
+  photos    String[] @default([])
+  manualUrl String?  @map("manual_url")
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household     Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  zone          Zone?              @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  serviceVendor Vendor?            @relation("AssetServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
+  serviceLogs   ServiceLog[]
+  documents     PropertyDocument[]
+
+  @@index([householdId, category])
+  @@index([zoneId])
+  @@map("property_assets")
+}
+
+// ServiceLog - History of all service/maintenance performed
+model ServiceLog {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Can be linked to asset, zone, or just property
+  assetId String? @map("asset_id")
+  zoneId  String? @map("zone_id")
+
+  // What happened
+  type        ServiceLogType
+  title       String
+  description String?        @db.Text
+
+  // Who did it
+  vendorId    String? @map("vendor_id")
+  performedBy String? @map("performed_by") // Name if not a vendor
+
+  // When
+  serviceDate DateTime @map("service_date")
+
+  // Cost
+  cost       Decimal? @db.Decimal(10, 2)
+  invoiceUrl String?  @map("invoice_url")
+
+  // Photos/Documents
+  photos String[] @default([])
+
+  // Notes
+  notes String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  asset     PropertyAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  zone      Zone?          @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  vendor    Vendor?        @relation("ServiceLogVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, serviceDate])
+  @@index([assetId])
+  @@index([vendorId])
+  @@map("service_logs")
+}
+
+// PropertyDocument - Documents linked to vendors, assets, bills
+model PropertyDocument {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  type    DocumentType
+  name    String
+  fileUrl String       @map("file_url")
+
+  // Connections
+  vendorId      String? @map("vendor_id")
+  assetId       String? @map("asset_id")
+  billAccountId String? @map("bill_account_id")
+
+  // Metadata
+  uploadedBy String? @map("uploaded_by")
+  notes      String? @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household   Household      @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor      Vendor?        @relation("DocumentVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+  asset       PropertyAsset? @relation(fields: [assetId], references: [id], onDelete: SetNull)
+  billAccount BillAccount?   @relation(fields: [billAccountId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, type])
+  @@index([vendorId])
+  @@index([assetId])
+  @@map("property_documents")
+}
+
+// OnboardingProgress - Track the homeowner's onboarding journey
+model OnboardingProgress {
+  id          String @id @default(cuid())
+  householdId String @unique @map("household_id")
+
+  // Initial signup
+  signupDate       DateTime @default(now()) @map("signup_date")
+  biggestChallenge String?  @map("biggest_challenge")
+  selectedTier     String?  @map("selected_tier")
+
+  // Onboarding call
+  callScheduledFor DateTime? @map("call_scheduled_for")
+  callCompletedAt  DateTime? @map("call_completed_at")
+  callNotes        String?   @map("call_notes") @db.Text
+
+  // Section completion (percentage 0-100)
+  familyComplete  Int @default(0) @map("family_complete")
+  zonesComplete   Int @default(0) @map("zones_complete")
+  assetsComplete  Int @default(0) @map("assets_complete")
+  vendorsComplete Int @default(0) @map("vendors_complete")
+  billsComplete   Int @default(0) @map("bills_complete")
+
+  // Milestones
+  profileDeliveredAt     DateTime? @map("profile_delivered_at")
+  firstBillPaidAt        DateTime? @map("first_bill_paid_at")
+  allBillsConsolidatedAt DateTime? @map("all_bills_consolidated_at")
+  thirtyDayReviewAt      DateTime? @map("thirty_day_review_at")
+  ninetyDayReviewAt      DateTime? @map("ninety_day_review_at")
+  oneYearReviewAt        DateTime? @map("one_year_review_at")
+
+  // Overall status
+  status OnboardingStatus @default(SIGNUP_COMPLETE)
+
+  // Assigned team
+  homeManagerId String? @map("home_manager_id")
+  handymanId    String? @map("handyman_id")
+
+  // Calculated monthly estimate
+  monthlyEstimate Decimal? @map("monthly_estimate") @db.Decimal(10, 2)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  homeManager User?     @relation("OnboardingHomeManager", fields: [homeManagerId], references: [id], onDelete: SetNull)
+  handyman    User?     @relation("OnboardingHandyman", fields: [handymanId], references: [id], onDelete: SetNull)
+
+  @@map("onboarding_progress")
 }

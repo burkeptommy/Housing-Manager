@@ -36,6 +36,7 @@ import { FamilyModule } from './family/family.module';
 import { TravelModule } from './travel/travel.module';
 import { PropertyModule } from './property';
 import { IntakeModule } from './intake';
+import { OnboardingModule } from './onboarding/onboarding.module';
 
 @Module({
   imports: [
@@ -76,6 +77,7 @@ import { IntakeModule } from './intake';
     TravelModule,
     PropertyModule,
     IntakeModule,
+    OnboardingModule,
   ],
   controllers: [AppController],
   providers: [AppService],

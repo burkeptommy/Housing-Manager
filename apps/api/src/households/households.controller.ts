@@ -107,4 +107,101 @@ export class HouseholdsController {
   ): Promise<void> {
     return this.householdsService.delete(id, user.userId);
   }
+
+  // ===========================================================================
+  // ZONE ENDPOINTS
+  // ===========================================================================
+
+  @Get(':id/zones')
+  @ApiOperation({ summary: 'Get all zones for a household' })
+  @ApiParam({ name: 'id', description: 'Household ID' })
+  async getZones(@Param('id') householdId: string) {
+    return this.householdsService.getZones(householdId);
+  }
+
+  @Post(':id/zones')
+  @ApiOperation({ summary: 'Create a zone for a household' })
+  @ApiParam({ name: 'id', description: 'Household ID' })
+  async createZone(
+    @Param('id') householdId: string,
+    @Body() data: { name: string; type: string; floor?: string },
+  ) {
+    return this.householdsService.createZone(householdId, data);
+  }
+
+  @Patch(':id/zones/:zoneId')
+  @ApiOperation({ summary: 'Update a zone' })
+  async updateZone(
+    @Param('id') householdId: string,
+    @Param('zoneId') zoneId: string,
+    @Body() data: { name?: string; floor?: string; notes?: string; procedures?: string },
+  ) {
+    return this.householdsService.updateZone(householdId, zoneId, data);
+  }
+
+  @Delete(':id/zones/:zoneId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete a zone' })
+  async deleteZone(
+    @Param('id') householdId: string,
+    @Param('zoneId') zoneId: string,
+  ) {
+    return this.householdsService.deleteZone(householdId, zoneId);
+  }
+
+  // ===========================================================================
+  // ASSET ENDPOINTS
+  // ===========================================================================
+
+  @Get(':id/assets')
+  @ApiOperation({ summary: 'Get all assets for a household' })
+  @ApiParam({ name: 'id', description: 'Household ID' })
+  async getAssets(@Param('id') householdId: string) {
+    return this.householdsService.getAssets(householdId);
+  }
+
+  @Post(':id/assets')
+  @ApiOperation({ summary: 'Create an asset for a household' })
+  @ApiParam({ name: 'id', description: 'Household ID' })
+  async createAsset(
+    @Param('id') householdId: string,
+    @Body() data: {
+      name: string;
+      category: string;
+      zoneId?: string;
+      brand?: string;
+      model?: string;
+      serialNumber?: string;
+      condition?: string;
+    },
+  ) {
+    return this.householdsService.createAsset(householdId, data);
+  }
+
+  @Patch(':id/assets/:assetId')
+  @ApiOperation({ summary: 'Update an asset' })
+  async updateAsset(
+    @Param('id') householdId: string,
+    @Param('assetId') assetId: string,
+    @Body() data: {
+      name?: string;
+      brand?: string;
+      model?: string;
+      condition?: string;
+      notes?: string;
+      serviceVendorId?: string;
+    },
+  ) {
+    return this.householdsService.updateAsset(householdId, assetId, data);
+  }
+
+  @Delete(':id/assets/:assetId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Delete an asset' })
+  async deleteAsset(
+    @Param('id') householdId: string,
+    @Param('assetId') assetId: string,
+  ) {
+    return this.householdsService.deleteAsset(householdId, assetId);
+  }
 }
