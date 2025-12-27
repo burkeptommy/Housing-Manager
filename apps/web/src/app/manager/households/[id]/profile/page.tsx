@@ -249,7 +249,7 @@ function generateAssetSuggestions(household: Household, zoneType: string): Array
 export default function HouseholdProfileBuilder() {
   const params = useParams();
   const router = useRouter();
-  const householdId = params.householdId as string;
+  const householdId = params.id as string;
 
   const [household, setHousehold] = useState<Household | null>(null);
   const [zones, setZones] = useState<Zone[]>([]);

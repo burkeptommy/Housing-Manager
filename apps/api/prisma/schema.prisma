@@ -3804,9 +3804,12 @@ enum DocumentType {
 }
 
 enum OnboardingStatus {
-  SIGNUP_COMPLETE // Just signed up
+  PENDING_CALL // Just signed up, waiting for call (same as SIGNUP_COMPLETE)
+  SIGNUP_COMPLETE // Legacy: Just signed up
   CALL_SCHEDULED // Intro call scheduled
   CALL_IN_PROGRESS // Currently on call
+  INTAKE_PARTIAL // Call done but need follow-up
+  INTAKE_COMPLETE // All data captured
   PROFILE_BUILDING // HM building profile
   PROFILE_DELIVERED // Sent to homeowner
   ACTIVE // Fully onboarded
@@ -4284,15 +4287,25 @@ model OnboardingProgress {
 
   // Onboarding call
   callScheduledFor DateTime? @map("call_scheduled_for")
+  callStartedAt    DateTime? @map("call_started_at")
   callCompletedAt  DateTime? @map("call_completed_at")
   callNotes        String?   @map("call_notes") @db.Text
 
   // Section completion (percentage 0-100)
-  familyComplete  Int @default(0) @map("family_complete")
-  zonesComplete   Int @default(0) @map("zones_complete")
-  assetsComplete  Int @default(0) @map("assets_complete")
-  vendorsComplete Int @default(0) @map("vendors_complete")
-  billsComplete   Int @default(0) @map("bills_complete")
+  familyComplete   Int @default(0) @map("family_complete")
+  propertyComplete Int @default(0) @map("property_complete")
+  zonesComplete    Int @default(0) @map("zones_complete")
+  systemsComplete  Int @default(0) @map("systems_complete")
+  assetsComplete   Int @default(0) @map("assets_complete")
+  vendorsComplete  Int @default(0) @map("vendors_complete")
+  billsComplete    Int @default(0) @map("bills_complete")
+
+  // Flexible intake data (JSON for storing form data during call)
+  intakeData Json? @map("intake_data")
+
+  // Follow-up
+  followUpNeeded Boolean @default(false) @map("follow_up_needed")
+  followUpNotes  String? @map("follow_up_notes") @db.Text
 
   // Milestones
   profileDeliveredAt     DateTime? @map("profile_delivered_at")
@@ -4303,7 +4316,7 @@ model OnboardingProgress {
   oneYearReviewAt        DateTime? @map("one_year_review_at")
 
   // Overall status
-  status OnboardingStatus @default(SIGNUP_COMPLETE)
+  status OnboardingStatus @default(PENDING_CALL)
 
   // Assigned team
   homeManagerId String? @map("home_manager_id")

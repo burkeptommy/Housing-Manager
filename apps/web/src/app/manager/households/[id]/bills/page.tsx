@@ -117,7 +117,7 @@ const CATEGORY_CONFIG: Record<string, { icon: React.ComponentType<any>; color: s
 export default function HouseholdBillsPage() {
   const params = useParams();
   const router = useRouter();
-  const householdId = params.householdId as string;
+  const householdId = params.id as string;
 
   const [isLoading, setIsLoading] = useState(true);
   const [billSections, setBillSections] = useState<BillSection[]>([]);

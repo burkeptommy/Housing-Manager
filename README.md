@@ -1,374 +1,304 @@
-# Haven Home Manager
+# Haven Home Management Platform
 
-A SaaS home-management platform with web app, mobile app, and backend API.
+**Stop managing your home. Start living in it.**
+
+Haven is a full-service home management platform that provides dedicated Home Managers who actually do the work—paying bills, coordinating vendors, scheduling maintenance, and handling the countless details of homeownership.
+
+**Model:** One bill. One contact. Zero hassle. SERVICE, not software.
+
+---
+
+## Quick Links
+
+| Resource | Location |
+|----------|----------|
+| **Project Root** | `/Users/tomburke/Projects/Housing-Manager/` |
+| **Production Web** | https://havenhome.dev |
+| **Production API** | https://api.havenhome.dev |
+| **GCP Project** | home-manager-480616 |
+| **Development Prompts** | `/prompts/` |
+| **Project Instructions** | See "Haven Home - Project Instructions" in Claude Project |
+
+---
+
+## Current Status (December 26, 2024)
+
+### ✅ Completed
+- Firebase Auth (Email/Password + Google Sign-In)
+- Cloud SQL database (haven-production-db)
+- Cloud Run services (haven-api, haven-web)
+- ATTOM Property API integration for property enrichment
+- Google Places API autocomplete for addresses
+- Basic user onboarding flow
+- Design system (Navy + Champagne + White)
+- Demo data specification (Morrison family)
+
+### 🔄 In Progress
+- **001-homeowner-portal-production-ready.md** - Dashboard, Your Home, Money, Family pages
+- **002-home-manager-intake-workbench.md** - Sarah's tool for capturing household data
+
+### ⏳ Pending
+- Approval system (HM requests → Homeowner approves)
+- Handyman portal (Mike's task view)
+- Messaging system (Homeowner ↔ Home Manager)
+- Calendar integration
+- Seed data update (Morrison family with new models)
+
+---
+
+## Architecture
+
+```
+/Users/tomburke/Projects/Housing-Manager/
+├── apps/
+│   ├── api/                    # NestJS backend (port 4000)
+│   │   ├── prisma/             # Schema + migrations + seed
+│   │   └── src/
+│   │       ├── auth/           # Firebase auth
+│   │       ├── property/       # ATTOM integration
+│   │       ├── household/      # Household management
+│   │       ├── bill/           # Bill tracking
+│   │       ├── activity/       # Activity logging
+│   │       └── manager/        # Home Manager features
+│   ├── mobile/                 # Expo React Native (future)
+│   └── web/                    # Next.js 15 App Router (port 3000)
+│       └── src/
+│           ├── app/
+│           │   ├── app/        # Homeowner portal
+│           │   ├── manager/    # Home Manager portal
+│           │   ├── handyman/   # Handyman portal
+│           │   └── onboarding/ # User signup flow
+│           ├── components/
+│           └── contexts/
+├── packages/
+│   ├── config/                 # Shared ESLint, TypeScript configs
+│   ├── core/                   # Shared types, schemas, constants
+│   └── ui/                     # Shared React components
+└── prompts/                    # Claude Code implementation prompts
+```
+
+---
 
 ## Tech Stack
 
-- **Monorepo**: pnpm workspaces
-- **Web**: Next.js 15 (App Router) + Tailwind CSS
-- **Mobile**: Expo React Native
-- **API**: NestJS + Prisma ORM
-- **Database**: PostgreSQL
-- **Auth**: JWT with refresh token rotation
-- **Storage**: Google Cloud Storage (file uploads)
-- **Shared**: TypeScript strict mode, ESLint, Prettier, Vitest/Jest
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js 15, React 18, Tailwind CSS, Radix UI |
+| Mobile | Expo/React Native (planned) |
+| Backend | NestJS 10, Prisma ORM, PostgreSQL |
+| Auth | Firebase Authentication |
+| Payments | Stripe (Issuing, Connect, Billing) |
+| Property Data | ATTOM Property API |
+| Address Autocomplete | Google Places API |
+| Deploy | Google Cloud Run |
+| Database | Google Cloud SQL (PostgreSQL) |
 
-## Project Structure
+---
 
-```
-haven-home-manager/
-├── apps/
-│   ├── api/          # NestJS backend
-│   ├── mobile/       # Expo React Native app
-│   └── web/          # Next.js 15 web app
-├── packages/
-│   ├── config/       # Shared ESLint/TS/Jest configs
-│   ├── core/         # Shared types, Zod schemas, API client
-│   └── ui/           # Shared React UI components
-├── docker-compose.yml
-├── DEPLOYMENT.md     # GCP deployment guide
-├── package.json
-├── pnpm-workspace.yaml
-└── tsconfig.json
-```
+## Service Tiers
 
-## Quick Start
+| Tier | Price | Key Features |
+|------|-------|--------------|
+| Essentials | $39/mo | Bill consolidation, tracking, reminders |
+| Lite | $349/mo | + Text-based manager, reactive support |
+| Haven | $749/mo | + Proactive manager, monthly handyman |
+| Haven+ | $1,499/mo | + Lifestyle services, errands |
+| Estate | $3,499/mo | + Multi-property, white-glove |
 
-```bash
-# 1. Install dependencies
-pnpm install
+---
 
-# 2. Start PostgreSQL
-docker-compose up -d postgres
+## User Portals
 
-# 3. Configure environment
-cp apps/api/.env.example apps/api/.env
+| Portal | Route | Users | Purpose |
+|--------|-------|-------|---------|
+| Homeowner | `/app/*` | Bob, Alice Morrison | View home, bills, family, communicate with Sarah |
+| Manager | `/manager/*` | Sarah Chen | Onboard households, manage bills, coordinate service |
+| Handyman | `/handyman/*` | Mike Rodriguez | View/complete assigned tasks |
+| Vendor | `/vendor/*` | Ace Roofing, etc. | (Future) View jobs, submit invoices |
+| Admin | `/admin/*` | Platform Admin | (Future) System management |
 
-# 4. Run migrations and seed demo data
-cd apps/api && pnpm prisma:migrate:dev && pnpm prisma:seed && cd ../..
+---
 
-# 5. Build shared packages
-pnpm -r --filter "@haven/core" --filter "@haven/ui" build
+## Key Data Models
 
-# 6. Start all apps (in separate terminals)
-pnpm dev:api    # Backend at http://localhost:4000
-pnpm dev:web    # Web app at http://localhost:3000
-pnpm dev:mobile # Mobile with Expo
+### Core Entities
+- **Household** - A customer account (the Morrisons)
+- **Property** - Physical address with ATTOM enrichment
+- **User** - Login credentials, linked to household
 
-# Login with: demo@haven.app / Demo123!
-```
+### Property Structure (Zone-Based)
+- **Zone** - Room/area (Kitchen, Garage, etc.)
+- **Asset** - Item in a zone (Refrigerator, Water Heater)
+- **ServiceLog** - History of work done on assets
 
-## Prerequisites
+### People
+- **FamilyMember** - Adults, children, pets, staff
+- **KidActivity** - Emma's soccer, Jack's piano
 
-- Node.js 20+
-- pnpm 9+
-- PostgreSQL 15+ (or Docker)
+### Financial
+- **Bill** - Recurring payment with account numbers
+- **BillPayment** - Record of payment made
+- **Vendor** - Service provider with contact info
 
-## Getting Started
+### Operations
+- **OnboardingSession** - Tracks intake progress
+- **ActivityLog** - All actions (HM paid bill, etc.)
+- **Approval** - Requests needing homeowner approval (future)
 
-### 1. Install Dependencies
+---
 
-```bash
-pnpm install
-```
+## API Keys & Secrets
 
-### 2. Set Up Environment Variables
+| Service | Location | Notes |
+|---------|----------|-------|
+| Firebase | GCP Secret Manager | `firebase-service-account` |
+| ATTOM API | Environment variable | `ATTOM_API_KEY=c4065c54cf3df7c4260115d2445bf0ef` |
+| Google Places | Environment variable | Restricted to havenhome.dev |
+| Stripe | GCP Secret Manager | (To be configured) |
 
-#### API Backend
+---
 
-Copy the example environment file:
-
-```bash
-cp apps/api/.env.example apps/api/.env
-```
-
-Required environment variables:
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgresql://postgres:postgres@localhost:5432/haven_db` |
-| `JWT_SECRET` | Secret key for JWT tokens (min 32 chars) | `your-super-secret-key-here` |
-| `JWT_ACCESS_EXPIRES_IN` | Access token expiry in seconds | `900` (15 min) |
-| `JWT_REFRESH_EXPIRES_DAYS` | Refresh token expiry in days | `7` |
-| `PORT` | API server port | `4000` |
-| `CORS_ORIGIN` | Allowed CORS origins | `http://localhost:3000` |
-
-Optional variables (for file uploads):
-
-| Variable | Description |
-|----------|-------------|
-| `GCP_PROJECT_ID` | Google Cloud Project ID |
-| `GCS_BUCKET_NAME` | GCS bucket for file uploads |
-| `STRIPE_SECRET_KEY` | Stripe API key for billing |
-
-#### Web App
-
-Create `apps/web/.env.local`:
+## Development Commands
 
 ```bash
-NEXT_PUBLIC_API_URL=http://localhost:4000/api
-```
+# Start development
+pnpm dev:web          # Web app at localhost:3000
+pnpm dev:api          # API at localhost:4000
 
-#### Mobile App
-
-Create `apps/mobile/.env`:
-
-```bash
-EXPO_PUBLIC_API_URL=http://localhost:4000/api
-```
-
-### 3. Set Up Database
-
-Start PostgreSQL using Docker:
-
-```bash
-docker-compose up -d postgres
-```
-
-Or connect to an existing PostgreSQL instance by updating `DATABASE_URL` in `apps/api/.env`.
-
-Run database migrations:
-
-```bash
+# Database
 cd apps/api
-pnpm prisma:migrate:dev
+pnpm prisma:migrate:dev   # Run migrations
+pnpm prisma:seed          # Seed demo data
+pnpm prisma:studio        # Database GUI
+
+# Build & Deploy
+pnpm build
+gcloud builds submit --config=cloudbuild-api.yaml --project=home-manager-480616
+gcloud builds submit --config=cloudbuild-web.yaml --project=home-manager-480616
 ```
 
-Seed the database with demo data:
+---
 
-```bash
-cd apps/api
-pnpm prisma:seed
+## Canonical Demo Data
+
+### Primary Demo Family: THE MORRISONS
+
+**Property:** Inspiration Farm  
+**Address:** 38 Bedford Road, Greenwich, CT 06831  
+**Specs:** 5 bed, 5.5 bath, 5,765 sqft, 2.0 acres
+
+**Adults:**
+- Bob Morrison (bob@example.com) - Head of Household, Morrison Capital Partners
+- Alice Morrison (alice@example.com) - Spouse, Greenwich Hospital NP
+
+**Children:**
+- Emma (12) - 7th Grade, Greenwich Country Day, Soccer, Piano, Allergies: Peanuts/Tree nuts
+- Jack (8) - 3rd Grade, North Street School, Little League, Piano, Art
+
+**Pet:** Max - Golden Retriever, 4 years
+
+**Staff:** Maria Garcia - Nanny, Mon-Thu 7am-6pm
+
+**Vehicles:**
+- 2023 Tesla Model Y (Bob)
+- 2022 Toyota Highlander (Alice)
+- 2024 Mercedes GLE 450 (Alice)
+
+### Haven Team
+
+**Home Manager:** Sarah Chen (sarah@haven.app)  
+**Handyman:** Mike Rodriguez (mike@haven.app)  
+**Admin:** admin@haven.app
+
+---
+
+## Design System
+
+### Colors (NO BRIGHT GREEN!)
+
+**Navy (Primary):**
+- navy-950: #0a1929 (Sidebar background)
+- navy-900: #102a43 (Headings, buttons)
+- navy-800: #243b53 (Secondary)
+
+**Champagne (Accent):**
+- champagne-500: #c4a574 (CTAs, highlights)
+- champagne-300: #e9dcc4 (Light accents)
+- champagne-100: #faf6ed (Backgrounds)
+
+**Usage:**
+- Sidebar: navy-950 background, light text
+- Page background: gray-50
+- Cards: white
+- Primary buttons: navy-900
+- Accent buttons: champagne-500
+- Success only: muted green (sparingly)
+
+---
+
+## Implementation Prompts
+
+Prompts are stored in `/prompts/` and executed by Claude Code.
+
+| # | File | Description | Status |
+|---|------|-------------|--------|
+| 001 | `001-homeowner-portal-production-ready.md` | Activity logging, Dashboard, Your Home, Money, Family | 🔄 Running |
+| 002 | `002-home-manager-intake-workbench.md` | Onboarding queue, intake workbench for Home Managers | ⏳ Next |
+
+### Running a Prompt
+
+In Claude Code:
+```
+Read the prompt at prompts/001-homeowner-portal-production-ready.md and implement it phase by phase.
 ```
 
-This creates a complete demo environment:
-- **14 maintenance templates** for seasonal home care
-- **Demo users** with different roles (see credentials below)
-- **Demo household** ("The Johnson Residence") with full property details
-- **13 vendors** covering all home service categories
-- **11 bill accounts** with realistic frequencies and amounts
-- **17 maintenance tasks** across 12 months
-- **Sample service requests** and subscription data
-
-### 4. Build Shared Packages
-
-```bash
-pnpm -r --filter "@haven/core" --filter "@haven/ui" build
+Or for a specific phase:
+```
+Read prompts/002-home-manager-intake-workbench.md and implement Phase 2: Manager Queue UI.
 ```
 
-### 5. Run Applications
+---
 
-#### All Services (Recommended)
+## Key Decisions Made
 
-Using Docker Compose:
+1. **Service-First Onboarding:** User enters address (2 min) → Home Manager does comprehensive intake during intro call. User never fills out forms.
 
-```bash
-docker-compose up
-```
+2. **Zone-Based Structure:** Property organized by zones (like Nines Living) - Kitchen → Assets → Service History. Natural for phone conversations.
 
-This starts PostgreSQL, Redis, and MinIO (S3-compatible storage for local dev).
+3. **Activity Logging:** Every action by HM/Handyman creates ActivityLog entry. Homeowner sees what's happening in real-time.
 
-#### Web App (Next.js)
+4. **Bill Consolidation:** Haven captures ALL recurring payments (mortgage, utilities, loans, tuition, activities, subscriptions). One monthly funding amount covers everything.
 
-```bash
-pnpm dev:web
-```
+5. **Connections Model:** Everything linked - Vendor → Assets → Service History → Bills → Documents. Find anything from anywhere.
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+---
 
-#### API Server (NestJS)
+## Inspiration
 
-```bash
-pnpm dev:api
-```
+Haven is bringing estate management (like Nines Living) to mass affluent homeowners ($300K-$3M income). Key principles borrowed:
 
-API runs at [http://localhost:4000/api](http://localhost:4000/api).
-Swagger docs: [http://localhost:4000/api/docs](http://localhost:4000/api/docs).
+- **Expert-led onboarding** - Dedicated specialist captures everything
+- **Zone-based organization** - Property → Zones → Assets
+- **Living household manual** - Always current, mobile accessible
+- **Proactive service** - Notice issues before homeowner does
+- **Easy handoffs** - Everything documented, anyone can pick up
 
-#### Mobile App (Expo)
+---
 
-```bash
-pnpm dev:mobile
-```
+## Contact
 
-- Press `i` for iOS simulator
-- Press `a` for Android emulator
-- Scan QR code with Expo Go app on physical device
+**CIO:** Tom Burke  
+**Project:** Haven Home (Claude Project)
 
-## Demo Credentials
+---
 
-After running the seed script, these demo accounts are available:
+## Next Session Checklist
 
-| Role | Email | Password |
-|------|-------|----------|
-| Admin | admin@haven.app | Admin123! |
-| Manager | manager@haven.app | Manager123! |
-| Homeowner | demo@haven.app | Demo123! |
+If starting a new chat, reference this README and:
 
-### Stripe Test Cards
+1. Check current status section above
+2. Review which prompts are completed vs in-progress
+3. Look at `/prompts/` folder for implementation details
+4. Continue with next pending prompt
 
-For testing payments and subscriptions in development:
-
-| Card Number | Description |
-|-------------|-------------|
-| `4242 4242 4242 4242` | Successful payment |
-| `4000 0000 0000 3220` | 3D Secure authentication required |
-| `4000 0000 0000 9995` | Payment declined |
-
-Use any future expiry date (e.g., 12/34) and any 3-digit CVC.
-
-### Demo Household Details
-
-The homeowner account (`demo@haven.app`) comes with a pre-configured household:
-
-**Property: The Johnson Residence**
-- Single family home, 2,800 sq ft, built 2015
-- 3 bedrooms, 2.5 bathrooms
-- Features: Pool, septic system, chimney, sprinkler system, lawn
-
-**Vendors (13 configured):**
-- Mortgage: First National Bank ($2,450/mo)
-- Utilities: PowerGrid Electric, Metro Gas, CityWater, TrashAway
-- Services: FastNet Internet, GreenLawn Care, BugGuard Pest Control
-- Seasonal: SnowClear, Chimney Masters, Septic Solutions, AquaPool
-
-**Bill Accounts** with realistic amounts and billing frequencies
-
-**Maintenance Tasks** for 12 months covering:
-- HVAC filter changes, gutter cleaning, smoke detector testing
-- Seasonal tasks: lawn aeration, pool winterization, chimney inspection
-- Appliance maintenance: water heater flush, refrigerator coils
-
-## Running Tests
-
-### Backend Tests (Jest)
-
-```bash
-cd apps/api
-pnpm test           # Run all tests
-pnpm test:watch     # Watch mode
-pnpm test:cov       # With coverage
-```
-
-### Frontend Tests (Vitest)
-
-```bash
-cd apps/web
-pnpm test           # Run all tests
-pnpm test:watch     # Watch mode
-pnpm test:coverage  # With coverage
-```
-
-### Run All Tests
-
-```bash
-pnpm test
-```
-
-## Database Management
-
-### Prisma Commands
-
-```bash
-cd apps/api
-
-# Generate Prisma client after schema changes
-pnpm prisma:generate
-
-# Create a new migration
-pnpm prisma:migrate:dev
-
-# Apply migrations in production
-pnpm prisma:migrate:deploy
-
-# Open Prisma Studio (database GUI)
-pnpm prisma:studio
-
-# Reset database (drops all data)
-pnpm db:reset
-
-# Run seed script
-pnpm prisma:seed
-```
-
-## Available Scripts
-
-| Script | Description |
-|--------|-------------|
-| `pnpm dev:web` | Start web app in development mode |
-| `pnpm dev:api` | Start API server in development mode |
-| `pnpm dev:mobile` | Start Expo development server |
-| `pnpm build` | Build all packages and apps |
-| `pnpm lint` | Run ESLint across all packages |
-| `pnpm test` | Run tests across all packages |
-| `pnpm format` | Format code with Prettier |
-| `pnpm typecheck` | Run TypeScript type checking |
-| `pnpm clean` | Remove all build artifacts |
-
-## Shared Packages
-
-### @haven/core
-
-Contains shared TypeScript types, Zod validation schemas, and API client wrapper.
-
-```typescript
-import { User, Household, ServiceRequest } from '@haven/core';
-import { createApiClient, ApiClient } from '@haven/core';
-```
-
-### @haven/ui
-
-Shared React UI components using Tailwind CSS.
-
-```typescript
-import { Button, Card, Input } from '@haven/ui';
-```
-
-### @haven/config
-
-Shared configuration for ESLint, TypeScript, and Jest.
-
-```javascript
-// .eslintrc.js
-module.exports = {
-  extends: [require.resolve('@haven/config/eslint/react')],
-};
-```
-
-## User Roles
-
-| Role | Description | Access |
-|------|-------------|--------|
-| `ADMIN` | System administrator | Full access, admin panel |
-| `MANAGER` | Property manager | Manage households, requests |
-| `HOMEOWNER` | Home owner | Own households, requests |
-| `VENDOR` | Service provider | Assigned requests |
-
-## API Endpoints
-
-Key API routes:
-
-- `POST /api/auth/register` - User registration
-- `POST /api/auth/login` - User login
-- `GET /api/auth/me` - Current user profile
-- `GET /api/households` - List user's households
-- `POST /api/households` - Create household
-- `GET /api/requests` - List service requests
-- `POST /api/requests` - Create service request
-- `GET /api/admin/*` - Admin endpoints (admin only)
-
-Full API documentation available at `/api/docs` when running the API server.
-
-## Deployment
-
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed Google Cloud Run deployment instructions.
-
-## Development Workflow
-
-1. Make changes to shared packages in `packages/`
-2. Run `pnpm -r build` to rebuild shared packages
-3. Changes will be reflected in apps that depend on them
-
-## License
-
-Private - All rights reserved
+The goal is seamless continuity across chat sessions.
