@@ -16,10 +16,17 @@ export default function WizardLayout({ children }: { children: React.ReactNode }
   const pathname = usePathname();
   const { data } = useOnboarding();
 
-  // Determine current step from URL
+  // Check if we're on the main wizard page (streamlined flow)
+  const isStreamlinedFlow = pathname === '/onboarding/wizard';
+
+  // For streamlined flow, don't show the old stepper
+  if (isStreamlinedFlow) {
+    return <>{children}</>;
+  }
+
+  // Legacy flow with stepper (for detailed/self-service mode)
   const currentStep = WIZARD_STEPS.find((step) => pathname.includes(step.id))?.id || 'property';
 
-  // Get completed steps from context
   const completedSteps = Object.entries(data.steps)
     .filter(([, completed]) => completed)
     .map(([step]) => step);

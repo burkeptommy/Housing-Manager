@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -34,6 +34,7 @@ import {
   Trash,
   Wine,
   Microwave,
+  Sparkles,
 } from 'lucide-react';
 import { SkipToHumanBanner } from '@/components/onboarding/SkipToHumanBanner';
 import { FormInput, FormSelect } from '@/components/onboarding/forms';
@@ -94,6 +95,117 @@ export default function SystemsPage() {
   const router = useRouter();
   const { data, addSystem, updateSystem, removeSystem, addAppliance, updateAppliance, removeAppliance, completeStep } =
     useOnboarding();
+
+  // Track if we've already auto-populated from ATTOM
+  const hasAutoPopulated = useRef(false);
+  const [showAutoPopulatedBanner, setShowAutoPopulatedBanner] = useState(false);
+
+  // Auto-populate systems from ATTOM property enrichment data
+  useEffect(() => {
+    const enrichment = data.propertyEnrichment;
+
+    // Only auto-populate once and if we have enrichment data and no existing systems
+    if (hasAutoPopulated.current || !enrichment || data.systems.length > 0) {
+      return;
+    }
+
+    hasAutoPopulated.current = true;
+    const systemsToAdd: Array<{ category: SystemCategory; fuelType?: HomeSystem['fuelType']; notes?: string }> = [];
+
+    // Heating system
+    if (enrichment.heatingType || enrichment.heatingFuel) {
+      let fuelType: HomeSystem['fuelType'] | undefined;
+      const heatingFuel = enrichment.heatingFuel?.toLowerCase() || '';
+      const heatingType = enrichment.heatingType?.toLowerCase() || '';
+
+      if (heatingFuel.includes('gas') || heatingType.includes('gas')) {
+        fuelType = 'gas';
+      } else if (heatingFuel.includes('oil')) {
+        fuelType = 'oil';
+      } else if (heatingFuel.includes('electric') || heatingType.includes('electric')) {
+        fuelType = 'electric';
+      } else if (heatingFuel.includes('propane')) {
+        fuelType = 'propane';
+      }
+
+      systemsToAdd.push({
+        category: 'hvac_heating',
+        fuelType,
+        notes: `${enrichment.heatingType || ''} ${enrichment.heatingFuel ? `(${enrichment.heatingFuel})` : ''}`.trim(),
+      });
+    }
+
+    // Cooling system
+    if (enrichment.coolingType) {
+      const coolingType = enrichment.coolingType.toLowerCase();
+      // Central AC or similar indicates a cooling system
+      if (coolingType !== 'none' && coolingType !== 'no' && coolingType !== 'n/a') {
+        systemsToAdd.push({
+          category: 'hvac_cooling',
+          fuelType: 'electric', // Most AC systems are electric
+          notes: enrichment.coolingType,
+        });
+      }
+    }
+
+    // Water heater - most homes have one
+    if (enrichment.heatingFuel) {
+      // Use same fuel type as heating for water heater (common)
+      let fuelType: HomeSystem['fuelType'] | undefined;
+      const heatingFuel = enrichment.heatingFuel.toLowerCase();
+
+      if (heatingFuel.includes('gas')) {
+        fuelType = 'gas';
+      } else if (heatingFuel.includes('oil')) {
+        fuelType = 'oil';
+      } else if (heatingFuel.includes('electric')) {
+        fuelType = 'electric';
+      } else if (heatingFuel.includes('propane')) {
+        fuelType = 'propane';
+      }
+
+      systemsToAdd.push({
+        category: 'water_heater',
+        fuelType,
+      });
+    }
+
+    // Pool system
+    if (enrichment.pool) {
+      systemsToAdd.push({
+        category: 'pool',
+        notes: enrichment.poolType || undefined,
+      });
+    }
+
+    // Septic system (infer from sewer type)
+    if (enrichment.sewerType?.toLowerCase().includes('septic')) {
+      systemsToAdd.push({
+        category: 'septic',
+      });
+    }
+
+    // Well water system (infer from water type)
+    if (enrichment.waterType?.toLowerCase().includes('well')) {
+      systemsToAdd.push({
+        category: 'well',
+      });
+    }
+
+    // Add all systems
+    if (systemsToAdd.length > 0) {
+      systemsToAdd.forEach((systemInfo) => {
+        const system: HomeSystem = {
+          id: generateId(),
+          category: systemInfo.category,
+          fuelType: systemInfo.fuelType,
+          notes: systemInfo.notes,
+        };
+        addSystem(system);
+      });
+      setShowAutoPopulatedBanner(true);
+    }
+  }, [data.propertyEnrichment, data.systems.length, addSystem]);
 
   // Modal state
   const [isAdding, setIsAdding] = useState(false);
@@ -307,6 +419,31 @@ export default function SystemsPage() {
           </div>
         </div>
       </div>
+
+      {/* Auto-populated Banner */}
+      {showAutoPopulatedBanner && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Sparkles className="w-5 h-5 text-emerald-600" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-emerald-800">
+                Systems auto-detected from public records
+              </p>
+              <p className="text-xs text-emerald-700 mt-0.5">
+                We&apos;ve pre-populated your systems based on property data. Review and add details as needed.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowAutoPopulatedBanner(false)}
+              className="text-emerald-400 hover:text-emerald-600 p-1"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Home Systems Section */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-4">

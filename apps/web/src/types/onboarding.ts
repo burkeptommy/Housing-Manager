@@ -18,6 +18,70 @@ export type OnboardingStatus =
   | 'complete';
 
 // ============================================
+// PROPERTY ENRICHMENT (from ATTOM API)
+// ============================================
+
+export interface PropertyEnrichmentData {
+  // Basic Info
+  bedrooms: number | null;
+  bathrooms: number | null;
+  bathsFull: number | null;
+  bathsHalf: number | null;
+  squareFeet: number | null;
+  lotSizeSquareFeet: number | null;
+  lotSizeAcres: number | null;
+  yearBuilt: number | null;
+  stories: number | null;
+  totalRooms: number | null;
+
+  // Property Type
+  propertyType: string | null;
+  propertySubType: string | null;
+
+  // Construction
+  constructionType: string | null;
+  foundationType: string | null;
+  exteriorWalls: string | null;
+
+  // Roof
+  roofType: string | null;
+  roofMaterial: string | null;
+
+  // HVAC / Systems
+  heatingType: string | null;
+  heatingFuel: string | null;
+  coolingType: string | null;
+
+  // Utilities
+  waterType: string | null;
+  sewerType: string | null;
+
+  // Features
+  fireplaces: number | null;
+  garage: string | null;
+  garageSpaces: number | null;
+  pool: boolean | null;
+  poolType: string | null;
+
+  // Basement
+  basementType: string | null;
+
+  // Valuation
+  assessedValue: number | null;
+  marketValue: number | null;
+  taxAmount: number | null;
+
+  // Sale Info
+  lastSalePrice: number | null;
+  lastSaleDate: string | null;
+
+  // Location
+  verifiedAddress: string | null;
+  latitude: number | null;
+  longitude: number | null;
+}
+
+// ============================================
 // PROPERTY
 // ============================================
 
@@ -330,6 +394,7 @@ export interface OnboardingData {
 
   // Data
   property: PropertyDetails | null;
+  propertyEnrichment: PropertyEnrichmentData | null; // ATTOM property data
   bills: Bill[];
   systems: HomeSystem[];
   appliances: Appliance[];

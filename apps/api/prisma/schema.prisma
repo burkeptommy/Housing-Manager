@@ -745,6 +745,9 @@ model User {
   assignedProtocols      HouseProtocol[]     @relation("ProtocolAssignee")
   protocolItemsCompleted HouseProtocolItem[] @relation("ProtocolItemCompleter")
 
+  // Intake checklist completions (Home Manager)
+  completedChecklists HomeChecklist[] @relation("ChecklistCompletedBy")
+
   @@map("users")
 }
 
@@ -851,6 +854,12 @@ model Household {
   // Family Assets relations
   pets        Pet[]
   homeSystems HomeSystem[]
+
+  // Property Enrichment from ATTOM (stored for reference)
+  enrichmentData Json? @map("enrichment_data")
+
+  // Intake checklist for Home Manager
+  intakeChecklist HomeChecklist?
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -3437,4 +3446,37 @@ model HomeSystemService {
 
   @@index([homeSystemId, serviceDate])
   @@map("home_system_services")
+}
+
+// HomeChecklist - Smart intake checklist generated from ATTOM property data
+// Used by Home Managers to gather comprehensive info during intro calls
+model HomeChecklist {
+  id          String   @id @default(cuid())
+  householdId String   @unique @map("household_id")
+
+  // Checklist items (JSON array of ChecklistItem)
+  // Each item has: id, category, priority, question, context, dataField, inputType, options, answered, answer
+  items Json
+
+  // Summary stats (denormalized for quick access)
+  totalItems     Int @default(0) @map("total_items")
+  completedItems Int @default(0) @map("completed_items")
+  highPriorityRemaining Int @default(0) @map("high_priority_remaining")
+
+  // Status
+  status    String   @default("pending") // pending, in_progress, completed
+  startedAt DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+
+  // Who completed it
+  completedByUserId String? @map("completed_by_user_id")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  completedBy User?     @relation("ChecklistCompletedBy", fields: [completedByUserId], references: [id], onDelete: SetNull)
+
+  @@map("home_checklists")
 }

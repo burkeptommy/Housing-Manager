@@ -7,6 +7,7 @@ import {
   OnboardingPath,
   OnboardingStatus,
   PropertyDetails,
+  PropertyEnrichmentData,
   Bill,
   HomeSystem,
   Appliance,
@@ -33,6 +34,7 @@ const initialOnboardingData: OnboardingData = {
     review: false,
   },
   property: null,
+  propertyEnrichment: null,
   bills: [],
   systems: [],
   appliances: [],
@@ -51,6 +53,7 @@ type OnboardingAction =
   | { type: 'SET_PATH'; payload: OnboardingPath }
   | { type: 'SET_STATUS'; payload: OnboardingStatus }
   | { type: 'SET_PROPERTY'; payload: PropertyDetails }
+  | { type: 'SET_PROPERTY_ENRICHMENT'; payload: PropertyEnrichmentData | null }
   | { type: 'ADD_BILL'; payload: Bill }
   | { type: 'UPDATE_BILL'; payload: Bill }
   | { type: 'REMOVE_BILL'; payload: string }
@@ -103,6 +106,9 @@ function onboardingReducer(state: OnboardingData, action: OnboardingAction): Onb
 
     case 'SET_PROPERTY':
       return { ...state, property: action.payload };
+
+    case 'SET_PROPERTY_ENRICHMENT':
+      return { ...state, propertyEnrichment: action.payload };
 
     case 'ADD_BILL':
       return { ...state, bills: [...state.bills, action.payload] };
@@ -249,6 +255,7 @@ interface OnboardingContextType {
   setTier: (tier: ServiceTier) => void;
   setPath: (path: OnboardingPath) => void;
   setProperty: (property: PropertyDetails) => void;
+  setPropertyEnrichment: (enrichment: PropertyEnrichmentData | null) => void;
   addBill: (bill: Bill) => void;
   updateBill: (bill: Bill) => void;
   removeBill: (id: string) => void;
@@ -317,6 +324,8 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const setPath = (path: OnboardingPath) => dispatch({ type: 'SET_PATH', payload: path });
   const setProperty = (property: PropertyDetails) =>
     dispatch({ type: 'SET_PROPERTY', payload: property });
+  const setPropertyEnrichment = (enrichment: PropertyEnrichmentData | null) =>
+    dispatch({ type: 'SET_PROPERTY_ENRICHMENT', payload: enrichment });
 
   const addBill = (bill: Bill) => dispatch({ type: 'ADD_BILL', payload: bill });
   const updateBill = (bill: Bill) => dispatch({ type: 'UPDATE_BILL', payload: bill });
@@ -418,6 +427,7 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         setTier,
         setPath,
         setProperty,
+        setPropertyEnrichment,
         addBill,
         updateBill,
         removeBill,

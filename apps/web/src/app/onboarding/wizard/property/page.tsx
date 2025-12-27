@@ -34,7 +34,7 @@ const PROPERTY_TYPES = [
 
 export default function PropertyPage() {
   const router = useRouter();
-  const { data, setProperty, completeStep } = useOnboarding();
+  const { data, setProperty, setPropertyEnrichment, completeStep } = useOnboarding();
   const { fetchPropertyDetails, isLoading: isEnrichingProperty } = usePropertyEnrichment();
 
   // Form state
@@ -91,6 +91,9 @@ export default function PropertyPage() {
         if (details.squareFeet) setSquareFeet(details.squareFeet.toString());
         if (details.yearBuilt) setYearBuilt(details.yearBuilt.toString());
         setWasAutoEnriched(true);
+
+        // Store full enrichment data in context for use in later steps
+        setPropertyEnrichment(details);
       }
     }
   };
