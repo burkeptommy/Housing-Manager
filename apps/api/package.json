@@ -24,7 +24,8 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "prisma:seed:social": "ts-node prisma/seed-social.ts",
     "prisma:seed:demo": "ts-node prisma/seed-comprehensive-demo.ts",
-    "db:reset": "prisma migrate reset --force"
+    "db:reset": "prisma migrate reset --force",
+    "setup-admin": "ts-node scripts/setup-admin.ts"
   },
   "dependencies": {
     "@google-cloud/storage": "^7.18.0",
@@ -45,6 +46,7 @@
     "bcrypt": "^5.1.1",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
+    "dotenv": "^17.2.3",
     "firebase-admin": "^13.0.2",
     "h3-js": "^4.1.0",
     "multer": "^2.0.2",
