@@ -153,7 +153,7 @@ export class DashboardService {
       where: {
         householdId,
         scheduledDate: { gte: now },
-        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+        status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS'] },
       },
       include: {
         vendor: {
@@ -177,7 +177,7 @@ export class DashboardService {
       where: {
         householdId,
         scheduledDate: { gte: now },
-        status: { in: ['PENDING', 'APPROVED', 'ASSIGNED'] },
+        status: { in: ['SCHEDULED', 'ASSIGNED', 'IN_PROGRESS'] },
       },
       include: {
         vendor: {
@@ -203,11 +203,11 @@ export class DashboardService {
    * Get count of pending approvals for homeowner
    */
   async getPendingApprovalsCount(householdId: string): Promise<number> {
-    // Count work orders pending homeowner approval
+    // Count work orders pending homeowner approval (REQUESTED status means awaiting approval)
     const workOrderCount = await this.prisma.workOrder.count({
       where: {
         householdId,
-        status: 'PENDING_APPROVAL',
+        status: 'REQUESTED',
       },
     });
 
@@ -231,7 +231,7 @@ export class DashboardService {
       where: {
         householdId,
         scheduledDate: { gte: now, lte: futureDate },
-        status: { in: ['SCHEDULED', 'CONFIRMED'] },
+        status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS'] },
       },
       orderBy: { scheduledDate: 'asc' },
       take: 5,
@@ -311,7 +311,7 @@ export class DashboardService {
     const pendingWorkOrders = await this.prisma.workOrder.count({
       where: {
         householdId,
-        status: { in: ['PENDING', 'PENDING_APPROVAL'] },
+        status: { in: ['REQUESTED', 'SCHEDULED', 'OPEN'] },
       },
     });
     score -= pendingWorkOrders * 3;
@@ -320,7 +320,7 @@ export class DashboardService {
     const openServiceRequests = await this.prisma.serviceRequest.count({
       where: {
         householdId,
-        status: { in: ['PENDING', 'IN_PROGRESS'] },
+        status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS'] },
       },
     });
     score -= openServiceRequests * 2;
