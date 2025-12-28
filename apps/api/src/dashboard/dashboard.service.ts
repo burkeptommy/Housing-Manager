@@ -176,7 +176,7 @@ export class DashboardService {
     const workOrder = await this.prisma.workOrder.findFirst({
       where: {
         householdId,
-        scheduledDate: { gte: now },
+        scheduledStart: { gte: now },
         status: { in: ['SCHEDULED', 'ASSIGNED', 'IN_PROGRESS'] },
       },
       include: {
@@ -184,7 +184,7 @@ export class DashboardService {
           select: { displayName: true },
         },
       },
-      orderBy: { scheduledDate: 'asc' },
+      orderBy: { scheduledStart: 'asc' },
     });
 
     if (workOrder) {
@@ -192,7 +192,7 @@ export class DashboardService {
         id: workOrder.id,
         title: workOrder.title,
         vendorName: workOrder.vendor?.displayName || null,
-        scheduledDate: workOrder.scheduledDate,
+        scheduledDate: workOrder.scheduledStart,
       };
     }
 
