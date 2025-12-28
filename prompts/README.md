@@ -6,10 +6,10 @@ This folder contains implementation prompts for Claude Code.
 
 ## Current Priority (December 27, 2024)
 
-**004 running → Next: Connect Manager Portal**
+**Fix Admin Login + Connect Manager Portal**
 
 ```
-Read the prompt at prompts/005-connect-manager-portal.md and implement all phases in order.
+Read the prompt at prompts/005-fix-login-connect-manager.md and implement all phases in order. This fixes the admin login infinite loading issue and connects the Manager Portal to real APIs. Remember: DO NOT DELETE existing code, only add and refactor.
 ```
 
 ---
@@ -22,50 +22,41 @@ Read the prompt at prompts/005-connect-manager-portal.md and implement all phase
 | 001 | `001-homeowner-portal-production-ready.md` | (Deprecated) | ⛔ Skip |
 | 002 | `002-home-manager-intake-workbench.md` | (Merged into 003) | ⛔ Skip |
 | 003 | `003-production-ready-real-data.md` | APIs, seed data, onboarding | ✅ Done |
-| 004 | `004-admin-portal.md` | Admin portal + Tom's account | 🔄 Running |
-| **005** | `005-connect-manager-portal.md` | **Wire up Manager Portal to APIs** | 🚀 Next |
+| 004 | `004-admin-portal.md` | Admin portal + Tom's account | ✅ Done |
+| **005** | `005-fix-login-connect-manager.md` | **Fix login + Manager Portal** | 🚀 Run Now |
 
 ---
 
 ## What Prompt 005 Does
 
-**This is NOT a rebuild** - the Manager Portal already exists with great UI. This prompt just connects it to real APIs.
+### Fixes Admin Login
+- Ensures `/user/me` endpoint exists and returns role
+- Fixes FirebaseAuthGuard to attach full user object
+- Fixes admin layout auth check (no more infinite loading)
 
-### New API Endpoints
-| Endpoint | Description |
-|----------|-------------|
-| `GET /manager/dashboard` | Dashboard data for logged-in manager |
-| `GET /manager/households` | Manager's assigned households |
-| `GET /manager/households/:id` | Full household detail |
-| `GET /manager/onboarding/queue` | Onboarding queue for this manager |
-| `GET /manager/activity` | Activity across managed households |
-| `POST /manager/activity` | Log new activity |
-
-### Frontend Updates
-| Page | Change |
-|------|--------|
-| `/manager` | Fetch real stats, households, activity |
-| `/manager/onboarding` | Already fetching - verify endpoint |
-| `/manager/onboarding/[id]` | Save intake data on field changes |
-| `/manager/households` | Fetch from `/manager/households` API |
-
-### Sarah's Login
-- Creates Firebase Auth account for sarah@haven.app
-- Password: SarahManager2024!
-- Links to existing database user
+### Connects Manager Portal (NO DELETIONS)
+- Adds `/manager/dashboard` API endpoint
+- Adds `/manager/households` API endpoint  
+- Adds `/manager/onboarding/queue` API endpoint
+- Enhances dashboard to fetch real data (keeps mock fallback)
+- Adds auto-save to intake workbench
+- Creates Sarah's Firebase login
 
 ---
 
-## After 005 Completes
+## Critical Rule
 
-**Sarah can login at:** https://havenhome.dev/manager
-- Email: sarah@haven.app
-- Password: SarahManager2024!
+**DO NOT DELETE existing code** - Only refactor and add. All existing portals must continue working.
 
-She'll see:
-- Her dashboard with the Morrison household
-- Any pending onboarding sessions
-- Real activity from the database
+---
+
+## Credentials After 005
+
+| User | Email | Password | Portal |
+|------|-------|----------|--------|
+| Tom (Admin) | tom@havenhome.dev | HavenAdmin2024! | /admin |
+| Sarah (HM) | sarah@haven.app | SarahManager2024! | /manager |
+| Bob (Demo) | bob@example.com | Bob123! | /app |
 
 ---
 
@@ -74,20 +65,10 @@ She'll see:
 | # | Prompt | What | Status |
 |---|--------|------|--------|
 | 003 | Production Ready | APIs + seed data | ✅ |
-| 004 | Admin Portal | Tom's control center | 🔄 |
-| 005 | Manager Portal | Sarah's tools | 🚀 |
+| 004 | Admin Portal | Tom's control center | ✅ |
+| 005 | Fix + Manager | Fix login, connect manager | 🚀 |
 | 006 | (Planned) | Approval system | ⏳ |
 | 007 | (Planned) | Handyman portal | ⏳ |
-
----
-
-## Key Credentials
-
-| User | Email | Password | Portal |
-|------|-------|----------|--------|
-| Tom (Admin) | tom@havenhome.dev | HavenAdmin2024! | /admin |
-| Sarah (HM) | sarah@haven.app | SarahManager2024! | /manager |
-| Bob (Demo) | bob@example.com | Bob123! | /app |
 
 ---
 

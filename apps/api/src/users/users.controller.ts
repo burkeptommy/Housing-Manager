@@ -46,6 +46,40 @@ export class MeController {
   async getMe(@CurrentUser() user: AuthPayload): Promise<MeResponse> {
     return this.usersService.getMe(user);
   }
+}
+
+/**
+ * User/Me Controller - Alternative endpoint for backward compatibility
+ * Uses Firebase Auth
+ */
+@ApiTags('User')
+@ApiBearerAuth()
+@Controller('user')
+@UseGuards(FirebaseAuthGuard)
+export class UserMeController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * Get current user - alternative endpoint for /user/me calls
+   */
+  @Get('me')
+  @ApiOperation({ summary: 'Get current user (alternative endpoint)' })
+  @ApiResponse({ status: 200, description: 'User profile with household info' })
+  async getUserMe(@CurrentUser() user: AuthPayload): Promise<MeResponse> {
+    return this.usersService.getMe(user);
+  }
+}
+
+/**
+ * Me Features Controller - Additional user profile operations
+ * Uses Firebase Auth
+ */
+@ApiTags('Me')
+@ApiBearerAuth()
+@Controller('me')
+@UseGuards(FirebaseAuthGuard)
+export class MeFeaturesController {
+  constructor(private readonly usersService: UsersService) {}
 
   /**
    * Get pending invites for current user
