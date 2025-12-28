@@ -50,6 +50,7 @@ export const sidebarNavigation: NavSection[] = [
       { name: 'Family', href: '/app/family', icon: UserCircle },
       { name: 'Projects', href: '/app/projects', icon: Wrench },
       { name: 'Maintenance', href: '/app/maintenance', icon: ClipboardList },
+      { name: 'Documents', href: '/app/vault', icon: FileText },
       { name: 'Find Pros', href: '/app/community', icon: Search },
     ],
   },

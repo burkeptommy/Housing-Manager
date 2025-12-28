@@ -820,6 +820,9 @@ model User {
   // Maintenance Task completion relation
   completedMaintenanceTasks MaintenanceTask[] @relation("MaintenanceTaskCompletedBy")
 
+  // Document Vault relations
+  uploadedDocuments Document[] @relation("DocumentUploader")
+
   @@map("users")
 }
 
@@ -1004,6 +1007,9 @@ model Household {
 
   // Approval System
   approvalRequests ApprovalRequest[]
+
+  // Document Vault
+  documents Document[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -1346,6 +1352,9 @@ model Vendor {
 
   // Comprehensive Bills
   bills ComprehensiveBill[] @relation("BillVendor")
+
+  // Document Vault
+  linkedDocuments Document[] @relation("VaultDocumentVendor")
 
   @@index([householdId, category])
   @@index([userId])
@@ -4548,4 +4557,65 @@ model ApprovalComment {
 
   @@index([approvalId, createdAt])
   @@map("approval_comments")
+}
+
+// =============================================================================
+// DOCUMENT VAULT
+// =============================================================================
+
+enum DocumentCategory {
+  PROPERTY  // Deed, survey, title, HOA
+  INSURANCE // Homeowners, auto, umbrella, life
+  WARRANTY  // Appliance and system warranties
+  MANUAL    // User manuals, guides
+  TAX       // Property tax, assessments
+  CONTRACT  // Vendor contracts, service agreements
+  RECEIPT   // Invoices, receipts
+  PERMIT    // Building permits, certificates
+  OTHER
+}
+
+model Document {
+  id          String   @id @default(cuid())
+  householdId String   @map("household_id")
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  // File info
+  fileName    String   @map("file_name")
+  originalName String  @map("original_name")
+  mimeType    String   @map("mime_type")
+  fileSize    Int      @map("file_size") // bytes
+  storageUrl  String   @map("storage_url") // GCS URL
+  storagePath String   @map("storage_path") // GCS path for deletion
+
+  // Organization
+  category    DocumentCategory
+  subcategory String?
+  title       String?  // User-friendly title
+  description String?
+
+  // Metadata
+  tags        String[] @default([])
+
+  // Expiration tracking
+  expiresAt       DateTime? @map("expires_at")
+  expirationAlert Boolean   @default(false) @map("expiration_alert")
+
+  // Related entities
+  vendorId    String? @map("vendor_id")
+  vendor      Vendor? @relation("VaultDocumentVendor", fields: [vendorId], references: [id], onDelete: SetNull)
+  applianceId String? @map("appliance_id") // Future: link to appliance inventory
+
+  // Access
+  uploadedById String @map("uploaded_by_id")
+  uploadedBy   User   @relation("DocumentUploader", fields: [uploadedById], references: [id], onDelete: Cascade)
+
+  // Audit
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([householdId])
+  @@index([category])
+  @@index([expiresAt])
+  @@map("documents")
 }

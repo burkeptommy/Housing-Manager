@@ -43,6 +43,8 @@ import { ManagerModule } from './manager';
 import { ManagerOnboardingModule } from './manager/onboarding';
 import { ActivityModule } from './activity';
 import { DashboardModule } from './dashboard';
+import { StorageModule } from './storage';
+import { DocumentModule } from './document';
 
 @Module({
   imports: [
@@ -90,6 +92,8 @@ import { DashboardModule } from './dashboard';
     ManagerOnboardingModule,
     ActivityModule,
     DashboardModule,
+    StorageModule,
+    DocumentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

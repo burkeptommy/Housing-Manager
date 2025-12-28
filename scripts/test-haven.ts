@@ -657,6 +657,67 @@ async function testMaintenanceCalendar(): Promise<TestSuite> {
   return { name: 'Maintenance Calendar', tests };
 }
 
+async function testDocumentVault(): Promise<TestSuite> {
+  const tests: TestResult[] = [];
+
+  if (!FIREBASE_API_KEY) {
+    tests.push({
+      name: 'Document vault',
+      passed: false,
+      skipped: true,
+      error: 'FIREBASE_API_KEY not set',
+    });
+    return { name: 'Document Vault', tests };
+  }
+
+  // Get homeowner token
+  let start = Date.now();
+  const homeownerToken = await getFirebaseToken(CREDENTIALS.homeowner.email, CREDENTIALS.homeowner.password);
+  if (!homeownerToken) {
+    tests.push({
+      name: 'Homeowner login for documents',
+      passed: false,
+      error: 'Could not get homeowner token',
+    });
+    return { name: 'Document Vault', tests };
+  }
+
+  // Get household ID from /user/me
+  let response = await apiRequest('GET', '/user/me', homeownerToken);
+  const householdId = response.data?.household?.id || response.data?.householdId;
+
+  if (!householdId) {
+    tests.push({
+      name: 'Get household for documents',
+      passed: false,
+      error: 'No household ID found',
+    });
+    return { name: 'Document Vault', tests };
+  }
+
+  // Test documents list endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/documents/household/${householdId}`, homeownerToken);
+  tests.push({
+    name: 'GET /documents/household/:id',
+    passed: response.status === 200 && Array.isArray(response.data),
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Test documents summary endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/documents/household/${householdId}/summary`, homeownerToken);
+  tests.push({
+    name: 'GET /documents/household/:id/summary',
+    passed: response.status === 200 && response.data?.total !== undefined,
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  return { name: 'Document Vault', tests };
+}
+
 async function testDataIntegrity(): Promise<TestSuite> {
   const tests: TestResult[] = [];
 
@@ -777,6 +838,11 @@ async function main() {
   const maintenanceSuite = await testMaintenanceCalendar();
   maintenanceSuite.tests.forEach(printResult);
   suites.push(maintenanceSuite);
+
+  printHeader('Document Vault');
+  const documentSuite = await testDocumentVault();
+  documentSuite.tests.forEach(printResult);
+  suites.push(documentSuite);
 
   printHeader('Data Integrity');
   const dataSuite = await testDataIntegrity();
