@@ -157,7 +157,7 @@ export class DashboardService {
       },
       include: {
         vendor: {
-          select: { name: true },
+          select: { displayName: true },
         },
       },
       orderBy: { scheduledDate: 'asc' },
@@ -167,7 +167,7 @@ export class DashboardService {
       return {
         id: serviceRequest.id,
         title: serviceRequest.title || serviceRequest.description?.substring(0, 50) || 'Scheduled Service',
-        vendorName: serviceRequest.vendor?.name || null,
+        vendorName: serviceRequest.vendor?.displayName || null,
         scheduledDate: serviceRequest.scheduledDate,
       };
     }
