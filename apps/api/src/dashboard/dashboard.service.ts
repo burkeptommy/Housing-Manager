@@ -125,15 +125,14 @@ export class DashboardService {
     const payments = await this.prisma.billPaymentRecord.findMany({
       where: {
         bill: { householdId },
-        paidAt: {
+        paidDate: {
           gte: startOfMonth,
           lt: endOfMonth,
         },
-        status: 'COMPLETED',
       },
     });
 
-    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amountPaid || 0), 0);
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
     const funding = Number(intake?.calculatedMonthlyFunding || 0);
 
     return {
@@ -341,7 +340,7 @@ export class DashboardService {
       },
       include: {
         paymentRecords: {
-          orderBy: { paidAt: 'desc' },
+          orderBy: { paidDate: 'desc' },
           take: 1,
         },
         vendor: {
@@ -410,9 +409,9 @@ export class DashboardService {
         currentAutopay: bill.currentAutopay,
         vendor: bill.vendor?.displayName,
         lastPayment: bill.paymentRecords[0] ? {
-          amount: Number(bill.paymentRecords[0].amountPaid),
-          date: bill.paymentRecords[0].paidAt,
-          status: bill.paymentRecords[0].status,
+          amount: Number(bill.paymentRecords[0].amount),
+          date: bill.paymentRecords[0].paidDate,
+          paidBy: bill.paymentRecords[0].paidBy,
         } : null,
       })),
       byCategory: Object.entries(byCategory).map(([category, data]) => ({

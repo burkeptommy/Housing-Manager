@@ -23,31 +23,31 @@ export class ManagerController {
   @Get('dashboard')
   @ApiOperation({ summary: 'Get manager dashboard data' })
   async getDashboard(@Request() req: any) {
-    return this.managerService.getDashboard(req.user.id);
+    return this.managerService.getDashboard(req.user.userId);
   }
 
   @Get('households')
   @ApiOperation({ summary: 'Get households assigned to this manager' })
   async getMyHouseholds(@Request() req: any) {
-    return this.managerService.getMyHouseholds(req.user.id);
+    return this.managerService.getMyHouseholds(req.user.userId);
   }
 
   @Get('households/:id')
   @ApiOperation({ summary: 'Get detailed household information' })
   async getHouseholdDetail(@Request() req: any, @Param('id') householdId: string) {
-    return this.managerService.getHouseholdDetail(req.user.id, householdId);
+    return this.managerService.getHouseholdDetail(req.user.userId, householdId);
   }
 
   @Get('onboarding/queue')
   @ApiOperation({ summary: 'Get onboarding queue for this manager' })
   async getOnboardingQueue(@Request() req: any, @Query('status') status?: string) {
-    return this.managerService.getOnboardingQueue(req.user.id, status);
+    return this.managerService.getOnboardingQueue(req.user.userId, status);
   }
 
   @Get('activity')
   @ApiOperation({ summary: 'Get activity across managed households' })
   async getMyActivity(@Request() req: any, @Query('limit') limit?: string) {
-    return this.managerService.getMyActivity(req.user.id, limit ? parseInt(limit) : undefined);
+    return this.managerService.getMyActivity(req.user.userId, limit ? parseInt(limit) : undefined);
   }
 
   @Post('activity')
@@ -65,8 +65,8 @@ export class ManagerController {
     },
   ) {
     return this.managerService.logActivity(
-      req.user.id,
-      req.user.displayName || req.user.firstName || 'Home Manager',
+      req.user.userId,
+      req.user.email || 'Home Manager',
       body,
     );
   }
