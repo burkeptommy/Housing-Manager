@@ -504,6 +504,159 @@ async function testHomeownerFlow(): Promise<TestSuite> {
   return { name: 'Homeowner Portal', tests };
 }
 
+async function testApprovalSystem(): Promise<TestSuite> {
+  const tests: TestResult[] = [];
+
+  if (!FIREBASE_API_KEY) {
+    tests.push({
+      name: 'Approval system',
+      passed: false,
+      skipped: true,
+      error: 'FIREBASE_API_KEY not set',
+    });
+    return { name: 'Approval System', tests };
+  }
+
+  // Get homeowner token
+  let start = Date.now();
+  const homeownerToken = await getFirebaseToken(CREDENTIALS.homeowner.email, CREDENTIALS.homeowner.password);
+  if (!homeownerToken) {
+    tests.push({
+      name: 'Homeowner login for approvals',
+      passed: false,
+      error: 'Could not get homeowner token',
+    });
+    return { name: 'Approval System', tests };
+  }
+
+  // Get household ID from /user/me
+  let response = await apiRequest('GET', '/user/me', homeownerToken);
+  const householdId = response.data?.household?.id || response.data?.householdId;
+
+  if (!householdId) {
+    tests.push({
+      name: 'Get household for approvals',
+      passed: false,
+      error: 'No household ID found',
+    });
+    return { name: 'Approval System', tests };
+  }
+
+  // Test homeowner approvals endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/approvals/household/${householdId}`, homeownerToken);
+  tests.push({
+    name: 'GET /approvals/household/:id',
+    passed: response.status === 200 && Array.isArray(response.data),
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Test pending count endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/approvals/household/${householdId}/pending-count`, homeownerToken);
+  tests.push({
+    name: 'GET /approvals/household/:id/pending-count',
+    passed: response.status === 200 && response.data?.count !== undefined,
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Get manager token
+  const managerToken = await getFirebaseToken(CREDENTIALS.manager.email, CREDENTIALS.manager.password);
+  if (!managerToken) {
+    tests.push({
+      name: 'Manager login for approvals',
+      passed: false,
+      error: 'Could not get manager token',
+    });
+    return { name: 'Approval System', tests };
+  }
+
+  // Test manager approvals endpoint
+  start = Date.now();
+  response = await apiRequest('GET', '/approvals/manager/my-requests', managerToken);
+  tests.push({
+    name: 'GET /approvals/manager/my-requests',
+    passed: response.status === 200 && Array.isArray(response.data),
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  return { name: 'Approval System', tests };
+}
+
+async function testMaintenanceCalendar(): Promise<TestSuite> {
+  const tests: TestResult[] = [];
+
+  if (!FIREBASE_API_KEY) {
+    tests.push({
+      name: 'Maintenance calendar',
+      passed: false,
+      skipped: true,
+      error: 'FIREBASE_API_KEY not set',
+    });
+    return { name: 'Maintenance Calendar', tests };
+  }
+
+  // Get homeowner token
+  let start = Date.now();
+  const homeownerToken = await getFirebaseToken(CREDENTIALS.homeowner.email, CREDENTIALS.homeowner.password);
+  if (!homeownerToken) {
+    tests.push({
+      name: 'Homeowner login for maintenance',
+      passed: false,
+      error: 'Could not get homeowner token',
+    });
+    return { name: 'Maintenance Calendar', tests };
+  }
+
+  // Get household ID from /user/me
+  let response = await apiRequest('GET', '/user/me', homeownerToken);
+  const householdId = response.data?.household?.id || response.data?.householdId;
+
+  if (!householdId) {
+    tests.push({
+      name: 'Get household for maintenance',
+      passed: false,
+      error: 'No household ID found',
+    });
+    return { name: 'Maintenance Calendar', tests };
+  }
+
+  // Test maintenance tasks endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/maintenance/household/${householdId}`, homeownerToken);
+  tests.push({
+    name: 'GET /maintenance/household/:id',
+    passed: response.status === 200 && Array.isArray(response.data),
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Test maintenance summary endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/maintenance/household/${householdId}/summary`, homeownerToken);
+  tests.push({
+    name: 'GET /maintenance/household/:id/summary',
+    passed: response.status === 200 && response.data?.total !== undefined,
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Test maintenance calendar endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/maintenance/household/${householdId}/calendar`, homeownerToken);
+  tests.push({
+    name: 'GET /maintenance/household/:id/calendar',
+    passed: response.status === 200 && typeof response.data === 'object',
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  return { name: 'Maintenance Calendar', tests };
+}
+
 async function testDataIntegrity(): Promise<TestSuite> {
   const tests: TestResult[] = [];
 
@@ -614,6 +767,16 @@ async function main() {
   const homeownerSuite = await testHomeownerFlow();
   homeownerSuite.tests.forEach(printResult);
   suites.push(homeownerSuite);
+
+  printHeader('Approval System');
+  const approvalSuite = await testApprovalSystem();
+  approvalSuite.tests.forEach(printResult);
+  suites.push(approvalSuite);
+
+  printHeader('Maintenance Calendar');
+  const maintenanceSuite = await testMaintenanceCalendar();
+  maintenanceSuite.tests.forEach(printResult);
+  suites.push(maintenanceSuite);
 
   printHeader('Data Integrity');
   const dataSuite = await testDataIntegrity();

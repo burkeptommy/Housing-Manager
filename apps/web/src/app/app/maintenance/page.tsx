@@ -1259,6 +1259,10 @@ export default function MaintenancePage() {
   const [selectedAsset, setSelectedAsset] = useState<HomeAsset | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'info' } | null>(null);
 
+  // Auto-generated maintenance tasks
+  const [maintenanceTasks, setMaintenanceTasks] = useState<any[]>([]);
+  const [taskSummary, setTaskSummary] = useState<{ total: number; overdue: number; dueSoon: number; completed: number } | null>(null);
+
   const showToast = (message: string, type: 'success' | 'info' = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
@@ -1273,15 +1277,36 @@ export default function MaintenancePage() {
 
     try {
       const api = getApiClient();
-      const vendorsResult = await Promise.allSettled([
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || '';
+
+      // Fetch vendors and maintenance tasks in parallel
+      const [vendorsResult, tasksResponse, summaryResponse] = await Promise.allSettled([
         api.getHouseholdVendors(currentHousehold.id),
+        fetch(`${apiUrl}/maintenance/household/${currentHousehold.id}`, {
+          headers: { Authorization: `Bearer ${await api.getToken?.()}` },
+        }),
+        fetch(`${apiUrl}/maintenance/household/${currentHousehold.id}/summary`, {
+          headers: { Authorization: `Bearer ${await api.getToken?.()}` },
+        }),
       ]);
 
-      if (vendorsResult[0].status === 'fulfilled') {
-        const vendorsData = vendorsResult[0].value;
+      if (vendorsResult.status === 'fulfilled') {
+        const vendorsData = vendorsResult.value;
         if (Array.isArray(vendorsData) && vendorsData.length > 0) {
           setVendors(vendorsData.map((v) => mapApiVendorToUi(v as unknown as Record<string, unknown>)));
         }
+      }
+
+      // Load maintenance tasks
+      if (tasksResponse.status === 'fulfilled' && tasksResponse.value.ok) {
+        const tasks = await tasksResponse.value.json();
+        setMaintenanceTasks(tasks);
+      }
+
+      // Load task summary
+      if (summaryResponse.status === 'fulfilled' && summaryResponse.value.ok) {
+        const summary = await summaryResponse.value.json();
+        setTaskSummary(summary);
       }
     } catch (error) {
       console.error('Error loading maintenance data:', error);
@@ -1437,6 +1462,127 @@ export default function MaintenancePage() {
       {/* Upcoming Services */}
       {scheduledServices.length > 0 && (
         <UpcomingServiceCard services={scheduledServices} />
+      )}
+
+      {/* Auto-Generated Maintenance Calendar */}
+      {maintenanceTasks.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-5 h-5 text-emerald-600" />
+                <h2 className="font-semibold text-warm-900">Maintenance Calendar</h2>
+              </div>
+              <p className="text-sm text-warm-500 mt-1">
+                {taskSummary?.total || maintenanceTasks.length} tasks identified for your home
+              </p>
+            </div>
+            {taskSummary && (
+              <div className="flex items-center gap-4 text-sm">
+                {taskSummary.dueSoon > 0 && (
+                  <div className="flex items-center gap-1.5 text-amber-600">
+                    <Clock className="w-4 h-4" />
+                    <span>{taskSummary.dueSoon} due soon</span>
+                  </div>
+                )}
+                {taskSummary.overdue > 0 && (
+                  <div className="flex items-center gap-1.5 text-red-600">
+                    <AlertTriangle className="w-4 h-4" />
+                    <span>{taskSummary.overdue} overdue</span>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Summary Cards */}
+          {taskSummary && (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+              <div className="bg-warm-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-warm-900">{taskSummary.total}</p>
+                <p className="text-sm text-warm-500">Total Tasks</p>
+              </div>
+              <div className="bg-amber-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-amber-600">{taskSummary.dueSoon}</p>
+                <p className="text-sm text-warm-500">Due Soon</p>
+              </div>
+              <div className="bg-red-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-red-600">{taskSummary.overdue}</p>
+                <p className="text-sm text-warm-500">Overdue</p>
+              </div>
+              <div className="bg-emerald-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-emerald-600">{taskSummary.completed}</p>
+                <p className="text-sm text-warm-500">Completed</p>
+              </div>
+            </div>
+          )}
+
+          {/* Task List */}
+          <div className="space-y-3">
+            {maintenanceTasks.slice(0, 6).map((task) => {
+              const isOverdue = task.nextDueDate && new Date(task.nextDueDate) < new Date() && task.status !== 'COMPLETED';
+              const isDueSoon = task.status === 'DUE_SOON' || (task.nextDueDate && new Date(task.nextDueDate) < new Date(Date.now() + 30 * 24 * 60 * 60 * 1000));
+
+              const categoryColors: Record<string, string> = {
+                HVAC: 'bg-orange-100 text-orange-700',
+                POOL: 'bg-cyan-100 text-cyan-700',
+                PLUMBING: 'bg-blue-100 text-blue-700',
+                CHIMNEY: 'bg-amber-100 text-amber-700',
+                ROOFING: 'bg-gray-100 text-gray-700',
+                EXTERIOR: 'bg-green-100 text-green-700',
+                LANDSCAPING: 'bg-emerald-100 text-emerald-700',
+                SAFETY: 'bg-red-100 text-red-700',
+                SEASONAL: 'bg-purple-100 text-purple-700',
+                APPLIANCES: 'bg-indigo-100 text-indigo-700',
+              };
+
+              return (
+                <div
+                  key={task.id}
+                  className={`flex items-center justify-between p-4 rounded-lg border ${
+                    isOverdue ? 'border-red-200 bg-red-50' : 'border-warm-200 bg-warm-50'
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[task.category] || 'bg-warm-100 text-warm-700'}`}>
+                      {task.category}
+                    </div>
+                    <div>
+                      <p className="font-medium text-warm-900">{task.title}</p>
+                      <div className="flex items-center gap-3 text-sm text-warm-500">
+                        <span>{task.frequency?.replace('_', ' ')}</span>
+                        {task.seasonalTiming && task.seasonalTiming !== 'ANY' && (
+                          <span className="capitalize">{task.seasonalTiming.toLowerCase()}</span>
+                        )}
+                        {task.estimatedCost > 0 && (
+                          <span>~${task.estimatedCost}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {task.nextDueDate && (
+                      <div className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : isDueSoon ? 'text-amber-600' : 'text-warm-500'}`}>
+                        {isOverdue ? 'Overdue' : new Date(task.nextDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </div>
+                    )}
+                    {task.priority === 'HIGH' && !isOverdue && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded">High Priority</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {maintenanceTasks.length > 6 && (
+            <div className="mt-4 text-center">
+              <button className="text-sm text-emerald-600 hover:text-emerald-700 font-medium">
+                View all {maintenanceTasks.length} tasks
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       {/* Warranty Alerts */}

@@ -28,6 +28,15 @@ import {
   VehicleType,
   ActivityType,
   PetType,
+  ApprovalType,
+  ApprovalStatus,
+  ApprovalPriority,
+  MaintenanceCategory,
+  MaintenanceFrequency,
+  SeasonalTiming,
+  TaskSource,
+  MaintenanceTaskStatus,
+  TaskPriority,
 } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -53,6 +62,11 @@ async function main() {
 
   for (const household of existingHouseholds) {
     // Delete related data (order matters due to foreign keys)
+    await prisma.approvalComment.deleteMany({
+      where: { approval: { householdId: household.id } },
+    });
+    await prisma.approvalRequest.deleteMany({ where: { householdId: household.id } });
+    await prisma.maintenanceTask.deleteMany({ where: { householdId: household.id } });
     await prisma.activityLog.deleteMany({ where: { householdId: household.id } });
     await prisma.billPaymentRecord.deleteMany({
       where: { bill: { householdId: household.id } },
@@ -185,6 +199,7 @@ async function main() {
       householdId: household.id,
       userId: bob.id,
       role: 'OWNER',
+      status: 'ACTIVE',
     },
   });
 
@@ -208,6 +223,7 @@ async function main() {
       householdId: household.id,
       userId: alice.id,
       role: 'MEMBER',
+      status: 'ACTIVE',
     },
   });
   console.log('  ✓ Alice Morrison (alice@example.com)');
@@ -903,6 +919,481 @@ async function main() {
     ],
   });
   console.log('  ✓ 4 activity log entries');
+
+  // =========================================================================
+  // APPROVAL REQUESTS (Demo for homeowner portal)
+  // =========================================================================
+  console.log('');
+  console.log('Creating approval requests...');
+
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  // Note: twoDaysAgo already defined above for activity logs
+  const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+
+  // Pending urgent approval - pipe repair
+  await prisma.approvalRequest.create({
+    data: {
+      householdId: household.id,
+      requesterId: sarah.id,
+      type: ApprovalType.EXPENSE,
+      priority: ApprovalPriority.URGENT,
+      status: ApprovalStatus.PENDING,
+      title: 'Emergency pipe burst repair - Kitchen',
+      description:
+        'Urgent - Pipe burst in kitchen. Vendor is on-site and waiting for approval. I recommend approving immediately to prevent water damage to cabinets.',
+      amount: 450,
+      vendorName: 'Emergency Plumbing Co.',
+      createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2 hours ago
+    },
+  });
+
+  // Pending normal approval - roof inspection
+  const roofApproval = await prisma.approvalRequest.create({
+    data: {
+      householdId: household.id,
+      requesterId: sarah.id,
+      type: ApprovalType.EXPENSE,
+      priority: ApprovalPriority.MEDIUM,
+      status: ApprovalStatus.PENDING,
+      title: 'Roof inspection and shingle replacement',
+      description:
+        'Recommended after last storm. I obtained 3 quotes - this is the best value ($875 vs $1,200 and $950). Happy to discuss alternatives.',
+      amount: 875,
+      vendorName: 'Ace Roofing Co.',
+      createdAt: yesterday,
+    },
+  });
+
+  // Add a comment to the roof approval
+  await prisma.approvalComment.create({
+    data: {
+      approvalId: roofApproval.id,
+      authorId: sarah.id,
+      content:
+        'I had their team do an initial inspection today. Found 12 damaged shingles on the north side. Photos attached to the work order.',
+      createdAt: new Date(yesterday.getTime() + 4 * 60 * 60 * 1000),
+    },
+  });
+
+  // Pending vendor selection
+  await prisma.approvalRequest.create({
+    data: {
+      householdId: household.id,
+      requesterId: sarah.id,
+      type: ApprovalType.VENDOR_SELECTION,
+      priority: ApprovalPriority.LOW,
+      status: ApprovalStatus.PENDING,
+      title: 'Annual HVAC maintenance vendor',
+      description:
+        "Time to schedule your annual HVAC tune-up. I'm recommending AirFlow Pros based on their excellent reviews and competitive pricing. Let me know if you'd prefer one of the other quotes.",
+      vendorName: 'AirFlow Pros',
+      amount: 189,
+      createdAt: twoDaysAgo,
+    },
+  });
+
+  // Already approved - garbage disposal
+  await prisma.approvalRequest.create({
+    data: {
+      householdId: household.id,
+      requesterId: sarah.id,
+      deciderId: bob.id,
+      type: ApprovalType.EXPENSE,
+      priority: ApprovalPriority.MEDIUM,
+      status: ApprovalStatus.APPROVED,
+      title: 'Garbage disposal replacement',
+      description: 'Current disposal is making grinding noises and leaking slightly. Replacement recommended.',
+      amount: 275,
+      vendorName: 'HandyPro Services',
+      createdAt: threeDaysAgo,
+      decidedAt: twoDaysAgo,
+      decisionNote: 'Approved. Thanks for the quick quote!',
+    },
+  });
+
+  // Already rejected - hot tub upgrade
+  await prisma.approvalRequest.create({
+    data: {
+      householdId: household.id,
+      requesterId: sarah.id,
+      deciderId: bob.id,
+      type: ApprovalType.PROJECT,
+      priority: ApprovalPriority.LOW,
+      status: ApprovalStatus.REJECTED,
+      title: 'Hot tub heater upgrade to energy efficient model',
+      description:
+        "The current heater works fine but uses more energy than newer models. Upgrade would save about $40/month in energy costs.",
+      amount: 2400,
+      vendorName: 'Spa Specialists',
+      createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
+      decidedAt: new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000),
+      decisionNote: "Let's wait until spring to consider this. The current heater is working fine.",
+    },
+  });
+
+  console.log('  ✓ 5 approval requests (3 pending, 1 approved, 1 rejected)');
+
+  // =========================================================================
+  // MAINTENANCE TASKS (Auto-generated from ATTOM property enrichment)
+  // Morrison enrichment: Forced Air Gas, Central AC, Pool, 2 fireplaces,
+  // 1985 build, 2.0 acres, Attached garage, CT (northeast)
+  // =========================================================================
+  console.log('');
+  console.log('Creating maintenance tasks from property enrichment...');
+
+  // Helper function to get next seasonal date
+  const getNextSeasonDate = (season: 'SPRING' | 'SUMMER' | 'FALL' | 'WINTER'): Date => {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const seasonMonths = { SPRING: 3, SUMMER: 6, FALL: 9, WINTER: 0 };
+    let targetMonth = seasonMonths[season];
+    let targetYear = year;
+    if (month >= targetMonth + 2) targetYear++;
+    return new Date(targetYear, targetMonth, 15);
+  };
+
+  // HVAC Tasks
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'HVAC Filter Change',
+        description: 'Replace or clean HVAC air filters for optimal efficiency and air quality',
+        category: MaintenanceCategory.HVAC,
+        frequency: MaintenanceFrequency.QUARTERLY,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'HVAC',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 30,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
+      },
+      {
+        householdId: household.id,
+        title: 'Furnace Annual Service',
+        description: 'Professional inspection and tune-up of heating system before winter',
+        category: MaintenanceCategory.HVAC,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.FALL,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'HVAC',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 150,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('FALL'),
+      },
+      {
+        householdId: household.id,
+        title: 'AC Annual Service',
+        description: 'Professional inspection and tune-up of cooling system before summer',
+        category: MaintenanceCategory.HVAC,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.SPRING,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'HVAC',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 150,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('SPRING'),
+      },
+    ],
+  });
+
+  // Pool Tasks (hasPool = true, CT = northeast so include closing)
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Pool Opening',
+        description: 'Remove cover, start filtration, balance chemicals, inspect equipment',
+        category: MaintenanceCategory.POOL,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.SPRING,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Pool',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 350,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('SPRING'),
+      },
+      {
+        householdId: household.id,
+        title: 'Pool Closing',
+        description: 'Winterize pool, add closing chemicals, install cover, drain equipment',
+        category: MaintenanceCategory.POOL,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.FALL,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Pool',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 350,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('FALL'),
+      },
+    ],
+  });
+
+  // Chimney (fireplaceCount = 2)
+  await prisma.maintenanceTask.create({
+    data: {
+      householdId: household.id,
+      title: 'Chimney Sweep & Inspection',
+      description: 'Professional chimney cleaning and safety inspection (2 fireplaces)',
+      category: MaintenanceCategory.CHIMNEY,
+      frequency: MaintenanceFrequency.ANNUAL,
+      seasonalTiming: SeasonalTiming.FALL,
+      source: TaskSource.SYSTEM_GENERATED,
+      sourceSystem: 'Fireplace',
+      priority: TaskPriority.HIGH,
+      estimatedCost: 400,
+      isRecurring: true,
+      status: MaintenanceTaskStatus.UPCOMING,
+      nextDueDate: getNextSeasonDate('FALL'),
+    },
+  });
+
+  // Roof (yearBuilt 1985 = 40 years old)
+  await prisma.maintenanceTask.create({
+    data: {
+      householdId: household.id,
+      title: 'Roof Inspection',
+      description: 'Professional inspection for damage, wear, and potential issues (40-year-old roof)',
+      category: MaintenanceCategory.ROOFING,
+      frequency: MaintenanceFrequency.ANNUAL,
+      seasonalTiming: SeasonalTiming.SPRING,
+      source: TaskSource.SYSTEM_GENERATED,
+      sourceSystem: 'Roof',
+      priority: TaskPriority.HIGH,
+      estimatedCost: 200,
+      isRecurring: true,
+      status: MaintenanceTaskStatus.UPCOMING,
+      nextDueDate: getNextSeasonDate('SPRING'),
+    },
+  });
+
+  // Exterior Tasks
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Gutter Cleaning',
+        description: 'Clean gutters and downspouts, check for damage',
+        category: MaintenanceCategory.EXTERIOR,
+        frequency: MaintenanceFrequency.SEMI_ANNUAL,
+        seasonalTiming: SeasonalTiming.FALL,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Exterior',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 150,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('FALL'),
+      },
+      {
+        householdId: household.id,
+        title: 'Spring Gutter Check',
+        description: 'Clean gutters after winter, check for ice damage',
+        category: MaintenanceCategory.EXTERIOR,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.SPRING,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Exterior',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 150,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('SPRING'),
+      },
+      {
+        householdId: household.id,
+        title: 'Garage Door Service',
+        description: 'Lubricate tracks and springs, test safety features',
+        category: MaintenanceCategory.EXTERIOR,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Garage',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 100,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000),
+      },
+    ],
+  });
+
+  // Landscaping Tasks (lotSizeAcres = 2.0)
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Spring Lawn Treatment',
+        description: 'Fertilization, weed control, and soil testing (2.0 acres)',
+        category: MaintenanceCategory.LANDSCAPING,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.SPRING,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Landscaping',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 400,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('SPRING'),
+      },
+      {
+        householdId: household.id,
+        title: 'Fall Lawn Aeration',
+        description: 'Aerate and overseed lawn for winter preparation',
+        category: MaintenanceCategory.LANDSCAPING,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.FALL,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Landscaping',
+        priority: TaskPriority.LOW,
+        estimatedCost: 350,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('FALL'),
+      },
+    ],
+  });
+
+  // Safety Tasks
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Smoke & CO Detector Test',
+        description: 'Test all smoke and carbon monoxide detectors, replace batteries',
+        category: MaintenanceCategory.SAFETY,
+        frequency: MaintenanceFrequency.SEMI_ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Safety',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 0,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.DUE_SOON,
+        nextDueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000),
+      },
+      {
+        householdId: household.id,
+        title: 'Fire Extinguisher Check',
+        description: 'Inspect fire extinguishers, replace if needed',
+        category: MaintenanceCategory.SAFETY,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Safety',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 50,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000),
+      },
+    ],
+  });
+
+  // Plumbing Tasks
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Water Heater Flush',
+        description: 'Drain and flush water heater to remove sediment',
+        category: MaintenanceCategory.PLUMBING,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Plumbing',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 100,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      },
+      {
+        householdId: household.id,
+        title: 'Water Heater Inspection',
+        description: 'Check anode rod, inspect for leaks and corrosion (40-year-old home)',
+        category: MaintenanceCategory.PLUMBING,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Plumbing',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 100,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000),
+      },
+    ],
+  });
+
+  // Seasonal & Appliance Tasks
+  await prisma.maintenanceTask.createMany({
+    data: [
+      {
+        householdId: household.id,
+        title: 'Winterization Checklist',
+        description: 'Disconnect hoses, insulate pipes, check weatherstripping, reverse ceiling fans',
+        category: MaintenanceCategory.SEASONAL,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.FALL,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Seasonal',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 0,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('FALL'),
+      },
+      {
+        householdId: household.id,
+        title: 'Spring Home Checklist',
+        description: 'Inspect roof after winter, check foundation, clean AC condenser, inspect deck/patio',
+        category: MaintenanceCategory.SEASONAL,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.SPRING,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Seasonal',
+        priority: TaskPriority.MEDIUM,
+        estimatedCost: 0,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: getNextSeasonDate('SPRING'),
+      },
+      {
+        householdId: household.id,
+        title: 'Dryer Vent Cleaning',
+        description: 'Clean dryer vent to prevent fire hazard and improve efficiency',
+        category: MaintenanceCategory.APPLIANCES,
+        frequency: MaintenanceFrequency.ANNUAL,
+        seasonalTiming: SeasonalTiming.ANY,
+        source: TaskSource.SYSTEM_GENERATED,
+        sourceSystem: 'Appliances',
+        priority: TaskPriority.HIGH,
+        estimatedCost: 100,
+        isRecurring: true,
+        status: MaintenanceTaskStatus.UPCOMING,
+        nextDueDate: new Date(now.getTime() + 120 * 24 * 60 * 60 * 1000),
+      },
+    ],
+  });
+
+  // Count total created
+  const maintenanceCount = await prisma.maintenanceTask.count({
+    where: { householdId: household.id },
+  });
+  console.log(`  ✓ ${maintenanceCount} maintenance tasks auto-generated from property data`);
+  console.log('  ✓ Onboarding marked complete');
 
   // =========================================================================
   // MARK ONBOARDING COMPLETE

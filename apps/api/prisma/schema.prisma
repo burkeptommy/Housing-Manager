@@ -123,8 +123,14 @@ enum MaintenanceFrequency {
   BIWEEKLY
   MONTHLY
   QUARTERLY
+  SEMI_ANNUAL
   SEMIANNUALLY
+  ANNUAL
   ANNUALLY
+  BIENNIAL
+  TRIENNIAL
+  ONE_TIME
+  AS_NEEDED
 }
 
 enum SubscriptionTier {
@@ -267,6 +273,8 @@ enum PaymentMethodType {
 enum MaintenanceCategory {
   HVAC
   PLUMBING
+  ELECTRICAL
+  ROOFING
   ROOF_GUTTER
   CHIMNEY
   SEPTIC
@@ -278,7 +286,9 @@ enum MaintenanceCategory {
   APPLIANCES
   EXTERIOR
   INTERIOR
+  SEASONAL
   GENERAL
+  OTHER
 }
 
 enum MaintenanceTaskStatus {
@@ -287,6 +297,24 @@ enum MaintenanceTaskStatus {
   COMPLETED
   SKIPPED
   OVERDUE
+  IN_PROGRESS
+  DUE_SOON
+  UPCOMING
+}
+
+enum SeasonalTiming {
+  SPRING
+  SUMMER
+  FALL
+  WINTER
+  ANY
+}
+
+enum TaskSource {
+  SYSTEM_GENERATED
+  MANAGER_CREATED
+  USER_CREATED
+  VENDOR_RECOMMENDED
 }
 
 enum ReminderType {
@@ -653,6 +681,36 @@ enum ApplianceCondition {
 }
 
 // ============================================================================
+// APPROVAL SYSTEM ENUMS
+// ============================================================================
+
+// Type of approval request
+enum ApprovalType {
+  EXPENSE // Expense over threshold requiring approval
+  VENDOR_SELECTION // Choosing a vendor for a project
+  SCHEDULE // Scheduling a service/visit
+  PROJECT // Approving a project/work
+  OTHER // Other approval types
+}
+
+// Status of approval request
+enum ApprovalStatus {
+  PENDING // Awaiting homeowner decision
+  APPROVED // Homeowner approved
+  REJECTED // Homeowner rejected
+  EXPIRED // Request expired without decision
+  CANCELLED // Manager cancelled the request
+}
+
+// Priority level for approval requests
+enum ApprovalPriority {
+  LOW // No rush - when convenient
+  MEDIUM // Normal priority
+  HIGH // Needs attention soon
+  URGENT // Time-sensitive, needs immediate attention
+}
+
+// ============================================================================
 // USER & AUTHENTICATION
 // ============================================================================
 
@@ -753,6 +811,14 @@ model User {
   // Zone-based onboarding progress
   onboardingManagedAs   OnboardingProgress[] @relation("OnboardingHomeManager")
   onboardingHandymanFor OnboardingProgress[] @relation("OnboardingHandyman")
+
+  // Approval System relations
+  requestedApprovals ApprovalRequest[] @relation("ApprovalRequestedBy")
+  decidedApprovals   ApprovalRequest[] @relation("ApprovalDecidedBy")
+  approvalComments   ApprovalComment[] @relation("ApprovalCommentAuthor")
+
+  // Maintenance Task completion relation
+  completedMaintenanceTasks MaintenanceTask[] @relation("MaintenanceTaskCompletedBy")
 
   @@map("users")
 }
@@ -935,6 +1001,9 @@ model Household {
 
   // Activity Log
   activityLogs ActivityLog[]
+
+  // Approval System
+  approvalRequests ApprovalRequest[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -1762,16 +1831,26 @@ model MaintenanceTask {
   templateId       String? @map("template_id") // Nullable if custom task
   assignedVendorId String? @map("assigned_vendor_id")
   attachmentFileId String? @map("attachment_file_id")
+  completedById    String? @map("completed_by_id")
 
   title       String
   description String?
   category    MaintenanceCategory   @default(GENERAL)
   status      MaintenanceTaskStatus @default(PENDING)
 
+  // Auto-generation fields
+  frequency      MaintenanceFrequency? @default(ANNUAL)
+  seasonalTiming SeasonalTiming?
+  source         TaskSource            @default(MANAGER_CREATED)
+  sourceSystem   String?               @map("source_system") // e.g., "HVAC", "Pool", "Roof"
+  isRecurring    Boolean               @default(true) @map("is_recurring")
+
   // Scheduling
-  dueDate       DateTime? @map("due_date")
-  scheduledDate DateTime? @map("scheduled_date")
-  completedAt   DateTime? @map("completed_at")
+  dueDate           DateTime? @map("due_date")
+  nextDueDate       DateTime? @map("next_due_date")
+  scheduledDate     DateTime? @map("scheduled_date")
+  completedAt       DateTime? @map("completed_at")
+  lastCompletedDate DateTime? @map("last_completed_date")
 
   // Cost Tracking
   estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
@@ -1780,8 +1859,9 @@ model MaintenanceTask {
   // Template tracking
   createdFromTemplate Boolean @default(false) @map("created_from_template")
 
-  notes    String?
-  priority TaskPriority @default(MEDIUM)
+  notes           String?
+  completionNotes String? @map("completion_notes")
+  priority        TaskPriority @default(MEDIUM)
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -1791,11 +1871,13 @@ model MaintenanceTask {
   template       MaintenanceTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
   assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
   attachmentFile FileAsset?           @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
+  completedBy    User?                @relation("MaintenanceTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
   transactions   Transaction[]
 
   @@index([householdId, status])
   @@index([householdId, dueDate])
+  @@index([householdId, nextDueDate])
   @@index([householdId, category])
   @@index([attachmentFileId])
   @@map("maintenance_tasks")
@@ -4400,4 +4482,70 @@ model ActivityLog {
   @@index([householdId, category])
   @@index([householdId, visibleToHomeowner])
   @@map("activity_logs")
+}
+
+// ============================================================================
+// APPROVAL SYSTEM - Manager requests homeowner approval for decisions
+// ============================================================================
+
+model ApprovalRequest {
+  id          String           @id @default(cuid())
+  householdId String           @map("household_id")
+  requesterId String           @map("requester_id") // Manager who requested
+  deciderId   String?          @map("decider_id") // Homeowner who decided
+
+  // Request details
+  type        ApprovalType
+  priority    ApprovalPriority @default(MEDIUM)
+  status      ApprovalStatus   @default(PENDING)
+  title       String
+  description String?          @db.Text
+
+  // Financial details (for expense approvals)
+  amount      Decimal?         @db.Decimal(10, 2)
+  vendorName  String?          @map("vendor_name")
+
+  // Related entities
+  workOrderId      String? @map("work_order_id")
+  serviceRequestId String? @map("service_request_id")
+  projectId        String? @map("project_id")
+
+  // Timeline
+  expiresAt   DateTime? @map("expires_at")
+  decidedAt   DateTime? @map("decided_at")
+
+  // Decision details
+  decisionNote String? @map("decision_note") @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  requester User              @relation("ApprovalRequestedBy", fields: [requesterId], references: [id], onDelete: Cascade)
+  decider   User?             @relation("ApprovalDecidedBy", fields: [deciderId], references: [id], onDelete: SetNull)
+  comments  ApprovalComment[]
+
+  @@index([householdId, status])
+  @@index([householdId, createdAt])
+  @@index([requesterId])
+  @@index([deciderId])
+  @@map("approval_requests")
+}
+
+model ApprovalComment {
+  id         String @id @default(cuid())
+  approvalId String @map("approval_id")
+  authorId   String @map("author_id")
+
+  content String @db.Text
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations
+  approval ApprovalRequest @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  author   User            @relation("ApprovalCommentAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([approvalId, createdAt])
+  @@map("approval_comments")
 }

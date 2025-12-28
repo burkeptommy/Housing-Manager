@@ -4,6 +4,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AdminModule } from './admin';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ApprovalModule } from './approval';
+import { MaintenanceModule } from './maintenance';
 import { AuthModule } from './auth';
 import { BillingModule } from './billing';
 import { ConversationsModule } from './conversations';
@@ -62,6 +64,8 @@ import { DashboardModule } from './dashboard';
     FilesModule,
     HealthModule,
     AdminModule,
+    ApprovalModule,
+    MaintenanceModule,
     HouseholdVendorsModule,
     BillAccountsModule,
     MaintenanceTasksModule,
