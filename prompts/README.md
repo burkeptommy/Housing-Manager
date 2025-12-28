@@ -4,12 +4,22 @@ This folder contains implementation prompts for Claude Code.
 
 ---
 
-## Current Priority (December 27, 2024)
+## Current Priority (December 28, 2024)
 
-**Fix Admin Login + Connect Manager Portal**
+**Fix Demo User Login + Run Tests Automatically**
 
 ```
-Read the prompt at prompts/005-fix-login-connect-manager.md and implement all phases in order. This fixes the admin login infinite loading issue and connects the Manager Portal to real APIs. Remember: DO NOT DELETE existing code, only add and refactor.
+Read the prompt at prompts/006-fix-demo-login-auto-tests.md and implement all phases in order.
+
+Key issues to fix:
+1. Bob (bob@example.com) is being redirected to onboarding instead of /app dashboard - fix the auth redirect logic to check if user already has a householdId
+2. Set up tests to run automatically - find the Firebase API key in apps/web/.env.local or apps/web/src/lib/firebase.ts and use it in the test script
+
+After fixing and deploying, run: pnpm test:e2e
+
+Report the test results.
+
+CRITICAL: DO NOT DELETE any existing code, only add and refactor.
 ```
 
 ---
@@ -23,52 +33,47 @@ Read the prompt at prompts/005-fix-login-connect-manager.md and implement all ph
 | 002 | `002-home-manager-intake-workbench.md` | (Merged into 003) | ⛔ Skip |
 | 003 | `003-production-ready-real-data.md` | APIs, seed data, onboarding | ✅ Done |
 | 004 | `004-admin-portal.md` | Admin portal + Tom's account | ✅ Done |
-| **005** | `005-fix-login-connect-manager.md` | **Fix login + Manager Portal** | 🚀 Run Now |
+| 005 | `005-fix-login-connect-manager.md` | Fix login + Manager Portal | ✅ Done |
+| **006** | `006-fix-demo-login-auto-tests.md` | **Fix demo login + auto tests** | 🚀 Run Now |
 
 ---
 
-## What Prompt 005 Does
+## What Prompt 006 Does
 
-### Fixes Admin Login
-- Ensures `/user/me` endpoint exists and returns role
-- Fixes FirebaseAuthGuard to attach full user object
-- Fixes admin layout auth check (no more infinite loading)
+### Fixes Demo User Login
+- Bob (bob@example.com) should go to /app, NOT onboarding
+- Check if user has householdId before redirecting to onboarding
+- Demo users already have all their data
 
-### Connects Manager Portal (NO DELETIONS)
-- Adds `/manager/dashboard` API endpoint
-- Adds `/manager/households` API endpoint  
-- Adds `/manager/onboarding/queue` API endpoint
-- Enhances dashboard to fetch real data (keeps mock fallback)
-- Adds auto-save to intake workbench
-- Creates Sarah's Firebase login
+### Auto-Run Tests
+- Find Firebase API key from project files
+- Run tests against production (havenhome.dev)
+- Report pass/fail results
 
 ---
 
-## Critical Rule
+## Expected Login Behavior After Fix
 
-**DO NOT DELETE existing code** - Only refactor and add. All existing portals must continue working.
-
----
-
-## Credentials After 005
-
-| User | Email | Password | Portal |
-|------|-------|----------|--------|
-| Tom (Admin) | tom@havenhome.dev | HavenAdmin2024! | /admin |
-| Sarah (HM) | sarah@haven.app | SarahManager2024! | /manager |
-| Bob (Demo) | bob@example.com | Bob123! | /app |
+| User | Email | Should Go To |
+|------|-------|--------------|
+| Bob (Homeowner) | bob@example.com | /app |
+| Sarah (Manager) | sarah@haven.app | /manager |
+| Tom (Admin) | tom@havenhome.dev | /admin |
+| NEW user | any new signup | /onboarding |
 
 ---
 
-## Build Order
+## Test Results Expected
 
-| # | Prompt | What | Status |
-|---|--------|------|--------|
-| 003 | Production Ready | APIs + seed data | ✅ |
-| 004 | Admin Portal | Tom's control center | ✅ |
-| 005 | Fix + Manager | Fix login, connect manager | 🚀 |
-| 006 | (Planned) | Approval system | ⏳ |
-| 007 | (Planned) | Handyman portal | ⏳ |
+After running `pnpm test:e2e`:
+- Web Pages: 4 tests
+- API Health: 1 test
+- Admin Portal: 5 tests
+- Manager Portal: 5 tests
+- Homeowner Portal: 5 tests
+- Data Integrity: 3 tests
+
+**Target: 100% pass rate**
 
 ---
 
