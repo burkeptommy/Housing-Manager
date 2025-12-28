@@ -9,7 +9,7 @@ import {
   UseGuards,
   Request,
 } from '@nestjs/common';
-import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import { MaintenanceService } from './maintenance.service';
 import { MaintenanceGeneratorService } from './maintenance-generator.service';
 import { MaintenanceTaskStatus, MaintenanceCategory } from '@prisma/client';
