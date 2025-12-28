@@ -19,7 +19,7 @@ export class ManagerService {
         owner: {
           select: { id: true, displayName: true, firstName: true, lastName: true, email: true },
         },
-        comprehensiveBills: { where: { isActive: true } },
+        comprehensiveBills: { where: { status: 'ACTIVE' } },
         _count: { select: { activityLogs: true, familyMembers: true } },
       },
     });
@@ -123,7 +123,7 @@ export class ManagerService {
         },
         familyMembers: true,
         vehicles: true,
-        comprehensiveBills: { where: { isActive: true } },
+        comprehensiveBills: { where: { status: 'ACTIVE' } },
         ownedVendors: true,
         onboardingProgress: true,
       },
