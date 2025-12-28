@@ -6,18 +6,20 @@ This folder contains implementation prompts for Claude Code.
 
 ## Current Priority (December 28, 2024)
 
-**Fix Demo User Login + Run Tests Automatically**
+**Fix 4 Remaining Test Failures → Target 100% Pass Rate**
 
 ```
-Read the prompt at prompts/006-fix-demo-login-auto-tests.md and implement all phases in order.
+Read the prompt at prompts/007-fix-remaining-tests.md and implement all phases.
 
-Key issues to fix:
-1. Bob (bob@example.com) is being redirected to onboarding instead of /app dashboard - fix the auth redirect logic to check if user already has a householdId
-2. Set up tests to run automatically - find the Firebase API key in apps/web/.env.local or apps/web/src/lib/firebase.ts and use it in the test script
+4 tests are failing:
+1. GET /manager/dashboard (500) - Sarah has no households assigned
+2. GET /manager/households (500) - Sarah has no households assigned  
+3. GET /dashboard/household/:id (500) - Query error
+4. GET /family/household/:id (404) - Endpoint missing
 
-After fixing and deploying, run: pnpm test:e2e
+Fix these issues, deploy, and run: pnpm test:e2e
 
-Report the test results.
+Report the test results. Target: 100% pass rate.
 
 CRITICAL: DO NOT DELETE any existing code, only add and refactor.
 ```
@@ -28,52 +30,37 @@ CRITICAL: DO NOT DELETE any existing code, only add and refactor.
 
 | # | File | Description | Status |
 |---|------|-------------|--------|
-| 000 | `000-RESTORE-polished-pages.md` | Restore pages if broken | ✅ Done |
-| 001 | `001-homeowner-portal-production-ready.md` | (Deprecated) | ⛔ Skip |
-| 002 | `002-home-manager-intake-workbench.md` | (Merged into 003) | ⛔ Skip |
 | 003 | `003-production-ready-real-data.md` | APIs, seed data, onboarding | ✅ Done |
 | 004 | `004-admin-portal.md` | Admin portal + Tom's account | ✅ Done |
 | 005 | `005-fix-login-connect-manager.md` | Fix login + Manager Portal | ✅ Done |
-| **006** | `006-fix-demo-login-auto-tests.md` | **Fix demo login + auto tests** | 🚀 Run Now |
+| 006 | `006-fix-demo-login-auto-tests.md` | Fix demo login + auto tests | ✅ Done (85%) |
+| **007** | `007-fix-remaining-tests.md` | **Fix 4 failing tests** | 🚀 Run Now |
 
 ---
 
-## What Prompt 006 Does
+## Current Test Status
 
-### Fixes Demo User Login
-- Bob (bob@example.com) should go to /app, NOT onboarding
-- Check if user has householdId before redirecting to onboarding
-- Demo users already have all their data
+### ✅ Passing (22 tests)
+- Web Pages: All 4 passing
+- API Health: Passing
+- Admin Portal: All 6 passing
+- Manager Portal: 3/5 passing
+- Homeowner Portal: 3/5 passing
+- Data Integrity: All 3 passing
 
-### Auto-Run Tests
-- Find Firebase API key from project files
-- Run tests against production (havenhome.dev)
-- Report pass/fail results
-
----
-
-## Expected Login Behavior After Fix
-
-| User | Email | Should Go To |
-|------|-------|--------------|
-| Bob (Homeowner) | bob@example.com | /app |
-| Sarah (Manager) | sarah@haven.app | /manager |
-| Tom (Admin) | tom@havenhome.dev | /admin |
-| NEW user | any new signup | /onboarding |
+### ❌ Failing (4 tests)
+| Test | Error | Fix |
+|------|-------|-----|
+| /manager/dashboard | 500 | Assign Sarah to Morrison household |
+| /manager/households | 500 | Assign Sarah to Morrison household |
+| /dashboard/household/:id | 500 | Fix query in dashboard service |
+| /family/household/:id | 404 | Create family endpoint |
 
 ---
 
-## Test Results Expected
+## Expected After 007
 
-After running `pnpm test:e2e`:
-- Web Pages: 4 tests
-- API Health: 1 test
-- Admin Portal: 5 tests
-- Manager Portal: 5 tests
-- Homeowner Portal: 5 tests
-- Data Integrity: 3 tests
-
-**Target: 100% pass rate**
+**100% pass rate (26/26 tests)**
 
 ---
 

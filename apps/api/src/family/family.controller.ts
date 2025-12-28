@@ -467,6 +467,123 @@ export class FamilyController {
     });
   }
 
+  // ==================== HOUSEHOLD FAMILY DATA ====================
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId')
+  async getHouseholdFamily(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      // Check if user is a member of the household
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Get family members
+    const familyMembers = await this.prisma.familyMember.findMany({
+      where: { householdId },
+      include: {
+        activities: true,
+      },
+      orderBy: [{ type: 'asc' }, { firstName: 'asc' }],
+    });
+
+    // Get pets
+    const pets = await this.prisma.pet.findMany({
+      where: { householdId },
+      orderBy: { name: 'asc' },
+    });
+
+    // Get vehicles
+    const vehicles = await this.prisma.vehicle.findMany({
+      where: { householdId, isActive: true },
+      orderBy: { name: 'asc' },
+    });
+
+    // Organize by type
+    const adults = familyMembers
+      .filter(m => m.type === 'ADULT')
+      .map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        nickname: m.nickname,
+        relationship: m.relationship,
+        email: m.email,
+        phone: m.phone,
+      }));
+
+    const children = familyMembers
+      .filter(m => m.type === 'CHILD')
+      .map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        nickname: m.nickname,
+        age: m.birthdate ? Math.floor((Date.now() - m.birthdate.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null,
+        school: m.school,
+        schoolGrade: m.schoolGrade,
+        activities: m.activities?.map(a => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          schedule: a.schedule,
+        })) || [],
+      }));
+
+    const staff = familyMembers
+      .filter(m => m.type === 'STAFF')
+      .map(m => ({
+        id: m.id,
+        firstName: m.firstName,
+        lastName: m.lastName,
+        relationship: m.relationship,
+        phone: m.phone,
+        workSchedule: m.workSchedule,
+      }));
+
+    return {
+      adults,
+      children,
+      staff,
+      pets: pets.map(p => ({
+        id: p.id,
+        name: p.name,
+        type: p.type,
+        breed: p.breed,
+        color: p.color,
+        age: p.birthday ? Math.floor((Date.now() - p.birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null,
+      })),
+      vehicles: vehicles.map(v => ({
+        id: v.id,
+        name: v.name,
+        year: v.year,
+        make: v.make,
+        model: v.model,
+        color: v.color,
+        licensePlate: v.licensePlate,
+      })),
+    };
+  }
+
   // ==================== AGGREGATED ALERTS ====================
 
   @UseGuards(FirebaseAuthGuard)
