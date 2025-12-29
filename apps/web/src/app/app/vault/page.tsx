@@ -90,7 +90,7 @@ const categoryConfig: Record<
 };
 
 export default function VaultPage() {
-  const { user } = useAuth();
+  const { householdId } = useAuth();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [summary, setSummary] = useState<DocumentSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,10 +106,11 @@ export default function VaultPage() {
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadExpires, setUploadExpires] = useState('');
 
-  const householdId = user?.householdId;
-
   const loadData = useCallback(async () => {
-    if (!householdId) return;
+    if (!householdId) {
+      setLoading(false);
+      return;
+    }
     try {
       const token = await getIdToken();
       const apiUrl =

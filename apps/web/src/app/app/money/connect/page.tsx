@@ -40,17 +40,18 @@ interface DetectedBillsSummary {
 
 export default function ConnectBankPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { householdId } = useAuth();
   const [linkToken, setLinkToken] = useState<string | null>(null);
   const [connections, setConnections] = useState<PlaidConnection[]>([]);
   const [summary, setSummary] = useState<DetectedBillsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
 
-  const householdId = user?.householdId;
-
   const loadData = useCallback(async () => {
-    if (!householdId) return;
+    if (!householdId) {
+      setLoading(false);
+      return;
+    }
     try {
       const token = await getIdToken();
       const apiUrl =

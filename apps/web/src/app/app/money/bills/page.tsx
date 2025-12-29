@@ -65,16 +65,17 @@ const frequencyLabels: Record<string, string> = {
 };
 
 export default function BillsReviewPage() {
-  const { user } = useAuth();
+  const { householdId } = useAuth();
   const [bills, setBills] = useState<DetectedBill[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'pending' | 'confirmed'>('pending');
 
-  const householdId = user?.householdId;
-
   const loadBills = useCallback(async () => {
-    if (!householdId) return;
+    if (!householdId) {
+      setLoading(false);
+      return;
+    }
     try {
       const token = await getIdToken();
       const apiUrl =
