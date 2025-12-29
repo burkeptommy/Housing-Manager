@@ -4726,8 +4726,13 @@ model DetectedBill {
 
   // User actions
   status          DetectedBillStatus @default(PENDING)
+  managementStatus String            @default("SELF_MANAGED") @map("management_status")  // SELF_MANAGED, PENDING_SETUP, HAVEN_MANAGED
   notes           String?            // User notes for manual bills
   linkedBillId    String?            @map("linked_bill_id")
+
+  // Payment setup (for Haven-managed bills)
+  paymentMethod   String?            @map("payment_method")  // CARD, ACH, CHECK
+  paymentAccountId String?           @map("payment_account_id")  // Stripe payment method or checkbook.io account
 
   // Transaction history
   transactionIds  String[]           @default([]) @map("transaction_ids")
@@ -4743,5 +4748,6 @@ model DetectedBill {
 
   @@index([householdId])
   @@index([status])
+  @@index([managementStatus])
   @@map("detected_bills")
 }

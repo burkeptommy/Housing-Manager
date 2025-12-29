@@ -12,13 +12,17 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { FirebaseAuthGuard } from '../firebase';
 import { ManagerService } from './manager.service';
 import { ActivityAction, ActivityCategory } from '@prisma/client';
+import { BillsService } from '../bills/bills.service';
 
 @ApiTags('Manager')
 @ApiBearerAuth()
 @Controller('manager')
 @UseGuards(FirebaseAuthGuard)
 export class ManagerController {
-  constructor(private managerService: ManagerService) {}
+  constructor(
+    private managerService: ManagerService,
+    private billsService: BillsService,
+  ) {}
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Get manager dashboard data' })
@@ -69,5 +73,11 @@ export class ManagerController {
       req.user.email || 'Home Manager',
       body,
     );
+  }
+
+  @Get('bills')
+  @ApiOperation({ summary: 'Get bills pending setup or managed by Haven' })
+  async getManagerBills(@Query('filter') filter: string = 'pending_setup') {
+    return this.billsService.getManagerBills(filter);
   }
 }
