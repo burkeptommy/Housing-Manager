@@ -278,12 +278,22 @@ export class PlaidService {
         (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
       );
 
+      // Detect if this is a check transaction
+      const isCheck = this.isCheckTransaction(txs[0]);
+      const checkPayee = isCheck ? this.extractCheckPayee(txs[0]) : null;
+      const checkNumber = isCheck ? this.extractCheckNumber(txs[0]) : null;
+
+      // Use check payee category if it's a check
+      const finalCategory = isCheck && checkPayee
+        ? this.categorizeCheckPayee(checkPayee)
+        : category;
+
       detectedBills.push({
         householdId,
         accountId,
-        merchantName: txs[0].merchant_name || txs[0].name,
+        merchantName: isCheck && checkPayee ? checkPayee : (txs[0].merchant_name || txs[0].name),
         normalizedName,
-        category,
+        category: finalCategory,
         averageAmount: Math.round(avgAmount * 100) / 100,
         lastAmount: sortedTxs[0].amount,
         frequency,
@@ -294,6 +304,10 @@ export class PlaidService {
         status: 'PENDING',
         transactionIds: txs.map((tx) => tx.transaction_id),
         transactionCount: txs.length,
+        // Check detection fields
+        detectionType: isCheck ? 'RECURRING_CHECK' : 'RECURRING_CHARGE',
+        checkPayee,
+        checkNumber,
       });
     }
 
@@ -383,6 +397,92 @@ export class PlaidService {
     }
 
     return nextDate;
+  }
+
+  /**
+   * Detect if a transaction is a check payment
+   */
+  private isCheckTransaction(tx: any): boolean {
+    const name = (tx.name || '').toLowerCase();
+    const merchantName = (tx.merchant_name || '').toLowerCase();
+
+    // Common check indicators
+    if (name.includes('check') || name.includes('chk')) return true;
+    if (/check\s*#?\d+/i.test(name)) return true;
+    if (/^#?\d{3,6}$/.test(name.trim())) return true; // Check number only
+    if (tx.payment_channel === 'other' && !merchantName) return true;
+
+    return false;
+  }
+
+  /**
+   * Extract payee name from check transaction
+   */
+  private extractCheckPayee(tx: any): string {
+    const name = tx.name || '';
+
+    // Remove check number prefix
+    let payee = name.replace(/^(check\s*#?\d+\s*[-:]?\s*)/i, '');
+    payee = payee.replace(/^#?\d+\s*[-:]?\s*/, '');
+
+    return payee.trim() || 'Unknown Payee';
+  }
+
+  /**
+   * Extract check number from transaction name
+   */
+  private extractCheckNumber(tx: any): string | null {
+    const name = tx.name || '';
+
+    // Look for check number patterns
+    const match = name.match(/(?:check|chk)\s*#?\s*(\d+)/i) || name.match(/^#?(\d{3,6})$/);
+    return match ? match[1] : null;
+  }
+
+  /**
+   * Categorize check payee for checkbook.io integration
+   */
+  private categorizeCheckPayee(payee: string): BillCategory {
+    const name = payee.toLowerCase();
+
+    // Landscaping
+    if (
+      name.includes('landscap') ||
+      name.includes('lawn') ||
+      name.includes('garden') ||
+      name.includes('yard') ||
+      name.includes('tree') ||
+      name.includes('mowing')
+    ) {
+      return 'OTHER_BILL'; // TODO: Add LANDSCAPING category
+    }
+    // Housekeeping
+    if (name.includes('clean') || name.includes('maid') || name.includes('housekeep')) {
+      return 'OTHER_BILL'; // TODO: Add HOUSEKEEPING category
+    }
+    // Pool service
+    if (name.includes('pool')) return 'OTHER_BILL';
+    // Pest control
+    if (name.includes('pest') || name.includes('exterminator')) return 'OTHER_BILL';
+    // HOA
+    if (name.includes('hoa') || name.includes('homeowner') || name.includes('association')) {
+      return 'HOA';
+    }
+    // Childcare
+    if (
+      name.includes('nanny') ||
+      name.includes('childcare') ||
+      name.includes('daycare') ||
+      name.includes('babysit')
+    ) {
+      return 'CHILDCARE';
+    }
+    // Tuition
+    if (name.includes('school') || name.includes('tuition') || name.includes('academy')) {
+      return 'OTHER_BILL';
+    }
+
+    return 'OTHER_BILL';
   }
 
   /**

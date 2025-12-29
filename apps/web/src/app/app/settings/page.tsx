@@ -62,6 +62,7 @@ interface Integration {
   status: 'connected' | 'disconnected' | 'active';
   lastSync?: Date;
   details?: string;
+  href?: string;
 }
 
 // Mock Data
@@ -84,12 +85,13 @@ const mockIntegrations: Integration[] = [
   },
   {
     id: 'plaid',
-    name: 'Plaid',
-    description: 'Financial data for House Wallet',
+    name: 'Connected Banks',
+    description: 'Bank connections for bill detection',
     icon: Building,
     status: 'connected',
     lastSync: new Date(Date.now() - 30 * 60 * 1000),
-    details: 'Chase •••• 4242',
+    details: 'Manage bank connections',
+    href: '/app/money/connect',
   },
   {
     id: 'mapbox',
@@ -525,7 +527,9 @@ export default function SettingsPage() {
                   )}
                   <button
                     onClick={() => {
-                      if (integration.status === 'disconnected') {
+                      if (integration.href) {
+                        window.location.href = integration.href;
+                      } else if (integration.status === 'disconnected') {
                         showToast(`Connecting to ${integration.name}...`);
                       } else {
                         showToast(`Opening ${integration.name} settings`);

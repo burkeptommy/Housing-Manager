@@ -4732,6 +4732,11 @@ model DetectedBill {
   transactionIds  String[]           @default([]) @map("transaction_ids")
   transactionCount Int               @default(0) @map("transaction_count")
 
+  // Check detection (for checkbook.io integration)
+  detectionType   String             @default("RECURRING_CHARGE") @map("detection_type")  // RECURRING_CHARGE or RECURRING_CHECK
+  checkPayee      String?            @map("check_payee")   // Payee name from check
+  checkNumber     String?            @map("check_number")  // Check number if available
+
   createdAt       DateTime           @default(now()) @map("created_at")
   updatedAt       DateTime           @updatedAt @map("updated_at")
 

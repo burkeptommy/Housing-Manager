@@ -229,7 +229,7 @@ export default function BillsPage() {
 
   const handleContinue = () => {
     completeStep('bills');
-    router.push('/onboarding/wizard/systems');
+    router.push('/onboarding/wizard/bank');
   };
 
   const getIcon = (iconName: string) => {

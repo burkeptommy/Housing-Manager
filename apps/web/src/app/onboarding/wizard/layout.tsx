@@ -7,6 +7,7 @@ import { useOnboarding } from '@/context/OnboardingContext';
 const WIZARD_STEPS = [
   { id: 'property', label: 'Property', href: '/onboarding/wizard/property' },
   { id: 'bills', label: 'Bills', href: '/onboarding/wizard/bills' },
+  { id: 'bank', label: 'Bank', href: '/onboarding/wizard/bank' },
   { id: 'systems', label: 'Systems', href: '/onboarding/wizard/systems' },
   { id: 'family', label: 'Family', href: '/onboarding/wizard/family' },
   { id: 'review', label: 'Review', href: '/onboarding/wizard/review' },
