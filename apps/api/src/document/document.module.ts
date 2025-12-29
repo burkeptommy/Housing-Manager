@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MulterModule } from '@nestjs/platform-express';
 import { DocumentController } from './document.controller';
 import { DocumentService } from './document.service';
+import { BillExtractionService } from './bill-extraction.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { FirebaseModule } from '../firebase';
 
@@ -16,7 +17,7 @@ import { FirebaseModule } from '../firebase';
     }),
   ],
   controllers: [DocumentController],
-  providers: [DocumentService],
-  exports: [DocumentService],
+  providers: [DocumentService, BillExtractionService],
+  exports: [DocumentService, BillExtractionService],
 })
 export class DocumentModule {}

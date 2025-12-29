@@ -4720,12 +4720,13 @@ model DetectedBill {
   frequency       BillingFrequency   @default(MONTHLY)
 
   // Timing
-  lastTransactionDate DateTime       @map("last_transaction_date")
+  lastTransactionDate DateTime?      @map("last_transaction_date")
   nextExpectedDate    DateTime?      @map("next_expected_date")
   dayOfMonth          Int?           @map("day_of_month")
 
   // User actions
   status          DetectedBillStatus @default(PENDING)
+  notes           String?            // User notes for manual bills
   linkedBillId    String?            @map("linked_bill_id")
 
   // Transaction history

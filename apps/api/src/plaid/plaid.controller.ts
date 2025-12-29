@@ -12,11 +12,24 @@ import {
 } from '@nestjs/common';
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import { PlaidService } from './plaid.service';
+import { BillSuggestionsService } from './bill-suggestions.service';
+
+interface CreateManualBillDto {
+  name: string;
+  category: string;
+  amount: number;
+  frequency: string;
+  dueDay?: number;
+  notes?: string;
+}
 
 @Controller('plaid')
 @UseGuards(FirebaseAuthGuard)
 export class PlaidController {
-  constructor(private plaidService: PlaidService) {}
+  constructor(
+    private plaidService: PlaidService,
+    private billSuggestionsService: BillSuggestionsService,
+  ) {}
 
   /**
    * Create a link token for Plaid Link
@@ -107,5 +120,32 @@ export class PlaidController {
   @Put('bills/:billId/dismiss')
   async dismissBill(@Param('billId') billId: string) {
     return this.plaidService.dismissBill(billId);
+  }
+
+  /**
+   * Get bill suggestions based on property profile
+   */
+  @Get('bills/household/:householdId/suggestions')
+  async getBillSuggestions(@Param('householdId') householdId: string) {
+    return this.billSuggestionsService.getSuggestedBills(householdId);
+  }
+
+  /**
+   * Get AI-enhanced bill suggestions
+   */
+  @Get('bills/household/:householdId/suggestions/ai')
+  async getAISuggestions(@Param('householdId') householdId: string) {
+    return this.billSuggestionsService.getAISuggestedBills(householdId);
+  }
+
+  /**
+   * Create a manual bill entry
+   */
+  @Post('bills/household/:householdId/manual')
+  async createManualBill(
+    @Param('householdId') householdId: string,
+    @Body() body: CreateManualBillDto,
+  ) {
+    return this.plaidService.createManualBill(householdId, body);
   }
 }

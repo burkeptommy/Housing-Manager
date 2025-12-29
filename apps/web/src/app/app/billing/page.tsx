@@ -61,6 +61,17 @@ type BillCategory =
   | 'pet_care'
   | 'maintenance';
 
+interface BillSuggestion {
+  id: string;
+  category: string;
+  label: string;
+  description: string;
+  estimatedAmount?: { min: number; max: number };
+  frequency: string;
+  reason: string;
+  confidence: number;
+}
+
 type PaymentStatus = 'paid' | 'scheduled' | 'due_soon' | 'overdue' | 'pending';
 
 interface BillItem {
@@ -386,6 +397,42 @@ const generateAuthorizationRequests = (): AuthorizationRequest[] => {
       urgency: 'medium',
       managerNote: 'Recommended after last storm. I obtained 3 quotes - this is the best value ($875 vs $1,200 and $950). Happy to discuss alternatives.',
       managerName: 'Sarah',
+    },
+  ];
+};
+
+// Mock bill suggestions based on property profile
+const generateBillSuggestions = (): BillSuggestion[] => {
+  return [
+    {
+      id: 'sug-1',
+      category: 'SECURITY_MONITORING',
+      label: 'Security Monitoring',
+      description: 'Home security system monitoring',
+      estimatedAmount: { min: 25, max: 60 },
+      frequency: 'MONTHLY',
+      reason: 'Common household expense',
+      confidence: 0.7,
+    },
+    {
+      id: 'sug-2',
+      category: 'SNOW_REMOVAL',
+      label: 'Snow Removal',
+      description: 'Driveway plowing and walkway clearing',
+      estimatedAmount: { min: 50, max: 200 },
+      frequency: 'PER_EVENT',
+      reason: 'Common service in the Northeast',
+      confidence: 0.65,
+    },
+    {
+      id: 'sug-3',
+      category: 'OTHER_BILL',
+      label: 'Home Warranty',
+      description: 'Appliance and system coverage plan',
+      estimatedAmount: { min: 400, max: 800 },
+      frequency: 'ANNUAL',
+      reason: 'Common household expense',
+      confidence: 0.5,
     },
   ];
 };
@@ -740,6 +787,309 @@ function BillCategoryGroup({
   );
 }
 
+// Bill category options for manual entry
+const BILL_CATEGORIES = [
+  { value: 'ELECTRIC', label: 'Electric' },
+  { value: 'GAS', label: 'Gas' },
+  { value: 'WATER_SEWER', label: 'Water/Sewer' },
+  { value: 'TRASH', label: 'Trash/Recycling' },
+  { value: 'INTERNET', label: 'Internet' },
+  { value: 'CELL_PHONE', label: 'Cell Phone' },
+  { value: 'HOME_INSURANCE', label: 'Home Insurance' },
+  { value: 'AUTO_INSURANCE', label: 'Auto Insurance' },
+  { value: 'HOA', label: 'HOA Dues' },
+  { value: 'STREAMING_SERVICE', label: 'Streaming Service' },
+  { value: 'GYM_FITNESS', label: 'Gym/Fitness' },
+  { value: 'POOL_SERVICE', label: 'Pool Service' },
+  { value: 'LAWN_LANDSCAPE', label: 'Lawn/Landscape' },
+  { value: 'PEST_CONTROL', label: 'Pest Control' },
+  { value: 'SECURITY_MONITORING', label: 'Security Monitoring' },
+  { value: 'CHILDCARE', label: 'Childcare' },
+  { value: 'OTHER_BILL', label: 'Other' },
+];
+
+const FREQUENCY_OPTIONS = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'BIWEEKLY', label: 'Bi-weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'QUARTERLY', label: 'Quarterly' },
+  { value: 'SEMI_ANNUAL', label: 'Semi-Annual' },
+  { value: 'ANNUAL', label: 'Annual' },
+];
+
+function ManualBillModal({
+  isOpen,
+  onClose,
+  onSave,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onSave: (data: { name: string; category: string; amount: number; frequency: string; dueDay?: number; notes?: string }) => void;
+}) {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('OTHER_BILL');
+  const [amount, setAmount] = useState('');
+  const [frequency, setFrequency] = useState('MONTHLY');
+  const [dueDay, setDueDay] = useState('');
+  const [notes, setNotes] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !amount) return;
+
+    onSave({
+      name,
+      category,
+      amount: parseFloat(amount),
+      frequency,
+      dueDay: dueDay ? parseInt(dueDay) : undefined,
+      notes: notes || undefined,
+    });
+
+    // Reset form
+    setName('');
+    setCategory('OTHER_BILL');
+    setAmount('');
+    setFrequency('MONTHLY');
+    setDueDay('');
+    setNotes('');
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
+        <div className="flex items-center justify-between p-5 border-b border-warm-200">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-emerald-100 rounded-lg">
+              <Plus className="w-5 h-5 text-emerald-600" />
+            </div>
+            <h2 className="text-lg font-bold text-warm-900">Add Bill Manually</h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-warm-500" />
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          {/* Bill Name */}
+          <div>
+            <label className="block text-sm font-medium text-warm-700 mb-1">Bill Name</label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g., Netflix, AT&T, Pool Service"
+              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              required
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label className="block text-sm font-medium text-warm-700 mb-1">Category</label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
+            >
+              {BILL_CATEGORIES.map((cat) => (
+                <option key={cat.value} value={cat.value}>{cat.label}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Amount and Frequency Row */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-1">Amount</label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400" />
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="0.00"
+                  step="0.01"
+                  min="0"
+                  className="w-full pl-9 pr-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  required
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-warm-700 mb-1">Frequency</label>
+              <select
+                value={frequency}
+                onChange={(e) => setFrequency(e.target.value)}
+                className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
+              >
+                {FREQUENCY_OPTIONS.map((freq) => (
+                  <option key={freq.value} value={freq.value}>{freq.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {/* Due Day */}
+          <div>
+            <label className="block text-sm font-medium text-warm-700 mb-1">
+              Due Day of Month <span className="text-warm-400 font-normal">(optional)</span>
+            </label>
+            <input
+              type="number"
+              value={dueDay}
+              onChange={(e) => setDueDay(e.target.value)}
+              placeholder="e.g., 15"
+              min="1"
+              max="31"
+              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+            />
+          </div>
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-warm-700 mb-1">
+              Notes <span className="text-warm-400 font-normal">(optional)</span>
+            </label>
+            <textarea
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Account number, login info, etc."
+              rows={2}
+              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2.5 border border-warm-300 text-warm-700 rounded-lg font-medium hover:bg-warm-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-4 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors"
+            >
+              Add Bill
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function BillSuggestionsCard({
+  suggestions,
+  onAddSuggestion,
+  onDismissSuggestion,
+  onAddManually,
+}: {
+  suggestions: BillSuggestion[];
+  onAddSuggestion: (suggestion: BillSuggestion) => void;
+  onDismissSuggestion: (id: string) => void;
+  onAddManually: () => void;
+}) {
+  if (suggestions.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Lightbulb className="w-5 h-5 text-amber-600" />
+          </div>
+          <h3 className="font-semibold text-warm-900">Anything We&apos;re Missing?</h3>
+        </div>
+        <p className="text-sm text-warm-600 mb-4">
+          Looks like we&apos;ve captured all your bills! If there&apos;s something we missed, add it manually.
+        </p>
+        <button
+          onClick={onAddManually}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="text-sm font-medium">Add Bill Manually</span>
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-warm-200 shadow-sm overflow-hidden">
+      <div className="p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-warm-200">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Lightbulb className="w-5 h-5 text-amber-600" />
+          </div>
+          <div>
+            <h3 className="font-semibold text-warm-900">Anything We&apos;re Missing?</h3>
+            <p className="text-sm text-warm-600">Based on your home profile, you might have these bills</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-3">
+        {suggestions.map((suggestion) => (
+          <div
+            key={suggestion.id}
+            className="p-4 bg-warm-50 rounded-xl border border-warm-100"
+          >
+            <div className="flex items-start justify-between mb-2">
+              <div>
+                <div className="font-medium text-warm-900">{suggestion.label}</div>
+                <div className="text-sm text-warm-500">{suggestion.description}</div>
+              </div>
+              {suggestion.estimatedAmount && (
+                <div className="text-right">
+                  <div className="text-sm font-medium text-warm-700">
+                    {formatCurrency(suggestion.estimatedAmount.min)} - {formatCurrency(suggestion.estimatedAmount.max)}
+                  </div>
+                  <div className="text-xs text-warm-400">/{suggestion.frequency.toLowerCase()}</div>
+                </div>
+              )}
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <span className="text-xs text-warm-400 flex items-center gap-1">
+                <Info className="w-3 h-3" />
+                {suggestion.reason}
+              </span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => onDismissSuggestion(suggestion.id)}
+                  className="px-3 py-1.5 text-xs font-medium text-warm-500 hover:text-warm-700 transition-colors"
+                >
+                  Dismiss
+                </button>
+                <button
+                  onClick={() => onAddSuggestion(suggestion)}
+                  className="px-3 py-1.5 text-xs font-medium bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+                >
+                  Add This Bill
+                </button>
+              </div>
+            </div>
+          </div>
+        ))}
+
+        <button
+          onClick={onAddManually}
+          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors mt-2"
+        >
+          <Plus className="w-4 h-4" />
+          <span className="text-sm font-medium">Add Different Bill</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ============================================================================
 // MAIN PAGE
 // ============================================================================
@@ -748,12 +1098,14 @@ export default function BillingPage() {
   const [bills] = useState<BillItem[]>(generateMockBills);
   const [authRequests, setAuthRequests] = useState<AuthorizationRequest[]>(generateAuthorizationRequests);
   const [mortgage] = useState<MortgageDetails>(MOCK_MORTGAGE);
+  const [billSuggestions, setBillSuggestions] = useState<BillSuggestion[]>(generateBillSuggestions);
 
   const [showConfetti, setShowConfetti] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [showStatementModal, setShowStatementModal] = useState(false);
   const [showThresholdModal, setShowThresholdModal] = useState(false);
   const [showHowItWorksModal, setShowHowItWorksModal] = useState(false);
+  const [showManualBillModal, setShowManualBillModal] = useState(false);
   const [trustThreshold, setTrustThreshold] = useState(200);
   const [tempThreshold, setTempThreshold] = useState(200);
 
@@ -777,6 +1129,22 @@ export default function BillingPage() {
   const handleDecline = useCallback((id: string) => {
     setAuthRequests((prev) => prev.filter((req) => req.id !== id));
     showToast('Declined. Sarah has been notified.', 'info');
+  }, []);
+
+  // Handle bill suggestion actions
+  const handleAddSuggestion = useCallback((suggestion: BillSuggestion) => {
+    setBillSuggestions((prev) => prev.filter((s) => s.id !== suggestion.id));
+    showToast(`Added ${suggestion.label} to your bills!`, 'success');
+  }, []);
+
+  const handleDismissSuggestion = useCallback((id: string) => {
+    setBillSuggestions((prev) => prev.filter((s) => s.id !== id));
+    showToast('Suggestion dismissed', 'info');
+  }, []);
+
+  const handleSaveManualBill = useCallback((data: { name: string; category: string; amount: number; frequency: string; dueDay?: number; notes?: string }) => {
+    setShowManualBillModal(false);
+    showToast(`Added ${data.name} to your bills!`, 'success');
   }, []);
 
   // Toggle category expansion
@@ -1081,6 +1449,14 @@ export default function BillingPage() {
 
           {/* Sidebar */}
           <div className="space-y-6">
+            {/* Bill Suggestions */}
+            <BillSuggestionsCard
+              suggestions={billSuggestions}
+              onAddSuggestion={handleAddSuggestion}
+              onDismissSuggestion={handleDismissSuggestion}
+              onAddManually={() => setShowManualBillModal(true)}
+            />
+
             {/* Annual Summary */}
             <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
               <div className="flex items-center gap-3 mb-4">
@@ -1444,6 +1820,13 @@ export default function BillingPage() {
           </div>
         </div>
       )}
+
+      {/* Manual Bill Modal */}
+      <ManualBillModal
+        isOpen={showManualBillModal}
+        onClose={() => setShowManualBillModal(false)}
+        onSave={handleSaveManualBill}
+      />
 
       {/* Animations */}
       <style jsx>{`

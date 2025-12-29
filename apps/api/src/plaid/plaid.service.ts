@@ -678,4 +678,72 @@ export class PlaidService {
 
     return { success: true };
   }
+
+  /**
+   * Create a manual bill entry
+   */
+  async createManualBill(
+    householdId: string,
+    data: {
+      name: string;
+      category: string;
+      amount: number;
+      frequency: string;
+      dueDay?: number;
+      notes?: string;
+    },
+  ) {
+    // Validate category
+    const validCategories = [
+      'ELECTRIC', 'GAS', 'WATER_SEWER', 'TRASH', 'INTERNET', 'CELL_PHONE',
+      'HOME_INSURANCE', 'AUTO_INSURANCE', 'MORTGAGE', 'PROPERTY_TAX',
+      'HOA', 'STREAMING_SERVICE', 'GYM_FITNESS', 'SOFTWARE_SUBSCRIPTION',
+      'PERSONAL_LOAN', 'CHILDCARE', 'OTHER_BILL', 'POOL_SERVICE',
+      'LAWN_LANDSCAPE', 'PEST_CONTROL', 'SECURITY_MONITORING', 'SNOW_REMOVAL',
+    ];
+
+    const category = validCategories.includes(data.category)
+      ? (data.category as BillCategory)
+      : 'OTHER_BILL';
+
+    // Validate frequency
+    const validFrequencies = [
+      'WEEKLY', 'BIWEEKLY', 'MONTHLY', 'QUARTERLY', 'SEMI_ANNUAL', 'ANNUAL', 'IRREGULAR',
+    ];
+
+    const frequency = validFrequencies.includes(data.frequency)
+      ? (data.frequency as BillingFrequency)
+      : 'MONTHLY';
+
+    // Calculate next expected date based on due day
+    let nextExpectedDate: Date | null = null;
+    if (data.dueDay && data.dueDay >= 1 && data.dueDay <= 31) {
+      const today = new Date();
+      nextExpectedDate = new Date(today.getFullYear(), today.getMonth(), data.dueDay);
+      if (nextExpectedDate <= today) {
+        nextExpectedDate.setMonth(nextExpectedDate.getMonth() + 1);
+      }
+    }
+
+    const bill = await this.prisma.detectedBill.create({
+      data: {
+        householdId,
+        merchantName: data.name,
+        normalizedName: data.name.toLowerCase().replace(/[^a-z0-9]/g, ''),
+        category,
+        averageAmount: data.amount,
+        lastAmount: data.amount,
+        frequency,
+        dayOfMonth: data.dueDay || null,
+        nextExpectedDate,
+        status: 'CONFIRMED',
+        transactionIds: [],
+        transactionCount: 0,
+        detectionType: 'MANUAL',
+        notes: data.notes || null,
+      },
+    });
+
+    return bill;
+  }
 }
