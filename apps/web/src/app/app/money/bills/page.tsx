@@ -11,6 +11,8 @@ import {
   Building2,
   Calendar,
   DollarSign,
+  FileCheck,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -25,6 +27,8 @@ interface DetectedBill {
   nextExpectedDate: string;
   status: string;
   transactionCount: number;
+  detectionType: string;
+  checkPayee: string | null;
   account: {
     name: string;
     mask: string;
@@ -47,10 +51,16 @@ const categoryLabels: Record<string, string> = {
   STREAMING_SERVICE: 'Streaming',
   GYM_FITNESS: 'Gym',
   CHILDCARE: 'Childcare',
+  NANNY: 'Nanny',
+  SCHOOL_TUITION: 'Tuition',
   PERSONAL_LOAN: 'Loan',
   CREDIT_CARD: 'Credit Card',
   HOA: 'HOA',
   PROPERTY_TAX: 'Property Tax',
+  SECURITY_MONITORING: 'Security',
+  LAWN_LANDSCAPE: 'Landscaping',
+  POOL_SERVICE: 'Pool Service',
+  HOUSE_CLEANING: 'Cleaning',
   OTHER_BILL: 'Other',
 };
 
@@ -261,24 +271,44 @@ export default function BillsReviewPage() {
               }`}
             >
               <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                  <Receipt className="w-6 h-6 text-gray-600" />
+                <div
+                  className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    bill.detectionType === 'RECURRING_CHECK'
+                      ? 'bg-amber-100'
+                      : 'bg-gray-100'
+                  }`}
+                >
+                  {bill.detectionType === 'RECURRING_CHECK' ? (
+                    <FileCheck className="w-6 h-6 text-amber-600" />
+                  ) : (
+                    <CreditCard className="w-6 h-6 text-gray-600" />
+                  )}
                 </div>
 
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <h3 className="font-medium text-gray-900">
                       {bill.merchantName}
                     </h3>
                     <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
                       {categoryLabels[bill.category] || bill.category}
                     </span>
+                    {bill.detectionType === 'RECURRING_CHECK' && (
+                      <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded">
+                        Check
+                      </span>
+                    )}
                     {bill.status === 'CONFIRMED' && (
                       <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded">
                         Confirmed
                       </span>
                     )}
                   </div>
+                  {bill.checkPayee && bill.checkPayee !== bill.merchantName && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      Payee: {bill.checkPayee}
+                    </p>
+                  )}
                   <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
                     <span className="flex items-center gap-1">
                       <DollarSign className="w-4 h-4" />$

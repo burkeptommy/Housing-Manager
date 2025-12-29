@@ -644,6 +644,660 @@ function generateMaintenanceTasks(
   return tasks;
 }
 
+// ============================================================================
+// DEMO DOCUMENTS FOR BURKE HOUSEHOLD
+// ============================================================================
+
+async function seedDocuments(householdId: string, userId: string) {
+  console.log('📄 Seeding demo documents...');
+
+  // First check if documents already exist
+  const existingCount = await prisma.document.count({ where: { householdId } });
+  if (existingCount > 0) {
+    console.log(`  ⏭️  Skipping - ${existingCount} documents already exist`);
+    return;
+  }
+
+  const documents = [
+    // Property Documents
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'deed-38-bedford-rd.pdf',
+      originalName: 'Property Deed - 38 Bedford Road.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 245000,
+      storageUrl: 'demo/deed-38-bedford-rd.pdf',
+      storagePath: 'demo/deed-38-bedford-rd.pdf',
+      category: 'PROPERTY' as const,
+      title: 'Property Deed',
+      description: 'Warranty deed for 38 Bedford Road, Greenwich CT',
+      tags: ['deed', 'property', 'legal'],
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'survey-2019.pdf',
+      originalName: 'Property Survey 2019.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 1250000,
+      storageUrl: 'demo/survey-2019.pdf',
+      storagePath: 'demo/survey-2019.pdf',
+      category: 'PROPERTY' as const,
+      title: 'Property Survey',
+      description: '2019 property survey showing boundaries and easements',
+      tags: ['survey', 'property', 'boundaries'],
+    },
+
+    // Insurance Documents
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'home-insurance-chubb.pdf',
+      originalName: 'Chubb Home Insurance Policy.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 890000,
+      storageUrl: 'demo/home-insurance-chubb.pdf',
+      storagePath: 'demo/home-insurance-chubb.pdf',
+      category: 'INSURANCE' as const,
+      title: 'Home Insurance Policy',
+      description: 'Chubb homeowners insurance - Policy #CHB-2024-Burke',
+      tags: ['insurance', 'home', 'chubb'],
+      expiresAt: new Date('2025-06-15'),
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'umbrella-policy.pdf',
+      originalName: 'Umbrella Liability Policy.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 456000,
+      storageUrl: 'demo/umbrella-policy.pdf',
+      storagePath: 'demo/umbrella-policy.pdf',
+      category: 'INSURANCE' as const,
+      title: 'Umbrella Liability Policy',
+      description: '$2M umbrella coverage',
+      tags: ['insurance', 'umbrella', 'liability'],
+      expiresAt: new Date('2025-06-15'),
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'auto-insurance-tesla.pdf',
+      originalName: 'Tesla Model Y Insurance.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 234000,
+      storageUrl: 'demo/auto-insurance-tesla.pdf',
+      storagePath: 'demo/auto-insurance-tesla.pdf',
+      category: 'INSURANCE' as const,
+      title: 'Auto Insurance - Tesla Model Y',
+      description: 'State Farm auto policy for 2023 Tesla Model Y',
+      tags: ['insurance', 'auto', 'tesla'],
+      expiresAt: new Date('2025-03-01'),
+    },
+
+    // Warranties
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'hvac-warranty.pdf',
+      originalName: 'Carrier HVAC Warranty.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 123000,
+      storageUrl: 'demo/hvac-warranty.pdf',
+      storagePath: 'demo/hvac-warranty.pdf',
+      category: 'WARRANTY' as const,
+      title: 'HVAC System Warranty',
+      description: 'Carrier furnace and AC - 10 year parts warranty',
+      tags: ['warranty', 'hvac', 'carrier'],
+      expiresAt: new Date('2028-09-15'),
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'roof-warranty.pdf',
+      originalName: 'GAF Roof Warranty.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 189000,
+      storageUrl: 'demo/roof-warranty.pdf',
+      storagePath: 'demo/roof-warranty.pdf',
+      category: 'WARRANTY' as const,
+      title: 'Roof Warranty',
+      description: 'GAF Timberline HDZ shingles - 25 year warranty',
+      tags: ['warranty', 'roof', 'gaf'],
+      expiresAt: new Date('2042-05-20'),
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'appliance-warranty-subzero.pdf',
+      originalName: 'Sub-Zero Refrigerator Warranty.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 98000,
+      storageUrl: 'demo/appliance-warranty-subzero.pdf',
+      storagePath: 'demo/appliance-warranty-subzero.pdf',
+      category: 'WARRANTY' as const,
+      title: 'Sub-Zero Refrigerator Warranty',
+      description: 'Sub-Zero 48" built-in refrigerator - 5 year full warranty',
+      tags: ['warranty', 'appliance', 'subzero', 'refrigerator'],
+      expiresAt: new Date('2026-11-10'),
+    },
+
+    // Manuals
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'pool-manual.pdf',
+      originalName: 'Pool System Manual.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 2340000,
+      storageUrl: 'demo/pool-manual.pdf',
+      storagePath: 'demo/pool-manual.pdf',
+      category: 'MANUAL' as const,
+      title: 'Pool System Manual',
+      description: 'Hayward pool pump, filter, and salt system manual',
+      tags: ['manual', 'pool', 'hayward'],
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'generator-manual.pdf',
+      originalName: 'Generac Generator Manual.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 3450000,
+      storageUrl: 'demo/generator-manual.pdf',
+      storagePath: 'demo/generator-manual.pdf',
+      category: 'MANUAL' as const,
+      title: 'Whole House Generator Manual',
+      description: 'Generac 22kW whole house generator',
+      tags: ['manual', 'generator', 'generac'],
+    },
+
+    // Tax Documents
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'property-tax-2024.pdf',
+      originalName: '2024 Property Tax Bill.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 156000,
+      storageUrl: 'demo/property-tax-2024.pdf',
+      storagePath: 'demo/property-tax-2024.pdf',
+      category: 'TAX' as const,
+      title: '2024 Property Tax Bill',
+      description: 'Town of Greenwich property tax - Annual bill',
+      tags: ['tax', 'property', '2024'],
+    },
+
+    // Contracts
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'landscaping-contract.pdf',
+      originalName: 'Greenwich Landscaping Contract.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 234000,
+      storageUrl: 'demo/landscaping-contract.pdf',
+      storagePath: 'demo/landscaping-contract.pdf',
+      category: 'CONTRACT' as const,
+      title: 'Landscaping Service Contract',
+      description: 'Weekly lawn maintenance and seasonal plantings',
+      tags: ['contract', 'landscaping', 'service'],
+      expiresAt: new Date('2025-12-31'),
+    },
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'pool-service-contract.pdf',
+      originalName: 'Crystal Clear Pools Contract.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 178000,
+      storageUrl: 'demo/pool-service-contract.pdf',
+      storagePath: 'demo/pool-service-contract.pdf',
+      category: 'CONTRACT' as const,
+      title: 'Pool Service Contract',
+      description: 'Weekly pool maintenance April-October',
+      tags: ['contract', 'pool', 'service'],
+      expiresAt: new Date('2025-10-31'),
+    },
+
+    // Permits
+    {
+      householdId,
+      uploadedById: userId,
+      fileName: 'pool-house-permit.pdf',
+      originalName: 'Pool House Building Permit.pdf',
+      mimeType: 'application/pdf',
+      fileSize: 567000,
+      storageUrl: 'demo/pool-house-permit.pdf',
+      storagePath: 'demo/pool-house-permit.pdf',
+      category: 'PERMIT' as const,
+      title: 'Pool House Building Permit',
+      description: 'Town of Greenwich building permit #2022-4532',
+      tags: ['permit', 'building', 'pool house'],
+    },
+  ];
+
+  for (const doc of documents) {
+    await prisma.document.create({ data: doc });
+  }
+
+  console.log(`  ✅ Created ${documents.length} demo documents`);
+}
+
+// ============================================================================
+// DEMO PLAID CONNECTION FOR BURKE HOUSEHOLD
+// ============================================================================
+
+async function seedPlaidData(householdId: string) {
+  console.log('🏦 Seeding demo Plaid data...');
+
+  // Check if Plaid connections already exist
+  const existingConnections = await prisma.plaidConnection.count({ where: { householdId } });
+  if (existingConnections > 0) {
+    console.log(`  ⏭️  Skipping - ${existingConnections} connections already exist`);
+    return;
+  }
+
+  // Create demo bank connection (Chase)
+  const chaseConnection = await prisma.plaidConnection.create({
+    data: {
+      householdId,
+      accessToken: 'demo-access-token-chase',
+      itemId: 'demo-item-chase',
+      institutionId: 'ins_3',
+      institutionName: 'Chase',
+      status: 'ACTIVE',
+      lastSyncedAt: new Date(),
+    },
+  });
+
+  // Create demo accounts
+  const checkingAccount = await prisma.plaidAccount.create({
+    data: {
+      connectionId: chaseConnection.id,
+      plaidAccountId: 'demo-chase-checking',
+      name: 'Chase Total Checking',
+      officialName: 'TOTAL CHECKING',
+      type: 'depository',
+      subtype: 'checking',
+      mask: '4823',
+      currentBalance: 45678.92,
+      availableBalance: 44500.0,
+    },
+  });
+
+  const savingsAccount = await prisma.plaidAccount.create({
+    data: {
+      connectionId: chaseConnection.id,
+      plaidAccountId: 'demo-chase-savings',
+      name: 'Chase Savings',
+      officialName: 'CHASE SAVINGS',
+      type: 'depository',
+      subtype: 'savings',
+      mask: '9156',
+      currentBalance: 125000.0,
+      availableBalance: 125000.0,
+    },
+  });
+
+  // Create second bank connection (Bank of America Credit Card)
+  const boaConnection = await prisma.plaidConnection.create({
+    data: {
+      householdId,
+      accessToken: 'demo-access-token-boa',
+      itemId: 'demo-item-boa',
+      institutionId: 'ins_1',
+      institutionName: 'Bank of America',
+      status: 'ACTIVE',
+      lastSyncedAt: new Date(),
+    },
+  });
+
+  const creditCardAccount = await prisma.plaidAccount.create({
+    data: {
+      connectionId: boaConnection.id,
+      plaidAccountId: 'demo-boa-cc',
+      name: 'Bank of America Credit Card',
+      officialName: 'CUSTOMIZED CASH REWARDS',
+      type: 'credit',
+      subtype: 'credit card',
+      mask: '7721',
+      currentBalance: 4523.67,
+      availableBalance: null,
+    },
+  });
+
+  console.log('  ✅ Created 2 demo bank connections with 4 accounts');
+
+  // Create detected bills
+  const detectedBills = [
+    // Recurring Charges (ACH/Card)
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Chase Mortgage',
+      normalizedName: 'chasemortgage',
+      category: 'MORTGAGE' as const,
+      averageAmount: 8500.0,
+      lastAmount: 8500.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-1', 'demo-tx-2', 'demo-tx-3'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Town of Greenwich Tax',
+      normalizedName: 'greenwichtax',
+      category: 'PROPERTY_TAX' as const,
+      averageAmount: 6300.0,
+      lastAmount: 6300.0,
+      frequency: BillingFrequency.QUARTERLY,
+      lastTransactionDate: new Date('2024-10-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-4', 'demo-tx-5'],
+      transactionCount: 4,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Chubb Insurance',
+      normalizedName: 'chubbinsurance',
+      category: 'HOME_INSURANCE' as const,
+      averageAmount: 450.0,
+      lastAmount: 450.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-15'),
+      nextExpectedDate: new Date('2025-01-15'),
+      dayOfMonth: 15,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-6', 'demo-tx-7', 'demo-tx-8'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Eversource Electric',
+      normalizedName: 'eversourceelectric',
+      category: 'ELECTRIC' as const,
+      averageAmount: 380.0,
+      lastAmount: 412.34,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-18'),
+      nextExpectedDate: new Date('2025-01-18'),
+      dayOfMonth: 18,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-9', 'demo-tx-10', 'demo-tx-11'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Eversource Gas',
+      normalizedName: 'eversourcegas',
+      category: 'GAS' as const,
+      averageAmount: 180.0,
+      lastAmount: 156.78,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-18'),
+      nextExpectedDate: new Date('2025-01-18'),
+      dayOfMonth: 18,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-12', 'demo-tx-13', 'demo-tx-14'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Aquarion Water',
+      normalizedName: 'aquarionwater',
+      category: 'WATER_SEWER' as const,
+      averageAmount: 85.0,
+      lastAmount: 92.45,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-10'),
+      nextExpectedDate: new Date('2025-01-10'),
+      dayOfMonth: 10,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-15', 'demo-tx-16', 'demo-tx-17'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Optimum',
+      normalizedName: 'optimum',
+      category: 'INTERNET' as const,
+      averageAmount: 120.0,
+      lastAmount: 119.99,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-05'),
+      nextExpectedDate: new Date('2025-01-05'),
+      dayOfMonth: 5,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-18', 'demo-tx-19', 'demo-tx-20'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Verizon Wireless',
+      normalizedName: 'verizonwireless',
+      category: 'CELL_PHONE' as const,
+      averageAmount: 280.0,
+      lastAmount: 284.56,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-22'),
+      nextExpectedDate: new Date('2025-01-22'),
+      dayOfMonth: 22,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-21', 'demo-tx-22', 'demo-tx-23'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'ADT Security',
+      normalizedName: 'adtsecurity',
+      category: 'SECURITY_MONITORING' as const,
+      averageAmount: 65.0,
+      lastAmount: 64.99,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-24', 'demo-tx-25', 'demo-tx-26'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Greenwich Country Day School',
+      normalizedName: 'greenwichcountryday',
+      category: 'SCHOOL_TUITION' as const,
+      averageAmount: 4500.0,
+      lastAmount: 4500.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-27', 'demo-tx-28', 'demo-tx-29'],
+      transactionCount: 10,
+    },
+
+    // Credit Card Subscriptions
+    {
+      householdId,
+      accountId: creditCardAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Netflix',
+      normalizedName: 'netflix',
+      category: 'STREAMING_SERVICE' as const,
+      averageAmount: 22.99,
+      lastAmount: 22.99,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-15'),
+      nextExpectedDate: new Date('2025-01-15'),
+      dayOfMonth: 15,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-30', 'demo-tx-31', 'demo-tx-32'],
+      transactionCount: 24,
+    },
+    {
+      householdId,
+      accountId: creditCardAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Spotify',
+      normalizedName: 'spotify',
+      category: 'STREAMING_SERVICE' as const,
+      averageAmount: 16.99,
+      lastAmount: 16.99,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-08'),
+      nextExpectedDate: new Date('2025-01-08'),
+      dayOfMonth: 8,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-33', 'demo-tx-34', 'demo-tx-35'],
+      transactionCount: 36,
+    },
+    {
+      householdId,
+      accountId: creditCardAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Disney+',
+      normalizedName: 'disneyplus',
+      category: 'STREAMING_SERVICE' as const,
+      averageAmount: 13.99,
+      lastAmount: 13.99,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-20'),
+      nextExpectedDate: new Date('2025-01-20'),
+      dayOfMonth: 20,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-tx-36', 'demo-tx-37', 'demo-tx-38'],
+      transactionCount: 18,
+    },
+
+    // CHECK PAYMENTS (Critical for checkbook.io demo)
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHECK',
+      merchantName: 'Greenwich Landscaping LLC',
+      normalizedName: 'greenwichlandscaping',
+      category: 'LAWN_LANDSCAPE' as const,
+      checkPayee: 'Greenwich Landscaping LLC',
+      averageAmount: 800.0,
+      lastAmount: 800.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-chk-1', 'demo-chk-2', 'demo-chk-3'],
+      transactionCount: 12,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHECK',
+      merchantName: 'Maria Garcia',
+      normalizedName: 'mariagarcia',
+      category: 'NANNY' as const,
+      checkPayee: 'Maria Garcia',
+      averageAmount: 1500.0,
+      lastAmount: 1500.0,
+      frequency: BillingFrequency.WEEKLY,
+      lastTransactionDate: new Date('2024-12-27'),
+      nextExpectedDate: new Date('2025-01-03'),
+      dayOfMonth: null,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-chk-4', 'demo-chk-5', 'demo-chk-6', 'demo-chk-7'],
+      transactionCount: 52,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHECK',
+      merchantName: 'Crystal Clear Pools',
+      normalizedName: 'crystalclearpools',
+      category: 'POOL_SERVICE' as const,
+      checkPayee: 'Crystal Clear Pools',
+      averageAmount: 350.0,
+      lastAmount: 350.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-10-01'),
+      nextExpectedDate: new Date('2025-04-01'),
+      dayOfMonth: 1,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-chk-8', 'demo-chk-9', 'demo-chk-10'],
+      transactionCount: 7,
+    },
+    {
+      householdId,
+      accountId: checkingAccount.id,
+      detectionType: 'RECURRING_CHECK',
+      merchantName: "Ana's Cleaning Service",
+      normalizedName: 'anascleaning',
+      category: 'HOUSE_CLEANING' as const,
+      checkPayee: 'Ana Rodriguez',
+      averageAmount: 300.0,
+      lastAmount: 300.0,
+      frequency: BillingFrequency.BIWEEKLY,
+      lastTransactionDate: new Date('2024-12-20'),
+      nextExpectedDate: new Date('2025-01-03'),
+      dayOfMonth: null,
+      status: 'CONFIRMED' as const,
+      transactionIds: ['demo-chk-11', 'demo-chk-12', 'demo-chk-13'],
+      transactionCount: 26,
+    },
+
+    // Pending bill for demo (user hasn't confirmed yet)
+    {
+      householdId,
+      accountId: creditCardAccount.id,
+      detectionType: 'RECURRING_CHARGE',
+      merchantName: 'Equinox Greenwich',
+      normalizedName: 'equinoxgreenwich',
+      category: 'GYM_FITNESS' as const,
+      averageAmount: 295.0,
+      lastAmount: 295.0,
+      frequency: BillingFrequency.MONTHLY,
+      lastTransactionDate: new Date('2024-12-01'),
+      nextExpectedDate: new Date('2025-01-01'),
+      dayOfMonth: 1,
+      status: 'PENDING' as const,
+      transactionIds: ['demo-tx-39', 'demo-tx-40'],
+      transactionCount: 6,
+    },
+  ];
+
+  for (const bill of detectedBills) {
+    await prisma.detectedBill.create({ data: bill });
+  }
+
+  console.log(`  ✅ Created ${detectedBills.length} detected bills (including 4 check payments)`);
+}
+
 async function main() {
   console.log('🌱 Starting database seed...');
 
@@ -2051,8 +2705,8 @@ async function main() {
   console.log('');
   console.log('🔧 Setting up Handyman work orders for Mike...');
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const handymanToday = new Date();
+  handymanToday.setHours(0, 0, 0, 0);
 
   // Handyman Task 1: ASSIGNED - Smoke detector batteries (today)
   await prisma.workOrder.upsert({
@@ -2068,8 +2722,8 @@ async function main() {
       status: WorkOrderStatus.ASSIGNED,
       isConciergeRequest: true,
       billingType: 'INCLUSIVE',
-      scheduledStart: new Date(today.getTime() + 9 * 60 * 60 * 1000), // Today at 9am
-      scheduledEnd: new Date(today.getTime() + 10 * 60 * 60 * 1000), // 1 hour
+      scheduledStart: new Date(handymanToday.getTime() + 9 * 60 * 60 * 1000), // Today at 9am
+      scheduledEnd: new Date(handymanToday.getTime() + 10 * 60 * 60 * 1000), // 1 hour
       estimatedCost: 0, // Included in monthly fee
       serviceArea: 'Greenwich',
     },
@@ -2090,8 +2744,8 @@ async function main() {
       status: WorkOrderStatus.ASSIGNED,
       isConciergeRequest: true,
       billingType: 'INCLUSIVE',
-      scheduledStart: new Date(today.getTime() + 10.5 * 60 * 60 * 1000), // Today at 10:30am
-      scheduledEnd: new Date(today.getTime() + 11 * 60 * 60 * 1000), // 30 min
+      scheduledStart: new Date(handymanToday.getTime() + 10.5 * 60 * 60 * 1000), // Today at 10:30am
+      scheduledEnd: new Date(handymanToday.getTime() + 11 * 60 * 60 * 1000), // 30 min
       estimatedCost: 0,
       serviceArea: 'Greenwich',
     },
@@ -2112,9 +2766,9 @@ async function main() {
       status: WorkOrderStatus.IN_PROGRESS,
       isConciergeRequest: true,
       billingType: 'INCLUSIVE',
-      scheduledStart: new Date(today.getTime() + 11.5 * 60 * 60 * 1000), // Today at 11:30am
-      scheduledEnd: new Date(today.getTime() + 12.5 * 60 * 60 * 1000), // 1 hour
-      checkInAt: new Date(today.getTime() + 11.5 * 60 * 60 * 1000), // Checked in at start
+      scheduledStart: new Date(handymanToday.getTime() + 11.5 * 60 * 60 * 1000), // Today at 11:30am
+      scheduledEnd: new Date(handymanToday.getTime() + 12.5 * 60 * 60 * 1000), // 1 hour
+      checkInAt: new Date(handymanToday.getTime() + 11.5 * 60 * 60 * 1000), // Checked in at start
       checkInLatitude: 41.0534,
       checkInLongitude: -73.5387,
       estimatedCost: 0,
@@ -2730,6 +3384,12 @@ async function main() {
   });
   console.log(`✅ Created pool question conversation (3 messages, CLOSED)`);
 
+  // ============================================================================
+  // SEED DEMO DOCUMENTS AND PLAID DATA FOR BOB'S HOUSEHOLD
+  // ============================================================================
+  await seedDocuments(demoHousehold.id, homeownerBob.id);
+  await seedPlaidData(demoHousehold.id);
+
   console.log('');
   console.log('  Conversation Demo Summary:');
   console.log('    - 3 conversations between Bob and Sarah');
@@ -2802,6 +3462,9 @@ async function main() {
   console.log('  - Features: pool, horse barn, GRTA trails, generator, septic');
   console.log(`  - ${billAccountsData.length} bill accounts configured`);
   console.log(`  - ${maintenanceTasks.length} maintenance tasks for 12 months`);
+  console.log('  - 14 demo documents (deed, insurance, warranties, manuals)');
+  console.log('  - 2 bank connections (Chase + Bank of America)');
+  console.log('  - 18 detected bills (~$24,759/month incl. 4 check payments)');
   console.log('');
   console.log('  Malibu Mansion (CA - Multi-property demo):');
   console.log('    Owner:    Bob Burke (bob@example.com)');
