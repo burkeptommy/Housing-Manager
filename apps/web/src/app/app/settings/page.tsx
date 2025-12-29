@@ -75,38 +75,31 @@ const mockInvoices: Invoice[] = [
 
 const mockIntegrations: Integration[] = [
   {
+    id: 'plaid',
+    name: 'Connected Banks',
+    description: 'Bank connections for automatic bill detection',
+    icon: Building,
+    status: 'connected',
+    lastSync: new Date(Date.now() - 30 * 60 * 1000),
+    details: 'Chase, Bank of America',
+    href: '/app/money/connect',
+  },
+  {
     id: 'google-calendar',
     name: 'Google Calendar',
     description: 'Sync family events to Haven Calendar',
     icon: Calendar,
     status: 'connected',
     lastSync: new Date(Date.now() - 2 * 60 * 60 * 1000),
-    details: 'miller.family@gmail.com',
-  },
-  {
-    id: 'plaid',
-    name: 'Connected Banks',
-    description: 'Bank connections for bill detection',
-    icon: Building,
-    status: 'connected',
-    lastSync: new Date(Date.now() - 30 * 60 * 1000),
-    details: 'Manage bank connections',
-    href: '/app/money/connect',
-  },
-  {
-    id: 'mapbox',
-    name: 'Mapbox',
-    description: 'Maps and location services',
-    icon: Map,
-    status: 'active',
+    details: 'morrison.family@gmail.com',
   },
   {
     id: 'email-forwarding',
     name: 'Email Forwarding',
-    description: 'Forward bills to your Manager',
+    description: 'Forward bills and documents to your Manager',
     icon: Mail,
     status: 'connected',
-    details: 'miller-house@haven-mail.com',
+    details: 'morrison-home@haven-mail.com',
   },
 ];
 
@@ -136,6 +129,9 @@ export default function SettingsPage() {
   const [showUpdateCardModal, setShowUpdateCardModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
+  const [helpMessage, setHelpMessage] = useState('');
 
   // Toast State
   const [toast, setToast] = useState<{ message: string; visible: boolean }>({ message: '', visible: false });
@@ -458,6 +454,37 @@ export default function SettingsPage() {
     </div>
   );
 
+  // Integration setup steps
+  const getIntegrationSetupSteps = (id: string): string[] => {
+    switch (id) {
+      case 'plaid':
+        return [
+          'Click "Connect a Bank Account"',
+          'Search for your bank',
+          'Log in with your bank credentials',
+          'Select which accounts to connect',
+          'We\'ll automatically detect your recurring bills',
+        ];
+      case 'google-calendar':
+        return [
+          'Click "Connect Google Calendar"',
+          'Sign in to your Google account',
+          'Grant Haven permission to read/write calendar events',
+          'Select which calendars to sync',
+          'Family events will appear in Haven Calendar',
+        ];
+      case 'email-forwarding':
+        return [
+          'Your unique forwarding address is shown below',
+          'Forward bills, receipts, and documents to this address',
+          'Your Manager will receive and organize them',
+          'Documents appear in your Document Vault automatically',
+        ];
+      default:
+        return [];
+    }
+  };
+
   // Render Integrations Section
   const renderIntegrationsSection = () => (
     <div className="space-y-6">
@@ -476,26 +503,27 @@ export default function SettingsPage() {
                 className="flex items-center justify-between p-4 bg-warm-50 rounded-lg border border-warm-200"
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-white rounded-xl border border-warm-200 flex items-center justify-center">
-                    <Icon className="w-6 h-6 text-warm-600" />
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                    integration.status === 'connected' ? 'bg-green-50' : 'bg-white border border-warm-200'
+                  }`}>
+                    <Icon className={`w-6 h-6 ${integration.status === 'connected' ? 'text-green-600' : 'text-warm-600'}`} />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-warm-900">{integration.name}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full ${
+                      <span className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                         integration.status === 'connected'
                           ? 'bg-green-100 text-green-700'
-                          : integration.status === 'active'
-                          ? 'bg-emerald-100 text-emerald-700'
                           : 'bg-warm-100 text-warm-600'
                       }`}>
+                        {integration.status === 'connected' && <CheckCircle2 className="w-3 h-3" />}
                         {integration.status.charAt(0).toUpperCase() + integration.status.slice(1)}
                       </span>
                     </div>
                     <p className="text-sm text-warm-500">{integration.description}</p>
                     {integration.details && (
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-xs text-warm-400">{integration.details}</span>
+                        <span className="text-xs text-warm-600 font-medium">{integration.details}</span>
                         {integration.id === 'email-forwarding' && (
                           <button
                             onClick={() => {
@@ -529,10 +557,8 @@ export default function SettingsPage() {
                     onClick={() => {
                       if (integration.href) {
                         window.location.href = integration.href;
-                      } else if (integration.status === 'disconnected') {
-                        showToast(`Connecting to ${integration.name}...`);
                       } else {
-                        showToast(`Opening ${integration.name} settings`);
+                        setSelectedIntegration(integration);
                       }
                     }}
                     className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -548,15 +574,28 @@ export default function SettingsPage() {
             );
           })}
         </div>
+      </div>
 
-        {/* Add Integration */}
-        <button
-          onClick={() => showToast('Browse integrations coming soon!')}
-          className="w-full mt-4 flex items-center justify-center gap-2 py-3 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
-        >
-          <Plus className="w-5 h-5" />
-          <span className="font-medium">Add Integration</span>
-        </button>
+      {/* Need Help Section */}
+      <div className="bg-blue-50 rounded-xl border border-blue-200 p-6">
+        <div className="flex items-start gap-4">
+          <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+            <HelpCircle className="w-5 h-5 text-blue-600" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-medium text-warm-900">Need help with integrations?</h3>
+            <p className="text-sm text-warm-600 mt-1">
+              Your Home Manager Sarah can help you set up and troubleshoot any integrations.
+            </p>
+            <button
+              onClick={() => setShowHelpModal(true)}
+              className="mt-3 inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700"
+            >
+              <MessageCircle className="w-4 h-4" />
+              Ask Sarah for Help
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -824,7 +863,7 @@ export default function SettingsPage() {
 
       {/* Toast Notification */}
       {toast.visible && (
-        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-warm-900 text-white rounded-lg shadow-lg z-50 animate-slide-up">
+        <div className="fixed bottom-6 right-6 flex items-center gap-2 px-4 py-3 bg-warm-900 text-white rounded-lg shadow-lg z-[9999] animate-slide-up">
           <CheckCircle2 className="w-5 h-5 text-emerald-400" />
           <span className="font-medium">{toast.message}</span>
         </div>
@@ -975,6 +1014,153 @@ export default function SettingsPage() {
                   }`}
                 >
                   Delete Permanently
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Integration Detail Modal */}
+      {selectedIntegration && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setSelectedIntegration(null)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
+              <div className="flex items-center justify-between p-4 border-b border-warm-200">
+                <div className="flex items-center gap-3">
+                  <selectedIntegration.icon className="w-6 h-6 text-warm-600" />
+                  <h2 className="text-lg font-semibold">{selectedIntegration.name}</h2>
+                </div>
+                <button
+                  onClick={() => setSelectedIntegration(null)}
+                  className="p-1 hover:bg-warm-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                <p className="text-warm-600">{selectedIntegration.description}</p>
+
+                {selectedIntegration.status === 'connected' && selectedIntegration.details && (
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-green-800">
+                      Connected: {selectedIntegration.details}
+                    </p>
+                    {selectedIntegration.lastSync && (
+                      <p className="text-xs text-green-600 mt-1">
+                        Last synced: {getTimeSince(selectedIntegration.lastSync)}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <div>
+                  <h4 className="font-medium text-warm-900 mb-2">How to set up</h4>
+                  <ol className="space-y-2">
+                    {getIntegrationSetupSteps(selectedIntegration.id).map((step, i) => (
+                      <li key={i} className="flex items-start gap-3 text-sm text-warm-600">
+                        <span className="flex-shrink-0 w-5 h-5 bg-warm-100 rounded-full flex items-center justify-center text-xs font-medium text-warm-700">
+                          {i + 1}
+                        </span>
+                        {step}
+                      </li>
+                    ))}
+                  </ol>
+                </div>
+
+                {selectedIntegration.id === 'email-forwarding' && (
+                  <div className="bg-warm-50 rounded-lg p-3">
+                    <p className="text-xs text-warm-500 mb-1">Your forwarding address:</p>
+                    <div className="flex items-center gap-2">
+                      <code className="flex-1 bg-white px-3 py-2 rounded border text-sm font-mono">
+                        morrison-home@haven-mail.com
+                      </code>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText('morrison-home@haven-mail.com');
+                          showToast('Email address copied');
+                        }}
+                        className="px-3 py-2 text-sm bg-warm-100 hover:bg-warm-200 rounded"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex gap-3 p-4 border-t bg-warm-50 rounded-b-xl">
+                <button
+                  onClick={() => setSelectedIntegration(null)}
+                  className="flex-1 px-4 py-2 border border-warm-300 rounded-lg hover:bg-white"
+                >
+                  Close
+                </button>
+                {selectedIntegration.href && (
+                  <a
+                    href={selectedIntegration.href}
+                    className="flex-1 px-4 py-2 bg-emerald-600 text-white text-center rounded-lg hover:bg-emerald-700"
+                  >
+                    Manage Connection
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Help Request Modal */}
+      {showHelpModal && (
+        <div className="fixed inset-0 z-[60] overflow-y-auto">
+          <div className="flex min-h-full items-center justify-center p-4">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setShowHelpModal(false)} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
+              <div className="flex items-center justify-between p-4 border-b border-warm-200">
+                <h2 className="text-lg font-semibold">Request Integration Help</h2>
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="p-1 hover:bg-warm-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-4 space-y-4">
+                <p className="text-warm-600">
+                  Tell Sarah what you need help with and she&apos;ll reach out to assist you.
+                </p>
+
+                <textarea
+                  value={helpMessage}
+                  onChange={(e) => setHelpMessage(e.target.value)}
+                  placeholder="I need help connecting my bank account..."
+                  className="w-full px-3 py-2 border border-warm-300 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  rows={4}
+                />
+              </div>
+
+              <div className="flex gap-3 p-4 border-t">
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="flex-1 px-4 py-2 border border-warm-300 rounded-lg hover:bg-warm-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (helpMessage.trim()) {
+                      setShowHelpModal(false);
+                      setHelpMessage('');
+                      showToast('Help request sent! Sarah will reach out shortly.');
+                    }
+                  }}
+                  disabled={!helpMessage.trim()}
+                  className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  Send Request
                 </button>
               </div>
             </div>
