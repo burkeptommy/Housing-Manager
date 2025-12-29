@@ -718,6 +718,67 @@ async function testDocumentVault(): Promise<TestSuite> {
   return { name: 'Document Vault', tests };
 }
 
+async function testPlaidIntegration(): Promise<TestSuite> {
+  const tests: TestResult[] = [];
+
+  if (!FIREBASE_API_KEY) {
+    tests.push({
+      name: 'Plaid integration',
+      passed: false,
+      skipped: true,
+      error: 'FIREBASE_API_KEY not set',
+    });
+    return { name: 'Plaid Integration', tests };
+  }
+
+  // Get homeowner token
+  let start = Date.now();
+  const homeownerToken = await getFirebaseToken(CREDENTIALS.homeowner.email, CREDENTIALS.homeowner.password);
+  if (!homeownerToken) {
+    tests.push({
+      name: 'Homeowner login for Plaid',
+      passed: false,
+      error: 'Could not get homeowner token',
+    });
+    return { name: 'Plaid Integration', tests };
+  }
+
+  // Get household ID from /user/me
+  let response = await apiRequest('GET', '/user/me', homeownerToken);
+  const householdId = response.data?.household?.id || response.data?.householdId;
+
+  if (!householdId) {
+    tests.push({
+      name: 'Get household for Plaid',
+      passed: false,
+      error: 'No household ID found',
+    });
+    return { name: 'Plaid Integration', tests };
+  }
+
+  // Test plaid connections endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/plaid/connections/${householdId}`, homeownerToken);
+  tests.push({
+    name: 'GET /plaid/connections/:id',
+    passed: response.status === 200 && Array.isArray(response.data),
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  // Test plaid bills summary endpoint
+  start = Date.now();
+  response = await apiRequest('GET', `/plaid/bills/${householdId}/summary`, homeownerToken);
+  tests.push({
+    name: 'GET /plaid/bills/:id/summary',
+    passed: response.status === 200 && response.data?.totalDetected !== undefined,
+    error: response.status !== 200 ? `HTTP ${response.status}` : undefined,
+    duration: Date.now() - start,
+  });
+
+  return { name: 'Plaid Integration', tests };
+}
+
 async function testDataIntegrity(): Promise<TestSuite> {
   const tests: TestResult[] = [];
 
@@ -843,6 +904,11 @@ async function main() {
   const documentSuite = await testDocumentVault();
   documentSuite.tests.forEach(printResult);
   suites.push(documentSuite);
+
+  printHeader('Plaid Integration');
+  const plaidSuite = await testPlaidIntegration();
+  plaidSuite.tests.forEach(printResult);
+  suites.push(plaidSuite);
 
   printHeader('Data Integrity');
   const dataSuite = await testDataIntegrity();

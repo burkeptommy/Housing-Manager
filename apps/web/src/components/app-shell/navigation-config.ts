@@ -15,6 +15,8 @@ import {
   User,
   Menu,
   Search,
+  Building2,
+  Receipt,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -58,6 +60,8 @@ export const sidebarNavigation: NavSection[] = [
     title: 'Financial',
     items: [
       { name: 'Money', href: '/app/billing', icon: DollarSign },
+      { name: 'Banks', href: '/app/money/connect', icon: Building2 },
+      { name: 'Bills', href: '/app/money/bills', icon: Receipt },
       { name: 'Tasks', href: '/app/tasks', icon: ListTodo },
       { name: 'Inventory', href: '/app/inventory', icon: Package },
     ],

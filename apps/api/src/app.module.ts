@@ -45,6 +45,7 @@ import { ActivityModule } from './activity';
 import { DashboardModule } from './dashboard';
 import { StorageModule } from './storage';
 import { DocumentModule } from './document';
+import { PlaidModule } from './plaid';
 
 @Module({
   imports: [
@@ -94,6 +95,7 @@ import { DocumentModule } from './document';
     DashboardModule,
     StorageModule,
     DocumentModule,
+    PlaidModule,
   ],
   controllers: [AppController],
   providers: [AppService],

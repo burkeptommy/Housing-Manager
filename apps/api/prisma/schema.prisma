@@ -253,9 +253,11 @@ enum BillingFrequency {
   MONTHLY
   QUARTERLY
   SEMIANNUALLY
+  SEMI_ANNUAL
   ANNUAL
   PER_VISIT
   PER_JOB
+  IRREGULAR
   OTHER
 }
 
@@ -1010,6 +1012,10 @@ model Household {
 
   // Document Vault
   documents Document[]
+
+  // Plaid Integration
+  plaidConnections PlaidConnection[]
+  detectedBills    DetectedBill[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -4618,4 +4624,118 @@ model Document {
   @@index([category])
   @@index([expiresAt])
   @@map("documents")
+}
+
+// =============================================================================
+// PLAID INTEGRATION
+// =============================================================================
+
+enum PlaidConnectionStatus {
+  ACTIVE
+  ERROR
+  DISCONNECTED
+  PENDING_REAUTH
+}
+
+enum DetectedBillStatus {
+  PENDING   // Awaiting user review
+  CONFIRMED // User confirmed, linked to bill
+  DISMISSED // User said "not a bill"
+  IGNORED   // User wants to ignore
+}
+
+model PlaidConnection {
+  id              String               @id @default(cuid())
+  householdId     String               @map("household_id")
+  household       Household            @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  // Plaid tokens (encrypted in production)
+  accessToken     String               @map("access_token")
+  itemId          String               @map("item_id")
+
+  // Institution info
+  institutionId   String?              @map("institution_id")
+  institutionName String?              @map("institution_name")
+
+  // Connection status
+  status          PlaidConnectionStatus @default(ACTIVE)
+  lastSyncedAt    DateTime?            @map("last_synced_at")
+  errorCode       String?              @map("error_code")
+  errorMessage    String?              @map("error_message")
+
+  // Linked accounts
+  accounts        PlaidAccount[]
+
+  // Audit
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  @@unique([householdId, itemId])
+  @@index([householdId])
+  @@map("plaid_connections")
+}
+
+model PlaidAccount {
+  id               String          @id @default(cuid())
+  connectionId     String          @map("connection_id")
+  connection       PlaidConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+
+  // Plaid account info
+  plaidAccountId   String          @map("plaid_account_id")
+  name             String
+  officialName     String?         @map("official_name")
+  type             String          // checking, savings, credit, etc.
+  subtype          String?
+  mask             String?         // Last 4 digits
+
+  // Balances (optional, refreshed periodically)
+  currentBalance   Float?          @map("current_balance")
+  availableBalance Float?          @map("available_balance")
+
+  // Detected recurring transactions
+  detectedBills    DetectedBill[]
+
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  @@unique([connectionId, plaidAccountId])
+  @@map("plaid_accounts")
+}
+
+model DetectedBill {
+  id              String             @id @default(cuid())
+  householdId     String             @map("household_id")
+  household       Household          @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  accountId       String?            @map("account_id")
+  account         PlaidAccount?      @relation(fields: [accountId], references: [id], onDelete: SetNull)
+
+  // Bill details (detected from transactions)
+  merchantName    String             @map("merchant_name")
+  normalizedName  String             @map("normalized_name")
+  category        BillCategory       @default(OTHER_BILL)
+
+  // Amount pattern
+  averageAmount   Float              @map("average_amount")
+  lastAmount      Float              @map("last_amount")
+  frequency       BillingFrequency   @default(MONTHLY)
+
+  // Timing
+  lastTransactionDate DateTime       @map("last_transaction_date")
+  nextExpectedDate    DateTime?      @map("next_expected_date")
+  dayOfMonth          Int?           @map("day_of_month")
+
+  // User actions
+  status          DetectedBillStatus @default(PENDING)
+  linkedBillId    String?            @map("linked_bill_id")
+
+  // Transaction history
+  transactionIds  String[]           @default([]) @map("transaction_ids")
+  transactionCount Int               @default(0) @map("transaction_count")
+
+  createdAt       DateTime           @default(now()) @map("created_at")
+  updatedAt       DateTime           @updatedAt @map("updated_at")
+
+  @@index([householdId])
+  @@index([status])
+  @@map("detected_bills")
 }
