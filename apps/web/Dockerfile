@@ -106,12 +106,11 @@ RUN adduser --system --uid 1001 nextjs
 
 WORKDIR /app
 
-# Copy necessary files
-COPY --from=builder /app/apps/web/public ./public
-COPY --from=builder /app/apps/web/package.json ./
-
 # Copy standalone build output
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone ./
+
+# Copy public folder and static files to the correct locations
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./apps/web/public
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./apps/web/.next/static
 
 USER nextjs
