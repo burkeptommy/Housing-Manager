@@ -21,9 +21,10 @@ export function DesktopSidebar() {
           <Image
             src="/logo-wordmark-white.svg"
             alt="Haven"
-            width={120}
-            height={32}
+            width={140}
+            height={36}
             priority
+            className="h-8 w-auto"
           />
         </Link>
       </div>

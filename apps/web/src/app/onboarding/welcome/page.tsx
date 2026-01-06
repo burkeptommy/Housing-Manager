@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Eye, EyeOff, Leaf, Check, Shield, Users } from 'lucide-react';
+import Image from 'next/image';
+import { ArrowRight, Eye, EyeOff, Check, Shield, Users } from 'lucide-react';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -136,11 +137,15 @@ export default function OnboardingWelcomePage() {
 
         {/* Logo */}
         <div className="relative z-10">
-          <Link href="/" className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-haven-champagne-500 rounded-xl flex items-center justify-center">
-              <Leaf className="w-5 h-5 text-haven-navy-900" />
-            </div>
-            <span className="text-2xl font-bold">Haven</span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src="/logo-wordmark-white.svg"
+              alt="Haven"
+              width={140}
+              height={36}
+              priority
+              className="h-9 w-auto"
+            />
           </Link>
         </div>
 
@@ -196,11 +201,15 @@ export default function OnboardingWelcomePage() {
         <div className="w-full max-w-md">
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
-            <Link href="/" className="inline-flex items-center gap-3">
-              <div className="w-10 h-10 bg-haven-navy-900 rounded-xl flex items-center justify-center">
-                <Leaf className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-2xl font-bold text-haven-navy-900">Haven</span>
+            <Link href="/" className="inline-flex items-center">
+              <Image
+                src="/logo-wordmark.svg"
+                alt="Haven"
+                width={140}
+                height={36}
+                priority
+                className="h-9 w-auto"
+              />
             </Link>
           </div>
 

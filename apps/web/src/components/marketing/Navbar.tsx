@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Menu, X, Leaf } from 'lucide-react';
+import Image from 'next/image';
+import { Menu, X } from 'lucide-react';
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -34,17 +35,15 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
-              isScrolled ? 'bg-haven-700' : 'bg-white/20'
-            }`}>
-              <Leaf className={`w-5 h-5 ${isScrolled ? 'text-white' : 'text-white'}`} />
-            </div>
-            <span className={`text-2xl font-bold tracking-tight transition-colors ${
-              isScrolled ? 'text-haven-700' : 'text-white'
-            }`}>
-              Haven
-            </span>
+          <Link href="/" className="flex items-center">
+            <Image
+              src={isScrolled ? '/logo-wordmark.svg' : '/logo-wordmark-white.svg'}
+              alt="Haven"
+              width={140}
+              height={36}
+              priority
+              className="h-9 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}

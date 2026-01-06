@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { X, Leaf } from 'lucide-react';
+import { X } from 'lucide-react';
 import { mobileNavigation, sidebarNavigation, sidebarBottomNav } from './navigation-config';
 
 export function MobileBottomNav() {
@@ -83,12 +84,14 @@ export function MobileBottomNav() {
       >
         {/* Drawer Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-haven-600 to-haven-800 flex items-center justify-center shadow-lg shadow-haven-700/20">
-              <Leaf className="w-4 h-4 text-white" />
-            </div>
-            <span className="text-lg font-bold text-white">Haven</span>
-          </div>
+          <Image
+            src="/logo-wordmark-white.svg"
+            alt="Haven"
+            width={120}
+            height={32}
+            priority
+            className="h-7 w-auto"
+          />
           <button
             onClick={() => setDrawerOpen(false)}
             className="p-2 text-white/50 hover:text-white transition-colors"
