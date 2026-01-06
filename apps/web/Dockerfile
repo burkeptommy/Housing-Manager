@@ -23,8 +23,8 @@ COPY packages/core/package.json ./packages/core/
 COPY packages/ui/package.json ./packages/ui/
 COPY packages/config/package.json ./packages/config/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile
+# Install dependencies (skip postinstall as source code isn't copied yet)
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ============================================================================
 # Stage 2: Builder
