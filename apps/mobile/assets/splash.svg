@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1284 2778" width="1284" height="2778">
+  <!-- Navy background - full screen -->
+  <rect width="1284" height="2778" fill="#0a1929"/>
+  
+  <!-- Centered logo -->
+  <g transform="translate(642, 1389)">
+    <!-- H in white -->
+    <g fill="white">
+      <path d="
+        M -152 -104
+        L -60 -104
+        L -60 -90
+        L -96 -90
+        L -96 -14
+        L 96 -14
+        L 96 -90
+        L 60 -90
+        L 60 -104
+        L 152 -104
+        L 152 -90
+        L 124 -90
+        L 124 90
+        L 152 90
+        L 152 104
+        L 60 104
+        L 60 90
+        L 96 90
+        L 96 14
+        L -96 14
+        L -96 90
+        L -60 90
+        L -60 104
+        L -152 104
+        L -152 90
+        L -124 90
+        L -124 -90
+        L -152 -90
+        Z
+      "/>
+    </g>
+    
+    <!-- Champagne roof -->
+    <g fill="#c4a574">
+      <path d="M 0 -160 L -220 -104 L -188 -104 L 0 -132 L 188 -104 L 220 -104 Z"/>
+    </g>
+  </g>
+</svg>

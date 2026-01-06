@@ -1,8 +1,8 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { Leaf } from 'lucide-react';
 import { sidebarNavigation, sidebarBottomNav } from './navigation-config';
 
 export function DesktopSidebar() {
@@ -17,11 +17,14 @@ export function DesktopSidebar() {
     <aside className="hidden lg:flex lg:flex-col lg:w-[260px] lg:fixed lg:inset-y-0 bg-gradient-to-b from-haven-800 to-haven-900">
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-white/10">
-        <Link href="/app" className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-haven-600 to-haven-800 flex items-center justify-center shadow-lg shadow-haven-700/20">
-            <Leaf className="w-5 h-5 text-white" />
-          </div>
-          <span className="text-xl font-bold tracking-tight text-white">Haven</span>
+        <Link href="/app" className="flex items-center">
+          <Image
+            src="/logo-wordmark-white.svg"
+            alt="Haven"
+            width={120}
+            height={32}
+            priority
+          />
         </Link>
       </div>
 

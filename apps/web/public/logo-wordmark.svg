@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 280 60" width="280" height="60">
+  <!-- Transparent background for flexibility -->
+  
+  <!-- Logo icon -->
+  <g transform="translate(30, 32)">
+    <!-- H in navy -->
+    <g fill="#0a1929">
+      <path d="
+        M -19 -13
+        L -7.5 -13
+        L -7.5 -11
+        L -12 -11
+        L -12 -2
+        L 12 -2
+        L 12 -11
+        L 7.5 -11
+        L 7.5 -13
+        L 19 -13
+        L 19 -11
+        L 15.5 -11
+        L 15.5 11
+        L 19 11
+        L 19 13
+        L 7.5 13
+        L 7.5 11
+        L 12 11
+        L 12 2
+        L -12 2
+        L -12 11
+        L -7.5 11
+        L -7.5 13
+        L -19 13
+        L -19 11
+        L -15.5 11
+        L -15.5 -11
+        L -19 -11
+        Z
+      "/>
+    </g>
+    
+    <!-- Champagne roof -->
+    <g fill="#c4a574">
+      <path d="M 0 -20 L -27.5 -13 L -23.5 -13 L 0 -16.5 L 23.5 -13 L 27.5 -13 Z"/>
+    </g>
+  </g>
+  
+  <!-- HAVEN text -->
+  <text x="70" y="40" font-family="'Times New Roman', Georgia, serif" font-size="28" font-weight="400" letter-spacing="5" fill="#0a1929">HAVEN</text>
+</svg>

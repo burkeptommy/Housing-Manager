@@ -103,4 +103,12 @@ export function getApiClient(): ApiClient {
   return apiClient;
 }
 
+/**
+ * React hook to get the API client
+ * Alias for getApiClient() for use in components
+ */
+export function useApi(): ApiClient {
+  return getApiClient();
+}
+
 export { API_BASE_URL };

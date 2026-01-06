@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Navy background - iOS adds rounded corners -->
+  <rect width="1024" height="1024" fill="#0a1929"/>
+  
+  <!-- Large continuous serif H in white - scaled for 1024 -->
+  <g transform="translate(512, 574)" fill="white">
+    <path d="
+      M -389 -266
+      L -154 -266
+      L -154 -230
+      L -246 -230
+      L -246 -36
+      L 246 -36
+      L 246 -230
+      L 154 -230
+      L 154 -266
+      L 389 -266
+      L 389 -230
+      L 318 -230
+      L 318 230
+      L 389 230
+      L 389 266
+      L 154 266
+      L 154 230
+      L 246 230
+      L 246 36
+      L -246 36
+      L -246 230
+      L -154 230
+      L -154 266
+      L -389 266
+      L -389 230
+      L -318 230
+      L -318 -230
+      L -389 -230
+      Z
+    "/>
+  </g>
+  
+  <!-- Champagne roof accent -->
+  <g transform="translate(512, 574)" fill="#c4a574">
+    <path d="M 0 -410 L -563 -266 L -482 -266 L 0 -338 L 482 -266 L 563 -266 Z"/>
+  </g>
+</svg>
