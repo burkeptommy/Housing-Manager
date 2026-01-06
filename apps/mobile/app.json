@@ -7,21 +7,34 @@
     "icon": "./assets/icon.png",
     "scheme": "haven",
     "userInterfaceStyle": "light",
-    "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/splash.png",
       "resizeMode": "contain",
       "backgroundColor": "#0a1929"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.havenhome.app",
-      "buildNumber": "1",
+      "buildNumber": "12",
       "infoPlist": {
-        "NSCameraUsageDescription": "Haven needs camera access to scan documents and take photos of your home.",
+        "NSCameraUsageDescription": "Haven needs camera access to scan documents and take photos for your home manager.",
         "NSPhotoLibraryUsageDescription": "Haven needs photo library access to upload documents and photos.",
-        "NSLocationWhenInUseUsageDescription": "Haven uses your location to provide local service recommendations."
+        "NSFaceIDUsageDescription": "Haven uses Face ID for secure, quick login to your account.",
+        "NSLocationWhenInUseUsageDescription": "Haven uses your location to find local service providers.",
+        "LSApplicationQueriesSchemes": [
+          "plaidlink"
+        ],
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "associatedDomains": [
+        "applinks:havenhome.dev",
+        "applinks:api.havenhome.dev"
+      ],
+      "config": {
+        "usesNonExemptEncryption": false
       }
     },
     "android": {
@@ -40,20 +53,60 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
+      "expo-apple-authentication",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Haven to use Face ID for quick login."
+        }
+      ],
       [
         "expo-image-picker",
         {
-          "photosPermission": "Haven needs photo access to upload documents."
+          "photosPermission": "Haven needs photo access to upload documents.",
+          "cameraPermission": "Haven needs camera access to scan documents."
         }
-      ]
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#c4a574"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Haven uses your location to find local service providers."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ],
+      "expo-asset",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
     },
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "0e7ef088-efd9-4488-9e33-218ee1f341c4"
+      },
+      "router": {
+        "origin": false
       }
+    },
+    "owner": "havenhome",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0e7ef088-efd9-4488-9e33-218ee1f341c4"
     }
   }
 }
