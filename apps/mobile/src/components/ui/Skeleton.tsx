@@ -1,14 +1,5 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, StyleSheet, ViewStyle, DimensionValue } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withRepeat,
-  withTiming,
-  interpolate,
-  Easing,
-} from 'react-native-reanimated';
-import { LinearGradient } from 'expo-linear-gradient';
 import { colors, borderRadius as br, spacing } from '../../lib/theme';
 
 interface SkeletonProps {
@@ -18,36 +9,16 @@ interface SkeletonProps {
   style?: ViewStyle;
 }
 
+/**
+ * Simple skeleton loading placeholder
+ * Uses a static shimmer effect to avoid native module conflicts
+ */
 export function Skeleton({
   width = '100%',
   height = 20,
   borderRadius = br.md,
   style,
 }: SkeletonProps) {
-  const shimmerPosition = useSharedValue(0);
-
-  useEffect(() => {
-    shimmerPosition.value = withRepeat(
-      withTiming(1, {
-        duration: 1200,
-        easing: Easing.inOut(Easing.ease),
-      }),
-      -1,
-      false
-    );
-  }, []);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    const translateX = interpolate(
-      shimmerPosition.value,
-      [0, 1],
-      [-200, 200]
-    );
-    return {
-      transform: [{ translateX }],
-    };
-  });
-
   return (
     <View
       style={[
@@ -55,16 +26,7 @@ export function Skeleton({
         { width, height, borderRadius },
         style,
       ]}
-    >
-      <Animated.View style={[styles.shimmer, animatedStyle]}>
-        <LinearGradient
-          colors={['transparent', 'rgba(255,255,255,0.4)', 'transparent']}
-          start={{ x: 0, y: 0.5 }}
-          end={{ x: 1, y: 0.5 }}
-          style={styles.gradient}
-        />
-      </Animated.View>
-    </View>
+    />
   );
 }
 
@@ -168,18 +130,6 @@ const styles = StyleSheet.create({
   skeleton: {
     backgroundColor: colors.gray[200],
     overflow: 'hidden',
-  },
-  shimmer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '200%',
-  },
-  gradient: {
-    flex: 1,
-    width: '50%',
   },
   card: {
     backgroundColor: colors.white,

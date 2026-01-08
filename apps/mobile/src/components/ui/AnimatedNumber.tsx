@@ -1,15 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet, TextStyle, TextInput } from 'react-native';
-import Animated, {
-  useSharedValue,
-  useAnimatedProps,
-  withTiming,
-  Easing,
-  runOnJS,
-} from 'react-native-reanimated';
+import React, { useEffect, useState, useRef } from 'react';
+import { Text, StyleSheet, TextStyle } from 'react-native';
 import { colors, typography } from '../../lib/theme';
-
-const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 interface AnimatedNumberProps {
   value: number;
@@ -20,6 +11,10 @@ interface AnimatedNumberProps {
   decimals?: number;
 }
 
+/**
+ * Animated number counter using JS-based animation
+ * Simplified version without react-native-reanimated to avoid native module conflicts
+ */
 export function AnimatedNumber({
   value,
   duration = 1000,
@@ -28,33 +23,43 @@ export function AnimatedNumber({
   suffix = '',
   decimals = 0,
 }: AnimatedNumberProps) {
-  const [displayText, setDisplayText] = useState(`${prefix}${value.toFixed(decimals)}${suffix}`);
-  const animatedValue = useSharedValue(0);
-
-  const updateText = (val: number) => {
-    setDisplayText(`${prefix}${val.toFixed(decimals)}${suffix}`);
-  };
+  const [displayValue, setDisplayValue] = useState(0);
+  const startValue = useRef(0);
+  const startTime = useRef(0);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    animatedValue.value = withTiming(value, {
-      duration,
-      easing: Easing.out(Easing.cubic),
-    });
+    startValue.current = displayValue;
+    startTime.current = Date.now();
+
+    const animate = () => {
+      const elapsed = Date.now() - startTime.current;
+      const progress = Math.min(elapsed / duration, 1);
+
+      // Ease out cubic
+      const eased = 1 - Math.pow(1 - progress, 3);
+
+      const current = startValue.current + (value - startValue.current) * eased;
+      setDisplayValue(current);
+
+      if (progress < 1) {
+        rafRef.current = requestAnimationFrame(animate);
+      }
+    };
+
+    rafRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, [value, duration]);
 
-  const animatedProps = useAnimatedProps(() => {
-    const currentValue = animatedValue.value;
-    runOnJS(updateText)(currentValue);
-    return {};
-  });
-
   return (
-    <AnimatedTextInput
-      editable={false}
-      value={displayText}
-      style={[styles.text, style]}
-      animatedProps={animatedProps}
-    />
+    <Text style={[styles.text, style]}>
+      {prefix}{displayValue.toFixed(decimals)}{suffix}
+    </Text>
   );
 }
 
@@ -97,9 +102,7 @@ export function HomeHealthScore({ score, size = 'lg' }: HomeHealthScoreProps) {
 const styles = StyleSheet.create({
   text: {
     fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
+    fontWeight: typography.fontWeights.bold as TextStyle['fontWeight'],
     color: colors.text.primary,
-    padding: 0,
-    margin: 0,
   },
 });

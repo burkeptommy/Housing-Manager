@@ -1,15 +1,6 @@
 import React from 'react';
 import { StyleSheet, ViewStyle, TouchableOpacity, View } from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-  FadeInUp,
-  FadeInDown,
-} from 'react-native-reanimated';
 import { colors, spacing, borderRadius, shadows } from '../../lib/theme';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface AnimatedCardProps {
   children: React.ReactNode;
@@ -20,6 +11,10 @@ interface AnimatedCardProps {
   variant?: 'default' | 'elevated' | 'outlined';
 }
 
+/**
+ * Card component with press feedback
+ * Simplified version without react-native-reanimated to avoid native module conflicts
+ */
 export function AnimatedCard({
   children,
   onPress,
@@ -28,24 +23,6 @@ export function AnimatedCard({
   direction = 'up',
   variant = 'default',
 }: AnimatedCardProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    scale.value = withSpring(0.97, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
-  const entering = direction === 'up'
-    ? FadeInUp.delay(delay).duration(400).springify()
-    : FadeInDown.delay(delay).duration(400).springify();
-
   const cardStyle = [
     styles.base,
     variant === 'elevated' && styles.elevated,
@@ -55,24 +32,20 @@ export function AnimatedCard({
 
   if (onPress) {
     return (
-      <Animated.View entering={entering}>
-        <AnimatedTouchable
-          style={[cardStyle, animatedStyle]}
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          activeOpacity={1}
-        >
-          {children}
-        </AnimatedTouchable>
-      </Animated.View>
+      <TouchableOpacity
+        style={cardStyle}
+        onPress={onPress}
+        activeOpacity={0.7}
+      >
+        {children}
+      </TouchableOpacity>
     );
   }
 
   return (
-    <Animated.View entering={entering} style={cardStyle}>
+    <View style={cardStyle}>
       {children}
-    </Animated.View>
+    </View>
   );
 }
 
