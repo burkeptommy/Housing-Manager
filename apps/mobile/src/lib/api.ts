@@ -12,8 +12,8 @@ const ACCESS_TOKEN_KEY = 'haven_access_token';
 const REFRESH_TOKEN_KEY = 'haven_refresh_token';
 const FIREBASE_TOKEN_KEY = 'haven_firebase_token';
 
-// API base URL - use your local IP for development or production URL
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'http://localhost:4000/api';
+// API base URL - defaults to production, use EXPO_PUBLIC_API_URL for development
+export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
 
 // Current Firebase token (managed by auth context)
 let currentFirebaseToken: string | null = null;
