@@ -1,11 +1,3 @@
-// Types
-export * from './types';
-
-// Schemas
+// @haven/core - Shared types and utilities for Haven
 export * from './schemas';
-
-// API Client
 export * from './api';
-
-// Constants
-export * from './constants';

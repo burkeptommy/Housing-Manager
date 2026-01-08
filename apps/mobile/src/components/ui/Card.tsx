@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, ViewStyle, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ViewStyle, TouchableOpacity, StyleProp } from 'react-native';
 import { colors, spacing, borderRadius, shadows } from '../../lib/theme';
 
 interface CardProps {
@@ -7,7 +7,7 @@ interface CardProps {
   onPress?: () => void;
   variant?: 'default' | 'elevated' | 'outlined';
   padding?: keyof typeof spacing;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
 }
 
 export function Card({

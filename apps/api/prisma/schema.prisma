@@ -138,6 +138,12 @@ enum SubscriptionTier {
   BASIC
   PREMIUM
   ENTERPRISE
+  // Haven subscription tiers
+  ESSENTIALS  // $39/mo - AI Home Manager (Alfred)
+  LITE        // $349/mo - Human Home Manager
+  HAVEN       // $749/mo - Human Home Manager + more
+  HAVEN_PLUS  // $1499/mo - Human Home Manager + premium
+  ESTATE      // $3499/mo - Human Home Manager + estate level
 }
 
 enum SubscriptionStatus {
@@ -1847,6 +1853,7 @@ model MaintenanceTask {
   assignedVendorId String? @map("assigned_vendor_id")
   attachmentFileId String? @map("attachment_file_id")
   completedById    String? @map("completed_by_id")
+  homeSystemId     String? @map("home_system_id") // Link to specific home system
 
   title       String
   description String?
@@ -1854,11 +1861,12 @@ model MaintenanceTask {
   status      MaintenanceTaskStatus @default(PENDING)
 
   // Auto-generation fields
-  frequency      MaintenanceFrequency? @default(ANNUAL)
-  seasonalTiming SeasonalTiming?
-  source         TaskSource            @default(MANAGER_CREATED)
-  sourceSystem   String?               @map("source_system") // e.g., "HVAC", "Pool", "Roof"
-  isRecurring    Boolean               @default(true) @map("is_recurring")
+  frequency               MaintenanceFrequency? @default(ANNUAL)
+  seasonalTiming          SeasonalTiming?
+  source                  TaskSource            @default(MANAGER_CREATED)
+  sourceSystem            String?               @map("source_system") // e.g., "HVAC", "Pool", "Roof"
+  isRecurring             Boolean               @default(true) @map("is_recurring")
+  recurringIntervalMonths Int?                  @map("recurring_interval_months") // For AI-generated schedules
 
   // Scheduling
   dueDate           DateTime? @map("due_date")
@@ -1887,6 +1895,7 @@ model MaintenanceTask {
   assignedVendor Vendor?              @relation(fields: [assignedVendorId], references: [id], onDelete: SetNull)
   attachmentFile FileAsset?           @relation(fields: [attachmentFileId], references: [id], onDelete: SetNull)
   completedBy    User?                @relation("MaintenanceTaskCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  homeSystem     HomeSystem?          @relation(fields: [homeSystemId], references: [id], onDelete: SetNull)
   workOrders     WorkOrder[]
   transactions   Transaction[]
 
@@ -1895,6 +1904,7 @@ model MaintenanceTask {
   @@index([householdId, nextDueDate])
   @@index([householdId, category])
   @@index([attachmentFileId])
+  @@index([homeSystemId])
   @@map("maintenance_tasks")
 }
 
@@ -3578,11 +3588,13 @@ model HomeSystem {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  household      Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  serviceVendor  Vendor?             @relation("SystemServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
-  serviceHistory HomeSystemService[]
+  household        Household           @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  serviceVendor    Vendor?             @relation("SystemServiceVendor", fields: [serviceVendorId], references: [id], onDelete: SetNull)
+  serviceHistory   HomeSystemService[]
+  maintenanceTasks MaintenanceTask[]
 
   @@index([householdId, type])
+  @@index([nextMaintenanceDate])
   @@map("home_systems")
 }
 

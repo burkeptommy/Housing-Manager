@@ -1,11 +1,6 @@
 'use client';
 
-import { createApiClient, ApiClient } from '@haven/core';
-
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
-
-// Singleton API client instance
-let apiClient: ApiClient | null = null;
 
 // Token storage keys
 const ACCESS_TOKEN_KEY = 'haven_access_token';
@@ -71,34 +66,78 @@ export function clearTokens(): void {
   localStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
-export function getApiClient(): ApiClient {
-  if (!apiClient) {
-    apiClient = createApiClient({
-      baseUrl: API_BASE_URL,
-      getAccessToken,
-      getRefreshToken: () => {
-        // Don't return refresh token when using Firebase auth
-        // This prevents the API client from trying to refresh with legacy tokens
-        if (currentFirebaseToken || sessionStorage.getItem(FIREBASE_TOKEN_KEY)) {
-          return null;
-        }
-        return getRefreshToken();
-      },
-      onTokenRefresh: ({ accessToken, refreshToken }) => {
-        // Only update legacy tokens - Firebase handles its own refresh
-        if (!currentFirebaseToken) {
-          setTokens(accessToken, refreshToken);
-        }
-      },
-      onUnauthorized: () => {
-        // Only clear tokens and trigger logout if we're not using Firebase
-        // With Firebase, a 401 might just mean we need a fresh token
-        if (!currentFirebaseToken && !sessionStorage.getItem(FIREBASE_TOKEN_KEY)) {
-          clearTokens();
-        }
-        // Redirect to login will be handled by auth context
+/**
+ * API Client for making authenticated requests
+ */
+export class ApiClient {
+  private baseUrl: string;
+
+  constructor(baseUrl: string) {
+    this.baseUrl = baseUrl;
+  }
+
+  private async request<T>(path: string, options: RequestInit = {}): Promise<T> {
+    const token = getAccessToken();
+
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      ...options,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options.headers,
       },
     });
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ message: 'Request failed' }));
+      throw new Error(error.message || `API Error: ${response.status}`);
+    }
+
+    // Handle empty responses
+    const text = await response.text();
+    if (!text) {
+      return {} as T;
+    }
+
+    return JSON.parse(text);
+  }
+
+  async get<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: 'GET' });
+  }
+
+  async post<T>(path: string, data?: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: 'POST',
+      body: data ? JSON.stringify(data) : undefined,
+    });
+  }
+
+  async put<T>(path: string, data: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async patch<T>(path: string, data: unknown): Promise<T> {
+    return this.request<T>(path, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  async delete<T>(path: string): Promise<T> {
+    return this.request<T>(path, { method: 'DELETE' });
+  }
+}
+
+// Singleton API client instance
+let apiClient: ApiClient | null = null;
+
+export function getApiClient(): ApiClient {
+  if (!apiClient) {
+    apiClient = new ApiClient(API_BASE_URL);
   }
   return apiClient;
 }

@@ -1,706 +1,902 @@
-import { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
-  ScrollView,
   StyleSheet,
-  RefreshControl,
+  ScrollView,
   TouchableOpacity,
-  ActivityIndicator,
-  Alert,
+  RefreshControl,
+  Image,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Link, useRouter } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/auth-context';
-import { getApiClient } from '../../src/lib/api';
-import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
-import type {
-  DashboardResponse,
-  UpcomingBill,
-  UpcomingMaintenanceTask,
-  TodayTask,
-} from '@haven/core';
+import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard } from '../../src/components';
+import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
+import { API_BASE_URL } from '../../src/lib/api';
+import { getIdToken } from '../../src/lib/firebase';
 
-// Category icon mapping
-const CATEGORY_ICONS: Record<string, string> = {
-  // Vendor categories
-  MORTGAGE: '🏠',
-  HOA: '🏘️',
-  PROPERTY_TAX: '📋',
-  ELECTRIC: '⚡',
-  GAS: '🔥',
-  WATER_SEWER: '💧',
-  TRASH: '🗑️',
-  INTERNET: '🌐',
-  MOBILE: '📱',
-  CABLE: '📺',
-  HOME_INSURANCE: '🛡️',
-  AUTO_INSURANCE: '🚗',
-  HEALTH_INSURANCE: '❤️',
-  LIFE_INSURANCE: '💼',
-  PET_INSURANCE: '🐾',
-  CREDIT_CARD: '💳',
-  STUDENT_LOAN: '🎓',
-  PERSONAL_LOAN: '💰',
-  VEHICLE_LOAN: '🚙',
-  HELOC: '🏦',
-  STREAMING: '🎬',
-  GYM: '💪',
-  SECURITY_MONITORING: '🔒',
-  PEST_CONTROL: '🐛',
-  LAWN_CARE: '🌱',
-  LANDSCAPING: '🌳',
-  HOME_WARRANTY: '📜',
-  CLEANING: '🧹',
-  WINDOW_WASHING: '🪟',
-  GUTTER_CLEANING: '🍂',
-  HVAC_SERVICE: '❄️',
-  FILTER_SERVICE: '🌀',
-  CHIMNEY_SWEEP: '🧱',
-  SEPTIC_SERVICE: '🚽',
-  POOL_SERVICE: '🏊',
-  SNOW_REMOVAL: '❄️',
-  HANDYMAN: '🔧',
-  // Maintenance categories
-  HVAC: '❄️',
-  PLUMBING: '🔧',
-  ROOF_GUTTER: '🏠',
-  CHIMNEY: '🧱',
-  SEPTIC: '🚽',
-  PEST: '🐛',
-  POOL: '🏊',
-  SAFETY: '🛡️',
-  APPLIANCES: '🔌',
-  EXTERIOR: '🏡',
-  INTERIOR: '🛋️',
-  GENERAL: '🔨',
-  OTHER: '📦',
-};
+// =============================================================================
+// TYPES
+// =============================================================================
 
-function getCategoryIcon(category: string): string {
-  return CATEGORY_ICONS[category] || '📋';
+interface DashboardResponse {
+  household: {
+    id: string;
+    name: string;
+    propertyAddress: string | null;
+  };
+  manager: {
+    id: string;
+    name: string;
+    email: string;
+    phone: string | null;
+  } | null;
+  homeHealth: number;
+  billing: {
+    monthlyFunding: number;
+    amountPaid: number;
+    billsPaidCount: number;
+    bufferRemaining: number;
+  };
+  nextService: {
+    title: string;
+    vendorName: string | null;
+    date: string;
+  } | null;
+  pendingApprovals: number;
+  recentActivity: Array<{
+    id: string;
+    title: string;
+    description: string | null;
+    actorName: string | null;
+    category: string;
+    createdAt: string;
+  }>;
+  upcoming: Array<{
+    id: string;
+    title: string;
+    type: string;
+    date: string;
+  }>;
 }
 
-function formatCurrency(amount: number | undefined): string {
-  if (amount === undefined) return '--';
+interface FamilyMember {
+  id: string;
+  firstName: string;
+  lastName: string | null;
+  type: 'ADULT' | 'CHILD' | 'STAFF';
+  relationship: string | null;
+  avatarUrl: string | null;
+}
+
+interface Pet {
+  id: string;
+  name: string;
+  species: string;
+  breed: string | null;
+}
+
+interface FamilyData {
+  members: FamilyMember[];
+  pets: Pet[];
+  summary: {
+    adults: number;
+    children: number;
+    pets: number;
+    staff: number;
+  };
+}
+
+// =============================================================================
+// MOCK DATA (matches web)
+// =============================================================================
+
+const mockWeather = { temp: 68, condition: 'sunny' as const };
+
+const mockTodayNotes = [
+  { id: 'trash', icon: 'trash-outline' as const, text: 'Trash day tomorrow - bins out?', color: colors.status.warning },
+  { id: 'package', icon: 'cube-outline' as const, text: 'Amazon delivery expected 2-5pm', color: colors.haven.navy[500] },
+  { id: 'soccer', icon: 'calendar-outline' as const, text: "Emma's soccer practice 4pm", color: colors.haven.champagne[500] },
+];
+
+const mockHealthFactors = {
+  helping: ['HVAC serviced recently', 'All bills current', 'No overdue maintenance'],
+  hurting: ['Gutter cleaning due soon'],
+};
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  return 'Good evening';
+}
+
+function getWeatherIcon(condition: string): keyof typeof Ionicons.glyphMap {
+  switch (condition) {
+    case 'sunny': return 'sunny-outline';
+    case 'cloudy': return 'cloud-outline';
+    case 'rainy': return 'rainy-outline';
+    default: return 'partly-sunny-outline';
+  }
+}
+
+function getHealthColor(score: number) {
+  if (score >= 90) return colors.status.success;
+  if (score >= 70) return colors.status.warning;
+  return colors.status.error;
+}
+
+function getHealthLabel(score: number) {
+  if (score >= 90) return 'Excellent';
+  if (score >= 70) return 'Good';
+  if (score >= 50) return 'Fair';
+  return 'Needs Attention';
+}
+
+function getAvatarType(member: FamilyMember): keyof typeof Ionicons.glyphMap {
+  if (member.type === 'CHILD') {
+    return member.relationship?.toLowerCase().includes('daughter') ? 'person-outline' : 'person-outline';
+  }
+  return 'person-outline';
+}
+
+function formatCurrency(amount: number) {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount);
 }
 
-function formatDate(date: Date | string | undefined): string {
-  if (!date) return '--';
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-  });
+function formatRelativeTime(dateString: string) {
+  const date = new Date(dateString);
+  const now = new Date();
+  const diffMs = now.getTime() - date.getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMs / 3600000);
+  const diffDays = Math.floor(diffMs / 86400000);
+
+  if (diffMins < 1) return 'Just now';
+  if (diffMins < 60) return `${diffMins}m ago`;
+  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays === 1) return 'Yesterday';
+  return `${diffDays}d ago`;
 }
 
-function getDaysUntilLabel(days: number): string {
-  if (days === 0) return 'Today';
-  if (days === 1) return 'Tomorrow';
-  if (days < 0) return `${Math.abs(days)} days overdue`;
-  return `in ${days} days`;
-}
+// =============================================================================
+// COMPONENT
+// =============================================================================
 
-export default function HomeScreen() {
+export default function DashboardScreen() {
   const router = useRouter();
-  const { user, currentHousehold, refreshCurrentHousehold } = useAuth();
-  const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
+  const { user, householdInfo } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
-  const [creatingWorkOrder, setCreatingWorkOrder] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [data, setData] = useState<DashboardResponse | null>(null);
+  const [familyData, setFamilyData] = useState<FamilyData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showHealthDetails, setShowHealthDetails] = useState(false);
 
-  const api = getApiClient();
-
-  const handleRequestVendorVisit = async (task: UpcomingMaintenanceTask) => {
-    if (!currentHousehold) return;
-
-    setCreatingWorkOrder(task.id);
-    try {
-      await api.createWorkOrder(currentHousehold.id, {
-        title: task.title,
-        description: task.description,
-        maintenanceTaskId: task.id,
-        vendorId: task.assignedVendorId || undefined,
-        preferredDate: task.dueDate || undefined,
-      });
-      Alert.alert('Success', 'Work order created', [
-        { text: 'View Orders', onPress: () => router.push('/work-orders') },
-        { text: 'OK', style: 'cancel' },
-      ]);
-      fetchData();
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create work order');
-    } finally {
-      setCreatingWorkOrder(null);
+  const fetchDashboard = useCallback(async () => {
+    if (!householdInfo?.id) {
+      setIsLoading(false);
+      setError('No household found. Please complete onboarding.');
+      return;
     }
-  };
-
-  const fetchData = useCallback(async () => {
-    if (!currentHousehold) return;
 
     try {
-      const dashboardData = await api.getDashboard(currentHousehold.id);
-      setDashboard(dashboardData);
-    } catch (error) {
-      console.error('Failed to fetch dashboard data:', error);
+      const token = await getIdToken(true);
+      if (!token) {
+        setError('Authentication expired. Please sign in again.');
+        setIsLoading(false);
+        return;
+      }
+
+      // Fetch dashboard and family data in parallel
+      const [dashboardRes, familyRes] = await Promise.all([
+        fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/family`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (!dashboardRes.ok) {
+        throw new Error(`Failed to fetch dashboard: ${dashboardRes.status}`);
+      }
+
+      const dashboardData = await dashboardRes.json();
+      setData(dashboardData);
+
+      if (familyRes.ok) {
+        const family = await familyRes.json();
+        setFamilyData(family);
+      }
+
+      setError(null);
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      setError('Failed to load dashboard. Please try again.');
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
-  }, [api, currentHousehold]);
+  }, [householdInfo?.id]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchDashboard();
+  }, [fetchDashboard]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await Promise.all([fetchData(), refreshCurrentHousehold()]);
-    setRefreshing(false);
-  }, [fetchData, refreshCurrentHousehold]);
+  const onRefresh = () => {
+    setIsRefreshing(true);
+    fetchDashboard();
+  };
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.loadingContainer} edges={['bottom']}>
-        <ActivityIndicator size="large" color={colors.primary[600]} />
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <DashboardSkeleton />
       </SafeAreaView>
     );
   }
 
-  const summary = dashboard?.summary;
-  const upcomingBills = dashboard?.upcomingBills || [];
-  const upcomingMaintenanceTasks = dashboard?.upcomingMaintenanceTasks || [];
+  if (error || !data) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle" size={48} color={colors.status.error} />
+          <Text style={styles.errorTitle}>Unable to Load Dashboard</Text>
+          <Text style={styles.errorText}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchDashboard}>
+            <Text style={styles.retryText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const firstName = user?.firstName || 'there';
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.primary[600]}
-          />
-        }
+        refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
+        showsVerticalScrollIndicator={false}
       >
-        {/* Hero Summary Section */}
-        <View style={styles.heroSection}>
-          <Text style={styles.heroTitle}>Welcome back, {user?.firstName}!</Text>
-          <Text style={styles.heroSubtitle}>
-            This month: {summary?.billsManagedThisMonth || 0} bills managed,{' '}
-            {summary?.tasksScheduledThisMonth || 0} tasks scheduled,{' '}
-            {summary?.tasksCompletedThisMonth || 0} completed
-          </Text>
+        {/* Hero Header */}
+        <Animated.View entering={FadeInDown.duration(400)}>
+          <LinearGradient
+            colors={[colors.haven.navy[900], colors.haven.navy[800]]}
+            style={styles.heroGradient}
+          >
+            {/* Date and Weather Row */}
+            <View style={styles.heroTop}>
+              <Text style={styles.heroDate}>{today}</Text>
+              <View style={styles.weatherBadge}>
+                <Ionicons name={getWeatherIcon(mockWeather.condition)} size={20} color={colors.white} />
+                <Text style={styles.weatherTemp}>{mockWeather.temp}°</Text>
+              </View>
+            </View>
 
-          {/* Next Up Highlight */}
-          {summary?.nextUp && (
-            <View style={styles.nextUpCard}>
-              <Text style={styles.nextUpLabel}>Next up</Text>
-              <View style={styles.nextUpContent}>
-                <Text style={styles.nextUpIcon}>{getCategoryIcon(summary.nextUp.category)}</Text>
-                <View style={styles.nextUpDetails}>
-                  <Text style={styles.nextUpTitle}>{summary.nextUp.title}</Text>
-                  <Text style={styles.nextUpDue}>
-                    {getDaysUntilLabel(summary.nextUp.daysUntilDue)}
-                    {summary.nextUp.vendorName && ` with ${summary.nextUp.vendorName}`}
+            {/* Greeting */}
+            <Text style={styles.heroGreeting}>{getGreeting()}, {firstName}</Text>
+            <Text style={styles.heroSubtext}>Your home is in great shape.</Text>
+
+            {/* Quick Stats */}
+            <View style={styles.heroStats}>
+              {/* Home Health */}
+              <TouchableOpacity
+                style={[styles.heroStat, styles.heroStatHealth]}
+                onPress={() => setShowHealthDetails(!showHealthDetails)}
+              >
+                <Text style={styles.heroStatLabel}>Home Health</Text>
+                <View style={styles.heroStatRow}>
+                  <Text style={[styles.heroStatValue, { color: getHealthColor(data.homeHealth) }]}>
+                    {data.homeHealth}%
                   </Text>
+                  <Badge
+                    label={getHealthLabel(data.homeHealth)}
+                    variant={data.homeHealth >= 90 ? 'success' : data.homeHealth >= 70 ? 'warning' : 'error'}
+                  />
                 </View>
-              </View>
-            </View>
-          )}
-        </View>
+              </TouchableOpacity>
 
-        {/* Today's Tasks */}
-        {summary?.todaysTasks && summary.todaysTasks.length > 0 && (
-          <View style={styles.todaySection}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionIcon}>📅</Text>
-              <Text style={styles.sectionTitle}>Today&apos;s Tasks</Text>
-              <View style={styles.countBadge}>
-                <Text style={styles.countBadgeText}>{summary.todaysTasks.length}</Text>
+              {/* Bills Paid */}
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatLabel}>Bills Paid</Text>
+                <Text style={styles.heroStatValue}>{data.billing.billsPaidCount}</Text>
+              </View>
+
+              {/* Next Service */}
+              <View style={styles.heroStat}>
+                <Text style={styles.heroStatLabel}>Next Service</Text>
+                <Text style={styles.heroStatValue}>
+                  {data.nextService ? new Date(data.nextService.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                </Text>
               </View>
             </View>
-            {summary.todaysTasks.map((task: TodayTask) => (
-              <View key={task.id} style={styles.todayTaskCard}>
-                <Text style={styles.taskIcon}>{getCategoryIcon(task.category)}</Text>
-                <View style={styles.taskContent}>
-                  <Text style={styles.taskTitle}>{task.title}</Text>
-                  {task.vendorName && (
-                    <Text style={styles.taskVendor}>{task.vendorName}</Text>
-                  )}
+          </LinearGradient>
+        </Animated.View>
+
+        {/* Health Score Details (expandable) */}
+        {showHealthDetails && (
+          <AnimatedCard style={styles.healthDetailsCard} delay={0}>
+            <Text style={styles.healthDetailsTitle}>What affects your score</Text>
+            <View style={styles.healthFactors}>
+              <View style={styles.healthFactorSection}>
+                <View style={styles.healthFactorHeader}>
+                  <Ionicons name="trending-up" size={16} color={colors.status.success} />
+                  <Text style={styles.healthFactorLabel}>Helping</Text>
                 </View>
-                <View style={styles.taskRight}>
-                  {task.amount !== undefined && (
-                    <Text style={styles.taskAmount}>{formatCurrency(task.amount)}</Text>
-                  )}
-                  {task.scheduledTime && (
-                    <Text style={styles.taskTime}>{task.scheduledTime}</Text>
-                  )}
-                </View>
+                {mockHealthFactors.helping.map((item, i) => (
+                  <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
+                ))}
               </View>
-            ))}
-          </View>
+              <View style={styles.healthFactorSection}>
+                <View style={styles.healthFactorHeader}>
+                  <Ionicons name="trending-down" size={16} color={colors.status.warning} />
+                  <Text style={styles.healthFactorLabel}>Needs Attention</Text>
+                </View>
+                {mockHealthFactors.hurting.map((item, i) => (
+                  <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
+                ))}
+              </View>
+            </View>
+          </AnimatedCard>
         )}
 
-        {/* Upcoming Bills */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>💰</Text>
-            <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-            {upcomingBills.length > 0 && (
-              <View style={[styles.countBadge, styles.blueBadge]}>
-                <Text style={[styles.countBadgeText, styles.blueBadgeText]}>{upcomingBills.length}</Text>
-              </View>
-            )}
+        {/* Today's Notes */}
+        <AnimatedCard style={styles.notesCard} delay={100}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Today's Notes</Text>
+            <Badge label={`${mockTodayNotes.length}`} variant="info" />
           </View>
-
-          {upcomingBills.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyEmoji}>✨</Text>
-              <Text style={styles.emptyText}>No upcoming bills in the next 30 days</Text>
-            </View>
-          ) : (
-            upcomingBills.slice(0, 4).map((bill: UpcomingBill) => (
-              <View
-                key={bill.id}
-                style={[styles.itemCard, bill.isOverdue && styles.overdueCard]}
-              >
-                <Text style={styles.itemIcon}>{getCategoryIcon(bill.category)}</Text>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>{bill.nickname}</Text>
-                  <Text style={styles.itemSubtitle}>{bill.vendorName}</Text>
-                  <Text style={[styles.itemDue, bill.isOverdue && styles.overdueDue]}>
-                    {formatDate(bill.nextDueDate)} ({getDaysUntilLabel(bill.daysUntilDue)})
-                  </Text>
-                </View>
-                <View style={styles.itemRight}>
-                  <Text style={styles.itemAmount}>{formatCurrency(bill.typicalAmount)}</Text>
-                  {bill.paymentResponsibility === 'HAVEN_PAYS_ON_BEHALF' ? (
-                    <Text style={styles.havenHandles}>✓ Haven handles</Text>
-                  ) : (
-                    <TouchableOpacity>
-                      <Text style={styles.askHaven}>Ask Haven</Text>
-                    </TouchableOpacity>
-                  )}
-                </View>
+          {mockTodayNotes.map((note) => (
+            <View key={note.id} style={styles.noteRow}>
+              <View style={[styles.noteIcon, { backgroundColor: note.color + '20' }]}>
+                <Ionicons name={note.icon} size={16} color={note.color} />
               </View>
-            ))
-          )}
-        </View>
-
-        {/* Upcoming Maintenance */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionIcon}>🔧</Text>
-            <Text style={styles.sectionTitle}>Upcoming Maintenance</Text>
-            {upcomingMaintenanceTasks.length > 0 && (
-              <View style={[styles.countBadge, styles.purpleBadge]}>
-                <Text style={[styles.countBadgeText, styles.purpleBadgeText]}>{upcomingMaintenanceTasks.length}</Text>
-              </View>
-            )}
-          </View>
-
-          {upcomingMaintenanceTasks.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyEmoji}>✨</Text>
-              <Text style={styles.emptyText}>No upcoming maintenance tasks</Text>
+              <Text style={styles.noteText}>{note.text}</Text>
             </View>
-          ) : (
-            upcomingMaintenanceTasks.slice(0, 4).map((task: UpcomingMaintenanceTask) => (
-              <View
-                key={task.id}
-                style={[styles.itemCard, task.isOverdue && styles.overdueCard]}
-              >
-                <Text style={styles.itemIcon}>{getCategoryIcon(task.category)}</Text>
-                <View style={styles.itemContent}>
-                  <Text style={styles.itemTitle}>{task.title}</Text>
-                  {task.assignedVendorName && (
-                    <Text style={styles.itemSubtitle}>{task.assignedVendorName}</Text>
-                  )}
-                  <Text style={[styles.itemDue, task.isOverdue && styles.overdueDue]}>
-                    {task.dueDate ? formatDate(task.dueDate) : 'No due date'} ({getDaysUntilLabel(task.daysUntilDue)})
-                  </Text>
-                </View>
-                <View style={styles.itemRight}>
-                  {task.estimatedCost !== undefined && (
-                    <Text style={styles.itemAmount}>{formatCurrency(task.estimatedCost)}</Text>
-                  )}
-                  <View style={[styles.statusBadge, task.status === 'SCHEDULED' && styles.scheduledBadge]}>
-                    <Text style={[styles.statusText, task.status === 'SCHEDULED' && styles.scheduledText]}>
-                      {task.status}
-                    </Text>
+          ))}
+        </AnimatedCard>
+
+        {/* Family Status */}
+        {familyData && (familyData.members.length > 0 || familyData.pets.length > 0) && (
+          <AnimatedCard style={styles.familyCard} delay={150}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Family</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/family')}>
+                <Text style={styles.seeAllLink}>See all</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.familyScroll}>
+              {familyData.members.map((member) => (
+                <View key={member.id} style={styles.familyMember}>
+                  <View style={styles.familyAvatar}>
+                    <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.navy[600]} />
                   </View>
-                  {task.status !== 'SCHEDULED' && (
-                    <TouchableOpacity
-                      onPress={() => handleRequestVendorVisit(task)}
-                      disabled={creatingWorkOrder === task.id}
-                      style={styles.requestVisitButton}
-                    >
-                      {creatingWorkOrder === task.id ? (
-                        <ActivityIndicator size="small" color={colors.primary[600]} />
-                      ) : (
-                        <Text style={styles.requestVisitText}>Request visit</Text>
-                      )}
-                    </TouchableOpacity>
-                  )}
+                  <Text style={styles.familyName} numberOfLines={1}>{member.firstName}</Text>
+                  <Text style={styles.familyRole} numberOfLines={1}>
+                    {member.type === 'CHILD' ? 'Child' : member.type === 'STAFF' ? 'Staff' : 'Adult'}
+                  </Text>
                 </View>
-              </View>
-            ))
-          )}
-        </View>
+              ))}
+              {familyData.pets.map((pet) => (
+                <View key={pet.id} style={styles.familyMember}>
+                  <View style={[styles.familyAvatar, { backgroundColor: colors.haven.champagne[100] }]}>
+                    <Ionicons name="paw-outline" size={24} color={colors.haven.champagne[600]} />
+                  </View>
+                  <Text style={styles.familyName} numberOfLines={1}>{pet.name}</Text>
+                  <Text style={styles.familyRole} numberOfLines={1}>{pet.breed || pet.species}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </AnimatedCard>
+        )}
 
-        {/* Quick Actions */}
+        {/* Pending Approvals Alert */}
+        {data.pendingApprovals > 0 && (
+          <TouchableOpacity
+            style={styles.alertCard}
+            onPress={() => router.push('/(tabs)/approvals')}
+          >
+            <View style={styles.alertIcon}>
+              <Ionicons name="checkmark-circle" size={24} color={colors.status.warning} />
+            </View>
+            <View style={styles.alertContent}>
+              <Text style={styles.alertTitle}>
+                {data.pendingApprovals} Pending Approval{data.pendingApprovals > 1 ? 's' : ''}
+              </Text>
+              <Text style={styles.alertSubtitle}>Tap to review and approve</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+          </TouchableOpacity>
+        )}
+
+        {/* Manager Card */}
+        {data.manager && (
+          <AnimatedCard style={styles.managerCard} delay={200} onPress={() => router.push('/(tabs)/sarah')}>
+            <View style={styles.managerHeader}>
+              <View style={styles.managerAvatar}>
+                <Text style={styles.managerInitials}>
+                  {data.manager.name.split(' ').map(n => n[0]).join('')}
+                </Text>
+                <View style={styles.onlineIndicator} />
+              </View>
+              <View style={styles.managerInfo}>
+                <Text style={styles.managerName}>{data.manager.name}</Text>
+                <Text style={styles.managerLabel}>Your Home Manager</Text>
+              </View>
+              <View style={styles.managerActions}>
+                <TouchableOpacity style={styles.managerActionBtn}>
+                  <Ionicons name="chatbubble" size={20} color={colors.haven.champagne[500]} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          </AnimatedCard>
+        )}
+
+        {/* Quick Actions Grid */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
-          <View style={styles.actionsGrid}>
-            <Link href="/(tabs)/new-request" asChild>
-              <TouchableOpacity style={styles.actionCard}>
-                <View style={[styles.actionIcon, styles.blueActionIcon]}>
-                  <Text style={styles.actionEmoji}>💰</Text>
-                </View>
-                <Text style={styles.actionLabel}>Add a new bill</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/(tabs)/new-request" asChild>
-              <TouchableOpacity style={styles.actionCard}>
-                <View style={[styles.actionIcon, styles.purpleActionIcon]}>
-                  <Text style={styles.actionEmoji}>🔧</Text>
-                </View>
-                <Text style={styles.actionLabel}>Add a task</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/work-orders" asChild>
-              <TouchableOpacity style={styles.actionCard}>
-                <View style={[styles.actionIcon, styles.orangeActionIcon]}>
-                  <Text style={styles.actionEmoji}>🏠</Text>
-                </View>
-                <Text style={styles.actionLabel}>Vendor visits</Text>
-              </TouchableOpacity>
-            </Link>
-            <Link href="/(tabs)/chat" asChild>
-              <TouchableOpacity style={styles.actionCard}>
-                <View style={[styles.actionIcon, styles.greenActionIcon]}>
-                  <Text style={styles.actionEmoji}>💬</Text>
-                </View>
-                <Text style={styles.actionLabel}>Chat</Text>
-              </TouchableOpacity>
-            </Link>
+          <View style={styles.quickActions}>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/sarah')}>
+              <View style={[styles.quickIcon, { backgroundColor: colors.haven.champagne[100] }]}>
+                <Ionicons name="chatbubble" size={22} color={colors.haven.champagne[600]} />
+              </View>
+              <Text style={styles.quickLabel}>Message</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/approvals')}>
+              <View style={[styles.quickIcon, { backgroundColor: colors.haven.navy[100] }]}>
+                <Ionicons name="checkmark-circle" size={22} color={colors.haven.navy[600]} />
+              </View>
+              <Text style={styles.quickLabel}>Approvals</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/maintenance')}>
+              <View style={[styles.quickIcon, { backgroundColor: colors.status.warningLight }]}>
+                <Ionicons name="construct" size={22} color={colors.status.warning} />
+              </View>
+              <Text style={styles.quickLabel}>Maintenance</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/vault')}>
+              <View style={[styles.quickIcon, { backgroundColor: colors.gray[100] }]}>
+                <Ionicons name="folder" size={22} color={colors.gray[600]} />
+              </View>
+              <Text style={styles.quickLabel}>Documents</Text>
+            </TouchableOpacity>
           </View>
         </View>
+
+        {/* Recent Activity */}
+        {data.recentActivity.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+            <AnimatedCard style={styles.activityCard} delay={300}>
+              {data.recentActivity.slice(0, 5).map((activity, index) => (
+                <View
+                  key={activity.id}
+                  style={[styles.activityRow, index < Math.min(data.recentActivity.length, 5) - 1 && styles.activityBorder]}
+                >
+                  <View style={styles.activityIcon}>
+                    <Ionicons name="ellipse" size={8} color={colors.haven.champagne[500]} />
+                  </View>
+                  <View style={styles.activityContent}>
+                    <Text style={styles.activityTitle} numberOfLines={1}>{activity.title}</Text>
+                    {activity.actorName && (
+                      <Text style={styles.activityActor}>{activity.actorName}</Text>
+                    )}
+                  </View>
+                  <Text style={styles.activityTime}>{formatRelativeTime(activity.createdAt)}</Text>
+                </View>
+              ))}
+            </AnimatedCard>
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// =============================================================================
+// STYLES
+// =============================================================================
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.slate[50],
   },
-  loadingContainer: {
+  scrollContent: {
+    paddingBottom: spacing[8],
+  },
+  errorContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.slate[50],
+    padding: spacing[6],
   },
-  scrollContent: {
-    padding: spacing[4],
+  errorTitle: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+    marginTop: spacing[4],
   },
+  errorText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginTop: spacing[2],
+  },
+  retryButton: {
+    marginTop: spacing[4],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: borderRadius.lg,
+  },
+  retryText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+
   // Hero Section
-  heroSection: {
-    backgroundColor: colors.primary[600],
-    borderRadius: borderRadius.xl,
-    padding: spacing[5],
-    marginBottom: spacing[5],
+  heroGradient: {
+    paddingHorizontal: spacing[4],
+    paddingTop: spacing[2],
+    paddingBottom: spacing[5],
+    borderBottomLeftRadius: borderRadius['2xl'],
+    borderBottomRightRadius: borderRadius['2xl'],
   },
-  heroTitle: {
+  heroTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+  },
+  heroDate: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[200],
+  },
+  weatherBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: borderRadius.full,
+  },
+  weatherTemp: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+  heroGreeting: {
+    fontSize: 28,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.white,
+    marginBottom: spacing[1],
+  },
+  heroSubtext: {
+    fontSize: typography.fontSizes.base,
+    color: colors.haven.champagne[200],
+    marginBottom: spacing[4],
+  },
+  heroStats: {
+    flexDirection: 'row',
+    gap: spacing[3],
+  },
+  heroStat: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: borderRadius.xl,
+    padding: spacing[3],
+  },
+  heroStatHealth: {
+    flex: 1.5,
+  },
+  heroStatLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.haven.champagne[200],
+    marginBottom: spacing[1],
+  },
+  heroStatRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  heroStatValue: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
     color: colors.white,
-    marginBottom: spacing[2],
   },
-  heroSubtitle: {
-    fontSize: typography.fontSizes.base,
-    color: 'rgba(255, 255, 255, 0.8)',
-    lineHeight: 22,
-  },
-  nextUpCard: {
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
+
+  // Health Details
+  healthDetailsCard: {
+    marginHorizontal: spacing[4],
     marginTop: spacing[4],
+    padding: spacing[4],
   },
-  nextUpLabel: {
+  healthDetailsTitle: {
     fontSize: typography.fontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing[3],
+  },
+  healthFactors: {
+    gap: spacing[3],
+  },
+  healthFactorSection: {},
+  healthFactorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
     marginBottom: spacing[1],
   },
-  nextUpContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  healthFactorLabel: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.secondary,
   },
-  nextUpIcon: {
-    fontSize: 28,
-    marginRight: spacing[3],
-  },
-  nextUpDetails: {
-    flex: 1,
-  },
-  nextUpTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.white,
-  },
-  nextUpDue: {
+  healthFactorItem: {
     fontSize: typography.fontSizes.sm,
-    color: 'rgba(255, 255, 255, 0.7)',
-    marginTop: spacing[1],
+    color: colors.text.primary,
+    paddingLeft: spacing[5],
+    paddingVertical: 2,
   },
-  // Today's Section
-  todaySection: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
+
+  // Notes Card
+  notesCard: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
     padding: spacing[4],
-    marginBottom: spacing[5],
-    borderLeftWidth: 4,
-    borderLeftColor: colors.warning,
-    ...shadows.sm,
   },
-  // Section styles
-  section: {
-    marginBottom: spacing[5],
-  },
-  sectionHeader: {
+  cardHeader: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing[3],
   },
-  sectionIcon: {
-    fontSize: 20,
-    marginRight: spacing[2],
-  },
-  sectionTitle: {
-    fontSize: typography.fontSizes.lg,
+  cardTitle: {
+    fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
+    color: colors.text.primary,
   },
-  countBadge: {
-    backgroundColor: colors.warning + '30',
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    marginLeft: spacing[2],
-  },
-  countBadgeText: {
-    fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.warning,
-  },
-  blueBadge: {
-    backgroundColor: colors.primary[100],
-  },
-  blueBadgeText: {
-    color: colors.primary[600],
-  },
-  purpleBadge: {
-    backgroundColor: colors.accent[100],
-  },
-  purpleBadgeText: {
-    color: colors.accent[600],
-  },
-  // Today Task Card
-  todayTaskCard: {
+  noteRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.slate[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing[3],
-    marginBottom: spacing[2],
-  },
-  taskIcon: {
-    fontSize: 22,
-    marginRight: spacing[3],
-  },
-  taskContent: {
-    flex: 1,
-  },
-  taskTitle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.slate[900],
-  },
-  taskVendor: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: 2,
-  },
-  taskRight: {
-    alignItems: 'flex-end',
-  },
-  taskAmount: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
-  taskTime: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: 2,
-  },
-  // Empty card
-  emptyCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing[6],
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  emptyEmoji: {
-    fontSize: 32,
-    marginBottom: spacing[2],
-  },
-  emptyText: {
-    fontSize: typography.fontSizes.base,
-    color: colors.slate[500],
-    textAlign: 'center',
-  },
-  // Item card (bills/tasks)
-  itemCard: {
-    flexDirection: 'row',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    marginBottom: spacing[3],
-    borderWidth: 1,
-    borderColor: colors.slate[200],
-    ...shadows.sm,
-  },
-  overdueCard: {
-    borderColor: colors.error,
-    backgroundColor: '#FEF2F2',
-  },
-  itemIcon: {
-    fontSize: 26,
-    marginRight: spacing[3],
-  },
-  itemContent: {
-    flex: 1,
-  },
-  itemTitle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
-  itemSubtitle: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: 2,
-  },
-  itemDue: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: spacing[1],
-  },
-  overdueDue: {
-    color: colors.error,
-    fontWeight: typography.fontWeights.medium,
-  },
-  itemRight: {
-    alignItems: 'flex-end',
-  },
-  itemAmount: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.slate[900],
-  },
-  askHaven: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.primary[600],
-    fontWeight: typography.fontWeights.medium,
-    marginTop: spacing[2],
-  },
-  havenHandles: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.success,
-    fontWeight: typography.fontWeights.medium,
-    marginTop: spacing[2],
-  },
-  statusBadge: {
-    backgroundColor: colors.slate[100],
-    borderRadius: borderRadius.full,
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    marginTop: spacing[2],
-  },
-  statusText: {
-    fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.slate[600],
-  },
-  scheduledBadge: {
-    backgroundColor: colors.primary[100],
-  },
-  scheduledText: {
-    color: colors.primary[600],
-  },
-  // Quick Actions
-  actionsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: spacing[3],
-    marginTop: spacing[3],
+    paddingVertical: spacing[2],
   },
-  actionCard: {
-    width: '47%',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
+  noteIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: borderRadius.md,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.slate[200],
-    ...shadows.sm,
+    justifyContent: 'center',
   },
-  actionIcon: {
+  noteText: {
+    flex: 1,
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.primary,
+  },
+
+  // Family Card
+  familyCard: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
+    padding: spacing[4],
+  },
+  seeAllLink: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[500],
+    fontWeight: typography.fontWeights.medium,
+  },
+  familyScroll: {
+    marginHorizontal: -spacing[2],
+  },
+  familyMember: {
+    alignItems: 'center',
+    paddingHorizontal: spacing[3],
+    width: 80,
+  },
+  familyAvatar: {
     width: 48,
     height: 48,
-    borderRadius: borderRadius.lg,
+    borderRadius: 24,
+    backgroundColor: colors.haven.navy[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
   },
-  actionEmoji: {
-    fontSize: 24,
-  },
-  blueActionIcon: {
-    backgroundColor: colors.primary[100],
-  },
-  orangeActionIcon: {
-    backgroundColor: '#FFF7ED',
-  },
-  purpleActionIcon: {
-    backgroundColor: colors.accent[100],
-  },
-  redActionIcon: {
-    backgroundColor: '#FEE2E2',
-  },
-  greenActionIcon: {
-    backgroundColor: '#D1FAE5',
-  },
-  actionLabel: {
+  familyName: {
     fontSize: typography.fontSizes.sm,
-    color: colors.slate[700],
     fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
     textAlign: 'center',
   },
-  requestVisitButton: {
-    marginTop: spacing[2],
-    paddingVertical: spacing[1],
-  },
-  requestVisitText: {
+  familyRole: {
     fontSize: typography.fontSizes.xs,
-    color: colors.primary[600],
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+
+  // Alert Card
+  alertCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.status.warningLight,
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
+    padding: spacing[4],
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.status.warning,
+  },
+  alertIcon: {
+    marginRight: spacing[3],
+  },
+  alertContent: {
+    flex: 1,
+  },
+  alertTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  alertSubtitle: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+
+  // Manager Card
+  managerCard: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
+    padding: spacing[4],
+  },
+  managerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  managerAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.haven.champagne[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  managerInitials: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: colors.status.success,
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  managerInfo: {
+    flex: 1,
+    marginLeft: spacing[3],
+  },
+  managerName: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  managerLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+  },
+  managerActions: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  managerActionBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.haven.champagne[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Sections
+  section: {
+    marginTop: spacing[6],
+    paddingHorizontal: spacing[4],
+  },
+  sectionTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+    marginBottom: spacing[3],
+  },
+
+  // Quick Actions
+  quickActions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[3],
+  },
+  quickAction: {
+    width: '47%',
+    backgroundColor: colors.white,
+    padding: spacing[4],
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  quickIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[2],
+  },
+  quickLabel: {
+    fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+
+  // Activity
+  activityCard: {
+    padding: spacing[3],
+  },
+  activityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+  },
+  activityBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  activityIcon: {
+    width: 24,
+    alignItems: 'center',
+    marginRight: spacing[3],
+  },
+  activityContent: {
+    flex: 1,
+  },
+  activityTitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.primary,
+  },
+  activityActor: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  activityTime: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
   },
 });

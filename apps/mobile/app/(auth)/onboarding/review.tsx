@@ -126,7 +126,7 @@ export default function OnboardingReviewScreen() {
     const routes = ['index', 'bills', 'maintenance', 'payment', 'review'];
     const route = routes[step - 1];
     if (route && step < 5) {
-      router.push(`/(auth)/onboarding/${route === 'index' ? '' : route}`);
+      router.push(`/(auth)/onboarding/${route === 'index' ? '' : route}` as any);
     }
   };
 

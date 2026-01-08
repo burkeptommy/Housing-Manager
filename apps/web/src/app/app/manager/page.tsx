@@ -30,6 +30,8 @@ import {
   ListChecks,
 } from 'lucide-react';
 import { ManagerAvatar } from '@/components/ui/avatar';
+import { useSubscription } from '@/contexts/subscription-context';
+import { AlfredChat } from '@/components/alfred/AlfredChat';
 
 // ============================================================================
 // TYPES
@@ -469,12 +471,26 @@ const getPriorityStyles = (priority: RequestPriority) => {
 // ============================================================================
 
 export default function ManagerHubPage() {
+  const { isEssentials, loading: subscriptionLoading } = useSubscription();
   const [requests, setRequests] = useState(PENDING_REQUESTS);
   const [selectedRequest, setSelectedRequest] = useState<PendingRequest | null>(null);
   const [messageInput, setMessageInput] = useState('');
   const [showAllCompleted, setShowAllCompleted] = useState(false);
 
   const pendingCount = requests.length;
+
+  // Show Alfred AI chat for Essentials tier users
+  if (!subscriptionLoading && isEssentials) {
+    return (
+      <div className="min-h-screen bg-warm-50 pb-24 lg:pb-8">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="h-[calc(100vh-180px)] lg:h-[calc(100vh-120px)]">
+            <AlfredChat />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const handleApprove = (requestId: string, optionId?: string) => {
     setRequests(prev => prev.filter(r => r.id !== requestId));

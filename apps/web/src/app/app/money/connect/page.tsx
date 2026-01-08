@@ -46,6 +46,8 @@ export default function ConnectBankPage() {
   const [summary, setSummary] = useState<DetectedBillsSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState<string | null>(null);
+  const [linkTokenError, setLinkTokenError] = useState<string | null>(null);
+  const [creatingToken, setCreatingToken] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!householdId) {
@@ -77,10 +79,16 @@ export default function ConnectBankPage() {
 
   const createLinkToken = useCallback(async () => {
     if (!householdId) return;
+    
+    setCreatingToken(true);
+    setLinkTokenError(null);
+    
     try {
       const token = await getIdToken();
       const apiUrl =
         process.env.NEXT_PUBLIC_API_URL || 'https://api.havenhome.dev/api';
+
+      console.log('Creating Plaid link token for household:', householdId);
 
       const response = await fetch(`${apiUrl}/plaid/link-token`, {
         method: 'POST',
@@ -91,12 +99,21 @@ export default function ConnectBankPage() {
         body: JSON.stringify({ householdId }),
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setLinkToken(data.linkToken);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Link token error:', response.status, errorText);
+        setLinkTokenError(`Failed to initialize bank connection (${response.status})`);
+        return;
       }
+
+      const data = await response.json();
+      console.log('Link token created successfully');
+      setLinkToken(data.linkToken);
     } catch (error) {
       console.error('Failed to create link token:', error);
+      setLinkTokenError('Failed to connect to Plaid. Please try again.');
+    } finally {
+      setCreatingToken(false);
     }
   }, [householdId]);
 
@@ -229,13 +246,55 @@ export default function ConnectBankPage() {
 
       {/* Connect Button */}
       <button
-        onClick={() => open()}
-        disabled={!ready}
-        className="w-full p-6 border-2 border-dashed border-gray-300 rounded-xl hover:border-indigo-400 hover:bg-indigo-50 transition-colors flex items-center justify-center gap-3"
+        onClick={() => {
+          console.log('Connect button clicked, ready:', ready, 'linkToken:', !!linkToken);
+          if (ready && linkToken) {
+            open();
+          } else if (!linkToken && !creatingToken) {
+            createLinkToken();
+          }
+        }}
+        disabled={creatingToken}
+        className={`w-full p-6 border-2 border-dashed rounded-xl transition-colors flex items-center justify-center gap-3 ${
+          ready && linkToken
+            ? 'border-gray-300 hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer'
+            : creatingToken
+              ? 'border-gray-200 bg-gray-50 cursor-wait'
+              : 'border-amber-300 bg-amber-50 hover:bg-amber-100 cursor-pointer'
+        }`}
       >
-        <Plus className="w-6 h-6 text-gray-400" />
-        <span className="text-gray-600 font-medium">Connect a Bank Account</span>
+        {creatingToken ? (
+          <>
+            <Loader2 className="w-6 h-6 text-gray-400 animate-spin" />
+            <span className="text-gray-500 font-medium">Initializing Plaid...</span>
+          </>
+        ) : ready && linkToken ? (
+          <>
+            <Plus className="w-6 h-6 text-indigo-500" />
+            <span className="text-gray-600 font-medium">Connect a Bank Account</span>
+          </>
+        ) : (
+          <>
+            <AlertCircle className="w-6 h-6 text-amber-500" />
+            <span className="text-amber-700 font-medium">
+              {linkTokenError || 'Click to initialize bank connection'}
+            </span>
+          </>
+        )}
       </button>
+
+      {/* Error Message */}
+      {linkTokenError && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 text-sm text-red-700 flex items-center justify-between">
+          <span>{linkTokenError}</span>
+          <button
+            onClick={createLinkToken}
+            className="ml-4 px-3 py-1 bg-red-100 hover:bg-red-200 rounded text-red-800 font-medium"
+          >
+            Try Again
+          </button>
+        </div>
+      )}
 
       {/* Connected Banks */}
       {connections.length > 0 && (

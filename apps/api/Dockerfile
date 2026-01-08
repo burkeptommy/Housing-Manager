@@ -22,8 +22,8 @@ COPY apps/api/package.json ./apps/api/
 COPY packages/core/package.json ./packages/core/
 COPY packages/config/package.json ./packages/config/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile --prod=false
+# Install dependencies (ignore-scripts prevents postinstall from building @haven/core before source is copied)
+RUN pnpm install --frozen-lockfile --prod=false --ignore-scripts
 
 # Copy source code
 COPY . .

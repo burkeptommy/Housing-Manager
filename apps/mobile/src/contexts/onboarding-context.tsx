@@ -9,6 +9,7 @@ import type {
   SubscriptionPlan,
   PropertyFeatures,
 } from '@haven/core';
+import type { PropertyData } from '../types/onboarding';
 
 // ============================================================================
 // TYPES
@@ -51,7 +52,7 @@ export interface TaskSelection {
 // ============================================================================
 
 interface OnboardingContextValue {
-  // State
+  // State (existing)
   householdId: string | null;
   homeBasics: HomeBasicsData | null;
   bills: BillEntry[];
@@ -60,7 +61,13 @@ interface OnboardingContextValue {
   taskSelections: TaskSelection[];
   selectedPlan: SubscriptionPlan | null;
 
-  // Actions
+  // State (new - ATTOM integration)
+  step: 'address' | 'property' | 'confirm' | 'bank' | 'plan' | 'complete';
+  propertyData: PropertyData | null;
+  isLoadingAttom: boolean;
+  attomError: string | null;
+
+  // Actions (existing)
   setHouseholdId: (id: string) => void;
   setHomeBasics: (data: HomeBasicsData) => void;
   setBills: (bills: BillEntry[]) => void;
@@ -69,6 +76,12 @@ interface OnboardingContextValue {
   setTaskSelections: (selections: TaskSelection[]) => void;
   setSelectedPlan: (plan: SubscriptionPlan) => void;
   reset: () => void;
+
+  // Actions (new - ATTOM integration)
+  setStep: (step: OnboardingContextValue['step']) => void;
+  setPropertyData: (data: PropertyData | null) => void;
+  setIsLoadingAttom: (loading: boolean) => void;
+  setAttomError: (error: string | null) => void;
 }
 
 const OnboardingContext = createContext<OnboardingContextValue | null>(null);
@@ -91,7 +104,8 @@ const DEFAULT_FEATURES: PropertyFeatures = {
 };
 
 export function OnboardingProvider({ children }: { children: ReactNode }) {
-  const [householdId, setHouseholdId] = useState<string | null>(null);
+  // Existing state
+  const [householdId, setHouseholdIdState] = useState<string | null>(null);
   const [homeBasics, setHomeBasics] = useState<HomeBasicsData | null>(null);
   const [bills, setBills] = useState<BillEntry[]>([]);
   const [vendors, setVendors] = useState<HouseholdVendor[]>([]);
@@ -99,19 +113,36 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
   const [taskSelections, setTaskSelections] = useState<TaskSelection[]>([]);
   const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null);
 
+  // New state for ATTOM integration
+  const [step, setStep] = useState<OnboardingContextValue['step']>('address');
+  const [propertyData, setPropertyData] = useState<PropertyData | null>(null);
+  const [isLoadingAttom, setIsLoadingAttom] = useState(false);
+  const [attomError, setAttomError] = useState<string | null>(null);
+
+  const setHouseholdId = useCallback((id: string) => {
+    setHouseholdIdState(id);
+  }, []);
+
   const reset = useCallback(() => {
-    setHouseholdId(null);
+    // Reset existing state
+    setHouseholdIdState(null);
     setHomeBasics(null);
     setBills([]);
     setVendors([]);
     setMaintenanceTasks([]);
     setTaskSelections([]);
     setSelectedPlan(null);
+    // Reset new state
+    setStep('address');
+    setPropertyData(null);
+    setIsLoadingAttom(false);
+    setAttomError(null);
   }, []);
 
   return (
     <OnboardingContext.Provider
       value={{
+        // Existing state
         householdId,
         homeBasics,
         bills,
@@ -119,6 +150,12 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         maintenanceTasks,
         taskSelections,
         selectedPlan,
+        // New state
+        step,
+        propertyData,
+        isLoadingAttom,
+        attomError,
+        // Existing actions
         setHouseholdId,
         setHomeBasics,
         setBills,
@@ -127,6 +164,11 @@ export function OnboardingProvider({ children }: { children: ReactNode }) {
         setTaskSelections,
         setSelectedPlan,
         reset,
+        // New actions
+        setStep,
+        setPropertyData,
+        setIsLoadingAttom,
+        setAttomError,
       }}
     >
       {children}

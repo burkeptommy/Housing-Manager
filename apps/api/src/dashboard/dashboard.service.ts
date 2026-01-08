@@ -1,12 +1,14 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { ActivityService } from '../activity/activity.service';
+import { HomeHealthService } from '../home-health/home-health.service';
 
 @Injectable()
 export class DashboardService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly activityService: ActivityService,
+    private readonly homeHealthService: HomeHealthService,
   ) {}
 
   /**
@@ -55,8 +57,9 @@ export class DashboardService {
     // Get upcoming items (next 7 days)
     const upcoming = await this.getUpcomingItems(householdId, 7);
 
-    // Calculate home health score
-    const homeHealth = await this.calculateHealthScore(householdId);
+    // Calculate home health score using the comprehensive HomeHealthService
+    const healthResult = await this.homeHealthService.calculateHealthScore(householdId);
+    const homeHealth = healthResult.score;
 
     const propertyAddress = household.homeProfile
       ? `${household.homeProfile.addressLine1}, ${household.homeProfile.city}, ${household.homeProfile.state} ${household.homeProfile.postalCode}`
@@ -339,7 +342,7 @@ export class DashboardService {
         status: 'ACTIVE',
       },
       include: {
-        paymentRecords: {
+        payments: {
           orderBy: { paidDate: 'desc' },
           take: 1,
         },
@@ -408,10 +411,10 @@ export class DashboardService {
         verified: bill.verified,
         currentAutopay: bill.currentAutopay,
         vendor: bill.vendor?.displayName,
-        lastPayment: bill.paymentRecords[0] ? {
-          amount: Number(bill.paymentRecords[0].amount),
-          date: bill.paymentRecords[0].paidDate,
-          paidBy: bill.paymentRecords[0].paidBy,
+        lastPayment: bill.payments[0] ? {
+          amount: Number(bill.payments[0].amount),
+          date: bill.payments[0].paidDate,
+          status: bill.payments[0].paidBy || 'Haven',
         } : null,
       })),
       byCategory: Object.entries(byCategory).map(([category, data]) => ({

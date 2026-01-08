@@ -9,103 +9,421 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
-import { getApiClient } from '../../src/lib/api';
 import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
-import type { BillingSummary, HouseholdInvoiceListItem, HouseholdInvoiceStatus } from '@haven/core';
+import { API_BASE_URL } from '../../src/lib/api';
+import { getIdToken } from '../../src/lib/firebase';
 
-const STATUS_COLORS: Record<HouseholdInvoiceStatus, string> = {
-  PENDING: colors.warning,
-  PROCESSING: colors.info,
-  PAID: colors.success,
-  FAILED: colors.error,
-  CANCELLED: colors.slate[400],
-};
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface Bill {
+  id: string;
+  category: string;
+  name: string;
+  payeeName: string | null;
+  amount: number;
+  frequency: string | null;
+  dueDay: number | null;
+  status: string;
+  havenManaged: boolean;
+  verified: boolean;
+  currentAutopay: boolean;
+  vendor: string | null;
+  lastPayment: {
+    amount: number;
+    date: string;
+    status: string;
+  } | null;
+}
+
+interface CategorySummary {
+  category: string;
+  billCount: number;
+  monthlyTotal: number;
+}
+
+interface BillsData {
+  bills: Bill[];
+  byCategory: CategorySummary[];
+  summary: {
+    totalBills: number;
+    monthlyTotal: number;
+    monthlyFunding: number;
+  };
+}
+
+// =============================================================================
+// HELPERS
+// =============================================================================
+
+function formatCurrency(amount: number | null | undefined) {
+  if (amount === null || amount === undefined) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatCurrencyDetailed(amount: number | null | undefined) {
+  if (amount === null || amount === undefined) return '$0.00';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(amount);
+}
+
+function getCategoryIcon(category: string): keyof typeof Ionicons.glyphMap {
+  const cat = category.toUpperCase();
+  if (cat.includes('MORTGAGE') || cat.includes('HOUSING') || cat.includes('RENT')) {
+    return 'home-outline';
+  }
+  if (cat.includes('UTILITY') || cat.includes('ELECTRIC') || cat.includes('GAS') || cat.includes('WATER')) {
+    return 'flash-outline';
+  }
+  if (cat.includes('INSURANCE')) {
+    return 'shield-outline';
+  }
+  if (cat.includes('SERVICE') || cat.includes('CLEANING') || cat.includes('LAWN')) {
+    return 'sparkles-outline';
+  }
+  if (cat.includes('KID') || cat.includes('ACTIVITY') || cat.includes('SCHOOL') || cat.includes('TUITION')) {
+    return 'school-outline';
+  }
+  if (cat.includes('PET')) {
+    return 'paw-outline';
+  }
+  if (cat.includes('VEHICLE') || cat.includes('AUTO') || cat.includes('CAR')) {
+    return 'car-outline';
+  }
+  if (cat.includes('HEALTH') || cat.includes('MEDICAL')) {
+    return 'heart-outline';
+  }
+  if (cat.includes('MAINTENANCE') || cat.includes('REPAIR')) {
+    return 'construct-outline';
+  }
+  return 'cash-outline';
+}
+
+function getCategoryColor(category: string) {
+  const cat = category.toUpperCase();
+  if (cat.includes('MORTGAGE') || cat.includes('HOUSING')) {
+    return { bg: '#E0E7FF', text: '#4338CA' }; // indigo
+  }
+  if (cat.includes('UTILITY')) {
+    return { bg: '#FEF3C7', text: '#B45309' }; // amber
+  }
+  if (cat.includes('INSURANCE')) {
+    return { bg: '#F5F0E6', text: '#8B7355' }; // champagne
+  }
+  if (cat.includes('SERVICE')) {
+    return { bg: '#F3E8FF', text: '#7C3AED' }; // purple
+  }
+  if (cat.includes('KID') || cat.includes('ACTIVITY')) {
+    return { bg: '#FCE7F3', text: '#BE185D' }; // pink
+  }
+  if (cat.includes('PET')) {
+    return { bg: '#FFEDD5', text: '#C2410C' }; // orange
+  }
+  if (cat.includes('VEHICLE')) {
+    return { bg: '#DBEAFE', text: '#1D4ED8' }; // blue
+  }
+  return { bg: colors.slate[100], text: colors.slate[700] };
+}
+
+function formatCategoryName(category: string) {
+  return category
+    .split('_')
+    .map((word) => word.charAt(0) + word.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function formatFrequency(freq: string | null) {
+  if (!freq) return 'mo';
+  const map: Record<string, string> = {
+    WEEKLY: 'wk',
+    BIWEEKLY: '2wk',
+    SEMI_MONTHLY: '2x/mo',
+    MONTHLY: 'mo',
+    QUARTERLY: 'qtr',
+    ANNUALLY: 'yr',
+  };
+  return map[freq] || 'mo';
+}
+
+// =============================================================================
+// COMPONENTS
+// =============================================================================
+
+function SummaryHeader({ summary }: { summary: BillsData['summary'] }) {
+  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long' });
+  const progress = summary.monthlyFunding > 0
+    ? Math.min((summary.monthlyTotal / summary.monthlyFunding) * 100, 100)
+    : 0;
+  const buffer = summary.monthlyFunding - summary.monthlyTotal;
+
+  return (
+    <View style={styles.summaryCard}>
+      <View style={styles.summaryHeader}>
+        <View style={styles.summaryLabel}>
+          <Ionicons name="card-outline" size={16} color={colors.haven.champagne[200]} />
+          <Text style={styles.summaryLabelText}>{currentMonth} Bills</Text>
+        </View>
+      </View>
+      <Text style={styles.summaryAmount}>{formatCurrency(summary.monthlyTotal)}</Text>
+      <Text style={styles.summarySubtext}>
+        {summary.totalBills} active bill{summary.totalBills !== 1 ? 's' : ''} managed by Haven
+      </Text>
+
+      {summary.monthlyFunding > 0 && (
+        <View style={styles.fundingSection}>
+          <View style={styles.fundingHeader}>
+            <Text style={styles.fundingLabel}>Monthly Funding</Text>
+            <Text style={styles.fundingAmount}>{formatCurrency(summary.monthlyFunding)}</Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View style={[styles.progressFill, { width: `${progress}%` }]} />
+          </View>
+          <Text style={styles.fundingBuffer}>
+            {buffer > 0
+              ? `${formatCurrency(buffer)} buffer remaining`
+              : 'Bills exceed funding amount'}
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
+function CategoryCard({
+  category,
+  bills,
+  isExpanded,
+  onToggle,
+}: {
+  category: CategorySummary;
+  bills: Bill[];
+  isExpanded: boolean;
+  onToggle: () => void;
+}) {
+  const categoryColors = getCategoryColor(category.category);
+  const icon = getCategoryIcon(category.category);
+
+  return (
+    <View style={styles.categoryCard}>
+      <TouchableOpacity
+        style={styles.categoryHeader}
+        onPress={onToggle}
+        activeOpacity={0.7}
+      >
+        <View style={styles.categoryLeft}>
+          <View style={[styles.categoryIcon, { backgroundColor: categoryColors.bg }]}>
+            <Ionicons name={icon} size={20} color={categoryColors.text} />
+          </View>
+          <View>
+            <Text style={styles.categoryName}>{formatCategoryName(category.category)}</Text>
+            <Text style={styles.categoryCount}>
+              {category.billCount} bill{category.billCount !== 1 ? 's' : ''}
+            </Text>
+          </View>
+        </View>
+        <View style={styles.categoryRight}>
+          <Text style={styles.categoryTotal}>{formatCurrency(category.monthlyTotal)}/mo</Text>
+          <Ionicons
+            name={isExpanded ? 'chevron-up' : 'chevron-down'}
+            size={20}
+            color={colors.slate[400]}
+          />
+        </View>
+      </TouchableOpacity>
+
+      {isExpanded && bills.length > 0 && (
+        <View style={styles.billsList}>
+          {bills.map((bill) => (
+            <View key={bill.id} style={styles.billItem}>
+              <View style={styles.billInfo}>
+                <View style={styles.billNameRow}>
+                  <Text style={styles.billName}>{bill.name}</Text>
+                  {bill.havenManaged && (
+                    <View style={styles.havenBadge}>
+                      <Text style={styles.havenBadgeText}>Haven Managed</Text>
+                    </View>
+                  )}
+                </View>
+                {bill.payeeName && (
+                  <Text style={styles.billPayee}>{bill.payeeName}</Text>
+                )}
+              </View>
+              <View style={styles.billRight}>
+                <Text style={styles.billAmount}>
+                  {formatCurrencyDetailed(bill.amount)}
+                  <Text style={styles.billFrequency}>/{formatFrequency(bill.frequency)}</Text>
+                </Text>
+                {bill.dueDay && (
+                  <Text style={styles.billDue}>Due day {bill.dueDay}</Text>
+                )}
+                {bill.lastPayment && (
+                  <View style={styles.paidRow}>
+                    <Ionicons name="checkmark-circle" size={12} color={colors.status.success} />
+                    <Text style={styles.paidText}>
+                      Paid {new Date(bill.lastPayment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+}
+
+function EmptyState() {
+  return (
+    <View style={styles.emptyState}>
+      <Ionicons name="card-outline" size={48} color={colors.slate[300]} />
+      <Text style={styles.emptyTitle}>No bills set up yet</Text>
+      <Text style={styles.emptySubtext}>
+        Your Home Manager will add your bills during onboarding.
+      </Text>
+    </View>
+  );
+}
+
+// =============================================================================
+// MAIN COMPONENT
+// =============================================================================
 
 export default function BillingScreen() {
-  const { currentHousehold } = useAuth();
-  const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null);
-  const [invoices, setInvoices] = useState<HouseholdInvoiceListItem[]>([]);
+  const { householdInfo } = useAuth();
+  const [data, setData] = useState<BillsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
-  const api = getApiClient();
-
-  const fetchData = useCallback(async () => {
-    if (!currentHousehold) return;
+  const fetchBills = useCallback(async () => {
+    if (!householdInfo?.id) {
+      setIsLoading(false);
+      return;
+    }
 
     try {
-      const [summaryData, invoicesData] = await Promise.all([
-        api.getBillingSummary(currentHousehold.id).catch(() => null),
-        api.getHouseholdInvoices(currentHousehold.id).catch(() => []),
-      ]);
-      setBillingSummary(summaryData);
-      setInvoices(invoicesData);
-    } catch (error) {
-      console.error('Failed to fetch billing data:', error);
+      const token = await getIdToken(true);
+      if (!token) {
+        setIsLoading(false);
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/household/${householdInfo.id}/bills`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to load bills');
+      }
+
+      const result: BillsData = await response.json();
+      setData(result);
+
+      // Expand first category by default
+      if (result.byCategory.length > 0) {
+        setExpandedCategories(new Set([result.byCategory[0].category]));
+      }
+    } catch (err) {
+      console.error('Bills error:', err);
+      setError(err instanceof Error ? err.message : 'Unknown error');
     } finally {
       setIsLoading(false);
     }
-  }, [api, currentHousehold]);
+  }, [householdInfo?.id]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    fetchBills();
+  }, [fetchBills]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchData();
+    await fetchBills();
     setRefreshing(false);
-  }, [fetchData]);
+  }, [fetchBills]);
 
-  const formatCurrency = (amount: number | null | undefined) => {
-    if (amount === null || amount === undefined) return '$0.00';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-    }).format(amount);
-  };
-
-  const formatDate = (date: string | Date | null | undefined) => {
-    if (!date) return 'N/A';
-    return new Date(date).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
+  const toggleCategory = (category: string) => {
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
     });
   };
 
-  // STUB: Subscription pricing
-  const subscriptionPricing: Record<string, number> = {
-    FREE: 0,
-    BASIC: 9.99,
-    PREMIUM: 19.99,
-    ENTERPRISE: 49.99,
-  };
-
-  const getTierName = (tier: string) => {
-    const names: Record<string, string> = {
-      FREE: 'Free',
-      BASIC: 'Basic',
-      PREMIUM: 'Premium',
-      ENTERPRISE: 'Enterprise',
-    };
-    return names[tier] || tier;
+  const getBillsForCategory = (category: string) => {
+    return data?.bills.filter((b) => b.category === category) || [];
   };
 
   if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer} edges={['bottom']}>
-        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
       </SafeAreaView>
     );
   }
 
-  if (!currentHousehold) {
+  if (!householdInfo?.id) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyText}>Select a household to view billing</Text>
+        <View style={styles.centerContent}>
+          <Ionicons name="wallet-outline" size={48} color={colors.slate[300]} />
+          <Text style={styles.emptyTitle}>No household found</Text>
+          <Text style={styles.emptySubtext}>Complete onboarding to view billing</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (error) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <View style={styles.centerContent}>
+          <Ionicons name="alert-circle-outline" size={48} color={colors.status.error} />
+          <Text style={[styles.emptyTitle, { color: colors.status.error }]}>Error loading bills</Text>
+          <Text style={styles.emptySubtext}>{error}</Text>
+          <TouchableOpacity style={styles.retryButton} onPress={fetchBills}>
+            <Text style={styles.retryButtonText}>Try Again</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!data || data.bills.length === 0) {
+    return (
+      <SafeAreaView style={styles.container} edges={['bottom']}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.haven.champagne[500]}
+            />
+          }
+        >
+          <EmptyState />
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -118,163 +436,57 @@ export default function BillingScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primary[600]}
+            tintColor={colors.haven.champagne[500]}
           />
         }
       >
-        {/* Summary Stats */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Current Plan</Text>
-            <Text style={styles.statValue}>
-              {getTierName(billingSummary?.subscriptionTier || 'FREE')}
-            </Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Subscription</Text>
-            <Text style={styles.statValue}>
-              {formatCurrency(subscriptionPricing[billingSummary?.subscriptionTier || 'FREE'])}/mo
-            </Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Bills Managed</Text>
-            <Text style={styles.statValue}>{billingSummary?.totalBillsManaged || 0}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Monthly Estimate</Text>
-            <Text style={styles.statValue}>
-              {formatCurrency(billingSummary?.monthlyBillEstimate)}
-            </Text>
-          </View>
+        {/* Summary Header */}
+        <SummaryHeader summary={data.summary} />
+
+        {/* Bills by Category */}
+        <View style={styles.categoriesSection}>
+          {data.byCategory.map((category) => (
+            <CategoryCard
+              key={category.category}
+              category={category}
+              bills={getBillsForCategory(category.category)}
+              isExpanded={expandedCategories.has(category.category)}
+              onToggle={() => toggleCategory(category.category)}
+            />
+          ))}
         </View>
 
-        {/* Latest Invoice */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Latest Invoice</Text>
-          {billingSummary?.latestInvoice ? (
-            <View style={styles.invoiceCard}>
-              <View style={styles.invoiceHeader}>
-                <Text style={styles.invoiceNumber}>
-                  {billingSummary.latestInvoice.invoiceNumber}
-                </Text>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: STATUS_COLORS[billingSummary.latestInvoice.status] + '20' },
-                  ]}
-                >
-                  <View
-                    style={[
-                      styles.statusDot,
-                      { backgroundColor: STATUS_COLORS[billingSummary.latestInvoice.status] },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: STATUS_COLORS[billingSummary.latestInvoice.status] },
-                    ]}
-                  >
-                    {billingSummary.latestInvoice.status}
-                  </Text>
-                </View>
+        {/* Quick Actions */}
+        <View style={styles.quickActions}>
+          <TouchableOpacity style={styles.actionCard}>
+            <View style={styles.actionContent}>
+              <View>
+                <Text style={styles.actionTitle}>Monthly Statement</Text>
+                <Text style={styles.actionSubtitle}>Download your detailed bill statement</Text>
               </View>
-              <Text style={styles.invoicePeriod}>
-                {formatDate(billingSummary.latestInvoice.billingPeriodStart)} - {formatDate(billingSummary.latestInvoice.billingPeriodEnd)}
-              </Text>
-              <Text style={styles.invoiceItems}>
-                {billingSummary.latestInvoice.itemCount} bill(s) included
-              </Text>
-              <View style={styles.invoiceTotalRow}>
-                <Text style={styles.invoiceTotalLabel}>Total</Text>
-                <Text style={styles.invoiceTotalAmount}>
-                  {formatCurrency(billingSummary.latestInvoice.total)}
-                </Text>
+              <View style={styles.actionButton}>
+                <Ionicons name="download-outline" size={20} color={colors.haven.navy[700]} />
+                <Text style={styles.actionButtonText}>PDF</Text>
               </View>
             </View>
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No invoices yet</Text>
-              <Text style={styles.emptySubtext}>
-                Consolidated invoices will appear here when you have bills managed by Haven.
-              </Text>
-            </View>
-          )}
+          </TouchableOpacity>
         </View>
 
-        {/* Bills Managed */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Bills Managed by Haven</Text>
-          {billingSummary?.billAccountsIncluded && billingSummary.billAccountsIncluded.length > 0 ? (
-            billingSummary.billAccountsIncluded.slice(0, 5).map((bill) => (
-              <View key={bill.id} style={styles.billCard}>
-                <View style={styles.billInfo}>
-                  <Text style={styles.billNickname}>{bill.nickname}</Text>
-                  <Text style={styles.billVendor}>{bill.vendorName}</Text>
-                </View>
-                <View style={styles.billAmount}>
-                  <Text style={styles.billAmountText}>
-                    {formatCurrency(bill.typicalAmount)}
-                  </Text>
-                  <Text style={styles.billAmountLabel}>/month</Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyText}>No bills set up</Text>
-              <Text style={styles.emptySubtext}>
-                Add bills with &quot;Haven pays on behalf&quot; to see them here.
-              </Text>
-            </View>
-          )}
-        </View>
-
-        {/* Invoice History */}
-        {invoices.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Invoice History</Text>
-            {invoices.slice(0, 5).map((invoice) => (
-              <View key={invoice.id} style={styles.historyCard}>
-                <View style={styles.historyInfo}>
-                  <Text style={styles.historyNumber}>{invoice.invoiceNumber}</Text>
-                  <Text style={styles.historyDate}>{formatDate(invoice.createdAt)}</Text>
-                </View>
-                <View style={styles.historyRight}>
-                  <Text style={styles.historyAmount}>{formatCurrency(invoice.total)}</Text>
-                  <View
-                    style={[
-                      styles.historyBadge,
-                      { backgroundColor: STATUS_COLORS[invoice.status] + '20' },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.historyBadgeText,
-                        { color: STATUS_COLORS[invoice.status] },
-                      ]}
-                    >
-                      {invoice.status}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            ))}
-          </View>
-        )}
-
-        {/* Info Card */}
-        {/* STUB: Coming soon notice for automatic bill pay */}
-        <View style={styles.infoCard}>
-          <Text style={styles.infoTitle}>Coming Soon: Automatic Bill Pay</Text>
-          <Text style={styles.infoText}>
-            Set up bills with &quot;Haven pays on behalf&quot; and we&apos;ll handle payments to your vendors automatically via Stripe Connect.
+        {/* Info Banner */}
+        <View style={styles.infoBanner}>
+          <Ionicons name="information-circle-outline" size={20} color={colors.haven.navy[600]} />
+          <Text style={styles.infoBannerText}>
+            Haven automatically pays your bills on time. Sit back and relax!
           </Text>
         </View>
       </ScrollView>
     </SafeAreaView>
   );
 }
+
+// =============================================================================
+// STYLES
+// =============================================================================
 
 const styles = StyleSheet.create({
   container: {
@@ -287,213 +499,302 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.slate[50],
   },
+  centerContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing[6],
+  },
   scrollContent: {
     padding: spacing[4],
+    paddingBottom: spacing[8],
   },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing[3],
+
+  // Summary Header
+  summaryCard: {
+    backgroundColor: colors.haven.navy[800],
+    borderRadius: borderRadius.xl,
+    padding: spacing[6],
     marginBottom: spacing[6],
+    overflow: 'hidden',
   },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    ...shadows.sm,
+  summaryHeader: {
+    marginBottom: spacing[2],
   },
-  statLabel: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.slate[500],
+  summaryLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  summaryLabelText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[200],
+  },
+  summaryAmount: {
+    fontSize: 40,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.white,
     marginBottom: spacing[1],
   },
-  statValue: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.slate[900],
+  summarySubtext: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[200],
+    marginBottom: spacing[4],
   },
-  section: {
-    marginBottom: spacing[6],
-  },
-  sectionTitle: {
-    fontSize: typography.fontSizes.lg,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-    marginBottom: spacing[3],
-  },
-  invoiceCard: {
-    backgroundColor: colors.white,
+  fundingSection: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
     borderRadius: borderRadius.lg,
     padding: spacing[4],
-    ...shadows.sm,
   },
-  invoiceHeader: {
+  fundingHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: spacing[2],
   },
-  invoiceNumber: {
+  fundingLabel: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[200],
+  },
+  fundingAmount: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+  progressBar: {
+    height: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: borderRadius.full,
+  },
+  fundingBuffer: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.haven.champagne[200],
+    marginTop: spacing[2],
+  },
+
+  // Categories Section
+  categoriesSection: {
+    gap: spacing[4],
+    marginBottom: spacing[6],
+  },
+  categoryCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    overflow: 'hidden',
+    ...shadows.sm,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing[4],
+  },
+  categoryLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  categoryIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  categoryName: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
     color: colors.slate[900],
   },
-  statusBadge: {
+  categoryCount: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.slate[500],
+    marginTop: 2,
+  },
+  categoryRight: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing[2],
-    paddingVertical: 4,
-    borderRadius: borderRadius.full,
+    gap: spacing[2],
   },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    marginRight: 4,
-  },
-  statusText: {
-    fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.medium,
-  },
-  invoicePeriod: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-  },
-  invoiceItems: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: spacing[1],
-  },
-  invoiceTotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: spacing[3],
-    paddingTop: spacing[3],
-    borderTopWidth: 1,
-    borderTopColor: colors.slate[200],
-  },
-  invoiceTotalLabel: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-  },
-  invoiceTotalAmount: {
-    fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.bold,
+  categoryTotal: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
     color: colors.slate[900],
   },
-  emptyCard: {
-    backgroundColor: colors.white,
+
+  // Bills List (expanded)
+  billsList: {
+    borderTopWidth: 1,
+    borderTopColor: colors.slate[100],
+    paddingHorizontal: spacing[4],
+    paddingBottom: spacing[4],
+  },
+  billItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.slate[50],
     borderRadius: borderRadius.lg,
-    padding: spacing[6],
+    marginTop: spacing[3],
+  },
+  billInfo: {
+    flex: 1,
+    marginRight: spacing[3],
+  },
+  billNameRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+  },
+  billName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  havenBadge: {
+    backgroundColor: colors.status.success + '20',
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: borderRadius.sm,
+  },
+  havenBadgeText: {
+    fontSize: 10,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.status.success,
+  },
+  billPayee: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[500],
+    marginTop: 2,
+  },
+  billRight: {
+    alignItems: 'flex-end',
+  },
+  billAmount: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  billFrequency: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.normal,
+    color: colors.slate[400],
+  },
+  billDue: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[500],
+    marginTop: 2,
+  },
+  paidRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 4,
+  },
+  paidText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.status.success,
+  },
+
+  // Quick Actions
+  quickActions: {
+    marginBottom: spacing[4],
+  },
+  actionCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing[4],
     ...shadows.sm,
   },
-  emptyText: {
+  actionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  actionTitle: {
     fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  actionSubtitle: {
+    fontSize: typography.fontSizes.sm,
     color: colors.slate[500],
+    marginTop: 2,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    backgroundColor: colors.slate[100],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.lg,
+  },
+  actionButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.navy[700],
+  },
+
+  // Info Banner
+  infoBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    backgroundColor: colors.haven.navy[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.haven.navy[100],
+  },
+  infoBannerText: {
+    flex: 1,
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.navy[700],
+    lineHeight: 20,
+  },
+
+  // Empty State
+  emptyState: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[12],
+  },
+  emptyTitle: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.slate[600],
+    marginTop: spacing[4],
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: typography.fontSizes.sm,
     color: colors.slate[400],
-    textAlign: 'center',
     marginTop: spacing[2],
+    textAlign: 'center',
+    maxWidth: 280,
   },
-  billCard: {
-    backgroundColor: colors.white,
+
+  // Retry Button
+  retryButton: {
+    backgroundColor: colors.haven.champagne[500],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    marginBottom: spacing[3],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    ...shadows.sm,
+    marginTop: spacing[4],
   },
-  billInfo: {
-    flex: 1,
-  },
-  billNickname: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.slate[900],
-  },
-  billVendor: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: spacing[1],
-  },
-  billAmount: {
-    alignItems: 'flex-end',
-  },
-  billAmountText: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
-  billAmountLabel: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.slate[400],
-  },
-  historyCard: {
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    marginBottom: spacing[2],
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  historyInfo: {
-    flex: 1,
-  },
-  historyNumber: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.slate[900],
-  },
-  historyDate: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.slate[400],
-    marginTop: 2,
-  },
-  historyRight: {
-    alignItems: 'flex-end',
-  },
-  historyAmount: {
+  retryButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
-  historyBadge: {
-    paddingHorizontal: spacing[2],
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    marginTop: 4,
-  },
-  historyBadgeText: {
-    fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.medium,
-  },
-  infoCard: {
-    backgroundColor: colors.info + '10',
-    borderRadius: borderRadius.lg,
-    padding: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.info + '30',
-  },
-  infoTitle: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.info,
-    marginBottom: spacing[2],
-  },
-  infoText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.info,
-    lineHeight: 20,
+    color: colors.white,
   },
 });

@@ -20,8 +20,20 @@ import {
   signOut as firebaseSignOut,
   onAuthChange,
   getIdToken,
+  resetPassword as firebaseResetPassword,
   type FirebaseUser,
 } from '../lib/firebase';
+import { signInWithApple, isAppleAuthAvailable } from '../lib/apple-auth';
+import { signInWithGoogle, configureGoogleSignIn } from '../lib/google-auth';
+import {
+  authenticateWithBiometric,
+  getBiometricStatus,
+  BiometricStatus,
+} from '../lib/biometric-auth';
+import * as SecureStore from 'expo-secure-store';
+
+const STORED_EMAIL_KEY = 'haven_stored_email';
+const STORED_PASSWORD_KEY = 'haven_stored_password';
 
 // Extended user info including household data from /api/me
 interface UserInfo {
@@ -68,13 +80,20 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, displayName?: string) => Promise<void>;
+  biometricStatus: BiometricStatus | null;
+  isAppleSignInAvailable: boolean;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  register: (email: string, password: string, displayName?: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithApple: () => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   selectHousehold: (household: Household) => void;
   refreshHouseholds: () => Promise<void>;
   refreshCurrentHousehold: () => Promise<void>;
   refreshMe: () => Promise<void>;
+  refreshBiometricStatus: () => Promise<void>;
   completeOnboarding: (householdId: string) => Promise<void>;
 }
 
@@ -90,8 +109,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [currentHousehold, setCurrentHousehold] = useState<HouseholdDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [biometricStatus, setBiometricStatus] = useState<BiometricStatus | null>(null);
+  const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
 
   const api = getApiClient();
+
+  // Configure Google Sign In and check Apple availability on mount
+  useEffect(() => {
+    configureGoogleSignIn();
+    isAppleAuthAvailable().then(setIsAppleSignInAvailable);
+  }, []);
+
+  // Refresh biometric status
+  const refreshBiometricStatus = useCallback(async () => {
+    const status = await getBiometricStatus();
+    setBiometricStatus(status);
+  }, []);
 
   // Check if user needs onboarding (no households)
   const needsOnboarding = !!user && !householdInfo;
@@ -219,25 +252,166 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
       if (needsOnboarding) {
-        router.replace('/(auth)/onboarding');
+        // Navigate to new magic onboarding flow (address screen)
+        router.replace('/(auth)/onboarding/address');
       } else {
         router.replace('/(tabs)');
       }
     }
   }, [user, segments, isLoading, isInitialized, needsOnboarding, router]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    await firebaseSignIn(email, password);
-    // Auth state change listener will handle the rest
+  const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await firebaseSignIn(email, password);
+
+      // Store credentials for biometric login
+      await SecureStore.setItemAsync(STORED_EMAIL_KEY, email);
+      await SecureStore.setItemAsync(STORED_PASSWORD_KEY, password);
+
+      return { success: true };
+    } catch (error: any) {
+      let errorMessage = 'Failed to sign in';
+
+      // Handle Firebase not configured error
+      if (error.message === 'Firebase is not configured') {
+        errorMessage = 'App configuration error. Please restart the app.';
+      } else {
+        switch (error.code) {
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          case 'auth/user-disabled':
+            errorMessage = 'This account has been disabled';
+            break;
+          case 'auth/user-not-found':
+            errorMessage = 'No account found with this email';
+            break;
+          case 'auth/wrong-password':
+            errorMessage = 'Incorrect password';
+            break;
+          case 'auth/too-many-requests':
+            errorMessage = 'Too many failed attempts. Please try again later.';
+            break;
+          case 'auth/invalid-credential':
+            errorMessage = 'Invalid email or password';
+            break;
+        }
+      }
+
+      return { success: false, error: errorMessage };
+    }
   }, []);
 
   const register = useCallback(
-    async (email: string, password: string, displayName?: string) => {
-      await firebaseSignUp(email, password, displayName);
-      // Auth state change listener will handle the rest
+    async (email: string, password: string, displayName?: string): Promise<{ success: boolean; error?: string }> => {
+      try {
+        await firebaseSignUp(email, password, displayName);
+
+        // Store credentials for biometric login
+        await SecureStore.setItemAsync(STORED_EMAIL_KEY, email);
+        await SecureStore.setItemAsync(STORED_PASSWORD_KEY, password);
+
+        return { success: true };
+      } catch (error: any) {
+        console.error('Sign up error:', error);
+
+        let errorMessage = 'Failed to create account';
+        switch (error.code) {
+          case 'auth/email-already-in-use':
+            errorMessage = 'An account with this email already exists';
+            break;
+          case 'auth/invalid-email':
+            errorMessage = 'Invalid email address';
+            break;
+          case 'auth/weak-password':
+            errorMessage = 'Password must be at least 6 characters';
+            break;
+        }
+
+        return { success: false, error: errorMessage };
+      }
     },
     []
   );
+
+  // Sign in with Apple
+  const loginWithApple = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const result = await signInWithApple();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Apple Sign In failed' };
+    }
+  }, []);
+
+  // Sign in with Google
+  const loginWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const result = await signInWithGoogle();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Google Sign In failed' };
+    }
+  }, []);
+
+  // Sign in with biometrics
+  const loginWithBiometric = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    // First, authenticate with biometrics
+    const authResult = await authenticateWithBiometric();
+
+    if (!authResult.success) {
+      return authResult;
+    }
+
+    // Get stored credentials
+    try {
+      const email = await SecureStore.getItemAsync(STORED_EMAIL_KEY);
+      const password = await SecureStore.getItemAsync(STORED_PASSWORD_KEY);
+
+      if (!email || !password) {
+        return {
+          success: false,
+          error: 'No stored credentials. Please sign in with your password first.',
+        };
+      }
+
+      // Sign in with stored credentials
+      return await login(email, password);
+    } catch (error) {
+      return {
+        success: false,
+        error: 'Failed to retrieve stored credentials',
+      };
+    }
+  }, [login]);
+
+  // Reset password
+  const resetPassword = useCallback(async (email: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await firebaseResetPassword(email);
+      return { success: true };
+    } catch (error: any) {
+      let errorMessage = 'Failed to send reset email';
+      if (error.code === 'auth/user-not-found') {
+        errorMessage = 'No account found with this email';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address';
+      } else if (error.message === 'Firebase is not configured') {
+        errorMessage = 'Password reset is not available';
+      }
+      return { success: false, error: errorMessage };
+    }
+  }, []);
 
   const logout = useCallback(async () => {
     await firebaseSignOut();
@@ -309,7 +483,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const completeOnboarding = useCallback(
     async (householdId: string) => {
-      // Refresh data after onboarding
+      // Refresh data after onboarding - this updates householdInfo
+      // The navigation guard will automatically redirect to /(tabs) when
+      // needsOnboarding becomes false (i.e., when householdInfo is set)
       await refreshHouseholds();
 
       try {
@@ -319,10 +495,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // Ignore errors
       }
 
-      // Navigate to main app
-      router.replace('/(tabs)');
+      // Don't navigate explicitly - let the navigation guard handle it
+      // This prevents race conditions with multiple navigation calls
     },
-    [api, router, refreshHouseholds]
+    [api, refreshHouseholds]
   );
 
   return (
@@ -336,13 +512,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding,
+        biometricStatus,
+        isAppleSignInAvailable,
         login,
         register,
+        loginWithApple,
+        loginWithGoogle,
+        loginWithBiometric,
+        resetPassword,
         logout,
         selectHousehold,
         refreshHouseholds,
         refreshCurrentHousehold,
         refreshMe,
+        refreshBiometricStatus,
         completeOnboarding,
       }}
     >

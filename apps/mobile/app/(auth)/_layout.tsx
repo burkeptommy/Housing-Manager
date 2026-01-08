@@ -1,26 +1,24 @@
 import { Stack } from 'expo-router';
-import { colors } from '../../src/lib/theme';
+import { colors, typography } from '../../src/lib/theme';
 
 export default function AuthLayout() {
   return (
     <Stack
       screenOptions={{
         headerStyle: {
-          backgroundColor: colors.primary[600],
+          backgroundColor: colors.white,
         },
-        headerTintColor: colors.white,
+        headerTintColor: colors.haven.navy[900],
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: typography.fontWeights.semibold,
         },
-        contentStyle: {
-          backgroundColor: colors.slate[50],
-        },
+        headerShadowVisible: false,
+        headerBackTitle: '',
       }}
     >
       <Stack.Screen
         name="login"
         options={{
-          title: 'Sign In',
           headerShown: false,
         }}
       />
@@ -28,14 +26,18 @@ export default function AuthLayout() {
         name="register"
         options={{
           title: 'Create Account',
-          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="forgot-password"
+        options={{
+          title: 'Reset Password',
         }}
       />
       <Stack.Screen
         name="onboarding"
         options={{
-          title: 'Set Up Your Home',
-          headerBackVisible: false,
+          headerShown: false,
         }}
       />
     </Stack>

@@ -147,6 +147,12 @@ export class SubscriptionRepository extends BaseRepository {
       BASIC: 0,
       PREMIUM: 0,
       ENTERPRISE: 0,
+      // Haven tiers
+      ESSENTIALS: 0,
+      LITE: 0,
+      HAVEN: 0,
+      HAVEN_PLUS: 0,
+      ESTATE: 0,
     };
 
     for (const item of counts) {

@@ -94,7 +94,7 @@ function ConfirmationContent() {
         <div className="space-y-3">
           {type !== 'visit' && (
             <Link
-              href="/onboarding/wizard"
+              href="/app"
               className="w-full py-4 px-6 bg-haven-champagne-500 hover:bg-haven-champagne-600 text-haven-navy-900 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
             >
               Start entering info now
@@ -102,7 +102,7 @@ function ConfirmationContent() {
             </Link>
           )}
           <Link
-            href="/"
+            href="/app"
             className="w-full py-4 px-6 border border-gray-200 text-gray-700 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
           >
             I&apos;ll wait for my {type === 'visit' ? 'visit' : 'call'}

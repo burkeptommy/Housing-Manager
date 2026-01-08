@@ -1485,6 +1485,100 @@ async function main() {
   });
   console.log(`✅ Created homeowner user: ${homeownerAlice.email} (Client - 1 house, 4 family members)`);
 
+  // Create Essentials Demo User - for testing Alfred AI (no human manager)
+  const essentialsPassword = await bcrypt.hash('Demo123!', 12);
+  const essentialsDemoUser = await prisma.user.upsert({
+    where: { email: 'demo@essentials.haven.app' },
+    update: {},
+    create: {
+      email: 'demo@essentials.haven.app',
+      passwordHash: essentialsPassword,
+      firstName: 'Demo',
+      lastName: 'Essentials',
+      displayName: 'Demo User',
+      role: UserRole.HOMEOWNER,
+      emailVerified: true,
+      emailVerifiedAt: new Date(),
+    },
+  });
+  console.log(`✅ Created Essentials demo user: ${essentialsDemoUser.email} (Alfred AI tier)`);
+
+  // Create Essentials Demo Household
+  const essentialsHousehold = await prisma.household.upsert({
+    where: { id: 'essentials-demo-household' },
+    update: {},
+    create: {
+      id: 'essentials-demo-household',
+      name: 'Maple Street Home',
+      description: 'Demo household for Essentials tier - Alfred AI managed',
+      ownerId: essentialsDemoUser.id,
+      // Note: No managerId - this is Essentials tier with Alfred AI
+      stripeCustomerId: 'cus_essentials_demo_123',
+      billingCycleDay: 1,
+      billingSettings: {
+        autoPayEnabled: false,
+        preferredPaymentDay: 1,
+        notifyBeforeDue: 3,
+      },
+      members: {
+        create: {
+          userId: essentialsDemoUser.id,
+          role: 'OWNER',
+          status: 'ACTIVE',
+          joinedAt: new Date(),
+        },
+      },
+      homeProfile: {
+        create: {
+          propertyType: 'SINGLE_FAMILY',
+          addressLine1: '123 Maple Street',
+          city: 'Westchester',
+          state: 'NY',
+          postalCode: '10604',
+          country: 'US',
+          squareFeet: 2400,
+          yearBuilt: 1985,
+          bedrooms: 3,
+          bathrooms: 2.5,
+          stories: 2,
+          garageSpaces: 2,
+          lotSize: 0.5,
+          notes: JSON.stringify({
+            systems: {
+              hasPool: false,
+              septicOrSewer: 'sewer',
+              hasFireplace: true,
+              fireplaceType: 'gas',
+              hasSprinklerSystem: true,
+              hasSecuritySystem: false,
+              hasSmartHome: true,
+            },
+          }),
+        },
+      },
+    },
+  });
+  console.log(`✅ Created Essentials household: ${essentialsHousehold.name}`);
+
+  // Create Essentials subscription for demo user
+  const existingEssentialsSubscription = await prisma.subscription.findFirst({
+    where: { userId: essentialsDemoUser.id },
+  });
+
+  const essentialsSubscription = existingEssentialsSubscription
+    ? existingEssentialsSubscription
+    : await prisma.subscription.create({
+        data: {
+          userId: essentialsDemoUser.id,
+          tier: 'ESSENTIALS',
+          status: 'ACTIVE',
+          stripeSubscriptionId: 'sub_essentials_demo_123',
+          currentPeriodStart: new Date(),
+          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      });
+  console.log(`✅ Created Essentials subscription: ${essentialsSubscription.tier}`);
+
   // Keep the original demo user for backward compatibility
   const demoUser = homeownerBob; // Alias for existing code
 
@@ -3425,6 +3519,13 @@ async function main() {
   console.log('    Password: Alice123!');
   console.log('    Properties: The Johnson Family Home (IL)');
   console.log('    Family: Alice, Michael (spouse), Emma (daughter), Jack (son)');
+  console.log('');
+  console.log('  🤖 Essentials Demo (Alfred AI tier - no human manager):');
+  console.log('    Email:    demo@essentials.haven.app');
+  console.log('    Password: Demo123!');
+  console.log('    Tier:     ESSENTIALS ($39/mo)');
+  console.log('    Manager:  Alfred AI (no human manager)');
+  console.log('    Property: Maple Street Home (Westchester, NY)');
   console.log('');
   console.log('  🔧 Vendor - Ace Roofing:');
   console.log('    Email:    vendor@aceroofing.example.com');

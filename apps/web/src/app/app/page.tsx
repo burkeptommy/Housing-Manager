@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/contexts/auth-context';
+import { useHomeHealth } from '@/hooks/use-home-health';
 import { images, getAvatarUrl } from '@/lib/images';
 import { Card, CardHeader, CardContent, Badge, Button } from '@/components/ui';
 import { Avatar, ManagerAvatar } from '@/components/ui/avatar';
@@ -207,11 +208,21 @@ function getLocationIcon(location: FamilyLocationStatus) {
 // ============================================================================
 
 // Hero Greeting Section
-function HeroGreeting({ userName, weather }: { userName: string; weather: WeatherData }) {
+interface HeroGreetingProps {
+  userName: string;
+  weather: WeatherData;
+  houseHealth: {
+    score: number;
+    itemsHandled: number;
+    nextService: string;
+  };
+}
+
+function HeroGreeting({ userName, weather, houseHealth }: HeroGreetingProps) {
   const { greeting, note } = useMemo(() => getGreeting(), []);
   const WeatherIcon = WEATHER_ICONS[weather.condition];
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-  const healthColors = getHealthColors(mockHouseHealth.score);
+  const healthColors = getHealthColors(houseHealth.score);
 
   return (
     <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-4 sm:p-8 text-white mb-6 sm:mb-8">
@@ -242,7 +253,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
           <div className={`col-span-2 sm:col-span-1 ${healthColors.bg} ${healthColors.border} border rounded-xl px-4 py-3`}>
             <p className="text-warm-500 text-xs font-medium">Home Health</p>
             <div className="flex items-center gap-2">
-              <p className={`text-2xl font-bold ${healthColors.text}`}>{mockHouseHealth.score}%</p>
+              <p className={`text-2xl font-bold ${healthColors.text}`}>{houseHealth.score}%</p>
               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${healthColors.badge}`}>
                 {healthColors.label}
               </span>
@@ -251,7 +262,7 @@ function HeroGreeting({ userName, weather }: { userName: string; weather: Weathe
           {/* Items Handled - Champagne */}
           <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
             <p className="text-champagne-600 text-xs font-medium">Items Handled</p>
-            <p className="text-2xl font-bold text-haven-700">{mockHouseHealth.itemsHandled}</p>
+            <p className="text-2xl font-bold text-haven-700">{houseHealth.itemsHandled}</p>
           </div>
           {/* Next Service - Champagne */}
           <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
@@ -522,11 +533,19 @@ function FamilyLogisticsCard({ members }: { members: FamilyMemberStatus[] }) {
 }
 
 // House Health Card (Premium)
-function HouseHealthCard({
-  health,
-}: {
-  health: typeof mockHouseHealth;
-}) {
+interface HouseHealthCardProps {
+  health: {
+    score: number;
+    grade: string;
+    factors: Array<{ category: string; description: string; status: string }>;
+    recommendations: string[];
+    itemsHandled: number;
+    nextService: string;
+    handlingItems: Array<{ id: string; task: string; status: HouseHealthStatus }>;
+  };
+}
+
+function HouseHealthCard({ health }: HouseHealthCardProps) {
   const healthColors = getHealthColors(health.score);
 
   return (
@@ -747,10 +766,24 @@ function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
 // ============================================================================
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, householdInfo } = useAuth();
   const userName = user?.firstName || 'there';
   const [actionItems, setActionItems] = useState(mockActionItems);
   const [showRequestModal, setShowRequestModal] = useState(false);
+
+  // Fetch real health score from API
+  const { data: healthScore } = useHomeHealth(householdInfo?.id);
+
+  // Merge real health score with mock data for items we don't have in API yet
+  const houseHealth = useMemo(() => ({
+    score: healthScore?.score ?? mockHouseHealth.score,
+    grade: healthScore?.grade ?? 'Good',
+    factors: healthScore?.factors ?? [],
+    recommendations: healthScore?.recommendations ?? [],
+    itemsHandled: mockHouseHealth.itemsHandled, // TODO: Get from API
+    nextService: mockHouseHealth.nextService, // TODO: Get from API
+    handlingItems: mockHouseHealth.handlingItems, // TODO: Get from API
+  }), [healthScore]);
 
   const dismissAction = (id: string) => {
     setActionItems(prev => prev.filter(item => item.id !== id));
@@ -763,7 +796,7 @@ export default function DashboardPage() {
   return (
     <div className="pb-32 lg:pb-8 max-w-6xl mx-auto">
       {/* Hero Greeting */}
-      <HeroGreeting userName={userName} weather={mockWeather} />
+      <HeroGreeting userName={userName} weather={mockWeather} houseHealth={houseHealth} />
 
       {/* Today's Notes */}
       <div className="mb-6">
@@ -783,9 +816,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <AllCaughtUpCard
-            itemsHandled={mockHouseHealth.itemsHandled}
-            healthScore={mockHouseHealth.score}
-            nextService={mockHouseHealth.nextService}
+            itemsHandled={houseHealth.itemsHandled}
+            healthScore={houseHealth.score}
+            nextService={houseHealth.nextService}
           />
         )}
       </div>
@@ -798,7 +831,7 @@ export default function DashboardPage() {
       {/* Two Column Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         <FamilyLogisticsCard members={mockFamilyStatus} />
-        <HouseHealthCard health={mockHouseHealth} />
+        <HouseHealthCard health={houseHealth} />
       </div>
 
       {/* Quick Actions */}

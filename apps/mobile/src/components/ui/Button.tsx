@@ -8,8 +8,15 @@ import {
   TextStyle,
   View,
 } from 'react-native';
-import * as Haptics from 'expo-haptics';
 import { colors, typography, spacing, borderRadius, shadows, touchTarget } from '../../lib/theme';
+
+// Lazy import haptics to prevent crash if native module isn't available
+let Haptics: typeof import('expo-haptics') | null = null;
+try {
+  Haptics = require('expo-haptics');
+} catch {
+  console.log('expo-haptics not available');
+}
 
 type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
 type ButtonSize = 'sm' | 'md' | 'lg';
@@ -44,8 +51,12 @@ export function Button({
   haptic = true,
 }: ButtonProps) {
   const handlePress = () => {
-    if (haptic) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    if (haptic && Haptics) {
+      try {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      } catch {
+        // Ignore haptic errors
+      }
     }
     onPress();
   };

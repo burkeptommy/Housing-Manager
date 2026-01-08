@@ -42,14 +42,14 @@ export default function RegisterScreen() {
     }
 
     setIsLoading(true);
-    try {
-      const displayName = `${firstName.trim()} ${lastName.trim()}`;
-      await register(email.trim(), password, displayName);
-    } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'Unable to create account');
-    } finally {
-      setIsLoading(false);
+    const displayName = `${firstName.trim()} ${lastName.trim()}`;
+    const result = await register(email.trim(), password, displayName);
+
+    if (!result.success) {
+      Alert.alert('Registration Failed', result.error || 'Unable to create account');
     }
+    // If successful, auth-context will handle navigation to onboarding
+    setIsLoading(false);
   };
 
   return (

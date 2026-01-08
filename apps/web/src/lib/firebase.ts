@@ -25,38 +25,60 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase (ensure single instance)
-let firebaseApp: FirebaseApp;
-let auth: Auth;
+let firebaseApp: FirebaseApp | null = null;
+let auth: Auth | null = null;
 
-function getFirebaseApp(): FirebaseApp {
+function getFirebaseApp(): FirebaseApp | null {
+  // Prevent initialization on server
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   if (firebaseApp) return firebaseApp;
 
-  const apps = getApps();
-  if (apps.length > 0) {
-    firebaseApp = apps[0]!;
-  } else {
-    firebaseApp = initializeApp(firebaseConfig);
+  try {
+    const apps = getApps();
+    if (apps.length > 0) {
+      firebaseApp = apps[0]!;
+    } else {
+      firebaseApp = initializeApp(firebaseConfig);
+    }
+  } catch (error) {
+    console.error('Failed to initialize Firebase:', error);
+    return null;
   }
 
   return firebaseApp;
 }
 
-export function getFirebaseAuth(): Auth {
+export function getFirebaseAuth(): Auth | null {
+  // Prevent initialization on server
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
   if (auth) return auth;
 
-  const app = getFirebaseApp();
-  auth = getAuth(app);
+  try {
+    const app = getFirebaseApp();
+    if (!app) return null;
 
-  // Connect to emulator in development if configured
-  if (
-    process.env.NODE_ENV === 'development' &&
-    process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST
-  ) {
-    connectAuthEmulator(
-      auth,
-      `http://${process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST}`,
-      { disableWarnings: true }
-    );
+    auth = getAuth(app);
+
+    // Connect to emulator in development if configured
+    if (
+      process.env.NODE_ENV === 'development' &&
+      process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST
+    ) {
+      connectAuthEmulator(
+        auth,
+        `http://${process.env.NEXT_PUBLIC_FIREBASE_AUTH_EMULATOR_HOST}`,
+        { disableWarnings: true }
+      );
+    }
+  } catch (error) {
+    console.error('Failed to get Firebase Auth:', error);
+    return null;
   }
 
   return auth;
@@ -67,6 +89,7 @@ export function getFirebaseAuth(): Auth {
  */
 export async function signIn(email: string, password: string) {
   const auth = getFirebaseAuth();
+  if (!auth) throw new Error('Firebase not initialized');
   const credential = await signInWithEmailAndPassword(auth, email, password);
   return credential.user;
 }
@@ -80,6 +103,7 @@ export async function signUp(
   displayName?: string
 ) {
   const auth = getFirebaseAuth();
+  if (!auth) throw new Error('Firebase not initialized');
   const credential = await createUserWithEmailAndPassword(auth, email, password);
 
   // Update profile with display name if provided
@@ -95,6 +119,7 @@ export async function signUp(
  */
 export async function signOut() {
   const auth = getFirebaseAuth();
+  if (!auth) return;
   await firebaseSignOut(auth);
 }
 
@@ -103,6 +128,7 @@ export async function signOut() {
  */
 export async function resetPassword(email: string) {
   const auth = getFirebaseAuth();
+  if (!auth) throw new Error('Firebase not initialized');
   await sendPasswordResetEmail(auth, email);
 }
 
@@ -111,6 +137,7 @@ export async function resetPassword(email: string) {
  */
 export async function signInWithGoogle() {
   const auth = getFirebaseAuth();
+  if (!auth) throw new Error('Firebase not initialized');
   const provider = new GoogleAuthProvider();
 
   // Request additional scopes if needed
@@ -127,6 +154,7 @@ export async function signInWithGoogle() {
  */
 export async function getIdToken(forceRefresh = false): Promise<string | null> {
   const auth = getFirebaseAuth();
+  if (!auth) return null;
   const user = auth.currentUser;
 
   if (!user) return null;
@@ -139,6 +167,7 @@ export async function getIdToken(forceRefresh = false): Promise<string | null> {
  */
 export function getCurrentUser(): FirebaseUser | null {
   const auth = getFirebaseAuth();
+  if (!auth) return null;
   return auth.currentUser;
 }
 
@@ -149,6 +178,10 @@ export function onAuthChange(
   callback: (user: FirebaseUser | null) => void
 ): () => void {
   const auth = getFirebaseAuth();
+  if (!auth) {
+    // Return a no-op unsubscribe function on server
+    return () => {};
+  }
   return onAuthStateChanged(auth, callback);
 }
 

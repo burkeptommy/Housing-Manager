@@ -24,6 +24,9 @@ export const GOOGLE_PLACES_API_KEY = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_K
 // Plaid
 export const PLAID_ENV = process.env.EXPO_PUBLIC_PLAID_ENV || 'sandbox';
 
+// Google Sign In - Get from Firebase Console > Authentication > Sign-in method > Google
+export const GOOGLE_WEB_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || 'YOUR_GOOGLE_WEB_CLIENT_ID';
+
 // App Config
 export const APP_CONFIG = {
   name: 'Haven',

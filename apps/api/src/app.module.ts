@@ -47,6 +47,10 @@ import { StorageModule } from './storage';
 import { DocumentModule } from './document';
 import { PlaidModule } from './plaid';
 import { BillsModule } from './bills/bills.module';
+import { AlfredModule } from './alfred/alfred.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { HomeHealthModule } from './home-health/home-health.module';
+import { EquipmentModule } from './equipment/equipment.module';
 
 @Module({
   imports: [
@@ -98,6 +102,10 @@ import { BillsModule } from './bills/bills.module';
     DocumentModule,
     PlaidModule,
     BillsModule,
+    AlfredModule,
+    SubscriptionModule,
+    HomeHealthModule,
+    EquipmentModule,
   ],
   controllers: [AppController],
   providers: [AppService],

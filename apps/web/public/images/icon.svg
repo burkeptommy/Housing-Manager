@@ -1,15 +1,18 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="navyGrad" x1="0" y1="0" x2="1024" y2="1024" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#1E3A8A"/> <stop offset="1" stop-color="#020617"/> </linearGradient>
-  </defs>
-  <rect width="1024" height="1024" fill="url(#navyGrad)"/>
+  <!-- Navy background -->
+  <rect width="1024" height="1024" fill="#0a1929"/>
 
-  <g transform="translate(512, 512) scale(8.5)">
-    <path d="M-35 5 L0 -25 L35 5 V30 C35 33 32 36 29 36 H-29 C-32 36 -35 33 -35 30 V5 Z"
-          stroke="white" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
-    
-    <path d="M0 -8 C0 -8 2 0 10 0 C 2 0 0 8 0 8 C 0 8 -2 0 -10 0 C -2 0 0 -8 0 -8 Z"
-          fill="white"/>
+  <!-- Haven H with champagne roof - centered and scaled -->
+  <g transform="translate(512, 550) scale(14)">
+    <!-- H letter in white -->
+    <path
+      d="M -19 -13 L -7.5 -13 L -7.5 -11 L -12 -11 L -12 -2 L 12 -2 L 12 -11 L 7.5 -11 L 7.5 -13 L 19 -13 L 19 -11 L 15.5 -11 L 15.5 11 L 19 11 L 19 13 L 7.5 13 L 7.5 11 L 12 11 L 12 2 L -12 2 L -12 11 L -7.5 11 L -7.5 13 L -19 13 L -19 11 L -15.5 11 L -15.5 -11 L -19 -11 Z"
+      fill="white"
+    />
+    <!-- Champagne roof -->
+    <path
+      d="M 0 -20 L -27.5 -13 L -23.5 -13 L 0 -16.5 L 23.5 -13 L 27.5 -13 Z"
+      fill="#c4a574"
+    />
   </g>
 </svg>

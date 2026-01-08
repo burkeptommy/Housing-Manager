@@ -1,5 +1,7 @@
 'use client';
 
+import { useEffect } from 'react';
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +9,13 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    // Log the error for debugging
+    console.error('Global error caught:', error);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
+  }, [error]);
+
   return (
     <html>
       <body>
