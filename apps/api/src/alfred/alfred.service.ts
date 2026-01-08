@@ -8,16 +8,41 @@ interface ConversationMessage {
   content: string;
 }
 
-interface AlfredAction {
+interface ActionTaken {
   type: string;
-  data: Record<string, any>;
-  requiresConfirmation: boolean;
+  description: string;
+  entityId?: string;
+}
+
+interface ProactiveSuggestion {
+  id: string;
+  type: 'MISSING_DATA' | 'MAINTENANCE_DUE' | 'SEASONAL' | 'OPTIMIZATION' | 'SAFETY';
+  priority: number;
+  message: string;
+  quickActions?: string[];
 }
 
 interface AlfredResponse {
   message: string;
-  action?: AlfredAction;
+  actions?: ActionTaken[];
   suggestions?: string[];
+  proactivePrompts?: ProactiveSuggestion[];
+}
+
+interface HouseholdContext {
+  household: any;
+  homeProfile: any;
+  members: any[];
+  familyMembers: any[];
+  pets: any[];
+  vehicles: any[];
+  systems: any[];
+  vendors: any[];
+  billAccounts: any[];
+  maintenanceTasks: any[];
+  healthScore: any;
+  season: string;
+  pendingPrompts: ProactiveSuggestion[];
 }
 
 @Injectable()
@@ -39,41 +64,88 @@ export class AlfredService {
     });
   }
 
+  /**
+   * Main chat endpoint - the heart of Alfred
+   */
   async chat(
     userId: string,
     householdId: string,
     message: string,
     conversationHistory: ConversationMessage[] = [],
   ): Promise<AlfredResponse> {
-    const context = await this.getHouseholdContext(householdId);
+    // 1. Load complete household context
+    const context = await this.loadHouseholdContext(householdId);
+
+    // 2. Build the system prompt with all household knowledge
     const systemPrompt = this.buildSystemPrompt(context);
 
-    const messages = [
-      ...conversationHistory.map((msg) => ({
-        role: msg.role as 'user' | 'assistant',
-        content: msg.content,
+    // 3. Build messages array
+    const messages: Anthropic.MessageParam[] = [
+      ...conversationHistory.map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
       })),
-      { role: 'user' as const, content: message },
+      { role: 'user', content: message },
     ];
 
     try {
+      // 4. Call Claude with tool use enabled
       const response = await this.anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
-        max_tokens: 1024,
+        max_tokens: 2048,
         system: systemPrompt,
+        tools: this.getTools(),
         messages,
       });
 
-      const assistantMessage =
-        response.content[0].type === 'text' ? response.content[0].text : '';
+      // 5. Process response and execute any tool calls
+      const actions: ActionTaken[] = [];
+      let responseText = '';
 
-      const { cleanMessage, action } =
-        this.parseResponseForActions(assistantMessage);
+      for (const block of response.content) {
+        if (block.type === 'text') {
+          responseText += block.text;
+        } else if (block.type === 'tool_use') {
+          const action = await this.executeToolCall(block, householdId);
+          if (action) {
+            actions.push(action);
+          }
+        }
+      }
+
+      // 6. If there were tool calls, get Claude's final response
+      if (response.stop_reason === 'tool_use') {
+        const toolResults = actions.map((a, i) => ({
+          type: 'tool_result' as const,
+          tool_use_id: response.content.find(
+            (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+          )?.id || `tool_${i}`,
+          content: `Successfully ${a.description}`,
+        }));
+
+        const followUp = await this.anthropic.messages.create({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1024,
+          system: systemPrompt,
+          messages: [
+            ...messages,
+            { role: 'assistant', content: response.content },
+            { role: 'user', content: toolResults },
+          ],
+        });
+
+        for (const block of followUp.content) {
+          if (block.type === 'text') {
+            responseText = block.text;
+          }
+        }
+      }
 
       return {
-        message: cleanMessage,
-        action,
+        message: responseText,
+        actions: actions.length > 0 ? actions : undefined,
         suggestions: this.generateSuggestions(context),
+        proactivePrompts: context.pendingPrompts.slice(0, 3),
       };
     } catch (error) {
       this.logger.error('Alfred chat error:', error);
@@ -84,359 +156,776 @@ export class AlfredService {
     }
   }
 
-  private async getHouseholdContext(householdId: string) {
+  /**
+   * Load ALL household data for comprehensive context
+   */
+  private async loadHouseholdContext(
+    householdId: string,
+  ): Promise<HouseholdContext> {
     try {
-      const [
-        household,
-        allMaintenanceTasks,
-        approvalRequests,
-        documents,
-        recentActivity,
-        healthScore,
-        homeSystems,
-      ] = await Promise.all([
-        this.prisma.household.findUnique({
-          where: { id: householdId },
-          include: {
-            homeProfile: true,
-            members: { include: { user: true } },
-            vehicles: true,
-            pets: true,
+      const household = await this.prisma.household.findUnique({
+        where: { id: householdId },
+        include: {
+          homeProfile: true,
+          members: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  firstName: true,
+                  lastName: true,
+                  email: true,
+                },
+              },
+            },
           },
-        }),
-        this.prisma.maintenanceTask.findMany({
-          where: { householdId },
-          orderBy: { dueDate: 'asc' },
-        }),
-        this.prisma.approvalRequest
-          .findMany({
-            where: { householdId, status: 'PENDING' },
-            orderBy: { createdAt: 'desc' },
-          })
+        },
+      });
+
+      if (!household) {
+        throw new Error(`Household ${householdId} not found`);
+      }
+
+      // Load all related data in parallel for performance
+      const [
+        familyMembers,
+        pets,
+        vehicles,
+        systems,
+        householdVendors,
+        billAccounts,
+        maintenanceTasks,
+        healthScore,
+      ] = await Promise.all([
+        this.prisma.familyMember
+          .findMany({ where: { householdId, isActive: true } })
           .catch(() => []),
-        this.prisma.document.findMany({ where: { householdId } }).catch(() => []),
-        this.prisma.activityLog
-          .findMany({
-            where: { householdId },
-            orderBy: { createdAt: 'desc' },
-            take: 20,
-          })
+        this.prisma.pet
+          .findMany({ where: { householdId, isActive: true } })
           .catch(() => []),
-        this.homeHealthService.calculateHealthScore(householdId).catch(() => null),
+        this.prisma.vehicle
+          .findMany({ where: { householdId, isActive: true } })
+          .catch(() => []),
         this.prisma.homeSystem
           .findMany({
             where: { householdId, isActive: true },
             include: {
-              maintenanceTasks: {
-                where: { status: { not: 'COMPLETED' } },
-                orderBy: { dueDate: 'asc' },
-                take: 3,
-              },
+              serviceHistory: { take: 3, orderBy: { serviceDate: 'desc' } },
             },
-            orderBy: { nextMaintenanceDate: 'asc' },
           })
           .catch(() => []),
+        this.prisma.householdVendor
+          .findMany({
+            where: { householdId },
+            include: { vendor: true },
+          })
+          .catch(() => []),
+        this.prisma.billAccount
+          .findMany({
+            where: { householdId, isActive: true },
+            include: { vendor: true },
+          })
+          .catch(() => []),
+        this.prisma.maintenanceTask
+          .findMany({
+            where: { householdId },
+            orderBy: { dueDate: 'asc' },
+          })
+          .catch(() => []),
+        this.homeHealthService.calculateHealthScore(householdId).catch(() => null),
       ]);
 
-      // Categorize maintenance tasks
-      const overdueTasks = allMaintenanceTasks.filter((t) => t.status === 'OVERDUE');
-      const upcomingTasks = allMaintenanceTasks.filter(
-        (t) => t.status === 'UPCOMING' || t.status === 'SCHEDULED' || t.status === 'DUE_SOON',
-      );
-      const completedTasks = allMaintenanceTasks.filter((t) => t.status === 'COMPLETED');
+      // Extract vendors from household-vendor relationships
+      const vendors = householdVendors.map((hv: any) => ({
+        ...hv.vendor,
+        isFavorite: hv.isFavorite,
+        notes: hv.notes,
+      }));
 
-      // Get current month for seasonal awareness
-      const currentMonth = new Date().getMonth() + 1;
-      const season = this.getSeason(currentMonth);
+      // Get current season
+      const month = new Date().getMonth();
+      const season =
+        month >= 2 && month <= 4
+          ? 'spring'
+          : month >= 5 && month <= 7
+            ? 'summer'
+            : month >= 8 && month <= 10
+              ? 'fall'
+              : 'winter';
+
+      // Generate proactive prompts based on gaps
+      const pendingPrompts = this.generateProactivePrompts({
+        household,
+        systems,
+        vendors,
+        billAccounts,
+        maintenanceTasks,
+        pets,
+        vehicles,
+      });
 
       return {
         household,
-        homeProfile: household?.homeProfile,
-        members: household?.members || [],
-        vehicles: household?.vehicles || [],
-        pets: household?.pets || [],
-        pendingApprovals: approvalRequests,
-        overdueTasks,
-        upcomingTasks,
-        completedTasks,
-        recentCompletedTasks: completedTasks.slice(0, 10),
-        documents,
+        homeProfile: household.homeProfile,
+        members: household.members,
+        familyMembers,
+        pets,
+        vehicles,
+        systems,
+        vendors,
+        billAccounts,
+        maintenanceTasks,
         healthScore,
-        recentActivity,
-        currentMonth,
         season,
-        homeSystems,
+        pendingPrompts,
       };
     } catch (error) {
-      this.logger.warn('Failed to fetch household context:', error);
+      this.logger.warn('Failed to load household context:', error);
+      // Return minimal context
       return {
         household: null,
         homeProfile: null,
         members: [],
-        vehicles: [],
+        familyMembers: [],
         pets: [],
-        pendingApprovals: [],
-        overdueTasks: [],
-        upcomingTasks: [],
-        completedTasks: [],
-        recentCompletedTasks: [],
-        documents: [],
+        vehicles: [],
+        systems: [],
+        vendors: [],
+        billAccounts: [],
+        maintenanceTasks: [],
         healthScore: null,
-        recentActivity: [],
-        currentMonth: new Date().getMonth() + 1,
         season: 'unknown',
-        homeSystems: [],
+        pendingPrompts: [],
       };
     }
   }
 
-  private getSeason(month: number): string {
-    if ([12, 1, 2].includes(month)) return 'winter';
-    if ([3, 4, 5].includes(month)) return 'spring';
-    if ([6, 7, 8].includes(month)) return 'summer';
-    return 'fall';
-  }
-
-  private buildSystemPrompt(context: any): string {
+  /**
+   * Build comprehensive system prompt with all household knowledge
+   */
+  private buildSystemPrompt(context: HouseholdContext): string {
     const {
       household,
       homeProfile,
       members,
-      vehicles,
+      familyMembers,
       pets,
-      pendingApprovals,
-      overdueTasks,
-      upcomingTasks,
-      recentCompletedTasks,
+      vehicles,
+      systems,
+      vendors,
+      billAccounts,
+      maintenanceTasks,
       healthScore,
       season,
-      homeSystems,
+      pendingPrompts,
     } = context;
 
-    // Build detailed property info
-    const propertyInfo = homeProfile
-      ? `
-- Address: ${homeProfile.addressLine1 || 'Unknown'}${homeProfile.city ? `, ${homeProfile.city}` : ''}${homeProfile.state ? `, ${homeProfile.state}` : ''} ${homeProfile.postalCode || ''}
-- Type: ${homeProfile.propertyType || 'Single Family Home'}
-- Size: ${homeProfile.squareFeet || 'Unknown'} sq ft
-- Bedrooms: ${homeProfile.bedrooms || 'Unknown'}, Bathrooms: ${homeProfile.bathrooms || 'Unknown'}
-- Year Built: ${homeProfile.yearBuilt || 'Unknown'}
-- Lot Size: ${homeProfile.lotSize ? homeProfile.lotSize + ' acres' : 'Unknown'}`
-      : 'Property details not available';
+    const today = new Date().toLocaleDateString('en-US', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
 
-    // Build family info
-    const familyInfo =
+    // Build members list
+    const membersStr =
       members.length > 0
         ? members
-            .map((m: any) => `- ${m.user?.firstName || 'Unknown'} ${m.user?.lastName || ''} (${m.role})`)
+            .map(
+              (m: any) =>
+                `- ${m.user?.firstName || 'Unknown'} ${m.user?.lastName || ''} (${m.role})`,
+            )
             .join('\n')
-        : 'No family members on file';
+        : 'None on file';
 
-    // Build health score info
-    const healthInfo = healthScore
-      ? `
-## Home Health Score: ${healthScore.score}/100 (${healthScore.grade})
+    // Build family members (non-user)
+    const familyStr =
+      familyMembers.length > 0
+        ? familyMembers
+            .map((m: any) => {
+              const age = m.birthdate
+                ? Math.floor(
+                    (Date.now() - new Date(m.birthdate).getTime()) /
+                      (365.25 * 24 * 60 * 60 * 1000),
+                  )
+                : null;
+              return `- ${m.firstName} ${m.lastName || ''} (${m.type})${age !== null ? `, ${age} years old` : ''}${m.relationship ? ` - ${m.relationship}` : ''}`;
+            })
+            .join('\n')
+        : '';
 
-### Positive Factors:
-${healthScore.factors.filter((f: any) => f.status === 'positive').map((f: any) => `- ${f.description}`).join('\n') || 'None identified'}
+    // Build pets list
+    const petsStr =
+      pets.length > 0
+        ? pets
+            .map((p: any) => {
+              const age = p.birthday
+                ? Math.floor(
+                    (Date.now() - new Date(p.birthday).getTime()) /
+                      (365.25 * 24 * 60 * 60 * 1000),
+                  )
+                : null;
+              return `- ${p.name}: ${p.breed || p.type}${age !== null ? `, ${age} years old` : ''}`;
+            })
+            .join('\n')
+        : 'No pets on file';
 
-### Areas Needing Attention:
-${healthScore.factors.filter((f: any) => f.status === 'negative').map((f: any) => `- ${f.description}`).join('\n') || 'None - great job!'}
+    // Build vehicles list
+    const vehiclesStr =
+      vehicles.length > 0
+        ? vehicles
+            .map(
+              (v: any) =>
+                `- ${v.year} ${v.make} ${v.model}${v.name ? ` "${v.name}"` : ''}${v.hasLoan ? ' (has loan)' : ' (paid off)'}`,
+            )
+            .join('\n')
+        : 'No vehicles on file';
 
-### Top Recommendations to Improve Score:
-${healthScore.recommendations.map((r: string, i: number) => `${i + 1}. ${r}`).join('\n') || 'No recommendations - home is in great shape!'}`
+    // Build systems list
+    const systemsStr =
+      systems.length > 0
+        ? systems
+            .map((s: any) => {
+              const details = [s.brand, s.model].filter(Boolean).join(' ');
+              const lastService = s.serviceHistory?.[0]?.serviceDate
+                ? `Last serviced: ${new Date(s.serviceHistory[0].serviceDate).toLocaleDateString()}`
+                : s.lastMaintenanceDate
+                  ? `Last maintained: ${new Date(s.lastMaintenanceDate).toLocaleDateString()}`
+                  : 'No service history';
+              return `- ${s.name} (${s.type}): ${details || 'Details unknown'}. ${lastService}`;
+            })
+            .join('\n')
+        : 'No systems on file';
+
+    // Build vendors list
+    const vendorsStr =
+      vendors.length > 0
+        ? vendors
+            .map(
+              (v: any) =>
+                `- ${v.displayName} (${v.category})${v.notes ? ` - Note: ${v.notes}` : ''}`,
+            )
+            .join('\n')
+        : 'No vendors on file';
+
+    // Build bills list
+    const billsStr =
+      billAccounts.length > 0
+        ? billAccounts
+            .map(
+              (b: any) =>
+                `- ${b.nickname}: ${b.vendor?.displayName || 'Unknown vendor'} (${b.category}) - ${b.billingFrequency}${b.typicalAmount ? `, ~$${b.typicalAmount}` : ''}`,
+            )
+            .join('\n')
+        : 'No bills being tracked';
+
+    // Build maintenance tasks
+    const pendingTasks = maintenanceTasks.filter(
+      (t: any) => t.status === 'PENDING' || t.status === 'OVERDUE',
+    );
+    const maintenanceStr =
+      pendingTasks.length > 0
+        ? pendingTasks
+            .slice(0, 5)
+            .map(
+              (t: any) =>
+                `- ${t.title}${t.dueDate ? ` - Due: ${new Date(t.dueDate).toLocaleDateString()}` : ''}${t.status === 'OVERDUE' ? ' [OVERDUE]' : ''}`,
+            )
+            .join('\n')
+        : 'No upcoming maintenance scheduled';
+
+    // Build health score section
+    const healthStr = healthScore
+      ? `Home Health Score: ${healthScore.score}/100 (${healthScore.grade})
+Top Recommendations: ${healthScore.recommendations?.slice(0, 3).join(', ') || 'None'}`
       : 'Health score not available';
 
-    // Build maintenance summary
-    const maintenanceSummary = `
-## Maintenance Status:
-- Overdue Tasks: ${overdueTasks.length}${overdueTasks.length > 0 ? ` (${overdueTasks.slice(0, 3).map((t: any) => t.title).join(', ')})` : ''}
-- Upcoming Tasks: ${upcomingTasks.length}${upcomingTasks.length > 0 ? ` (${upcomingTasks.slice(0, 3).map((t: any) => t.title).join(', ')})` : ''}
-- Recently Completed: ${recentCompletedTasks.length > 0 ? recentCompletedTasks.slice(0, 3).map((t: any) => t.title).join(', ') : 'None recently'}`;
-
-    // Build pending approvals summary
-    const approvalsSummary =
-      pendingApprovals.length > 0
-        ? `
-## Pending Approvals (${pendingApprovals.length}):
-${pendingApprovals.slice(0, 5).map((a: any) => `- ${a.title}: $${a.amount || 0} (${a.priority || 'Normal'} priority)`).join('\n')}`
-        : '## Pending Approvals: None';
-
-    // Vehicles and pets
-    const vehiclesInfo =
-      vehicles.length > 0
-        ? `\n## Vehicles:\n${vehicles.map((v: any) => `- ${v.year || ''} ${v.make || ''} ${v.model || ''}`).join('\n')}`
-        : '';
-
-    const petsInfo =
-      pets.length > 0
-        ? `\n## Pets:\n${pets.map((p: any) => `- ${p.name} (${p.species}${p.breed ? ', ' + p.breed : ''})`).join('\n')}`
-        : '';
-
-    // Build home systems info
-    const systemsInfo =
-      homeSystems?.length > 0
-        ? `\n## Home Systems & Equipment (${homeSystems.length}):\n${homeSystems.map((s: any) => {
-            const age = s.installedDate
-              ? Math.floor((Date.now() - new Date(s.installedDate).getTime()) / (1000 * 60 * 60 * 24 * 365))
-              : null;
-            const ageStr = age !== null ? ` - ${age} years old` : '';
-            const warrantyStr = s.warrantyExpires
-              ? new Date(s.warrantyExpires) > new Date()
-                ? ' (Under Warranty)'
-                : ' (Warranty Expired)'
-              : '';
-            const nextService = s.nextMaintenanceDate
-              ? ` - Next service: ${new Date(s.nextMaintenanceDate).toLocaleDateString()}`
-              : '';
-            const pendingTasks = s.maintenanceTasks?.length > 0
-              ? ` - ${s.maintenanceTasks.length} pending task(s)`
-              : '';
-            return `- ${s.name}${s.brand ? ` (${s.brand}${s.model ? ' ' + s.model : ''})` : ''}${ageStr}${warrantyStr}${nextService}${pendingTasks}`;
-          }).join('\n')}`
-        : '\n## Home Systems & Equipment: None registered yet';
-
-    // Seasonal awareness
+    // Seasonal tips
     const seasonalTips = this.getSeasonalTips(season);
 
-    return `You are Alfred, an AI Home Manager for Haven. You have COMPLETE knowledge of this homeowner's property and situation. Use this context to give personalized, specific advice.
+    // Proactive items
+    const proactiveStr =
+      pendingPrompts.length > 0
+        ? pendingPrompts
+            .slice(0, 5)
+            .map((p) => `- [${p.type}] ${p.message}`)
+            .join('\n')
+        : 'None at this time';
 
-## Your Personality
-- Warm, professional, and proactive
-- You know this home intimately and reference specific details
-- You anticipate needs before they become problems
-- You explain the "why" behind recommendations
-- You're like a knowledgeable friend who happens to be an expert in home maintenance
+    return `You are Alfred, the AI Home Manager for ${household?.name || 'this household'}. Today is ${today}.
 
-## Your Capabilities
-1. **Answer questions** about their specific home, maintenance history, equipment, and what's due
-2. **Make recommendations** based on their actual situation and home health score
-3. **Schedule vendors** for any home service
-4. **Book handyman** for small tasks ($50/visit)
-5. **Explain the home health score** and how to improve it
-6. **Provide seasonal guidance** specific to their location and home
-7. **Track home systems** - Know the age, warranty status, and maintenance needs of their HVAC, water heater, appliances, etc.
+## YOUR PERSONALITY
+You are modeled after Batman's Alfred Pennyworth - distinguished, helpful, proactive, and always looking out for the family's best interests. You are:
+- Knowledgeable about everything in this household
+- Proactive in identifying gaps and suggesting improvements
+- Helpful in finding better rates, vendors, and services
+- Action-oriented - you can add systems, schedule maintenance, and manage the home
+- Warm but professional, with occasional dry wit
 
-## Current Household: ${household?.name || 'Unknown'}
+## THIS HOUSEHOLD
 
-## Property Details:
-${propertyInfo}
+### Property
+Address: ${homeProfile?.addressLine1 || 'Not set'}${homeProfile?.city ? `, ${homeProfile.city}` : ''}${homeProfile?.state ? `, ${homeProfile.state}` : ''} ${homeProfile?.postalCode || ''}
+Type: ${homeProfile?.propertyType || 'Unknown'}
+${homeProfile?.bedrooms ? `Bedrooms: ${homeProfile.bedrooms}` : ''}
+${homeProfile?.bathrooms ? `Bathrooms: ${homeProfile.bathrooms}` : ''}
+${homeProfile?.yearBuilt ? `Year Built: ${homeProfile.yearBuilt}` : ''}
+${homeProfile?.squareFeet ? `Square Feet: ${homeProfile.squareFeet}` : ''}
 
-## Family Members:
-${familyInfo}
-${vehiclesInfo}
-${petsInfo}
-${systemsInfo}
+### Household Members (App Users)
+${membersStr}
 
-${healthInfo}
+### Family Members (Additional)
+${familyStr || 'None on file'}
 
-${maintenanceSummary}
+### Pets
+${petsStr}
 
-${approvalsSummary}
+### Vehicles
+${vehiclesStr}
 
-## Current Season: ${season.charAt(0).toUpperCase() + season.slice(1)}
+### Home Systems & Appliances
+${systemsStr}
+
+### Vendors & Service Providers
+${vendorsStr}
+
+### Bills Being Tracked
+${billsStr}
+
+### Upcoming Maintenance
+${maintenanceStr}
+
+### ${healthStr}
+
+## CURRENT SEASON: ${season.toUpperCase()}
 ${seasonalTips}
 
-## How to Respond:
-1. **Be specific** - Reference their actual tasks, property details, and situation
-2. **Be proactive** - If they ask about one thing, mention related items they should know
-3. **Explain impact** - Tell them how actions affect their home health score
-4. **Prioritize** - Help them focus on what's most important first
-5. **Offer next steps** - Always suggest what they can do right now
+## PROACTIVE ITEMS TO MENTION (when relevant)
+${proactiveStr}
 
-When suggesting actions, use: [ACTION:type:{"key":"value"}]
-Types: schedule_vendor, book_handyman, create_task, mark_complete, get_quotes
+## YOUR CAPABILITIES
 
-Remember: You're not just answering questions - you're their trusted home advisor who knows their situation inside and out.`;
+You can use tools to:
+1. **add_home_system** - Add a new appliance or system (refrigerator, furnace, etc.)
+2. **update_home_system** - Update details on an existing system
+3. **add_vendor** - Add a new service provider
+4. **schedule_maintenance** - Create a maintenance task/reminder
+
+## IMPORTANT BEHAVIORS
+
+1. **Be specific and helpful** - Reference actual data from the household
+2. **Ask follow-up questions** - When information is incomplete, ask for details
+3. **Be proactive** - Mention relevant gaps or upcoming maintenance when appropriate
+4. **Take action** - When the user wants to add or update something, use your tools
+5. **Zone awareness** - When discussing a zone (kitchen, HVAC, etc.), mention what's missing
+6. **Seasonal awareness** - It's ${season}, mention relevant seasonal maintenance
+
+## ZONE CHECKLIST (for reference)
+
+**Kitchen**: Refrigerator, Oven/Range, Dishwasher, Microwave, Garbage Disposal, Range Hood
+**Laundry**: Washer, Dryer, Utility Sink
+**HVAC**: Furnace/Boiler, AC, Heat Pump, Thermostat, Humidifier, Air Filters
+**Water**: Water Heater, Water Softener, Well Pump (if well), Sump Pump, Water Filtration
+**Electrical**: Main Panel, Generator, Solar, EV Charger
+**Exterior**: Roof, Gutters, Siding, Deck/Patio, Driveway, Fence, Irrigation, Pool
+**Safety**: Smoke Detectors, CO Detectors, Fire Extinguishers, Security System
+**Garage**: Garage Door Opener, Tools/Equipment
+
+When the user asks about a zone, check what they have vs. what's common for that zone.
+`;
   }
 
+  /**
+   * Get seasonal maintenance tips
+   */
   private getSeasonalTips(season: string): string {
     const tips: Record<string, string> = {
-      winter: `### Winter Tips (Current):
-- Ensure heating system is running efficiently
-- Check for drafts and ice dams
-- Keep walkways clear and safe
-- Monitor pipes for freezing risk`,
-      spring: `### Spring Tips (Current):
-- Schedule AC tune-up before summer
-- Clean gutters after winter debris
-- Check roof for winter damage
-- Start lawn care and landscaping`,
-      summer: `### Summer Tips (Current):
-- Ensure AC is running efficiently
-- Check irrigation systems
-- Inspect deck and outdoor structures
-- Monitor humidity levels inside`,
-      fall: `### Fall Tips (Current):
-- Schedule heating system service
-- Clean gutters before winter
-- Winterize outdoor faucets and irrigation
-- Check weatherstripping and insulation`,
+      winter: `Winter priorities: Furnace service, pipe insulation, generator testing, snow removal prep, chimney cleaning before use`,
+      spring: `Spring priorities: AC tune-up, gutter cleaning, lawn equipment service, exterior inspection, window cleaning`,
+      summer: `Summer priorities: AC maintenance, pest control, irrigation check, deck/patio maintenance, pool care (if applicable)`,
+      fall: `Fall priorities: Furnace service before heating season, chimney cleaning, gutter cleaning, winterization, generator testing`,
+      unknown: ``,
     };
     return tips[season] || '';
   }
 
-  private parseResponseForActions(response: string): {
-    cleanMessage: string;
-    action?: AlfredAction;
-  } {
-    const actionRegex = /\[ACTION:(\w+):(\{.*?\})\]/g;
-    let action: AlfredAction | undefined;
+  /**
+   * Generate proactive suggestions based on gaps in data
+   */
+  private generateProactivePrompts(data: {
+    household: any;
+    systems: any[];
+    vendors: any[];
+    billAccounts: any[];
+    maintenanceTasks: any[];
+    pets: any[];
+    vehicles: any[];
+  }): ProactiveSuggestion[] {
+    const prompts: ProactiveSuggestion[] = [];
 
-    const match = actionRegex.exec(response);
-    if (match) {
-      try {
-        action = {
-          type: match[1],
-          data: JSON.parse(match[2]),
-          requiresConfirmation: ['schedule_vendor', 'book_handyman'].includes(
-            match[1],
-          ),
-        };
-      } catch (e) {
-        this.logger.warn('Failed to parse action:', e);
+    // Check for incomplete systems
+    for (const system of data.systems) {
+      const missingFields: string[] = [];
+      if (!system.brand) missingFields.push('brand');
+      if (!system.model) missingFields.push('model');
+      if (!system.serialNumber) missingFields.push('serial number');
+
+      if (missingFields.length >= 2) {
+        prompts.push({
+          id: `system-${system.id}`,
+          type: 'MISSING_DATA',
+          priority: 6,
+          message: `Your ${system.name} is missing ${missingFields.join(', ')}. Having this info helps with maintenance and repairs.`,
+          quickActions: ['Add details now', 'Take a photo', 'Remind me later'],
+        });
       }
     }
 
-    const cleanMessage = response.replace(actionRegex, '').trim();
-    return { cleanMessage, action };
+    // Check for overdue maintenance
+    const now = new Date();
+    for (const task of data.maintenanceTasks) {
+      if (
+        (task.status === 'PENDING' || task.status === 'OVERDUE') &&
+        task.dueDate &&
+        new Date(task.dueDate) < now
+      ) {
+        prompts.push({
+          id: `maint-${task.id}`,
+          type: 'MAINTENANCE_DUE',
+          priority: 8,
+          message: `${task.title} is overdue (was due ${new Date(task.dueDate).toLocaleDateString()})`,
+          quickActions: ['Schedule now', 'Mark complete', 'Snooze 1 week'],
+        });
+      }
+    }
+
+    // Check for common missing systems
+    const systemTypes = data.systems.map((s: any) => s.type);
+
+    if (!systemTypes.includes('SMOKE_DETECTOR')) {
+      prompts.push({
+        id: 'safety-smoke',
+        type: 'SAFETY',
+        priority: 10,
+        message: `I don't have smoke detectors on file. Do you have them? (This is important for safety tracking)`,
+        quickActions: ['Add smoke detectors', 'Not applicable'],
+      });
+    }
+
+    // Seasonal prompts
+    const month = new Date().getMonth();
+    if (month >= 8 && month <= 10) {
+      // Fall
+      const furnace = data.systems.find((s: any) => s.type === 'FURNACE');
+      if (
+        furnace &&
+        !furnace.serviceHistory?.some((h: any) => {
+          const serviceDate = new Date(h.serviceDate);
+          return serviceDate.getFullYear() === now.getFullYear();
+        })
+      ) {
+        prompts.push({
+          id: 'seasonal-furnace',
+          type: 'SEASONAL',
+          priority: 7,
+          message: `Winter is coming! Your furnace hasn't been serviced this year. Want me to help schedule it?`,
+          quickActions: ['Find HVAC techs', 'Schedule reminder', 'Already done'],
+        });
+      }
+    }
+
+    // Check for pet vet info
+    for (const pet of data.pets) {
+      if (!pet.vetClinicName && !pet.vetClinicPhone) {
+        prompts.push({
+          id: `pet-${pet.id}`,
+          type: 'MISSING_DATA',
+          priority: 5,
+          message: `${pet.name} doesn't have vet information on file. This is helpful in emergencies.`,
+          quickActions: ['Add vet info', 'Remind me later'],
+        });
+      }
+    }
+
+    return prompts.sort((a, b) => b.priority - a.priority);
   }
 
-  private generateSuggestions(context: any): string[] {
+  /**
+   * Define available tools for Claude
+   */
+  private getTools(): Anthropic.Tool[] {
+    return [
+      {
+        name: 'add_home_system',
+        description:
+          'Add a new home system or appliance to the household inventory',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            type: {
+              type: 'string',
+              description:
+                'Type of system (e.g., FURNACE, WATER_HEATER, REFRIGERATOR, DISHWASHER, GENERATOR, FIREPLACE)',
+            },
+            name: {
+              type: 'string',
+              description: 'Display name for the system',
+            },
+            brand: { type: 'string', description: 'Brand/manufacturer' },
+            model: { type: 'string', description: 'Model number' },
+            serialNumber: { type: 'string', description: 'Serial number' },
+            location: {
+              type: 'string',
+              description: 'Location in home (e.g., Kitchen, Basement)',
+            },
+            notes: { type: 'string', description: 'Additional notes' },
+          },
+          required: ['type', 'name'],
+        },
+      },
+      {
+        name: 'update_home_system',
+        description: 'Update an existing home system with new information',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            systemId: {
+              type: 'string',
+              description: 'ID of the system to update',
+            },
+            brand: { type: 'string' },
+            model: { type: 'string' },
+            serialNumber: { type: 'string' },
+            notes: { type: 'string' },
+            lastServiceDate: {
+              type: 'string',
+              description: 'Date of last service (ISO format)',
+            },
+          },
+          required: ['systemId'],
+        },
+      },
+      {
+        name: 'add_vendor',
+        description: 'Add a new vendor or service provider to the household',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            displayName: { type: 'string', description: 'Name of the vendor' },
+            category: {
+              type: 'string',
+              description:
+                'Category (e.g., ELECTRIC, CLEANING, LANDSCAPING, PLUMBING, HVAC)',
+            },
+            phone: { type: 'string' },
+            email: { type: 'string' },
+            notes: { type: 'string' },
+          },
+          required: ['displayName', 'category'],
+        },
+      },
+      {
+        name: 'schedule_maintenance',
+        description: 'Create a new maintenance task or reminder',
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            title: {
+              type: 'string',
+              description: 'Title of the maintenance task',
+            },
+            description: { type: 'string' },
+            category: {
+              type: 'string',
+              description:
+                'Category (e.g., HVAC, PLUMBING, ELECTRICAL, EXTERIOR, SAFETY, GENERAL)',
+            },
+            dueDate: { type: 'string', description: 'Due date (ISO format)' },
+            priority: {
+              type: 'string',
+              enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
+            },
+          },
+          required: ['title', 'category'],
+        },
+      },
+    ];
+  }
+
+  /**
+   * Execute a tool call from Claude
+   */
+  private async executeToolCall(
+    toolCall: Anthropic.ToolUseBlock,
+    householdId: string,
+  ): Promise<ActionTaken | null> {
+    const { name, input, id } = toolCall;
+    const params = input as Record<string, any>;
+
+    this.logger.log(`Executing tool: ${name} with params:`, params);
+
+    try {
+      switch (name) {
+        case 'add_home_system':
+          const system = await this.prisma.homeSystem.create({
+            data: {
+              householdId,
+              type: params.type,
+              name: params.name,
+              brand: params.brand,
+              model: params.model,
+              serialNumber: params.serialNumber,
+              location: params.location,
+              notes: params.notes,
+              isActive: true,
+            },
+          });
+          return {
+            type: 'ADD_SYSTEM',
+            description: `Added ${params.name} (${params.type}) to your home`,
+            entityId: system.id,
+          };
+
+        case 'update_home_system':
+          await this.prisma.homeSystem.update({
+            where: { id: params.systemId },
+            data: {
+              brand: params.brand,
+              model: params.model,
+              serialNumber: params.serialNumber,
+              notes: params.notes,
+              lastMaintenanceDate: params.lastServiceDate
+                ? new Date(params.lastServiceDate)
+                : undefined,
+            },
+          });
+          return {
+            type: 'UPDATE_SYSTEM',
+            description: `Updated system information`,
+            entityId: params.systemId,
+          };
+
+        case 'add_vendor':
+          // First create the vendor
+          const vendor = await this.prisma.vendor.create({
+            data: {
+              householdId, // Private vendor for this household
+              displayName: params.displayName,
+              category: params.category,
+              phone: params.phone,
+              email: params.email,
+              isLocal: true,
+              isActive: true,
+            },
+          });
+          // Then link to household
+          await this.prisma.householdVendor.create({
+            data: {
+              householdId,
+              vendorId: vendor.id,
+              notes: params.notes,
+              isFavorite: false,
+            },
+          });
+          return {
+            type: 'ADD_VENDOR',
+            description: `Added ${params.displayName} as a vendor`,
+            entityId: vendor.id,
+          };
+
+        case 'schedule_maintenance':
+          const task = await this.prisma.maintenanceTask.create({
+            data: {
+              householdId,
+              title: params.title,
+              description: params.description,
+              category: params.category,
+              dueDate: params.dueDate ? new Date(params.dueDate) : null,
+              priority: params.priority || 'MEDIUM',
+              status: 'PENDING',
+            },
+          });
+          return {
+            type: 'SCHEDULE_MAINTENANCE',
+            description: `Scheduled: ${params.title}`,
+            entityId: task.id,
+          };
+
+        default:
+          this.logger.warn(`Unknown tool: ${name}`);
+          return null;
+      }
+    } catch (error) {
+      this.logger.error(`Error executing tool ${name}:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Generate context-aware suggestions
+   */
+  private generateSuggestions(context: HouseholdContext): string[] {
     const suggestions: string[] = [];
-    const { healthScore, pendingApprovals, overdueTasks, upcomingTasks, season } = context;
+    const { healthScore, pendingPrompts, maintenanceTasks, season } = context;
 
-    // Add health score recommendations first
+    // Add proactive suggestions from gaps
+    for (const prompt of pendingPrompts.slice(0, 2)) {
+      if (prompt.type === 'MAINTENANCE_DUE') {
+        suggestions.push(`Schedule ${prompt.message.split(' ')[0]}`);
+      }
+    }
+
+    // Add health score recommendations
     if (healthScore?.recommendations?.length > 0) {
-      suggestions.push(...healthScore.recommendations.slice(0, 2));
+      suggestions.push(healthScore.recommendations[0]);
     }
 
-    // Add context-aware suggestions
-    if (pendingApprovals?.length > 0) {
-      suggestions.push(`Review ${pendingApprovals.length} pending approval${pendingApprovals.length > 1 ? 's' : ''}`);
+    // Check for overdue tasks
+    const overdueTasks = maintenanceTasks.filter(
+      (t: any) => t.status === 'OVERDUE',
+    );
+    if (overdueTasks.length > 0) {
+      suggestions.push(
+        `Address ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? 's' : ''}`,
+      );
     }
 
-    if (overdueTasks?.length > 0) {
-      suggestions.push(`Address ${overdueTasks.length} overdue task${overdueTasks.length > 1 ? 's' : ''}`);
-    }
+    // Add common helpful suggestions
+    suggestions.push('What maintenance is coming up?');
+    suggestions.push('Help me add a new appliance');
 
-    // Seasonal suggestions
+    // Seasonal suggestion
     if (season === 'fall') {
       suggestions.push('Prepare home for winter');
     } else if (season === 'spring') {
       suggestions.push('Schedule spring maintenance');
     }
 
-    // General helpful suggestions
-    if (suggestions.length < 3) {
-      suggestions.push("What's my home health score?");
-    }
-
-    return suggestions.slice(0, 4);
+    return suggestions.slice(0, 5);
   }
 
+  /**
+   * Get dynamic suggestions based on household context
+   */
+  async getSuggestions(householdId: string): Promise<string[]> {
+    try {
+      const context = await this.loadHouseholdContext(householdId);
+      return this.generateSuggestions(context);
+    } catch (error) {
+      this.logger.warn('Failed to get suggestions:', error);
+      return [
+        'What maintenance is due?',
+        'Help me add a home system',
+        "What's my home health score?",
+      ];
+    }
+  }
+
+  /**
+   * Get conversation history (placeholder for future implementation)
+   */
   async getConversationHistory(userId: string, limit = 50) {
-    // Return empty for now - can implement conversation storage later
     return [];
   }
 }
