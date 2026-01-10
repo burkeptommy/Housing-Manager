@@ -51,6 +51,9 @@ import { AlfredModule } from './alfred/alfred.module';
 import { SubscriptionModule } from './subscription/subscription.module';
 import { HomeHealthModule } from './home-health/home-health.module';
 import { EquipmentModule } from './equipment/equipment.module';
+import { ReferralsModule } from './referrals/referrals.module';
+import { InvitationsModule } from './invitations/invitations.module';
+import { HomeModule } from './home/home.module';
 
 @Module({
   imports: [
@@ -106,6 +109,9 @@ import { EquipmentModule } from './equipment/equipment.module';
     SubscriptionModule,
     HomeHealthModule,
     EquipmentModule,
+    ReferralsModule,
+    InvitationsModule,
+    HomeModule,
   ],
   controllers: [AppController],
   providers: [AppService],
