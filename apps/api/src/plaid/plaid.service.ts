@@ -1,4 +1,4 @@
-import { Injectable, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, Logger, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import {
   Configuration,
@@ -9,13 +9,18 @@ import {
   TransactionsGetRequest,
 } from 'plaid';
 import { BillCategory, BillingFrequency } from '@prisma/client';
+import { TransactionAnalyzerService } from './transaction-analyzer.service';
 
 @Injectable()
 export class PlaidService {
   private readonly logger = new Logger(PlaidService.name);
   private plaidClient: PlaidApi;
 
-  constructor(private prisma: PrismaService) {
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => TransactionAnalyzerService))
+    private transactionAnalyzer: TransactionAnalyzerService,
+  ) {
     const configuration = new Configuration({
       basePath: PlaidEnvironments[process.env.PLAID_ENV || 'sandbox'],
       baseOptions: {
@@ -201,6 +206,13 @@ export class PlaidService {
         `Detected ${detectedBills.length} recurring bills for household ${connection.householdId}`,
       );
 
+      // Trigger Alfred-first transaction analysis for household enrichment
+      try {
+        await this.analyzeTransactionsForHousehold(connection.householdId, transactions);
+      } catch (err) {
+        this.logger.warn(`Alfred analysis failed for household ${connection.householdId}:`, err);
+      }
+
       return detectedBills.length;
     } catch (error: any) {
       this.logger.error('Error syncing transactions:', error);
@@ -216,6 +228,29 @@ export class PlaidService {
       });
 
       throw new BadRequestException('Failed to sync transactions');
+    }
+  }
+
+  /**
+   * Analyze transactions for Alfred-first household enrichment
+   * Detects utilities, mortgage, insurance, and service providers
+   */
+  async analyzeTransactionsForHousehold(
+    householdId: string,
+    transactions: any[],
+  ): Promise<void> {
+    this.logger.log(`Analyzing ${transactions.length} transactions for household ${householdId}`);
+
+    const analysis = await this.transactionAnalyzer.analyzeTransactions(
+      householdId,
+      transactions,
+    );
+
+    if (analysis.length > 0) {
+      await this.transactionAnalyzer.applyAnalysisToHousehold(householdId, analysis);
+      this.logger.log(
+        `Applied ${analysis.length} detected providers to household ${householdId}`,
+      );
     }
   }
 
