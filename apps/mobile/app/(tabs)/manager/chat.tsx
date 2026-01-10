@@ -55,6 +55,17 @@ interface Message {
   sender: 'user' | 'manager';
   timestamp: Date;
   image?: string;
+  pendingQuestion?: AlfredQuestion | null;
+}
+
+interface AlfredQuestion {
+  id: string;
+  dataGap: string;
+  question: string;
+  followUp?: string;
+  responseType: 'choice' | 'text' | 'confirm';
+  choices?: { label: string; value: string }[];
+  priority: number;
 }
 
 export default function ManagerChatScreen() {
@@ -66,7 +77,110 @@ export default function ManagerChatScreen() {
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [conversationId, setConversationId] = useState<string | null>(null);
+  const [pendingQuestion, setPendingQuestion] = useState<AlfredQuestion | null>(null);
+  const [isAnswering, setIsAnswering] = useState(false);
   const flatListRef = useRef<FlatList>(null);
+
+  // Fetch pending Alfred question for Essentials tier
+  const fetchPendingQuestion = useCallback(async () => {
+    if (!isEssentials || !householdInfo?.id) return;
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) return;
+
+      const response = await fetch(
+        `${API_BASE_URL}/alfred/next-question/${householdInfo.id}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.question) {
+          setPendingQuestion(data.question);
+          // Add question as a message if not already present
+          setMessages(prev => {
+            const hasQuestion = prev.some(m => m.id === `question-${data.question.id}`);
+            if (!hasQuestion) {
+              return [
+                ...prev,
+                {
+                  id: `question-${data.question.id}`,
+                  text: data.question.question,
+                  sender: 'manager' as const,
+                  timestamp: new Date(),
+                  pendingQuestion: data.question,
+                },
+              ];
+            }
+            return prev;
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Fetch pending question error:', err);
+    }
+  }, [isEssentials, householdInfo?.id]);
+
+  // Submit answer to Alfred question
+  const answerQuestion = async (questionId: string, answer: string, label: string) => {
+    if (isAnswering || !householdInfo?.id) return;
+
+    setIsAnswering(true);
+
+    // Add user's answer as a message
+    const userMessage: Message = {
+      id: `answer-${Date.now()}`,
+      text: label,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) return;
+
+      const response = await fetch(`${API_BASE_URL}/alfred/answer-question`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          householdId: householdInfo.id,
+          questionId,
+          answer,
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Add Alfred's response
+        if (data.message) {
+          setMessages(prev => [
+            ...prev,
+            {
+              id: `response-${Date.now()}`,
+              text: data.message,
+              sender: 'manager',
+              timestamp: new Date(),
+            },
+          ]);
+        }
+        setPendingQuestion(null);
+
+        // Check for next question after a short delay
+        setTimeout(() => fetchPendingQuestion(), 1500);
+      }
+    } catch (err) {
+      console.error('Answer question error:', err);
+    } finally {
+      setIsAnswering(false);
+    }
+  };
 
   const fetchConversation = useCallback(async () => {
     if (!householdInfo?.id) {
@@ -160,6 +274,13 @@ export default function ManagerChatScreen() {
   useEffect(() => {
     fetchConversation();
   }, [fetchConversation]);
+
+  // Fetch pending questions after conversation loads for Essentials tier
+  useEffect(() => {
+    if (!isLoading && isEssentials && householdInfo?.id) {
+      fetchPendingQuestion();
+    }
+  }, [isLoading, isEssentials, householdInfo?.id, fetchPendingQuestion]);
 
   const sendMessage = async () => {
     if (!inputText.trim() || isSending) return;
@@ -277,29 +398,51 @@ export default function ManagerChatScreen() {
 
   const renderMessage = ({ item }: { item: Message }) => {
     const isUser = item.sender === 'user';
+    const hasChoices = item.pendingQuestion?.responseType === 'choice' && item.pendingQuestion?.choices;
 
     return (
-      <View style={[styles.messageRow, isUser && styles.messageRowUser]}>
-        {!isUser &&
-          (isEssentials ? (
-            <AlfredAvatar size="small" showBadge={false} />
-          ) : (
-            <View style={styles.avatar}>
-              <Text style={styles.avatarText}>{getManagerInitials()}</Text>
-            </View>
-          ))}
-        <View
-          style={[styles.messageBubble, isUser ? styles.userBubble : styles.managerBubble]}
-        >
-          {item.image ? (
-            <Image source={{ uri: item.image }} style={styles.messageImage} />
-          ) : (
-            <Text style={[styles.messageText, isUser && styles.userText]}>{item.text}</Text>
-          )}
-          <Text style={[styles.messageTime, isUser && styles.userTime]}>
-            {formatTime(item.timestamp)}
-          </Text>
+      <View>
+        <View style={[styles.messageRow, isUser && styles.messageRowUser]}>
+          {!isUser &&
+            (isEssentials ? (
+              <AlfredAvatar size="sm" />
+            ) : (
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{getManagerInitials()}</Text>
+              </View>
+            ))}
+          <View
+            style={[styles.messageBubble, isUser ? styles.userBubble : styles.managerBubble]}
+          >
+            {item.image ? (
+              <Image source={{ uri: item.image }} style={styles.messageImage} />
+            ) : (
+              <Text style={[styles.messageText, isUser && styles.userText]}>{item.text}</Text>
+            )}
+            <Text style={[styles.messageTime, isUser && styles.userTime]}>
+              {formatTime(item.timestamp)}
+            </Text>
+          </View>
         </View>
+        {/* Choice buttons for Alfred questions */}
+        {hasChoices && pendingQuestion?.id === item.pendingQuestion?.id && (
+          <View style={styles.choicesContainer}>
+            {item.pendingQuestion!.choices!.map(choice => (
+              <TouchableOpacity
+                key={choice.value}
+                style={[styles.choiceButton, isAnswering && styles.choiceButtonDisabled]}
+                onPress={() => answerQuestion(item.pendingQuestion!.id, choice.value, choice.label)}
+                disabled={isAnswering}
+              >
+                {isAnswering ? (
+                  <ActivityIndicator size="small" color={colors.haven.navy[900]} />
+                ) : (
+                  <Text style={styles.choiceButtonText}>{choice.label}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     );
   };
@@ -520,5 +663,29 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.gray[200],
+  },
+  choicesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+    marginLeft: 42, // Align with message bubble (avatar width + margin)
+    marginTop: spacing[2],
+    marginBottom: spacing[2],
+  },
+  choiceButton: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    borderColor: colors.haven.navy[900],
+  },
+  choiceButtonDisabled: {
+    opacity: 0.6,
+  },
+  choiceButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.navy[900],
   },
 });

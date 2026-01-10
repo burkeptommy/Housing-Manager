@@ -220,32 +220,42 @@ export class TransactionAnalyzerService {
         )
       ) {
         try {
-          await this.prisma.comprehensiveBill.upsert({
+          const category = this.mapTypeToCategory(item.type);
+          const frequency = this.mapFrequencyToEnum(item.frequency);
+
+          // Find existing bill for this provider
+          const existingBill = await this.prisma.comprehensiveBill.findFirst({
             where: {
-              householdId_type_provider: {
-                householdId,
-                type: this.mapTypeToCategory(item.type),
-                provider: item.provider,
-              },
-            },
-            create: {
               householdId,
-              type: this.mapTypeToCategory(item.type),
-              provider: item.provider,
-              description: this.getServiceName(item.type),
-              amount: item.amount,
-              frequency: this.mapFrequencyToEnum(item.frequency),
-              source: 'PLAID_DETECTED',
-              status: 'ACTIVE',
-              isAutoPay: false,
-            },
-            update: {
-              amount: item.amount,
-              frequency: this.mapFrequencyToEnum(item.frequency),
+              category,
+              name: item.provider,
             },
           });
+
+          if (existingBill) {
+            await this.prisma.comprehensiveBill.update({
+              where: { id: existingBill.id },
+              data: {
+                amount: item.amount,
+                frequency,
+              },
+            });
+          } else {
+            await this.prisma.comprehensiveBill.create({
+              data: {
+                householdId,
+                category,
+                name: item.provider,
+                description: this.getServiceName(item.type),
+                amount: item.amount,
+                frequency,
+                status: 'ACTIVE',
+                currentAutopay: false,
+              },
+            });
+          }
         } catch (err) {
-          this.logger.warn(`Failed to upsert bill for ${item.type}: ${err}`);
+          this.logger.warn(`Failed to save bill for ${item.type}: ${err}`);
         }
       }
     }
@@ -366,24 +376,24 @@ export class TransactionAnalyzerService {
     return names[type] || type;
   }
 
-  private mapTypeToCategory(type: string): string {
-    const mapping: Record<string, string> = {
-      landscaping: 'SERVICE',
-      pool: 'SERVICE',
-      'pest-control': 'SERVICE',
-      cleaning: 'SERVICE',
-      security: 'SERVICE',
+  private mapTypeToCategory(type: string): 'LAWN_LANDSCAPE' | 'POOL_SERVICE' | 'PEST_CONTROL' | 'HOUSE_CLEANING' | 'SECURITY_MONITORING' | 'OTHER_BILL' {
+    const mapping: Record<string, 'LAWN_LANDSCAPE' | 'POOL_SERVICE' | 'PEST_CONTROL' | 'HOUSE_CLEANING' | 'SECURITY_MONITORING'> = {
+      landscaping: 'LAWN_LANDSCAPE',
+      pool: 'POOL_SERVICE',
+      'pest-control': 'PEST_CONTROL',
+      cleaning: 'HOUSE_CLEANING',
+      security: 'SECURITY_MONITORING',
     };
-    return mapping[type] || 'OTHER';
+    return mapping[type] || 'OTHER_BILL';
   }
 
   private mapFrequencyToEnum(
     freq: 'monthly' | 'quarterly' | 'annually' | 'one-time',
-  ): string {
-    const mapping: Record<string, string> = {
+  ): 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'ONE_TIME' {
+    const mapping: Record<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'ONE_TIME'> = {
       monthly: 'MONTHLY',
       quarterly: 'QUARTERLY',
-      annually: 'ANNUALLY',
+      annually: 'ANNUAL',
       'one-time': 'ONE_TIME',
     };
     return mapping[freq] || 'MONTHLY';

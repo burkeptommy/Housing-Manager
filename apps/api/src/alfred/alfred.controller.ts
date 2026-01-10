@@ -3,11 +3,14 @@ import {
   Post,
   Get,
   Body,
+  Param,
+  Query,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { AlfredService } from './alfred.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { AlfredQuestionsService } from './alfred-questions.service';
+import { FirebaseAuthGuard, AuthPayload } from '../firebase/firebase-auth.guard';
+import { CurrentUser } from '../firebase/current-user.decorator';
 
 interface ChatRequest {
   message: string;
@@ -15,14 +18,17 @@ interface ChatRequest {
 }
 
 @Controller('alfred')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class AlfredController {
-  constructor(private alfredService: AlfredService) {}
+  constructor(
+    private alfredService: AlfredService,
+    private questionsService: AlfredQuestionsService,
+  ) {}
 
   @Post('chat')
-  async chat(@Request() req, @Body() body: ChatRequest) {
-    const userId = req.user.sub || req.user.userId || req.user.id;
-    const householdId = req.user.householdId;
+  async chat(@CurrentUser() user: AuthPayload, @Body() body: ChatRequest) {
+    const userId = user.userId;
+    const householdId = user.householdId;
 
     if (!householdId) {
       return {
@@ -41,8 +47,8 @@ export class AlfredController {
   }
 
   @Get('suggestions')
-  async getSuggestions(@Request() req) {
-    const householdId = req.user.householdId;
+  async getSuggestions(@CurrentUser() user: AuthPayload) {
+    const householdId = user.householdId;
 
     if (!householdId) {
       return {
@@ -55,5 +61,34 @@ export class AlfredController {
 
     const suggestions = await this.alfredService.getSuggestions(householdId);
     return { suggestions };
+  }
+
+  @Get('next-question/:householdId')
+  async getNextQuestion(
+    @Param('householdId') householdId: string,
+    @Query('context') context?: string,
+  ) {
+    const question = await this.questionsService.getNextQuestion(
+      householdId,
+      context,
+    );
+    return { question };
+  }
+
+  @Post('answer-question')
+  async answerQuestion(
+    @Body()
+    body: { householdId: string; questionId: string; answer: string },
+  ) {
+    return this.questionsService.processAnswer(
+      body.householdId,
+      body.questionId,
+      body.answer,
+    );
+  }
+
+  @Get('data-gaps/:householdId')
+  async getDataGaps(@Param('householdId') householdId: string) {
+    return this.questionsService.getDataGapsSummary(householdId);
   }
 }
