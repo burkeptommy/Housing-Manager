@@ -1,0 +1,56 @@
+substitutions:
+  _TAG: latest
+
+steps:
+  # Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-t'
+      - 'gcr.io/home-manager-480616/haven-api:${_TAG}'
+      - '-t'
+      - 'gcr.io/home-manager-480616/haven-api:latest'
+      - '-f'
+      - 'apps/api/Dockerfile'
+      - '.'
+
+  # Push the image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/home-manager-480616/haven-api:${_TAG}'
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/home-manager-480616/haven-api:latest'
+
+  # Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'haven-api'
+      - '--image'
+      - 'gcr.io/home-manager-480616/haven-api:${_TAG}'
+      - '--region'
+      - 'us-central1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--add-cloudsql-instances'
+      - 'home-manager-480616:us-central1:haven-production-db'
+      - '--set-env-vars'
+      - '^@^NODE_ENV=production@GCP_PROJECT_ID=home-manager-480616@GCS_BUCKET_NAME=home-manager-480616-uploads@CORS_ORIGIN=https://havenhome.dev,https://www.havenhome.dev,http://localhost:3000'
+      - '--set-secrets'
+      - 'JWT_SECRET=JWT_SECRET:latest,DATABASE_URL=DATABASE_URL:latest,STRIPE_SECRET_KEY=STRIPE_SECRET_KEY:latest,STRIPE_PUBLISHABLE_KEY=STRIPE_PUBLISHABLE_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,SENDGRID_API_KEY=SENDGRID_API_KEY:latest,FIREBASE_SERVICE_ACCOUNT=FIREBASE_SERVICE_ACCOUNT:latest,MAPS_KEY=MAPS_KEY:latest,ATTOM_API_KEY=ATTOM_API_KEY:latest,ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest'
+      - '--memory'
+      - '1Gi'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '10'
+
+options:
+  logging: CLOUD_LOGGING_ONLY
