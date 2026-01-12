@@ -4,9 +4,10 @@ import { AlfredQuestionsService } from './alfred-questions.service';
 import { AlfredController } from './alfred.controller';
 import { PrismaModule } from '../prisma/prisma.module';
 import { HomeHealthModule } from '../home-health/home-health.module';
+import { AlfredToolsModule } from './tools/tools.module';
 
 @Module({
-  imports: [PrismaModule, HomeHealthModule],
+  imports: [PrismaModule, HomeHealthModule, AlfredToolsModule],
   controllers: [AlfredController],
   providers: [AlfredService, AlfredQuestionsService],
   exports: [AlfredService, AlfredQuestionsService],

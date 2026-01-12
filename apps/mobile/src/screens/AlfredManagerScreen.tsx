@@ -11,7 +11,7 @@ import {
   Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AlfredAvatar } from '../components/Alfred';
 import { AlfredSuggestions } from '../components/AlfredSuggestions';
@@ -33,6 +33,8 @@ interface Message {
     label: string;
     data?: Record<string, unknown>;
   };
+  // Quick reply suggestions (for Yes/No/Other type questions)
+  quickReplies?: string[];
 }
 
 // =============================================================================
@@ -52,11 +54,35 @@ const INITIAL_MESSAGE: Message = {
 
 export function AlfredManagerScreen() {
   const router = useRouter();
+  const { prefill } = useLocalSearchParams<{ prefill?: string }>();
   const scrollViewRef = useRef<ScrollView>(null);
+  const inputRef = useRef<TextInput>(null);
   const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
+  const hasHandledPrefill = useRef(false);
+
+  // Handle prefill when screen comes into focus
+  useFocusEffect(
+    useCallback(() => {
+      if (prefill && !hasHandledPrefill.current) {
+        setInput(prefill);
+        hasHandledPrefill.current = true;
+        setShowSuggestions(false);
+
+        // Focus the input after a short delay
+        setTimeout(() => {
+          inputRef.current?.focus();
+        }, 100);
+      }
+
+      // Reset when leaving the screen
+      return () => {
+        hasHandledPrefill.current = false;
+      };
+    }, [prefill])
+  );
 
   // Typing indicator animation
   const dot1Opacity = useRef(new Animated.Value(0.3)).current;
@@ -121,24 +147,32 @@ export function AlfredManagerScreen() {
         body: JSON.stringify({
           message: textToSend,
           conversationHistory: messages.slice(-10).map(m => ({
-            role: m.role,
+            role: m.role === 'alfred' ? 'assistant' : 'user',
             content: m.content,
           })),
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get response');
+        const errorText = await response.text();
+        console.error('Alfred API error:', response.status, errorText);
+        throw new Error(`Failed to get response: ${response.status}`);
       }
 
       const data = await response.json();
 
+      // Detect if the response is asking a yes/no question
+      const messageContent = data.message || "I understand. Let me help you with that.";
+      const isYesNoQuestion = /would you like|do you want|shall i|should i|can i help/i.test(messageContent);
+
       const alfredResponse: Message = {
         id: (Date.now() + 1).toString(),
         role: 'alfred',
-        content: data.message || "I understand. Let me help you with that.",
+        content: messageContent,
         timestamp: new Date(),
         action: data.action,
+        // Add quick replies for yes/no questions
+        quickReplies: data.quickReplies || (isYesNoQuestion ? ['Yes, please', 'No, thanks', 'Tell me more'] : undefined),
       };
 
       setMessages(prev => [...prev, alfredResponse]);
@@ -258,7 +292,7 @@ export function AlfredManagerScreen() {
             >
               {message.role === 'alfred' && (
                 <View style={styles.alfredHeader}>
-                  <AlfredAvatar size="small" showBadge={false} />
+                  <AlfredAvatar size="sm" />
                   <Text style={styles.alfredName}>Alfred</Text>
                   <Text style={styles.messageTime}>{formatTime(message.timestamp)}</Text>
                 </View>
@@ -295,6 +329,31 @@ export function AlfredManagerScreen() {
                 </TouchableOpacity>
               )}
 
+              {/* Quick reply buttons */}
+              {message.quickReplies && message.quickReplies.length > 0 && (
+                <View style={styles.quickRepliesContainer}>
+                  {message.quickReplies.map((reply, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.quickReplyButton,
+                        index === 0 && styles.quickReplyButtonPrimary,
+                      ]}
+                      onPress={() => sendMessage(reply)}
+                    >
+                      <Text
+                        style={[
+                          styles.quickReplyText,
+                          index === 0 && styles.quickReplyTextPrimary,
+                        ]}
+                      >
+                        {reply}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               {message.role === 'user' && (
                 <Text style={styles.userTime}>{formatTime(message.timestamp)}</Text>
               )}
@@ -305,7 +364,7 @@ export function AlfredManagerScreen() {
           {isTyping && (
             <View style={[styles.messageBubble, styles.alfredBubble]}>
               <View style={styles.alfredHeader}>
-                <AlfredAvatar size="small" showBadge={false} />
+                <AlfredAvatar size="sm" />
                 <Text style={styles.alfredName}>Alfred</Text>
               </View>
               <View style={styles.typingIndicator}>
@@ -325,6 +384,7 @@ export function AlfredManagerScreen() {
         {/* Input Bar */}
         <View style={styles.inputContainer}>
           <TextInput
+            ref={inputRef}
             style={styles.input}
             placeholder="Ask Alfred anything..."
             placeholderTextColor={colors.text.tertiary}
@@ -507,5 +567,31 @@ const styles = StyleSheet.create({
   },
   sendButtonDisabled: {
     backgroundColor: colors.background.tertiary,
+  },
+  quickRepliesContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing[2],
+    marginTop: spacing[3],
+  },
+  quickReplyButton: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[300],
+  },
+  quickReplyButtonPrimary: {
+    backgroundColor: colors.haven.champagne[500],
+    borderColor: colors.haven.champagne[500],
+  },
+  quickReplyText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[600],
+  },
+  quickReplyTextPrimary: {
+    color: colors.white,
   },
 });

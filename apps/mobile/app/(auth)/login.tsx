@@ -9,9 +9,11 @@ import {
   ScrollView,
   Image,
   Animated,
+  StatusBar,
 } from 'react-native';
 import { useRouter, Link } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
@@ -21,6 +23,7 @@ import { getBiometricName } from '../../src/lib/biometric-auth';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const {
     login,
     loginWithApple,
@@ -110,12 +113,13 @@ export default function LoginScreen() {
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
+      <StatusBar barStyle="light-content" backgroundColor={colors.haven.navy[950]} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingTop: insets.top + spacing[6] }]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >

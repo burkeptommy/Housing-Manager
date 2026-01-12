@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Linking } from 'react-native'
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../contexts/subscription-context';
 import { AlfredCard, AlfredAvatar } from './Alfred';
+import { AlfredTabIcon } from './AlfredIcon';
 import { colors, typography, spacing, borderRadius } from '../lib/theme';
 
 // =============================================================================
@@ -92,9 +93,16 @@ export function ManagerCard({ message, showActions = true, onChat, onCall }: Man
 export function ManagerAvatar({ size = 'medium' }: ManagerAvatarProps) {
   const { isEssentials, managerInfo } = useSubscription();
 
+  // Map ManagerAvatar sizes to AlfredAvatar sizes
+  const alfredSizeMap = {
+    small: 'sm' as const,
+    medium: 'md' as const,
+    large: 'lg' as const,
+  };
+
   // Essentials tier gets Alfred avatar
   if (isEssentials) {
-    return <AlfredAvatar size={size} />;
+    return <AlfredAvatar size={alfredSizeMap[size]} />;
   }
 
   // Premium tiers get human manager avatar
@@ -163,11 +171,11 @@ export function ContactManagerButton({ variant = 'primary', onPress, showIcon = 
       activeOpacity={0.8}
     >
       {showIcon && (
-        <Ionicons
-          name={isEssentials ? 'sparkles' : 'chatbubble'}
-          size={18}
-          color={iconColor[variant]}
-        />
+        isEssentials ? (
+          <AlfredTabIcon size={18} color={iconColor[variant]} />
+        ) : (
+          <Ionicons name="chatbubble" size={18} color={iconColor[variant]} />
+        )
       )}
       <Text style={[styles.contactButtonText, textStyles[variant]]}>
         {isEssentials ? 'Chat with Alfred' : `Message ${managerInfo.name.split(' ')[0]}`}
@@ -229,11 +237,11 @@ export function ManagerHelpBanner({ context, onDismiss, onChat }: ManagerHelpBan
       <Text style={styles.helpBannerMessage}>{message}</Text>
       {onChat && (
         <TouchableOpacity style={styles.helpBannerAction} onPress={onChat}>
-          <Ionicons
-            name={isEssentials ? 'sparkles' : 'chatbubble-outline'}
-            size={16}
-            color={colors.haven.champagne[500]}
-          />
+          {isEssentials ? (
+            <AlfredTabIcon size={16} color={colors.haven.champagne[500]} />
+          ) : (
+            <Ionicons name="chatbubble-outline" size={16} color={colors.haven.champagne[500]} />
+          )}
           <Text style={styles.helpBannerActionText}>
             {isEssentials ? 'Ask Alfred' : 'Send Message'}
           </Text>

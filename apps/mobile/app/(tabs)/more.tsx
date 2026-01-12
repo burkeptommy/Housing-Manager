@@ -25,9 +25,11 @@ const MENU_SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Your Home',
     items: [
+      { id: 'home', title: 'Property & Zones', subtitle: 'Rooms, appliances, systems', icon: 'home-outline', route: '/(tabs)/home' },
       { id: 'family', title: 'Family & Household', icon: 'people-outline', route: '/(tabs)/family' },
       { id: 'maintenance', title: 'Maintenance', icon: 'construct-outline', route: '/(tabs)/maintenance' },
       { id: 'vault', title: 'Document Vault', icon: 'folder-outline', route: '/(tabs)/vault' },
+      { id: 'vendors', title: 'Vendors', subtitle: 'Service providers & contacts', icon: 'business-outline', route: '/(tabs)/manager/vendors' },
     ],
   },
   {
@@ -42,6 +44,7 @@ const MENU_SECTIONS: { title: string; items: MenuItem[] }[] = [
     items: [
       { id: 'profile', title: 'Profile', icon: 'person-outline', route: '/(tabs)/profile' },
       { id: 'settings', title: 'Settings', icon: 'settings-outline', route: '/(tabs)/settings' },
+      { id: 'activity', title: 'Activity', subtitle: 'Recent actions & updates', icon: 'time-outline', route: '/(tabs)/activity' },
     ],
   },
 ];
@@ -180,7 +183,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.semibold,
     color: colors.text.tertiary,
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1.5,  // Wide for uppercase labels
     marginBottom: spacing[2],
     marginLeft: spacing[4],
   },

@@ -17,7 +17,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import { useAuth } from '../../src/contexts/auth-context';
-import { getApiClient } from '../../src/lib/api';
+import { API_BASE_URL } from '../../src/lib/api';
+import { getIdToken } from '../../src/lib/firebase';
 import {
   useConversations,
   useConversation,
@@ -143,10 +144,21 @@ function MessageBubble({
   // Load signed URL for file assets
   useEffect(() => {
     if (message.attachmentFile?.id) {
-      const api = getApiClient();
-      api.getFileAssetUrl(message.attachmentFile.id)
-        .then((res) => setImageUrl(res.url))
-        .catch(() => setImageUrl(null));
+      (async () => {
+        try {
+          const token = await getIdToken();
+          if (!token) return;
+          const response = await fetch(`${API_BASE_URL}/files/${message.attachmentFile!.id}/url`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (response.ok) {
+            const data: { url: string } = await response.json();
+            setImageUrl(data.url);
+          }
+        } catch {
+          setImageUrl(null);
+        }
+      })();
     }
   }, [message.attachmentFile?.id]);
 
@@ -285,21 +297,40 @@ function ChatView({
     if (selectedImage) {
       setIsUploading(true);
       try {
-        const api = getApiClient();
-        // Convert URI to blob for upload
-        const response = await fetch(selectedImage.uri);
-        const blob = await response.blob();
+        const token = await getIdToken();
+        if (!token) throw new Error('Not authenticated');
+
         const fileName = selectedImage.fileName || `photo_${Date.now()}.jpg`;
         const mimeType = selectedImage.mimeType || 'image/jpeg';
 
-        const fileAsset = await api.uploadFileToGcs(blob, {
-          householdId,
-          type: 'ISSUE_PHOTO',
-          filename: fileName,
+        // Create FormData for multipart upload
+        const formData = new FormData();
+        formData.append('file', {
+          uri: selectedImage.uri,
+          name: fileName,
+          type: mimeType,
+        } as unknown as Blob);
+        formData.append('householdId', householdId);
+        formData.append('category', 'MESSAGE_ATTACHMENT');
+
+        const uploadResponse = await fetch(`${API_BASE_URL}/files/upload`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data',
+          },
+          body: formData,
         });
-        attachmentFileId = fileAsset.id;
-      } catch (err: any) {
-        Alert.alert('Upload failed', err.message || 'Failed to upload image');
+
+        if (!uploadResponse.ok) {
+          throw new Error('Upload failed');
+        }
+
+        const uploadResult: { success: boolean; file: { id: string } } = await uploadResponse.json();
+        attachmentFileId = uploadResult.file.id;
+      } catch (err: unknown) {
+        const message = err instanceof Error ? err.message : 'Failed to upload image';
+        Alert.alert('Upload failed', message);
         setIsSending(false);
         setIsUploading(false);
         return;
@@ -837,8 +868,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
   },
   statusTextSmall: {
-    fontSize: 10,
-    fontWeight: typography.fontWeights.medium,
+    fontSize: 11,  // Minimum for small status badges
+    fontWeight: typography.fontWeights.semibold,  // Bolder to compensate
     color: colors.slate[700],
   },
 

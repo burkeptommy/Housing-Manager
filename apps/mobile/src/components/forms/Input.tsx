@@ -118,6 +118,7 @@ const styles = StyleSheet.create({
   },
   inputFocused: {
     borderColor: colors.haven.champagne[500],
+    borderWidth: 2,
     backgroundColor: colors.white,
   },
   inputError: {

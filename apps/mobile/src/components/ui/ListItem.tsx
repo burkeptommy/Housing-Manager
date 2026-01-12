@@ -7,14 +7,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
 import { colors, typography, spacing, borderRadius } from '../../lib/theme';
-
-const AnimatedTouchable = Animated.createAnimatedComponent(TouchableOpacity);
 
 interface ListItemProps {
   title: string;
@@ -47,22 +40,6 @@ export function ListItem({
   style,
   isLast = false,
 }: ListItemProps) {
-  const scale = useSharedValue(1);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }],
-  }));
-
-  const handlePressIn = () => {
-    if (!disabled && onPress) {
-      scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-    }
-  };
-
-  const handlePressOut = () => {
-    scale.value = withSpring(1, { damping: 15, stiffness: 300 });
-  };
-
   const getBadgeStyle = () => {
     switch (badgeVariant) {
       case 'success':
@@ -112,15 +89,12 @@ export function ListItem({
 
   if (onPress && !disabled) {
     return (
-      <AnimatedTouchable
-        style={animatedStyle}
+      <TouchableOpacity
         onPress={onPress}
-        onPressIn={handlePressIn}
-        onPressOut={handlePressOut}
-        activeOpacity={1}
+        activeOpacity={0.7}
       >
         {content}
-      </AnimatedTouchable>
+      </TouchableOpacity>
     );
   }
 
@@ -154,7 +128,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.medium,
+    fontWeight: typography.fontWeights.medium as '500',
     color: colors.text.primary,
   },
   titleDisabled: {
@@ -173,7 +147,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: typography.fontSizes.xs,
-    fontWeight: typography.fontWeights.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
     color: colors.white,
   },
   chevron: {

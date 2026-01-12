@@ -7,13 +7,15 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  StatusBar,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+// Removed react-native-reanimated to fix Worklets crash
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/auth-context';
+import { useSubscription } from '../../src/contexts/subscription-context';
 import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { API_BASE_URL } from '../../src/lib/api';
@@ -172,13 +174,29 @@ function formatRelativeTime(dateString: string) {
   return `${diffDays}d ago`;
 }
 
+// Get emoji and background color based on activity category
+function getActivityConfig(category: string): { emoji: string; bgColor: string } {
+  const configs: Record<string, { emoji: string; bgColor: string }> = {
+    PROPERTY: { emoji: '🏠', bgColor: '#E0E7FF' },      // Indigo tint
+    BILLING: { emoji: '💰', bgColor: '#D1FAE5' },       // Green tint
+    FAMILY: { emoji: '👨‍👩‍👧‍👦', bgColor: '#FCE7F3' },       // Pink tint
+    MAINTENANCE: { emoji: '🔧', bgColor: '#FEF3C7' },   // Amber tint
+    SERVICE: { emoji: '👷', bgColor: '#DBEAFE' },       // Blue tint
+    COMMUNICATION: { emoji: '💬', bgColor: '#F3E8FF' }, // Purple tint
+    SYSTEM: { emoji: '🤖', bgColor: '#E5E7EB' },        // Gray tint
+  };
+  return configs[category] || { emoji: '📌', bgColor: '#F3F4F6' };
+}
+
 // =============================================================================
 // COMPONENT
 // =============================================================================
 
 export default function DashboardScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { user, householdInfo } = useAuth();
+  const { tierDetails } = useSubscription();
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [data, setData] = useState<DashboardResponse | null>(null);
@@ -244,16 +262,18 @@ export default function DashboardScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <DashboardSkeleton />
-      </SafeAreaView>
+      <View style={styles.container}>
+        <View style={{ paddingTop: insets.top }}>
+          <DashboardSkeleton />
+        </View>
+      </View>
     );
   }
 
   if (error || !data) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.errorContainer}>
+      <View style={styles.container}>
+        <View style={[styles.errorContainer, { paddingTop: insets.top }]}>
           <Ionicons name="alert-circle" size={48} color={colors.status.error} />
           <Text style={styles.errorTitle}>Unable to Load Dashboard</Text>
           <Text style={styles.errorText}>{error}</Text>
@@ -261,7 +281,7 @@ export default function DashboardScreen() {
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -269,17 +289,18 @@ export default function DashboardScreen() {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.haven.navy[950]} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}
       >
         {/* Hero Header */}
-        <Animated.View entering={FadeInDown.duration(400)}>
+        <View>
           <LinearGradient
-            colors={[colors.haven.navy[900], colors.haven.navy[800]]}
-            style={styles.heroGradient}
+            colors={[colors.haven.navy[950], colors.haven.navy[900]]}
+            style={[styles.heroGradient, { paddingTop: insets.top + spacing[2] }]}
           >
             {/* Date and Weather Row */}
             <View style={styles.heroTop}>
@@ -303,13 +324,12 @@ export default function DashboardScreen() {
               >
                 <Text style={styles.heroStatLabel}>Home Health</Text>
                 <View style={styles.heroStatRow}>
-                  <Text style={[styles.heroStatValue, { color: getHealthColor(data.homeHealth) }]}>
+                  <Text style={styles.heroStatValue}>
                     {data.homeHealth}%
                   </Text>
-                  <Badge
-                    label={getHealthLabel(data.homeHealth)}
-                    variant={data.homeHealth >= 90 ? 'success' : data.homeHealth >= 70 ? 'warning' : 'error'}
-                  />
+                  <View style={[styles.healthBadge, { backgroundColor: getHealthColor(data.homeHealth) }]}>
+                    <Text style={styles.healthBadgeText}>{getHealthLabel(data.homeHealth)}</Text>
+                  </View>
                 </View>
               </TouchableOpacity>
 
@@ -328,7 +348,7 @@ export default function DashboardScreen() {
               </View>
             </View>
           </LinearGradient>
-        </Animated.View>
+        </View>
 
         {/* Health Score Details (expandable) */}
         {showHealthDetails && (
@@ -384,7 +404,12 @@ export default function DashboardScreen() {
             </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.familyScroll}>
               {familyData.members.map((member) => (
-                <View key={member.id} style={styles.familyMember}>
+                <TouchableOpacity
+                  key={member.id}
+                  style={styles.familyMember}
+                  onPress={() => router.push(`/(tabs)/family/member/${member.id}` as any)}
+                  activeOpacity={0.7}
+                >
                   <View style={styles.familyAvatar}>
                     <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.navy[600]} />
                   </View>
@@ -392,16 +417,21 @@ export default function DashboardScreen() {
                   <Text style={styles.familyRole} numberOfLines={1}>
                     {member.type === 'CHILD' ? 'Child' : member.type === 'STAFF' ? 'Staff' : 'Adult'}
                   </Text>
-                </View>
+                </TouchableOpacity>
               ))}
               {familyData.pets.map((pet) => (
-                <View key={pet.id} style={styles.familyMember}>
+                <TouchableOpacity
+                  key={pet.id}
+                  style={styles.familyMember}
+                  onPress={() => router.push(`/(tabs)/family/pet/${pet.id}` as any)}
+                  activeOpacity={0.7}
+                >
                   <View style={[styles.familyAvatar, { backgroundColor: colors.haven.champagne[100] }]}>
                     <Ionicons name="paw-outline" size={24} color={colors.haven.champagne[600]} />
                   </View>
                   <Text style={styles.familyName} numberOfLines={1}>{pet.name}</Text>
                   <Text style={styles.familyRole} numberOfLines={1}>{pet.breed || pet.species}</Text>
-                </View>
+                </TouchableOpacity>
               ))}
             </ScrollView>
           </AnimatedCard>
@@ -428,7 +458,7 @@ export default function DashboardScreen() {
 
         {/* Manager Card */}
         {data.manager && (
-          <AnimatedCard style={styles.managerCard} delay={200} onPress={() => router.push('/(tabs)/sarah')}>
+          <AnimatedCard style={styles.managerCard} delay={200} onPress={() => router.push('/(tabs)/manager')}>
             <View style={styles.managerHeader}>
               <View style={styles.managerAvatar}>
                 <Text style={styles.managerInitials}>
@@ -453,7 +483,7 @@ export default function DashboardScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/sarah')}>
+            <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/manager')}>
               <View style={[styles.quickIcon, { backgroundColor: colors.haven.champagne[100] }]}>
                 <Ionicons name="chatbubble" size={22} color={colors.haven.champagne[600]} />
               </View>
@@ -481,32 +511,50 @@ export default function DashboardScreen() {
         </View>
 
         {/* Recent Activity */}
-        {data.recentActivity.length > 0 && (
-          <View style={styles.section}>
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Recent Activity</Text>
-            <AnimatedCard style={styles.activityCard} delay={300}>
-              {data.recentActivity.slice(0, 5).map((activity, index) => (
-                <View
-                  key={activity.id}
-                  style={[styles.activityRow, index < Math.min(data.recentActivity.length, 5) - 1 && styles.activityBorder]}
-                >
-                  <View style={styles.activityIcon}>
-                    <Ionicons name="ellipse" size={8} color={colors.haven.champagne[500]} />
-                  </View>
-                  <View style={styles.activityContent}>
-                    <Text style={styles.activityTitle} numberOfLines={1}>{activity.title}</Text>
-                    {activity.actorName && (
-                      <Text style={styles.activityActor}>{activity.actorName}</Text>
-                    )}
-                  </View>
-                  <Text style={styles.activityTime}>{formatRelativeTime(activity.createdAt)}</Text>
-                </View>
-              ))}
-            </AnimatedCard>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/activity' as any)}>
+              <Text style={styles.seeAllLink}>See All</Text>
+            </TouchableOpacity>
           </View>
-        )}
+          <AnimatedCard style={styles.activityCard} delay={300}>
+            {data.recentActivity.length === 0 ? (
+              <View style={styles.activityEmpty}>
+                <Ionicons name="newspaper-outline" size={32} color={colors.gray[300]} />
+                <Text style={styles.activityEmptyText}>No recent activity</Text>
+              </View>
+            ) : (
+              data.recentActivity.slice(0, 5).map((activity, index) => {
+                const config = getActivityConfig(activity.category);
+                return (
+                  <View
+                    key={activity.id}
+                    style={[styles.activityRow, index < Math.min(data.recentActivity.length, 5) - 1 && styles.activityBorder]}
+                  >
+                    <View style={[styles.activityEmoji, { backgroundColor: config.bgColor }]}>
+                      <Text style={styles.activityEmojiText}>{config.emoji}</Text>
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityTitle} numberOfLines={1}>{activity.title}</Text>
+                      {activity.description && (
+                        <Text style={styles.activityDescription} numberOfLines={1}>{activity.description}</Text>
+                      )}
+                      <View style={styles.activityMeta}>
+                        {activity.actorName && (
+                          <Text style={styles.activityActor}>{activity.actorName}</Text>
+                        )}
+                        <Text style={styles.activityTime}>{formatRelativeTime(activity.createdAt)}</Text>
+                      </View>
+                    </View>
+                  </View>
+                );
+              })
+            )}
+          </AnimatedCard>
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -590,6 +638,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.bold,
     color: colors.white,
     marginBottom: spacing[1],
+    letterSpacing: -0.5,  // Tighter for large display text
   },
   heroSubtext: {
     fontSize: typography.fontSizes.base,
@@ -622,6 +671,17 @@ const styles = StyleSheet.create({
   heroStatValue: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
+    color: colors.white,
+  },
+  healthBadge: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[1],
+    borderRadius: borderRadius.full,
+    flexShrink: 0,  // Prevent shrinking in flex container
+  },
+  healthBadgeText: {
+    fontSize: 11,
+    fontWeight: typography.fontWeights.semibold,
     color: colors.white,
   },
 
@@ -830,11 +890,16 @@ const styles = StyleSheet.create({
     marginTop: spacing[6],
     paddingHorizontal: spacing[4],
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
   sectionTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
     color: colors.text.primary,
-    marginBottom: spacing[3],
   },
 
   // Quick Actions
@@ -871,32 +936,59 @@ const styles = StyleSheet.create({
   },
   activityRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     paddingVertical: spacing[3],
+    gap: spacing[3],
   },
   activityBorder: {
     borderBottomWidth: 1,
     borderBottomColor: colors.border.light,
   },
-  activityIcon: {
-    width: 24,
+  activityEmoji: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
     alignItems: 'center',
-    marginRight: spacing[3],
+    justifyContent: 'center',
+  },
+  activityEmojiText: {
+    fontSize: 18,
   },
   activityContent: {
     flex: 1,
   },
   activityTitle: {
     fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
     color: colors.text.primary,
+  },
+  activityDescription: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  activityMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: 4,
   },
   activityActor: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.tertiary,
-    marginTop: 2,
   },
   activityTime: {
     fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+  },
+  activityEmpty: {
+    padding: spacing[8],
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+  },
+  activityEmptyText: {
+    fontSize: typography.fontSizes.sm,
     color: colors.text.tertiary,
   },
 });

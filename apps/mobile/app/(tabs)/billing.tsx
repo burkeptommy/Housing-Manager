@@ -7,13 +7,20 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
+  Alert,
+  Modal,
+  TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
+import { usePlaid } from '../../src/contexts/plaid-context';
 import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
 import { API_BASE_URL } from '../../src/lib/api';
 import { getIdToken } from '../../src/lib/firebase';
+import { formatFrequency as formatPlaidFrequency, getCategoryIcon as getPlaidCategoryIcon, DetectedBill } from '../../src/lib/plaid';
 
 // =============================================================================
 // TYPES
@@ -285,15 +292,353 @@ function CategoryCard({
   );
 }
 
-function EmptyState() {
+function EmptyState({ onAddBill }: { onAddBill: () => void }) {
   return (
     <View style={styles.emptyState}>
       <Ionicons name="card-outline" size={48} color={colors.slate[300]} />
       <Text style={styles.emptyTitle}>No bills set up yet</Text>
       <Text style={styles.emptySubtext}>
-        Your Home Manager will add your bills during onboarding.
+        Add your bills to track expenses and let Haven help manage them.
       </Text>
+      <TouchableOpacity style={styles.addBillButton} onPress={onAddBill}>
+        <Ionicons name="add" size={20} color={colors.white} />
+        <Text style={styles.addBillButtonText}>Add Your First Bill</Text>
+      </TouchableOpacity>
     </View>
+  );
+}
+
+function ConnectBankCard({
+  onConnect,
+  isLinking,
+  isSyncing,
+  hasConnections,
+}: {
+  onConnect: () => void;
+  isLinking: boolean;
+  isSyncing: boolean;
+  hasConnections: boolean;
+}) {
+  if (hasConnections) return null;
+
+  return (
+    <View style={styles.connectBankCard}>
+      <View style={styles.connectBankIcon}>
+        <Ionicons name="business-outline" size={28} color={colors.haven.champagne[500]} />
+      </View>
+      <View style={styles.connectBankContent}>
+        <Text style={styles.connectBankTitle}>Connect Your Bank</Text>
+        <Text style={styles.connectBankSubtitle}>
+          Automatically detect and track your recurring bills
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.connectBankButton, (isLinking || isSyncing) && styles.connectBankButtonDisabled]}
+        onPress={onConnect}
+        disabled={isLinking || isSyncing}
+      >
+        {isLinking || isSyncing ? (
+          <ActivityIndicator size="small" color={colors.white} />
+        ) : (
+          <>
+            <Ionicons name="link-outline" size={18} color={colors.white} />
+            <Text style={styles.connectBankButtonText}>Connect</Text>
+          </>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+function DetectedBillsSection({
+  bills,
+  onConfirm,
+  onDismiss,
+  isLoading,
+}: {
+  bills: DetectedBill[];
+  onConfirm: (billId: string) => void;
+  onDismiss: (billId: string) => void;
+  isLoading: boolean;
+}) {
+  const pendingBills = bills.filter((b) => b.status === 'DETECTED');
+
+  if (pendingBills.length === 0) return null;
+
+  return (
+    <View style={styles.detectedBillsSection}>
+      <View style={styles.detectedBillsHeader}>
+        <View style={styles.detectedBillsHeaderLeft}>
+          <View style={styles.detectedBillsBadge}>
+            <Ionicons name="sparkles" size={16} color={colors.haven.champagne[500]} />
+          </View>
+          <View>
+            <Text style={styles.detectedBillsTitle}>Bills Found!</Text>
+            <Text style={styles.detectedBillsSubtitle}>
+              We found {pendingBills.length} recurring bill{pendingBills.length !== 1 ? 's' : ''} in your transactions
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      <View style={styles.detectedBillsList}>
+        {pendingBills.map((bill) => (
+          <View key={bill.id} style={styles.detectedBillItem}>
+            <View style={styles.detectedBillInfo}>
+              <View style={styles.detectedBillIconContainer}>
+                <Ionicons
+                  name={getPlaidCategoryIcon(bill.category) as keyof typeof Ionicons.glyphMap}
+                  size={20}
+                  color={colors.haven.navy[600]}
+                />
+              </View>
+              <View style={styles.detectedBillDetails}>
+                <Text style={styles.detectedBillName}>{bill.visibleName}</Text>
+                <Text style={styles.detectedBillMeta}>
+                  {formatCurrencyDetailed(bill.lastAmount)} · {formatPlaidFrequency(bill.frequency)}
+                </Text>
+                {bill.accountName && (
+                  <Text style={styles.detectedBillAccount}>From: {bill.accountName}</Text>
+                )}
+              </View>
+            </View>
+            <View style={styles.detectedBillActions}>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => onConfirm(bill.id)}
+                disabled={isLoading}
+              >
+                <Ionicons name="checkmark" size={18} color={colors.white} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dismissButton}
+                onPress={() => onDismiss(bill.id)}
+                disabled={isLoading}
+              >
+                <Ionicons name="close" size={18} color={colors.slate[600]} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+}
+
+// =============================================================================
+// ADD BILL MODAL
+// =============================================================================
+
+const BILL_CATEGORIES = [
+  { value: 'MORTGAGE_RENT', label: 'Mortgage/Rent' },
+  { value: 'UTILITY', label: 'Utility' },
+  { value: 'INSURANCE', label: 'Insurance' },
+  { value: 'HOME_SERVICE', label: 'Home Service' },
+  { value: 'VEHICLE', label: 'Vehicle' },
+  { value: 'KID_ACTIVITY', label: 'Kid Activity' },
+  { value: 'PET', label: 'Pet' },
+  { value: 'HEALTH', label: 'Health' },
+  { value: 'OTHER', label: 'Other' },
+];
+
+const FREQUENCIES = [
+  { value: 'WEEKLY', label: 'Weekly' },
+  { value: 'BIWEEKLY', label: 'Bi-weekly' },
+  { value: 'MONTHLY', label: 'Monthly' },
+  { value: 'QUARTERLY', label: 'Quarterly' },
+  { value: 'ANNUALLY', label: 'Annually' },
+];
+
+function AddBillModal({
+  visible,
+  onClose,
+  onSave,
+  isLoading,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onSave: (bill: { name: string; category: string; amount: string; frequency: string; dueDay: string }) => void;
+  isLoading: boolean;
+}) {
+  const [name, setName] = useState('');
+  const [category, setCategory] = useState('UTILITY');
+  const [amount, setAmount] = useState('');
+  const [frequency, setFrequency] = useState('MONTHLY');
+  const [dueDay, setDueDay] = useState('');
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const [showFrequencyPicker, setShowFrequencyPicker] = useState(false);
+
+  const resetForm = () => {
+    setName('');
+    setCategory('UTILITY');
+    setAmount('');
+    setFrequency('MONTHLY');
+    setDueDay('');
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const handleSave = () => {
+    if (!name.trim()) {
+      Alert.alert('Error', 'Please enter a bill name');
+      return;
+    }
+    if (!amount.trim() || isNaN(parseFloat(amount))) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
+    onSave({ name: name.trim(), category, amount, frequency, dueDay });
+    resetForm();
+  };
+
+  const selectedCategory = BILL_CATEGORIES.find(c => c.value === category);
+  const selectedFrequency = FREQUENCIES.find(f => f.value === frequency);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.modalOverlay}
+      >
+        <View style={styles.modalContainer}>
+          {/* Header */}
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={handleClose}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Add Bill</Text>
+            <TouchableOpacity onPress={handleSave} disabled={isLoading}>
+              <Text style={[styles.modalSave, isLoading && styles.modalSaveDisabled]}>
+                {isLoading ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent}>
+            {/* Bill Name */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Bill Name</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g., Electric Bill, Netflix"
+                placeholderTextColor={colors.slate[400]}
+                value={name}
+                onChangeText={setName}
+              />
+            </View>
+
+            {/* Category */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Category</Text>
+              <TouchableOpacity
+                style={styles.formSelect}
+                onPress={() => setShowCategoryPicker(!showCategoryPicker)}
+              >
+                <Text style={styles.formSelectText}>{selectedCategory?.label || 'Select'}</Text>
+                <Ionicons name="chevron-down" size={20} color={colors.slate[400]} />
+              </TouchableOpacity>
+              {showCategoryPicker && (
+                <View style={styles.pickerList}>
+                  {BILL_CATEGORIES.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.value}
+                      style={[styles.pickerItem, cat.value === category && styles.pickerItemSelected]}
+                      onPress={() => {
+                        setCategory(cat.value);
+                        setShowCategoryPicker(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          cat.value === category && styles.pickerItemTextSelected,
+                        ]}
+                      >
+                        {cat.label}
+                      </Text>
+                      {cat.value === category && (
+                        <Ionicons name="checkmark" size={18} color={colors.haven.champagne[500]} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Amount */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Amount</Text>
+              <View style={styles.amountInputContainer}>
+                <Text style={styles.currencyPrefix}>$</Text>
+                <TextInput
+                  style={styles.amountInput}
+                  placeholder="0.00"
+                  placeholderTextColor={colors.slate[400]}
+                  value={amount}
+                  onChangeText={setAmount}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+            </View>
+
+            {/* Frequency */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Frequency</Text>
+              <TouchableOpacity
+                style={styles.formSelect}
+                onPress={() => setShowFrequencyPicker(!showFrequencyPicker)}
+              >
+                <Text style={styles.formSelectText}>{selectedFrequency?.label || 'Select'}</Text>
+                <Ionicons name="chevron-down" size={20} color={colors.slate[400]} />
+              </TouchableOpacity>
+              {showFrequencyPicker && (
+                <View style={styles.pickerList}>
+                  {FREQUENCIES.map((freq) => (
+                    <TouchableOpacity
+                      key={freq.value}
+                      style={[styles.pickerItem, freq.value === frequency && styles.pickerItemSelected]}
+                      onPress={() => {
+                        setFrequency(freq.value);
+                        setShowFrequencyPicker(false);
+                      }}
+                    >
+                      <Text
+                        style={[
+                          styles.pickerItemText,
+                          freq.value === frequency && styles.pickerItemTextSelected,
+                        ]}
+                      >
+                        {freq.label}
+                      </Text>
+                      {freq.value === frequency && (
+                        <Ionicons name="checkmark" size={18} color={colors.haven.champagne[500]} />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+
+            {/* Due Day */}
+            <View style={styles.formGroup}>
+              <Text style={styles.formLabel}>Due Day (optional)</Text>
+              <TextInput
+                style={styles.formInput}
+                placeholder="e.g., 15 (day of month)"
+                placeholderTextColor={colors.slate[400]}
+                value={dueDay}
+                onChangeText={setDueDay}
+                keyboardType="number-pad"
+                maxLength={2}
+              />
+            </View>
+          </ScrollView>
+        </View>
+      </KeyboardAvoidingView>
+    </Modal>
   );
 }
 
@@ -303,11 +648,26 @@ function EmptyState() {
 
 export default function BillingScreen() {
   const { householdInfo } = useAuth();
+  const {
+    connections,
+    detectedBills,
+    isLinking,
+    isSyncing,
+    isLoading: plaidLoading,
+    connectBank,
+    refreshConnections,
+    refreshDetectedBills,
+    confirmBill,
+    dismissBill,
+  } = usePlaid();
+
   const [data, setData] = useState<BillsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const fetchBills = useCallback(async () => {
     if (!householdInfo?.id) {
@@ -352,11 +712,23 @@ export default function BillingScreen() {
     fetchBills();
   }, [fetchBills]);
 
+  // Load Plaid data on mount
+  useEffect(() => {
+    if (householdInfo?.id) {
+      refreshConnections(householdInfo.id);
+      refreshDetectedBills(householdInfo.id);
+    }
+  }, [householdInfo?.id, refreshConnections, refreshDetectedBills]);
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await fetchBills();
+    await Promise.all([
+      fetchBills(),
+      householdInfo?.id ? refreshConnections(householdInfo.id) : Promise.resolve(),
+      householdInfo?.id ? refreshDetectedBills(householdInfo.id) : Promise.resolve(),
+    ]);
     setRefreshing(false);
-  }, [fetchBills]);
+  }, [fetchBills, householdInfo?.id, refreshConnections, refreshDetectedBills]);
 
   const toggleCategory = (category: string) => {
     setExpandedCategories((prev) => {
@@ -372,6 +744,86 @@ export default function BillingScreen() {
 
   const getBillsForCategory = (category: string) => {
     return data?.bills.filter((b) => b.category === category) || [];
+  };
+
+  const handleConnectBank = useCallback(async () => {
+    if (!householdInfo?.id) return;
+    const result = await connectBank(householdInfo.id);
+    if (result.success) {
+      // Refresh bills after successful connection
+      fetchBills();
+    } else if (result.error) {
+      Alert.alert('Connection Error', result.error);
+    }
+  }, [householdInfo?.id, connectBank, fetchBills]);
+
+  const handleConfirmBill = useCallback(async (billId: string) => {
+    try {
+      await confirmBill(billId);
+      // Refresh the main bills list to show the confirmed bill
+      fetchBills();
+      Alert.alert('Bill Added', 'The bill has been added to your bill list.');
+    } catch {
+      Alert.alert('Error', 'Failed to confirm bill. Please try again.');
+    }
+  }, [confirmBill, fetchBills]);
+
+  const handleDismissBill = useCallback(async (billId: string) => {
+    try {
+      await dismissBill(billId);
+    } catch {
+      Alert.alert('Error', 'Failed to dismiss bill. Please try again.');
+    }
+  }, [dismissBill]);
+
+  const handleAddBill = async (bill: {
+    name: string;
+    category: string;
+    amount: string;
+    frequency: string;
+    dueDay: string;
+  }) => {
+    if (!householdInfo?.id) return;
+
+    setIsSaving(true);
+    try {
+      const token = await getIdToken(true);
+      if (!token) {
+        Alert.alert('Error', 'Authentication expired');
+        return;
+      }
+
+      const response = await fetch(
+        `${API_BASE_URL}/dashboard/household/${householdInfo.id}/bills`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: bill.name,
+            category: bill.category,
+            amount: parseFloat(bill.amount),
+            frequency: bill.frequency,
+            dueDay: bill.dueDay ? parseInt(bill.dueDay, 10) : null,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to add bill');
+      }
+
+      setShowAddModal(false);
+      fetchBills(); // Refresh the bills list
+      Alert.alert('Success', 'Bill added successfully');
+    } catch (err) {
+      console.error('Add bill error:', err);
+      Alert.alert('Error', 'Failed to add bill. Please try again.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (isLoading) {
@@ -422,8 +874,30 @@ export default function BillingScreen() {
             />
           }
         >
-          <EmptyState />
+          {/* Connect Bank Card - Show prominently even when no bills */}
+          <ConnectBankCard
+            onConnect={handleConnectBank}
+            isLinking={isLinking}
+            isSyncing={isSyncing}
+            hasConnections={connections.length > 0}
+          />
+
+          {/* Detected Bills Section - may have bills from Plaid even if no manual bills */}
+          <DetectedBillsSection
+            bills={detectedBills}
+            onConfirm={handleConfirmBill}
+            onDismiss={handleDismissBill}
+            isLoading={plaidLoading}
+          />
+
+          <EmptyState onAddBill={() => setShowAddModal(true)} />
         </ScrollView>
+        <AddBillModal
+          visible={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          onSave={handleAddBill}
+          isLoading={isSaving}
+        />
       </SafeAreaView>
     );
   }
@@ -442,6 +916,22 @@ export default function BillingScreen() {
       >
         {/* Summary Header */}
         <SummaryHeader summary={data.summary} />
+
+        {/* Connect Bank Card */}
+        <ConnectBankCard
+          onConnect={handleConnectBank}
+          isLinking={isLinking}
+          isSyncing={isSyncing}
+          hasConnections={connections.length > 0}
+        />
+
+        {/* Detected Bills Section */}
+        <DetectedBillsSection
+          bills={detectedBills}
+          onConfirm={handleConfirmBill}
+          onDismiss={handleDismissBill}
+          isLoading={plaidLoading}
+        />
 
         {/* Bills by Category */}
         <View style={styles.categoriesSection}>
@@ -480,6 +970,23 @@ export default function BillingScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* Floating Add Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => setShowAddModal(true)}
+        activeOpacity={0.8}
+      >
+        <Ionicons name="add" size={28} color={colors.white} />
+      </TouchableOpacity>
+
+      {/* Add Bill Modal */}
+      <AddBillModal
+        visible={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSave={handleAddBill}
+        isLoading={isSaving}
+      />
     </SafeAreaView>
   );
 }
@@ -667,8 +1174,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
   },
   havenBadgeText: {
-    fontSize: 10,
-    fontWeight: typography.fontWeights.medium,
+    fontSize: 11,  // Minimum for badges
+    fontWeight: typography.fontWeights.semibold,  // Bolder to compensate
     color: colors.status.success,
   },
   billPayee: {
@@ -796,5 +1303,316 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
     color: colors.white,
+  },
+
+  // Add Bill Button (Empty State)
+  addBillButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    backgroundColor: colors.haven.champagne[500],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[4],
+    borderRadius: borderRadius.xl,
+    marginTop: spacing[6],
+  },
+  addBillButtonText: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+
+  // FAB
+  fab: {
+    position: 'absolute',
+    bottom: spacing[6],
+    right: spacing[4],
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.haven.champagne[500],
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.md,
+  },
+
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalContainer: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: borderRadius['2xl'],
+    borderTopRightRadius: borderRadius['2xl'],
+    maxHeight: '90%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate[100],
+  },
+  modalCancel: {
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[500],
+  },
+  modalTitle: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  modalSave: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.haven.champagne[500],
+  },
+  modalSaveDisabled: {
+    color: colors.slate[300],
+  },
+  modalContent: {
+    padding: spacing[4],
+    paddingBottom: spacing[8],
+  },
+
+  // Form Styles
+  formGroup: {
+    marginBottom: spacing[5],
+  },
+  formLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.slate[700],
+    marginBottom: spacing[2],
+  },
+  formInput: {
+    backgroundColor: colors.slate[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[900],
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+  },
+  formSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.slate[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+  },
+  formSelectText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[900],
+  },
+  amountInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.slate[50],
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+  },
+  currencyPrefix: {
+    fontSize: typography.fontSizes.lg,
+    color: colors.slate[500],
+    paddingLeft: spacing[4],
+  },
+  amountInput: {
+    flex: 1,
+    padding: spacing[4],
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[900],
+  },
+  pickerList: {
+    marginTop: spacing[2],
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+    overflow: 'hidden',
+  },
+  pickerItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.slate[100],
+  },
+  pickerItemSelected: {
+    backgroundColor: colors.haven.champagne[50],
+  },
+  pickerItemText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[700],
+  },
+  pickerItemTextSelected: {
+    color: colors.haven.champagne[600],
+    fontWeight: typography.fontWeights.medium,
+  },
+
+  // Connect Bank Card
+  connectBankCard: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[200],
+    borderStyle: 'dashed',
+    ...shadows.sm,
+  },
+  connectBankIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.haven.champagne[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  connectBankContent: {
+    flex: 1,
+  },
+  connectBankTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  connectBankSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.slate[500],
+    marginTop: 2,
+  },
+  connectBankButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    backgroundColor: colors.haven.champagne[500],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.lg,
+  },
+  connectBankButtonDisabled: {
+    backgroundColor: colors.slate[300],
+  },
+  connectBankButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+
+  // Detected Bills Section
+  detectedBillsSection: {
+    backgroundColor: colors.haven.champagne[50],
+    borderRadius: borderRadius.xl,
+    marginBottom: spacing[6],
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[200],
+  },
+  detectedBillsHeader: {
+    padding: spacing[4],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.haven.champagne[200],
+  },
+  detectedBillsHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  detectedBillsBadge: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadows.sm,
+  },
+  detectedBillsTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  detectedBillsSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.slate[600],
+    marginTop: 2,
+  },
+  detectedBillsList: {
+    padding: spacing[3],
+  },
+  detectedBillItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    marginBottom: spacing[2],
+    ...shadows.sm,
+  },
+  detectedBillInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+  },
+  detectedBillIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.slate[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  detectedBillDetails: {
+    flex: 1,
+  },
+  detectedBillName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+  detectedBillMeta: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[600],
+    marginTop: 2,
+  },
+  detectedBillAccount: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[400],
+    marginTop: 2,
+  },
+  detectedBillActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  confirmButton: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.status.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dismissButton: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.slate[100],
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

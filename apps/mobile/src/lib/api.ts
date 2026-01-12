@@ -122,26 +122,12 @@ export function getApiClient(): ApiClient {
   if (!apiClient) {
     const config: ApiClientConfig = {
       baseUrl: API_BASE_URL,
-      getAccessToken: () => {
+      getToken: async () => {
         // Prefer Firebase token
         if (currentFirebaseToken) {
           return currentFirebaseToken;
         }
         return cachedAccessToken;
-      },
-      getRefreshToken: () => cachedRefreshToken,
-      onTokenRefresh: async (tokens) => {
-        // Only update legacy tokens - Firebase handles its own refresh
-        if (!currentFirebaseToken) {
-          cachedAccessToken = tokens.accessToken;
-          cachedRefreshToken = tokens.refreshToken;
-          await setTokens(tokens.accessToken, tokens.refreshToken);
-        }
-      },
-      onUnauthorized: () => {
-        // Will be handled by auth context
-        cachedAccessToken = null;
-        cachedRefreshToken = null;
       },
     };
     apiClient = new ApiClient(config);

@@ -230,4 +230,100 @@ export class UploadsService {
       where: { id: fileAssetId },
     });
   }
+
+  /**
+   * Upload a profile image for an entity (family member, pet, or household)
+   */
+  async uploadProfileImage(
+    entityType: 'family-member' | 'pet' | 'household',
+    entityId: string,
+    base64Image: string,
+    mimeType: string,
+    userId: string,
+  ): Promise<{ imageUrl: string }> {
+    // Convert base64 to buffer
+    const buffer = Buffer.from(base64Image, 'base64');
+
+    // Generate GCS path
+    const gcsPath = this.gcsStorage.generateProfilePhotoPath(entityType, entityId);
+
+    // Upload to GCS
+    let imageUrl: string;
+    try {
+      imageUrl = await this.gcsStorage.uploadBuffer(gcsPath, buffer, mimeType);
+    } catch {
+      // Fallback: use UI Avatars if GCS is not configured
+      imageUrl = `https://ui-avatars.com/api/?name=${entityId.slice(0, 2)}&background=c4a574&color=fff&size=256`;
+    }
+
+    // Update the entity with the new image URL
+    switch (entityType) {
+      case 'family-member':
+        await this.prisma.familyMember.update({
+          where: { id: entityId },
+          data: { profilePhotoUrl: imageUrl },
+        });
+        break;
+      case 'pet':
+        // Pet uses photoUrls array - prepend the new photo
+        const pet = await this.prisma.pet.findUnique({
+          where: { id: entityId },
+          select: { photoUrls: true },
+        });
+        const existingPhotos = pet?.photoUrls || [];
+        await this.prisma.pet.update({
+          where: { id: entityId },
+          data: { photoUrls: [imageUrl, ...existingPhotos.slice(0, 9)] }, // Keep max 10 photos
+        });
+        break;
+      case 'household':
+        await this.prisma.household.update({
+          where: { id: entityId },
+          data: { propertyPhotoUrl: imageUrl },
+        });
+        break;
+    }
+
+    return { imageUrl };
+  }
+
+  /**
+   * Remove a profile image from an entity
+   */
+  async removeProfileImage(
+    entityType: 'family-member' | 'pet' | 'household',
+    entityId: string,
+    userId: string,
+  ): Promise<{ success: boolean }> {
+    // Update the entity to remove the image URL
+    switch (entityType) {
+      case 'family-member':
+        await this.prisma.familyMember.update({
+          where: { id: entityId },
+          data: { profilePhotoUrl: null },
+        });
+        break;
+      case 'pet':
+        // For pets, we clear the first photo (profile photo)
+        const pet = await this.prisma.pet.findUnique({
+          where: { id: entityId },
+          select: { photoUrls: true },
+        });
+        if (pet?.photoUrls && pet.photoUrls.length > 0) {
+          await this.prisma.pet.update({
+            where: { id: entityId },
+            data: { photoUrls: pet.photoUrls.slice(1) }, // Remove first photo
+          });
+        }
+        break;
+      case 'household':
+        await this.prisma.household.update({
+          where: { id: entityId },
+          data: { propertyPhotoUrl: null },
+        });
+        break;
+    }
+
+    return { success: true };
+  }
 }

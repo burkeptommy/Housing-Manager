@@ -62,7 +62,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       if (data?.type === 'approval') {
         router.push('/(tabs)/approvals');
       } else if (data?.type === 'message') {
-        router.push('/(tabs)/sarah');
+        router.push('/(tabs)/manager');
       } else if (data?.type === 'bill') {
         router.push('/(tabs)/billing');
       }

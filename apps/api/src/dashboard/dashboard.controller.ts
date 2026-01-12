@@ -1,7 +1,15 @@
-import { Controller, Get, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, UseGuards } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
 import { FirebaseAuthGuard } from '../firebase';
 import { DashboardService } from './dashboard.service';
+
+class CreateBillDto {
+  name: string;
+  category: string;
+  amount: number;
+  frequency: string;
+  dueDay?: number | null;
+}
 
 @ApiTags('Dashboard')
 @ApiBearerAuth()
@@ -46,6 +54,16 @@ export class DashboardController {
   @ApiParam({ name: 'householdId', description: 'Household ID' })
   async getBills(@Param('householdId') householdId: string) {
     return this.dashboardService.getBills(householdId);
+  }
+
+  @Post('household/:householdId/bills')
+  @ApiOperation({ summary: 'Create a new bill for a household' })
+  @ApiParam({ name: 'householdId', description: 'Household ID' })
+  async createBill(
+    @Param('householdId') householdId: string,
+    @Body() dto: CreateBillDto,
+  ) {
+    return this.dashboardService.createBill(householdId, dto);
   }
 
   @Get('household/:householdId/family')

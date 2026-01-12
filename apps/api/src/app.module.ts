@@ -54,6 +54,7 @@ import { EquipmentModule } from './equipment/equipment.module';
 import { ReferralsModule } from './referrals/referrals.module';
 import { InvitationsModule } from './invitations/invitations.module';
 import { HomeModule } from './home/home.module';
+import { PaymentsModule } from './payments/payments.module';
 
 @Module({
   imports: [
@@ -112,6 +113,7 @@ import { HomeModule } from './home/home.module';
     ReferralsModule,
     InvitationsModule,
     HomeModule,
+    PaymentsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

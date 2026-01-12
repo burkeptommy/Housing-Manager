@@ -160,32 +160,166 @@ export const colors = {
     800: '#991b1b',
     900: '#7f1d1d',
   },
+  blue: {
+    50: '#eff6ff',
+    100: '#dbeafe',
+    200: '#bfdbfe',
+    300: '#93c5fd',
+    400: '#60a5fa',
+    500: '#3b82f6',
+    600: '#2563eb',
+    700: '#1d4ed8',
+    800: '#1e40af',
+    900: '#1e3a8a',
+  },
+  indigo: {
+    50: '#eef2ff',
+    100: '#e0e7ff',
+    200: '#c7d2fe',
+    300: '#a5b4fc',
+    400: '#818cf8',
+    500: '#6366f1',
+    600: '#4f46e5',
+    700: '#4338ca',
+    800: '#3730a3',
+    900: '#312e81',
+  },
+  amber: {
+    50: '#fffbeb',
+    100: '#fef3c7',
+    200: '#fde68a',
+    300: '#fcd34d',
+    400: '#fbbf24',
+    500: '#f59e0b',
+    600: '#d97706',
+    700: '#b45309',
+    800: '#92400e',
+    900: '#78350f',
+  },
+  cyan: {
+    50: '#ecfeff',
+    100: '#cffafe',
+    200: '#a5f3fc',
+    300: '#67e8f9',
+    400: '#22d3ee',
+    500: '#06b6d4',
+    600: '#0891b2',
+    700: '#0e7490',
+    800: '#155e75',
+    900: '#164e63',
+  },
+  emerald: {
+    50: '#ecfdf5',
+    100: '#d1fae5',
+    200: '#a7f3d0',
+    300: '#6ee7b7',
+    400: '#34d399',
+    500: '#10b981',
+    600: '#059669',
+    700: '#047857',
+    800: '#065f46',
+    900: '#064e3b',
+  },
+  orange: {
+    50: '#fff7ed',
+    100: '#ffedd5',
+    200: '#fed7aa',
+    300: '#fdba74',
+    400: '#fb923c',
+    500: '#f97316',
+    600: '#ea580c',
+    700: '#c2410c',
+    800: '#9a3412',
+    900: '#7c2d12',
+  },
+  rose: {
+    50: '#fff1f2',
+    100: '#ffe4e6',
+    200: '#fecdd3',
+    300: '#fda4af',
+    400: '#fb7185',
+    500: '#f43f5e',
+    600: '#e11d48',
+    700: '#be123c',
+    800: '#9f1239',
+    900: '#881337',
+  },
+  lime: {
+    50: '#f7fee7',
+    100: '#ecfccb',
+    200: '#d9f99d',
+    300: '#bef264',
+    400: '#a3e635',
+    500: '#84cc16',
+    600: '#65a30d',
+    700: '#4d7c0f',
+    800: '#3f6212',
+    900: '#365314',
+  },
+  sky: {
+    50: '#f0f9ff',
+    100: '#e0f2fe',
+    200: '#bae6fd',
+    300: '#7dd3fc',
+    400: '#38bdf8',
+    500: '#0ea5e9',
+    600: '#0284c7',
+    700: '#0369a1',
+    800: '#075985',
+    900: '#0c4a6e',
+  },
 };
 
 // Typography scale
 export const typography = {
+  // =========================================================================
+  // FONT SIZES - Minimum 13px for accessibility and readability
+  // =========================================================================
   fontSizes: {
-    '2xs': 10,
-    xs: 12,
-    sm: 14,
-    base: 16,
-    lg: 18,
-    xl: 20,
-    '2xl': 24,
-    '3xl': 30,
-    '4xl': 36,
+    xs: 13,      // Was 12 - minimum readable size (captions, timestamps)
+    sm: 14,      // Secondary text, button labels
+    base: 16,    // Body text, inputs
+    lg: 18,      // Subheadings, card titles
+    xl: 20,      // Section titles
+    '2xl': 24,   // Screen titles
+    '3xl': 30,   // Large headings
+    '4xl': 36,   // Hero text
+    '5xl': 48,   // Extra large display
   },
+
+  // =========================================================================
+  // FONT WEIGHTS - Clear hierarchy
+  // =========================================================================
   fontWeights: {
-    normal: '400' as const,
-    medium: '500' as const,
-    semibold: '600' as const,
-    bold: '700' as const,
+    regular: '400' as const,   // Body text
+    normal: '400' as const,    // Alias for regular
+    medium: '500' as const,    // Labels, secondary emphasis
+    semibold: '600' as const,  // Headings, buttons
+    bold: '700' as const,      // Strong emphasis
   },
+
+  // =========================================================================
+  // LINE HEIGHTS - Comfortable reading
+  // =========================================================================
   lineHeights: {
-    tight: 1.1,
-    snug: 1.25,
-    normal: 1.5,
-    relaxed: 1.75,
+    none: 1,        // Single line items
+    tight: 1.2,     // Headings
+    snug: 1.375,    // Compact text
+    normal: 1.5,    // Body text (default)
+    relaxed: 1.625, // Long-form text
+    loose: 2,       // Extra spacing
+  },
+
+  // =========================================================================
+  // LETTER SPACING - Elegance and readability
+  // =========================================================================
+  letterSpacing: {
+    tighter: -0.5,   // Large display text (36px+)
+    tight: -0.25,    // Headings (24px+)
+    normal: 0,       // Body text
+    wide: 0.25,      // Buttons, labels
+    wider: 0.5,      // Small caps
+    widest: 1.5,     // UPPERCASE LABELS
   },
 };
 

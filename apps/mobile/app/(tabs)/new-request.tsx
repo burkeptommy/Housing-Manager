@@ -14,7 +14,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/contexts/auth-context';
-import { getApiClient } from '../../src/lib/api';
+import { API_BASE_URL } from '../../src/lib/api';
+import { getIdToken } from '../../src/lib/firebase';
 import { colors, spacing, typography, borderRadius, shadows } from '../../src/lib/theme';
 import type { ServiceCategory, ServiceRequestPriority } from '@haven/core';
 
@@ -28,7 +29,6 @@ const PRIORITIES: { value: ServiceRequestPriority; label: string; color: string 
 export default function NewRequestScreen() {
   const router = useRouter();
   const { currentHousehold } = useAuth();
-  const api = getApiClient();
 
   const [categories, setCategories] = useState<ServiceCategory[]>([]);
   const [title, setTitle] = useState('');
@@ -42,8 +42,15 @@ export default function NewRequestScreen() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const data = await api.getServiceCategories();
-        setCategories(data.filter((c) => c.isActive));
+        const token = await getIdToken();
+        if (!token) return;
+        const response = await fetch(`${API_BASE_URL}/service-categories`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (response.ok) {
+          const data: ServiceCategory[] = await response.json();
+          setCategories(data.filter((c: ServiceCategory) => c.isActive));
+        }
       } catch (error) {
         console.error('Failed to fetch categories:', error);
       } finally {
@@ -51,7 +58,7 @@ export default function NewRequestScreen() {
       }
     };
     fetchCategories();
-  }, [api]);
+  }, []);
 
   const handleSubmit = async () => {
     if (!currentHousehold) {
@@ -71,14 +78,29 @@ export default function NewRequestScreen() {
 
     setIsLoading(true);
     try {
-      await api.createServiceRequest({
-        householdId: currentHousehold.id,
-        title: title.trim(),
-        description: description.trim(),
-        categoryId: selectedCategory || undefined,
-        priority,
-        notes: notes.trim() || undefined,
+      const token = await getIdToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const response = await fetch(`${API_BASE_URL}/service-requests`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          householdId: currentHousehold.id,
+          title: title.trim(),
+          description: description.trim(),
+          categoryId: selectedCategory || undefined,
+          priority,
+          notes: notes.trim() || undefined,
+        }),
       });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to create request');
+      }
 
       Alert.alert('Success', 'Your request has been submitted', [
         {
@@ -86,8 +108,9 @@ export default function NewRequestScreen() {
           onPress: () => router.replace('/(tabs)'),
         },
       ]);
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create request');
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to create request';
+      Alert.alert('Error', message);
     } finally {
       setIsLoading(false);
     }

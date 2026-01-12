@@ -144,4 +144,48 @@ export class GcsStorageService {
       return false;
     }
   }
+
+  /**
+   * Upload a buffer directly to GCS and return the public URL
+   */
+  async uploadBuffer(
+    gcsPath: string,
+    buffer: Buffer,
+    contentType: string,
+    makePublic: boolean = true,
+  ): Promise<string> {
+    const bucket = this.storage.bucket(this.bucketName);
+    const file = bucket.file(gcsPath);
+
+    try {
+      await file.save(buffer, {
+        contentType,
+        public: makePublic,
+        metadata: {
+          cacheControl: 'public, max-age=31536000',
+        },
+      });
+
+      if (makePublic) {
+        return `https://storage.googleapis.com/${this.bucketName}/${gcsPath}`;
+      }
+
+      // Return signed URL if not public
+      return this.generateSignedReadUrl(gcsPath, 60 * 24 * 7); // 7 days
+    } catch (error) {
+      this.logger.error(`Failed to upload buffer: ${error}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Generate a profile photo path
+   */
+  generateProfilePhotoPath(
+    entityType: 'family-member' | 'pet' | 'household',
+    entityId: string,
+  ): string {
+    const uniqueId = uuidv4().slice(0, 8);
+    return `profiles/${entityType}/${entityId}-${uniqueId}.jpg`;
+  }
 }

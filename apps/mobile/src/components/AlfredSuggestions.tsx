@@ -22,10 +22,12 @@ interface AlfredSuggestionsProps {
 // =============================================================================
 
 const SUGGESTIONS: Suggestion[] = [
-  { id: '1', text: 'Schedule HVAC maintenance', icon: 'thermometer-outline' },
-  { id: '2', text: "What's on my maintenance checklist?", icon: 'list-outline' },
-  { id: '3', text: 'Book a handyman visit', icon: 'construct-outline' },
-  { id: '4', text: 'Find a plumber for a leak', icon: 'water-outline' },
+  { id: '1', text: "What's on my maintenance checklist?", icon: 'list-outline' },
+  { id: '2', text: 'Book a handyman visit', icon: 'construct-outline' },
+  { id: '3', text: 'I have a bill to add', icon: 'receipt-outline' },
+  { id: '4', text: 'Schedule HVAC maintenance', icon: 'thermometer-outline' },
+  { id: '5', text: 'Find a plumber for a leak', icon: 'water-outline' },
+  { id: '6', text: 'What home systems do I have?', icon: 'home-outline' },
 ];
 
 // =============================================================================
@@ -98,7 +100,7 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[700],
+    color: colors.haven.champagne[600],
     fontWeight: typography.fontWeights.medium,
     maxWidth: 180,
   },

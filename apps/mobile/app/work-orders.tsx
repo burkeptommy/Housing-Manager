@@ -66,8 +66,8 @@ export default function WorkOrdersScreen() {
 
     try {
       const [ordersData, tasksData, vendorsData] = await Promise.all([
-        api.getWorkOrders(currentHousehold.id, { includeCompleted: false }),
-        api.getMaintenanceTasks(currentHousehold.id, { status: 'PENDING' }).catch(() => []),
+        api.getWorkOrders(currentHousehold.id),
+        api.getMaintenanceTasks(currentHousehold.id).catch(() => []),
         api.getHouseholdVendors(currentHousehold.id).catch(() => []),
       ]);
       setWorkOrders(ordersData);
@@ -289,7 +289,7 @@ function CreateWorkOrderModal({
         preferredDate: preferredDate || undefined,
       };
 
-      await api.createWorkOrder(householdId, data);
+      await api.createWorkOrder({ ...data, householdId });
       Alert.alert('Success', 'Work order created successfully');
 
       // Reset form

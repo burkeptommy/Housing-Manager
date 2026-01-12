@@ -5,6 +5,13 @@ import {
   MaintenanceCategory,
   MaintenanceFrequency,
 } from '@prisma/client';
+import {
+  CHECKLIST_TEMPLATES,
+  ChecklistStep,
+  findMatchingTemplate,
+  createChecklistFromTemplate,
+  getWhyThisMatters,
+} from './checklist-templates';
 
 @Injectable()
 export class MaintenanceService {
@@ -243,5 +250,214 @@ export class MaintenanceService {
     }
 
     return date;
+  }
+
+  /**
+   * Get all checklist templates
+   */
+  getTemplates() {
+    return CHECKLIST_TEMPLATES.map((t) => ({
+      id: t.id,
+      name: t.name,
+      category: t.category,
+      whyThisMatters: t.whyThisMatters,
+      stepCount: t.steps.length,
+    }));
+  }
+
+  /**
+   * Get a single maintenance task with full details
+   */
+  async getTask(taskId: string) {
+    const task = await this.prisma.maintenanceTask.findUnique({
+      where: { id: taskId },
+      include: {
+        assignedVendor: {
+          select: { id: true, displayName: true, phone: true, email: true },
+        },
+        homeSystem: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            brand: true,
+            model: true,
+            location: true,
+            installedDate: true,
+            warrantyExpires: true,
+          },
+        },
+        completedBy: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    if (!task) throw new NotFoundException('Task not found');
+
+    // If task has no checklist, try to initialize from template
+    if (!task.checklistSteps) {
+      const template = findMatchingTemplate(task.title, task.category);
+      if (template) {
+        const checklist = createChecklistFromTemplate(template);
+        const whyThisMatters = template.whyThisMatters;
+
+        // Update task with initial checklist
+        await this.prisma.maintenanceTask.update({
+          where: { id: taskId },
+          data: {
+            checklistSteps: checklist as any,
+            intervalExplanation: whyThisMatters,
+          },
+        });
+
+        return {
+          ...task,
+          checklistSteps: checklist,
+          intervalExplanation: whyThisMatters,
+          templateId: template.id,
+        };
+      }
+    }
+
+    return task;
+  }
+
+  /**
+   * Complete a checklist step
+   */
+  async completeChecklistStep(
+    taskId: string,
+    stepId: string,
+    userId: string,
+    completed: boolean,
+  ) {
+    const task = await this.prisma.maintenanceTask.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) throw new NotFoundException('Task not found');
+
+    // Parse existing checklist
+    const checklist = (task.checklistSteps as unknown as ChecklistStep[]) || [];
+
+    // Find and update the step
+    const stepIndex = checklist.findIndex((s) => s.id === stepId);
+    if (stepIndex === -1) {
+      throw new NotFoundException('Checklist step not found');
+    }
+
+    checklist[stepIndex] = {
+      ...checklist[stepIndex],
+      completed,
+      completedAt: completed ? new Date().toISOString() : undefined,
+    };
+
+    // Check if all steps are completed
+    const allCompleted = checklist.every((s) => s.completed);
+
+    // Update task
+    const updated = await this.prisma.maintenanceTask.update({
+      where: { id: taskId },
+      data: {
+        checklistSteps: checklist as any,
+        // If all steps completed, mark task as completed
+        ...(allCompleted && {
+          status: 'COMPLETED',
+          completedById: userId,
+          completedAt: new Date(),
+          lastCompletedDate: new Date(),
+          nextDueDate: task.isRecurring
+            ? this.calculateNextDueDate(
+                task.frequency as MaintenanceFrequency,
+                task.nextDueDate,
+              )
+            : null,
+        }),
+      },
+      include: {
+        assignedVendor: {
+          select: { id: true, displayName: true, phone: true },
+        },
+        homeSystem: {
+          select: {
+            id: true,
+            name: true,
+            type: true,
+            location: true,
+          },
+        },
+      },
+    });
+
+    // Log activity if task is completed
+    if (allCompleted) {
+      await this.prisma.activityLog.create({
+        data: {
+          householdId: task.householdId,
+          actorId: userId,
+          actorType: 'HOME_MANAGER',
+          actorName: 'Home Manager',
+          action: 'SERVICE_COMPLETED',
+          category: 'SERVICE',
+          title: `Completed: ${task.title}`,
+          description: 'All checklist items completed',
+          visibleToHomeowner: true,
+        },
+      });
+    }
+
+    return updated;
+  }
+
+  /**
+   * Initialize checklist for a task from a template
+   */
+  async initializeChecklist(taskId: string, templateId?: string) {
+    const task = await this.prisma.maintenanceTask.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) throw new NotFoundException('Task not found');
+
+    // Find template
+    let template;
+    if (templateId) {
+      template = CHECKLIST_TEMPLATES.find((t) => t.id === templateId);
+    } else {
+      template = findMatchingTemplate(task.title, task.category);
+    }
+
+    if (!template) {
+      throw new NotFoundException('No matching template found');
+    }
+
+    const checklist = createChecklistFromTemplate(template);
+
+    return this.prisma.maintenanceTask.update({
+      where: { id: taskId },
+      data: {
+        checklistSteps: checklist as any,
+        intervalExplanation: template.whyThisMatters,
+      },
+    });
+  }
+
+  /**
+   * Update checklist steps (for reordering or custom modifications)
+   */
+  async updateChecklist(taskId: string, steps: ChecklistStep[]) {
+    const task = await this.prisma.maintenanceTask.findUnique({
+      where: { id: taskId },
+    });
+
+    if (!task) throw new NotFoundException('Task not found');
+
+    return this.prisma.maintenanceTask.update({
+      where: { id: taskId },
+      data: {
+        checklistSteps: steps as any,
+      },
+    });
   }
 }

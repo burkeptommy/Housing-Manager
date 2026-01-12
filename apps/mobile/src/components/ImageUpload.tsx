@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   placeholderTextSmall: {
-    fontSize: typography.fontSizes['2xs'],
+    fontSize: typography.fontSizes.xs,  // Minimum 13px
   },
 });
 

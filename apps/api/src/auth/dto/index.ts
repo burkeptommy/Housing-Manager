@@ -1,4 +1,5 @@
 export { RegisterDto } from './register.dto';
+export { RegisterSimpleDto } from './register-simple.dto';
 export { LoginDto } from './login.dto';
 export { RefreshTokenDto } from './refresh-token.dto';
 export {

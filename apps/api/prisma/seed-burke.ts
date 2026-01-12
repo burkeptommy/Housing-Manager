@@ -168,12 +168,40 @@ async function main() {
   console.log('✅ Created home profile: 146 Putnam Park Rd, Bethel, CT 06801');
 
   // ============================================================================
-  // 5. CREATE FAMILY MEMBERS (Non-User)
+  // 5. CREATE FAMILY MEMBERS (All household members)
   // ============================================================================
   console.log('\n👨‍👩‍👧‍👦 Creating family members...');
 
   // Clear existing family members for this household
   await prisma.familyMember.deleteMany({ where: { householdId: household.id } });
+
+  // Tom Burke - Head of Household (36 years old)
+  await prisma.familyMember.create({
+    data: {
+      householdId: household.id,
+      firstName: 'Tom',
+      lastName: 'Burke',
+      type: FamilyMemberType.ADULT,
+      relationship: 'Head of Household',
+      email: 'tom@example.com',
+      phone: '203-555-0001',
+      birthdate: new Date('1989-03-15'), // ~36 years old
+    },
+  });
+
+  // Mindy Burke - Spouse (32 years old)
+  await prisma.familyMember.create({
+    data: {
+      householdId: household.id,
+      firstName: 'Mindy',
+      lastName: 'Burke',
+      type: FamilyMemberType.ADULT,
+      relationship: 'Spouse',
+      email: 'mindy@example.com',
+      phone: '203-555-0002',
+      birthdate: new Date('1993-07-22'), // ~32 years old
+    },
+  });
 
   // Blake Burke - Daughter (3 years old)
   await prisma.familyMember.create({
@@ -214,7 +242,7 @@ async function main() {
     },
   });
 
-  console.log('✅ Created family members: Blake (3), Valerie (1 month), Hevellyn (Au Pair)');
+  console.log('✅ Created family members: Tom (36), Mindy (32), Blake (3), Valerie (1 month), Hevellyn (Au Pair)');
 
   // ============================================================================
   // 6. CREATE PETS

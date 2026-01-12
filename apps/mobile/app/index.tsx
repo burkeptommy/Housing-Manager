@@ -4,7 +4,7 @@ import { useAuth } from '../src/contexts/auth-context';
 import { colors } from '../src/lib/theme';
 
 export default function Index() {
-  const { isLoading, isAuthenticated, needsOnboarding } = useAuth();
+  const { isLoading, isAuthenticated } = useAuth();
 
   if (isLoading) {
     return (
@@ -18,10 +18,8 @@ export default function Index() {
     return <Redirect href="/(auth)/login" />;
   }
 
-  if (needsOnboarding) {
-    return <Redirect href="/(auth)/onboarding" />;
-  }
-
+  // New Alfred-first flow: users go directly to main app
+  // Alfred will progressively capture data through natural conversation
   return <Redirect href="/(tabs)" />;
 }
 

@@ -7,8 +7,13 @@ import {
   IsEmail,
   IsUrl,
   MaxLength,
+  IsNumber,
+  IsDateString,
+  Min,
+  Max,
+  IsArray,
 } from 'class-validator';
-import { VendorCategory } from '@prisma/client';
+import { VendorCategory, VendorActivityType } from '@prisma/client';
 
 export class CreateVendorDto {
   @ApiProperty({ description: 'Display name of the vendor' })
@@ -232,4 +237,139 @@ export class VendorQueryDto {
   @IsOptional()
   @IsBoolean()
   includeInactive?: boolean;
+}
+
+// ========== CRM Activity DTOs ==========
+
+export class CreateActivityDto {
+  @ApiProperty({ enum: VendorActivityType, description: 'Type of activity' })
+  @IsEnum(VendorActivityType)
+  type: VendorActivityType;
+
+  @ApiProperty({ description: 'Title of the activity' })
+  @IsString()
+  @MaxLength(255)
+  title: string;
+
+  @ApiPropertyOptional({ description: 'Description or notes' })
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @ApiPropertyOptional({ description: 'Amount (for payments, quotes, etc.)' })
+  @IsOptional()
+  @IsNumber()
+  amount?: number;
+
+  @ApiPropertyOptional({ description: 'Is this paid?' })
+  @IsOptional()
+  @IsBoolean()
+  isPaid?: boolean;
+
+  @ApiProperty({ description: 'Date of the activity' })
+  @IsDateString()
+  date: string;
+
+  @ApiPropertyOptional({ description: 'Duration in minutes' })
+  @IsOptional()
+  @IsNumber()
+  duration?: number;
+
+  @ApiPropertyOptional({ description: 'Invoice URL' })
+  @IsOptional()
+  @IsUrl()
+  invoiceUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Receipt URL' })
+  @IsOptional()
+  @IsUrl()
+  receiptUrl?: string;
+
+  @ApiPropertyOptional({ description: 'Related maintenance task ID' })
+  @IsOptional()
+  @IsString()
+  maintenanceTaskId?: string;
+
+  @ApiPropertyOptional({ description: 'Related service request ID' })
+  @IsOptional()
+  @IsString()
+  serviceRequestId?: string;
+}
+
+export class ActivityResponseDto {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  householdVendorId: string;
+
+  @ApiProperty({ enum: VendorActivityType })
+  type: VendorActivityType;
+
+  @ApiProperty()
+  title: string;
+
+  @ApiPropertyOptional()
+  description?: string | null;
+
+  @ApiPropertyOptional()
+  amount?: number | null;
+
+  @ApiProperty()
+  isPaid: boolean;
+
+  @ApiProperty()
+  date: Date;
+
+  @ApiPropertyOptional()
+  duration?: number | null;
+
+  @ApiPropertyOptional()
+  invoiceUrl?: string | null;
+
+  @ApiPropertyOptional()
+  receiptUrl?: string | null;
+
+  @ApiPropertyOptional()
+  maintenanceTaskId?: string | null;
+
+  @ApiPropertyOptional()
+  serviceRequestId?: string | null;
+
+  @ApiPropertyOptional()
+  createdBy?: string | null;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+}
+
+// ========== Extended Vendor Response with CRM data ==========
+
+export class VendorWithCrmDto extends VendorResponseDto {
+  @ApiPropertyOptional({ description: 'Is this vendor a favorite?' })
+  isFavorite?: boolean;
+
+  @ApiPropertyOptional({ description: 'Household rating (1-5)' })
+  rating?: number | null;
+
+  @ApiPropertyOptional({ description: 'Custom tags' })
+  tags?: string[];
+
+  @ApiPropertyOptional({ description: 'Source of vendor (manual, plaid, alfred, referral)' })
+  source?: string | null;
+
+  @ApiPropertyOptional({ description: 'Last contact date' })
+  lastContactDate?: Date | null;
+
+  @ApiPropertyOptional({ description: 'HouseholdVendor ID' })
+  householdVendorId?: string;
+
+  @ApiPropertyOptional({ description: 'Recent activities (up to 3)' })
+  activities?: ActivityResponseDto[];
+
+  @ApiPropertyOptional({ description: 'Total activity count' })
+  activityCount?: number;
 }

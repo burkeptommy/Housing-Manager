@@ -22,6 +22,22 @@ export class MaintenanceController {
     private generatorService: MaintenanceGeneratorService,
   ) {}
 
+  /**
+   * Get all checklist templates
+   */
+  @Get('templates')
+  getTemplates() {
+    return this.maintenanceService.getTemplates();
+  }
+
+  /**
+   * Get a single maintenance task with full details
+   */
+  @Get(':taskId')
+  async getTask(@Param('taskId') taskId: string) {
+    return this.maintenanceService.getTask(taskId);
+  }
+
   @Get('household/:householdId')
   async getHouseholdTasks(
     @Param('householdId') householdId: string,
@@ -89,5 +105,45 @@ export class MaintenanceController {
     @Body() body: { reason?: string },
   ) {
     return this.maintenanceService.skipTask(taskId, body.reason);
+  }
+
+  /**
+   * Complete or uncomplete a checklist step
+   */
+  @Put(':taskId/step/:stepId/complete')
+  async completeChecklistStep(
+    @Request() req: any,
+    @Param('taskId') taskId: string,
+    @Param('stepId') stepId: string,
+    @Body() body: { completed: boolean },
+  ) {
+    return this.maintenanceService.completeChecklistStep(
+      taskId,
+      stepId,
+      req.user.userId || req.user.id,
+      body.completed,
+    );
+  }
+
+  /**
+   * Initialize checklist from template
+   */
+  @Post(':taskId/initialize-checklist')
+  async initializeChecklist(
+    @Param('taskId') taskId: string,
+    @Body() body: { templateId?: string },
+  ) {
+    return this.maintenanceService.initializeChecklist(taskId, body.templateId);
+  }
+
+  /**
+   * Update checklist steps
+   */
+  @Put(':taskId/checklist')
+  async updateChecklist(
+    @Param('taskId') taskId: string,
+    @Body() body: { steps: any[] },
+  ) {
+    return this.maintenanceService.updateChecklist(taskId, body.steps);
   }
 }

@@ -9,12 +9,10 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInUp, FadeIn } from 'react-native-reanimated';
 import { useAuth } from '../../../src/contexts/auth-context';
-import { Card, Badge } from '../../../src/components';
+import { Card, Badge, ScreenContainer } from '../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
@@ -23,109 +21,71 @@ import { getIdToken } from '../../../src/lib/firebase';
 // TYPES
 // =============================================================================
 
+interface ChecklistStep {
+  id: string;
+  order: number;
+  title: string;
+  description?: string;
+  completed: boolean;
+  completedAt?: string;
+  alfredCanHandle: boolean;
+  alfredPrompt?: string;
+  estimatedMinutes?: number;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+interface HomeSystem {
+  id: string;
+  name: string;
+  type: string;
+  brand?: string;
+  model?: string;
+  location?: string;
+  installedDate?: string;
+  warrantyExpires?: string;
+}
+
 interface MaintenanceTask {
   id: string;
   title: string;
   description: string | null;
   category: string;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-  status: 'UPCOMING' | 'DUE' | 'OVERDUE' | 'COMPLETED' | 'CANCELLED';
+  status: 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED' | 'CANCELLED';
   dueDate: string | null;
+  nextDueDate: string | null;
   frequency: string | null;
   estimatedCost: number | null;
-  lastCompletedAt: string | null;
+  lastCompletedDate: string | null;
   seasonalTiming?: string;
-  vendor?: {
+  intervalExplanation?: string;
+  checklistSteps?: ChecklistStep[];
+  homeSystem?: HomeSystem | null;
+  assignedVendor?: {
     id: string;
     displayName: string;
     phone?: string;
+    email?: string;
   } | null;
-  assignedTo?: {
+  completedBy?: {
     id: string;
     firstName: string | null;
     lastName: string | null;
   } | null;
 }
 
-interface ChecklistItem {
-  id: string;
-  label: string;
-  completed: boolean;
-  category?: string;
-  estimatedTime?: string;
-  difficulty?: 'easy' | 'medium' | 'hard';
-}
-
-// Default checklist items for common maintenance tasks
-const CHECKLIST_TEMPLATES: Record<string, ChecklistItem[]> = {
-  'Winterization Checklist': [
-    { id: 'w1', label: 'Disconnect and drain outdoor hoses', completed: false, category: 'Plumbing', estimatedTime: '15 min', difficulty: 'easy' },
-    { id: 'w2', label: 'Turn off exterior faucets', completed: false, category: 'Plumbing', estimatedTime: '5 min', difficulty: 'easy' },
-    { id: 'w3', label: 'Insulate exposed pipes in garage/basement', completed: false, category: 'Plumbing', estimatedTime: '30 min', difficulty: 'medium' },
-    { id: 'w4', label: 'Check and replace weatherstripping on doors', completed: false, category: 'Exterior', estimatedTime: '45 min', difficulty: 'medium' },
-    { id: 'w5', label: 'Reverse ceiling fan direction (clockwise)', completed: false, category: 'Interior', estimatedTime: '10 min', difficulty: 'easy' },
-    { id: 'w6', label: 'Clean and inspect fireplace/chimney', completed: false, category: 'HVAC', estimatedTime: '2 hrs', difficulty: 'hard' },
-    { id: 'w7', label: 'Schedule furnace inspection', completed: false, category: 'HVAC', estimatedTime: '5 min', difficulty: 'easy' },
-    { id: 'w8', label: 'Check and seal window gaps', completed: false, category: 'Exterior', estimatedTime: '1 hr', difficulty: 'medium' },
-    { id: 'w9', label: 'Test smoke and CO detectors', completed: false, category: 'Safety', estimatedTime: '15 min', difficulty: 'easy' },
-    { id: 'w10', label: 'Clean gutters and downspouts', completed: false, category: 'Exterior', estimatedTime: '2 hrs', difficulty: 'hard' },
-    { id: 'w11', label: 'Service snow blower/equipment', completed: false, category: 'Equipment', estimatedTime: '30 min', difficulty: 'medium' },
-    { id: 'w12', label: 'Check attic insulation', completed: false, category: 'Interior', estimatedTime: '30 min', difficulty: 'medium' },
-  ],
-  'Spring Home Checklist': [
-    { id: 's1', label: 'Inspect roof for winter damage', completed: false, category: 'Exterior', estimatedTime: '30 min', difficulty: 'medium' },
-    { id: 's2', label: 'Check foundation for cracks', completed: false, category: 'Exterior', estimatedTime: '20 min', difficulty: 'easy' },
-    { id: 's3', label: 'Clean AC condenser unit', completed: false, category: 'HVAC', estimatedTime: '45 min', difficulty: 'medium' },
-    { id: 's4', label: 'Inspect and clean deck/patio', completed: false, category: 'Exterior', estimatedTime: '1 hr', difficulty: 'medium' },
-    { id: 's5', label: 'Check for pest entry points', completed: false, category: 'Exterior', estimatedTime: '30 min', difficulty: 'easy' },
-    { id: 's6', label: 'Service lawn mower', completed: false, category: 'Equipment', estimatedTime: '30 min', difficulty: 'medium' },
-    { id: 's7', label: 'Clean windows inside and out', completed: false, category: 'Interior', estimatedTime: '2 hrs', difficulty: 'medium' },
-    { id: 's8', label: 'Test irrigation system', completed: false, category: 'Landscaping', estimatedTime: '20 min', difficulty: 'easy' },
-    { id: 's9', label: 'Replace HVAC filters', completed: false, category: 'HVAC', estimatedTime: '15 min', difficulty: 'easy' },
-    { id: 's10', label: 'Touch up exterior paint', completed: false, category: 'Exterior', estimatedTime: '2 hrs', difficulty: 'hard' },
-  ],
-  'HVAC Filter Change': [
-    { id: 'h1', label: 'Locate filter compartment', completed: false, estimatedTime: '2 min', difficulty: 'easy' },
-    { id: 'h2', label: 'Note filter size from old filter', completed: false, estimatedTime: '1 min', difficulty: 'easy' },
-    { id: 'h3', label: 'Remove old filter', completed: false, estimatedTime: '1 min', difficulty: 'easy' },
-    { id: 'h4', label: 'Check airflow direction arrow', completed: false, estimatedTime: '1 min', difficulty: 'easy' },
-    { id: 'h5', label: 'Insert new filter with arrow pointing toward blower', completed: false, estimatedTime: '1 min', difficulty: 'easy' },
-    { id: 'h6', label: 'Close compartment securely', completed: false, estimatedTime: '1 min', difficulty: 'easy' },
-  ],
-  'Smoke & CO Detector Test': [
-    { id: 'sc1', label: 'Test each smoke detector with test button', completed: false, estimatedTime: '5 min', difficulty: 'easy' },
-    { id: 'sc2', label: 'Test each CO detector with test button', completed: false, estimatedTime: '5 min', difficulty: 'easy' },
-    { id: 'sc3', label: 'Replace batteries in all units', completed: false, estimatedTime: '10 min', difficulty: 'easy' },
-    { id: 'sc4', label: 'Check manufacture date (replace if 10+ years)', completed: false, estimatedTime: '5 min', difficulty: 'easy' },
-    { id: 'sc5', label: 'Vacuum dust from detector vents', completed: false, estimatedTime: '5 min', difficulty: 'easy' },
-  ],
-  'Gutter Cleaning': [
-    { id: 'g1', label: 'Set up ladder safely on level ground', completed: false, estimatedTime: '5 min', difficulty: 'medium' },
-    { id: 'g2', label: 'Remove debris from gutter sections', completed: false, estimatedTime: '30 min', difficulty: 'medium' },
-    { id: 'g3', label: 'Check and clear downspouts', completed: false, estimatedTime: '15 min', difficulty: 'medium' },
-    { id: 'g4', label: 'Flush gutters with hose', completed: false, estimatedTime: '15 min', difficulty: 'easy' },
-    { id: 'g5', label: 'Inspect for damage or loose sections', completed: false, estimatedTime: '10 min', difficulty: 'easy' },
-    { id: 'g6', label: 'Repair any loose fasteners', completed: false, estimatedTime: '15 min', difficulty: 'hard' },
-  ],
-};
-
 const CATEGORY_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   'HVAC': 'thermometer-outline',
-  'Plumbing': 'water-outline',
   'PLUMBING': 'water-outline',
-  'Electrical': 'flash-outline',
   'ELECTRICAL': 'flash-outline',
-  'Exterior': 'home-outline',
   'EXTERIOR': 'home-outline',
-  'Pool': 'water',
   'POOL': 'water',
-  'Landscaping': 'leaf-outline',
   'LANDSCAPING': 'leaf-outline',
-  'Safety': 'shield-checkmark-outline',
+  'LAWN': 'leaf-outline',
   'SAFETY': 'shield-checkmark-outline',
-  'Interior': 'bed-outline',
-  'Equipment': 'construct-outline',
+  'APPLIANCE': 'cube-outline',
   'SEASONAL': 'calendar-outline',
+  'GENERAL': 'construct-outline',
   'default': 'construct-outline',
 };
 
@@ -133,13 +93,12 @@ export default function MaintenanceDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { householdInfo } = useAuth();
-  
+
   const [task, setTask] = useState<MaintenanceTask | null>(null);
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [savingStepId, setSavingStepId] = useState<string | null>(null);
 
   const fetchTask = useCallback(async () => {
     if (!householdInfo?.id || !id) {
@@ -156,8 +115,9 @@ export default function MaintenanceDetailScreen() {
         return;
       }
 
+      // Use the new endpoint that returns full task details with checklist
       const response = await fetch(
-        `${API_BASE_URL}/maintenance-tasks/${id}`,
+        `${API_BASE_URL}/maintenance/${id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -172,23 +132,6 @@ export default function MaintenanceDetailScreen() {
 
       const taskData = await response.json();
       setTask(taskData);
-
-      const templateKey = Object.keys(CHECKLIST_TEMPLATES).find(
-        key => taskData.title.includes(key) || key.includes(taskData.title)
-      );
-      
-      if (templateKey) {
-        setChecklist(CHECKLIST_TEMPLATES[templateKey].map(item => ({ ...item })));
-      } else {
-        setChecklist([
-          { id: 'gen1', label: 'Review task requirements', completed: false, difficulty: 'easy' },
-          { id: 'gen2', label: 'Gather necessary materials', completed: false, difficulty: 'easy' },
-          { id: 'gen3', label: 'Complete main task', completed: false, difficulty: 'medium' },
-          { id: 'gen4', label: 'Verify work is complete', completed: false, difficulty: 'easy' },
-          { id: 'gen5', label: 'Clean up work area', completed: false, difficulty: 'easy' },
-        ]);
-      }
-      
       setError(null);
     } catch (err) {
       console.error('Fetch task error:', err);
@@ -203,48 +146,116 @@ export default function MaintenanceDetailScreen() {
     fetchTask();
   }, [fetchTask]);
 
-  const toggleChecklistItem = (itemId: string) => {
-    setChecklist(prev =>
-      prev.map(item =>
-        item.id === itemId ? { ...item, completed: !item.completed } : item
-      )
-    );
+  const toggleChecklistStep = async (stepId: string, currentCompleted: boolean) => {
+    if (!task || savingStepId) return;
+
+    setSavingStepId(stepId);
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) return;
+
+      const response = await fetch(
+        `${API_BASE_URL}/maintenance/${task.id}/step/${stepId}/complete`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ completed: !currentCompleted }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to update step');
+      }
+
+      const updatedTask = await response.json();
+      setTask(updatedTask);
+
+      // Check if all steps are now complete
+      const steps = updatedTask.checklistSteps as ChecklistStep[] | undefined;
+      if (steps && steps.every(s => s.completed)) {
+        Alert.alert(
+          'Task Complete!',
+          'All checklist items have been completed. Great job!',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (err) {
+      console.error('Toggle step error:', err);
+      Alert.alert('Error', 'Failed to update checklist. Please try again.');
+    } finally {
+      setSavingStepId(null);
+    }
   };
 
-  const handleHireVendor = () => {
+  const handleHaveAlfredDoIt = (step: ChecklistStep) => {
+    const prompt = step.alfredPrompt || `Help me with: ${step.title}`;
+
     Alert.alert(
-      'Hire a Vendor',
-      'Would you like Sarah to find and schedule a vendor for this task?',
+      'Have Alfred Handle This',
+      `Alfred will take care of "${step.title}" for you. He'll coordinate any necessary scheduling or ordering.`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'Yes, Find a Vendor',
+          text: 'Yes, Have Alfred Do It',
           onPress: () => {
-            Alert.alert(
-              'Request Sent',
-              'Sarah will find the best vendor and get back to you with options and pricing.',
-              [{ text: 'OK' }]
-            );
+            // Navigate to Alfred chat with prefilled prompt
+            router.push({
+              pathname: '/(tabs)/manager/chat',
+              params: {
+                prefillMessage: prompt,
+                context: `Maintenance Task: ${task?.title}`,
+              },
+            });
           },
         },
       ]
     );
   };
 
-  const handleAskSarah = () => {
+  const handleAskAlfred = () => {
     Alert.alert(
-      'Ask Sarah to Handle',
-      "Sarah will take care of this entire task for you. She'll coordinate vendors, schedule the work, and keep you updated.",
+      'Have Alfred Handle This Task',
+      "Alfred will take care of this entire maintenance task for you. He'll coordinate vendors, schedule the work, and keep you updated.",
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Yes, Handle It',
           onPress: () => {
-            Alert.alert(
-              'Got It!',
-              "Sarah is on it. You'll receive updates as progress is made.",
-              [{ text: 'OK' }]
-            );
+            const prompt = `Please help me complete this maintenance task: "${task?.title}". ${task?.description || ''}`;
+            router.push({
+              pathname: '/(tabs)/manager/chat',
+              params: {
+                prefillMessage: prompt,
+                context: `Maintenance: ${task?.title}`,
+              },
+            });
+          },
+        },
+      ]
+    );
+  };
+
+  const handleHireVendor = () => {
+    Alert.alert(
+      'Hire a Vendor',
+      'Would you like Alfred to find and schedule a vendor for this task?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Yes, Find a Vendor',
+          onPress: () => {
+            const prompt = `I need to hire a vendor for: "${task?.title}". Please find trusted professionals and get quotes.`;
+            router.push({
+              pathname: '/(tabs)/manager/chat',
+              params: {
+                prefillMessage: prompt,
+                context: `Vendor Request: ${task?.title}`,
+              },
+            });
           },
         },
       ]
@@ -252,10 +263,11 @@ export default function MaintenanceDetailScreen() {
   };
 
   const handleMarkComplete = async () => {
-    const completedCount = checklist.filter(item => item.completed).length;
-    const totalCount = checklist.length;
-    
-    if (completedCount < totalCount) {
+    const steps = task?.checklistSteps || [];
+    const completedCount = steps.filter(s => s.completed).length;
+    const totalCount = steps.length;
+
+    if (completedCount < totalCount && totalCount > 0) {
       Alert.alert(
         'Incomplete Items',
         `You have ${totalCount - completedCount} items remaining. Mark task as complete anyway?`,
@@ -270,26 +282,41 @@ export default function MaintenanceDetailScreen() {
   };
 
   const submitCompletion = async () => {
-    setIsSaving(true);
     try {
       const token = await getIdToken(true);
-      if (!token) return;
+      if (!token || !task) return;
+
+      const response = await fetch(
+        `${API_BASE_URL}/maintenance/${task.id}/complete`,
+        {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({}),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to complete task');
+      }
 
       Alert.alert('Task Completed', 'Great job! This task has been marked as complete.', [
         { text: 'OK', onPress: () => router.back() },
       ]);
     } catch (err) {
       Alert.alert('Error', 'Failed to update task. Please try again.');
-    } finally {
-      setIsSaving(false);
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'OVERDUE': return colors.status.error;
-      case 'DUE': return colors.status.warning;
+      case 'PENDING': return colors.haven.champagne[500];
+      case 'SCHEDULED': return colors.status.info;
+      case 'IN_PROGRESS': return colors.status.warning;
       case 'COMPLETED': return colors.status.success;
+      case 'SKIPPED': return colors.text.tertiary;
       default: return colors.haven.champagne[500];
     }
   };
@@ -303,24 +330,33 @@ export default function MaintenanceDetailScreen() {
     }
   };
 
-  const completedCount = checklist.filter(item => item.completed).length;
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) return null;
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  };
+
+  const checklist = task?.checklistSteps || [];
+  const completedCount = checklist.filter(s => s.completed).length;
   const progress = checklist.length > 0 ? completedCount / checklist.length : 0;
+  const isOverdue = task?.nextDueDate && new Date(task.nextDueDate) < new Date() && task.status !== 'COMPLETED';
 
   if (isLoading) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'Loading...', headerBackTitle: 'Back' }} />
+      <ScreenContainer title="Loading...">
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.haven.navy[900]} />
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   if (error || !task) {
     return (
-      <SafeAreaView style={styles.container} edges={['bottom']}>
-        <Stack.Screen options={{ title: 'Error', headerBackTitle: 'Back' }} />
+      <ScreenContainer title="Error">
         <View style={styles.errorContainer}>
           <Ionicons name="alert-circle-outline" size={48} color={colors.status.error} />
           <Text style={styles.errorTitle}>Unable to Load Task</Text>
@@ -329,87 +365,108 @@ export default function MaintenanceDetailScreen() {
             <Text style={styles.retryText}>Try Again</Text>
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen 
-        options={{ 
-          title: task.category,
-          headerBackTitle: 'Back',
-        }} 
-      />
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl refreshing={isRefreshing} onRefresh={() => {
-            setIsRefreshing(true);
-            fetchTask();
-          }} />
-        }
-      >
+    <ScreenContainer
+      title={task.category}
+      refreshing={isRefreshing}
+      onRefresh={() => {
+        setIsRefreshing(true);
+        fetchTask();
+      }}
+    >
         {/* Header Card */}
-        <Animated.View entering={FadeIn.duration(300)}>
-          <Card style={styles.headerCard}>
-            <View style={styles.headerTop}>
-              <View style={[styles.categoryIcon, { backgroundColor: `${getStatusColor(task.status)}20` }]}>
-                <Ionicons
-                  name={CATEGORY_ICONS[task.category] || CATEGORY_ICONS.default}
-                  size={28}
-                  color={getStatusColor(task.status)}
-                />
-              </View>
-              <Badge
-                label={task.status.replace('_', ' ')}
-                variant={
-                  task.status === 'OVERDUE' ? 'error' :
-                  task.status === 'DUE' ? 'warning' :
-                  task.status === 'COMPLETED' ? 'success' : 'default'
-                }
+        <Card style={styles.headerCard}>
+          <View style={styles.headerTop}>
+            <View style={[styles.categoryIcon, { backgroundColor: `${getStatusColor(task.status)}20` }]}>
+              <Ionicons
+                name={CATEGORY_ICONS[task.category] || CATEGORY_ICONS.default}
+                size={28}
+                color={getStatusColor(task.status)}
               />
             </View>
-            
-            <Text style={styles.taskTitle}>{task.title}</Text>
-            
-            {task.description && (
-              <Text style={styles.taskDescription}>{task.description}</Text>
+            <Badge
+              label={isOverdue ? 'OVERDUE' : task.status.replace('_', ' ')}
+              variant={
+                isOverdue ? 'error' :
+                task.status === 'COMPLETED' ? 'success' :
+                task.status === 'SCHEDULED' ? 'info' : 'default'
+              }
+            />
+          </View>
+
+          <Text style={styles.taskTitle}>{task.title}</Text>
+
+          {task.description && (
+            <Text style={styles.taskDescription}>{task.description}</Text>
+          )}
+
+          <View style={styles.metaRow}>
+            {task.nextDueDate && (
+              <View style={styles.metaItem}>
+                <Ionicons name="calendar-outline" size={16} color={isOverdue ? colors.status.error : colors.text.tertiary} />
+                <Text style={[styles.metaText, isOverdue && styles.metaTextOverdue]}>
+                  Due: {formatDate(task.nextDueDate)}
+                </Text>
+              </View>
             )}
-            
-            <View style={styles.metaRow}>
-              {task.dueDate && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="calendar-outline" size={16} color={colors.text.tertiary} />
-                  <Text style={styles.metaText}>
-                    Due: {new Date(task.dueDate).toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
+            {task.frequency && (
+              <View style={styles.metaItem}>
+                <Ionicons name="repeat-outline" size={16} color={colors.text.tertiary} />
+                <Text style={styles.metaText}>{task.frequency}</Text>
+              </View>
+            )}
+            {task.estimatedCost !== null && task.estimatedCost > 0 && (
+              <View style={styles.metaItem}>
+                <Ionicons name="cash-outline" size={16} color={colors.text.tertiary} />
+                <Text style={styles.metaText}>~${task.estimatedCost}</Text>
+              </View>
+            )}
+          </View>
+        </Card>
+
+        {/* System Info Card */}
+        {task.homeSystem && (
+          <Card style={styles.systemCard}>
+            <View style={styles.systemHeader}>
+              <Ionicons name="cube-outline" size={20} color={colors.haven.navy[900]} />
+              <Text style={styles.systemTitle}>Related System</Text>
+            </View>
+            <View style={styles.systemInfo}>
+              <Text style={styles.systemName}>{task.homeSystem.name}</Text>
+              <View style={styles.systemDetails}>
+                {task.homeSystem.brand && (
+                  <Text style={styles.systemDetail}>{task.homeSystem.brand} {task.homeSystem.model}</Text>
+                )}
+                {task.homeSystem.location && (
+                  <Text style={styles.systemDetail}>Location: {task.homeSystem.location}</Text>
+                )}
+                {task.homeSystem.warrantyExpires && (
+                  <Text style={styles.systemDetail}>
+                    Warranty: {new Date(task.homeSystem.warrantyExpires) > new Date() ? 'Active' : 'Expired'} (until {formatDate(task.homeSystem.warrantyExpires)})
                   </Text>
-                </View>
-              )}
-              {task.frequency && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="repeat-outline" size={16} color={colors.text.tertiary} />
-                  <Text style={styles.metaText}>{task.frequency}</Text>
-                </View>
-              )}
-              {task.estimatedCost !== null && task.estimatedCost > 0 && (
-                <View style={styles.metaItem}>
-                  <Ionicons name="cash-outline" size={16} color={colors.text.tertiary} />
-                  <Text style={styles.metaText}>~${task.estimatedCost}</Text>
-                </View>
-              )}
+                )}
+              </View>
             </View>
           </Card>
-        </Animated.View>
+        )}
+
+        {/* Why This Matters Card */}
+        {task.intervalExplanation && (
+          <Card style={styles.whyCard}>
+            <View style={styles.whyHeader}>
+              <Ionicons name="bulb-outline" size={20} color={colors.haven.champagne[600]} />
+              <Text style={styles.whyTitle}>Why This Matters</Text>
+            </View>
+            <Text style={styles.whyText}>{task.intervalExplanation}</Text>
+          </Card>
+        )}
 
         {/* Progress Card */}
-        <Animated.View entering={FadeInUp.delay(100).duration(300)}>
+        {checklist.length > 0 && (
           <Card style={styles.progressCard}>
             <View style={styles.progressHeader}>
               <Text style={styles.progressTitle}>Checklist Progress</Text>
@@ -419,109 +476,126 @@ export default function MaintenanceDetailScreen() {
               <View style={[styles.progressFill, { width: `${progress * 100}%` }]} />
             </View>
           </Card>
-        </Animated.View>
+        )}
 
         {/* Checklist Items */}
-        <Animated.View entering={FadeInUp.delay(200).duration(300)}>
+        {checklist.length > 0 && (
           <Card style={styles.checklistCard}>
-            <Text style={styles.sectionTitle}>Checklist Items</Text>
-            
-            {checklist.map((item, index) => (
-              <TouchableOpacity
-                key={item.id}
-                style={[
-                  styles.checklistItem,
-                  item.completed && styles.checklistItemCompleted,
-                ]}
-                onPress={() => toggleChecklistItem(item.id)}
-                activeOpacity={0.7}
-              >
-                <View style={[
-                  styles.checkbox,
-                  item.completed && styles.checkboxChecked,
-                ]}>
-                  {item.completed && (
-                    <Ionicons name="checkmark" size={16} color={colors.white} />
-                  )}
-                </View>
-                <View style={styles.checklistItemContent}>
-                  <Text style={[
-                    styles.checklistItemLabel,
-                    item.completed && styles.checklistItemLabelCompleted,
+            <Text style={styles.sectionTitle}>Checklist</Text>
+
+            {checklist.sort((a, b) => a.order - b.order).map((step) => (
+              <View key={step.id} style={styles.checklistItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.checklistItem,
+                    step.completed && styles.checklistItemCompleted,
+                  ]}
+                  onPress={() => toggleChecklistStep(step.id, step.completed)}
+                  activeOpacity={0.7}
+                  disabled={savingStepId === step.id}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    step.completed && styles.checkboxChecked,
                   ]}>
-                    {item.label}
-                  </Text>
-                  <View style={styles.checklistItemMeta}>
-                    {item.category && (
-                      <View style={styles.checklistTag}>
-                        <Ionicons 
-                          name={CATEGORY_ICONS[item.category] || 'pricetag-outline'} 
-                          size={10} 
-                          color={colors.text.tertiary} 
-                        />
-                        <Text style={styles.checklistTagText}>{item.category}</Text>
-                      </View>
-                    )}
-                    {item.estimatedTime && (
-                      <View style={styles.checklistTag}>
-                        <Ionicons name="time-outline" size={10} color={colors.text.tertiary} />
-                        <Text style={styles.checklistTagText}>{item.estimatedTime}</Text>
-                      </View>
-                    )}
-                    {item.difficulty && (
-                      <View style={[styles.checklistTag, { backgroundColor: `${getDifficultyColor(item.difficulty)}15` }]}>
-                        <Text style={[styles.checklistTagText, { color: getDifficultyColor(item.difficulty) }]}>
-                          {item.difficulty}
-                        </Text>
-                      </View>
-                    )}
+                    {savingStepId === step.id ? (
+                      <ActivityIndicator size="small" color={step.completed ? colors.white : colors.haven.navy[900]} />
+                    ) : step.completed ? (
+                      <Ionicons name="checkmark" size={16} color={colors.white} />
+                    ) : null}
                   </View>
-                </View>
-              </TouchableOpacity>
+                  <View style={styles.checklistItemContent}>
+                    <Text style={[
+                      styles.checklistItemLabel,
+                      step.completed && styles.checklistItemLabelCompleted,
+                    ]}>
+                      {step.title}
+                    </Text>
+                    {step.description && (
+                      <Text style={styles.checklistItemDescription}>{step.description}</Text>
+                    )}
+                    <View style={styles.checklistItemMeta}>
+                      {step.estimatedMinutes && (
+                        <View style={styles.checklistTag}>
+                          <Ionicons name="time-outline" size={10} color={colors.text.tertiary} />
+                          <Text style={styles.checklistTagText}>{step.estimatedMinutes} min</Text>
+                        </View>
+                      )}
+                      {step.difficulty && (
+                        <View style={[styles.checklistTag, { backgroundColor: `${getDifficultyColor(step.difficulty)}15` }]}>
+                          <Text style={[styles.checklistTagText, { color: getDifficultyColor(step.difficulty) }]}>
+                            {step.difficulty}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Alfred Can Handle Button */}
+                {step.alfredCanHandle && !step.completed && (
+                  <TouchableOpacity
+                    style={styles.alfredButton}
+                    onPress={() => handleHaveAlfredDoIt(step)}
+                  >
+                    <Ionicons name="sparkles" size={14} color={colors.haven.champagne[600]} />
+                    <Text style={styles.alfredButtonText}>Have Alfred Do It</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
             ))}
           </Card>
-        </Animated.View>
+        )}
 
         {/* Maintenance Schedule Info */}
-        {task.frequency && task.frequency !== 'One-time' && (
-          <Animated.View entering={FadeInUp.delay(300).duration(300)}>
-            <Card style={styles.scheduleCard}>
-              <View style={styles.scheduleHeader}>
-                <Ionicons name="calendar" size={24} color={colors.haven.navy[900]} />
-                <Text style={styles.scheduleTitle}>Maintenance Schedule</Text>
+        {task.frequency && (
+          <Card style={styles.scheduleCard}>
+            <View style={styles.scheduleHeader}>
+              <Ionicons name="calendar" size={24} color={colors.haven.navy[900]} />
+              <Text style={styles.scheduleTitle}>Maintenance Schedule</Text>
+            </View>
+            <View style={styles.scheduleInfo}>
+              <View style={styles.scheduleRow}>
+                <Text style={styles.scheduleLabel}>Frequency:</Text>
+                <Text style={styles.scheduleValue}>{task.frequency}</Text>
               </View>
-              <View style={styles.scheduleInfo}>
+              {task.seasonalTiming && (
                 <View style={styles.scheduleRow}>
-                  <Text style={styles.scheduleLabel}>Frequency:</Text>
-                  <Text style={styles.scheduleValue}>{task.frequency}</Text>
+                  <Text style={styles.scheduleLabel}>Best Time:</Text>
+                  <Text style={styles.scheduleValue}>{task.seasonalTiming}</Text>
                 </View>
-                {task.seasonalTiming && (
-                  <View style={styles.scheduleRow}>
-                    <Text style={styles.scheduleLabel}>Best Time:</Text>
-                    <Text style={styles.scheduleValue}>{task.seasonalTiming}</Text>
-                  </View>
-                )}
-                {task.lastCompletedAt && (
-                  <View style={styles.scheduleRow}>
-                    <Text style={styles.scheduleLabel}>Last Completed:</Text>
-                    <Text style={styles.scheduleValue}>
-                      {new Date(task.lastCompletedAt).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </View>
-                )}
-              </View>
-            </Card>
-          </Animated.View>
+              )}
+              {task.lastCompletedDate && (
+                <View style={styles.scheduleRow}>
+                  <Text style={styles.scheduleLabel}>Last Completed:</Text>
+                  <Text style={styles.scheduleValue}>{formatDate(task.lastCompletedDate)}</Text>
+                </View>
+              )}
+            </View>
+          </Card>
+        )}
+
+        {/* Assigned Vendor */}
+        {task.assignedVendor && (
+          <Card style={styles.vendorCard}>
+            <View style={styles.vendorHeader}>
+              <Ionicons name="business-outline" size={20} color={colors.haven.navy[900]} />
+              <Text style={styles.vendorTitle}>Assigned Vendor</Text>
+            </View>
+            <Text style={styles.vendorName}>{task.assignedVendor.displayName}</Text>
+            {task.assignedVendor.phone && (
+              <TouchableOpacity style={styles.vendorContact}>
+                <Ionicons name="call-outline" size={16} color={colors.haven.champagne[500]} />
+                <Text style={styles.vendorPhone}>{task.assignedVendor.phone}</Text>
+              </TouchableOpacity>
+            )}
+          </Card>
         )}
 
         {/* Action Buttons */}
-        <Animated.View entering={FadeInUp.delay(400).duration(300)} style={styles.actionSection}>
+        <View style={styles.actionSection}>
           <Text style={styles.actionTitle}>Need Help?</Text>
-          
+
           <TouchableOpacity style={styles.actionButton} onPress={handleHireVendor}>
             <View style={styles.actionIconContainer}>
               <Ionicons name="briefcase-outline" size={24} color={colors.haven.navy[900]} />
@@ -529,68 +603,63 @@ export default function MaintenanceDetailScreen() {
             <View style={styles.actionContent}>
               <Text style={styles.actionButtonTitle}>Hire a Vendor</Text>
               <Text style={styles.actionButtonSubtitle}>
-                We'll find a trusted professional
+                Alfred will find a trusted professional
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
           </TouchableOpacity>
-          
-          <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={handleAskSarah}>
+
+          <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={handleAskAlfred}>
             <View style={[styles.actionIconContainer, styles.actionIconPrimary]}>
               <Ionicons name="sparkles" size={24} color={colors.white} />
             </View>
             <View style={styles.actionContent}>
               <Text style={[styles.actionButtonTitle, styles.actionButtonTitlePrimary]}>
-                Ask Sarah to Handle
+                Have Alfred Handle It
               </Text>
               <Text style={[styles.actionButtonSubtitle, styles.actionButtonSubtitlePrimary]}>
-                She'll take care of everything
+                He'll take care of everything
               </Text>
             </View>
             <Ionicons name="chevron-forward" size={20} color={colors.haven.champagne[200]} />
           </TouchableOpacity>
-        </Animated.View>
+        </View>
 
         {/* Complete Button */}
         {task.status !== 'COMPLETED' && (
-          <Animated.View entering={FadeInUp.delay(500).duration(300)}>
-            <TouchableOpacity
-              style={[
-                styles.completeButton,
-                progress === 1 && styles.completeButtonReady,
-              ]}
-              onPress={handleMarkComplete}
-              disabled={isSaving}
-            >
-              {isSaving ? (
-                <ActivityIndicator color={colors.white} />
-              ) : (
-                <>
-                  <Ionicons 
-                    name={progress === 1 ? 'checkmark-circle' : 'checkmark-circle-outline'} 
-                    size={24} 
-                    color={colors.white} 
-                  />
-                  <Text style={styles.completeButtonText}>
-                    {progress === 1 ? 'Mark as Complete' : 'Mark as Complete Anyway'}
-                  </Text>
-                </>
-              )}
-            </TouchableOpacity>
-          </Animated.View>
+          <TouchableOpacity
+            style={[
+              styles.completeButton,
+              progress === 1 && styles.completeButtonReady,
+            ]}
+            onPress={handleMarkComplete}
+          >
+            <Ionicons
+              name={progress === 1 ? 'checkmark-circle' : 'checkmark-circle-outline'}
+              size={24}
+              color={colors.white}
+            />
+            <Text style={styles.completeButtonText}>
+              {progress === 1 ? 'Mark as Complete' : 'Mark as Complete Anyway'}
+            </Text>
+          </TouchableOpacity>
         )}
-      </ScrollView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  fullContainer: {
+    flex: 1,
+    backgroundColor: colors.haven.navy[900],
+  },
   container: {
     flex: 1,
     backgroundColor: colors.background.secondary,
   },
   scrollView: {
     flex: 1,
+    backgroundColor: colors.background.secondary,
   },
   scrollContent: {
     padding: spacing[4],
@@ -600,9 +669,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.background.secondary,
   },
   errorContainer: {
     flex: 1,
+    backgroundColor: colors.background.secondary,
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing[6],
@@ -674,6 +745,68 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.text.tertiary,
   },
+  metaTextOverdue: {
+    color: colors.status.error,
+    fontWeight: typography.fontWeights.medium,
+  },
+  systemCard: {
+    padding: spacing[4],
+    marginBottom: spacing[4],
+  },
+  systemHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[3],
+  },
+  systemTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  systemInfo: {
+    gap: spacing[1],
+  },
+  systemName: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  systemDetails: {
+    marginTop: spacing[1],
+    gap: spacing[1],
+  },
+  systemDetail: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+  },
+  whyCard: {
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    backgroundColor: colors.haven.champagne[50],
+    borderLeftWidth: 4,
+    borderLeftColor: colors.haven.champagne[500],
+  },
+  whyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  whyTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.haven.champagne[600],
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  whyText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.text.primary,
+    lineHeight: 22,
+  },
   progressCard: {
     padding: spacing[4],
     marginBottom: spacing[4],
@@ -715,6 +848,9 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     marginBottom: spacing[4],
   },
+  checklistItemContainer: {
+    marginBottom: spacing[2],
+  },
   checklistItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -751,6 +887,11 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
     color: colors.text.tertiary,
   },
+  checklistItemDescription: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing[2],
+  },
   checklistItemMeta: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -768,6 +909,25 @@ const styles = StyleSheet.create({
   checklistTagText: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.tertiary,
+  },
+  alfredButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    alignSelf: 'flex-start',
+    marginLeft: 36,
+    marginTop: spacing[1],
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.haven.champagne[50],
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[200],
+  },
+  alfredButtonText: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[600],
   },
   scheduleCard: {
     padding: spacing[4],
@@ -799,6 +959,38 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
     color: colors.text.primary,
+  },
+  vendorCard: {
+    padding: spacing[4],
+    marginBottom: spacing[4],
+  },
+  vendorHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  vendorTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.secondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  vendorName: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  vendorContact: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: spacing[2],
+  },
+  vendorPhone: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[600],
   },
   actionSection: {
     marginBottom: spacing[4],

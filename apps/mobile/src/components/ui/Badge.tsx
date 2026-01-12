@@ -82,11 +82,11 @@ const styles = StyleSheet.create({
     color: colors.haven.champagne[600],
   },
 
-  // Text sizes
+  // Text sizes - minimum 11px for badges (xs is now 13px)
   text_sm: {
-    fontSize: typography.fontSizes['2xs'],
+    fontSize: 11,  // Minimum for small badges
   },
   text_md: {
-    fontSize: typography.fontSizes.xs,
+    fontSize: typography.fontSizes.xs,  // 13px
   },
 });

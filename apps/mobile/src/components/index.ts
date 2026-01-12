@@ -21,6 +21,12 @@ export * from './ImageUpload';
 export * from './ErrorBoundary';
 export * from './OfflineBanner';
 
+// Layout Components
+export * from './ScreenContainer';
+export * from './AppHeader';
+export * from './HomeHeader';
+
 // Alfred AI Components
 export * from './Alfred';
 export * from './AlfredSuggestions';
+export * from './AlfredIcon';

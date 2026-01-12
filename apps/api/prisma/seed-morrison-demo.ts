@@ -631,6 +631,125 @@ async function main() {
   });
   console.log('  ✓ Backyard & Grounds (3 assets)');
 
+  // Living Room
+  const livingRoom = await prisma.zone.create({
+    data: {
+      householdId: household.id,
+      name: 'Living Room',
+      type: ZoneType.LIVING_ROOM,
+      floor: 'First Floor',
+      notes: 'Main family gathering space with built-in entertainment center',
+    },
+  });
+
+  await prisma.propertyAsset.createMany({
+    data: [
+      {
+        householdId: household.id,
+        zoneId: livingRoom.id,
+        name: 'Gas Fireplace',
+        category: AssetCategory.HVAC,
+        brand: 'Heat & Glo',
+        condition: 'Excellent',
+        notes: 'Annual inspection recommended',
+      },
+      {
+        householdId: household.id,
+        zoneId: livingRoom.id,
+        name: 'Smart Thermostat',
+        category: AssetCategory.ELECTRONICS,
+        brand: 'Nest',
+        model: 'Learning Thermostat 3rd Gen',
+        condition: 'Excellent',
+      },
+    ],
+  });
+  console.log('  ✓ Living Room (2 assets)');
+
+  // Master Bedroom
+  const masterBedroom = await prisma.zone.create({
+    data: {
+      householdId: household.id,
+      name: 'Master Bedroom',
+      type: ZoneType.BEDROOM,
+      floor: 'Second Floor',
+    },
+  });
+
+  await prisma.propertyAsset.createMany({
+    data: [
+      {
+        householdId: household.id,
+        zoneId: masterBedroom.id,
+        name: 'Ceiling Fan',
+        category: AssetCategory.ELECTRICAL,
+        brand: 'Hunter',
+        condition: 'Good',
+      },
+    ],
+  });
+  console.log('  ✓ Master Bedroom (1 asset)');
+
+  // Master Bathroom
+  const masterBathroom = await prisma.zone.create({
+    data: {
+      householdId: household.id,
+      name: 'Master Bathroom',
+      type: ZoneType.BATHROOM,
+      floor: 'Second Floor',
+      procedures: 'Check caulking around tub annually. Clean grout quarterly.',
+    },
+  });
+
+  await prisma.propertyAsset.createMany({
+    data: [
+      {
+        householdId: household.id,
+        zoneId: masterBathroom.id,
+        name: 'Tankless Water Heater',
+        category: AssetCategory.PLUMBING,
+        brand: 'Rinnai',
+        model: 'RU199iN',
+        condition: 'Good',
+        notes: 'Flush annually. Filter cleaning every 6 months.',
+      },
+      {
+        householdId: household.id,
+        zoneId: masterBathroom.id,
+        name: 'Bathroom Exhaust Fan',
+        category: AssetCategory.HVAC,
+        brand: 'Panasonic',
+        condition: 'Good',
+      },
+    ],
+  });
+  console.log('  ✓ Master Bathroom (2 assets)');
+
+  // Home Office
+  const homeOffice = await prisma.zone.create({
+    data: {
+      householdId: household.id,
+      name: "Bob's Office",
+      type: ZoneType.OFFICE,
+      floor: 'First Floor',
+    },
+  });
+
+  await prisma.propertyAsset.createMany({
+    data: [
+      {
+        householdId: household.id,
+        zoneId: homeOffice.id,
+        name: 'Smoke Detector',
+        category: AssetCategory.SAFETY,
+        brand: 'First Alert',
+        condition: 'Good',
+        notes: 'Replace batteries annually',
+      },
+    ],
+  });
+  console.log("  ✓ Bob's Office (1 asset)");
+
   // =========================================================================
   // VENDORS
   // =========================================================================
@@ -1388,11 +1507,152 @@ async function main() {
     ],
   });
 
+  // Add a few tasks with pre-populated checklists (showing progress)
+  await prisma.maintenanceTask.create({
+    data: {
+      householdId: household.id,
+      title: 'Smoke Detector Test',
+      description: 'Monthly test of all smoke and CO detectors throughout the home',
+      category: MaintenanceCategory.SAFETY,
+      frequency: MaintenanceFrequency.MONTHLY,
+      seasonalTiming: SeasonalTiming.ANY,
+      source: TaskSource.SYSTEM_GENERATED,
+      sourceSystem: 'Safety',
+      priority: TaskPriority.HIGH,
+      estimatedCost: 0,
+      isRecurring: true,
+      status: MaintenanceTaskStatus.PENDING,
+      nextDueDate: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000), // Due in 1 week
+      intervalExplanation:
+        'Working smoke detectors are your first line of defense against fire. Testing monthly and replacing batteries annually ensures your family has critical warning time in an emergency.',
+      checklistSteps: [
+        {
+          id: 'smoke-1',
+          order: 1,
+          title: 'Locate all smoke detectors',
+          description: 'Walk through home and identify each detector location',
+          completed: true,
+          completedAt: new Date().toISOString(),
+          alfredCanHandle: false,
+          estimatedMinutes: 5,
+          difficulty: 'easy',
+        },
+        {
+          id: 'smoke-2',
+          order: 2,
+          title: 'Test each detector',
+          description: 'Press and hold test button until alarm sounds',
+          completed: true,
+          completedAt: new Date().toISOString(),
+          alfredCanHandle: false,
+          estimatedMinutes: 10,
+          difficulty: 'easy',
+        },
+        {
+          id: 'smoke-3',
+          order: 3,
+          title: 'Replace batteries if needed',
+          description: 'Use 9V or AA batteries depending on model',
+          completed: false,
+          alfredCanHandle: true,
+          alfredPrompt: 'Order replacement batteries for my smoke detectors.',
+          estimatedMinutes: 5,
+          difficulty: 'easy',
+        },
+        {
+          id: 'smoke-4',
+          order: 4,
+          title: 'Check expiration dates',
+          description: 'Smoke detectors expire after 10 years - check manufacture date',
+          completed: false,
+          alfredCanHandle: false,
+          estimatedMinutes: 5,
+          difficulty: 'easy',
+        },
+      ],
+    },
+  });
+
+  await prisma.maintenanceTask.create({
+    data: {
+      householdId: household.id,
+      title: 'Gutter Cleaning',
+      description: 'Clear leaves and debris from gutters and downspouts',
+      category: MaintenanceCategory.EXTERIOR,
+      frequency: MaintenanceFrequency.SEMI_ANNUAL,
+      seasonalTiming: SeasonalTiming.FALL,
+      source: TaskSource.SYSTEM_GENERATED,
+      sourceSystem: 'Exterior',
+      priority: TaskPriority.MEDIUM,
+      estimatedCost: 200,
+      isRecurring: true,
+      status: MaintenanceTaskStatus.PENDING,
+      nextDueDate: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000), // Due in 2 weeks
+      intervalExplanation:
+        'Clogged gutters cause water to overflow and damage your foundation, siding, and landscaping. Ice dams in winter can cause roof leaks. Clean gutters in spring and fall protect your home from thousands in water damage.',
+      checklistSteps: [
+        {
+          id: 'gutter-1',
+          order: 1,
+          title: 'Schedule gutter service',
+          description: 'This can be DIY with ladder or hire a professional',
+          completed: false,
+          alfredCanHandle: true,
+          alfredPrompt:
+            'Schedule a gutter cleaning service for my home. I prefer to have this done professionally due to safety concerns with ladders.',
+          estimatedMinutes: 10,
+          difficulty: 'easy',
+        },
+        {
+          id: 'gutter-2',
+          order: 2,
+          title: 'Remove debris from gutters',
+          description: 'Scoop out leaves, twigs, and sediment with gloved hands or scoop',
+          completed: false,
+          alfredCanHandle: false,
+          estimatedMinutes: 60,
+          difficulty: 'hard',
+        },
+        {
+          id: 'gutter-3',
+          order: 3,
+          title: 'Flush with hose',
+          description: 'Run water through gutters to clear remaining debris',
+          completed: false,
+          alfredCanHandle: false,
+          estimatedMinutes: 15,
+          difficulty: 'medium',
+        },
+        {
+          id: 'gutter-4',
+          order: 4,
+          title: 'Check downspouts',
+          description: 'Ensure water flows freely through downspouts',
+          completed: false,
+          alfredCanHandle: false,
+          estimatedMinutes: 10,
+          difficulty: 'easy',
+        },
+        {
+          id: 'gutter-5',
+          order: 5,
+          title: 'Inspect for damage',
+          description: 'Look for loose brackets, holes, or separation',
+          completed: false,
+          alfredCanHandle: false,
+          estimatedMinutes: 10,
+          difficulty: 'easy',
+        },
+      ],
+    },
+  });
+
   // Count total created
   const maintenanceCount = await prisma.maintenanceTask.count({
     where: { householdId: household.id },
   });
   console.log(`  ✓ ${maintenanceCount} maintenance tasks auto-generated from property data`);
+  console.log('  ✓ Added tasks with checklist progress for demo');
   console.log('  ✓ Onboarding marked complete');
 
   // =========================================================================

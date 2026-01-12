@@ -18,18 +18,280 @@ import { colors, typography, spacing, borderRadius } from '../../../../src/lib/t
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+type StaffRole = 'nanny' | 'housekeeper' | 'gardener' | 'driver' | 'chef' | 'other';
+type PayFrequency = 'weekly' | 'biweekly' | 'monthly';
+type PayMethod = 'check' | 'direct_deposit' | 'cash' | 'payroll_service';
+
+interface EmergencyContactInfo {
+  name?: string | null;
+  phone?: string | null;
+  relationship?: string | null;
+}
+
+interface Employment {
+  startDate?: string | null;
+  agency?: string | null;
+  agencyContact?: string | null;
+  agencyPhone?: string | null;
+  schedule?: string | null;
+  responsibilities?: string[] | null;
+}
+
+interface Benefits {
+  healthInsurance?: boolean;
+  healthInsuranceCost?: number | null;
+  dentalInsurance?: boolean;
+  paidTimeOff?: number | null;
+  sickDays?: number | null;
+  holidayPay?: boolean;
+}
+
+interface Reimbursements {
+  mileage?: boolean;
+  mileageRate?: number | null;
+  gas?: boolean;
+  gasMonthlyLimit?: number | null;
+  meals?: boolean;
+  mealsMonthlyLimit?: number | null;
+  phone?: boolean;
+  phoneMonthly?: number | null;
+  other?: string | null;
+}
+
+interface Compensation {
+  payFrequency?: PayFrequency | null;
+  payAmount?: number | null;
+  payMethod?: PayMethod | null;
+  lastPayDate?: string | null;
+  benefits?: Benefits;
+  reimbursements?: Reimbursements;
+}
+
+interface Documents {
+  w9OnFile?: boolean;
+  i9OnFile?: boolean;
+  backgroundCheckDate?: string | null;
+  backgroundCheckProvider?: string | null;
+  driversLicense?: string | null;
+  driversLicenseExpires?: string | null;
+  cprCertified?: boolean;
+  cprExpires?: string | null;
+  firstAidCertified?: boolean;
+}
+
 interface StaffDetail {
   id: string;
   firstName: string;
   lastName: string;
   relationship?: string | null;
+  role?: StaffRole | null;
   phone?: string | null;
   email?: string | null;
+  address?: string | null;
   workSchedule?: string | null;
   startDate?: string | null;
   notes?: string | null;
   emergencyContact?: boolean;
+  // Enhanced fields
+  staffEmergencyContact?: EmergencyContactInfo;
+  employment?: Employment;
+  compensation?: Compensation;
+  documents?: Documents;
 }
+
+// =============================================================================
+// HELPER COMPONENTS
+// =============================================================================
+
+interface SectionHeaderProps {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}
+
+function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
+  return (
+    <View style={helperStyles.sectionHeader}>
+      <Text style={helperStyles.sectionHeaderText}>{title}</Text>
+      {action && onAction && (
+        <TouchableOpacity onPress={onAction}>
+          <Text style={helperStyles.sectionAction}>{action}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+interface InfoRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value?: string | null;
+  onPress?: () => void;
+}
+
+function InfoRow({ icon, label, value, onPress }: InfoRowProps) {
+  if (!value) return null;
+  const content = (
+    <View style={helperStyles.infoRow}>
+      <Ionicons name={icon} size={18} color={colors.text.tertiary} />
+      <View style={helperStyles.infoContent}>
+        <Text style={helperStyles.infoLabel}>{label}</Text>
+        <Text style={[
+          helperStyles.infoValue,
+          onPress && helperStyles.linkText,
+        ]}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+  if (onPress) {
+    return <TouchableOpacity onPress={onPress}>{content}</TouchableOpacity>;
+  }
+  return content;
+}
+
+interface EmptyPromptProps {
+  text: string;
+  onPress?: () => void;
+}
+
+function EmptyPrompt({ text, onPress }: EmptyPromptProps) {
+  return (
+    <TouchableOpacity style={helperStyles.emptyPrompt} onPress={onPress} disabled={!onPress}>
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Text style={helperStyles.emptyPromptText}>{text}</Text>
+    </TouchableOpacity>
+  );
+}
+
+interface ChecklistRowProps {
+  label: string;
+  checked?: boolean;
+  subtitle?: string;
+}
+
+function ChecklistRow({ label, checked, subtitle }: ChecklistRowProps) {
+  return (
+    <View style={helperStyles.checklistRow}>
+      <View style={[
+        helperStyles.checklistIcon,
+        checked ? helperStyles.checklistIconChecked : helperStyles.checklistIconUnchecked,
+      ]}>
+        <Ionicons
+          name={checked ? 'checkmark' : 'close'}
+          size={14}
+          color={checked ? colors.white : colors.text.tertiary}
+        />
+      </View>
+      <View style={helperStyles.checklistContent}>
+        <Text style={[
+          helperStyles.checklistLabel,
+          !checked && helperStyles.checklistLabelUnchecked,
+        ]}>
+          {label}
+        </Text>
+        {subtitle && (
+          <Text style={helperStyles.checklistSubtitle}>{subtitle}</Text>
+        )}
+      </View>
+    </View>
+  );
+}
+
+const helperStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  sectionHeaderText: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionAction: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[500],
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  linkText: {
+    color: colors.haven.champagne[500],
+  },
+  emptyPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[3],
+  },
+  emptyPromptText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[500],
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  checklistIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checklistIconChecked: {
+    backgroundColor: colors.status.success,
+  },
+  checklistIconUnchecked: {
+    backgroundColor: colors.background.secondary,
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  checklistContent: {
+    flex: 1,
+  },
+  checklistLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  checklistLabelUnchecked: {
+    color: colors.text.tertiary,
+  },
+  checklistSubtitle: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+});
 
 export default function StaffDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -171,6 +433,59 @@ export default function StaffDetailScreen() {
   const fullName = `${staff.firstName} ${staff.lastName}`;
   const initials = `${staff.firstName?.[0] || ''}${staff.lastName?.[0] || ''}`;
 
+  // Format currency
+  const formatCurrency = (amount?: number | null) => {
+    if (!amount) return null;
+    return `$${amount.toLocaleString()}`;
+  };
+
+  // Format pay frequency
+  const formatPayFrequency = (freq?: PayFrequency | null) => {
+    if (!freq) return '';
+    const labels: Record<PayFrequency, string> = {
+      weekly: '/week',
+      biweekly: '/2 weeks',
+      monthly: '/month',
+    };
+    return labels[freq] || '';
+  };
+
+  // Format pay method
+  const formatPayMethod = (method?: PayMethod | null) => {
+    if (!method) return null;
+    const labels: Record<PayMethod, string> = {
+      check: 'Check',
+      direct_deposit: 'Direct Deposit',
+      cash: 'Cash',
+      payroll_service: 'Payroll Service',
+    };
+    return labels[method] || method;
+  };
+
+  // Role display
+  const roleLabel = staff.role
+    ? staff.role.charAt(0).toUpperCase() + staff.role.slice(1).replace('_', ' ')
+    : staff.relationship || 'Staff';
+
+  // Check for compensation data
+  const hasCompensationData = staff.compensation?.payAmount;
+
+  // Check for benefits data
+  const hasBenefitsData = staff.compensation?.benefits && (
+    staff.compensation.benefits.healthInsurance ||
+    staff.compensation.benefits.paidTimeOff ||
+    staff.compensation.benefits.sickDays ||
+    staff.compensation.benefits.holidayPay
+  );
+
+  // Check for reimbursements data
+  const hasReimbursementsData = staff.compensation?.reimbursements && (
+    staff.compensation.reimbursements.gas ||
+    staff.compensation.reimbursements.mileage ||
+    staff.compensation.reimbursements.meals ||
+    staff.compensation.reimbursements.phone
+  );
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
@@ -202,7 +517,7 @@ export default function StaffDetailScreen() {
           </View>
           <Text style={styles.fullName}>{fullName}</Text>
           <View style={styles.badgeRow}>
-            <Badge label={staff.relationship || 'Staff'} variant="default" />
+            <Badge label={roleLabel} variant="default" />
             {staff.emergencyContact && (
               <Badge label="Emergency Contact" variant="warning" />
             )}
@@ -241,62 +556,336 @@ export default function StaffDetailScreen() {
 
         {/* Contact Info */}
         <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-
-          {staff.phone && (
-            <View style={styles.detailRow}>
-              <Ionicons name="call-outline" size={18} color={colors.text.tertiary} />
-              <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Phone</Text>
-                <Text style={styles.detailValue}>{staff.phone}</Text>
-              </View>
-            </View>
-          )}
-
-          {staff.email && (
-            <View style={styles.detailRow}>
-              <Ionicons name="mail-outline" size={18} color={colors.text.tertiary} />
-              <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Email</Text>
-                <Text style={styles.detailValue}>{staff.email}</Text>
-              </View>
-            </View>
-          )}
-
-          {!staff.phone && !staff.email && (
-            <Text style={styles.emptyText}>No contact information</Text>
+          <SectionHeader
+            title="CONTACT INFORMATION"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit contact coming soon')}
+          />
+          <InfoRow
+            icon="call-outline"
+            label="Phone"
+            value={staff.phone}
+            onPress={staff.phone ? handleCall : undefined}
+          />
+          <InfoRow
+            icon="mail-outline"
+            label="Email"
+            value={staff.email}
+            onPress={staff.email ? handleEmail : undefined}
+          />
+          <InfoRow icon="location-outline" label="Address" value={staff.address} />
+          {!staff.phone && !staff.email && !staff.address && (
+            <EmptyPrompt
+              text="Add contact information"
+              onPress={() => Alert.alert('Edit', 'Edit contact coming soon')}
+            />
           )}
         </Card>
 
-        {/* Work Schedule */}
-        {staff.workSchedule && (
-          <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Work Schedule</Text>
-            <View style={styles.scheduleContainer}>
+        {/* Schedule & Employment */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="SCHEDULE & EMPLOYMENT"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit employment coming soon')}
+          />
+          {(staff.workSchedule || staff.employment?.schedule) && (
+            <View style={styles.scheduleCard}>
               <Ionicons name="calendar-outline" size={20} color={colors.haven.champagne[500]} />
-              <Text style={styles.scheduleText}>{staff.workSchedule}</Text>
-            </View>
-          </Card>
-        )}
-
-        {/* Employment Details */}
-        {staff.startDate && (
-          <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Employment</Text>
-            <View style={styles.detailRow}>
-              <Ionicons name="briefcase-outline" size={18} color={colors.text.tertiary} />
-              <View style={styles.detailContent}>
-                <Text style={styles.detailLabel}>Start Date</Text>
-                <Text style={styles.detailValue}>{formatDate(staff.startDate)}</Text>
+              <View style={styles.scheduleContent}>
+                <Text style={styles.scheduleLabel}>Work Schedule</Text>
+                <Text style={styles.scheduleText}>
+                  {staff.employment?.schedule || staff.workSchedule}
+                </Text>
               </View>
             </View>
+          )}
+          <InfoRow
+            icon="briefcase-outline"
+            label="Start Date"
+            value={formatDate(staff.employment?.startDate || staff.startDate)}
+          />
+          {staff.employment?.agency && (
+            <View style={styles.agencyCard}>
+              <Ionicons name="business-outline" size={20} color={colors.text.tertiary} />
+              <View style={styles.agencyContent}>
+                <Text style={styles.agencyLabel}>Staffing Agency</Text>
+                <Text style={styles.agencyName}>{staff.employment.agency}</Text>
+                {staff.employment.agencyContact && (
+                  <Text style={styles.agencyContact}>{staff.employment.agencyContact}</Text>
+                )}
+              </View>
+              {staff.employment.agencyPhone && (
+                <TouchableOpacity
+                  style={styles.agencyCallButton}
+                  onPress={() => Linking.openURL(`tel:${staff.employment?.agencyPhone}`)}
+                >
+                  <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                </TouchableOpacity>
+              )}
+            </View>
+          )}
+          {staff.employment?.responsibilities && staff.employment.responsibilities.length > 0 && (
+            <View style={styles.responsibilitiesSection}>
+              <Text style={styles.responsibilitiesLabel}>Responsibilities</Text>
+              {staff.employment.responsibilities.map((resp, index) => (
+                <View key={index} style={styles.responsibilityRow}>
+                  <Text style={styles.responsibilityBullet}>•</Text>
+                  <Text style={styles.responsibilityText}>{resp}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </Card>
+
+        {/* Compensation */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="COMPENSATION"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit compensation coming soon')}
+          />
+          {hasCompensationData ? (
+            <>
+              <View style={styles.payCard}>
+                <View style={styles.payMain}>
+                  <Text style={styles.payAmount}>
+                    {formatCurrency(staff.compensation?.payAmount)}
+                  </Text>
+                  <Text style={styles.payFrequency}>
+                    {formatPayFrequency(staff.compensation?.payFrequency)}
+                  </Text>
+                </View>
+                {staff.compensation?.payMethod && (
+                  <Text style={styles.payMethod}>
+                    via {formatPayMethod(staff.compensation.payMethod)}
+                  </Text>
+                )}
+              </View>
+              <InfoRow
+                icon="calendar-outline"
+                label="Last Pay Date"
+                value={formatDate(staff.compensation?.lastPayDate)}
+              />
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add compensation details"
+              onPress={() => Alert.alert('Edit', 'Edit compensation coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* Benefits You Provide */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="BENEFITS YOU PROVIDE"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit benefits coming soon')}
+          />
+          {hasBenefitsData ? (
+            <>
+              {staff.compensation?.benefits?.healthInsurance && (
+                <View style={styles.benefitRow}>
+                  <Ionicons name="medkit-outline" size={18} color={colors.status.success} />
+                  <View style={styles.benefitContent}>
+                    <Text style={styles.benefitLabel}>Health Insurance</Text>
+                    {staff.compensation.benefits.healthInsuranceCost && (
+                      <Text style={styles.benefitValue}>
+                        {formatCurrency(staff.compensation.benefits.healthInsuranceCost)}/mo contribution
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.benefits?.dentalInsurance && (
+                <View style={styles.benefitRow}>
+                  <Ionicons name="happy-outline" size={18} color={colors.status.success} />
+                  <Text style={styles.benefitLabel}>Dental Insurance</Text>
+                </View>
+              )}
+              {staff.compensation?.benefits?.paidTimeOff && (
+                <View style={styles.benefitRow}>
+                  <Ionicons name="calendar-outline" size={18} color={colors.status.success} />
+                  <View style={styles.benefitContent}>
+                    <Text style={styles.benefitLabel}>Paid Time Off</Text>
+                    <Text style={styles.benefitValue}>
+                      {staff.compensation.benefits.paidTimeOff} days/year
+                    </Text>
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.benefits?.sickDays && (
+                <View style={styles.benefitRow}>
+                  <Ionicons name="bed-outline" size={18} color={colors.status.success} />
+                  <View style={styles.benefitContent}>
+                    <Text style={styles.benefitLabel}>Sick Days</Text>
+                    <Text style={styles.benefitValue}>
+                      {staff.compensation.benefits.sickDays} days/year
+                    </Text>
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.benefits?.holidayPay && (
+                <View style={styles.benefitRow}>
+                  <Ionicons name="gift-outline" size={18} color={colors.status.success} />
+                  <Text style={styles.benefitLabel}>Holiday Pay</Text>
+                </View>
+              )}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add benefits information"
+              onPress={() => Alert.alert('Edit', 'Edit benefits coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* Reimbursements */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="REIMBURSEMENTS"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit reimbursements coming soon')}
+          />
+          {hasReimbursementsData ? (
+            <>
+              {staff.compensation?.reimbursements?.gas && (
+                <View style={styles.reimbursementRow}>
+                  <Ionicons name="car-outline" size={18} color={colors.text.tertiary} />
+                  <View style={styles.reimbursementContent}>
+                    <Text style={styles.reimbursementLabel}>Gas</Text>
+                    {staff.compensation.reimbursements.gasMonthlyLimit && (
+                      <Text style={styles.reimbursementValue}>
+                        Up to {formatCurrency(staff.compensation.reimbursements.gasMonthlyLimit)}/mo
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.reimbursements?.mileage && (
+                <View style={styles.reimbursementRow}>
+                  <Ionicons name="speedometer-outline" size={18} color={colors.text.tertiary} />
+                  <View style={styles.reimbursementContent}>
+                    <Text style={styles.reimbursementLabel}>Mileage</Text>
+                    {staff.compensation.reimbursements.mileageRate && (
+                      <Text style={styles.reimbursementValue}>
+                        ${staff.compensation.reimbursements.mileageRate}/mile
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.reimbursements?.meals && (
+                <View style={styles.reimbursementRow}>
+                  <Ionicons name="restaurant-outline" size={18} color={colors.text.tertiary} />
+                  <View style={styles.reimbursementContent}>
+                    <Text style={styles.reimbursementLabel}>Meals</Text>
+                    {staff.compensation.reimbursements.mealsMonthlyLimit && (
+                      <Text style={styles.reimbursementValue}>
+                        Up to {formatCurrency(staff.compensation.reimbursements.mealsMonthlyLimit)}/mo
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {staff.compensation?.reimbursements?.phone && (
+                <View style={styles.reimbursementRow}>
+                  <Ionicons name="phone-portrait-outline" size={18} color={colors.text.tertiary} />
+                  <View style={styles.reimbursementContent}>
+                    <Text style={styles.reimbursementLabel}>Phone</Text>
+                    {staff.compensation.reimbursements.phoneMonthly && (
+                      <Text style={styles.reimbursementValue}>
+                        {formatCurrency(staff.compensation.reimbursements.phoneMonthly)}/mo
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              )}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add reimbursement policy"
+              onPress={() => Alert.alert('Edit', 'Edit reimbursements coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* Documents & Certifications */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="DOCUMENTS & CERTIFICATIONS"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit documents coming soon')}
+          />
+          <ChecklistRow
+            label="W-9 on file"
+            checked={staff.documents?.w9OnFile}
+          />
+          <ChecklistRow
+            label="I-9 on file"
+            checked={staff.documents?.i9OnFile}
+          />
+          <ChecklistRow
+            label="Background check"
+            checked={!!staff.documents?.backgroundCheckDate}
+            subtitle={staff.documents?.backgroundCheckDate
+              ? `Completed ${formatDate(staff.documents.backgroundCheckDate)}`
+              : undefined}
+          />
+          <ChecklistRow
+            label="CPR certified"
+            checked={staff.documents?.cprCertified}
+            subtitle={staff.documents?.cprExpires
+              ? `Expires ${formatDate(staff.documents.cprExpires)}`
+              : undefined}
+          />
+          <ChecklistRow
+            label="First Aid certified"
+            checked={staff.documents?.firstAidCertified}
+          />
+          {staff.documents?.driversLicense && (
+            <InfoRow
+              icon="card-outline"
+              label="Driver's License"
+              value={staff.documents.driversLicense}
+            />
+          )}
+        </Card>
+
+        {/* Emergency Contact */}
+        {staff.staffEmergencyContact?.name && (
+          <Card style={styles.section}>
+            <SectionHeader
+              title="THEIR EMERGENCY CONTACT"
+              action="Edit"
+              onAction={() => Alert.alert('Edit', 'Edit emergency contact coming soon')}
+            />
+            <InfoRow
+              icon="person-outline"
+              label="Name"
+              value={staff.staffEmergencyContact.name}
+            />
+            <InfoRow
+              icon="people-outline"
+              label="Relationship"
+              value={staff.staffEmergencyContact.relationship}
+            />
+            <InfoRow
+              icon="call-outline"
+              label="Phone"
+              value={staff.staffEmergencyContact.phone}
+              onPress={staff.staffEmergencyContact.phone
+                ? () => Linking.openURL(`tel:${staff.staffEmergencyContact?.phone}`)
+                : undefined}
+            />
           </Card>
         )}
 
         {/* Notes */}
         {staff.notes && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <SectionHeader title="NOTES" />
             <Text style={styles.notes}>{staff.notes}</Text>
           </Card>
         )}
@@ -350,6 +939,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.semibold,
     color: colors.white,
   },
+  // Profile Card
   profileCard: {
     alignItems: 'center',
     padding: spacing[6],
@@ -379,6 +969,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing[2],
   },
+  // Action Buttons
   actionButtons: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -402,62 +993,161 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
     fontWeight: typography.fontWeights.medium,
   },
+  // Section
   section: {
     padding: spacing[4],
     marginBottom: spacing[4],
   },
-  sectionTitle: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing[3],
-  },
-  detailRow: {
+  // Schedule Card
+  scheduleCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    gap: spacing[3],
-  },
-  detailContent: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.text.tertiary,
-    marginBottom: 2,
-  },
-  detailValue: {
-    fontSize: typography.fontSizes.base,
-    color: colors.text.primary,
-  },
-  emptyText: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.text.tertiary,
-    textAlign: 'center',
-    paddingVertical: spacing[4],
-  },
-  scheduleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing[3],
     backgroundColor: colors.haven.champagne[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
+    marginBottom: spacing[3],
+  },
+  scheduleContent: {
+    flex: 1,
+  },
+  scheduleLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
   },
   scheduleText: {
-    flex: 1,
-    fontSize: typography.fontSizes.base,
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
     color: colors.text.primary,
   },
+  // Agency Card
+  agencyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  agencyContent: {
+    flex: 1,
+  },
+  agencyLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  agencyName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  agencyContact: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  agencyCallButton: {
+    padding: spacing[2],
+  },
+  // Responsibilities
+  responsibilitiesSection: {
+    marginTop: spacing[3],
+  },
+  responsibilitiesLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: spacing[2],
+  },
+  responsibilityRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[2],
+    paddingVertical: spacing[1],
+  },
+  responsibilityBullet: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+  },
+  responsibilityText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.primary,
+    flex: 1,
+  },
+  // Pay Card
+  payCard: {
+    backgroundColor: colors.haven.navy[50],
+    padding: spacing[4],
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing[3],
+  },
+  payMain: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: spacing[1],
+  },
+  payAmount: {
+    fontSize: typography.fontSizes['2xl'],
+    fontWeight: typography.fontWeights.bold,
+    color: colors.text.primary,
+  },
+  payFrequency: {
+    fontSize: typography.fontSizes.base,
+    color: colors.text.secondary,
+  },
+  payMethod: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    marginTop: spacing[1],
+  },
+  // Benefits
+  benefitRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  benefitContent: {
+    flex: 1,
+  },
+  benefitLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  benefitValue: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  // Reimbursements
+  reimbursementRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  reimbursementContent: {
+    flex: 1,
+  },
+  reimbursementLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  reimbursementValue: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  // Notes
   notes: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
     lineHeight: 22,
   },
+  // Delete Button
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',

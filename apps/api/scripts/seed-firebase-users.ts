@@ -30,6 +30,7 @@ const demoUsers = [
   // Homeowners
   { email: 'bob@example.com', password: 'Bob123!', displayName: 'Bob Morrison' },
   { email: 'alice@example.com', password: 'Alice123!', displayName: 'Alice Morrison' },
+  { email: 'tom@example.com', password: 'Tom123!', displayName: 'Tom Burke' },
 
   // Manager
   { email: 'sarah@haven.app', password: 'Manager123!', displayName: 'Sarah Chen' },

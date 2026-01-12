@@ -3,6 +3,7 @@ import { View, StyleSheet, ViewStyle, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '../lib/theme';
+import { AlfredLogo } from './AlfredIcon';
 
 // =============================================================================
 // TYPES
@@ -11,6 +12,7 @@ import { colors, borderRadius } from '../lib/theme';
 interface AlfredAvatarProps {
   size?: 'sm' | 'md' | 'lg' | 'xl';
   style?: ViewStyle;
+  variant?: 'light' | 'dark'; // background context
 }
 
 // =============================================================================
@@ -18,10 +20,10 @@ interface AlfredAvatarProps {
 // =============================================================================
 
 const SIZES = {
-  sm: { container: 32, icon: 16 },
-  md: { container: 44, icon: 22 },
-  lg: { container: 56, icon: 28 },
-  xl: { container: 72, icon: 36 },
+  sm: { container: 32, logo: 28 },
+  md: { container: 44, logo: 40 },
+  lg: { container: 56, logo: 52 },
+  xl: { container: 72, logo: 68 },
 };
 
 // =============================================================================
@@ -29,16 +31,15 @@ const SIZES = {
 // =============================================================================
 
 /**
- * Alfred AI avatar with sparkle icon and gradient background
+ * Alfred AI avatar with the new A-frame house logo
+ * variant='light' = navy house (for light backgrounds)
+ * variant='dark' = white house (for dark backgrounds)
  */
-export function AlfredAvatar({ size = 'md', style }: AlfredAvatarProps) {
-  const sizeConfig = SIZES[size];
+export function AlfredAvatar({ size = 'md', style, variant = 'light' }: AlfredAvatarProps) {
+  const sizeConfig = SIZES[size] || SIZES.md;
 
   return (
-    <LinearGradient
-      colors={[colors.haven.champagne[400], colors.haven.champagne[600]]}
-      start={{ x: 0, y: 0 }}
-      end={{ x: 1, y: 1 }}
+    <View
       style={[
         styles.container,
         {
@@ -49,12 +50,8 @@ export function AlfredAvatar({ size = 'md', style }: AlfredAvatarProps) {
         style,
       ]}
     >
-      <Ionicons
-        name="sparkles"
-        size={sizeConfig.icon}
-        color={colors.white}
-      />
-    </LinearGradient>
+      <AlfredLogo size={sizeConfig.logo} variant={variant} />
+    </View>
   );
 }
 
@@ -84,6 +81,35 @@ export function AlfredTypingIndicator({ dot1Opacity, dot2Opacity, dot3Opacity }:
 }
 
 // =============================================================================
+// ALFRED CARD COMPONENT
+// =============================================================================
+
+interface AlfredCardProps {
+  message?: string;
+  showActions?: boolean;
+  onChat?: () => void;
+}
+
+/**
+ * Alfred AI card with message and optional actions
+ */
+export function AlfredCard({ message, showActions, onChat }: AlfredCardProps) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.cardHeader}>
+        <AlfredAvatar size="md" />
+        <View style={styles.cardInfo}>
+          <View style={styles.cardNameRow}>
+            <Ionicons name="sparkles" size={14} color={colors.haven.champagne[500]} />
+          </View>
+        </View>
+      </View>
+      {message && <View style={styles.cardMessage} />}
+    </View>
+  );
+}
+
+// =============================================================================
 // STYLES
 // =============================================================================
 
@@ -91,6 +117,26 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  card: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: 16,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardInfo: {
+    marginLeft: 12,
+    flex: 1,
+  },
+  cardNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardMessage: {
+    marginTop: 12,
   },
   typingContainer: {
     flexDirection: 'row',

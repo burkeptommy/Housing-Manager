@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, Stack } from 'expo-router';
+import { askAlfredForHandyman } from '../../src/lib/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import { Card, Button, Badge } from '../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../src/lib/theme';
@@ -132,12 +133,7 @@ export default function BookHandymanScreen() {
   };
 
   const handleAskAlfred = () => {
-    router.push({
-      pathname: '/(tabs)/manager',
-      params: {
-        message: 'I need help with a handyman task',
-      },
-    } as any);
+    askAlfredForHandyman();
   };
 
   // =============================================================================

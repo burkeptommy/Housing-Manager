@@ -13,6 +13,7 @@ import { Request } from 'express';
 import { AuthService } from './auth.service';
 import {
   RegisterDto,
+  RegisterSimpleDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
@@ -37,6 +38,22 @@ export class AuthController {
     const ipAddress = req.ip || req.socket.remoteAddress;
 
     return this.authService.register(dto, userAgent, ipAddress);
+  }
+
+  /**
+   * Simplified registration for Alfred-first mobile flow
+   * Creates user, household with address, and triggers auto-enrichment
+   */
+  @Post('register-simple')
+  @HttpCode(HttpStatus.CREATED)
+  async registerSimple(
+    @Body() dto: RegisterSimpleDto,
+    @Req() req: Request,
+  ) {
+    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || req.socket.remoteAddress;
+
+    return this.authService.registerSimple(dto, userAgent, ipAddress);
   }
 
   @Post('login')

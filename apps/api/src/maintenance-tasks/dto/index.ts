@@ -176,6 +176,9 @@ export class MaintenanceTaskResponseDto {
   dueDate?: Date | null;
 
   @ApiPropertyOptional()
+  nextDueDate?: Date | null;
+
+  @ApiPropertyOptional()
   scheduledDate?: Date | null;
 
   @ApiPropertyOptional()
@@ -201,6 +204,10 @@ export class MaintenanceTaskResponseDto {
 
   @ApiProperty()
   updatedAt: Date;
+
+  // Checklist steps
+  @ApiPropertyOptional({ description: 'Checklist steps for this task' })
+  checklistSteps?: { id: string; completed: boolean }[];
 
   // Included relations
   @ApiPropertyOptional()

@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Alfred Logo - Full Color for Light Backgrounds -->
+<!-- Navy house with champagne accents -->
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- A-frame house - Navy -->
+  <path d="M60 12L99 96H84L60 45L36 96H21L60 12Z" fill="#0a1929"/>
+  
+  <!-- Inner warmth - Champagne -->
+  <path d="M60 51L77 89H43L60 51Z" fill="#c4a574"/>
+  
+  <!-- Window cutout -->
+  <rect x="54" y="63" width="12" height="9" rx="1.5" fill="#0a1929"/>
+  
+  <!-- Door cutout -->
+  <rect x="56" y="75" width="8" height="14" rx="1.5" fill="#0a1929"/>
+  
+  <!-- Sparkles - Champagne -->
+  <!-- Large sparkle top right -->
+  <path d="M93 27L95.5 33.5L102 36L95.5 38.5L93 45L90.5 38.5L84 36L90.5 33.5L93 27Z" fill="#c4a574"/>
+  
+  <!-- Medium sparkle top left -->
+  <path d="M30 33L31.8 38L37 39.5L31.8 41L30 46L28.2 41L23 39.5L28.2 38L30 33Z" fill="#c4a574" opacity="0.8"/>
+  
+  <!-- Small sparkle right -->
+  <path d="M103 54L104.2 57.5L108 58.5L104.2 59.5L103 63L101.8 59.5L98 58.5L101.8 57.5L103 54Z" fill="#c4a574" opacity="0.6"/>
+  
+  <!-- Small sparkle left -->
+  <path d="M19 60L20.2 63.5L24 64.5L20.2 65.5L19 69L17.8 65.5L14 64.5L17.8 63.5L19 60Z" fill="#c4a574" opacity="0.6"/>
+  
+  <!-- Tiny accent dots -->
+  <circle cx="99" cy="42" r="1.5" fill="#c4a574" opacity="0.4"/>
+  <circle cx="23" cy="51" r="1.5" fill="#c4a574" opacity="0.4"/>
+</svg>

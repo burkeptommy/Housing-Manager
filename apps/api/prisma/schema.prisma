@@ -253,6 +253,20 @@ enum VendorCategory {
   OTHER
 }
 
+// Vendor CRM - Activity types for tracking interactions
+enum VendorActivityType {
+  SERVICE       // Service performed
+  QUOTE         // Quote received
+  CALL          // Phone call
+  EMAIL         // Email exchange
+  PAYMENT       // Payment made
+  NOTE          // General note
+  COMPLAINT     // Issue/complaint
+  APPOINTMENT   // Scheduled appointment
+  ESTIMATE      // Estimate/assessment
+  WARRANTY      // Warranty claim
+}
+
 enum BillingFrequency {
   WEEKLY
   BIWEEKLY
@@ -831,6 +845,11 @@ model User {
   // Document Vault relations
   uploadedDocuments Document[] @relation("DocumentUploader")
 
+  // Referral relations
+  referralsSent     Referral[] @relation("ReferralReferrer") // Referrals this user has sent
+  referredBy        Referral[] @relation("ReferralReferee") // How this user was referred
+  referralCode      String?    @unique @map("referral_code") // User's unique referral code
+
   @@map("users")
 }
 
@@ -991,6 +1010,47 @@ model Household {
   // Property Enrichment from ATTOM (stored for reference)
   enrichmentData Json? @map("enrichment_data")
 
+  // Alfred-First Data Capture
+  // Utility Providers (from ZIP lookup + Plaid confirmation)
+  electricityProvider    String? @map("electricity_provider")
+  electricityConfirmed   Boolean @default(false) @map("electricity_confirmed")
+  gasProvider            String? @map("gas_provider")
+  gasConfirmed           Boolean @default(false) @map("gas_confirmed")
+  waterSource            String? @map("water_source") // "well" or "municipal"
+  waterSourceConfirmed   Boolean @default(false) @map("water_source_confirmed")
+  waterProvider          String? @map("water_provider")
+  sewerType              String? @map("sewer_type") // "septic" or "municipal"
+  sewerTypeConfirmed     Boolean @default(false) @map("sewer_type_confirmed")
+  sewerProvider          String? @map("sewer_provider")
+  heatingFuel            String? @map("heating_fuel") // "oil", "natural-gas", "propane", "electric"
+  heatingFuelProvider    String? @map("heating_fuel_provider")
+  internetProvider       String? @map("internet_provider")
+  cableProvider          String? @map("cable_provider")
+
+  // Plaid-detected financial info
+  mortgageProvider       String?   @map("mortgage_provider")
+  mortgageMonthlyPayment Float?    @map("mortgage_monthly_payment")
+  mortgageDetectedAt     DateTime? @map("mortgage_detected_at")
+  insuranceProvider      String?   @map("insurance_provider")
+  insurancePaymentAmount Float?    @map("insurance_payment_amount")
+  insurancePaymentFreq   String?   @map("insurance_payment_freq")
+  insuranceDetectedAt    DateTime? @map("insurance_detected_at")
+
+  // Home Health Score
+  homeHealthScore Int? @default(85) @map("home_health_score")
+
+  // Property Photo (main photo for household)
+  propertyPhotoUrl String? @map("property_photo_url")
+
+  // Data Capture Status
+  attomDataFetched     Boolean @default(false) @map("attom_data_fetched")
+  plaidDataAnalyzed    Boolean @default(false) @map("plaid_data_analyzed")
+  initialSetupComplete Boolean @default(false) @map("initial_setup_complete")
+
+  // Alfred Progressive Questions
+  alfredQuestionsAsked Json? @map("alfred_questions_asked") // Array of question IDs asked
+  alfredDataGaps       Json? @map("alfred_data_gaps") // Array of data gaps to fill
+
   // Intake checklist for Home Manager
   intakeChecklist HomeChecklist?
 
@@ -998,6 +1058,7 @@ model Household {
   householdIntake  HouseholdIntake?
   familyMembers    FamilyMember[]
   familyActivities FamilyActivity[]
+  memberships      Membership[]
 
   // Zone-based property structure
   zones              Zone[]
@@ -1022,6 +1083,11 @@ model Household {
   // Plaid Integration
   plaidConnections PlaidConnection[]
   detectedBills    DetectedBill[]
+
+  // Payment System
+  card              HouseholdCard?
+  bills             Bill[]
+  paymentApprovals  PaymentApproval[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -1115,6 +1181,43 @@ model HouseholdInvite {
   @@index([email])
   @@index([token])
   @@map("household_invites")
+}
+
+// ============================================================================
+// REFERRALS
+// ============================================================================
+
+enum ReferralStatus {
+  PENDING // Invitee hasn't signed up yet
+  SIGNED_UP // Invitee created account
+  CONVERTED // Invitee subscribed (reward earned)
+  EXPIRED // Referral link expired
+}
+
+model Referral {
+  id            String         @id @default(cuid())
+  referrerId    String         @map("referrer_id") // User who referred
+  referralCode  String         @unique @map("referral_code") // Unique code for this referral
+  refereeEmail  String?        @map("referee_email") // Email if sent to specific person
+  refereeId     String?        @map("referee_id") // User who was referred (once they sign up)
+  status        ReferralStatus @default(PENDING)
+  rewardEarned  Boolean        @default(false) @map("reward_earned")
+  rewardAmount  Decimal?       @map("reward_amount") @db.Decimal(10, 2)
+  rewardPaidAt  DateTime?      @map("reward_paid_at")
+  signedUpAt    DateTime?      @map("signed_up_at")
+  convertedAt   DateTime?      @map("converted_at")
+  expiresAt     DateTime       @map("expires_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  // Relations
+  referrer User  @relation("ReferralReferrer", fields: [referrerId], references: [id], onDelete: Cascade)
+  referee  User? @relation("ReferralReferee", fields: [refereeId], references: [id], onDelete: SetNull)
+
+  @@index([referrerId])
+  @@index([referralCode])
+  @@index([refereeEmail])
+  @@map("referrals")
 }
 
 // ============================================================================
@@ -1377,17 +1480,86 @@ model HouseholdVendor {
   id          String   @id @default(cuid())
   householdId String   @map("household_id")
   vendorId    String   @map("vendor_id")
-  notes       String?
+  notes       String?  @db.Text
   isFavorite  Boolean  @default(false) @map("is_favorite")
   createdAt   DateTime @default(now()) @map("created_at")
   updatedAt   DateTime @updatedAt @map("updated_at")
 
+  // CRM Fields
+  rating          Int?      // 1-5 stars (household's personal rating)
+  tags            String[]  @default([]) // Custom tags
+  source          String?   // "manual", "plaid", "alfred", "referral", etc.
+  referredBy      String?   @map("referred_by") // Who referred this vendor
+  lastContactDate DateTime? @map("last_contact_date")
+  customCategory  String?   @map("custom_category") // Household's own category name
+
   // Relations
-  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
-  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  household  Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  vendor     Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  activities VendorActivity[]
+  messages   VendorMessage[]
+  bills      Bill[]
 
   @@unique([householdId, vendorId])
+  @@index([householdId, isFavorite])
+  @@index([householdId, lastContactDate])
   @@map("household_vendors")
+}
+
+// Vendor CRM Activity Log - tracks all interactions with vendors
+model VendorActivity {
+  id                String             @id @default(cuid())
+  householdVendorId String             @map("household_vendor_id")
+  householdVendor   HouseholdVendor    @relation(fields: [householdVendorId], references: [id], onDelete: Cascade)
+
+  // Activity Details
+  type        VendorActivityType
+  title       String
+  description String? @db.Text
+
+  // Financial
+  amount Float?
+  isPaid Boolean @default(false) @map("is_paid")
+
+  // Date & Time
+  date     DateTime
+  duration Int?     // Duration in minutes (for calls/services)
+
+  // Attachments/References
+  invoiceUrl  String? @map("invoice_url")
+  receiptUrl  String? @map("receipt_url")
+  documentIds String[] @default([]) @map("document_ids") // Links to Document vault
+
+  // Link to other entities
+  maintenanceTaskId String? @map("maintenance_task_id")
+  serviceRequestId  String? @map("service_request_id")
+
+  // Metadata
+  createdBy String? @map("created_by") // User who logged this
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@index([householdVendorId])
+  @@index([householdVendorId, date])
+  @@index([householdVendorId, type])
+  @@map("vendor_activities")
+}
+
+// Vendor Messages - in-app messaging with vendors
+model VendorMessage {
+  id                String          @id @default(cuid())
+  householdVendorId String          @map("household_vendor_id")
+  householdVendor   HouseholdVendor @relation(fields: [householdVendorId], references: [id], onDelete: Cascade)
+
+  direction String // "outgoing" or "incoming"
+  content   String @db.Text
+  status    String @default("sent") // sent, delivered, read
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([householdVendorId, createdAt])
+  @@map("vendor_messages")
 }
 
 // ============================================================================
@@ -1885,6 +2057,10 @@ model MaintenanceTask {
   notes           String?
   completionNotes String? @map("completion_notes")
   priority        TaskPriority @default(MEDIUM)
+
+  // Checklist functionality
+  checklistSteps      Json?   @map("checklist_steps") // Array of ChecklistStep objects
+  intervalExplanation String? @map("interval_explanation") // Why this maintenance interval matters
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
@@ -3796,6 +3972,22 @@ model FamilyMember {
   allergies    String[] @default([])
   medications  String[] @default([])
   specialNeeds String?  @map("special_needs") @db.Text
+  bloodType    String?  @map("blood_type")
+  medicalNotes String?  @map("medical_notes") @db.Text
+
+  // Medical Providers
+  primaryDoctorName    String? @map("primary_doctor_name")
+  primaryDoctorPhone   String? @map("primary_doctor_phone")
+  primaryDoctorAddress String? @map("primary_doctor_address")
+  dentistName          String? @map("dentist_name")
+  dentistPhone         String? @map("dentist_phone")
+  dentistAddress       String? @map("dentist_address")
+
+  // Work info (for adults)
+  occupation   String?
+  employer     String?
+  workPhone    String? @map("work_phone")
+  workAddress  String? @map("work_address")
 
   // Emergency contacts
   emergencyContact      String? @map("emergency_contact")
@@ -3818,6 +4010,44 @@ model FamilyMember {
 
   @@index([householdId, type])
   @@map("family_members")
+}
+
+// Membership - Club memberships, gym memberships, country clubs, etc.
+model Membership {
+  id          String @id @default(cuid())
+  householdId String @map("household_id")
+
+  // Basic Info
+  name         String  // e.g., "Greenwich Country Club", "Equinox"
+  type         String  // "country-club", "gym", "pool", "club", "other"
+  memberName   String? @map("member_name") // Primary member on the account
+  memberNumber String? @map("member_number")
+
+  // Costs
+  monthlyCost Float? @map("monthly_cost")
+  annualCost  Float? @map("annual_cost")
+
+  // Contact & Location
+  contactPhone  String? @map("contact_phone")
+  contactEmail  String? @map("contact_email")
+  address       String?
+  website       String?
+
+  // Dates
+  renewalDate DateTime? @map("renewal_date") @db.Date
+  startDate   DateTime? @map("start_date") @db.Date
+
+  notes    String? @db.Text
+  isActive Boolean @default(true) @map("is_active")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  @@index([householdId])
+  @@map("memberships")
 }
 
 // FamilyActivity - Recurring activities and subscriptions for family members
@@ -4762,4 +4992,168 @@ model DetectedBill {
   @@index([status])
   @@index([managementStatus])
   @@map("detected_bills")
+}
+
+// ============================================================================
+// PAYMENT SYSTEM MODELS
+// ============================================================================
+
+model HouseholdCard {
+  id                  String   @id @default(cuid())
+  householdId         String   @unique @map("household_id")
+  household           Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  // Stripe Issuing
+  stripeCardholderId  String?  @map("stripe_cardholder_id")
+  stripeCardId        String?  @unique @map("stripe_card_id")
+  last4               String?
+  expMonth            Int?     @map("exp_month")
+  expYear             Int?     @map("exp_year")
+  brand               String   @default("visa")
+  status              String   @default("pending") // pending, active, frozen, cancelled
+
+  // Funding source (linked via Plaid)
+  plaidAccountId      String?  @map("plaid_account_id") // Primary funding source
+  fundingStatus       String   @default("not_connected") @map("funding_status") // not_connected, connected, error
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@map("household_cards")
+}
+
+model Bill {
+  id                  String   @id @default(cuid())
+  householdId         String   @map("household_id")
+  household           Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  // Vendor link (optional - some bills aren't tied to vendors in our system)
+  vendorId            String?  @map("vendor_id")
+  vendor              HouseholdVendor? @relation(fields: [vendorId], references: [id])
+
+  // Bill details
+  name                String
+  description         String?
+  category            String   // utility, insurance, mortgage, service, subscription, tax, other
+
+  // Amount handling
+  amount              Float?   // Null if variable
+  isVariableAmount    Boolean  @default(false) @map("is_variable_amount")
+  averageAmount       Float?   @map("average_amount") // For variable bills, historical average
+  lastKnownAmount     Float?   @map("last_known_amount")
+
+  // Schedule
+  frequency           String   // weekly, biweekly, monthly, quarterly, semi_annual, annual, one_time
+  dueDay              Int?     @map("due_day") // Day of month (1-31)
+  seasonStart         Int?     @map("season_start") // Month (1-12) if seasonal
+  seasonEnd           Int?     @map("season_end") // Month (1-12) if seasonal
+  nextDueDate         DateTime? @map("next_due_date")
+
+  // Payment method
+  paymentMethod       String   @map("payment_method") // card, check_digital, check_physical, manual
+  paymentPortalUrl    String?  @map("payment_portal_url") // URL to pay online (for card payments)
+  paymentEmail        String?  @map("payment_email") // Vendor email (for digital checks)
+  mailingAddress      String?  @map("mailing_address") // Vendor address (for physical checks)
+  accountNumber       String?  @map("account_number") // User's account number WITH the vendor
+
+  // Autopay settings
+  autopayEnabled      Boolean  @default(true) @map("autopay_enabled")
+  requiresApproval    Boolean  @default(false) @map("requires_approval")
+  approvalThreshold   Float?   @map("approval_threshold") // Require approval if amount exceeds this
+  daysBeforeDue       Int      @default(5) @map("days_before_due") // Pay this many days before due date
+
+  // Risk/Priority
+  priority            String   @default("normal") // critical, high, normal, low
+
+  // Status
+  status              String   @default("active") // active, paused, cancelled
+
+  // Source tracking
+  sourceType          String   @default("manual") @map("source_type") // manual, plaid_detected, alfred
+  detectedBillId      String?  @map("detected_bill_id") // Link to DetectedBill if created from detection
+
+  // Relationships
+  payments            BillPayment[]
+  approvals           PaymentApproval[]
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([householdId, status])
+  @@index([nextDueDate])
+  @@map("bills")
+}
+
+model BillPayment {
+  id                  String   @id @default(cuid())
+  billId              String   @map("bill_id")
+  bill                Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+  householdId         String   @map("household_id")
+
+  // Payment details
+  amount              Float
+  status              String   @default("pending") // pending, processing, completed, failed, cancelled
+  paymentMethod       String   @map("payment_method") // card, check_digital, check_physical
+
+  // Stripe (for card payments)
+  stripePaymentId     String?  @map("stripe_payment_id")
+  stripeAuthId        String?  @map("stripe_auth_id")
+
+  // Checkbook.io (for check payments)
+  checkbookCheckId    String?  @map("checkbook_check_id")
+  checkNumber         String?  @map("check_number")
+  checkTrackingNumber String?  @map("check_tracking_number")
+
+  // Timing
+  scheduledDate       DateTime @map("scheduled_date")
+  processedDate       DateTime? @map("processed_date")
+  confirmedDate       DateTime? @map("confirmed_date")
+
+  // Error handling
+  failureReason       String?  @map("failure_reason")
+  retryCount          Int      @default(0) @map("retry_count")
+  maxRetries          Int      @default(3) @map("max_retries")
+
+  // Approval link
+  approvalId          String?  @map("approval_id")
+
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  @@index([householdId, status])
+  @@index([scheduledDate])
+  @@map("bill_payments")
+}
+
+model PaymentApproval {
+  id                  String   @id @default(cuid())
+  householdId         String   @map("household_id")
+  household           Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  billId              String   @map("bill_id")
+  bill                Bill     @relation(fields: [billId], references: [id], onDelete: Cascade)
+
+  // Approval details
+  amount              Float
+  reason              String   // high_amount, first_payment, anomaly, critical_bill, manual_request
+
+  // Status
+  status              String   @default("pending") // pending, approved, denied, expired, auto_approved
+
+  // Timing
+  requestedAt         DateTime @default(now()) @map("requested_at")
+  respondedAt         DateTime? @map("responded_at")
+  expiresAt           DateTime @map("expires_at")
+
+  // Who responded
+  respondedBy         String?  @map("responded_by") // User ID
+  responseNote        String?  @map("response_note")
+
+  // Resulting payment
+  paymentId           String?  @map("payment_id")
+
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  @@index([householdId, status])
+  @@index([expiresAt])
+  @@map("payment_approvals")
 }

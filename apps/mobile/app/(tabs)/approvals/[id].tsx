@@ -547,7 +547,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   priorityText: {
-    fontSize: 10,
+    fontSize: 11,  // Minimum for badges
     fontWeight: typography.fontWeights.bold,
     color: colors.white,
   },

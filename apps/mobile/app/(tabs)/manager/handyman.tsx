@@ -7,11 +7,10 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useSubscription } from '../../../src/contexts/subscription-context';
-import { Card, Button, Badge } from '../../../src/components';
+import { Card, Button, Badge, ScreenContainer } from '../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
 import {
   HANDYMAN_SERVICES,
@@ -72,9 +71,7 @@ export default function HandymanScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
-      <Stack.Screen options={{ title: 'Book Handyman' }} />
-
+    <ScreenContainer title="Service Request" scrollable={false}>
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
@@ -234,7 +231,7 @@ export default function HandymanScreen() {
           style={styles.bookButton}
         />
       </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 

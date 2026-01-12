@@ -18,6 +18,60 @@ import { colors, typography, spacing, borderRadius } from '../../../../src/lib/t
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+interface VetInfo {
+  clinicName?: string | null;
+  vetName?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  lastVisit?: string | null;
+  nextVisit?: string | null;
+}
+
+interface Vaccination {
+  id: string;
+  name: string;
+  date: string;
+  expiresAt?: string | null;
+  notes?: string | null;
+}
+
+interface Medication {
+  id: string;
+  name: string;
+  dosage: string;
+  frequency: string;
+  prescribedBy?: string | null;
+}
+
+interface CareInfo {
+  foodBrand?: string | null;
+  foodType?: string | null;
+  feedingSchedule?: string | null;
+  monthlyFoodCost?: number | null;
+  groomer?: string | null;
+  groomerPhone?: string | null;
+  groomingFrequency?: string | null;
+  walker?: string | null;
+  walkerPhone?: string | null;
+  boardingFacility?: string | null;
+}
+
+interface Registration {
+  microchipId?: string | null;
+  licenseNumber?: string | null;
+  licenseExpires?: string | null;
+}
+
+interface PetInsurance {
+  provider?: string | null;
+  policyNumber?: string | null;
+  monthlyPremium?: number | null;
+}
+
 interface PetDetail {
   id: string;
   name: string;
@@ -27,6 +81,7 @@ interface PetDetail {
   age?: number | null;
   weight?: number | null;
   birthDate?: string | null;
+  adoptionDate?: string | null;
   microchipId?: string | null;
   vetName?: string | null;
   vetPhone?: string | null;
@@ -35,17 +90,149 @@ interface PetDetail {
   medications?: string | null;
   allergies?: string | null;
   notes?: string | null;
+  // Enhanced fields
+  vet?: VetInfo;
+  vaccinations?: Vaccination[];
+  medicationList?: Medication[];
+  care?: CareInfo;
+  registration?: Registration;
+  insurance?: PetInsurance;
 }
 
-const PET_ICONS: Record<string, string> = {
+const PET_ICONS: Record<string, keyof typeof Ionicons.glyphMap> = {
   dog: 'paw',
   cat: 'paw',
   bird: 'leaf',
   fish: 'water',
   rabbit: 'paw',
   hamster: 'paw',
+  reptile: 'bug-outline',
   default: 'paw',
 };
+
+// =============================================================================
+// HELPER COMPONENTS
+// =============================================================================
+
+interface SectionHeaderProps {
+  title: string;
+  action?: string;
+  onAction?: () => void;
+}
+
+function SectionHeader({ title, action, onAction }: SectionHeaderProps) {
+  return (
+    <View style={helperStyles.sectionHeader}>
+      <Text style={helperStyles.sectionHeaderText}>{title}</Text>
+      {action && onAction && (
+        <TouchableOpacity onPress={onAction}>
+          <Text style={helperStyles.sectionAction}>{action}</Text>
+        </TouchableOpacity>
+      )}
+    </View>
+  );
+}
+
+interface InfoRowProps {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  value?: string | null;
+  alert?: boolean;
+  onPress?: () => void;
+}
+
+function InfoRow({ icon, label, value, alert, onPress }: InfoRowProps) {
+  if (!value) return null;
+  const content = (
+    <View style={helperStyles.infoRow}>
+      <Ionicons name={icon} size={18} color={colors.text.tertiary} />
+      <View style={helperStyles.infoContent}>
+        <Text style={helperStyles.infoLabel}>{label}</Text>
+        <Text style={[
+          helperStyles.infoValue,
+          alert && helperStyles.alertText,
+          onPress && helperStyles.linkText,
+        ]}>
+          {value}
+        </Text>
+      </View>
+    </View>
+  );
+  if (onPress) {
+    return <TouchableOpacity onPress={onPress}>{content}</TouchableOpacity>;
+  }
+  return content;
+}
+
+interface EmptyPromptProps {
+  text: string;
+  onPress?: () => void;
+}
+
+function EmptyPrompt({ text, onPress }: EmptyPromptProps) {
+  return (
+    <TouchableOpacity style={helperStyles.emptyPrompt} onPress={onPress} disabled={!onPress}>
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Text style={helperStyles.emptyPromptText}>{text}</Text>
+    </TouchableOpacity>
+  );
+}
+
+const helperStyles = StyleSheet.create({
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[3],
+  },
+  sectionHeaderText: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  sectionAction: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[500],
+  },
+  infoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[2],
+  },
+  infoContent: {
+    flex: 1,
+  },
+  infoLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  infoValue: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  alertText: {
+    color: colors.status.error,
+  },
+  linkText: {
+    color: colors.haven.champagne[500],
+  },
+  emptyPrompt: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[3],
+  },
+  emptyPromptText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[500],
+  },
+});
 
 export default function PetDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -182,6 +369,32 @@ export default function PetDetailScreen() {
 
   const petIcon = PET_ICONS[pet.type.toLowerCase()] || PET_ICONS.default;
 
+  // Format currency
+  const formatCurrency = (amount?: number | null) => {
+    if (!amount) return null;
+    return `$${amount.toLocaleString()}`;
+  };
+
+  // Check if vaccination is expiring
+  const isVaccinationExpiring = (expiresAt?: string | null) => {
+    if (!expiresAt) return false;
+    const daysUntil = Math.ceil(
+      (new Date(expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+    );
+    return daysUntil <= 30 && daysUntil > 0;
+  };
+
+  const isVaccinationExpired = (expiresAt?: string | null) => {
+    if (!expiresAt) return false;
+    return new Date(expiresAt) < new Date();
+  };
+
+  // Check for vet info
+  const hasVetInfo = pet.vet?.clinicName || pet.vet?.vetName || pet.vetName || pet.vetPhone;
+
+  // Check for care info
+  const hasCareInfo = pet.care?.foodBrand || pet.care?.feedingSchedule || pet.care?.groomer || pet.care?.walker;
+
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
       <Stack.Screen
@@ -206,140 +419,350 @@ export default function PetDetailScreen() {
           />
         }
       >
-        {/* Pet Header */}
-        <Card style={styles.headerCard}>
-          <View style={styles.petIcon}>
-            <Ionicons name={petIcon as any} size={48} color={colors.haven.champagne[500]} />
+        {/* Hero Card */}
+        <Card style={styles.heroCard}>
+          <View style={styles.petIconContainer}>
+            <Ionicons name={petIcon} size={56} color={colors.haven.champagne[500]} />
           </View>
           <Text style={styles.petName}>{pet.name}</Text>
           <View style={styles.badgeRow}>
             <Badge label={pet.type} variant="default" />
             {pet.breed && <Badge label={pet.breed} variant="info" />}
           </View>
-        </Card>
-
-        {/* Basic Info */}
-        <Card style={styles.section}>
-          <Text style={styles.sectionTitle}>Basic Info</Text>
-
           {pet.age !== undefined && pet.age !== null && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Age</Text>
-              <Text style={styles.detailValue}>{pet.age} years</Text>
-            </View>
-          )}
-
-          {pet.color && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Color</Text>
-              <Text style={styles.detailValue}>{pet.color}</Text>
-            </View>
-          )}
-
-          {pet.weight && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Weight</Text>
-              <Text style={styles.detailValue}>{pet.weight} lbs</Text>
-            </View>
-          )}
-
-          {pet.birthDate && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Birthday</Text>
-              <Text style={styles.detailValue}>{formatDate(pet.birthDate)}</Text>
-            </View>
-          )}
-
-          {pet.microchipId && (
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Microchip ID</Text>
-              <Text style={styles.detailValueMono}>{pet.microchipId}</Text>
-            </View>
+            <Text style={styles.petAge}>{pet.age} years old</Text>
           )}
         </Card>
 
-        {/* Vet Info */}
-        {(pet.vetName || pet.vetPhone || pet.lastVetVisit || pet.nextVetVisit) && (
-          <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Veterinarian</Text>
-
-            {pet.vetName && (
-              <View style={styles.detailRow}>
-                <Ionicons name="medical-outline" size={18} color={colors.text.tertiary} />
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Vet</Text>
-                  <Text style={styles.detailValue}>{pet.vetName}</Text>
-                </View>
-                {pet.vetPhone && (
-                  <TouchableOpacity onPress={handleCallVet} style={styles.callButton}>
-                    <Ionicons name="call" size={20} color={colors.haven.champagne[500]} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-
-            {pet.lastVetVisit && (
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar-outline" size={18} color={colors.text.tertiary} />
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Last Visit</Text>
-                  <Text style={styles.detailValue}>{formatDate(pet.lastVetVisit)}</Text>
-                </View>
-              </View>
-            )}
-
-            {pet.nextVetVisit && (
-              <View style={styles.detailRow}>
-                <Ionicons name="calendar" size={18} color={colors.text.tertiary} />
-                <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Next Visit</Text>
-                  <Text style={styles.detailValue}>{formatDate(pet.nextVetVisit)}</Text>
-                </View>
-                {isUpcomingVetVisit(pet.nextVetVisit) && (
-                  <Badge label="Coming Up" variant="warning" />
-                )}
-              </View>
-            )}
+        {/* Allergies Alert - Prominent if exists */}
+        {pet.allergies && (
+          <Card style={styles.allergyCard}>
+            <View style={styles.allergyHeader}>
+              <Ionicons name="warning" size={20} color={colors.status.error} />
+              <Text style={styles.allergyTitle}>ALLERGIES</Text>
+            </View>
+            <Text style={styles.allergyText}>{pet.allergies}</Text>
           </Card>
         )}
 
-        {/* Health Info */}
-        {(pet.medications || pet.allergies) && (
-          <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Health Information</Text>
+        {/* Basic Info */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="BASIC INFO"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit pet info coming soon')}
+          />
+          <InfoRow icon="calendar-outline" label="Birthday" value={formatDate(pet.birthDate)} />
+          {pet.adoptionDate && (
+            <InfoRow icon="heart-outline" label="Adoption Date" value={formatDate(pet.adoptionDate)} />
+          )}
+          <InfoRow icon="color-palette-outline" label="Color" value={pet.color} />
+          {pet.weight && (
+            <InfoRow icon="scale-outline" label="Weight" value={`${pet.weight} lbs`} />
+          )}
+        </Card>
 
-            {pet.medications && (
-              <View style={styles.healthItem}>
-                <View style={styles.healthIcon}>
-                  <Ionicons name="medkit" size={20} color={colors.haven.champagne[500]} />
+        {/* Veterinarian */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="VETERINARIAN"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit vet info coming soon')}
+          />
+          {hasVetInfo ? (
+            <>
+              <InfoRow
+                icon="medical-outline"
+                label="Clinic"
+                value={pet.vet?.clinicName}
+              />
+              <InfoRow
+                icon="person-outline"
+                label="Veterinarian"
+                value={pet.vet?.vetName || pet.vetName}
+              />
+              <InfoRow
+                icon="call-outline"
+                label="Phone"
+                value={pet.vet?.phone || pet.vetPhone}
+                onPress={() => {
+                  const phone = pet.vet?.phone || pet.vetPhone;
+                  if (phone) Linking.openURL(`tel:${phone}`);
+                }}
+              />
+              <InfoRow
+                icon="location-outline"
+                label="Address"
+                value={pet.vet?.address}
+              />
+              {(pet.vet?.nextVisit || pet.nextVetVisit) && (
+                <View style={styles.appointmentRow}>
+                  <View style={styles.appointmentInfo}>
+                    <Ionicons name="calendar" size={18} color={colors.haven.navy[600]} />
+                    <View style={styles.appointmentContent}>
+                      <Text style={styles.appointmentLabel}>Next Appointment</Text>
+                      <Text style={styles.appointmentDate}>
+                        {formatDate(pet.vet?.nextVisit || pet.nextVetVisit)}
+                      </Text>
+                    </View>
+                  </View>
+                  {isUpcomingVetVisit(pet.vet?.nextVisit || pet.nextVetVisit) && (
+                    <Badge label="Soon" variant="warning" />
+                  )}
                 </View>
-                <View style={styles.healthContent}>
-                  <Text style={styles.healthLabel}>Medications</Text>
-                  <Text style={styles.healthValue}>{pet.medications}</Text>
-                </View>
-              </View>
-            )}
+              )}
+              {(pet.vet?.lastVisit || pet.lastVetVisit) && (
+                <InfoRow
+                  icon="time-outline"
+                  label="Last Visit"
+                  value={formatDate(pet.vet?.lastVisit || pet.lastVetVisit)}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add veterinarian information"
+              onPress={() => Alert.alert('Edit', 'Edit vet info coming soon')}
+            />
+          )}
+        </Card>
 
-            {pet.allergies && (
-              <View style={styles.healthItem}>
-                <View style={[styles.healthIcon, { backgroundColor: colors.status.errorLight }]}>
-                  <Ionicons name="warning" size={20} color={colors.status.error} />
+        {/* Vaccinations */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="VACCINATIONS"
+            action="+ Add"
+            onAction={() => Alert.alert('Add', 'Add vaccination coming soon')}
+          />
+          {pet.vaccinations && pet.vaccinations.length > 0 ? (
+            pet.vaccinations.map((vaccination) => (
+              <TouchableOpacity key={vaccination.id} style={styles.vaccinationRow}>
+                <View style={[
+                  styles.vaccinationIcon,
+                  isVaccinationExpired(vaccination.expiresAt) && styles.vaccinationIconExpired,
+                ]}>
+                  <Ionicons
+                    name="shield-checkmark-outline"
+                    size={18}
+                    color={isVaccinationExpired(vaccination.expiresAt)
+                      ? colors.status.error
+                      : colors.haven.navy[600]}
+                  />
                 </View>
-                <View style={styles.healthContent}>
-                  <Text style={styles.healthLabel}>Allergies</Text>
-                  <Text style={[styles.healthValue, { color: colors.status.error }]}>
-                    {pet.allergies}
+                <View style={styles.vaccinationContent}>
+                  <Text style={styles.vaccinationName}>{vaccination.name}</Text>
+                  <Text style={styles.vaccinationDate}>
+                    Given: {new Date(vaccination.date).toLocaleDateString()}
                   </Text>
+                  {vaccination.expiresAt && (
+                    <Text style={[
+                      styles.vaccinationExpiry,
+                      isVaccinationExpired(vaccination.expiresAt) && styles.expiredText,
+                    ]}>
+                      Expires: {new Date(vaccination.expiresAt).toLocaleDateString()}
+                    </Text>
+                  )}
+                </View>
+                {isVaccinationExpired(vaccination.expiresAt) ? (
+                  <Badge label="Expired" variant="error" />
+                ) : isVaccinationExpiring(vaccination.expiresAt) ? (
+                  <Badge label="Due Soon" variant="warning" />
+                ) : vaccination.expiresAt ? (
+                  <Badge label="Current" variant="success" />
+                ) : null}
+              </TouchableOpacity>
+            ))
+          ) : (
+            <EmptyPrompt
+              text="Add vaccination records"
+              onPress={() => Alert.alert('Add', 'Add vaccination coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* Medications */}
+        {(pet.medicationList && pet.medicationList.length > 0) || pet.medications ? (
+          <Card style={styles.section}>
+            <SectionHeader
+              title="MEDICATIONS"
+              action="+ Add"
+              onAction={() => Alert.alert('Add', 'Add medication coming soon')}
+            />
+            {pet.medicationList && pet.medicationList.length > 0 ? (
+              pet.medicationList.map((med) => (
+                <View key={med.id} style={styles.medicationRow}>
+                  <View style={styles.medicationIcon}>
+                    <Ionicons name="medkit-outline" size={18} color={colors.haven.champagne[500]} />
+                  </View>
+                  <View style={styles.medicationContent}>
+                    <Text style={styles.medicationName}>{med.name}</Text>
+                    <Text style={styles.medicationDosage}>{med.dosage}</Text>
+                    <Text style={styles.medicationFrequency}>{med.frequency}</Text>
+                  </View>
+                </View>
+              ))
+            ) : pet.medications ? (
+              <View style={styles.medicationRow}>
+                <View style={styles.medicationIcon}>
+                  <Ionicons name="medkit-outline" size={18} color={colors.haven.champagne[500]} />
+                </View>
+                <View style={styles.medicationContent}>
+                  <Text style={styles.medicationName}>{pet.medications}</Text>
                 </View>
               </View>
-            )}
+            ) : null}
+          </Card>
+        ) : null}
+
+        {/* Care Instructions */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="CARE"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit care info coming soon')}
+          />
+          {hasCareInfo ? (
+            <>
+              {(pet.care?.foodBrand || pet.care?.foodType) && (
+                <View style={styles.careCard}>
+                  <Ionicons name="restaurant-outline" size={20} color={colors.haven.navy[600]} />
+                  <View style={styles.careContent}>
+                    <Text style={styles.careLabel}>Food</Text>
+                    {pet.care?.foodBrand && (
+                      <Text style={styles.careValue}>{pet.care.foodBrand}</Text>
+                    )}
+                    {pet.care?.foodType && (
+                      <Text style={styles.careSubvalue}>{pet.care.foodType}</Text>
+                    )}
+                  </View>
+                </View>
+              )}
+              {pet.care?.feedingSchedule && (
+                <InfoRow
+                  icon="time-outline"
+                  label="Feeding Schedule"
+                  value={pet.care.feedingSchedule}
+                />
+              )}
+              {pet.care?.groomer && (
+                <View style={styles.serviceProviderCard}>
+                  <Ionicons name="cut-outline" size={20} color={colors.text.tertiary} />
+                  <View style={styles.serviceProviderContent}>
+                    <Text style={styles.serviceProviderLabel}>Groomer</Text>
+                    <Text style={styles.serviceProviderName}>{pet.care.groomer}</Text>
+                    {pet.care.groomingFrequency && (
+                      <Text style={styles.serviceProviderNote}>{pet.care.groomingFrequency}</Text>
+                    )}
+                  </View>
+                  {pet.care.groomerPhone && (
+                    <TouchableOpacity
+                      style={styles.callButton}
+                      onPress={() => Linking.openURL(`tel:${pet.care?.groomerPhone}`)}
+                    >
+                      <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              {pet.care?.walker && (
+                <View style={styles.serviceProviderCard}>
+                  <Ionicons name="walk-outline" size={20} color={colors.text.tertiary} />
+                  <View style={styles.serviceProviderContent}>
+                    <Text style={styles.serviceProviderLabel}>Dog Walker</Text>
+                    <Text style={styles.serviceProviderName}>{pet.care.walker}</Text>
+                  </View>
+                  {pet.care.walkerPhone && (
+                    <TouchableOpacity
+                      style={styles.callButton}
+                      onPress={() => Linking.openURL(`tel:${pet.care?.walkerPhone}`)}
+                    >
+                      <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+              {pet.care?.boardingFacility && (
+                <InfoRow
+                  icon="home-outline"
+                  label="Boarding Facility"
+                  value={pet.care.boardingFacility}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add care instructions"
+              onPress={() => Alert.alert('Edit', 'Edit care info coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* IDs & Registration */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="IDS & REGISTRATION"
+            action="Edit"
+            onAction={() => Alert.alert('Edit', 'Edit registration coming soon')}
+          />
+          {pet.microchipId || pet.registration?.microchipId || pet.registration?.licenseNumber ? (
+            <>
+              <InfoRow
+                icon="qr-code-outline"
+                label="Microchip ID"
+                value={pet.registration?.microchipId || pet.microchipId}
+              />
+              <InfoRow
+                icon="card-outline"
+                label="License Number"
+                value={pet.registration?.licenseNumber}
+              />
+              {pet.registration?.licenseExpires && (
+                <InfoRow
+                  icon="calendar-outline"
+                  label="License Expires"
+                  value={formatDate(pet.registration.licenseExpires)}
+                  alert={isVaccinationExpired(pet.registration.licenseExpires)}
+                />
+              )}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add microchip or license info"
+              onPress={() => Alert.alert('Edit', 'Edit registration coming soon')}
+            />
+          )}
+        </Card>
+
+        {/* Insurance */}
+        {pet.insurance?.provider && (
+          <Card style={styles.section}>
+            <SectionHeader
+              title="PET INSURANCE"
+              action="Edit"
+              onAction={() => Alert.alert('Edit', 'Edit insurance coming soon')}
+            />
+            <InfoRow
+              icon="shield-outline"
+              label="Provider"
+              value={pet.insurance.provider}
+            />
+            <InfoRow
+              icon="document-outline"
+              label="Policy #"
+              value={pet.insurance.policyNumber}
+            />
+            <InfoRow
+              icon="cash-outline"
+              label="Monthly Premium"
+              value={formatCurrency(pet.insurance.monthlyPremium)}
+            />
           </Card>
         )}
 
         {/* Notes */}
         {pet.notes && (
           <Card style={styles.section}>
-            <Text style={styles.sectionTitle}>Notes</Text>
+            <SectionHeader title="NOTES" />
             <Text style={styles.notes}>{pet.notes}</Text>
           </Card>
         )}
@@ -393,19 +816,20 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.semibold,
     color: colors.white,
   },
-  headerCard: {
+  // Hero Card
+  heroCard: {
     alignItems: 'center',
     padding: spacing[6],
     marginBottom: spacing[4],
   },
-  petIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+  petIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
     backgroundColor: colors.haven.champagne[50],
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing[3],
+    marginBottom: spacing[4],
   },
   petName: {
     fontSize: typography.fontSizes['2xl'],
@@ -417,82 +841,213 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: spacing[2],
   },
+  petAge: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    marginTop: spacing[2],
+  },
+  // Allergy Alert Card
+  allergyCard: {
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    backgroundColor: colors.status.errorLight,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.status.error,
+  },
+  allergyHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  allergyTitle: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.status.error,
+    letterSpacing: 0.5,
+  },
+  allergyText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.status.error,
+  },
+  // Sections
   section: {
     padding: spacing[4],
     marginBottom: spacing[4],
   },
-  sectionTitle: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.text.secondary,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing[3],
-  },
-  detailRow: {
+  // Appointment row
+  appointmentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-    gap: spacing[3],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.haven.navy[50],
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[2],
   },
-  detailContent: {
-    flex: 1,
-  },
-  detailLabel: {
-    fontSize: typography.fontSizes.sm,
-    color: colors.text.tertiary,
-  },
-  detailValue: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.text.primary,
-    textAlign: 'right',
-  },
-  detailValueMono: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.medium,
-    color: colors.text.primary,
-    fontFamily: 'monospace',
-  },
-  callButton: {
-    padding: spacing[2],
-  },
-  healthItem: {
+  appointmentInfo: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing[3],
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border.light,
-  },
-  healthIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.haven.champagne[50],
     alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing[3],
-  },
-  healthContent: {
+    gap: spacing[3],
     flex: 1,
   },
-  healthLabel: {
+  appointmentContent: {
+    flex: 1,
+  },
+  appointmentLabel: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.tertiary,
     marginBottom: 2,
   },
-  healthValue: {
-    fontSize: typography.fontSizes.base,
+  appointmentDate: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
     color: colors.text.primary,
   },
+  // Vaccinations
+  vaccinationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  vaccinationIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.haven.navy[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vaccinationIconExpired: {
+    backgroundColor: colors.status.errorLight,
+  },
+  vaccinationContent: {
+    flex: 1,
+  },
+  vaccinationName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  vaccinationDate: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  vaccinationExpiry: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  expiredText: {
+    color: colors.status.error,
+  },
+  // Medications
+  medicationRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  medicationIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.haven.champagne[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  medicationContent: {
+    flex: 1,
+  },
+  medicationName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  medicationDosage: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  medicationFrequency: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  // Care
+  careCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.haven.navy[50],
+    borderRadius: borderRadius.lg,
+    marginBottom: spacing[2],
+  },
+  careContent: {
+    flex: 1,
+  },
+  careLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  careValue: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  careSubvalue: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  // Service Provider Cards (groomer, walker)
+  serviceProviderCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  serviceProviderContent: {
+    flex: 1,
+  },
+  serviceProviderLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginBottom: 2,
+  },
+  serviceProviderName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  serviceProviderNote: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  callButton: {
+    padding: spacing[2],
+  },
+  // Notes
   notes: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
     lineHeight: 22,
   },
+  // Delete Button
   deleteButton: {
     flexDirection: 'row',
     alignItems: 'center',

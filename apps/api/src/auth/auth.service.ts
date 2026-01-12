@@ -3,6 +3,9 @@ import {
   UnauthorizedException,
   ConflictException,
   BadRequestException,
+  Inject,
+  forwardRef,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -11,9 +14,11 @@ import * as bcrypt from 'bcrypt';
 import { randomBytes } from 'crypto';
 
 import { PrismaService } from '../prisma';
+import { PropertyEnrichmentService } from '../property/property-enrichment.service';
 
 import {
   RegisterDto,
+  RegisterSimpleDto,
   LoginDto,
   AuthResponseDto,
   TokenResponseDto,
@@ -32,6 +37,7 @@ export interface JwtPayload {
 
 @Injectable()
 export class AuthService {
+  private readonly logger = new Logger(AuthService.name);
   private readonly saltRounds = 12;
   private readonly accessTokenExpiresIn: number;
   private readonly refreshTokenExpiresInDays: number;
@@ -40,6 +46,8 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => PropertyEnrichmentService))
+    private readonly enrichmentService: PropertyEnrichmentService,
   ) {
     this.accessTokenExpiresIn = this.configService.get<number>('JWT_ACCESS_EXPIRES_IN', 900); // 15 min
     this.refreshTokenExpiresInDays = this.configService.get<number>('JWT_REFRESH_EXPIRES_DAYS', 7);
@@ -93,6 +101,97 @@ export class AuthService {
     return {
       user: this.mapUserToResponse(result.user),
       ...tokens,
+    };
+  }
+
+  /**
+   * Simplified registration for Alfred-first flow
+   * Creates user, household, home profile with address, and triggers enrichment
+   */
+  async registerSimple(
+    dto: RegisterSimpleDto,
+    userAgent?: string,
+    ipAddress?: string,
+  ): Promise<{ user: UserResponseDto; householdId: string; message: string }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('A user with this email already exists');
+    }
+
+    const passwordHash = await this.hashPassword(dto.password);
+
+    // Create user, household, home profile in a transaction
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Create user
+      const user = await tx.user.create({
+        data: {
+          email: dto.email.toLowerCase(),
+          passwordHash,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: UserRole.HOMEOWNER,
+        },
+      });
+
+      // 2. Create household
+      const household = await tx.household.create({
+        data: {
+          name: `The ${dto.lastName} Family`,
+          ownerId: user.id,
+          subscriptionPlan: 'ESSENTIALS',
+          subscriptionStatus: 'ACTIVE',
+          members: {
+            create: {
+              userId: user.id,
+              role: 'OWNER',
+              status: 'ACTIVE',
+              joinedAt: new Date(),
+            },
+          },
+        },
+      });
+
+      // 3. Create home profile with address
+      await tx.homeProfile.create({
+        data: {
+          householdId: household.id,
+          addressLine1: dto.address.addressLine1,
+          addressLine2: dto.address.addressLine2,
+          city: dto.address.city,
+          state: dto.address.state,
+          postalCode: dto.address.zipCode,
+        },
+      });
+
+      // 4. Create family member entry for the owner
+      await tx.familyMember.create({
+        data: {
+          householdId: household.id,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email: dto.email.toLowerCase(),
+          relationship: 'Owner',
+          type: 'ADULT',
+        },
+      });
+
+      return { user, household };
+    });
+
+    // 5. Trigger ATTOM enrichment in background (async - don't wait)
+    this.enrichmentService
+      .enrichHouseholdFromAttom(result.household.id, {})
+      .catch((err) => {
+        this.logger.error(`ATTOM enrichment failed for household ${result.household.id}:`, err);
+      });
+
+    return {
+      user: this.mapUserToResponse(result.user),
+      householdId: result.household.id,
+      message: 'Account created successfully',
     };
   }
 

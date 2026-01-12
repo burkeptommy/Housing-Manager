@@ -10,7 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeInUp, Layout } from 'react-native-reanimated';
+// Removed react-native-reanimated to fix Worklets crash
 import { useAuth } from '../../../src/contexts/auth-context';
 import { Card, Badge, SkeletonList, NoMaintenanceEmptyState, ErrorEmptyState } from '../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
@@ -21,18 +21,25 @@ import { getIdToken } from '../../../src/lib/firebase';
 // TYPES - Match backend MaintenanceTaskResponseDto
 // =============================================================================
 
+interface ChecklistStep {
+  id: string;
+  completed: boolean;
+}
+
 interface MaintenanceTaskFromAPI {
   id: string;
   title: string;
   description: string | null;
   category: string;
   priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
-  status: 'UPCOMING' | 'DUE' | 'OVERDUE' | 'COMPLETED' | 'CANCELLED';
+  status: 'UPCOMING' | 'DUE' | 'OVERDUE' | 'COMPLETED' | 'CANCELLED' | 'PENDING' | 'SCHEDULED' | 'IN_PROGRESS' | 'SKIPPED';
   dueDate: string | null;
+  nextDueDate: string | null;
   completedAt: string | null;
   frequency: string | null;
   estimatedCost: number | null;
   lastCompletedAt: string | null;
+  checklistSteps?: ChecklistStep[] | null;
   vendor?: {
     id: string;
     companyName: string;
@@ -57,6 +64,8 @@ interface MaintenanceTask {
   estimatedCost?: number;
   lastCompleted?: string;
   assignedTo?: string;
+  checklistTotal?: number;
+  checklistCompleted?: number;
 }
 
 // Home systems type for Systems view
@@ -113,9 +122,13 @@ export default function MaintenanceScreen() {
   const convertTask = (apiTask: MaintenanceTaskFromAPI): MaintenanceTask => {
     const statusMap: Record<string, 'upcoming' | 'due' | 'overdue' | 'completed'> = {
       'UPCOMING': 'upcoming',
+      'PENDING': 'upcoming',
+      'SCHEDULED': 'upcoming',
+      'IN_PROGRESS': 'due',
       'DUE': 'due',
       'OVERDUE': 'overdue',
       'COMPLETED': 'completed',
+      'SKIPPED': 'completed',
       'CANCELLED': 'completed',
     };
 
@@ -123,17 +136,24 @@ export default function MaintenanceScreen() {
       ? `${apiTask.assignedTo.firstName || ''} ${apiTask.assignedTo.lastName || ''}`.trim()
       : apiTask.vendor?.companyName;
 
+    // Calculate checklist progress
+    const checklistSteps = apiTask.checklistSteps || [];
+    const checklistTotal = checklistSteps.length;
+    const checklistCompleted = checklistSteps.filter(s => s.completed).length;
+
     return {
       id: apiTask.id,
       title: apiTask.title,
       description: apiTask.description || '',
       category: apiTask.category,
-      dueDate: apiTask.dueDate || apiTask.createdAt,
+      dueDate: apiTask.nextDueDate || apiTask.dueDate || apiTask.createdAt,
       frequency: apiTask.frequency || 'One-time',
       status: statusMap[apiTask.status] || 'upcoming',
       estimatedCost: apiTask.estimatedCost || undefined,
       lastCompleted: apiTask.lastCompletedAt || undefined,
       assignedTo: assignedToName || undefined,
+      checklistTotal: checklistTotal > 0 ? checklistTotal : undefined,
+      checklistCompleted: checklistTotal > 0 ? checklistCompleted : undefined,
     };
   };
 
@@ -301,9 +321,7 @@ export default function MaintenanceScreen() {
   };
 
   const renderTask = ({ item, index }: { item: MaintenanceTask; index: number }) => (
-    <Animated.View
-      entering={FadeInUp.delay(index * 50).duration(400)}
-      layout={Layout.springify()}
+    <View
     >
     <TouchableOpacity activeOpacity={0.7} onPress={() => handleTaskPress(item.id)}>
     <Card style={styles.taskCard}>
@@ -353,6 +371,24 @@ export default function MaintenanceScreen() {
         )}
       </View>
 
+      {/* Checklist Progress Bar */}
+      {item.checklistTotal !== undefined && item.checklistTotal > 0 && item.status !== 'completed' && (
+        <View style={styles.progressContainer}>
+          <View style={styles.progressInfo}>
+            <Text style={styles.progressLabel}>Checklist</Text>
+            <Text style={styles.progressCount}>{item.checklistCompleted}/{item.checklistTotal}</Text>
+          </View>
+          <View style={styles.progressBar}>
+            <View
+              style={[
+                styles.progressFill,
+                { width: `${((item.checklistCompleted || 0) / item.checklistTotal) * 100}%` },
+              ]}
+            />
+          </View>
+        </View>
+      )}
+
       {item.assignedTo && (
         <View style={styles.assignedContainer}>
           <Ionicons name="person-outline" size={14} color={colors.haven.champagne[600]} />
@@ -361,7 +397,7 @@ export default function MaintenanceScreen() {
       )}
     </Card>
     </TouchableOpacity>
-    </Animated.View>
+    </View>
   );
 
   const getSystemStatusColor = (status: HomeSystem['status']) => {
@@ -381,9 +417,7 @@ export default function MaintenanceScreen() {
   };
 
   const renderSystem = ({ item, index }: { item: HomeSystem; index: number }) => (
-    <Animated.View
-      entering={FadeInUp.delay(index * 50).duration(400)}
-      layout={Layout.springify()}
+    <View
     >
       <Card style={styles.systemCard}>
         <View style={styles.systemHeader}>
@@ -438,7 +472,7 @@ export default function MaintenanceScreen() {
           </TouchableOpacity>
         ))}
       </Card>
-    </Animated.View>
+    </View>
   );
 
   if (isLoading) {
@@ -548,7 +582,7 @@ export default function MaintenanceScreen() {
             }
             ListEmptyComponent={
               <NoMaintenanceEmptyState
-                onAction={() => router.push('/(tabs)/sarah/new-request' as any)}
+                onAction={() => router.push('/(tabs)/manager/new-request' as any)}
               />
             }
           />
@@ -571,10 +605,21 @@ export default function MaintenanceScreen() {
           }
           ListHeaderComponent={
             <View style={styles.systemsHeader}>
-              <Text style={styles.systemsHeaderTitle}>Home Systems</Text>
-              <Text style={styles.systemsHeaderSubtitle}>
-                Tap a system to view and manage maintenance tasks
-              </Text>
+              <View style={styles.systemsHeaderRow}>
+                <View style={styles.systemsHeaderText}>
+                  <Text style={styles.systemsHeaderTitle}>Home Systems</Text>
+                  <Text style={styles.systemsHeaderSubtitle}>
+                    Tap a system to view and manage maintenance tasks
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.addSystemButton}
+                  onPress={() => router.push('/(tabs)/manager/new-request' as any)}
+                >
+                  <Ionicons name="add" size={18} color={colors.haven.champagne[500]} />
+                  <Text style={styles.addSystemText}>Add</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           }
           ListEmptyComponent={
@@ -582,8 +627,15 @@ export default function MaintenanceScreen() {
               <Ionicons name="hardware-chip-outline" size={48} color={colors.text.tertiary} />
               <Text style={styles.emptySystemsTitle}>No Systems Yet</Text>
               <Text style={styles.emptySystemsText}>
-                Systems will appear here once maintenance tasks are added
+                Track your home's major systems and their maintenance schedules
               </Text>
+              <TouchableOpacity
+                style={styles.addFirstSystemButton}
+                onPress={() => router.push('/(tabs)/manager/new-request' as any)}
+              >
+                <Ionicons name="add-circle-outline" size={20} color={colors.white} />
+                <Text style={styles.addFirstSystemText}>Add First System</Text>
+              </TouchableOpacity>
             </View>
           }
         />
@@ -734,6 +786,38 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.haven.champagne[600],
   },
+  progressContainer: {
+    marginTop: spacing[3],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  progressInfo: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing[2],
+  },
+  progressLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+  },
+  progressCount: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.navy[900],
+  },
+  progressBar: {
+    height: 6,
+    backgroundColor: colors.background.secondary,
+    borderRadius: borderRadius.full,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.haven.navy[900],
+    borderRadius: borderRadius.full,
+  },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: spacing[10],
@@ -868,7 +952,16 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   systemsHeader: {
+    paddingTop: spacing[5],  // Gap after tab bar
     paddingBottom: spacing[4],
+  },
+  systemsHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  systemsHeaderText: {
+    flex: 1,
   },
   systemsHeaderTitle: {
     fontSize: typography.fontSizes.lg,
@@ -879,6 +972,20 @@ const styles = StyleSheet.create({
   systemsHeaderSubtitle: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
+  },
+  addSystemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[1],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.haven.champagne[50],
+    borderRadius: borderRadius.lg,
+  },
+  addSystemText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[600],
   },
   emptySystemsContainer: {
     alignItems: 'center',
@@ -896,5 +1003,20 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
     textAlign: 'center',
     paddingHorizontal: spacing[6],
+  },
+  addFirstSystemButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginTop: spacing[4],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[5],
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: borderRadius.lg,
+  },
+  addFirstSystemText: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
   },
 });

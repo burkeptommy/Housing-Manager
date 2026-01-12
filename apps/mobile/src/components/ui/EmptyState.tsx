@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import Animated, { FadeIn, FadeInUp } from 'react-native-reanimated';
 import { Button } from './Button';
 import { colors, typography, spacing } from '../../lib/theme';
 
@@ -29,40 +28,25 @@ export function EmptyState({
   style,
 }: EmptyStateProps) {
   return (
-    <Animated.View
-      entering={FadeIn.duration(300)}
-      style={[styles.container, style]}
-    >
-      <Animated.View
-        entering={FadeInUp.delay(100).duration(400)}
-        style={styles.iconContainer}
-      >
+    <View style={[styles.container, style]}>
+      <View style={styles.iconContainer}>
         <View style={styles.iconBackground}>
           <Ionicons name={icon} size={48} color={iconColor} />
         </View>
-      </Animated.View>
+      </View>
 
-      <Animated.Text
-        entering={FadeInUp.delay(200).duration(400)}
-        style={styles.title}
-      >
+      <Text style={styles.title}>
         {title}
-      </Animated.Text>
+      </Text>
 
       {description && (
-        <Animated.Text
-          entering={FadeInUp.delay(300).duration(400)}
-          style={styles.description}
-        >
+        <Text style={styles.description}>
           {description}
-        </Animated.Text>
+        </Text>
       )}
 
       {actionLabel && onAction && (
-        <Animated.View
-          entering={FadeInUp.delay(400).duration(400)}
-          style={styles.actions}
-        >
+        <View style={styles.actions}>
           <Button
             title={actionLabel}
             onPress={onAction}
@@ -76,9 +60,9 @@ export function EmptyState({
               style={styles.secondaryButton}
             />
           )}
-        </Animated.View>
+        </View>
       )}
-    </Animated.View>
+    </View>
   );
 }
 
@@ -173,7 +157,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.semibold,
+    fontWeight: typography.fontWeights.semibold as '600',
     color: colors.text.primary,
     textAlign: 'center',
     marginBottom: spacing[2],

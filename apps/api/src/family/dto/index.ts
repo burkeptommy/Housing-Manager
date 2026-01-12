@@ -20,7 +20,192 @@ import {
   ApplianceCondition,
   FamilyEventCategory,
   MemberPermissionType,
+  FamilyMemberType,
+  ActivityType,
+  PaymentFrequency,
 } from '@prisma/client';
+
+// ============================================================================
+// FAMILY MEMBER DTOs
+// ============================================================================
+
+export class CreateFamilyMemberDto {
+  @IsString()
+  firstName: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  nickname?: string;
+
+  @IsEnum(FamilyMemberType)
+  type: FamilyMemberType;
+
+  @IsOptional()
+  @IsString()
+  relationship?: string;
+
+  @IsOptional()
+  @IsString()
+  email?: string;
+
+  @IsOptional()
+  @IsString()
+  phone?: string;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  birthdate?: Date;
+
+  // Child-specific
+  @IsOptional()
+  @IsString()
+  school?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolGrade?: string;
+
+  @IsOptional()
+  @IsString()
+  teacher?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolPickup?: string;
+
+  @IsOptional()
+  @IsString()
+  schoolDropoff?: string;
+
+  // Staff-specific
+  @IsOptional()
+  @IsString()
+  workSchedule?: string;
+
+  @IsOptional()
+  @IsString()
+  responsibilities?: string;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  startDate?: Date;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  // Medical
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  allergies?: string[];
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  medications?: string[];
+
+  @IsOptional()
+  @IsString()
+  specialNeeds?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContact?: string;
+
+  @IsOptional()
+  @IsString()
+  emergencyContactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class UpdateFamilyMemberDto extends CreateFamilyMemberDto {}
+
+// ============================================================================
+// ACTIVITY/MEMBERSHIP DTOs (KidActivity)
+// ============================================================================
+
+export class CreateActivityDto {
+  @IsString()
+  name: string;
+
+  @IsEnum(ActivityType)
+  type: ActivityType;
+
+  @IsOptional()
+  @IsString()
+  organization?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsString()
+  schedule?: string;
+
+  @IsOptional()
+  @IsNumber()
+  cost?: number;
+
+  @IsOptional()
+  @IsEnum(PaymentFrequency)
+  costFrequency?: PaymentFrequency;
+
+  @IsOptional()
+  @IsNumber()
+  registrationFee?: number;
+
+  @IsOptional()
+  @IsNumber()
+  equipmentCost?: number;
+
+  @IsOptional()
+  @IsString()
+  coachName?: string;
+
+  @IsOptional()
+  @IsString()
+  contactPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  contactEmail?: string;
+
+  @IsOptional()
+  @IsString()
+  paymentMethod?: string;
+
+  @IsOptional()
+  @IsString()
+  accountNumber?: string;
+
+  @IsOptional()
+  @IsString()
+  portalUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+
+  @IsString()
+  familyMemberId: string;
+}
+
+export class UpdateActivityDto extends CreateActivityDto {}
 
 // ============================================================================
 // MEMBER PROFILE DTOs

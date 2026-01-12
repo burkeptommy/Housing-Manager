@@ -142,4 +142,50 @@ export class UploadsController {
     await this.uploadsService.deleteFileAsset(id, userId);
     return { success: true };
   }
+
+  // ========== PROFILE IMAGE ENDPOINTS ==========
+
+  @Post('profile-image')
+  @ApiOperation({ summary: 'Upload a profile image for an entity' })
+  @ApiResponse({ status: 200, description: 'Image uploaded', schema: { properties: { imageUrl: { type: 'string' } } } })
+  @ApiResponse({ status: 400, description: 'Invalid entity type' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async uploadProfileImage(
+    @Body()
+    body: {
+      entityType: 'family-member' | 'pet' | 'household';
+      entityId: string;
+      image: string; // base64
+      mimeType: string;
+    },
+    @CurrentUser('id') userId: string,
+  ): Promise<{ imageUrl: string }> {
+    return this.uploadsService.uploadProfileImage(
+      body.entityType,
+      body.entityId,
+      body.image,
+      body.mimeType,
+      userId,
+    );
+  }
+
+  @Delete('profile-image')
+  @ApiOperation({ summary: 'Remove a profile image from an entity' })
+  @ApiResponse({ status: 200, description: 'Image removed' })
+  @ApiResponse({ status: 400, description: 'Invalid entity type' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async removeProfileImage(
+    @Body()
+    body: {
+      entityType: 'family-member' | 'pet' | 'household';
+      entityId: string;
+    },
+    @CurrentUser('id') userId: string,
+  ): Promise<{ success: boolean }> {
+    return this.uploadsService.removeProfileImage(
+      body.entityType,
+      body.entityId,
+      userId,
+    );
+  }
 }

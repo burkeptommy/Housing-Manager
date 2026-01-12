@@ -444,6 +444,7 @@ export class MaintenanceTasksService {
     category: MaintenanceCategory;
     status: MaintenanceTaskStatus;
     dueDate: Date | null;
+    nextDueDate?: Date | null;
     scheduledDate: Date | null;
     completedAt: Date | null;
     estimatedCost: Prisma.Decimal | null;
@@ -453,6 +454,7 @@ export class MaintenanceTasksService {
     priority: TaskPriority;
     createdAt: Date;
     updatedAt: Date;
+    checklistSteps?: Prisma.JsonValue | null;
     template?: {
       id: string;
       slug: string;
@@ -474,6 +476,7 @@ export class MaintenanceTasksService {
       category: task.category,
       status: task.status,
       dueDate: task.dueDate,
+      nextDueDate: task.nextDueDate ?? task.dueDate,
       scheduledDate: task.scheduledDate,
       completedAt: task.completedAt,
       estimatedCost: task.estimatedCost ? Number(task.estimatedCost) : null,
@@ -483,6 +486,7 @@ export class MaintenanceTasksService {
       priority: task.priority,
       createdAt: task.createdAt,
       updatedAt: task.updatedAt,
+      checklistSteps: task.checklistSteps as { id: string; completed: boolean }[] | undefined,
       template: task.template ? {
         id: task.template.id,
         slug: task.template.slug,

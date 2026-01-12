@@ -31,6 +31,10 @@ import {
   UpdateFamilyEventDto,
   CalendarFeedQueryDto,
   UpdateMemberProfileDto,
+  CreateFamilyMemberDto,
+  UpdateFamilyMemberDto,
+  CreateActivityDto,
+  UpdateActivityDto,
 } from './dto';
 import { PrismaService } from '../prisma/prisma.service';
 import { FamilyEventCategory, HomeSystemType } from '@prisma/client';
@@ -470,6 +474,829 @@ export class FamilyController {
   // ==================== HOUSEHOLD FAMILY DATA ====================
 
   @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/member/:memberId')
+  async getHouseholdFamilyMember(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('memberId') memberId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Get the family member with activities
+    const familyMember = await this.prisma.familyMember.findUnique({
+      where: { id: memberId },
+      include: {
+        activities: true,
+      },
+    });
+
+    if (!familyMember || familyMember.householdId !== householdId) {
+      throw new Error('Family member not found');
+    }
+
+    // Calculate age if birthdate exists
+    const age = familyMember.birthdate
+      ? Math.floor(
+          (Date.now() - familyMember.birthdate.getTime()) /
+            (365.25 * 24 * 60 * 60 * 1000),
+        )
+      : null;
+
+    return {
+      id: familyMember.id,
+      firstName: familyMember.firstName,
+      lastName: familyMember.lastName,
+      nickname: familyMember.nickname,
+      relationship: familyMember.relationship,
+      email: familyMember.email,
+      phone: familyMember.phone,
+      birthDate: familyMember.birthdate?.toISOString() || null,
+      age,
+      school: familyMember.school,
+      schoolGrade: familyMember.schoolGrade,
+      teacher: familyMember.teacher,
+      activities:
+        familyMember.activities?.map((a) => ({
+          id: a.id,
+          name: a.name,
+          category: a.category,
+          schedule: a.schedule,
+          location: a.location,
+        })) || [],
+      workSchedule: familyMember.workSchedule,
+      type: familyMember.type,
+      // Work info
+      occupation: (familyMember as any).occupation,
+      employer: (familyMember as any).employer,
+      workPhone: (familyMember as any).workPhone,
+      workAddress: (familyMember as any).workAddress,
+      // Medical Information
+      primaryDoctorName: (familyMember as any).primaryDoctorName,
+      primaryDoctorPhone: (familyMember as any).primaryDoctorPhone,
+      primaryDoctorAddress: (familyMember as any).primaryDoctorAddress,
+      dentistName: (familyMember as any).dentistName,
+      dentistPhone: (familyMember as any).dentistPhone,
+      dentistAddress: (familyMember as any).dentistAddress,
+      bloodType: (familyMember as any).bloodType,
+      allergies: familyMember.allergies,
+      medications: familyMember.medications,
+      specialNeeds: familyMember.specialNeeds,
+      medicalNotes: (familyMember as any).medicalNotes,
+      // Emergency contacts
+      emergencyContact: familyMember.emergencyContact,
+      emergencyContactPhone: familyMember.emergencyContactPhone,
+    };
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('household/:householdId/member/:memberId')
+  async deleteHouseholdFamilyMember(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('memberId') memberId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Verify the family member exists and belongs to this household
+    const familyMember = await this.prisma.familyMember.findUnique({
+      where: { id: memberId },
+    });
+
+    if (!familyMember || familyMember.householdId !== householdId) {
+      throw new Error('Family member not found');
+    }
+
+    // Delete the family member
+    await this.prisma.familyMember.delete({
+      where: { id: memberId },
+    });
+
+    return { success: true, message: 'Family member removed' };
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('household/:householdId/members')
+  async createHouseholdFamilyMember(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Body() dto: CreateFamilyMemberDto,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Create the family member
+    const familyMember = await this.prisma.familyMember.create({
+      data: {
+        householdId,
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        nickname: dto.nickname,
+        type: dto.type,
+        relationship: dto.relationship,
+        email: dto.email,
+        phone: dto.phone,
+        birthdate: dto.birthdate,
+        school: dto.school,
+        schoolGrade: dto.schoolGrade,
+        teacher: dto.teacher,
+        schoolPickup: dto.schoolPickup,
+        schoolDropoff: dto.schoolDropoff,
+        workSchedule: dto.workSchedule,
+        responsibilities: dto.responsibilities,
+        startDate: dto.startDate,
+        paymentMethod: dto.paymentMethod,
+        allergies: dto.allergies,
+        medications: dto.medications,
+        specialNeeds: dto.specialNeeds,
+        emergencyContact: dto.emergencyContact,
+        emergencyContactPhone: dto.emergencyContactPhone,
+        photoUrl: dto.photoUrl,
+        notes: dto.notes,
+      },
+    });
+
+    return familyMember;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Patch('household/:householdId/member/:memberId')
+  async updateHouseholdFamilyMember(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('memberId') memberId: string,
+    @Body() dto: UpdateFamilyMemberDto,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Verify the family member exists and belongs to this household
+    const existingMember = await this.prisma.familyMember.findUnique({
+      where: { id: memberId },
+    });
+
+    if (!existingMember || existingMember.householdId !== householdId) {
+      throw new Error('Family member not found');
+    }
+
+    // Update the family member
+    const familyMember = await this.prisma.familyMember.update({
+      where: { id: memberId },
+      data: {
+        firstName: dto.firstName,
+        lastName: dto.lastName,
+        nickname: dto.nickname,
+        type: dto.type,
+        relationship: dto.relationship,
+        email: dto.email,
+        phone: dto.phone,
+        birthdate: dto.birthdate,
+        school: dto.school,
+        schoolGrade: dto.schoolGrade,
+        teacher: dto.teacher,
+        schoolPickup: dto.schoolPickup,
+        schoolDropoff: dto.schoolDropoff,
+        workSchedule: dto.workSchedule,
+        responsibilities: dto.responsibilities,
+        startDate: dto.startDate,
+        paymentMethod: dto.paymentMethod,
+        allergies: dto.allergies,
+        medications: dto.medications,
+        specialNeeds: dto.specialNeeds,
+        emergencyContact: dto.emergencyContact,
+        emergencyContactPhone: dto.emergencyContactPhone,
+        photoUrl: dto.photoUrl,
+        notes: dto.notes,
+      },
+    });
+
+    return familyMember;
+  }
+
+  // ==================== ACTIVITIES/MEMBERSHIPS ====================
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/activities')
+  async getHouseholdActivities(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Query('memberId') memberId?: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const where: any = { householdId };
+    if (memberId) {
+      where.familyMemberId = memberId;
+    }
+
+    const activities = await this.prisma.kidActivity.findMany({
+      where,
+      include: {
+        familyMember: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    return activities;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('household/:householdId/activities')
+  async createHouseholdActivity(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Body() dto: CreateActivityDto,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Create the activity
+    const activity = await this.prisma.kidActivity.create({
+      data: {
+        householdId,
+        familyMemberId: dto.familyMemberId,
+        name: dto.name,
+        type: dto.type,
+        organization: dto.organization,
+        location: dto.location,
+        schedule: dto.schedule,
+        cost: dto.cost,
+        costFrequency: dto.costFrequency,
+        registrationFee: dto.registrationFee,
+        equipmentCost: dto.equipmentCost,
+        coachName: dto.coachName,
+        contactPhone: dto.contactPhone,
+        contactEmail: dto.contactEmail,
+        paymentMethod: dto.paymentMethod,
+        accountNumber: dto.accountNumber,
+        portalUrl: dto.portalUrl,
+        notes: dto.notes,
+      },
+    });
+
+    return activity;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/activity/:activityId')
+  async getHouseholdActivity(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const activity = await this.prisma.kidActivity.findUnique({
+      where: { id: activityId },
+      include: {
+        familyMember: {
+          select: { id: true, firstName: true, lastName: true },
+        },
+      },
+    });
+
+    if (!activity || activity.householdId !== householdId) {
+      throw new Error('Activity not found');
+    }
+
+    return activity;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Patch('household/:householdId/activity/:activityId')
+  async updateHouseholdActivity(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('activityId') activityId: string,
+    @Body() dto: UpdateActivityDto,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Verify the activity exists and belongs to this household
+    const existingActivity = await this.prisma.kidActivity.findUnique({
+      where: { id: activityId },
+    });
+
+    if (!existingActivity || existingActivity.householdId !== householdId) {
+      throw new Error('Activity not found');
+    }
+
+    // Update the activity
+    const activity = await this.prisma.kidActivity.update({
+      where: { id: activityId },
+      data: {
+        name: dto.name,
+        type: dto.type,
+        organization: dto.organization,
+        location: dto.location,
+        schedule: dto.schedule,
+        cost: dto.cost,
+        costFrequency: dto.costFrequency,
+        registrationFee: dto.registrationFee,
+        equipmentCost: dto.equipmentCost,
+        coachName: dto.coachName,
+        contactPhone: dto.contactPhone,
+        contactEmail: dto.contactEmail,
+        paymentMethod: dto.paymentMethod,
+        accountNumber: dto.accountNumber,
+        portalUrl: dto.portalUrl,
+        notes: dto.notes,
+        familyMemberId: dto.familyMemberId,
+      },
+    });
+
+    return activity;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('household/:householdId/activity/:activityId')
+  async deleteHouseholdActivity(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('activityId') activityId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Verify the activity exists and belongs to this household
+    const activity = await this.prisma.kidActivity.findUnique({
+      where: { id: activityId },
+    });
+
+    if (!activity || activity.householdId !== householdId) {
+      throw new Error('Activity not found');
+    }
+
+    // Delete the activity
+    await this.prisma.kidActivity.delete({
+      where: { id: activityId },
+    });
+
+    return { success: true, message: 'Activity removed' };
+  }
+
+  // ==================== HOUSEHOLD VEHICLE ENDPOINTS ====================
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/vehicle/:vehicleId')
+  async getHouseholdVehicle(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('vehicleId') vehicleId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+    });
+
+    if (!vehicle || vehicle.householdId !== householdId) {
+      throw new Error('Vehicle not found');
+    }
+
+    return vehicle;
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('household/:householdId/vehicle/:vehicleId')
+  async deleteHouseholdVehicle(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('vehicleId') vehicleId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const vehicle = await this.prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+    });
+
+    if (!vehicle || vehicle.householdId !== householdId) {
+      throw new Error('Vehicle not found');
+    }
+
+    await this.prisma.vehicle.delete({
+      where: { id: vehicleId },
+    });
+
+    return { success: true, message: 'Vehicle removed' };
+  }
+
+  // ==================== HOUSEHOLD PET ENDPOINTS ====================
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/pet/:petId')
+  async getHouseholdPet(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('petId') petId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const pet = await this.prisma.pet.findUnique({
+      where: { id: petId },
+      include: {
+        vetRecords: {
+          orderBy: { visitDate: 'desc' },
+          take: 1,
+        },
+      },
+    });
+
+    if (!pet || pet.householdId !== householdId) {
+      throw new Error('Pet not found');
+    }
+
+    // Get the most recent vet record for lastVetVisit
+    const lastVetRecord = pet.vetRecords?.[0];
+
+    // Format response to match mobile app expectations
+    return {
+      id: pet.id,
+      name: pet.name,
+      type: pet.type,
+      breed: pet.breed,
+      color: pet.color,
+      age: pet.birthday ? Math.floor((Date.now() - pet.birthday.getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : null,
+      weight: pet.weight ? Number(pet.weight) : null,
+      birthDate: pet.birthday?.toISOString() || null,
+      microchipId: pet.microchipId,
+      vetName: pet.primaryVetName || pet.vetClinicName,
+      vetPhone: pet.vetClinicPhone,
+      lastVetVisit: lastVetRecord?.visitDate?.toISOString() || null,
+      nextVetVisit: lastVetRecord?.followUpDate?.toISOString() || null,
+      medications: pet.medications,
+      allergies: pet.allergies,
+      notes: pet.notes,
+    };
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('household/:householdId/pet/:petId')
+  async deleteHouseholdPet(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('petId') petId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const pet = await this.prisma.pet.findUnique({
+      where: { id: petId },
+    });
+
+    if (!pet || pet.householdId !== householdId) {
+      throw new Error('Pet not found');
+    }
+
+    await this.prisma.pet.delete({
+      where: { id: petId },
+    });
+
+    return { success: true, message: 'Pet removed' };
+  }
+
+  // ==================== HOUSEHOLD STAFF ENDPOINTS ====================
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('household/:householdId/staff/:staffId')
+  async getHouseholdStaff(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('staffId') staffId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    // Staff is stored as FamilyMember with type STAFF
+    const staff = await this.prisma.familyMember.findUnique({
+      where: { id: staffId },
+    });
+
+    if (!staff || staff.householdId !== householdId || staff.type !== 'STAFF') {
+      throw new Error('Staff member not found');
+    }
+
+    return {
+      id: staff.id,
+      firstName: staff.firstName,
+      lastName: staff.lastName,
+      relationship: staff.relationship,
+      phone: staff.phone,
+      email: staff.email,
+      workSchedule: staff.workSchedule,
+      startDate: staff.startDate?.toISOString() || null,
+      notes: staff.notes,
+      emergencyContact: staff.emergencyContact ? true : false,
+    };
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Delete('household/:householdId/staff/:staffId')
+  async deleteHouseholdStaff(
+    @Req() req: any,
+    @Param('householdId') householdId: string,
+    @Param('staffId') staffId: string,
+  ) {
+    // Verify user has access to this household
+    const userHasAccess =
+      req.user.householdId === householdId ||
+      req.user.role === 'ADMIN' ||
+      req.user.role === 'HOME_MANAGER' ||
+      req.user.role === 'MANAGER';
+
+    if (!userHasAccess) {
+      const membership = await this.prisma.householdMember.findFirst({
+        where: {
+          householdId,
+          userId: req.user.id,
+          status: 'ACTIVE',
+        },
+      });
+
+      if (!membership) {
+        throw new Error('Access denied to this household');
+      }
+    }
+
+    const staff = await this.prisma.familyMember.findUnique({
+      where: { id: staffId },
+    });
+
+    if (!staff || staff.householdId !== householdId || staff.type !== 'STAFF') {
+      throw new Error('Staff member not found');
+    }
+
+    await this.prisma.familyMember.delete({
+      where: { id: staffId },
+    });
+
+    return { success: true, message: 'Staff member removed' };
+  }
+
+  // ==================== HOUSEHOLD FAMILY LIST ====================
+
+  @UseGuards(FirebaseAuthGuard)
   @Get('household/:householdId')
   async getHouseholdFamily(
     @Req() req: any,
@@ -544,7 +1371,7 @@ export class FamilyController {
         activities: m.activities?.map(a => ({
           id: a.id,
           name: a.name,
-          type: a.type,
+          type: a.category,
           schedule: a.schedule,
         })) || [],
       }));

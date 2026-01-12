@@ -2,25 +2,36 @@ import {
   Injectable,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from '@nestjs/common';
-import { VendorCategory } from '@prisma/client';
+import { VendorCategory, VendorActivityType, ActorType, ActivityAction, ActivityCategory } from '@prisma/client';
 
 import { PrismaService } from '../prisma';
+import { ActivityService } from '../activity/activity.service';
 
-import { CreateVendorDto, UpdateVendorDto, VendorResponseDto } from './dto';
+import {
+  CreateVendorDto,
+  UpdateVendorDto,
+  VendorResponseDto,
+  CreateActivityDto,
+  ActivityResponseDto,
+} from './dto';
 
 @Injectable()
 export class HouseholdVendorsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly activityService: ActivityService,
+  ) {}
 
   async create(
     householdId: string,
     userId: string,
     dto: CreateVendorDto,
   ): Promise<VendorResponseDto> {
-    // Verify user has access to this household
     await this.verifyHouseholdAccess(householdId, userId);
 
+    // Create the vendor
     const vendor = await this.prisma.vendor.create({
       data: {
         householdId,
@@ -41,7 +52,36 @@ export class HouseholdVendorsService {
       },
     });
 
-    return this.mapToResponse(vendor);
+    // Create the HouseholdVendor entry for CRM tracking
+    const householdVendor = await this.prisma.householdVendor.create({
+      data: {
+        householdId,
+        vendorId: vendor.id,
+        source: 'manual',
+      },
+    });
+
+    // Log activity
+    try {
+      const user = await this.prisma.user.findUnique({ where: { id: userId } });
+      await this.activityService.log({
+        householdId,
+        actorId: userId,
+        actorType: ActorType.HOMEOWNER,
+        actorName: user?.firstName || 'User',
+        action: ActivityAction.VENDOR_ADDED,
+        category: ActivityCategory.SERVICE,
+        title: `New vendor added: ${dto.displayName}`,
+        description: dto.category ? `Category: ${dto.category}` : undefined,
+        vendorId: vendor.id,
+        visibleToHomeowner: true,
+      });
+    } catch (error) {
+      // Don't fail vendor creation if activity logging fails
+      console.error('Failed to log vendor activity:', error);
+    }
+
+    return this.mapToResponseWithCrm(vendor, householdVendor);
   }
 
   async findAll(
@@ -49,25 +89,50 @@ export class HouseholdVendorsService {
     userId: string,
     options?: {
       category?: VendorCategory;
+      favorite?: boolean;
+      search?: string;
       includeInactive?: boolean;
     },
   ): Promise<VendorResponseDto[]> {
-    // Verify user has access to this household
     await this.verifyHouseholdAccess(householdId, userId);
 
-    const vendors = await this.prisma.vendor.findMany({
-      where: {
-        householdId,
-        ...(options?.category && { category: options.category }),
-        ...(!options?.includeInactive && { isActive: true }),
+    // First get HouseholdVendor entries to filter by CRM fields
+    const householdVendorWhere: any = { householdId };
+    if (options?.favorite) {
+      householdVendorWhere.isFavorite = true;
+    }
+
+    const householdVendors = await this.prisma.householdVendor.findMany({
+      where: householdVendorWhere,
+      include: {
+        vendor: true,
+        activities: {
+          orderBy: { date: 'desc' },
+          take: 3,
+        },
       },
       orderBy: [
-        { category: 'asc' },
-        { displayName: 'asc' },
+        { isFavorite: 'desc' },
+        { lastContactDate: 'desc' },
       ],
     });
 
-    return vendors.map(this.mapToResponse);
+    // Filter by vendor properties
+    let results = householdVendors.filter(hv => {
+      if (!options?.includeInactive && !hv.vendor.isActive) return false;
+      if (options?.category && hv.vendor.category !== options.category) return false;
+      if (options?.search) {
+        const searchLower = options.search.toLowerCase();
+        return (
+          hv.vendor.displayName.toLowerCase().includes(searchLower) ||
+          hv.vendor.contactName?.toLowerCase().includes(searchLower) ||
+          hv.vendor.notes?.toLowerCase().includes(searchLower)
+        );
+      }
+      return true;
+    });
+
+    return results.map(hv => this.mapToResponseWithCrm(hv.vendor, hv, hv.activities));
   }
 
   async findOne(
@@ -75,21 +140,42 @@ export class HouseholdVendorsService {
     householdId: string,
     userId: string,
   ): Promise<VendorResponseDto> {
-    // Verify user has access to this household
     await this.verifyHouseholdAccess(householdId, userId);
 
     const vendor = await this.prisma.vendor.findFirst({
-      where: {
-        id,
-        householdId,
-      },
+      where: { id, householdId },
     });
 
     if (!vendor) {
       throw new NotFoundException(`Vendor with ID ${id} not found`);
     }
 
-    return this.mapToResponse(vendor);
+    // Get or create HouseholdVendor entry
+    let householdVendor = await this.prisma.householdVendor.findUnique({
+      where: {
+        householdId_vendorId: { householdId, vendorId: id },
+      },
+      include: {
+        activities: {
+          orderBy: { date: 'desc' },
+        },
+      },
+    });
+
+    if (!householdVendor) {
+      householdVendor = await this.prisma.householdVendor.create({
+        data: {
+          householdId,
+          vendorId: id,
+          source: 'legacy',
+        },
+        include: {
+          activities: true,
+        },
+      });
+    }
+
+    return this.mapToResponseWithCrm(vendor, householdVendor, householdVendor.activities);
   }
 
   async update(
@@ -98,15 +184,10 @@ export class HouseholdVendorsService {
     userId: string,
     dto: UpdateVendorDto,
   ): Promise<VendorResponseDto> {
-    // Verify user has access to this household
     await this.verifyHouseholdAccess(householdId, userId);
 
-    // Verify vendor exists and belongs to household
     const existing = await this.prisma.vendor.findFirst({
-      where: {
-        id,
-        householdId,
-      },
+      where: { id, householdId },
     });
 
     if (!existing) {
@@ -134,7 +215,8 @@ export class HouseholdVendorsService {
       },
     });
 
-    return this.mapToResponse(vendor);
+    const householdVendor = await this.getOrCreateHouseholdVendor(householdId, id);
+    return this.mapToResponseWithCrm(vendor, householdVendor);
   }
 
   async remove(
@@ -142,26 +224,253 @@ export class HouseholdVendorsService {
     householdId: string,
     userId: string,
   ): Promise<void> {
-    // Verify user has access to this household
     await this.verifyHouseholdAccess(householdId, userId);
 
-    // Verify vendor exists and belongs to household
     const existing = await this.prisma.vendor.findFirst({
-      where: {
-        id,
-        householdId,
-      },
+      where: { id, householdId },
     });
 
     if (!existing) {
       throw new NotFoundException(`Vendor with ID ${id} not found`);
     }
 
-    // Soft delete - just mark as inactive
+    // Soft delete
     await this.prisma.vendor.update({
       where: { id },
       data: { isActive: false },
     });
+  }
+
+  // ========== CRM METHODS ==========
+
+  async toggleFavorite(
+    vendorId: string,
+    householdId: string,
+    userId: string,
+  ): Promise<VendorResponseDto> {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: vendorId, householdId },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with ID ${vendorId} not found`);
+    }
+
+    const householdVendor = await this.getOrCreateHouseholdVendor(householdId, vendorId);
+
+    const updated = await this.prisma.householdVendor.update({
+      where: { id: householdVendor.id },
+      data: { isFavorite: !householdVendor.isFavorite },
+      include: { activities: { orderBy: { date: 'desc' }, take: 3 } },
+    });
+
+    return this.mapToResponseWithCrm(vendor, updated, updated.activities);
+  }
+
+  async setRating(
+    vendorId: string,
+    householdId: string,
+    userId: string,
+    rating: number,
+  ): Promise<VendorResponseDto> {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    if (rating < 1 || rating > 5) {
+      throw new BadRequestException('Rating must be between 1 and 5');
+    }
+
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: vendorId, householdId },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with ID ${vendorId} not found`);
+    }
+
+    const householdVendor = await this.getOrCreateHouseholdVendor(householdId, vendorId);
+
+    const updated = await this.prisma.householdVendor.update({
+      where: { id: householdVendor.id },
+      data: { rating },
+      include: { activities: { orderBy: { date: 'desc' }, take: 3 } },
+    });
+
+    return this.mapToResponseWithCrm(vendor, updated, updated.activities);
+  }
+
+  // ========== ACTIVITY METHODS ==========
+
+  async getActivities(
+    vendorId: string,
+    householdId: string,
+    userId: string,
+  ): Promise<ActivityResponseDto[]> {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    const householdVendor = await this.prisma.householdVendor.findUnique({
+      where: {
+        householdId_vendorId: { householdId, vendorId },
+      },
+    });
+
+    if (!householdVendor) {
+      return [];
+    }
+
+    const activities = await this.prisma.vendorActivity.findMany({
+      where: { householdVendorId: householdVendor.id },
+      orderBy: { date: 'desc' },
+    });
+
+    return activities.map(this.mapActivity);
+  }
+
+  async addActivity(
+    vendorId: string,
+    householdId: string,
+    userId: string,
+    dto: CreateActivityDto,
+  ): Promise<ActivityResponseDto> {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    const vendor = await this.prisma.vendor.findFirst({
+      where: { id: vendorId, householdId },
+    });
+
+    if (!vendor) {
+      throw new NotFoundException(`Vendor with ID ${vendorId} not found`);
+    }
+
+    const householdVendor = await this.getOrCreateHouseholdVendor(householdId, vendorId);
+
+    // Create the activity
+    const activity = await this.prisma.vendorActivity.create({
+      data: {
+        householdVendorId: householdVendor.id,
+        type: dto.type,
+        title: dto.title,
+        description: dto.description,
+        amount: dto.amount,
+        isPaid: dto.isPaid ?? false,
+        date: new Date(dto.date),
+        duration: dto.duration,
+        invoiceUrl: dto.invoiceUrl,
+        receiptUrl: dto.receiptUrl,
+        maintenanceTaskId: dto.maintenanceTaskId,
+        serviceRequestId: dto.serviceRequestId,
+        createdBy: userId,
+      },
+    });
+
+    // Update lastContactDate on HouseholdVendor
+    await this.prisma.householdVendor.update({
+      where: { id: householdVendor.id },
+      data: { lastContactDate: new Date() },
+    });
+
+    return this.mapActivity(activity);
+  }
+
+  async deleteActivity(
+    activityId: string,
+    vendorId: string,
+    householdId: string,
+    userId: string,
+  ): Promise<void> {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    const householdVendor = await this.prisma.householdVendor.findUnique({
+      where: {
+        householdId_vendorId: { householdId, vendorId },
+      },
+    });
+
+    if (!householdVendor) {
+      throw new NotFoundException('Vendor not found');
+    }
+
+    const activity = await this.prisma.vendorActivity.findFirst({
+      where: {
+        id: activityId,
+        householdVendorId: householdVendor.id,
+      },
+    });
+
+    if (!activity) {
+      throw new NotFoundException('Activity not found');
+    }
+
+    await this.prisma.vendorActivity.delete({
+      where: { id: activityId },
+    });
+  }
+
+  // ========== MESSAGE METHODS ==========
+
+  async getMessages(
+    householdVendorId: string,
+    householdId: string,
+    userId: string,
+  ) {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    const messages = await this.prisma.vendorMessage.findMany({
+      where: { householdVendorId },
+      orderBy: { createdAt: 'asc' },
+    });
+
+    return messages;
+  }
+
+  async sendMessage(
+    householdVendorId: string,
+    householdId: string,
+    userId: string,
+    content: string,
+  ) {
+    await this.verifyHouseholdAccess(householdId, userId);
+
+    // Update lastContactDate
+    await this.prisma.householdVendor.update({
+      where: { id: householdVendorId },
+      data: { lastContactDate: new Date() },
+    });
+
+    // Create the message
+    const message = await this.prisma.vendorMessage.create({
+      data: {
+        householdVendorId,
+        direction: 'outgoing',
+        content,
+        status: 'sent',
+      },
+    });
+
+    return message;
+  }
+
+  // ========== HELPER METHODS ==========
+
+  private async getOrCreateHouseholdVendor(householdId: string, vendorId: string) {
+    let householdVendor = await this.prisma.householdVendor.findUnique({
+      where: {
+        householdId_vendorId: { householdId, vendorId },
+      },
+    });
+
+    if (!householdVendor) {
+      householdVendor = await this.prisma.householdVendor.create({
+        data: {
+          householdId,
+          vendorId,
+          source: 'legacy',
+        },
+      });
+    }
+
+    return householdVendor;
   }
 
   private async verifyHouseholdAccess(
@@ -170,10 +479,7 @@ export class HouseholdVendorsService {
   ): Promise<void> {
     const membership = await this.prisma.householdMember.findUnique({
       where: {
-        householdId_userId: {
-          householdId,
-          userId,
-        },
+        householdId_userId: { householdId, userId },
       },
     });
 
@@ -182,27 +488,7 @@ export class HouseholdVendorsService {
     }
   }
 
-  private mapToResponse(vendor: {
-    id: string;
-    householdId: string | null;
-    displayName: string;
-    category: VendorCategory;
-    serviceDescription: string | null;
-    isLocal: boolean;
-    contactName: string | null;
-    phone: string | null;
-    email: string | null;
-    websiteUrl: string | null;
-    addressLine1: string | null;
-    addressLine2: string | null;
-    city: string | null;
-    state: string | null;
-    postalCode: string | null;
-    notes: string | null;
-    isActive: boolean;
-    createdAt: Date;
-    updatedAt: Date;
-  }): VendorResponseDto {
+  private mapToResponse(vendor: any): VendorResponseDto {
     return {
       id: vendor.id,
       householdId: vendor.householdId!,
@@ -223,6 +509,49 @@ export class HouseholdVendorsService {
       isActive: vendor.isActive,
       createdAt: vendor.createdAt,
       updatedAt: vendor.updatedAt,
+    };
+  }
+
+  private mapToResponseWithCrm(
+    vendor: any,
+    householdVendor?: any,
+    activities?: any[],
+  ): VendorResponseDto {
+    const base = this.mapToResponse(vendor);
+
+    return {
+      ...base,
+      // CRM fields from HouseholdVendor
+      isFavorite: householdVendor?.isFavorite ?? false,
+      rating: householdVendor?.rating ?? null,
+      tags: householdVendor?.tags ?? [],
+      source: householdVendor?.source ?? null,
+      lastContactDate: householdVendor?.lastContactDate ?? null,
+      householdVendorId: householdVendor?.id,
+      // Activities
+      activities: activities?.map(this.mapActivity) ?? [],
+      activityCount: activities?.length ?? 0,
+    } as any;
+  }
+
+  private mapActivity(activity: any): ActivityResponseDto {
+    return {
+      id: activity.id,
+      householdVendorId: activity.householdVendorId,
+      type: activity.type,
+      title: activity.title,
+      description: activity.description,
+      amount: activity.amount,
+      isPaid: activity.isPaid,
+      date: activity.date,
+      duration: activity.duration,
+      invoiceUrl: activity.invoiceUrl,
+      receiptUrl: activity.receiptUrl,
+      maintenanceTaskId: activity.maintenanceTaskId,
+      serviceRequestId: activity.serviceRequestId,
+      createdBy: activity.createdBy,
+      createdAt: activity.createdAt,
+      updatedAt: activity.updatedAt,
     };
   }
 }

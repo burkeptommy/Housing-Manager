@@ -1,6 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { HomeHealthService } from '../home-health/home-health.service';
+import { BillToolsService, billToolDefinitions } from './tools/bill-tools';
 import Anthropic from '@anthropic-ai/sdk';
 
 interface ConversationMessage {
@@ -53,6 +54,7 @@ export class AlfredService {
   constructor(
     private prisma: PrismaService,
     private homeHealthService: HomeHealthService,
+    private billToolsService: BillToolsService,
   ) {
     if (!process.env.ANTHROPIC_API_KEY) {
       this.logger.warn(
@@ -106,7 +108,7 @@ export class AlfredService {
         if (block.type === 'text') {
           responseText += block.text;
         } else if (block.type === 'tool_use') {
-          const action = await this.executeToolCall(block, householdId);
+          const action = await this.executeToolCall(block, householdId, userId);
           if (action) {
             actions.push(action);
           }
@@ -507,10 +509,24 @@ ${proactiveStr}
 ## YOUR CAPABILITIES
 
 You can use tools to:
-1. **add_home_system** - Add a new appliance or system (refrigerator, furnace, etc.)
-2. **update_home_system** - Update details on an existing system
-3. **add_vendor** - Add a new service provider
-4. **schedule_maintenance** - Create a maintenance task/reminder
+
+### Bill & Payment Management
+1. **create_bill** - Set up a new recurring bill for automatic payment
+2. **get_upcoming_bills** - Get bills due in the next few days
+3. **get_bill_summary** - Get an overview of all bills and spending
+4. **pay_bill_now** - Immediately pay a specific bill
+5. **pause_bill** / **resume_bill** - Toggle automatic payments
+6. **confirm_detected_bill** - Confirm a bill detected from bank transactions
+7. **get_pending_approvals** - See payments awaiting approval
+8. **approve_payment** - Approve a pending payment
+9. **request_service** - Request Haven team to negotiate, dispute, or research something
+10. **get_haven_card** / **setup_haven_card** - Manage the household virtual card
+
+### Home Management
+11. **add_home_system** - Add a new appliance or system (refrigerator, furnace, etc.)
+12. **update_home_system** - Update details on an existing system
+13. **add_vendor** - Add a new service provider
+14. **schedule_maintenance** - Create a maintenance task/reminder
 
 ## IMPORTANT BEHAVIORS
 
@@ -655,7 +671,12 @@ When the user asks about a zone, check what they have vs. what's common for that
    * Define available tools for Claude
    */
   private getTools(): Anthropic.Tool[] {
+    // Get bill tools from BillToolsService
+    const billTools = this.billToolsService.getAnthropicTools();
+
     return [
+      // Bill tools for payment management
+      ...billTools,
       {
         name: 'add_home_system',
         description:
@@ -759,6 +780,7 @@ When the user asks about a zone, check what they have vs. what's common for that
   private async executeToolCall(
     toolCall: Anthropic.ToolUseBlock,
     householdId: string,
+    userId: string,
   ): Promise<ActionTaken | null> {
     const { name, input, id } = toolCall;
     const params = input as Record<string, any>;
@@ -766,6 +788,21 @@ When the user asks about a zone, check what they have vs. what's common for that
     this.logger.log(`Executing tool: ${name} with params:`, params);
 
     try {
+      // Check if this is a bill tool
+      if (BillToolsService.isBillTool(name)) {
+        const result = await this.billToolsService.executeTool(
+          name,
+          params,
+          householdId,
+          userId,
+        );
+        return {
+          type: name.toUpperCase(),
+          description: result.message || `Executed ${name}`,
+          entityId: result.bill?.id || result.paymentId || undefined,
+        };
+      }
+
       switch (name) {
         case 'add_home_system':
           const system = await this.prisma.homeSystem.create({

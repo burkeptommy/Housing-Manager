@@ -431,6 +431,52 @@ export class DashboardService {
   }
 
   /**
+   * Create a new bill for a household
+   */
+  async createBill(
+    householdId: string,
+    data: {
+      name: string;
+      category: string;
+      amount: number;
+      frequency: string;
+      dueDay?: number | null;
+    },
+  ) {
+    // Map category to BillCategory enum if possible
+    const categoryMap: Record<string, string> = {
+      MORTGAGE_RENT: 'MORTGAGE_RENT',
+      UTILITY: 'UTILITY',
+      INSURANCE: 'INSURANCE',
+      HOME_SERVICE: 'HOME_SERVICE',
+      VEHICLE: 'VEHICLE',
+      KID_ACTIVITY: 'KID_ACTIVITIES',
+      PET: 'PET',
+      HEALTH: 'HEALTH',
+      OTHER: 'OTHER',
+    };
+
+    const mappedCategory = categoryMap[data.category] || 'OTHER';
+
+    const bill = await this.prisma.comprehensiveBill.create({
+      data: {
+        householdId,
+        category: mappedCategory as any,
+        name: data.name,
+        amount: data.amount,
+        frequency: data.frequency as any,
+        dueDay: data.dueDay,
+        status: 'ACTIVE',
+        havenManaged: false,
+        verified: false,
+        currentAutopay: false,
+      },
+    });
+
+    return { success: true, bill };
+  }
+
+  /**
    * Get family data for a household
    */
   async getFamily(householdId: string) {

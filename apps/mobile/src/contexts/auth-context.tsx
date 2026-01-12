@@ -71,6 +71,21 @@ interface MeResponse {
   }>;
 }
 
+// New simplified registration input (Alfred-first flow)
+interface RegisterSimpleInput {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+}
+
 interface AuthContextValue {
   user: User | null;
   firebaseUser: FirebaseUser | null;
@@ -84,6 +99,7 @@ interface AuthContextValue {
   isAppleSignInAvailable: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, displayName?: string) => Promise<{ success: boolean; error?: string }>;
+  registerSimple: (input: RegisterSimpleInput) => Promise<{ success: boolean; error?: string }>;
   loginWithApple: () => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
@@ -243,6 +259,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchMe, loadCurrentHousehold]);
 
   // Handle navigation based on auth state
+  // Alfred-first flow: users go directly to main app after registration
   useEffect(() => {
     if (!isInitialized || isLoading) return;
 
@@ -251,14 +268,47 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user && !inAuthGroup) {
       router.replace('/(auth)/login');
     } else if (user && inAuthGroup) {
-      if (needsOnboarding) {
-        // Navigate to new magic onboarding flow (address screen)
-        router.replace('/(auth)/onboarding/address');
-      } else {
-        router.replace('/(tabs)');
-      }
+      // Go directly to main app - Alfred will handle data collection progressively
+      router.replace('/(tabs)');
     }
-  }, [user, segments, isLoading, isInitialized, needsOnboarding, router]);
+  }, [user, segments, isLoading, isInitialized, router]);
+
+  // Define refresh functions early so they can be used by registerSimple
+  const refreshMe = useCallback(async () => {
+    const meData = await fetchMe();
+    if (meData) {
+      setUser({
+        id: meData.user.id,
+        email: meData.user.email,
+        firstName: meData.user.firstName || '',
+        lastName: meData.user.lastName || '',
+        phone: null,
+        avatarUrl: meData.user.avatarUrl,
+        role: meData.user.role as User['role'],
+        isActive: true,
+        createdAt: meData.user.createdAt,
+        updatedAt: meData.user.createdAt,
+      });
+      setHouseholdInfo(meData.household);
+    }
+  }, [fetchMe]);
+
+  const refreshHouseholds = useCallback(async () => {
+    const meData = await fetchMe();
+    if (meData) {
+      setHouseholdInfo(meData.household);
+      const householdList: Household[] = meData.memberships.map((m) => ({
+        id: m.householdId,
+        name: m.householdName,
+        description: null,
+        ownerId: '',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }));
+      setHouseholds(householdList);
+      await loadCurrentHousehold(householdList);
+    }
+  }, [fetchMe, loadCurrentHousehold]);
 
   const login = useCallback(async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
     try {
@@ -332,6 +382,69 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     },
     []
+  );
+
+  // New Alfred-first simplified registration
+  const registerSimple = useCallback(
+    async (input: RegisterSimpleInput): Promise<{ success: boolean; error?: string }> => {
+      try {
+        // 1. Create Firebase auth user first
+        const displayName = `${input.firstName} ${input.lastName}`;
+        await firebaseSignUp(input.email, input.password, displayName);
+
+        // 2. Get the Firebase token
+        const token = await getIdToken(true);
+        if (!token) {
+          throw new Error('Failed to get authentication token');
+        }
+
+        // 3. Call our API to create user, household, and home profile
+        const response = await fetch(`${API_BASE_URL}/auth/register-simple`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: input.email,
+            password: input.password,
+            firstName: input.firstName,
+            lastName: input.lastName,
+            address: input.address,
+          }),
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Failed to complete registration');
+        }
+
+        // 4. Store credentials for biometric login
+        await SecureStore.setItemAsync(STORED_EMAIL_KEY, input.email);
+        await SecureStore.setItemAsync(STORED_PASSWORD_KEY, input.password);
+
+        // 5. Refresh user data to get household info
+        await refreshMe();
+        await refreshHouseholds();
+
+        return { success: true };
+      } catch (error: any) {
+        console.error('Simple registration error:', error);
+
+        let errorMessage = 'Failed to create account';
+
+        if (error.code === 'auth/email-already-in-use') {
+          errorMessage = 'An account with this email already exists';
+        } else if (error.code === 'auth/weak-password') {
+          errorMessage = 'Password must be at least 8 characters';
+        } else if (error.message) {
+          errorMessage = error.message;
+        }
+
+        return { success: false, error: errorMessage };
+      }
+    },
+    [refreshMe, refreshHouseholds]
   );
 
   // Sign in with Apple
@@ -435,23 +548,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [api]
   );
 
-  const refreshHouseholds = useCallback(async () => {
-    const meData = await fetchMe();
-    if (meData) {
-      setHouseholdInfo(meData.household);
-      const householdList: Household[] = meData.memberships.map((m) => ({
-        id: m.householdId,
-        name: m.householdName,
-        description: null,
-        ownerId: '',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      }));
-      setHouseholds(householdList);
-      await loadCurrentHousehold(householdList);
-    }
-  }, [fetchMe, loadCurrentHousehold]);
-
   const refreshCurrentHousehold = useCallback(async () => {
     if (!currentHousehold) return;
     try {
@@ -461,25 +557,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore errors on refresh
     }
   }, [api, currentHousehold]);
-
-  const refreshMe = useCallback(async () => {
-    const meData = await fetchMe();
-    if (meData) {
-      setUser({
-        id: meData.user.id,
-        email: meData.user.email,
-        firstName: meData.user.firstName || '',
-        lastName: meData.user.lastName || '',
-        phone: null,
-        avatarUrl: meData.user.avatarUrl,
-        role: meData.user.role as User['role'],
-        isActive: true,
-        createdAt: meData.user.createdAt,
-        updatedAt: meData.user.createdAt,
-      });
-      setHouseholdInfo(meData.household);
-    }
-  }, [fetchMe]);
 
   const completeOnboarding = useCallback(
     async (householdId: string) => {
@@ -516,6 +593,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAppleSignInAvailable,
         login,
         register,
+        registerSimple,
         loginWithApple,
         loginWithGoogle,
         loginWithBiometric,

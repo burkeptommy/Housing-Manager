@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter, useLocalSearchParams, Stack } from 'expo-router';
+import { askAlfredAboutTask } from '../../../../src/lib/navigation';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Card, Button, Badge } from '../../../../src/components';
@@ -139,12 +140,7 @@ export default function ChecklistDetailScreen() {
   };
 
   const handleAskAlfred = () => {
-    router.push({
-      pathname: '/(tabs)/manager',
-      params: {
-        message: `Help me with ${item?.title}`,
-      },
-    } as any);
+    askAlfredAboutTask(item?.title || 'this task');
   };
 
   if (!item) {
