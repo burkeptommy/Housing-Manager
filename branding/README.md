@@ -1,25 +1,31 @@
 # Haven Branding Assets
 
 ## Logo Design
-The Haven logo features an elegant serif "H" with a champagne-colored A-frame roof, representing premium home management.
+The Haven logo is a simple roof peak (A-frame chevron) representing home, shelter, and sanctuary.
+
+### Design Principles
+- **Simple**: Recognizable at any size, from 16px favicon to 1024px app icon
+- **Two colors**: Navy background (#0a1929) + White icon (#ffffff)
+- **Meaningful**: Says "home" without being literal - a modern, abstract take
 
 ### Colors
-- **Navy (Primary):** `#0a1929` - Background, H letterform
-- **Champagne (Accent):** `#c4a574` - Roof element
-- **White:** `#ffffff` - H letterform on dark backgrounds
+- **Navy (Primary):** `#0a1929` - Background
+- **White:** `#ffffff` - Roof peak icon
 
-### Typography
-The "H" uses a classic serif style inspired by luxury fashion brands, with:
-- Continuous letterform (single path, no gaps)
-- Elegant serifs at top and bottom
-- Balanced proportions filling the logo space
+### The Logo
+```
+      /\
+     /  \
+    /    \
+```
+A simple upward-pointing chevron representing a roof peak.
 
 ## File Locations
 
 ### Web App (`apps/web/public/`)
 | File | Purpose |
 |------|---------|
-| `logo.svg` | Main square logo with navy background |
+| `logo.svg` | Main square logo (navy bg, white icon) |
 | `favicon.svg` | Browser tab icon (32x32 optimized) |
 | `logo-wordmark.svg` | Logo + "HAVEN" text (navy on transparent) |
 | `logo-wordmark-white.svg` | Logo + "HAVEN" text (white on transparent) |
@@ -29,22 +35,38 @@ The "H" uses a classic serif style inspired by luxury fashion brands, with:
 ### Mobile App (`apps/mobile/assets/`)
 | File | Purpose |
 |------|---------|
-| `icon.svg` | App icon source (1024x1024) |
-| `adaptive-icon.svg` | Android adaptive icon |
-| `splash.svg` | Splash screen |
-| `favicon.svg` | Favicon source |
-| `notification-icon.svg` | Push notification icon (monochrome) |
+| `icon.svg` / `icon.png` | App icon (1024x1024) |
+| `adaptive-icon.svg` / `adaptive-icon.png` | Android adaptive icon |
+| `splash.svg` / `splash.png` | Launch/splash screen |
+| `favicon.svg` / `favicon.png` | Favicon source |
+| `notification-icon.svg` / `notification-icon.png` | Push notification icon |
 
-## PNG Generation
-Run the conversion script to generate PNG versions:
-```bash
-cd apps/mobile/assets
-./convert-icons.sh
-```
+### Master File (`branding/`)
+| File | Purpose |
+|------|---------|
+| `haven-logo-master.svg` | Master source file |
 
 ## Usage Guidelines
-1. **Always use the champagne roof** - This is the distinctive brand element
-2. **Minimum clear space** - Leave padding equal to the roof height around the logo
-3. **On dark backgrounds** - Use white H with champagne roof
-4. **On light backgrounds** - Use navy H with champagne roof
-5. **Never alter proportions** - Keep the H and roof relationship intact
+
+1. **App Icon**: Use `logo.svg` - navy background with white roof peak
+2. **On dark backgrounds**: Use `icon-white.svg` or `logo-wordmark-white.svg`
+3. **On light backgrounds**: Use `icon-navy.svg` or `logo-wordmark.svg`
+4. **Favicon**: Use `favicon.svg` - optimized for small sizes
+5. **Never alter**: Keep the roof peak shape and proportions intact
+
+## PNG Generation
+
+Generate PNGs from SVGs for mobile:
+```bash
+cd apps/mobile/assets
+convert -background none icon.svg -resize 1024x1024 icon.png
+convert -background none adaptive-icon.svg -resize 1024x1024 adaptive-icon.png
+convert -background none splash.svg splash.png
+convert -background none notification-icon.svg -resize 96x96 notification-icon.png
+```
+
+## Important Notes
+
+- **Do NOT use Next.js `<Image>` component** with wordmark SVGs (they contain `<text>` elements)
+- Use regular `<img>` tags for all logo SVGs
+- The logo should work at all sizes without modification

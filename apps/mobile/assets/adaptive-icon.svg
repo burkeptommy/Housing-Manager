@@ -1,44 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
-  <!-- Navy background for Android adaptive icon -->
-  <rect width="1024" height="1024" fill="#0a1929"/>
-  
-  <!-- Centered logo with safe zone padding -->
-  <g transform="translate(512, 574)" fill="white">
-    <path d="
-      M -290 -200
-      L -115 -200
-      L -115 -173
-      L -184 -173
-      L -184 -27
-      L 184 -27
-      L 184 -173
-      L 115 -173
-      L 115 -200
-      L 290 -200
-      L 290 -173
-      L 238 -173
-      L 238 173
-      L 290 173
-      L 290 200
-      L 115 200
-      L 115 173
-      L 184 173
-      L 184 27
-      L -184 27
-      L -184 173
-      L -115 173
-      L -115 200
-      L -290 200
-      L -290 173
-      L -238 173
-      L -238 -173
-      L -290 -173
-      Z
-    "/>
-  </g>
-  
-  <!-- Champagne roof -->
-  <g transform="translate(512, 574)" fill="#c4a574">
-    <path d="M 0 -310 L -420 -200 L -360 -200 L 0 -255 L 360 -200 L 420 -200 Z"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108" width="108" height="108">
+  <rect width="108" height="108" fill="#0a1929"/>
+  <g transform="translate(54, 58)" fill="white">
+    <path d="M 0 -18 L -23 5 L -18 5 L 0 -11 L 18 5 L 23 5 Z"/>
   </g>
 </svg>

@@ -101,7 +101,7 @@ const contacts: Contact[] = [
     id: 'haven-concierge',
     name: 'Haven Concierge',
     role: 'AI Assistant',
-    avatar: '/haven-logo.svg',
+    avatar: '/icon-navy.svg',
     isPinned: true,
     isOnline: true,
     lastMessage: 'How can I help you today?',

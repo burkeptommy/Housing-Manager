@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { X } from 'lucide-react';
 import { mobileNavigation, sidebarNavigation, sidebarBottomNav } from './navigation-config';
@@ -84,12 +83,9 @@ export function MobileBottomNav() {
       >
         {/* Drawer Header */}
         <div className="flex items-center justify-between h-16 px-6 border-b border-white/10">
-          <Image
+          <img
             src="/logo-wordmark-white.svg"
             alt="Haven"
-            width={120}
-            height={32}
-            priority
             className="h-7 w-auto"
           />
           <button

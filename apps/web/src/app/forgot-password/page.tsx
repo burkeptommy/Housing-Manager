@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowLeft, Mail, CheckCircle } from 'lucide-react';
 
 export default function ForgotPasswordPage() {
@@ -33,12 +32,9 @@ export default function ForgotPasswordPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center">
-            <Image
+            <img
               src="/logo-wordmark.svg"
               alt="Haven"
-              width={140}
-              height={36}
-              priority
               className="h-9 w-auto"
             />
           </Link>

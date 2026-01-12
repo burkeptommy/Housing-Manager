@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import { ArrowRight, Eye, EyeOff, Check, Shield, Users } from 'lucide-react';
 import { useOnboarding } from '@/context/OnboardingContext';
 import { useAuth } from '@/contexts/auth-context';
@@ -138,12 +137,9 @@ export default function OnboardingWelcomePage() {
         {/* Logo */}
         <div className="relative z-10">
           <Link href="/" className="flex items-center">
-            <Image
+            <img
               src="/logo-wordmark-white.svg"
               alt="Haven"
-              width={140}
-              height={36}
-              priority
               className="h-9 w-auto"
             />
           </Link>
@@ -202,12 +198,9 @@ export default function OnboardingWelcomePage() {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <Link href="/" className="inline-flex items-center">
-              <Image
+              <img
                 src="/logo-wordmark.svg"
                 alt="Haven"
-                width={140}
-                height={36}
-                priority
                 className="h-9 w-auto"
               />
             </Link>

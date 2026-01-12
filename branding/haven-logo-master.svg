@@ -1,44 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <!-- Navy background -->
-  <rect width="200" height="200" fill="#0a1929" rx="16" ry="16"/>
-  
-  <!-- Large continuous serif H in white -->
-  <g transform="translate(100, 112)" fill="white">
-    <path d="
-      M -76 -52
-      L -30 -52
-      L -30 -45
-      L -48 -45
-      L -48 -7
-      L 48 -7
-      L 48 -45
-      L 30 -45
-      L 30 -52
-      L 76 -52
-      L 76 -45
-      L 62 -45
-      L 62 45
-      L 76 45
-      L 76 52
-      L 30 52
-      L 30 45
-      L 48 45
-      L 48 7
-      L -48 7
-      L -48 45
-      L -30 45
-      L -30 52
-      L -76 52
-      L -76 45
-      L -62 45
-      L -62 -45
-      L -76 -45
-      Z
-    "/>
-  </g>
-  
-  <!-- Champagne roof accent -->
-  <g transform="translate(100, 112)" fill="#c4a574">
-    <path d="M 0 -80 L -110 -52 L -94 -52 L 0 -66 L 94 -52 L 110 -52 Z"/>
+  <rect width="200" height="200" fill="#0a1929"/>
+  <g transform="translate(100, 105)" fill="white">
+    <path d="M 0 -55 L -70 15 L -55 15 L 0 -35 L 55 15 L 70 15 Z"/>
   </g>
 </svg>

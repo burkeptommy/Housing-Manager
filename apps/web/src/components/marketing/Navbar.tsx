@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Menu, X } from 'lucide-react';
 
 export function Navbar() {
@@ -36,12 +35,9 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16 lg:h-20">
           {/* Logo */}
           <Link href="/" className="flex items-center">
-            <Image
+            <img
               src={isScrolled ? '/logo-wordmark.svg' : '/logo-wordmark-white.svg'}
               alt="Haven"
-              width={140}
-              height={36}
-              priority
               className="h-9 w-auto"
             />
           </Link>

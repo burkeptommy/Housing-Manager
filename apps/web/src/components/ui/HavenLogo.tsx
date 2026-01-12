@@ -1,7 +1,5 @@
 'use client';
 
-import Image from 'next/image';
-
 interface HavenLogoProps {
   variant?: 'icon' | 'wordmark';
   color?: 'white' | 'navy';
@@ -9,10 +7,10 @@ interface HavenLogoProps {
   className?: string;
 }
 
-const sizes = {
-  sm: { icon: 24, wordmark: { width: 100, height: 24 } },
-  md: { icon: 32, wordmark: { width: 120, height: 32 } },
-  lg: { icon: 40, wordmark: { width: 140, height: 36 } },
+const sizeClasses = {
+  sm: { icon: 'h-6 w-6', wordmark: 'h-6 w-auto' },
+  md: { icon: 'h-8 w-8', wordmark: 'h-8 w-auto' },
+  lg: { icon: 'h-10 w-10', wordmark: 'h-9 w-auto' },
 };
 
 export function HavenLogo({
@@ -21,31 +19,25 @@ export function HavenLogo({
   size = 'md',
   className = ''
 }: HavenLogoProps) {
-  const sizeConfig = sizes[size];
+  const sizeClass = sizeClasses[size];
 
   if (variant === 'wordmark') {
     const src = color === 'white' ? '/logo-wordmark-white.svg' : '/logo-wordmark.svg';
     return (
-      <Image
+      <img
         src={src}
         alt="Haven"
-        width={sizeConfig.wordmark.width}
-        height={sizeConfig.wordmark.height}
-        className={className}
-        priority
+        className={`${sizeClass.wordmark} ${className}`}
       />
     );
   }
 
   const src = color === 'white' ? '/icon-white.svg' : '/icon-navy.svg';
   return (
-    <Image
+    <img
       src={src}
       alt="Haven"
-      width={sizeConfig.icon}
-      height={sizeConfig.icon}
-      className={className}
-      priority
+      className={`${sizeClass.icon} ${className}`}
     />
   );
 }
@@ -62,13 +54,11 @@ export function HavenIcon({
 }) {
   const src = color === 'white' ? '/icon-white.svg' : '/icon-navy.svg';
   return (
-    <Image
+    <img
       src={src}
       alt="Haven"
-      width={size}
-      height={size}
+      style={{ width: size, height: size }}
       className={className}
-      priority
     />
   );
 }

@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Eye, EyeOff, ArrowRight, Shield, Clock, Users } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
@@ -109,12 +108,9 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="relative z-10">
           <Link href="/" className="flex items-center">
-            <Image
+            <img
               src="/logo-wordmark-white.svg"
               alt="Haven"
-              width={140}
-              height={36}
-              priority
               className="h-9 w-auto"
             />
           </Link>
@@ -171,12 +167,9 @@ export default function LoginPage() {
           {/* Mobile Logo */}
           <div className="lg:hidden mb-8 text-center">
             <Link href="/" className="inline-flex items-center">
-              <Image
+              <img
                 src="/logo-wordmark.svg"
                 alt="Haven"
-                width={140}
-                height={36}
-                priority
                 className="h-9 w-auto"
               />
             </Link>

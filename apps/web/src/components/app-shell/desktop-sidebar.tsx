@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { sidebarNavigation, sidebarBottomNav } from './navigation-config';
 
@@ -18,12 +17,9 @@ export function DesktopSidebar() {
       {/* Logo */}
       <div className="flex items-center h-16 px-6 border-b border-white/10">
         <Link href="/app" className="flex items-center">
-          <Image
+          <img
             src="/logo-wordmark-white.svg"
             alt="Haven"
-            width={140}
-            height={36}
-            priority
             className="h-8 w-auto"
           />
         </Link>

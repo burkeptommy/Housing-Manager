@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
 import { useState } from 'react';
 import { TierComparisonModal } from './TierComparisonModal';
 
@@ -14,12 +13,9 @@ export function OnboardingHeader() {
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
           {/* Haven Logo */}
           <Link href="/" className="flex items-center">
-            <Image
+            <img
               src="/logo-wordmark.svg"
               alt="Haven"
-              width={120}
-              height={32}
-              priority
               className="h-8 w-auto"
             />
           </Link>
