@@ -1,18 +1,6 @@
-<svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Navy background -->
-  <rect width="1024" height="1024" fill="#0a1929"/>
-
-  <!-- Haven H with champagne roof - centered and scaled -->
-  <g transform="translate(512, 550) scale(14)">
-    <!-- H letter in white -->
-    <path
-      d="M -19 -13 L -7.5 -13 L -7.5 -11 L -12 -11 L -12 -2 L 12 -2 L 12 -11 L 7.5 -11 L 7.5 -13 L 19 -13 L 19 -11 L 15.5 -11 L 15.5 11 L 19 11 L 19 13 L 7.5 13 L 7.5 11 L 12 11 L 12 2 L -12 2 L -12 11 L -7.5 11 L -7.5 13 L -19 13 L -19 11 L -15.5 11 L -15.5 -11 L -19 -11 Z"
-      fill="white"
-    />
-    <!-- Champagne roof -->
-    <path
-      d="M 0 -20 L -27.5 -13 L -23.5 -13 L 0 -16.5 L 23.5 -13 L 27.5 -13 Z"
-      fill="#c4a574"
-    />
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#0a1929" rx="12"/>
+  <g transform="translate(32, 34)" fill="white">
+    <path d="M 0 -18 L -22 4 L -18 4 L 0 -12 L 18 4 L 22 4 Z"/>
   </g>
 </svg>

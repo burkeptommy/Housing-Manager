@@ -1,1 +1,6 @@
-<svg width="400" height="100" viewBox="0 0 400 100" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse"><stop stop-color="#1E3A8A"/><stop offset="1" stop-color="#0F172A"/></linearGradient></defs><g transform="translate(15, 8) scale(0.75)"><path d="M20 50 L60 15 L100 50 V90 C100 95 96 99 91 99 H29 C24 99 20 95 20 90 V50 Z" stroke="url(#logoGrad)" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="M60 40 C60 40 65 58 80 58 C 65 58 60 76 60 76 C 60 76 55 58 40 58 C 55 58 60 40 60 40 Z" fill="url(#logoGrad)"/></g><text x="110" y="67" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="48" fill="url(#logoGrad)" letter-spacing="1">HAVEN</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 140 36" width="140" height="36">
+  <g transform="translate(18, 18)" fill="#0a1929">
+    <path d="M 0 -14 L -18 4 L -14 4 L 0 -8 L 14 4 L 18 4 Z"/>
+  </g>
+  <text x="44" y="26" font-family="system-ui, -apple-system, sans-serif" font-size="24" font-weight="600" fill="#0a1929">Haven</text>
+</svg>
