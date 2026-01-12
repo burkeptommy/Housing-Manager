@@ -86,6 +86,28 @@ interface RegisterSimpleInput {
   };
 }
 
+// Social registration input (Apple/Google)
+interface RegisterSocialInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  address: {
+    addressLine1: string;
+    addressLine2?: string;
+    city: string;
+    state: string;
+    zipCode: string;
+  };
+}
+
+// Pending social auth data when user needs to complete registration
+interface PendingSocialAuth {
+  email: string;
+  firstName: string;
+  lastName: string;
+  provider: 'apple' | 'google';
+}
+
 interface AuthContextValue {
   user: User | null;
   firebaseUser: FirebaseUser | null;
@@ -95,11 +117,17 @@ interface AuthContextValue {
   isLoading: boolean;
   isAuthenticated: boolean;
   needsOnboarding: boolean;
+  needsSocialRegistration: boolean;
+  pendingSocialAuth: PendingSocialAuth | null;
   biometricStatus: BiometricStatus | null;
   isAppleSignInAvailable: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (email: string, password: string, displayName?: string) => Promise<{ success: boolean; error?: string }>;
   registerSimple: (input: RegisterSimpleInput) => Promise<{ success: boolean; error?: string }>;
+  registerWithApple: () => Promise<{ success: boolean; error?: string; needsAddress?: boolean }>;
+  registerWithGoogle: () => Promise<{ success: boolean; error?: string; needsAddress?: boolean }>;
+  completeSocialRegistration: (input: RegisterSocialInput) => Promise<{ success: boolean; error?: string }>;
+  cancelSocialRegistration: () => Promise<void>;
   loginWithApple: () => Promise<{ success: boolean; error?: string }>;
   loginWithGoogle: () => Promise<{ success: boolean; error?: string }>;
   loginWithBiometric: () => Promise<{ success: boolean; error?: string }>;
@@ -127,6 +155,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isInitialized, setIsInitialized] = useState(false);
   const [biometricStatus, setBiometricStatus] = useState<BiometricStatus | null>(null);
   const [isAppleSignInAvailable, setIsAppleSignInAvailable] = useState(false);
+  const [pendingSocialAuth, setPendingSocialAuth] = useState<PendingSocialAuth | null>(null);
 
   const api = getApiClient();
 
@@ -144,6 +173,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check if user needs onboarding (no households)
   const needsOnboarding = !!user && !householdInfo;
+
+  // Check if social auth user needs to complete registration
+  const needsSocialRegistration = !!pendingSocialAuth;
 
   // Fetch user profile and household data from /api/me
   const fetchMe = useCallback(async (): Promise<MeResponse | null> => {
@@ -477,6 +509,138 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  // Register with Apple (for new users)
+  const registerWithApple = useCallback(async (): Promise<{ success: boolean; error?: string; needsAddress?: boolean }> => {
+    try {
+      const result = await signInWithApple();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      // Check if user already exists in our database
+      const meData = await fetchMe();
+
+      if (meData && meData.household) {
+        // User already has an account, they're logged in
+        return { success: true };
+      }
+
+      // New user - need to collect address
+      // Parse name from Apple (they may not provide it on subsequent sign-ins)
+      let firstName = '';
+      let lastName = '';
+      if (result.user?.displayName) {
+        const nameParts = result.user.displayName.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+
+      setPendingSocialAuth({
+        email: result.user?.email || '',
+        firstName,
+        lastName,
+        provider: 'apple',
+      });
+
+      return { success: true, needsAddress: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Apple Sign In failed' };
+    }
+  }, [fetchMe]);
+
+  // Register with Google (for new users)
+  const registerWithGoogle = useCallback(async (): Promise<{ success: boolean; error?: string; needsAddress?: boolean }> => {
+    try {
+      const result = await signInWithGoogle();
+
+      if (!result.success) {
+        return { success: false, error: result.error };
+      }
+
+      // Check if user already exists in our database
+      const meData = await fetchMe();
+
+      if (meData && meData.household) {
+        // User already has an account, they're logged in
+        return { success: true };
+      }
+
+      // New user - need to collect address
+      let firstName = '';
+      let lastName = '';
+      if (result.user?.displayName) {
+        const nameParts = result.user.displayName.split(' ');
+        firstName = nameParts[0] || '';
+        lastName = nameParts.slice(1).join(' ') || '';
+      }
+
+      setPendingSocialAuth({
+        email: result.user?.email || '',
+        firstName,
+        lastName,
+        provider: 'google',
+      });
+
+      return { success: true, needsAddress: true };
+    } catch (error: any) {
+      return { success: false, error: error.message || 'Google Sign In failed' };
+    }
+  }, [fetchMe]);
+
+  // Complete social registration by providing address
+  const completeSocialRegistration = useCallback(async (input: RegisterSocialInput): Promise<{ success: boolean; error?: string }> => {
+    if (!pendingSocialAuth) {
+      return { success: false, error: 'No pending social authentication' };
+    }
+
+    try {
+      // Get fresh Firebase token
+      const token = await getIdToken(true);
+      if (!token) {
+        throw new Error('Failed to get authentication token');
+      }
+
+      // Call our API to create user, household, and home profile
+      const response = await fetch(`${API_BASE_URL}/auth/register-social`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: input.email,
+          firstName: input.firstName,
+          lastName: input.lastName,
+          address: input.address,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to complete registration');
+      }
+
+      // Clear pending state
+      setPendingSocialAuth(null);
+
+      // Refresh user data to get household info
+      await refreshMe();
+      await refreshHouseholds();
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Social registration error:', error);
+      return { success: false, error: error.message || 'Failed to create account' };
+    }
+  }, [pendingSocialAuth, refreshMe, refreshHouseholds]);
+
+  // Cancel social registration
+  const cancelSocialRegistration = useCallback(async () => {
+    setPendingSocialAuth(null);
+    await firebaseSignOut();
+  }, []);
+
   // Sign in with biometrics
   const loginWithBiometric = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
     // First, authenticate with biometrics
@@ -533,8 +697,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setHouseholdInfo(null);
     setHouseholds([]);
     setCurrentHousehold(null);
-    router.replace('/(auth)/login');
-  }, [router]);
+    // Navigation is handled by the auth state navigation guard
+    // Don't manually navigate here to avoid race conditions
+  }, []);
 
   const selectHousehold = useCallback(
     async (household: Household) => {
@@ -589,11 +754,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading,
         isAuthenticated: !!user,
         needsOnboarding,
+        needsSocialRegistration,
+        pendingSocialAuth,
         biometricStatus,
         isAppleSignInAvailable,
         login,
         register,
         registerSimple,
+        registerWithApple,
+        registerWithGoogle,
+        completeSocialRegistration,
+        cancelSocialRegistration,
         loginWithApple,
         loginWithGoogle,
         loginWithBiometric,
