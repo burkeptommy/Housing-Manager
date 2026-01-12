@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.havenhome.app",
-      "buildNumber": "36",
+      "buildNumber": "37",
       "infoPlist": {
         "NSCameraUsageDescription": "Haven needs camera access to scan documents and take photos for your home manager.",
         "NSPhotoLibraryUsageDescription": "Haven needs photo library access to upload documents and photos.",
