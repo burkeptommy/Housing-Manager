@@ -18,6 +18,13 @@ import { ProfilePhotoEditor } from '../../../../src/components/ProfilePhotoEdito
 import { colors, typography, spacing, borderRadius } from '../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
+import { EditMemberContactModal } from '../../../../src/components/forms/EditMemberContactModal';
+import { EditEmergencyContactModal } from '../../../../src/components/forms/EditEmergencyContactModal';
+import { EditMedicalInfoModal } from '../../../../src/components/forms/EditMedicalInfoModal';
+import { EditSchoolModal } from '../../../../src/components/forms/EditSchoolModal';
+import { EditActivityModal, ActivityData } from '../../../../src/components/forms/EditActivityModal';
+import { EditWorkModal } from '../../../../src/components/forms/EditWorkModal';
+import { EditMembershipModal, MembershipData } from '../../../../src/components/forms/EditMembershipModal';
 
 // Helper function to get icon for activity type
 const getActivityIcon = (type: string): keyof typeof Ionicons.glyphMap => {
@@ -138,6 +145,17 @@ export default function MemberDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal states
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showMedicalModal, setShowMedicalModal] = useState(false);
+  const [showSchoolModal, setShowSchoolModal] = useState(false);
+  const [showActivityModal, setShowActivityModal] = useState(false);
+  const [showWorkModal, setShowWorkModal] = useState(false);
+  const [showMembershipModal, setShowMembershipModal] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<Activity | null>(null);
+  const [editingMembership, setEditingMembership] = useState<Membership | null>(null);
+
   const fetchMember = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
 
@@ -244,7 +262,238 @@ export default function MemberDetailScreen() {
   const isAdult = member?.type === 'ADULT' || (!isChild && member?.type !== 'STAFF');
 
   const handleEditSection = (section: string) => {
-    Alert.alert('Edit', `Edit ${section} coming soon`);
+    switch (section) {
+      case 'contact':
+        setShowContactModal(true);
+        break;
+      case 'emergency':
+        setShowEmergencyModal(true);
+        break;
+      case 'medical':
+        setShowMedicalModal(true);
+        break;
+      case 'school':
+        setShowSchoolModal(true);
+        break;
+      case 'activities':
+        setEditingActivity(null); // New activity
+        setShowActivityModal(true);
+        break;
+      case 'work':
+        setShowWorkModal(true);
+        break;
+      case 'memberships':
+        setEditingMembership(null); // New membership
+        setShowMembershipModal(true);
+        break;
+      default:
+        // For sections without focused modals, go to full edit page
+        router.push(`/(tabs)/family/member/edit/${id}` as any);
+    }
+  };
+
+  // Save handlers for focused modals
+  const handleSaveContact = async (data: {
+    phone?: string | null;
+    email?: string | null;
+    birthDate?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleSaveEmergencyContact = async (data: {
+    emergencyContact?: string | null;
+    emergencyContactPhone?: string | null;
+    emergencyContactRelationship?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleSaveMedical = async (data: {
+    primaryDoctorName?: string | null;
+    primaryDoctorPhone?: string | null;
+    bloodType?: string | null;
+    insuranceProvider?: string | null;
+    insuranceMemberId?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleSaveSchool = async (data: {
+    school?: string | null;
+    schoolGrade?: string | null;
+    teacher?: string | null;
+    schoolPhone?: string | null;
+    busNumber?: string | null;
+    pickupTime?: string | null;
+    dropoffTime?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleSaveActivity = async (data: ActivityData) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const endpoint = data.id
+      ? `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/activity/${data.id}`
+      : `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/activity`;
+
+    const response = await fetch(endpoint, {
+      method: data.id ? 'PATCH' : 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/activity/${activityId}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to delete');
+    await fetchMember();
+  };
+
+  const handleSaveWork = async (data: {
+    employer?: string | null;
+    occupation?: string | null;
+    workPhone?: string | null;
+    workEmail?: string | null;
+    workAddress?: string | null;
+    workSchedule?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleSaveMembership = async (data: MembershipData) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const endpoint = data.id
+      ? `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/membership/${data.id}`
+      : `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/membership`;
+
+    const response = await fetch(endpoint, {
+      method: data.id ? 'PATCH' : 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchMember();
+  };
+
+  const handleDeleteMembership = async (membershipId: string) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/membership/${membershipId}`,
+      {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to delete');
+    await fetchMember();
   };
 
   // Section Header component
@@ -321,7 +570,7 @@ export default function MemberDetailScreen() {
         options={{
           title: fullName,
           headerRight: () => (
-            <TouchableOpacity onPress={() => Alert.alert('Edit', 'Edit member coming soon')}>
+            <TouchableOpacity onPress={() => router.push(`/(tabs)/family/member/edit/${id}` as any)}>
               <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
             </TouchableOpacity>
           ),
@@ -441,7 +690,14 @@ export default function MemberDetailScreen() {
             <SectionHeader title="ACTIVITIES & SPORTS" action="+ Add" onAction={() => handleEditSection('activities')} />
             {member.activities && member.activities.length > 0 ? (
               member.activities.map((activity) => (
-                <View key={activity.id} style={styles.activityItem}>
+                <TouchableOpacity
+                  key={activity.id}
+                  style={styles.activityItem}
+                  onPress={() => {
+                    setEditingActivity(activity);
+                    setShowActivityModal(true);
+                  }}
+                >
                   <View style={styles.activityIcon}>
                     <Ionicons
                       name={getActivityIcon(activity.type)}
@@ -459,7 +715,8 @@ export default function MemberDetailScreen() {
                       <Text style={styles.activityLocation}>{activity.location}</Text>
                     )}
                   </View>
-                </View>
+                  <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+                </TouchableOpacity>
               ))
             ) : (
               <EmptyPrompt text="Add activities and sports" onPress={() => handleEditSection('activities')} />
@@ -492,7 +749,14 @@ export default function MemberDetailScreen() {
             <SectionHeader title="MEMBERSHIPS" action="+ Add" onAction={() => handleEditSection('memberships')} />
             {member.memberships && member.memberships.length > 0 ? (
               member.memberships.map((membership) => (
-                <TouchableOpacity key={membership.id} style={styles.membershipRow} onPress={() => handleEditSection('memberships')}>
+                <TouchableOpacity
+                  key={membership.id}
+                  style={styles.membershipRow}
+                  onPress={() => {
+                    setEditingMembership(membership);
+                    setShowMembershipModal(true);
+                  }}
+                >
                   <View style={styles.membershipIcon}>
                     <Ionicons name={getMembershipIcon(membership.type)} size={18} color={colors.haven.champagne[500]} />
                   </View>
@@ -519,7 +783,14 @@ export default function MemberDetailScreen() {
           <Card style={styles.section}>
             <SectionHeader title="ACTIVITIES" action="+ Add" onAction={() => handleEditSection('activities')} />
             {member.activities.map((activity) => (
-              <View key={activity.id} style={styles.activityItem}>
+              <TouchableOpacity
+                key={activity.id}
+                style={styles.activityItem}
+                onPress={() => {
+                  setEditingActivity(activity);
+                  setShowActivityModal(true);
+                }}
+              >
                 <View style={styles.activityIcon}>
                   <Ionicons
                     name={getActivityIcon(activity.type)}
@@ -537,7 +808,8 @@ export default function MemberDetailScreen() {
                     <Text style={styles.activityLocation}>{activity.location}</Text>
                   )}
                 </View>
-              </View>
+                <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+              </TouchableOpacity>
             ))}
           </Card>
         )}
@@ -614,6 +886,109 @@ export default function MemberDetailScreen() {
           <Text style={styles.deleteButtonText}>Remove Family Member</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Focused Edit Modals */}
+      <EditMemberContactModal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        onSave={handleSaveContact}
+        initialData={{
+          phone: member.phone,
+          email: member.email,
+          birthDate: member.birthDate,
+        }}
+      />
+
+      <EditEmergencyContactModal
+        visible={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+        onSave={handleSaveEmergencyContact}
+        initialData={{
+          emergencyContact: member.emergencyContact,
+          emergencyContactPhone: member.emergencyContactPhone,
+          emergencyContactRelationship: member.emergencyContactRelationship,
+        }}
+      />
+
+      <EditMedicalInfoModal
+        visible={showMedicalModal}
+        onClose={() => setShowMedicalModal(false)}
+        onSave={handleSaveMedical}
+        initialData={{
+          primaryDoctorName: member.primaryDoctorName,
+          primaryDoctorPhone: member.primaryDoctorPhone,
+          bloodType: member.bloodType,
+          insuranceProvider: member.insuranceProvider,
+          insuranceMemberId: member.insuranceMemberId,
+        }}
+      />
+
+      <EditSchoolModal
+        visible={showSchoolModal}
+        onClose={() => setShowSchoolModal(false)}
+        onSave={handleSaveSchool}
+        initialData={{
+          school: member.school,
+          schoolGrade: member.schoolGrade,
+          teacher: member.teacher,
+          schoolPhone: member.schoolPhone,
+          busNumber: member.busNumber,
+          pickupTime: member.pickupTime,
+          dropoffTime: member.dropoffTime,
+        }}
+      />
+
+      <EditActivityModal
+        visible={showActivityModal}
+        onClose={() => {
+          setShowActivityModal(false);
+          setEditingActivity(null);
+        }}
+        onSave={handleSaveActivity}
+        onDelete={handleDeleteActivity}
+        initialData={editingActivity ? {
+          id: editingActivity.id,
+          name: editingActivity.name,
+          type: editingActivity.type,
+          location: editingActivity.location,
+          schedule: editingActivity.schedule,
+        } : null}
+        isNew={!editingActivity}
+      />
+
+      <EditWorkModal
+        visible={showWorkModal}
+        onClose={() => setShowWorkModal(false)}
+        onSave={handleSaveWork}
+        initialData={{
+          employer: member.employer,
+          occupation: member.occupation,
+          workPhone: member.workPhone,
+          workEmail: member.workEmail,
+          workAddress: member.workAddress,
+          workSchedule: member.workSchedule,
+        }}
+      />
+
+      <EditMembershipModal
+        visible={showMembershipModal}
+        onClose={() => {
+          setShowMembershipModal(false);
+          setEditingMembership(null);
+        }}
+        onSave={handleSaveMembership}
+        onDelete={handleDeleteMembership}
+        initialData={editingMembership ? {
+          id: editingMembership.id,
+          name: editingMembership.name,
+          type: editingMembership.type,
+          memberNumber: editingMembership.memberNumber,
+          expiresAt: editingMembership.expiresAt,
+          monthlyFee: editingMembership.monthlyFee,
+          notes: editingMembership.notes,
+        } : null}
+        isNew={!editingMembership}
+      />
     </SafeAreaView>
   );
 }
