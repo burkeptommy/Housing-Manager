@@ -20,6 +20,7 @@ import { useAuth } from '../../src/contexts/auth-context';
 import { Button, Input, LoadingSpinner } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { getBiometricName } from '../../src/lib/biometric-auth';
+import { useGoogleAuth, handleGoogleAuthResponse } from '../../src/lib/google-auth';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -27,7 +28,6 @@ export default function LoginScreen() {
   const {
     login,
     loginWithApple,
-    loginWithGoogle,
     loginWithBiometric,
     isLoading,
     isAppleSignInAvailable,
@@ -38,6 +38,23 @@ export default function LoginScreen() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+
+  // Google Auth hook
+  const [googleRequest, googleResponse, googlePromptAsync] = useGoogleAuth();
+
+  // Handle Google auth response
+  useEffect(() => {
+    if (googleResponse) {
+      setIsGoogleLoading(true);
+      handleGoogleAuthResponse(googleResponse).then((result) => {
+        setIsGoogleLoading(false);
+        if (!result.success && result.error !== 'Sign in was cancelled') {
+          setError(result.error || 'Google Sign In failed');
+        }
+      });
+    }
+  }, [googleResponse]);
 
   // Fade in animation
   useEffect(() => {
@@ -80,10 +97,10 @@ export default function LoginScreen() {
 
   const handleGoogleLogin = async () => {
     setError('');
-    const result = await loginWithGoogle();
-
-    if (!result.success && result.error !== 'Sign in was cancelled') {
-      setError(result.error || 'Google Sign In failed');
+    if (googleRequest) {
+      await googlePromptAsync();
+    } else {
+      setError('Google Sign In is not available');
     }
   };
 
@@ -102,7 +119,7 @@ export default function LoginScreen() {
     router.push('/(auth)/forgot-password');
   };
 
-  if (isLoading && !email) {
+  if ((isLoading || isGoogleLoading) && !email) {
     return <LoadingSpinner fullScreen message="Signing in..." />;
   }
 

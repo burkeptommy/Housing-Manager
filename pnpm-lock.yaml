@@ -345,6 +345,9 @@ importers:
       expo-asset:
         specifier: ~12.0.12
         version: 12.0.12(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))(react@19.1.0)
+      expo-auth-session:
+        specifier: ^7.0.10
+        version: 7.0.10(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))(react@19.1.0)
       expo-constants:
         specifier: ~18.0.12
         version: 18.0.12(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))
@@ -5607,6 +5610,12 @@ packages:
     resolution: {integrity: sha512-CsXFCQbx2fElSMn0lyTdRIyKlSXOal6ilLJd+yeZ6xaC7I9AICQgscY5nj0QcwgA+KYYCCEQEBndMsmj7drOWQ==}
     peerDependencies:
       expo: '*'
+      react: '*'
+      react-native: '*'
+
+  expo-auth-session@7.0.10:
+    resolution: {integrity: sha512-XDnKkudvhHSKkZfJ+KkodM+anQcrxB71i+h0kKabdLa5YDXTQ81aC38KRc3TMqmnBDHAu0NpfbzEVd9WDFY3Qg==}
+    peerDependencies:
       react: '*'
       react-native: '*'
 
@@ -15443,6 +15452,20 @@ snapshots:
       react: 19.1.0
       react-native: 0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0)
     transitivePeerDependencies:
+      - supports-color
+
+  expo-auth-session@7.0.10(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))(react@19.1.0):
+    dependencies:
+      expo-application: 7.0.8(expo@54.0.30)
+      expo-constants: 18.0.12(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))
+      expo-crypto: 15.0.8(expo@54.0.30)
+      expo-linking: 8.0.11(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))(react@19.1.0)
+      expo-web-browser: 15.0.10(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0))
+      invariant: 2.2.4
+      react: 19.1.0
+      react-native: 0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0)
+    transitivePeerDependencies:
+      - expo
       - supports-color
 
   expo-constants@18.0.12(expo@54.0.30)(react-native@0.81.5(@babel/core@7.28.5)(@types/react@18.2.79)(react@19.1.0)):

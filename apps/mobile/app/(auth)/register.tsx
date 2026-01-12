@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
 import { colors, spacing, typography, borderRadius } from '../../src/lib/theme';
+import { useGoogleAuth, handleGoogleAuthResponse } from '../../src/lib/google-auth';
 
 // US States for picker
 const US_STATES = [
@@ -28,11 +29,49 @@ const US_STATES = [
 ];
 
 export default function RegisterScreen() {
-  const { registerSimple } = useAuth();
+  const {
+    registerSimple,
+    registerWithApple,
+    completeSocialRegistration,
+    cancelSocialRegistration,
+    needsSocialRegistration,
+    pendingSocialAuth,
+    isAppleSignInAvailable,
+  } = useAuth();
   const router = useRouter();
 
-  // Step tracking
-  const [step, setStep] = useState<'account' | 'address'>('account');
+  // Step tracking: 'account' | 'address' | 'social-address' (for social sign-up)
+  const [step, setStep] = useState<'account' | 'address' | 'social-address'>('account');
+  const [socialLoading, setSocialLoading] = useState<'apple' | 'google' | null>(null);
+
+  // Google Auth hook
+  const [googleRequest, googleResponse, googlePromptAsync] = useGoogleAuth();
+
+  // Handle Google auth response for registration
+  useEffect(() => {
+    if (googleResponse && socialLoading === 'google') {
+      handleGoogleAuthResponse(googleResponse).then((result) => {
+        setSocialLoading(null);
+        if (!result.success) {
+          if (result.error !== 'Sign in was cancelled') {
+            Alert.alert('Sign Up Failed', result.error || 'Unable to sign up with Google');
+          }
+        }
+        // If successful, Firebase auth state will trigger and we check for household below
+      });
+    }
+  }, [googleResponse]);
+
+  // When pendingSocialAuth is set, show the address form for social registration
+  useEffect(() => {
+    if (pendingSocialAuth) {
+      // Pre-fill name fields from social auth
+      if (pendingSocialAuth.firstName) setFirstName(pendingSocialAuth.firstName);
+      if (pendingSocialAuth.lastName) setLastName(pendingSocialAuth.lastName);
+      setEmail(pendingSocialAuth.email);
+      setStep('social-address');
+    }
+  }, [pendingSocialAuth]);
 
   // Account fields
   const [firstName, setFirstName] = useState('');
@@ -136,8 +175,121 @@ export default function RegisterScreen() {
     setIsLoading(false);
   };
 
+  // Handle Apple Sign Up
+  const handleAppleSignUp = async () => {
+    setSocialLoading('apple');
+    const result = await registerWithApple();
+    setSocialLoading(null);
+
+    if (!result.success) {
+      if (result.error !== 'Sign in was cancelled') {
+        Alert.alert('Sign Up Failed', result.error || 'Unable to sign up with Apple');
+      }
+    }
+    // If needsAddress is true, the useEffect will show the address form
+  };
+
+  // Handle Google Sign Up
+  const handleGoogleSignUp = async () => {
+    if (googleRequest) {
+      setSocialLoading('google');
+      await googlePromptAsync();
+      // Response will be handled by the useEffect above
+    } else {
+      Alert.alert('Sign Up Failed', 'Google Sign In is not available');
+    }
+  };
+
+  // Complete social registration with address
+  const handleSocialRegister = async () => {
+    if (!validateAddressStep()) {
+      return;
+    }
+
+    if (!pendingSocialAuth) {
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+      setStep('account');
+      return;
+    }
+
+    setIsLoading(true);
+
+    const result = await completeSocialRegistration({
+      email: pendingSocialAuth.email || email.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      address: {
+        addressLine1: addressLine1.trim(),
+        addressLine2: addressLine2.trim() || undefined,
+        city: city.trim(),
+        state,
+        zipCode: zipCode.trim(),
+      },
+    });
+
+    if (!result.success) {
+      Alert.alert('Registration Failed', result.error || 'Unable to complete registration');
+    }
+    // If successful, auth-context will handle navigation to main app
+    setIsLoading(false);
+  };
+
+  // Cancel social registration
+  const handleCancelSocialRegistration = async () => {
+    await cancelSocialRegistration();
+    setStep('account');
+    setFirstName('');
+    setLastName('');
+    setEmail('');
+    setAddressLine1('');
+    setAddressLine2('');
+    setCity('');
+    setState('CT');
+    setZipCode('');
+  };
+
   const renderAccountStep = () => (
     <>
+      {/* Social Sign Up Buttons */}
+      <View style={styles.socialButtons}>
+        {isAppleSignInAvailable && (
+          <TouchableOpacity
+            style={styles.socialButton}
+            onPress={handleAppleSignUp}
+            disabled={socialLoading !== null}
+          >
+            {socialLoading === 'apple' ? (
+              <ActivityIndicator color={colors.white} size="small" />
+            ) : (
+              <>
+                <Ionicons name="logo-apple" size={20} color={colors.white} />
+                <Text style={styles.socialButtonText}>Sign up with Apple</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity
+          style={[styles.socialButton, styles.googleButton]}
+          onPress={handleGoogleSignUp}
+          disabled={socialLoading !== null}
+        >
+          {socialLoading === 'google' ? (
+            <ActivityIndicator color={colors.haven.navy[900]} size="small" />
+          ) : (
+            <>
+              <Ionicons name="logo-google" size={20} color={colors.haven.navy[900]} />
+              <Text style={[styles.socialButtonText, styles.googleButtonText]}>Sign up with Google</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.divider}>
+        <View style={styles.dividerLine} />
+        <Text style={styles.dividerText}>or</Text>
+        <View style={styles.dividerLine} />
+      </View>
+
       <View style={styles.row}>
         <View style={[styles.inputContainer, styles.halfWidth]}>
           <Text style={styles.label}>First Name</Text>
@@ -365,6 +517,204 @@ export default function RegisterScreen() {
     </>
   );
 
+  // Social registration address step (for Apple/Google sign-up)
+  const renderSocialAddressStep = () => (
+    <>
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={handleCancelSocialRegistration}
+      >
+        <Ionicons name="arrow-back" size={20} color={colors.haven.navy[600]} />
+        <Text style={styles.backButtonText}>Cancel</Text>
+      </TouchableOpacity>
+
+      <Text style={styles.stepTitle}>Complete Your Profile</Text>
+      <Text style={styles.stepSubtitle}>
+        Tell us where you live so we can set up your home
+      </Text>
+
+      {/* Name fields (pre-filled from social auth, editable) */}
+      <View style={styles.row}>
+        <View style={[styles.inputContainer, styles.halfWidth]}>
+          <Text style={styles.label}>First Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="First"
+            placeholderTextColor={colors.haven.navy[400]}
+            value={firstName}
+            onChangeText={setFirstName}
+            autoCapitalize="words"
+          />
+        </View>
+        <View style={[styles.inputContainer, styles.halfWidth]}>
+          <Text style={styles.label}>Last Name</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Last"
+            placeholderTextColor={colors.haven.navy[400]}
+            value={lastName}
+            onChangeText={setLastName}
+            autoCapitalize="words"
+          />
+        </View>
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Street Address</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="123 Main Street"
+          placeholderTextColor={colors.haven.navy[400]}
+          value={addressLine1}
+          onChangeText={setAddressLine1}
+          autoCapitalize="words"
+          autoComplete="street-address"
+          returnKeyType="next"
+          onSubmitEditing={() => addressLine2Ref.current?.focus()}
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Apt/Unit (optional)</Text>
+        <TextInput
+          ref={addressLine2Ref}
+          style={styles.input}
+          placeholder="Apt 4B"
+          placeholderTextColor={colors.haven.navy[400]}
+          value={addressLine2}
+          onChangeText={setAddressLine2}
+          autoCapitalize="words"
+          returnKeyType="next"
+          onSubmitEditing={() => cityRef.current?.focus()}
+        />
+      </View>
+
+      <View style={styles.row}>
+        <View style={[styles.inputContainer, { flex: 2 }]}>
+          <Text style={styles.label}>City</Text>
+          <TextInput
+            ref={cityRef}
+            style={styles.input}
+            placeholder="City"
+            placeholderTextColor={colors.haven.navy[400]}
+            value={city}
+            onChangeText={setCity}
+            autoCapitalize="words"
+            returnKeyType="next"
+            onSubmitEditing={() => zipRef.current?.focus()}
+          />
+        </View>
+        <View style={[styles.inputContainer, { flex: 1, marginLeft: spacing[3] }]}>
+          <Text style={styles.label}>State</Text>
+          <TouchableOpacity
+            style={styles.statePicker}
+            onPress={() => setShowStatePicker(!showStatePicker)}
+          >
+            <Text style={styles.statePickerText}>{state}</Text>
+            <Ionicons
+              name={showStatePicker ? "chevron-up" : "chevron-down"}
+              size={16}
+              color={colors.haven.navy[600]}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {showStatePicker && (
+        <View style={styles.stateList}>
+          {US_STATES.map((s) => (
+            <TouchableOpacity
+              key={s.value}
+              style={[
+                styles.stateOption,
+                state === s.value && styles.stateOptionSelected,
+              ]}
+              onPress={() => {
+                setState(s.value);
+                setShowStatePicker(false);
+              }}
+            >
+              <Text
+                style={[
+                  styles.stateOptionText,
+                  state === s.value && styles.stateOptionTextSelected,
+                ]}
+              >
+                {s.label} ({s.value})
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>ZIP Code</Text>
+        <TextInput
+          ref={zipRef}
+          style={styles.input}
+          placeholder="06810"
+          placeholderTextColor={colors.haven.navy[400]}
+          value={zipCode}
+          onChangeText={setZipCode}
+          keyboardType="number-pad"
+          maxLength={10}
+          returnKeyType="done"
+          onSubmitEditing={handleSocialRegister}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.button, isLoading && styles.buttonDisabled]}
+        onPress={handleSocialRegister}
+        disabled={isLoading}
+      >
+        {isLoading ? (
+          <ActivityIndicator color={colors.white} />
+        ) : (
+          <>
+            <Text style={styles.buttonText}>Complete Sign Up</Text>
+            <Ionicons name="checkmark-circle" size={20} color={colors.white} />
+          </>
+        )}
+      </TouchableOpacity>
+    </>
+  );
+
+  // Determine which step to render
+  const renderStep = () => {
+    switch (step) {
+      case 'account':
+        return renderAccountStep();
+      case 'address':
+        return renderAddressStep();
+      case 'social-address':
+        return renderSocialAddressStep();
+    }
+  };
+
+  // Get header text based on step
+  const getHeaderTitle = () => {
+    switch (step) {
+      case 'account':
+        return 'Create Account';
+      case 'address':
+        return 'Almost There!';
+      case 'social-address':
+        return 'One More Step';
+    }
+  };
+
+  const getHeaderSubtitle = () => {
+    switch (step) {
+      case 'account':
+        return 'Join Haven Home Manager';
+      case 'address':
+        return 'Step 2 of 2';
+      case 'social-address':
+        return pendingSocialAuth?.provider === 'apple' ? 'Signed in with Apple' : 'Signed in with Google';
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
@@ -382,29 +732,25 @@ export default function RegisterScreen() {
                 <Text style={styles.logoText}>H</Text>
               </View>
             </View>
-            <Text style={styles.title}>
-              {step === 'account' ? 'Create Account' : 'Almost There!'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {step === 'account'
-                ? 'Join Haven Home Manager'
-                : 'Step 2 of 2'}
-            </Text>
+            <Text style={styles.title}>{getHeaderTitle()}</Text>
+            <Text style={styles.subtitle}>{getHeaderSubtitle()}</Text>
 
-            {/* Progress indicator */}
-            <View style={styles.progressContainer}>
-              <View style={[styles.progressDot, styles.progressDotActive]} />
-              <View style={styles.progressLine} />
-              <View style={[
-                styles.progressDot,
-                step === 'address' && styles.progressDotActive
-              ]} />
-            </View>
+            {/* Progress indicator (hide for social-address) */}
+            {step !== 'social-address' && (
+              <View style={styles.progressContainer}>
+                <View style={[styles.progressDot, styles.progressDotActive]} />
+                <View style={styles.progressLine} />
+                <View style={[
+                  styles.progressDot,
+                  step === 'address' && styles.progressDotActive
+                ]} />
+              </View>
+            )}
           </View>
 
           {/* Form */}
           <View style={styles.form}>
-            {step === 'account' ? renderAccountStep() : renderAddressStep()}
+            {renderStep()}
 
             <View style={styles.footer}>
               <Text style={styles.footerText}>Already have an account? </Text>
@@ -609,5 +955,47 @@ const styles = StyleSheet.create({
     color: colors.haven.champagne[600],
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
+  },
+  // Social sign-up styles
+  socialButtons: {
+    gap: spacing[3],
+    marginBottom: spacing[4],
+  },
+  socialButton: {
+    backgroundColor: colors.haven.navy[900],
+    borderRadius: borderRadius.lg,
+    padding: spacing[4],
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[3],
+  },
+  googleButton: {
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.haven.navy[200],
+  },
+  socialButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+  },
+  googleButtonText: {
+    color: colors.haven.navy[900],
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing[4],
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.haven.navy[200],
+  },
+  dividerText: {
+    marginHorizontal: spacing[4],
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.navy[400],
   },
 });
