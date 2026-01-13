@@ -30,3 +30,6 @@ export * from './HomeHeader';
 export * from './Alfred';
 export * from './AlfredSuggestions';
 export * from './AlfredIcon';
+
+// Onboarding Components
+export * from './OnboardingChecklist';

@@ -17,6 +17,8 @@ import { Card, Badge, LoadingSpinner } from '../../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
+import { EditStaffContactModal } from '../../../../src/components/forms/EditStaffContactModal';
+import { EditEmergencyContactModal } from '../../../../src/components/forms/EditEmergencyContactModal';
 
 // =============================================================================
 // TYPES
@@ -302,6 +304,10 @@ export default function StaffDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal states
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+
   const fetchStaff = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
 
@@ -410,6 +416,60 @@ export default function StaffDetailScreen() {
     });
   };
 
+  // Save contact info
+  const handleSaveContact = async (data: {
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save emergency contact
+  const handleSaveEmergencyContact = async (data: {
+    emergencyContact?: string | null;
+    emergencyContactPhone?: string | null;
+    emergencyContactRelationship?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          emergencyContactName: data.emergencyContact,
+          emergencyContactPhone: data.emergencyContactPhone,
+          emergencyContactRelationship: data.emergencyContactRelationship,
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
   if (isLoading) {
     return <LoadingSpinner fullScreen message="Loading staff..." />;
   }
@@ -492,7 +552,7 @@ export default function StaffDetailScreen() {
         options={{
           title: 'Staff Member',
           headerRight: () => (
-            <TouchableOpacity onPress={() => Alert.alert('Edit', 'Edit staff coming soon')}>
+            <TouchableOpacity onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}>
               <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
             </TouchableOpacity>
           ),
@@ -559,7 +619,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="CONTACT INFORMATION"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit contact coming soon')}
+            onAction={() => setShowContactModal(true)}
           />
           <InfoRow
             icon="call-outline"
@@ -577,7 +637,7 @@ export default function StaffDetailScreen() {
           {!staff.phone && !staff.email && !staff.address && (
             <EmptyPrompt
               text="Add contact information"
-              onPress={() => Alert.alert('Edit', 'Edit contact coming soon')}
+              onPress={() => setShowContactModal(true)}
             />
           )}
         </Card>
@@ -587,7 +647,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="SCHEDULE & EMPLOYMENT"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit employment coming soon')}
+            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
           />
           {(staff.workSchedule || staff.employment?.schedule) && (
             <View style={styles.scheduleCard}>
@@ -643,7 +703,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="COMPENSATION"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit compensation coming soon')}
+            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
           />
           {hasCompensationData ? (
             <>
@@ -671,7 +731,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add compensation details"
-              onPress={() => Alert.alert('Edit', 'Edit compensation coming soon')}
+              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -681,7 +741,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="BENEFITS YOU PROVIDE"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit benefits coming soon')}
+            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
           />
           {hasBenefitsData ? (
             <>
@@ -736,7 +796,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add benefits information"
-              onPress={() => Alert.alert('Edit', 'Edit benefits coming soon')}
+              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -746,7 +806,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="REIMBURSEMENTS"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit reimbursements coming soon')}
+            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
           />
           {hasReimbursementsData ? (
             <>
@@ -806,7 +866,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add reimbursement policy"
-              onPress={() => Alert.alert('Edit', 'Edit reimbursements coming soon')}
+              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -816,7 +876,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="DOCUMENTS & CERTIFICATIONS"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit documents coming soon')}
+            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
           />
           <ChecklistRow
             label="W-9 on file"
@@ -854,33 +914,40 @@ export default function StaffDetailScreen() {
         </Card>
 
         {/* Emergency Contact */}
-        {staff.staffEmergencyContact?.name && (
-          <Card style={styles.section}>
-            <SectionHeader
-              title="THEIR EMERGENCY CONTACT"
-              action="Edit"
-              onAction={() => Alert.alert('Edit', 'Edit emergency contact coming soon')}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="THEIR EMERGENCY CONTACT"
+            action="Edit"
+            onAction={() => setShowEmergencyModal(true)}
+          />
+          {staff.staffEmergencyContact?.name ? (
+            <>
+              <InfoRow
+                icon="person-outline"
+                label="Name"
+                value={staff.staffEmergencyContact.name}
+              />
+              <InfoRow
+                icon="people-outline"
+                label="Relationship"
+                value={staff.staffEmergencyContact.relationship}
+              />
+              <InfoRow
+                icon="call-outline"
+                label="Phone"
+                value={staff.staffEmergencyContact.phone}
+                onPress={staff.staffEmergencyContact.phone
+                  ? () => Linking.openURL(`tel:${staff.staffEmergencyContact?.phone}`)
+                  : undefined}
+              />
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add emergency contact"
+              onPress={() => setShowEmergencyModal(true)}
             />
-            <InfoRow
-              icon="person-outline"
-              label="Name"
-              value={staff.staffEmergencyContact.name}
-            />
-            <InfoRow
-              icon="people-outline"
-              label="Relationship"
-              value={staff.staffEmergencyContact.relationship}
-            />
-            <InfoRow
-              icon="call-outline"
-              label="Phone"
-              value={staff.staffEmergencyContact.phone}
-              onPress={staff.staffEmergencyContact.phone
-                ? () => Linking.openURL(`tel:${staff.staffEmergencyContact?.phone}`)
-                : undefined}
-            />
-          </Card>
-        )}
+          )}
+        </Card>
 
         {/* Notes */}
         {staff.notes && (
@@ -896,6 +963,29 @@ export default function StaffDetailScreen() {
           <Text style={styles.deleteButtonText}>Remove Staff Member</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Focused Edit Modals */}
+      <EditStaffContactModal
+        visible={showContactModal}
+        onClose={() => setShowContactModal(false)}
+        onSave={handleSaveContact}
+        initialData={{
+          phone: staff.phone,
+          email: staff.email,
+          address: staff.address,
+        }}
+      />
+
+      <EditEmergencyContactModal
+        visible={showEmergencyModal}
+        onClose={() => setShowEmergencyModal(false)}
+        onSave={handleSaveEmergencyContact}
+        initialData={{
+          emergencyContact: staff.staffEmergencyContact?.name,
+          emergencyContactPhone: staff.staffEmergencyContact?.phone,
+          emergencyContactRelationship: staff.staffEmergencyContact?.relationship,
+        }}
+      />
     </SafeAreaView>
   );
 }

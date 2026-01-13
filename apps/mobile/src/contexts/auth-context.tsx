@@ -86,6 +86,24 @@ interface RegisterSimpleInput {
   };
 }
 
+// Property details from ATTOM (for onboarding)
+interface PropertyDetails {
+  bedrooms: number | null;
+  bathrooms: number | null;
+  squareFeet: number | null;
+  yearBuilt: number | null;
+  lotSizeAcres: number | null;
+  stories: number | null;
+  heatingType: string | null;
+  heatingFuel: string | null;
+  coolingType: string | null;
+  waterType: string | null;
+  sewerType: string | null;
+  garageSpaces: number | null;
+  pool: boolean | null;
+  propertyType: string | null;
+}
+
 // Social registration input (Apple/Google)
 interface RegisterSocialInput {
   email: string;
@@ -98,6 +116,7 @@ interface RegisterSocialInput {
     state: string;
     zipCode: string;
   };
+  propertyDetails?: PropertyDetails | null;
 }
 
 // Pending social auth data when user needs to complete registration
@@ -291,19 +310,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [fetchMe, loadCurrentHousehold]);
 
   // Handle navigation based on auth state
-  // Alfred-first flow: users go directly to main app after registration
   useEffect(() => {
     if (!isInitialized || isLoading) return;
 
     const inAuthGroup = segments[0] === '(auth)';
+    const inOnboarding = segments[0] === '(onboarding)';
 
-    if (!user && !inAuthGroup) {
+    // Case 1: No Firebase user at all - must go to login
+    if (!firebaseUser && !inAuthGroup) {
       router.replace('/(auth)/login');
-    } else if (user && inAuthGroup) {
-      // Go directly to main app - Alfred will handle data collection progressively
+      return;
+    }
+
+    // Case 2: Firebase user exists but needs to complete registration (no household)
+    // This covers both: user auto-created by API, or user record exists but no household
+    if (firebaseUser && !householdInfo) {
+      // Don't redirect if already in onboarding
+      if (inOnboarding) return;
+
+      // Check if this is a social auth user
+      const providerData = firebaseUser.providerData || [];
+      const socialProvider = providerData.find(
+        (p: any) => p.providerId === 'apple.com' || p.providerId === 'google.com'
+      );
+
+      if (socialProvider) {
+        // Social auth user needs to complete registration with address
+        if (!pendingSocialAuth) {
+          const displayName = firebaseUser.displayName || '';
+          const nameParts = displayName.split(' ');
+          setPendingSocialAuth({
+            email: firebaseUser.email || '',
+            firstName: nameParts[0] || '',
+            lastName: nameParts.slice(1).join(' ') || '',
+            provider: socialProvider.providerId === 'apple.com' ? 'apple' : 'google',
+          });
+        }
+        router.replace('/(onboarding)/address');
+        return;
+      }
+
+      // Email/password user without household - they need to register
+      if (!inAuthGroup) {
+        router.replace('/(auth)/register');
+        return;
+      }
+    }
+
+    // Case 3: User is fully set up (has Haven account + household) - go to main app
+    // Don't redirect if user is on the completion page - let them see the success message
+    const onCompletePage = inOnboarding && segments[1] === 'complete';
+    if (user && householdInfo && (inAuthGroup || (inOnboarding && !onCompletePage))) {
       router.replace('/(tabs)');
     }
-  }, [user, segments, isLoading, isInitialized, router]);
+  }, [user, firebaseUser, householdInfo, pendingSocialAuth, segments, isLoading, isInitialized, router]);
 
   // Define refresh functions early so they can be used by registerSimple
   const refreshMe = useCallback(async () => {
@@ -613,6 +673,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName: input.firstName,
           lastName: input.lastName,
           address: input.address,
+          propertyDetails: input.propertyDetails, // Include ATTOM data
         }),
       });
 

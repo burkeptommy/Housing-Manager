@@ -72,4 +72,12 @@ export class DashboardController {
   async getFamily(@Param('householdId') householdId: string) {
     return this.dashboardService.getFamily(householdId);
   }
+
+  @Get('household/:householdId/onboarding')
+  @ApiOperation({ summary: 'Get onboarding checklist status for a household' })
+  @ApiParam({ name: 'householdId', description: 'Household ID' })
+  @ApiResponse({ status: 200, description: 'Onboarding checklist status' })
+  async getOnboardingChecklist(@Param('householdId') householdId: string) {
+    return this.dashboardService.getOnboardingChecklist(householdId);
+  }
 }

@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/auth-context';
 import { useSubscription } from '../../src/contexts/subscription-context';
-import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard } from '../../src/components';
+import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard, OnboardingChecklist, OnboardingChecklistData } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { API_BASE_URL } from '../../src/lib/api';
 import { getIdToken } from '../../src/lib/firebase';
@@ -201,6 +201,8 @@ export default function DashboardScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [familyData, setFamilyData] = useState<FamilyData | null>(null);
+  const [onboardingData, setOnboardingData] = useState<OnboardingChecklistData | null>(null);
+  const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
 
@@ -219,12 +221,15 @@ export default function DashboardScreen() {
         return;
       }
 
-      // Fetch dashboard and family data in parallel
-      const [dashboardRes, familyRes] = await Promise.all([
+      // Fetch dashboard, family, and onboarding data in parallel
+      const [dashboardRes, familyRes, onboardingRes] = await Promise.all([
         fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/family`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/onboarding`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -239,6 +244,11 @@ export default function DashboardScreen() {
       if (familyRes.ok) {
         const family = await familyRes.json();
         setFamilyData(family);
+      }
+
+      if (onboardingRes.ok) {
+        const onboarding = await onboardingRes.json();
+        setOnboardingData(onboarding);
       }
 
       setError(null);
@@ -377,6 +387,14 @@ export default function DashboardScreen() {
           </AnimatedCard>
         )}
 
+        {/* Onboarding Checklist - shown for new users who haven't completed all items */}
+        {showOnboardingChecklist && onboardingData && (
+          <OnboardingChecklist
+            data={onboardingData}
+            onDismiss={() => setShowOnboardingChecklist(false)}
+          />
+        )}
+
         {/* Today's Notes */}
         <AnimatedCard style={styles.notesCard} delay={100}>
           <View style={styles.cardHeader}>
@@ -393,49 +411,59 @@ export default function DashboardScreen() {
           ))}
         </AnimatedCard>
 
-        {/* Family Status */}
-        {familyData && (familyData.members.length > 0 || familyData.pets.length > 0) && (
-          <AnimatedCard style={styles.familyCard} delay={150}>
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>Family</Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/family')}>
-                <Text style={styles.seeAllLink}>See all</Text>
+        {/* Family Status - Always show with add option */}
+        <AnimatedCard style={styles.familyCard} delay={150}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>Family</Text>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/family')}>
+              <Text style={styles.seeAllLink}>Manage</Text>
+            </TouchableOpacity>
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.familyScroll}>
+            {familyData?.members.map((member) => (
+              <TouchableOpacity
+                key={member.id}
+                style={styles.familyMember}
+                onPress={() => router.push(`/(tabs)/family/member/${member.id}` as any)}
+                activeOpacity={0.7}
+              >
+                <View style={styles.familyAvatar}>
+                  <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.navy[600]} />
+                </View>
+                <Text style={styles.familyName} numberOfLines={1}>{member.firstName}</Text>
+                <Text style={styles.familyRole} numberOfLines={1}>
+                  {member.type === 'CHILD' ? 'Child' : member.type === 'STAFF' ? 'Staff' : 'Adult'}
+                </Text>
               </TouchableOpacity>
-            </View>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.familyScroll}>
-              {familyData.members.map((member) => (
-                <TouchableOpacity
-                  key={member.id}
-                  style={styles.familyMember}
-                  onPress={() => router.push(`/(tabs)/family/member/${member.id}` as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.familyAvatar}>
-                    <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.navy[600]} />
-                  </View>
-                  <Text style={styles.familyName} numberOfLines={1}>{member.firstName}</Text>
-                  <Text style={styles.familyRole} numberOfLines={1}>
-                    {member.type === 'CHILD' ? 'Child' : member.type === 'STAFF' ? 'Staff' : 'Adult'}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-              {familyData.pets.map((pet) => (
-                <TouchableOpacity
-                  key={pet.id}
-                  style={styles.familyMember}
-                  onPress={() => router.push(`/(tabs)/family/pet/${pet.id}` as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.familyAvatar, { backgroundColor: colors.haven.champagne[100] }]}>
-                    <Ionicons name="paw-outline" size={24} color={colors.haven.champagne[600]} />
-                  </View>
-                  <Text style={styles.familyName} numberOfLines={1}>{pet.name}</Text>
-                  <Text style={styles.familyRole} numberOfLines={1}>{pet.breed || pet.species}</Text>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </AnimatedCard>
-        )}
+            ))}
+            {familyData?.pets.map((pet) => (
+              <TouchableOpacity
+                key={pet.id}
+                style={styles.familyMember}
+                onPress={() => router.push(`/(tabs)/family/pet/${pet.id}` as any)}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.familyAvatar, { backgroundColor: colors.haven.champagne[100] }]}>
+                  <Ionicons name="paw-outline" size={24} color={colors.haven.champagne[600]} />
+                </View>
+                <Text style={styles.familyName} numberOfLines={1}>{pet.name}</Text>
+                <Text style={styles.familyRole} numberOfLines={1}>{pet.breed || pet.species}</Text>
+              </TouchableOpacity>
+            ))}
+            {/* Add Member Button */}
+            <TouchableOpacity
+              style={styles.familyMember}
+              onPress={() => router.push('/(tabs)/family')}
+              activeOpacity={0.7}
+            >
+              <View style={styles.addMemberAvatar}>
+                <Ionicons name="add" size={24} color={colors.haven.champagne[500]} />
+              </View>
+              <Text style={styles.familyName} numberOfLines={1}>Add</Text>
+              <Text style={styles.familyRole} numberOfLines={1}>Member</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </AnimatedCard>
 
         {/* Pending Approvals Alert */}
         {data.pendingApprovals > 0 && (
@@ -779,6 +807,18 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     backgroundColor: colors.haven.navy[100],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[2],
+  },
+  addMemberAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.haven.champagne[50],
+    borderWidth: 2,
+    borderColor: colors.haven.champagne[300],
+    borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],

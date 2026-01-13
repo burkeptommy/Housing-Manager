@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { GoogleAuthProvider, signInWithCredential } from 'firebase/auth';
 import { getFirebaseAuth, isFirebaseConfigured } from './firebase';
 import { makeRedirectUri, type AuthSessionResult } from 'expo-auth-session';
+import { Platform } from 'react-native';
 
 // Required for web browser auth session
 WebBrowser.maybeCompleteAuthSession();
@@ -36,6 +37,16 @@ const IOS_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID;
 const ANDROID_CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID;
 
 /**
+ * Check if Google Sign In is properly configured for the current platform
+ */
+export function isGoogleSignInConfigured(): boolean {
+  if (!WEB_CLIENT_ID) return false;
+  if (Platform.OS === 'ios' && !IOS_CLIENT_ID) return false;
+  if (Platform.OS === 'android' && !ANDROID_CLIENT_ID) return false;
+  return true;
+}
+
+/**
  * Configure Google Sign In (called at app startup)
  */
 export function configureGoogleSignIn(): void {
@@ -43,30 +54,57 @@ export function configureGoogleSignIn(): void {
     console.warn('Google Sign In: EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID not configured');
     return;
   }
-  console.log('Google Sign In: Configured with web client');
+  if (Platform.OS === 'ios' && !IOS_CLIENT_ID) {
+    console.warn('Google Sign In: EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID not configured for iOS');
+    return;
+  }
+  console.log('Google Sign In: Configured');
 }
 
 /**
  * Check if Google Sign In is available
  */
 export async function isGoogleAuthAvailable(): Promise<boolean> {
-  // Available if Firebase is configured and we have a client ID
-  if (!isFirebaseConfigured()) {
-    return false;
+  if (!isFirebaseConfigured()) return false;
+  return isGoogleSignInConfigured();
+}
+
+/**
+ * Get the reversed client ID for iOS OAuth redirect
+ * The reversed client ID is used as the URL scheme for OAuth callbacks
+ */
+function getIOSReversedClientId(): string | undefined {
+  if (!IOS_CLIENT_ID) return undefined;
+  // iOS client ID format: XXX.apps.googleusercontent.com
+  // Reversed format: com.googleusercontent.apps.XXX
+  const parts = IOS_CLIENT_ID.split('.');
+  if (parts.length >= 4) {
+    // Extract the unique ID part (e.g., 421884826038-oi6sdgqco1g7umpogf1g2b754tpg80q8)
+    const uniqueId = parts[0];
+    return `com.googleusercontent.apps.${uniqueId}`;
   }
-  return !!WEB_CLIENT_ID;
+  return undefined;
 }
 
 /**
  * Get the Google auth request configuration
+ * Only call this hook if isGoogleSignInConfigured() returns true
  */
 export function useGoogleAuth() {
-  // Create redirect URI using the app's custom scheme
-  // For production iOS: uses the app's scheme (haven://)
-  // For Expo Go: uses the Expo proxy automatically
-  const redirectUri = makeRedirectUri({
-    scheme: 'haven',
-  });
+  // For iOS, use the reversed client ID as the redirect scheme
+  // This is required for Google OAuth to properly redirect back to the app
+  let redirectUri: string;
+
+  if (Platform.OS === 'ios') {
+    const reversedClientId = getIOSReversedClientId();
+    if (reversedClientId) {
+      redirectUri = `${reversedClientId}:/`;
+    } else {
+      redirectUri = makeRedirectUri({ scheme: 'haven' });
+    }
+  } else {
+    redirectUri = makeRedirectUri({ scheme: 'haven' });
+  }
 
   console.log('Google Auth redirect URI:', redirectUri);
 

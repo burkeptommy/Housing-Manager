@@ -7,15 +7,21 @@ import {
   TouchableOpacity,
   Alert,
   RefreshControl,
+  TextInput,
+  Modal,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../../src/contexts/auth-context';
-import { Card, Badge, LoadingSpinner } from '../../../../src/components';
+import { Card, Badge, LoadingSpinner, Button } from '../../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
+import { EditRegistrationModal } from '../../../../src/components/forms/EditRegistrationModal';
+import { EditInsuranceModal } from '../../../../src/components/forms/EditInsuranceModal';
 
 // =============================================================================
 // TYPES
@@ -78,6 +84,14 @@ interface ServiceRecord {
   notes?: string | null;
 }
 
+interface ServiceProvider {
+  id: string;
+  name: string;
+  type: string;
+  phone?: string | null;
+  address?: string | null;
+}
+
 interface VehicleDetail {
   id: string;
   name?: string | null;
@@ -88,7 +102,11 @@ interface VehicleDetail {
   licensePlate?: string | null;
   vin?: string | null;
   registrationExpiry?: string | null;
+  registrationDocUrl?: string | null;
   insuranceExpiry?: string | null;
+  insuranceDocUrl?: string | null;
+  insuranceProvider?: string | null;
+  insurancePolicyNumber?: string | null;
   notes?: string | null;
   // Enhanced fields
   registration?: Registration;
@@ -97,6 +115,7 @@ interface VehicleDetail {
   status?: VehicleStatus;
   financing?: Financing;
   serviceHistory?: ServiceRecord[];
+  serviceProviders?: ServiceProvider[];
 }
 
 // =============================================================================
@@ -318,6 +337,14 @@ export default function VehicleDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal states
+  const [showRegistrationModal, setShowRegistrationModal] = useState(false);
+  const [showInsuranceModal, setShowInsuranceModal] = useState(false);
+  const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [newProviderName, setNewProviderName] = useState('');
+  const [newProviderType, setNewProviderType] = useState('mechanic');
+  const [newProviderPhone, setNewProviderPhone] = useState('');
+
   const fetchVehicle = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
 
@@ -392,6 +419,141 @@ export default function VehicleDetailScreen() {
               router.back();
             } catch (err) {
               Alert.alert('Error', 'Failed to delete vehicle.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Save registration data
+  const handleSaveRegistration = async (data: {
+    licensePlate?: string | null;
+    vin?: string | null;
+    state?: string | null;
+    expiresAt?: string | null;
+    registrationDocUrl?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          licensePlate: data.licensePlate,
+          vin: data.vin,
+          registrationState: data.state,
+          registrationExpiry: data.expiresAt,
+          registrationDocUrl: data.registrationDocUrl,
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchVehicle();
+  };
+
+  // Save insurance data
+  const handleSaveInsurance = async (data: {
+    insuranceProvider?: string | null;
+    insurancePolicyNumber?: string | null;
+    insuranceExpiresAt?: string | null;
+    insuranceDocUrl?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          insuranceProvider: data.insuranceProvider,
+          insurancePolicyNumber: data.insurancePolicyNumber,
+          insuranceExpiry: data.insuranceExpiresAt,
+          insuranceDocUrl: data.insuranceDocUrl,
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchVehicle();
+  };
+
+  // Add service provider
+  const handleAddServiceProvider = async () => {
+    if (!newProviderName.trim()) {
+      Alert.alert('Required', 'Provider name is required');
+      return;
+    }
+
+    try {
+      const token = await getIdToken(true);
+      if (!token) throw new Error('Authentication expired');
+
+      const response = await fetch(
+        `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}/provider`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            name: newProviderName.trim(),
+            type: newProviderType,
+            phone: newProviderPhone.trim() || null,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error('Failed to add provider');
+
+      setNewProviderName('');
+      setNewProviderType('mechanic');
+      setNewProviderPhone('');
+      setShowAddProviderModal(false);
+      await fetchVehicle();
+    } catch (err) {
+      Alert.alert('Error', 'Failed to add service provider');
+    }
+  };
+
+  // Remove service provider
+  const handleRemoveProvider = async (providerId: string) => {
+    Alert.alert(
+      'Remove Provider',
+      'Are you sure you want to remove this service provider?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await getIdToken(true);
+              if (!token) return;
+
+              await fetch(
+                `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}/provider/${providerId}`,
+                {
+                  method: 'DELETE',
+                  headers: { Authorization: `Bearer ${token}` },
+                }
+              );
+              await fetchVehicle();
+            } catch (err) {
+              Alert.alert('Error', 'Failed to remove provider');
             }
           },
         },
@@ -500,7 +662,7 @@ export default function VehicleDetailScreen() {
         options={{
           title: 'Vehicle',
           headerRight: () => (
-            <TouchableOpacity onPress={() => Alert.alert('Edit', 'Edit vehicle coming soon')}>
+            <TouchableOpacity onPress={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}>
               <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
             </TouchableOpacity>
           ),
@@ -545,14 +707,20 @@ export default function VehicleDetailScreen() {
           <SectionHeader
             title="REGISTRATION"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit registration coming soon')}
+            onAction={() => setShowRegistrationModal(true)}
           />
-          {hasRegistrationData || vehicle.licensePlate ? (
+          {hasRegistrationData || vehicle.licensePlate || vehicle.vin ? (
             <>
               <InfoRow
                 icon="card-outline"
                 label="License Plate"
                 value={vehicle.registration?.licensePlate || vehicle.licensePlate}
+                mono
+              />
+              <InfoRow
+                icon="document-text-outline"
+                label="VIN"
+                value={vehicle.vin}
                 mono
               />
               <InfoRow
@@ -585,17 +753,17 @@ export default function VehicleDetailScreen() {
                   )}
                 </View>
               )}
-              <InfoRow
-                icon="document-text-outline"
-                label="VIN"
-                value={vehicle.vin}
-                mono
-              />
+              {vehicle.registrationDocUrl && (
+                <TouchableOpacity style={styles.documentButton}>
+                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.champagne[500]} />
+                  <Text style={styles.documentButtonText}>View Registration Document</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <EmptyPrompt
               text="Add registration details"
-              onPress={() => Alert.alert('Edit', 'Edit registration coming soon')}
+              onPress={() => setShowRegistrationModal(true)}
             />
           )}
         </Card>
@@ -605,19 +773,19 @@ export default function VehicleDetailScreen() {
           <SectionHeader
             title="INSURANCE"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit insurance coming soon')}
+            onAction={() => setShowInsuranceModal(true)}
           />
-          {hasInsuranceData || vehicle.insuranceExpiry ? (
+          {hasInsuranceData || vehicle.insuranceExpiry || vehicle.insuranceProvider ? (
             <>
               <InfoRow
                 icon="shield-checkmark-outline"
                 label="Provider"
-                value={vehicle.insurance?.provider}
+                value={vehicle.insurance?.provider || vehicle.insuranceProvider}
               />
               <InfoRow
                 icon="document-outline"
                 label="Policy #"
-                value={vehicle.insurance?.policyNumber}
+                value={vehicle.insurance?.policyNumber || vehicle.insurancePolicyNumber}
                 mono
               />
               {(vehicle.insurance?.expiresAt || vehicle.insuranceExpiry) && (
@@ -663,11 +831,17 @@ export default function VehicleDetailScreen() {
                 label="Monthly Premium"
                 value={formatCurrency(vehicle.insurance?.monthlyPremium)}
               />
+              {vehicle.insuranceDocUrl && (
+                <TouchableOpacity style={styles.documentButton}>
+                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.champagne[500]} />
+                  <Text style={styles.documentButtonText}>View Insurance Card</Text>
+                </TouchableOpacity>
+              )}
             </>
           ) : (
             <EmptyPrompt
               text="Add insurance details"
-              onPress={() => Alert.alert('Edit', 'Edit insurance coming soon')}
+              onPress={() => setShowInsuranceModal(true)}
             />
           )}
         </Card>
@@ -728,7 +902,7 @@ export default function VehicleDetailScreen() {
           <SectionHeader
             title="SERVICE HISTORY"
             action="+ Add"
-            onAction={() => Alert.alert('Add Service', 'Add service record coming soon')}
+            onAction={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}
           />
           {vehicle.serviceHistory && vehicle.serviceHistory.length > 0 ? (
             <>
@@ -770,7 +944,7 @@ export default function VehicleDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add service record"
-              onPress={() => Alert.alert('Add Service', 'Add service record coming soon')}
+              onPress={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -781,7 +955,7 @@ export default function VehicleDetailScreen() {
             <SectionHeader
               title="FINANCING"
               action="Edit"
-              onAction={() => Alert.alert('Edit', 'Edit financing coming soon')}
+              onAction={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}
             />
             <InfoRow
               icon="business-outline"
@@ -809,6 +983,46 @@ export default function VehicleDetailScreen() {
           </Card>
         )}
 
+        {/* Service Providers */}
+        <Card style={styles.section}>
+          <SectionHeader
+            title="SERVICE PROVIDERS"
+            action="+ Add"
+            onAction={() => setShowAddProviderModal(true)}
+          />
+          {vehicle.serviceProviders && vehicle.serviceProviders.length > 0 ? (
+            <>
+              {vehicle.serviceProviders.map((provider) => (
+                <View key={provider.id} style={styles.providerRow}>
+                  <View style={styles.providerIcon}>
+                    <Ionicons name="construct-outline" size={18} color={colors.haven.navy[600]} />
+                  </View>
+                  <View style={styles.providerContent}>
+                    <Text style={styles.providerName}>{provider.name}</Text>
+                    <Text style={styles.providerType}>{provider.type}</Text>
+                    {provider.phone && (
+                      <TouchableOpacity>
+                        <Text style={styles.providerPhone}>{provider.phone}</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.removeProviderButton}
+                    onPress={() => handleRemoveProvider(provider.id)}
+                  >
+                    <Ionicons name="close-circle" size={20} color={colors.text.tertiary} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </>
+          ) : (
+            <EmptyPrompt
+              text="Add service provider"
+              onPress={() => setShowAddProviderModal(true)}
+            />
+          )}
+        </Card>
+
         {/* Notes */}
         {vehicle.notes && (
           <Card style={styles.section}>
@@ -823,6 +1037,110 @@ export default function VehicleDetailScreen() {
           <Text style={styles.deleteButtonText}>Delete Vehicle</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Focused Edit Modals */}
+      <EditRegistrationModal
+        visible={showRegistrationModal}
+        onClose={() => setShowRegistrationModal(false)}
+        onSave={handleSaveRegistration}
+        initialData={{
+          licensePlate: vehicle.registration?.licensePlate || vehicle.licensePlate,
+          vin: vehicle.vin,
+          state: vehicle.registration?.state,
+          expiresAt: vehicle.registration?.expiresAt || vehicle.registrationExpiry,
+          registrationDocUrl: vehicle.registrationDocUrl,
+        }}
+      />
+
+      <EditInsuranceModal
+        visible={showInsuranceModal}
+        onClose={() => setShowInsuranceModal(false)}
+        onSave={handleSaveInsurance}
+        initialData={{
+          insuranceProvider: vehicle.insurance?.provider || vehicle.insuranceProvider,
+          insurancePolicyNumber: vehicle.insurance?.policyNumber || vehicle.insurancePolicyNumber,
+          insuranceExpiresAt: vehicle.insurance?.expiresAt || vehicle.insuranceExpiry,
+          insuranceDocUrl: vehicle.insuranceDocUrl,
+        }}
+      />
+
+      {/* Add Service Provider Modal */}
+      <Modal
+        visible={showAddProviderModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+      >
+        <SafeAreaView style={styles.modalContainer} edges={['top']}>
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.modalKeyboard}
+          >
+            <View style={styles.modalHeader}>
+              <TouchableOpacity onPress={() => setShowAddProviderModal(false)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+              <Text style={styles.modalTitle}>Add Service Provider</Text>
+              <View style={styles.modalPlaceholder} />
+            </View>
+
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Provider Name</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newProviderName}
+                  onChangeText={setNewProviderName}
+                  placeholder="e.g., Joe's Auto Shop"
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Type</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {['mechanic', 'body_shop', 'dealer', 'tire_shop', 'detailing', 'other'].map((type) => (
+                    <TouchableOpacity
+                      key={type}
+                      style={[styles.typeChip, newProviderType === type && styles.typeChipActive]}
+                      onPress={() => setNewProviderType(type)}
+                    >
+                      <Text style={[styles.typeChipText, newProviderType === type && styles.typeChipTextActive]}>
+                        {type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Phone (optional)</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={newProviderPhone}
+                  onChangeText={setNewProviderPhone}
+                  placeholder="(555) 123-4567"
+                  placeholderTextColor={colors.text.tertiary}
+                  keyboardType="phone-pad"
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <Button
+                title="Cancel"
+                variant="outline"
+                onPress={() => setShowAddProviderModal(false)}
+                style={styles.modalCancelButton}
+              />
+              <Button
+                title="Add Provider"
+                onPress={handleAddServiceProvider}
+                style={styles.modalSaveButton}
+              />
+            </View>
+          </KeyboardAvoidingView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1083,6 +1401,146 @@ const styles = StyleSheet.create({
   deleteButtonText: {
     fontSize: typography.fontSizes.base,
     color: colors.status.error,
+    fontWeight: typography.fontWeights.medium,
+  },
+  // Document buttons
+  documentButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.haven.champagne[50],
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[3],
+  },
+  documentButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[500],
+  },
+  // Service Providers
+  providerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  providerIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.haven.navy[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  providerContent: {
+    flex: 1,
+  },
+  providerName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  providerType: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    textTransform: 'capitalize',
+    marginTop: 2,
+  },
+  providerPhone: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[500],
+    marginTop: 2,
+  },
+  removeProviderButton: {
+    padding: spacing[2],
+  },
+  // Modal styles
+  modalContainer: {
+    flex: 1,
+    backgroundColor: colors.background.primary,
+  },
+  modalKeyboard: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  modalCloseButton: {
+    padding: spacing[2],
+    marginLeft: -spacing[2],
+  },
+  modalTitle: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  modalPlaceholder: {
+    width: 40,
+  },
+  modalContent: {
+    flex: 1,
+    padding: spacing[4],
+  },
+  modalFooter: {
+    flexDirection: 'row',
+    padding: spacing[4],
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+    gap: spacing[3],
+  },
+  modalCancelButton: {
+    flex: 1,
+  },
+  modalSaveButton: {
+    flex: 1,
+  },
+  // Form inputs
+  inputGroup: {
+    marginBottom: spacing[4],
+  },
+  inputLabel: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+    marginBottom: spacing[2],
+  },
+  textInput: {
+    backgroundColor: colors.gray[50],
+    borderWidth: 1,
+    borderColor: colors.border.default,
+    borderRadius: borderRadius.lg,
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[3],
+    fontSize: typography.fontSizes.base,
+    color: colors.text.primary,
+  },
+  typeChip: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.gray[100],
+    marginRight: spacing[2],
+  },
+  typeChipActive: {
+    backgroundColor: colors.haven.champagne[500],
+  },
+  typeChipText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+  },
+  typeChipTextActive: {
+    color: colors.white,
     fontWeight: typography.fontWeights.medium,
   },
 });

@@ -19,12 +19,12 @@ import { PropertyEnrichmentService } from '../property/property-enrichment.servi
 import {
   RegisterDto,
   RegisterSimpleDto,
+  RegisterSocialDto,
   LoginDto,
   AuthResponseDto,
   TokenResponseDto,
   UserResponseDto,
   MeResponseDto,
-  HouseholdResponseDto,
 } from './dto';
 
 export interface JwtPayload {
@@ -195,6 +195,135 @@ export class AuthService {
     };
   }
 
+  /**
+   * Social registration for Apple/Google Sign-In users
+   * Creates user, household, home profile with address - no password needed
+   * Firebase handles authentication, we just need to create our database records
+   */
+  async registerSocial(
+    dto: RegisterSocialDto,
+    userAgent?: string,
+    ipAddress?: string,
+  ): Promise<{ user: UserResponseDto; householdId: string; message: string }> {
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email: dto.email.toLowerCase() },
+    });
+
+    if (existingUser) {
+      throw new ConflictException('A user with this email already exists');
+    }
+
+    // Create user, household, home profile in a transaction
+    // No password hash needed - Firebase handles auth
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Create user (no password hash for social auth)
+      const user = await tx.user.create({
+        data: {
+          email: dto.email.toLowerCase(),
+          passwordHash: '', // Empty - social auth via Firebase
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          role: UserRole.HOMEOWNER,
+          emailVerified: true, // Social providers verify email
+        },
+      });
+
+      // 2. Create household with utility info from ATTOM
+      const household = await tx.household.create({
+        data: {
+          name: `The ${dto.lastName} Family`,
+          ownerId: user.id,
+          subscriptionPlan: 'ESSENTIALS',
+          subscriptionStatus: 'ACTIVE',
+          // Utility/system data from ATTOM (if available)
+          waterSource: dto.propertyDetails?.waterType ?? undefined,
+          sewerType: dto.propertyDetails?.sewerType ?? undefined,
+          heatingFuel: dto.propertyDetails?.heatingFuel ?? undefined,
+          attomDataFetched: dto.propertyDetails ? true : false,
+          enrichmentData: dto.propertyDetails ? { ...dto.propertyDetails } : undefined,
+          members: {
+            create: {
+              userId: user.id,
+              role: 'OWNER',
+              status: 'ACTIVE',
+              joinedAt: new Date(),
+            },
+          },
+        },
+      });
+
+      // 3. Create home profile with address and property details from ATTOM
+      await tx.homeProfile.create({
+        data: {
+          householdId: household.id,
+          addressLine1: dto.address.addressLine1,
+          addressLine2: dto.address.addressLine2,
+          city: dto.address.city,
+          state: dto.address.state,
+          postalCode: dto.address.zipCode,
+          // Property details from ATTOM (if available)
+          bedrooms: dto.propertyDetails?.bedrooms ?? undefined,
+          bathrooms: dto.propertyDetails?.bathrooms ?? undefined,
+          squareFeet: dto.propertyDetails?.squareFeet ?? undefined,
+          yearBuilt: dto.propertyDetails?.yearBuilt ?? undefined,
+          stories: dto.propertyDetails?.stories ?? undefined,
+          garageSpaces: dto.propertyDetails?.garageSpaces ?? undefined,
+        },
+      });
+
+      // 4. Create family member entry for the owner
+      await tx.familyMember.create({
+        data: {
+          householdId: household.id,
+          firstName: dto.firstName,
+          lastName: dto.lastName,
+          email: dto.email.toLowerCase(),
+          relationship: 'Owner',
+          type: 'ADULT',
+        },
+      });
+
+      return { user, household };
+    });
+
+    // 5. Trigger ATTOM enrichment in background (async - don't wait)
+    this.enrichmentService
+      .enrichHouseholdFromAttom(result.household.id, {})
+      .catch((err) => {
+        this.logger.error(`ATTOM enrichment failed for household ${result.household.id}:`, err);
+      });
+
+    // 6. Initialize Alfred data gaps based on missing property info
+    // Build list of what we don't have
+    const dataGaps: string[] = [];
+    const pd = dto.propertyDetails;
+    if (!pd?.waterType) dataGaps.push('water_source');
+    if (!pd?.sewerType) dataGaps.push('sewer_type');
+    if (!pd?.heatingFuel) dataGaps.push('heating_fuel');
+    if (!pd?.yearBuilt) dataGaps.push('year_built');
+    if (!pd?.bedrooms) dataGaps.push('bedrooms');
+    if (!pd?.bathrooms) dataGaps.push('bathrooms');
+    if (!pd?.squareFeet) dataGaps.push('square_feet');
+    if (pd?.garageSpaces === null || pd?.garageSpaces === undefined) dataGaps.push('garage');
+
+    if (dataGaps.length > 0) {
+      this.prisma.household
+        .update({
+          where: { id: result.household.id },
+          data: { alfredDataGaps: dataGaps },
+        })
+        .catch((err) => {
+          this.logger.error(`Failed to set Alfred data gaps for household ${result.household.id}:`, err);
+        });
+    }
+
+    return {
+      user: this.mapUserToResponse(result.user),
+      householdId: result.household.id,
+      message: 'Account created successfully',
+    };
+  }
+
   async login(dto: LoginDto, userAgent?: string, ipAddress?: string): Promise<AuthResponseDto> {
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
@@ -276,7 +405,21 @@ export class AuthService {
       include: {
         householdMembers: {
           where: { status: 'ACTIVE' },
-          include: { household: true },
+          include: {
+            household: {
+              include: {
+                homeProfile: {
+                  select: {
+                    id: true,
+                    addressLine1: true,
+                    city: true,
+                    state: true,
+                    postalCode: true,
+                  },
+                },
+              },
+            },
+          },
         },
       },
     });
@@ -285,16 +428,43 @@ export class AuthService {
       throw new UnauthorizedException('User not found');
     }
 
-    const households: HouseholdResponseDto[] = user.householdMembers.map((member) => ({
-      id: member.household.id,
-      name: member.household.name,
-      description: member.household.description,
+    // Build memberships array
+    const memberships = user.householdMembers.map((member) => ({
+      householdId: member.household.id,
+      householdName: member.household.name,
       role: member.role,
+      status: member.status,
     }));
+
+    // Get primary household (first active membership)
+    const primaryMembership = user.householdMembers[0];
+    let household = null;
+
+    if (primaryMembership) {
+      const h = primaryMembership.household;
+      const homeProfile = h.homeProfile;
+      const hasProperty = !!homeProfile;
+      const propertyAddress = homeProfile
+        ? `${homeProfile.addressLine1}, ${homeProfile.city}, ${homeProfile.state} ${homeProfile.postalCode}`
+        : undefined;
+
+      household = {
+        id: h.id,
+        name: h.name,
+        description: h.description,
+        subscriptionPlan: h.subscriptionPlan,
+        subscriptionStatus: h.subscriptionStatus,
+        billingCycleDay: h.billingCycleDay,
+        role: primaryMembership.role,
+        hasProperty,
+        propertyAddress,
+      };
+    }
 
     return {
       user: this.mapUserToResponse(user),
-      households,
+      household,
+      memberships,
     };
   }
 

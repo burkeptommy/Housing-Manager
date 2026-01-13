@@ -10,13 +10,14 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { Link, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
 import { colors, spacing, typography, borderRadius } from '../../src/lib/theme';
-import { useGoogleAuth, handleGoogleAuthResponse } from '../../src/lib/google-auth';
+import { GoogleSignInButtonIfAvailable } from '../../src/components/GoogleSignInButton';
 
 // US States for picker
 const US_STATES = [
@@ -42,25 +43,7 @@ export default function RegisterScreen() {
 
   // Step tracking: 'account' | 'address' | 'social-address' (for social sign-up)
   const [step, setStep] = useState<'account' | 'address' | 'social-address'>('account');
-  const [socialLoading, setSocialLoading] = useState<'apple' | 'google' | null>(null);
-
-  // Google Auth hook
-  const [googleRequest, googleResponse, googlePromptAsync] = useGoogleAuth();
-
-  // Handle Google auth response for registration
-  useEffect(() => {
-    if (googleResponse && socialLoading === 'google') {
-      handleGoogleAuthResponse(googleResponse).then((result) => {
-        setSocialLoading(null);
-        if (!result.success) {
-          if (result.error !== 'Sign in was cancelled') {
-            Alert.alert('Sign Up Failed', result.error || 'Unable to sign up with Google');
-          }
-        }
-        // If successful, Firebase auth state will trigger and we check for household below
-      });
-    }
-  }, [googleResponse]);
+  const [socialLoading, setSocialLoading] = useState<'apple' | null>(null);
 
   // When pendingSocialAuth is set, show the address form for social registration
   useEffect(() => {
@@ -189,15 +172,9 @@ export default function RegisterScreen() {
     // If needsAddress is true, the useEffect will show the address form
   };
 
-  // Handle Google Sign Up
-  const handleGoogleSignUp = async () => {
-    if (googleRequest) {
-      setSocialLoading('google');
-      await googlePromptAsync();
-      // Response will be handled by the useEffect above
-    } else {
-      Alert.alert('Sign Up Failed', 'Google Sign In is not available');
-    }
+  // Handle Google Sign Up error
+  const handleGoogleError = (errorMsg: string) => {
+    Alert.alert('Sign Up Failed', errorMsg);
   };
 
   // Complete social registration with address
@@ -268,20 +245,10 @@ export default function RegisterScreen() {
             )}
           </TouchableOpacity>
         )}
-        <TouchableOpacity
-          style={[styles.socialButton, styles.googleButton]}
-          onPress={handleGoogleSignUp}
-          disabled={socialLoading !== null}
-        >
-          {socialLoading === 'google' ? (
-            <ActivityIndicator color={colors.haven.navy[900]} size="small" />
-          ) : (
-            <>
-              <Ionicons name="logo-google" size={20} color={colors.haven.navy[900]} />
-              <Text style={[styles.socialButtonText, styles.googleButtonText]}>Sign up with Google</Text>
-            </>
-          )}
-        </TouchableOpacity>
+        <GoogleSignInButtonIfAvailable
+          onError={handleGoogleError}
+          style={styles.googleButtonStyle}
+        />
       </View>
 
       <View style={styles.divider}>
@@ -728,9 +695,11 @@ export default function RegisterScreen() {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <View style={styles.logo}>
-                <Text style={styles.logoText}>H</Text>
-              </View>
+              <Image
+                source={require('../../assets/icon.png')}
+                style={styles.logo}
+                resizeMode="contain"
+              />
             </View>
             <Text style={styles.title}>{getHeaderTitle()}</Text>
             <Text style={styles.subtitle}>{getHeaderSubtitle()}</Text>
@@ -788,17 +757,9 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   logo: {
-    width: 64,
-    height: 64,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.navy[900],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: typography.fontWeights.bold,
-    color: colors.haven.champagne[500],
+    width: 72,
+    height: 72,
+    borderRadius: 16,
   },
   title: {
     fontSize: typography.fontSizes['2xl'],
@@ -997,5 +958,8 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing[4],
     fontSize: typography.fontSizes.sm,
     color: colors.haven.navy[400],
+  },
+  googleButtonStyle: {
+    marginBottom: 0, // Override default margin since socialButtons uses gap
   },
 });

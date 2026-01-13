@@ -14,6 +14,7 @@ import { AuthService } from './auth.service';
 import {
   RegisterDto,
   RegisterSimpleDto,
+  RegisterSocialDto,
   LoginDto,
   RefreshTokenDto,
   AuthResponseDto,
@@ -23,6 +24,7 @@ import {
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtPayload } from './auth.service';
+import { FirebaseAuthGuard, AuthPayload, AuthenticatedRequest } from '../firebase/firebase-auth.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -54,6 +56,24 @@ export class AuthController {
     const ipAddress = req.ip || req.socket.remoteAddress;
 
     return this.authService.registerSimple(dto, userAgent, ipAddress);
+  }
+
+  /**
+   * Social registration for Apple/Google Sign-In
+   * Creates Haven user/household for users authenticated via Firebase social providers
+   * No password required - Firebase handles authentication
+   * Note: No auth guard - user is registering, not yet authenticated with Haven
+   */
+  @Post('register-social')
+  @HttpCode(HttpStatus.CREATED)
+  async registerSocial(
+    @Body() dto: RegisterSocialDto,
+    @Req() req: Request,
+  ) {
+    const userAgent = req.headers['user-agent'];
+    const ipAddress = req.ip || req.socket.remoteAddress;
+
+    return this.authService.registerSocial(dto, userAgent, ipAddress);
   }
 
   @Post('login')
@@ -91,8 +111,8 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(JwtAuthGuard)
-  async getMe(@CurrentUser() user: JwtPayload): Promise<MeResponseDto> {
-    return this.authService.getMe(user.sub);
+  @UseGuards(FirebaseAuthGuard)
+  async getMe(@Req() req: AuthenticatedRequest): Promise<MeResponseDto> {
+    return this.authService.getMe(req.user.userId);
   }
 }

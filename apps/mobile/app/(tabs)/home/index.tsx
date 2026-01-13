@@ -491,12 +491,14 @@ export default function YourHomeScreen() {
         </View>
 
         {/* Systems Status */}
-        {data.systems.length > 0 && (
-          <View style={styles.section}>
-            <SectionHeader
-              title="Home Systems"
-              subtitle={`${data.systems.length} systems tracked`}
-            />
+        <View style={styles.section}>
+          <SectionHeader
+            title="Home Systems"
+            subtitle={data.systems.length > 0 ? `${data.systems.length} systems tracked` : 'Track your major systems'}
+            actionText="+ Add"
+            onActionPress={() => setShowAddAssetModal(true)}
+          />
+          {data.systems.length > 0 ? (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -519,8 +521,22 @@ export default function YourHomeScreen() {
                 </TouchableOpacity>
               ))}
             </ScrollView>
-          </View>
-        )}
+          ) : (
+            <TouchableOpacity
+              style={styles.emptySystemsCard}
+              onPress={() => setShowAddAssetModal(true)}
+            >
+              <View style={styles.emptySystemsIcon}>
+                <Ionicons name="hardware-chip-outline" size={28} color={colors.haven.champagne[500]} />
+              </View>
+              <View style={styles.emptySystemsContent}>
+                <Text style={styles.emptySystemsTitle}>Add your home systems</Text>
+                <Text style={styles.emptySystemsSubtitle}>HVAC, water heater, appliances...</Text>
+              </View>
+              <Ionicons name="add-circle-outline" size={24} color={colors.haven.champagne[500]} />
+            </TouchableOpacity>
+          )}
+        </View>
 
         {/* Zones Grid */}
         <View style={styles.section}>
@@ -860,6 +876,38 @@ const styles = StyleSheet.create({
   systemStatus: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  emptySystemsCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.haven.champagne[50],
+    borderRadius: borderRadius.xl,
+    padding: spacing[4],
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[200],
+    borderStyle: 'dashed',
+  },
+  emptySystemsIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing[3],
+  },
+  emptySystemsContent: {
+    flex: 1,
+  },
+  emptySystemsTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  emptySystemsSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
     marginTop: 2,
   },
 

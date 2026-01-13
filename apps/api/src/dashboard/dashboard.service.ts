@@ -477,6 +477,56 @@ export class DashboardService {
   }
 
   /**
+   * Get onboarding checklist status for a household
+   * Returns which onboarding items have been completed
+   */
+  async getOnboardingChecklist(householdId: string) {
+    // Check if bank is connected (Plaid link exists)
+    const bankConnected = await this.prisma.plaidLink.count({
+      where: { householdId },
+    }) > 0;
+
+    // Check if HVAC system exists (PropertyAsset with HVAC category)
+    const hasHvacSystem = await this.prisma.propertyAsset.count({
+      where: {
+        householdId,
+        category: 'HVAC',
+        isActive: true,
+      },
+    }) > 0;
+
+    // Check if any documents exist in vault
+    const hasDocuments = await this.prisma.document.count({
+      where: { householdId },
+    }) > 0;
+
+    // Check if family members beyond owner exist (more than 1)
+    const familyMemberCount = await this.prisma.familyMember.count({
+      where: { householdId },
+    });
+    const hasFamilyMembers = familyMemberCount > 1;
+
+    // Check if any maintenance tasks exist
+    const hasMaintenanceTask = await this.prisma.maintenanceTask.count({
+      where: { householdId },
+    }) > 0;
+
+    // Check if any vendors are added
+    const hasVendor = await this.prisma.householdVendor.count({
+      where: { householdId },
+    }) > 0;
+
+    return {
+      bankConnected,
+      hasHvacSystem,
+      hasDocuments,
+      hasFamilyMembers,
+      hasMaintenanceTask,
+      hasVendor,
+    };
+  }
+
+  /**
    * Get family data for a household
    */
   async getFamily(householdId: string) {

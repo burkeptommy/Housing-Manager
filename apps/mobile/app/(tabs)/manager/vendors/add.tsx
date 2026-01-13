@@ -59,6 +59,7 @@ export default function AddVendorScreen() {
   const [postalCode, setPostalCode] = useState('');
   const [serviceDescription, setServiceDescription] = useState('');
   const [notes, setNotes] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
 
   const handleSubmit = async () => {
     if (!displayName.trim()) {
@@ -96,6 +97,7 @@ export default function AddVendorScreen() {
           postalCode: postalCode.trim() || undefined,
           serviceDescription: serviceDescription.trim() || undefined,
           notes: notes.trim() || undefined,
+          accountNumber: accountNumber.trim() || undefined,
         }),
       });
 
@@ -136,6 +138,7 @@ export default function AddVendorScreen() {
     setPostalCode('');
     setServiceDescription('');
     setNotes('');
+    setAccountNumber('');
   };
 
   const SaveButton = () => (
@@ -257,6 +260,18 @@ export default function AddVendorScreen() {
               keyboardType="url"
               autoCapitalize="none"
             />
+
+            <Text style={styles.inputLabel}>Account Number</Text>
+            <TextInput
+              style={styles.textInput}
+              value={accountNumber}
+              onChangeText={setAccountNumber}
+              placeholder="Your account # with this vendor"
+              placeholderTextColor={colors.text.tertiary}
+            />
+            <Text style={styles.inputHint}>
+              For utilities: helps us track and pay your bills
+            </Text>
           </Card>
 
           {/* Address */}
@@ -439,6 +454,12 @@ const styles = StyleSheet.create({
   textArea: {
     height: 80,
     textAlignVertical: 'top',
+  },
+  inputHint: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: spacing[1],
+    fontStyle: 'italic',
   },
   row: {
     flexDirection: 'row',

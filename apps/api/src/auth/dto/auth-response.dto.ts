@@ -19,6 +19,25 @@ export class HouseholdResponseDto {
   role: string;
 }
 
+export class HouseholdInfoDto {
+  id: string;
+  name: string;
+  description: string | null;
+  subscriptionPlan: string;
+  subscriptionStatus: string;
+  billingCycleDay: number;
+  role: string;
+  hasProperty: boolean;
+  propertyAddress?: string;
+}
+
+export class MembershipDto {
+  householdId: string;
+  householdName: string;
+  role: string;
+  status: string;
+}
+
 export class AuthResponseDto {
   user: UserResponseDto;
   accessToken: string;
@@ -33,5 +52,6 @@ export class TokenResponseDto {
 
 export class MeResponseDto {
   user: UserResponseDto;
-  households: HouseholdResponseDto[];
+  household: HouseholdInfoDto | null;
+  memberships: MembershipDto[];
 }

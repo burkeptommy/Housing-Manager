@@ -20,7 +20,7 @@ import { useAuth } from '../../src/contexts/auth-context';
 import { Button, Input, LoadingSpinner } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { getBiometricName } from '../../src/lib/biometric-auth';
-import { useGoogleAuth, handleGoogleAuthResponse } from '../../src/lib/google-auth';
+import { GoogleSignInButtonIfAvailable } from '../../src/components/GoogleSignInButton';
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -39,22 +39,6 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
   const [fadeAnim] = useState(new Animated.Value(0));
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-
-  // Google Auth hook
-  const [googleRequest, googleResponse, googlePromptAsync] = useGoogleAuth();
-
-  // Handle Google auth response
-  useEffect(() => {
-    if (googleResponse) {
-      setIsGoogleLoading(true);
-      handleGoogleAuthResponse(googleResponse).then((result) => {
-        setIsGoogleLoading(false);
-        if (!result.success && result.error !== 'Sign in was cancelled') {
-          setError(result.error || 'Google Sign In failed');
-        }
-      });
-    }
-  }, [googleResponse]);
 
   // Fade in animation
   useEffect(() => {
@@ -95,13 +79,8 @@ export default function LoginScreen() {
     }
   };
 
-  const handleGoogleLogin = async () => {
-    setError('');
-    if (googleRequest) {
-      await googlePromptAsync();
-    } else {
-      setError('Google Sign In is not available');
-    }
+  const handleGoogleError = (errorMsg: string) => {
+    setError(errorMsg);
   };
 
   const handleBiometricLogin = async () => {
@@ -179,15 +158,10 @@ export default function LoginScreen() {
               )}
 
               {/* Google Sign In */}
-              <TouchableOpacity style={styles.googleButton} onPress={handleGoogleLogin}>
-                <Image
-                  source={{
-                    uri: 'https://developers.google.com/identity/images/g-logo.png',
-                  }}
-                  style={styles.googleLogo}
-                />
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
-              </TouchableOpacity>
+              <GoogleSignInButtonIfAvailable
+                onError={handleGoogleError}
+                onLoadingChange={setIsGoogleLoading}
+              />
 
               {/* Biometric */}
               {biometricStatus?.isAvailable && biometricStatus?.isEnabled && (

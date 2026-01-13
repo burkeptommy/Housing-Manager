@@ -93,6 +93,91 @@ export class AlfredQuestionsService {
       followUp: "Just a rough year is fine, like '1985' or 'early 2000s'.",
       priority: 3,
     },
+    {
+      id: 'heating_fuel',
+      dataGap: 'heating_fuel',
+      question:
+        'What type of heating does your home have? This helps me plan maintenance and track your energy costs.',
+      responseType: 'choice',
+      choices: [
+        { label: 'Natural Gas', value: 'natural-gas' },
+        { label: 'Oil', value: 'oil' },
+        { label: 'Propane', value: 'propane' },
+        { label: 'Electric', value: 'electric' },
+        { label: 'Heat Pump', value: 'heat-pump' },
+        { label: 'Other', value: 'other' },
+      ],
+      priority: 1,
+    },
+    {
+      id: 'cooling_type',
+      dataGap: 'cooling_type',
+      question:
+        'How do you cool your home during summer?',
+      responseType: 'choice',
+      choices: [
+        { label: 'Central Air Conditioning', value: 'central-ac' },
+        { label: 'Window Units', value: 'window-units' },
+        { label: 'Mini-Split / Ductless', value: 'mini-split' },
+        { label: 'Heat Pump', value: 'heat-pump' },
+        { label: 'No Air Conditioning', value: 'none' },
+      ],
+      priority: 2,
+    },
+    {
+      id: 'bedrooms',
+      dataGap: 'bedrooms',
+      question:
+        'How many bedrooms does your home have?',
+      responseType: 'text',
+      followUp: 'Just the number is fine.',
+      priority: 3,
+    },
+    {
+      id: 'bathrooms',
+      dataGap: 'bathrooms',
+      question:
+        'How many bathrooms? Half baths count as 0.5.',
+      responseType: 'text',
+      followUp: 'For example: 2.5 or 3',
+      priority: 3,
+    },
+    {
+      id: 'square_feet',
+      dataGap: 'square_feet',
+      question:
+        'Approximately how many square feet is your home? This helps me estimate maintenance costs.',
+      responseType: 'text',
+      followUp: "A rough estimate is fine, like '2000' or 'about 1500'.",
+      priority: 4,
+    },
+    {
+      id: 'garage',
+      dataGap: 'garage',
+      question:
+        'Does your home have a garage? If so, how many cars does it fit?',
+      responseType: 'choice',
+      choices: [
+        { label: 'No Garage', value: '0' },
+        { label: '1-Car Garage', value: '1' },
+        { label: '2-Car Garage', value: '2' },
+        { label: '3+ Car Garage', value: '3' },
+      ],
+      priority: 4,
+    },
+    {
+      id: 'pool',
+      dataGap: 'pool',
+      question:
+        'Does your home have a pool?',
+      responseType: 'choice',
+      choices: [
+        { label: 'Yes, in-ground pool', value: 'inground' },
+        { label: 'Yes, above-ground pool', value: 'aboveground' },
+        { label: 'No pool', value: 'none' },
+      ],
+      priority: 4,
+    },
   ];
 
   async getNextQuestion(
@@ -215,7 +300,8 @@ export class AlfredQuestionsService {
       case 'year_built':
         const year = this.parseYear(answer);
         if (year) {
-          updates.yearBuilt = year;
+          // Update the homeProfile for year_built
+          await this.updateHomeProfile(householdId, { yearBuilt: year });
           const age = new Date().getFullYear() - year;
           message = `Got it! Your home was built around ${year}, making it about ${age} years old. This helps me estimate when major systems might need attention.`;
         } else {
@@ -223,6 +309,90 @@ export class AlfredQuestionsService {
             "I'll note that for now. If you find out later, just let me know!";
         }
         removeGap = 'year_built';
+        break;
+
+      case 'heating_fuel':
+        updates.heatingFuel = answer;
+        if (answer === 'oil') {
+          // Add follow-up question for oil provider
+          await this.addDataGap(householdId, 'oil_provider');
+          message = "Got it, oil heat! I'll ask about your oil provider next so I can help track deliveries.";
+        } else if (answer === 'propane') {
+          await this.addDataGap(householdId, 'propane_provider');
+          message = "Propane heat noted! I'll help you track refills and find competitive pricing.";
+        } else if (answer === 'natural-gas') {
+          message = "Natural gas heat - great for efficiency! I'll monitor your gas usage.";
+        } else {
+          message = `${answer.charAt(0).toUpperCase() + answer.slice(1).replace('-', ' ')} heating noted!`;
+        }
+        removeGap = 'heating_fuel';
+        break;
+
+      case 'cooling_type':
+        // Store in household or homeProfile as appropriate
+        message = answer === 'none'
+          ? "No AC - got it! I'll remind you about window unit maintenance if you add them."
+          : `${answer.replace('-', ' ')} cooling system noted. I'll add filter reminders to your maintenance schedule.`;
+        if (answer !== 'none') {
+          // Could create HVAC maintenance tasks here
+        }
+        removeGap = 'cooling_type';
+        break;
+
+      case 'bedrooms':
+        const bedroomsNum = parseInt(answer);
+        if (bedroomsNum > 0) {
+          await this.updateHomeProfile(householdId, { bedrooms: bedroomsNum });
+          message = `${bedroomsNum} bedrooms noted!`;
+        } else {
+          message = "I'll make a note of that.";
+        }
+        removeGap = 'bedrooms';
+        break;
+
+      case 'bathrooms':
+        const bathroomsNum = parseFloat(answer);
+        if (bathroomsNum > 0) {
+          await this.updateHomeProfile(householdId, { bathrooms: bathroomsNum });
+          message = `${bathroomsNum} bathrooms noted!`;
+        } else {
+          message = "I'll make a note of that.";
+        }
+        removeGap = 'bathrooms';
+        break;
+
+      case 'square_feet':
+        const sqft = this.parseNumber(answer);
+        if (sqft) {
+          await this.updateHomeProfile(householdId, { squareFeet: sqft });
+          message = `About ${sqft.toLocaleString()} square feet - this helps me estimate costs for things like HVAC and painting.`;
+        } else {
+          message = "No problem! We can estimate this later.";
+        }
+        removeGap = 'square_feet';
+        break;
+
+      case 'garage':
+        const garageSpaces = parseInt(answer);
+        await this.updateHomeProfile(householdId, { garageSpaces });
+        if (garageSpaces === 0) {
+          message = "No garage - got it!";
+        } else {
+          message = `${garageSpaces}-car garage noted. I'll add garage door maintenance to your schedule.`;
+        }
+        removeGap = 'garage';
+        break;
+
+      case 'pool':
+        if (answer !== 'none') {
+          await this.createPoolMaintenanceTask(householdId, answer === 'inground');
+          message = answer === 'inground'
+            ? "In-ground pool! I've added pool opening, closing, and maintenance reminders to your schedule."
+            : "Above-ground pool noted! I'll remind you about seasonal setup and winterization.";
+        } else {
+          message = "No pool - got it!";
+        }
+        removeGap = 'pool';
         break;
 
       default:
@@ -351,5 +521,151 @@ export class AlfredQuestionsService {
       questionsRemaining: pendingQuestions.length,
       completionPercentage,
     };
+  }
+
+  private parseNumber(answer: string): number | null {
+    // Remove commas and extract numbers
+    const cleaned = answer.replace(/,/g, '').replace(/[^\d.]/g, ' ').trim();
+    const match = cleaned.match(/\d+/);
+    if (match) {
+      const num = parseInt(match[0]);
+      return num > 0 ? num : null;
+    }
+    return null;
+  }
+
+  private async addDataGap(householdId: string, gap: string) {
+    const household = await this.prisma.household.findUnique({
+      where: { id: householdId },
+      select: { alfredDataGaps: true },
+    });
+
+    const dataGaps = (household?.alfredDataGaps as string[]) || [];
+    if (!dataGaps.includes(gap)) {
+      dataGaps.push(gap);
+      await this.prisma.household.update({
+        where: { id: householdId },
+        data: { alfredDataGaps: dataGaps },
+      });
+    }
+  }
+
+  private async updateHomeProfile(householdId: string, data: Record<string, any>) {
+    await this.prisma.homeProfile.updateMany({
+      where: { householdId },
+      data,
+    });
+  }
+
+  private async createPoolMaintenanceTask(householdId: string, isInground: boolean) {
+    // Check if pool task already exists
+    const existingTask = await this.prisma.maintenanceTask.findFirst({
+      where: { householdId, title: { contains: 'Pool' } },
+    });
+
+    if (!existingTask) {
+      // Create pool opening task (spring)
+      await this.prisma.maintenanceTask.create({
+        data: {
+          householdId,
+          title: isInground ? 'Pool Opening (In-Ground)' : 'Pool Setup (Above-Ground)',
+          description: isInground
+            ? 'Annual pool opening: remove cover, add chemicals, start filter'
+            : 'Set up above-ground pool for the season',
+          frequency: 'ANNUAL',
+          dueDate: this.getNextSpringDate(),
+          status: 'UPCOMING',
+          estimatedCost: isInground ? 300 : 50,
+        },
+      });
+
+      // Create pool closing task (fall)
+      await this.prisma.maintenanceTask.create({
+        data: {
+          householdId,
+          title: isInground ? 'Pool Closing (In-Ground)' : 'Pool Winterization (Above-Ground)',
+          description: isInground
+            ? 'Annual pool closing: winterize plumbing, cover pool'
+            : 'Drain and store above-ground pool for winter',
+          frequency: 'ANNUAL',
+          dueDate: this.getNextFallDate(),
+          status: 'UPCOMING',
+          estimatedCost: isInground ? 350 : 25,
+        },
+      });
+
+      this.logger.log(`Created pool maintenance tasks for household ${householdId}`);
+    }
+  }
+
+  private getNextSpringDate(): Date {
+    const now = new Date();
+    const year = now.getMonth() < 4 ? now.getFullYear() : now.getFullYear() + 1;
+    return new Date(year, 4, 1); // May 1st
+  }
+
+  private getNextFallDate(): Date {
+    const now = new Date();
+    const year = now.getMonth() < 9 ? now.getFullYear() : now.getFullYear() + 1;
+    return new Date(year, 9, 1); // October 1st
+  }
+
+  /**
+   * Initialize data gaps for a new household based on what ATTOM didn't provide
+   * Called after registration to determine what questions Alfred should ask
+   */
+  async initializeDataGaps(householdId: string): Promise<string[]> {
+    const household = await this.prisma.household.findUnique({
+      where: { id: householdId },
+      include: {
+        homeProfile: true,
+      },
+    });
+
+    if (!household) return [];
+
+    const dataGaps: string[] = [];
+
+    // Check what data is missing from household
+    if (!household.waterSource && !household.waterSourceConfirmed) {
+      dataGaps.push('water_source');
+    }
+    if (!household.sewerType && !household.sewerTypeConfirmed) {
+      dataGaps.push('sewer_type');
+    }
+    if (!household.heatingFuel) {
+      dataGaps.push('heating_fuel');
+    }
+
+    // Check homeProfile for missing property details
+    const homeProfile = household.homeProfile;
+    if (homeProfile) {
+      if (!homeProfile.yearBuilt) {
+        dataGaps.push('year_built');
+      }
+      if (!homeProfile.bedrooms) {
+        dataGaps.push('bedrooms');
+      }
+      if (!homeProfile.bathrooms) {
+        dataGaps.push('bathrooms');
+      }
+      if (!homeProfile.squareFeet) {
+        dataGaps.push('square_feet');
+      }
+      if (homeProfile.garageSpaces === null || homeProfile.garageSpaces === undefined) {
+        dataGaps.push('garage');
+      }
+    }
+
+    // Save the data gaps to the household
+    if (dataGaps.length > 0) {
+      await this.prisma.household.update({
+        where: { id: householdId },
+        data: { alfredDataGaps: dataGaps },
+      });
+      this.logger.log(`Initialized ${dataGaps.length} data gaps for household ${householdId}: ${dataGaps.join(', ')}`);
+    }
+
+    return dataGaps;
   }
 }

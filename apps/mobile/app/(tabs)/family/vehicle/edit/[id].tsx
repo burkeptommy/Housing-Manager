@@ -19,6 +19,13 @@ import { colors, typography, spacing, borderRadius } from '../../../../../src/li
 import { API_BASE_URL } from '../../../../../src/lib/api';
 import { getIdToken } from '../../../../../src/lib/firebase';
 
+interface ServiceProvider {
+  id?: string;
+  name: string;
+  phone?: string;
+  type: string; // 'mechanic', 'dealer', 'body_shop', 'tire', 'other'
+}
+
 interface Vehicle {
   id: string;
   make: string;
@@ -29,8 +36,10 @@ interface Vehicle {
   vin?: string;
   insuranceExpiry?: string;
   registrationExpiry?: string;
+  registrationDocUrl?: string;
   notes?: string;
   imageUrl?: string;
+  serviceProviders?: ServiceProvider[];
 }
 
 export default function EditVehicleScreen() {
@@ -42,6 +51,10 @@ export default function EditVehicleScreen() {
   const [showInsurancePicker, setShowInsurancePicker] = useState(false);
   const [showRegistrationPicker, setShowRegistrationPicker] = useState(false);
   const [vehicleImage, setVehicleImage] = useState<string | null>(null);
+  const [registrationDoc, setRegistrationDoc] = useState<string | null>(null);
+  const [serviceProviders, setServiceProviders] = useState<ServiceProvider[]>([]);
+  const [showAddProvider, setShowAddProvider] = useState(false);
+  const [newProvider, setNewProvider] = useState({ name: '', phone: '', type: 'mechanic' });
 
   const [formData, setFormData] = useState({
     make: '',
@@ -88,6 +101,8 @@ export default function EditVehicleScreen() {
           notes: vehicle.notes || '',
         });
         setVehicleImage(vehicle.imageUrl || null);
+        setRegistrationDoc(vehicle.registrationDocUrl || null);
+        setServiceProviders(vehicle.serviceProviders || []);
       }
     } catch (err) {
       console.error('Fetch vehicle error:', err);
@@ -127,8 +142,10 @@ export default function EditVehicleScreen() {
         vin: formData.vin.trim() || null,
         insuranceExpiry: formData.insuranceExpiry?.toISOString() || null,
         registrationExpiry: formData.registrationExpiry?.toISOString() || null,
+        registrationDocUrl: registrationDoc,
         notes: formData.notes.trim() || null,
         imageUrl: vehicleImage,
+        serviceProviders: serviceProviders,
       };
 
       const response = await fetch(`${API_BASE_URL}/households/${householdInfo?.id}/vehicles/${id}`, {
@@ -345,6 +362,134 @@ export default function EditVehicleScreen() {
             )}
           </Card>
 
+          {/* Registration Document */}
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Registration Document</Text>
+            <Text style={styles.cardSubtitle}>Upload a photo of your registration for safekeeping</Text>
+            <ImageUpload
+              currentImage={registrationDoc}
+              onImageSelected={setRegistrationDoc}
+              shape="rectangle"
+              size="medium"
+              placeholder="Upload Registration"
+            />
+          </Card>
+
+          {/* Service Providers */}
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Service Providers</Text>
+            <Text style={styles.cardSubtitle}>Add mechanics, dealers, and other service shops</Text>
+
+            {serviceProviders.map((provider, index) => (
+              <View key={index} style={styles.providerRow}>
+                <View style={styles.providerIcon}>
+                  <Ionicons
+                    name={provider.type === 'dealer' ? 'car-sport-outline' :
+                          provider.type === 'tire' ? 'ellipse-outline' :
+                          provider.type === 'body_shop' ? 'color-palette-outline' :
+                          'build-outline'}
+                    size={20}
+                    color={colors.haven.champagne[500]}
+                  />
+                </View>
+                <View style={styles.providerInfo}>
+                  <Text style={styles.providerName}>{provider.name}</Text>
+                  <Text style={styles.providerType}>
+                    {provider.type === 'mechanic' ? 'Mechanic' :
+                     provider.type === 'dealer' ? 'Dealer' :
+                     provider.type === 'body_shop' ? 'Body Shop' :
+                     provider.type === 'tire' ? 'Tire Shop' : 'Other'}
+                  </Text>
+                  {provider.phone && <Text style={styles.providerPhone}>{provider.phone}</Text>}
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    const updated = [...serviceProviders];
+                    updated.splice(index, 1);
+                    setServiceProviders(updated);
+                  }}
+                  style={styles.removeButton}
+                >
+                  <Ionicons name="close-circle" size={24} color={colors.status.error} />
+                </TouchableOpacity>
+              </View>
+            ))}
+
+            {showAddProvider ? (
+              <View style={styles.addProviderForm}>
+                <Input
+                  label="Business Name"
+                  value={newProvider.name}
+                  onChangeText={(v) => setNewProvider({ ...newProvider, name: v })}
+                  placeholder="e.g., Joe's Auto Shop"
+                />
+                <Input
+                  label="Phone (optional)"
+                  value={newProvider.phone}
+                  onChangeText={(v) => setNewProvider({ ...newProvider, phone: v })}
+                  placeholder="(555) 123-4567"
+                  keyboardType="phone-pad"
+                />
+                <View style={styles.typeSelector}>
+                  <Text style={styles.typeLabel}>Type</Text>
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                    {['mechanic', 'dealer', 'body_shop', 'tire', 'other'].map((type) => (
+                      <TouchableOpacity
+                        key={type}
+                        style={[styles.typeChip, newProvider.type === type && styles.typeChipActive]}
+                        onPress={() => setNewProvider({ ...newProvider, type })}
+                      >
+                        <Text style={[styles.typeChipText, newProvider.type === type && styles.typeChipTextActive]}>
+                          {type === 'mechanic' ? 'Mechanic' :
+                           type === 'dealer' ? 'Dealer' :
+                           type === 'body_shop' ? 'Body Shop' :
+                           type === 'tire' ? 'Tire Shop' : 'Other'}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+                <View style={styles.addProviderActions}>
+                  <TouchableOpacity
+                    style={styles.cancelAddButton}
+                    onPress={() => {
+                      setShowAddProvider(false);
+                      setNewProvider({ name: '', phone: '', type: 'mechanic' });
+                    }}
+                  >
+                    <Text style={styles.cancelAddText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.confirmAddButton}
+                    onPress={() => {
+                      if (newProvider.name.trim()) {
+                        setServiceProviders([...serviceProviders, {
+                          name: newProvider.name.trim(),
+                          phone: newProvider.phone.trim() || undefined,
+                          type: newProvider.type,
+                        }]);
+                        setNewProvider({ name: '', phone: '', type: 'mechanic' });
+                        setShowAddProvider(false);
+                      } else {
+                        Alert.alert('Required', 'Please enter a business name');
+                      }
+                    }}
+                  >
+                    <Text style={styles.confirmAddText}>Add Provider</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.addProviderButton}
+                onPress={() => setShowAddProvider(true)}
+              >
+                <Ionicons name="add-circle-outline" size={24} color={colors.haven.champagne[500]} />
+                <Text style={styles.addProviderText}>Add Service Provider</Text>
+              </TouchableOpacity>
+            )}
+          </Card>
+
           {/* Notes */}
           <Card style={styles.card}>
             <Text style={styles.cardTitle}>Notes</Text>
@@ -408,6 +553,11 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
     color: colors.text.primary,
+    marginBottom: spacing[1],
+  },
+  cardSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
     marginBottom: spacing[4],
   },
   row: {
@@ -466,5 +616,118 @@ const styles = StyleSheet.create({
   },
   saveButton: {
     flex: 1,
+  },
+  // Service Providers
+  providerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  providerIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.haven.champagne[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing[3],
+  },
+  providerInfo: {
+    flex: 1,
+  },
+  providerName: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  providerType: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.champagne[600],
+    marginTop: 2,
+  },
+  providerPhone: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  removeButton: {
+    padding: spacing[2],
+  },
+  addProviderButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing[4],
+    gap: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.haven.champagne[300],
+    borderStyle: 'dashed',
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[2],
+  },
+  addProviderText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.haven.champagne[500],
+    fontWeight: typography.fontWeights.medium,
+  },
+  addProviderForm: {
+    padding: spacing[4],
+    backgroundColor: colors.gray[50],
+    borderRadius: borderRadius.lg,
+    marginTop: spacing[2],
+  },
+  typeSelector: {
+    marginTop: spacing[2],
+    marginBottom: spacing[3],
+  },
+  typeLabel: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    marginBottom: spacing[2],
+  },
+  typeChip: {
+    paddingHorizontal: spacing[3],
+    paddingVertical: spacing[2],
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.gray[100],
+    marginRight: spacing[2],
+  },
+  typeChipActive: {
+    backgroundColor: colors.haven.champagne[500],
+  },
+  typeChipText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+  },
+  typeChipTextActive: {
+    color: colors.white,
+    fontWeight: typography.fontWeights.medium,
+  },
+  addProviderActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing[3],
+    marginTop: spacing[2],
+  },
+  cancelAddButton: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+  },
+  cancelAddText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.text.tertiary,
+  },
+  confirmAddButton: {
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: borderRadius.lg,
+  },
+  confirmAddText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.white,
+    fontWeight: typography.fontWeights.medium,
   },
 });

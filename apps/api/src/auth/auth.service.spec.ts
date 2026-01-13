@@ -247,13 +247,23 @@ describe('AuthService', () => {
   });
 
   describe('getMe', () => {
-    it('should return user with households', async () => {
+    it('should return user with household and memberships', async () => {
       const userWithHouseholds = {
         ...mockUser,
         householdMembers: [
           {
             role: 'OWNER',
-            household: mockHousehold,
+            status: 'ACTIVE',
+            household: {
+              ...mockHousehold,
+              homeProfile: {
+                id: 'home-profile-1',
+                addressLine1: '123 Main St',
+                city: 'Springfield',
+                state: 'IL',
+                postalCode: '62701',
+              },
+            },
           },
         ],
       };
@@ -263,8 +273,11 @@ describe('AuthService', () => {
       const result = await service.getMe('user-123');
 
       expect(result).toHaveProperty('user');
-      expect(result).toHaveProperty('households');
-      expect(result.households).toHaveLength(1);
+      expect(result).toHaveProperty('household');
+      expect(result).toHaveProperty('memberships');
+      expect(result.memberships).toHaveLength(1);
+      expect(result.household).not.toBeNull();
+      expect(result.household?.hasProperty).toBe(true);
     });
 
     it('should throw UnauthorizedException if user not found', async () => {

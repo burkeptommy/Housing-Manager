@@ -17,6 +17,9 @@ import { Card, Badge, LoadingSpinner } from '../../../../src/components';
 import { colors, typography, spacing, borderRadius } from '../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
+import { EditPetBasicInfoModal } from '../../../../src/components/forms/EditPetBasicInfoModal';
+import { EditPetVetModal } from '../../../../src/components/forms/EditPetVetModal';
+import { EditPetCareModal } from '../../../../src/components/forms/EditPetCareModal';
 
 // =============================================================================
 // TYPES
@@ -243,6 +246,11 @@ export default function PetDetailScreen() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Modal states
+  const [showBasicInfoModal, setShowBasicInfoModal] = useState(false);
+  const [showVetModal, setShowVetModal] = useState(false);
+  const [showCareModal, setShowCareModal] = useState(false);
+
   const fetchPet = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
 
@@ -330,6 +338,86 @@ export default function PetDetailScreen() {
     );
   };
 
+  // Save basic info
+  const handleSaveBasicInfo = async (data: {
+    birthDate?: string | null;
+    color?: string | null;
+    weight?: number | null;
+    allergies?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchPet();
+  };
+
+  // Save vet info
+  const handleSaveVetInfo = async (data: {
+    vetName?: string | null;
+    vetClinic?: string | null;
+    vetPhone?: string | null;
+    vetAddress?: string | null;
+    lastVetVisit?: string | null;
+    nextVetVisit?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchPet();
+  };
+
+  // Save care info (food & feeding)
+  const handleSaveCareInfo = async (data: {
+    foodBrand?: string | null;
+    foodType?: string | null;
+    feedingSchedule?: string | null;
+    feedingAmount?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchPet();
+  };
+
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return null;
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -401,7 +489,7 @@ export default function PetDetailScreen() {
         options={{
           title: 'Pet',
           headerRight: () => (
-            <TouchableOpacity onPress={() => Alert.alert('Edit', 'Edit pet coming soon')}>
+            <TouchableOpacity onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}>
               <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
             </TouchableOpacity>
           ),
@@ -450,7 +538,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="BASIC INFO"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit pet info coming soon')}
+            onAction={() => setShowBasicInfoModal(true)}
           />
           <InfoRow icon="calendar-outline" label="Birthday" value={formatDate(pet.birthDate)} />
           {pet.adoptionDate && (
@@ -467,7 +555,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="VETERINARIAN"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit vet info coming soon')}
+            onAction={() => setShowVetModal(true)}
           />
           {hasVetInfo ? (
             <>
@@ -522,7 +610,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add veterinarian information"
-              onPress={() => Alert.alert('Edit', 'Edit vet info coming soon')}
+              onPress={() => setShowVetModal(true)}
             />
           )}
         </Card>
@@ -532,7 +620,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="VACCINATIONS"
             action="+ Add"
-            onAction={() => Alert.alert('Add', 'Add vaccination coming soon')}
+            onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
           />
           {pet.vaccinations && pet.vaccinations.length > 0 ? (
             pet.vaccinations.map((vaccination) => (
@@ -575,7 +663,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add vaccination records"
-              onPress={() => Alert.alert('Add', 'Add vaccination coming soon')}
+              onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -586,7 +674,7 @@ export default function PetDetailScreen() {
             <SectionHeader
               title="MEDICATIONS"
               action="+ Add"
-              onAction={() => Alert.alert('Add', 'Add medication coming soon')}
+              onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
             />
             {pet.medicationList && pet.medicationList.length > 0 ? (
               pet.medicationList.map((med) => (
@@ -619,7 +707,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="CARE"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit care info coming soon')}
+            onAction={() => setShowCareModal(true)}
           />
           {hasCareInfo ? (
             <>
@@ -692,7 +780,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add care instructions"
-              onPress={() => Alert.alert('Edit', 'Edit care info coming soon')}
+              onPress={() => setShowCareModal(true)}
             />
           )}
         </Card>
@@ -702,7 +790,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="IDS & REGISTRATION"
             action="Edit"
-            onAction={() => Alert.alert('Edit', 'Edit registration coming soon')}
+            onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
           />
           {pet.microchipId || pet.registration?.microchipId || pet.registration?.licenseNumber ? (
             <>
@@ -728,7 +816,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add microchip or license info"
-              onPress={() => Alert.alert('Edit', 'Edit registration coming soon')}
+              onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
             />
           )}
         </Card>
@@ -739,7 +827,7 @@ export default function PetDetailScreen() {
             <SectionHeader
               title="PET INSURANCE"
               action="Edit"
-              onAction={() => Alert.alert('Edit', 'Edit insurance coming soon')}
+              onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
             />
             <InfoRow
               icon="shield-outline"
@@ -773,6 +861,44 @@ export default function PetDetailScreen() {
           <Text style={styles.deleteButtonText}>Remove Pet</Text>
         </TouchableOpacity>
       </ScrollView>
+
+      {/* Focused Edit Modals */}
+      <EditPetBasicInfoModal
+        visible={showBasicInfoModal}
+        onClose={() => setShowBasicInfoModal(false)}
+        onSave={handleSaveBasicInfo}
+        initialData={{
+          birthDate: pet.birthDate,
+          color: pet.color,
+          weight: pet.weight,
+          allergies: pet.allergies,
+        }}
+      />
+
+      <EditPetVetModal
+        visible={showVetModal}
+        onClose={() => setShowVetModal(false)}
+        onSave={handleSaveVetInfo}
+        initialData={{
+          vetName: pet.vet?.vetName || pet.vetName,
+          vetClinic: pet.vet?.clinicName,
+          vetPhone: pet.vet?.phone || pet.vetPhone,
+          vetAddress: pet.vet?.address,
+          lastVetVisit: pet.vet?.lastVisit || pet.lastVetVisit,
+          nextVetVisit: pet.vet?.nextVisit || pet.nextVetVisit,
+        }}
+      />
+
+      <EditPetCareModal
+        visible={showCareModal}
+        onClose={() => setShowCareModal(false)}
+        onSave={handleSaveCareInfo}
+        initialData={{
+          foodBrand: pet.care?.foodBrand,
+          foodType: pet.care?.foodType,
+          feedingSchedule: pet.care?.feedingSchedule,
+        }}
+      />
     </SafeAreaView>
   );
 }
