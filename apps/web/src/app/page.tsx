@@ -48,48 +48,55 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* HERO SECTION */}
       {/* ================================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-haven-navy-800 via-haven-navy-900 to-haven-navy-950 pt-20 sm:pt-32 pb-12 sm:pb-24">
+      <section className="relative overflow-hidden bg-gradient-to-br from-haven-navy-800 via-haven-navy-900 to-haven-navy-950 min-h-[100dvh] sm:min-h-0 pt-20 sm:pt-32 pb-8 sm:pb-24 flex flex-col justify-center">
         {/* Background decoration */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-navy-700 rounded-full blur-3xl opacity-20" />
           <div className="absolute top-1/2 -left-20 w-72 h-72 bg-sage-300/20 rounded-full blur-3xl opacity-30" />
         </div>
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 flex-1 flex items-center">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
             {/* Left - Copy */}
             <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-              {/* Badge - Meet Alfred - Simpler on mobile */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full mb-4 sm:mb-6">
+              {/* Badge - Meet Alfred */}
+              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full mb-5 sm:mb-6">
                 <Image src="/alfred-icon.svg" alt="Alfred" width={20} height={20} />
                 <span className="text-sm font-medium text-haven-navy-900">Meet Alfred</span>
                 <span className="hidden sm:inline text-haven-navy-400">|</span>
                 <span className="hidden sm:inline text-sm text-haven-navy-700">Your Home Manager</span>
               </div>
 
-              {/* H1 - Smaller on mobile */}
-              <h1 className="text-3xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1] font-serif">
+              {/* H1 */}
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1] font-serif">
                 Your home, finally
                 <br />
                 <span className="text-sage-300">under control.</span>
               </h1>
 
-              {/* Subheadline - Shorter on mobile */}
-              <p className="mt-3 sm:mt-6 text-base sm:text-xl text-haven-100 max-w-xl mx-auto lg:mx-0">
-                <span className="sm:hidden">One bill. One app. Everything handled.</span>
+              {/* Subheadline */}
+              <p className="mt-4 sm:mt-6 text-lg sm:text-xl text-haven-100 max-w-xl mx-auto lg:mx-0">
+                <span className="sm:hidden">Alfred tracks bills, schedules maintenance, finds savings, and consolidates everything into one monthly payment.</span>
                 <span className="hidden sm:inline">Alfred tracks your bills, reminds you before things break, finds savings you&apos;re missing, and consolidates everything into one monthly payment. Stop managing. Start living.</span>
               </p>
 
-              {/* Price - Centered on mobile */}
-              <div className="mt-4 sm:mt-6 flex items-center gap-3 sm:gap-4">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-2xl sm:text-4xl font-bold text-white">$39</span>
-                  <span className="text-base sm:text-xl text-white/70">/mo</span>
+              {/* Mobile value props */}
+              <div className="flex sm:hidden flex-col gap-2 mt-5 w-full max-w-xs">
+                <div className="flex items-center gap-3 text-white/90">
+                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
+                  <span className="text-sm">One bill for everything</span>
                 </div>
-                <span className="text-xs sm:text-sm text-sage-300">Cancel anytime</span>
+                <div className="flex items-center gap-3 text-white/90">
+                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
+                  <span className="text-sm">Never miss maintenance</span>
+                </div>
+                <div className="flex items-center gap-3 text-white/90">
+                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
+                  <span className="text-sm">Handyman who knows your home</span>
+                </div>
               </div>
 
-              {/* Value props - Hidden on mobile, show on sm+ */}
+              {/* Desktop value props */}
               <div className="hidden sm:flex mt-6 flex-wrap justify-center lg:justify-start gap-4 text-sm">
                 <span className="flex items-center gap-2 text-white">
                   <CheckCircle2 className="w-5 h-5 text-sage-300" />
@@ -105,34 +112,43 @@ export default function MarketingPage() {
                 </span>
               </div>
 
-              {/* CTAs - Stacked and smaller on mobile */}
-              <div className="mt-5 sm:mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              {/* Price */}
+              <div className="mt-6 sm:mt-6 flex items-center gap-3 sm:gap-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl sm:text-4xl font-bold text-white">$39</span>
+                  <span className="text-lg sm:text-xl text-white/70">/mo</span>
+                </div>
+                <span className="text-sm text-sage-300">Cancel anytime</span>
+              </div>
+
+              {/* CTAs */}
+              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
                 <Link
                   href="/onboarding/welcome"
-                  className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 bg-white text-haven-navy-900 font-semibold rounded-xl hover:bg-sage-50 transition-all shadow-lg text-base sm:text-lg flex items-center justify-center gap-2"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-white text-haven-navy-900 font-semibold rounded-xl hover:bg-sage-50 transition-all shadow-lg text-base sm:text-lg flex items-center justify-center gap-2"
                 >
                   Get Started
                   <ArrowRight className="w-5 h-5" />
                 </Link>
                 <a
                   href="#how-it-works"
-                  className="w-full sm:w-auto px-6 sm:px-8 py-3 sm:py-4 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-base sm:text-lg text-center"
+                  className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-base sm:text-lg text-center"
                 >
                   See How It Works
                 </a>
               </div>
 
-              {/* Trust - Hidden on mobile, show on sm+ */}
-              <div className="hidden sm:flex mt-8 pt-8 border-t border-white/20 flex-wrap items-center justify-center lg:justify-start gap-6">
-                <div className="flex items-center gap-2 text-sm text-white/70">
+              {/* Trust indicators - compact on mobile */}
+              <div className="mt-6 sm:mt-8 pt-5 sm:pt-8 border-t border-white/20 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/70">
                   <Shield className="w-4 h-4" />
                   <span>Bank-Level Security</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-white/70">
+                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/70">
                   <Star className="w-4 h-4 text-sage-300 fill-current" />
                   <span>4.9/5 Rating</span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-white/70">
+                <div className="hidden sm:flex items-center gap-2 text-sm text-white/70">
                   <Award className="w-4 h-4" />
                   <span>500+ Homes Managed</span>
                 </div>
@@ -144,6 +160,14 @@ export default function MarketingPage() {
               <AlfredChatPreview />
             </div>
           </div>
+        </div>
+
+        {/* Scroll indicator on mobile */}
+        <div className="sm:hidden flex justify-center pb-4 mt-auto">
+          <a href="#how-it-works" className="flex flex-col items-center gap-1 text-white/50 animate-bounce">
+            <span className="text-xs">Scroll to learn more</span>
+            <ChevronDown className="w-5 h-5" />
+          </a>
         </div>
       </section>
 
