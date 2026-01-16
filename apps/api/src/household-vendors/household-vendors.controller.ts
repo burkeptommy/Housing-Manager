@@ -268,6 +268,21 @@ export class VendorsController {
     return this.vendorsService.setRating(vendorId, householdId, user.userId, body.rating);
   }
 
+  @Patch(':vendorId')
+  @ApiOperation({ summary: 'Update a vendor' })
+  @ApiParam({ name: 'vendorId', description: 'Vendor ID' })
+  @ApiQuery({ name: 'householdId', required: true })
+  @ApiResponse({ status: 200, description: 'Vendor updated', type: VendorResponseDto })
+  @ApiResponse({ status: 404, description: 'Vendor not found' })
+  async update(
+    @Param('vendorId') vendorId: string,
+    @Query('householdId') householdId: string,
+    @Body() updateVendorDto: UpdateVendorDto,
+    @CurrentUser() user: AuthPayload,
+  ): Promise<VendorResponseDto> {
+    return this.vendorsService.update(vendorId, householdId, user.userId, updateVendorDto);
+  }
+
   @Get(':vendorId/activities')
   @ApiOperation({ summary: 'Get activities for a vendor' })
   @ApiParam({ name: 'vendorId', description: 'Vendor ID' })

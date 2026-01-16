@@ -175,7 +175,18 @@ export class HouseholdVendorsService {
       });
     }
 
-    return this.mapToResponseWithCrm(vendor, householdVendor, householdVendor.activities);
+    // Get related bill accounts for this vendor
+    const billAccounts = await this.prisma.billAccount.findMany({
+      where: {
+        householdId,
+        vendorId: id,
+        isActive: true,
+      },
+      orderBy: { nextDueDate: 'asc' },
+      take: 10,
+    });
+
+    return this.mapToResponseWithCrm(vendor, householdVendor, householdVendor.activities, billAccounts);
   }
 
   async update(
@@ -516,6 +527,7 @@ export class HouseholdVendorsService {
     vendor: any,
     householdVendor?: any,
     activities?: any[],
+    billAccounts?: any[],
   ): VendorResponseDto {
     const base = this.mapToResponse(vendor);
 
@@ -531,7 +543,24 @@ export class HouseholdVendorsService {
       // Activities
       activities: activities?.map(this.mapActivity) ?? [],
       activityCount: activities?.length ?? 0,
+      // Bill Accounts
+      billAccounts: billAccounts?.map(this.mapBillAccount) ?? [],
     } as any;
+  }
+
+  private mapBillAccount(billAccount: any) {
+    return {
+      id: billAccount.id,
+      nickname: billAccount.nickname,
+      category: billAccount.category,
+      accountNumber: billAccount.accountNumber,
+      billingFrequency: billAccount.billingFrequency,
+      typicalAmount: billAccount.typicalAmount ? Number(billAccount.typicalAmount) : null,
+      nextDueDate: billAccount.nextDueDate,
+      lastPaidDate: billAccount.lastPaidDate,
+      lastPaidAmount: billAccount.lastPaidAmount ? Number(billAccount.lastPaidAmount) : null,
+      paymentResponsibility: billAccount.paymentResponsibility,
+    };
   }
 
   private mapActivity(activity: any): ActivityResponseDto {

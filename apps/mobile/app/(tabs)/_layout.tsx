@@ -63,7 +63,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: '#c4a574',  // Champagne - warm, distinctive active state
+        tabBarActiveTintColor: colors.haven.sage[500],  // Sage - natural, grounded active state
         tabBarInactiveTintColor: colors.gray[400],
         tabBarStyle: {
           backgroundColor: colors.white,

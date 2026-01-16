@@ -20,190 +20,94 @@ export default async function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #1E2A3B 0%, #111827 100%)',
+          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
           fontFamily: 'system-ui, sans-serif',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Subtle champagne glow in corner */}
+        {/* Subtle sage glow */}
         <div
           style={{
             position: 'absolute',
-            top: '-100px',
-            right: '-100px',
-            width: '400px',
-            height: '400px',
-            background: 'radial-gradient(circle, rgba(212, 197, 169, 0.15) 0%, transparent 70%)',
-            borderRadius: '50%',
-          }}
-        />
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-150px',
-            left: '-150px',
-            width: '500px',
-            height: '500px',
-            background: 'radial-gradient(circle, rgba(212, 197, 169, 0.1) 0%, transparent 70%)',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '800px',
+            height: '800px',
+            background: 'radial-gradient(circle, rgba(125, 142, 116, 0.12) 0%, transparent 60%)',
             borderRadius: '50%',
           }}
         />
 
-        {/* Content container */}
+        {/* Content */}
         <div
           style={{
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            padding: '60px',
             position: 'relative',
             zIndex: 1,
           }}
         >
-          {/* Logo - H with roof + "aven" */}
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              marginBottom: '40px',
-            }}
+          {/* Alfred House Logo */}
+          <svg
+            width="140"
+            height="140"
+            viewBox="0 0 120 120"
+            fill="none"
+            style={{ marginBottom: '32px' }}
           >
-            {/* Haven H icon with champagne roof */}
-            <svg
-              width="72"
-              height="72"
-              viewBox="-30 -25 60 50"
-              fill="none"
-            >
-              {/* H letter in white */}
-              <path
-                d="M -19 -13 L -7.5 -13 L -7.5 -11 L -12 -11 L -12 -2 L 12 -2 L 12 -11 L 7.5 -11 L 7.5 -13 L 19 -13 L 19 -11 L 15.5 -11 L 15.5 11 L 19 11 L 19 13 L 7.5 13 L 7.5 11 L 12 11 L 12 2 L -12 2 L -12 11 L -7.5 11 L -7.5 13 L -19 13 L -19 11 L -15.5 11 L -15.5 -11 L -19 -11 Z"
-                fill="white"
-              />
-              {/* Champagne roof */}
-              <path
-                d="M 0 -20 L -27.5 -13 L -23.5 -13 L 0 -16.5 L 23.5 -13 L 27.5 -13 Z"
-                fill="#c4a574"
-              />
-            </svg>
-            {/* "aven" text to spell Haven */}
-            <span
-              style={{
-                fontSize: '56px',
-                fontWeight: 300,
-                color: 'white',
-                letterSpacing: '0.04em',
-                marginLeft: '4px',
-              }}
-            >
-              aven
-            </span>
-          </div>
+            {/* A-frame house - White */}
+            <path d="M60 12L99 96H84L60 45L36 96H21L60 12Z" fill="#ffffff" />
+            {/* Inner warmth - Sage */}
+            <path d="M60 51L77 89H43L60 51Z" fill="#7D8E74" />
+            {/* Window cutout */}
+            <rect x="54" y="63" width="12" height="9" rx="1.5" fill="#0F172A" />
+            {/* Door cutout */}
+            <rect x="56" y="75" width="8" height="14" rx="1.5" fill="#0F172A" />
+            {/* Sparkle */}
+            <path
+              d="M93 27L95.5 33.5L102 36L95.5 38.5L93 45L90.5 38.5L84 36L90.5 33.5L93 27Z"
+              fill="#7D8E74"
+            />
+          </svg>
 
-          {/* Headline */}
-          <div
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              marginBottom: '24px',
-            }}
-          >
-            <span
-              style={{
-                fontSize: '52px',
-                fontWeight: 700,
-                color: 'white',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.1,
-              }}
-            >
-              Stop managing your home.
-            </span>
-            <span
-              style={{
-                fontSize: '52px',
-                fontWeight: 700,
-                color: '#D4C5A9',
-                letterSpacing: '-0.02em',
-                lineHeight: 1.1,
-              }}
-            >
-              Start living in it.
-            </span>
-          </div>
-
-          {/* Divider */}
-          <div
-            style={{
-              width: '80px',
-              height: '3px',
-              background: 'linear-gradient(90deg, transparent, #D4C5A9, transparent)',
-              marginBottom: '24px',
-              borderRadius: '2px',
-            }}
-          />
-
-          {/* Subheadline */}
+          {/* Brand name */}
           <span
             style={{
-              fontSize: '24px',
-              color: 'rgba(255, 255, 255, 0.8)',
-              marginBottom: '40px',
-              letterSpacing: '0.01em',
+              fontSize: '72px',
+              fontWeight: 700,
+              color: 'white',
+              letterSpacing: '-0.02em',
+              marginBottom: '16px',
             }}
           >
-            One payment. One text. Everything handled.
+            Haven
           </span>
 
-          {/* Stats row */}
-          <div
+          {/* Tagline */}
+          <span
             style={{
-              display: 'flex',
-              gap: '48px',
+              fontSize: '28px',
+              color: '#A4B494',
+              fontWeight: 500,
+              marginBottom: '32px',
             }}
           >
-            {[
-              { value: '8+', label: 'hours saved monthly' },
-              { value: '500+', label: 'families served' },
-              { value: '4.9★', label: 'average rating' },
-            ].map((stat, i) => (
-              <div
-                key={i}
-                style={{
-                  display: 'flex',
-                  flexDirection: 'column',
-                  alignItems: 'center',
-                  padding: '16px 24px',
-                  background: 'rgba(255, 255, 255, 0.05)',
-                  borderRadius: '12px',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                }}
-              >
-                <span
-                  style={{
-                    fontSize: '32px',
-                    fontWeight: 700,
-                    color: '#D4C5A9',
-                  }}
-                >
-                  {stat.value}
-                </span>
-                <span
-                  style={{
-                    fontSize: '14px',
-                    color: 'rgba(255, 255, 255, 0.6)',
-                    textTransform: 'uppercase',
-                    letterSpacing: '0.05em',
-                  }}
-                >
-                  {stat.label}
-                </span>
-              </div>
-            ))}
-          </div>
+            Your home, finally under control.
+          </span>
+
+          {/* Subtext */}
+          <span
+            style={{
+              fontSize: '20px',
+              color: 'rgba(255, 255, 255, 0.6)',
+            }}
+          >
+            One bill. One app. Everything handled.
+          </span>
         </div>
       </div>
     ),

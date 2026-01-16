@@ -2,7 +2,7 @@
  * Haven Mobile Design System
  *
  * Primary: Navy (#0a1929) - Brand identity, headers, primary actions
- * Accent: Champagne (#c4a574) - CTAs, highlights, premium feel
+ * Accent: Sage Green (#7D8E74) - Natural, grounded, calm
  *
  * CRITICAL: NO BRIGHT GREEN - Old brand is deprecated
  */
@@ -24,14 +24,28 @@ export const colors = {
       100: '#d9e2ec',  // Very light backgrounds
       50: '#f0f4f8',   // Near white
     },
+    // Sage Green accent (replaces champagne)
+    sage: {
+      900: '#3B4536',  // Darkest
+      800: '#4A5544',  // Dark
+      700: '#5A6853',  // Dark accent
+      600: '#6B7A63',  // Medium dark
+      500: '#7D8E74',  // Primary accent - CTAs
+      400: '#8FA37F',  // Hover state
+      300: '#A4B494',  // Light accent
+      200: '#D1DBC9',  // Very light
+      100: '#E8EDE4',  // Subtle backgrounds
+      50: '#F4F6F2',   // Near white
+    },
+    // Legacy alias (maps to sage)
     champagne: {
-      600: '#a68a5b',  // Dark accent
-      500: '#c4a574',  // Primary accent - CTAs
-      400: '#d4c4a5',  // Hover state
-      300: '#e9dcc4',  // Light accent
-      200: '#f2ebe0',  // Very light
-      100: '#faf6ed',  // Subtle backgrounds
-      50: '#fdfbf7',   // Near white
+      600: '#6B7A63',  // Dark accent (was #a68a5b)
+      500: '#7D8E74',  // Primary accent (was #c4a574)
+      400: '#8FA37F',  // Hover state (was #d4c4a5)
+      300: '#A4B494',  // Light accent (was #e9dcc4)
+      200: '#D1DBC9',  // Very light (was #f2ebe0)
+      100: '#E8EDE4',  // Subtle backgrounds (was #faf6ed)
+      50: '#F4F6F2',   // Near white (was #fdfbf7)
     },
   },
 
@@ -80,7 +94,7 @@ export const colors = {
     secondary: '#627d98',    // haven.navy.500
     tertiary: '#829ab1',     // haven.navy.400
     inverse: '#ffffff',      // On dark backgrounds
-    accent: '#c4a574',       // Champagne accent
+    accent: '#7D8E74',       // Sage accent
   },
 
   // Border colors
@@ -88,7 +102,7 @@ export const colors = {
     default: '#e2e8f0',
     light: '#f1f5f9',
     dark: '#cbd5e1',
-    focus: '#c4a574',        // Champagne for focus
+    focus: '#7D8E74',        // Sage for focus
   },
 
   // BACKWARD COMPATIBILITY - Old color aliases (deprecated, use haven.navy/champagne)
@@ -106,16 +120,16 @@ export const colors = {
     900: '#102a43',  // maps to haven.navy.900
   },
   accent: {
-    50: '#fdfbf7',   // maps to haven.champagne.50
-    100: '#faf6ed',  // maps to haven.champagne.100
-    200: '#f2ebe0',  // maps to haven.champagne.200
-    300: '#e9dcc4',  // maps to haven.champagne.300
-    400: '#d4c4a5',  // maps to haven.champagne.400
-    500: '#c4a574',  // maps to haven.champagne.500
-    600: '#a68a5b',  // maps to haven.champagne.600
-    700: '#8a7048',  // darker champagne
-    800: '#6e5836',  // darker champagne
-    900: '#524024',  // darkest champagne
+    50: '#F4F6F2',   // maps to haven.sage.50
+    100: '#E8EDE4',  // maps to haven.sage.100
+    200: '#D1DBC9',  // maps to haven.sage.200
+    300: '#A4B494',  // maps to haven.sage.300
+    400: '#8FA37F',  // maps to haven.sage.400
+    500: '#7D8E74',  // maps to haven.sage.500
+    600: '#6B7A63',  // maps to haven.sage.600
+    700: '#5A6853',  // maps to haven.sage.700
+    800: '#4A5544',  // maps to haven.sage.800
+    900: '#3B4536',  // maps to haven.sage.900
   },
   green: {
     50: '#ecfdf5',

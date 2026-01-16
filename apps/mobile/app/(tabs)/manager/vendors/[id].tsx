@@ -10,6 +10,7 @@ import {
   Linking,
   TextInput,
   Modal,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -111,6 +112,19 @@ interface InsuranceVendorData {
 
 type VendorTypeSpecificData = ElectricVendorData | InternetVendorData | InsuranceVendorData | Record<string, any>;
 
+interface VendorBillAccount {
+  id: string;
+  nickname: string;
+  category: string;
+  accountNumber?: string;
+  billingFrequency: string;
+  typicalAmount?: number;
+  nextDueDate?: string;
+  lastPaidDate?: string;
+  lastPaidAmount?: number;
+  paymentResponsibility: string;
+}
+
 interface Vendor {
   id: string;
   displayName: string;
@@ -138,6 +152,7 @@ interface Vendor {
   billing?: VendorBilling;
   contracts?: VendorContract[];
   typeSpecificData?: VendorTypeSpecificData;
+  billAccounts?: VendorBillAccount[];
 }
 
 const ACTIVITY_TYPES = [
@@ -203,6 +218,24 @@ const isUtilityType = (category: string): boolean => {
   return utilityTypes.includes(category.toLowerCase().replace(/[_\s]/g, '_'));
 };
 
+const extractDomain = (url?: string | null): string | null => {
+  if (!url) return null;
+  try {
+    // Handle URLs without protocol
+    const urlWithProtocol = url.startsWith('http') ? url : `https://${url}`;
+    const parsed = new URL(urlWithProtocol);
+    return parsed.hostname.replace('www.', '');
+  } catch {
+    return null;
+  }
+};
+
+const getLogoUrl = (domain: string | null): string | null => {
+  if (!domain) return null;
+  // Use Clearbit Logo API for high-quality logos
+  return `https://logo.clearbit.com/${domain}`;
+};
+
 // =============================================================================
 // COMPONENT
 // =============================================================================
@@ -226,6 +259,29 @@ export default function VendorDetailScreen() {
   const [activityAmount, setActivityAmount] = useState('');
   const [activityDate, setActivityDate] = useState(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Edit Contact Modal State
+  const [showEditContact, setShowEditContact] = useState(false);
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editWebsite, setEditWebsite] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [editCity, setEditCity] = useState('');
+  const [editState, setEditState] = useState('');
+  const [editPostalCode, setEditPostalCode] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editAccountNumber, setEditAccountNumber] = useState('');
+  const [isSavingContact, setIsSavingContact] = useState(false);
+
+  // Logo state
+  const [logoError, setLogoError] = useState(false);
+  const vendorDomain = vendor ? extractDomain(vendor.websiteUrl) : null;
+  const logoUrl = !logoError ? getLogoUrl(vendorDomain) : null;
+
+  // Reset logo error when vendor website changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [vendor?.websiteUrl]);
 
   const fetchVendor = useCallback(async () => {
     if (!householdInfo?.id || !id) return;
@@ -374,6 +430,64 @@ export default function VendorDetailScreen() {
     setActivityDate(new Date());
   };
 
+  const openEditContact = () => {
+    if (vendor) {
+      setEditPhone(vendor.phone || '');
+      setEditEmail(vendor.email || '');
+      setEditWebsite(vendor.websiteUrl || '');
+      setEditAddress(vendor.addressLine1 || '');
+      setEditCity(vendor.city || '');
+      setEditState(vendor.state || '');
+      setEditPostalCode(vendor.postalCode || '');
+      setEditNotes(vendor.notes || '');
+      setEditAccountNumber(vendor.account?.accountNumber || '');
+      setShowEditContact(true);
+    }
+  };
+
+  const handleSaveContact = async () => {
+    if (!vendor || !householdInfo?.id) return;
+
+    setIsSavingContact(true);
+    try {
+      const token = await getIdToken(true);
+      const response = await fetch(
+        `${API_BASE_URL}/vendors/${id}?householdId=${householdInfo.id}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            phone: editPhone.trim() || null,
+            email: editEmail.trim() || undefined,
+            websiteUrl: editWebsite.trim() || undefined,
+            addressLine1: editAddress.trim() || null,
+            city: editCity.trim() || null,
+            state: editState.trim() || null,
+            postalCode: editPostalCode.trim() || null,
+            notes: editNotes.trim() || null,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const updatedVendor = await response.json();
+        setVendor(updatedVendor);
+        setShowEditContact(false);
+        Alert.alert('Success', 'Contact information updated');
+      } else {
+        Alert.alert('Error', 'Failed to update contact information');
+      }
+    } catch (err) {
+      console.error('Save contact error:', err);
+      Alert.alert('Error', 'Failed to update contact information');
+    } finally {
+      setIsSavingContact(false);
+    }
+  };
+
   const handleScheduleService = () => {
     router.push({
       pathname: '/(tabs)/manager/new-request',
@@ -405,7 +519,7 @@ export default function VendorDetailScreen() {
       <Ionicons
         name={vendor?.isFavorite ? 'star' : 'star-outline'}
         size={24}
-        color={vendor?.isFavorite ? colors.haven.champagne[500] : colors.white}
+        color={vendor?.isFavorite ? colors.haven.sage[500] : colors.white}
       />
     </TouchableOpacity>
   );
@@ -457,9 +571,20 @@ export default function VendorDetailScreen() {
         {/* Header Card */}
         <Card style={styles.headerCard}>
           <View style={styles.vendorHeader}>
-            <View style={styles.vendorIcon}>
-              <Ionicons name={getVendorIcon(vendor.category)} size={32} color={colors.haven.champagne[500]} />
-            </View>
+            {logoUrl && !logoError ? (
+              <View style={styles.vendorLogoContainer}>
+                <Image
+                  source={{ uri: logoUrl }}
+                  style={styles.vendorLogo}
+                  onError={() => setLogoError(true)}
+                  resizeMode="contain"
+                />
+              </View>
+            ) : (
+              <View style={styles.vendorIcon}>
+                <Ionicons name={getVendorIcon(vendor.category)} size={32} color={colors.haven.sage[500]} />
+              </View>
+            )}
             <View style={styles.vendorInfo}>
               <Text style={styles.vendorName}>{vendor.displayName}</Text>
               <Text style={styles.vendorCategory}>
@@ -480,7 +605,7 @@ export default function VendorDetailScreen() {
                   key={star}
                   name={star <= (vendor.rating || 0) ? 'star' : 'star-outline'}
                   size={20}
-                  color={colors.haven.champagne[500]}
+                  color={colors.haven.sage[500]}
                 />
               ))}
             </View>
@@ -509,14 +634,19 @@ export default function VendorDetailScreen() {
 
           {/* Schedule Button */}
           <TouchableOpacity style={styles.scheduleButton} onPress={handleScheduleService}>
-            <Ionicons name="calendar" size={20} color={colors.haven.champagne[600]} />
+            <Ionicons name="calendar" size={20} color={colors.haven.navy[700]} />
             <Text style={styles.scheduleText}>Schedule Service</Text>
           </TouchableOpacity>
         </Card>
 
         {/* Contact Info */}
         <Card style={styles.sectionCard}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
+          <View style={styles.sectionHeaderRow}>
+            <Text style={styles.sectionTitle}>Contact Information</Text>
+            <TouchableOpacity onPress={openEditContact}>
+              <Text style={styles.editLink}>Edit</Text>
+            </TouchableOpacity>
+          </View>
           {vendor.phone && (
             <View style={styles.infoRow}>
               <Ionicons name="call-outline" size={18} color={colors.text.secondary} />
@@ -545,13 +675,83 @@ export default function VendorDetailScreen() {
               </Text>
             </View>
           )}
+          {!vendor.phone && !vendor.email && !vendor.websiteUrl && !vendor.addressLine1 && (
+            <TouchableOpacity onPress={openEditContact} style={styles.emptyContactRow}>
+              <Ionicons name="add-circle-outline" size={20} color={colors.haven.navy[600]} />
+              <Text style={styles.addContactText}>Add contact information</Text>
+            </TouchableOpacity>
+          )}
         </Card>
+
+        {/* Utility Quick Actions - for utilities like electric and internet */}
+        {isUtilityType(vendor.category) && (
+          <Card style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitleSmall}>QUICK ACTIONS</Text>
+            </View>
+            <View style={styles.utilityActions}>
+              <TouchableOpacity
+                style={styles.utilityActionButton}
+                onPress={() => {
+                  if (vendor.websiteUrl) {
+                    Linking.openURL(vendor.websiteUrl);
+                  } else {
+                    Alert.alert('No Website', 'Add a website URL to report outages online.');
+                  }
+                }}
+              >
+                <View style={styles.utilityActionIcon}>
+                  <Ionicons name="alert-circle" size={22} color={colors.status.error} />
+                </View>
+                <Text style={styles.utilityActionText}>Report Outage</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.utilityActionButton}
+                onPress={() => {
+                  if (vendor.phone) {
+                    Linking.openURL(`tel:${vendor.phone.replace(/[^0-9+]/g, '')}`);
+                  } else if (vendor.websiteUrl) {
+                    Linking.openURL(vendor.websiteUrl);
+                  } else {
+                    Alert.alert('No Contact', 'Add phone or website to check account.');
+                  }
+                }}
+              >
+                <View style={styles.utilityActionIcon}>
+                  <Ionicons name="wallet" size={22} color={colors.haven.navy[600]} />
+                </View>
+                <Text style={styles.utilityActionText}>Check Balance</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.utilityActionButton}
+                onPress={() => {
+                  router.push({
+                    pathname: '/(tabs)/manager/vendors/chat/[id]',
+                    params: { id: vendor.householdVendorId || '' },
+                  });
+                }}
+              >
+                <View style={styles.utilityActionIcon}>
+                  <Ionicons name="help-buoy" size={22} color={colors.haven.sage[500]} />
+                </View>
+                <Text style={styles.utilityActionText}>Get Support</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity style={styles.checkRatesButton}>
+              <Ionicons name="sparkles" size={16} color={colors.haven.navy[600]} />
+              <Text style={styles.checkRatesText}>Ask Alfred to check better rates</Text>
+            </TouchableOpacity>
+          </Card>
+        )}
 
         {/* Type-Specific Card - for utilities */}
         {isUtilityType(vendor.category) && vendor.typeSpecificData && (
           <Card style={styles.sectionCard}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitleSmall}>CURRENT RATE</Text>
+              <Text style={styles.sectionTitleSmall}>CURRENT PLAN</Text>
             </View>
             {vendor.category.toLowerCase().includes('electric') && (
               <>
@@ -581,7 +781,7 @@ export default function VendorDetailScreen() {
                     </Text>
                   </View>
                   <View style={styles.speedItem}>
-                    <Ionicons name="arrow-up" size={16} color={colors.haven.champagne[500]} />
+                    <Ionicons name="arrow-up" size={16} color={colors.haven.sage[500]} />
                     <Text style={styles.speedValue}>
                       {(vendor.typeSpecificData as InternetVendorData).uploadSpeed || '—'} Mbps
                     </Text>
@@ -589,10 +789,6 @@ export default function VendorDetailScreen() {
                 </View>
               </>
             )}
-            <TouchableOpacity style={styles.checkRatesButton}>
-              <Ionicons name="sparkles" size={16} color={colors.haven.champagne[500]} />
-              <Text style={styles.checkRatesText}>Ask Alfred to check better rates</Text>
-            </TouchableOpacity>
           </Card>
         )}
 
@@ -777,7 +973,7 @@ export default function VendorDetailScreen() {
                   </Text>
                   {contract.autoRenews && (
                     <View style={styles.autoRenewBadge}>
-                      <Ionicons name="refresh" size={12} color={colors.haven.champagne[600]} />
+                      <Ionicons name="refresh" size={12} color={colors.haven.navy[600]} />
                       <Text style={styles.autoRenewText}>Auto-renews</Text>
                     </View>
                   )}
@@ -801,6 +997,47 @@ export default function VendorDetailScreen() {
           </Card>
         )}
 
+        {/* Related Bills */}
+        {vendor.billAccounts && vendor.billAccounts.length > 0 && (
+          <Card style={styles.sectionCard}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitleSmall}>RELATED BILLS</Text>
+              <TouchableOpacity>
+                <Text style={styles.editLink}>View All</Text>
+              </TouchableOpacity>
+            </View>
+            {vendor.billAccounts.map(bill => (
+              <View key={bill.id} style={styles.billRow}>
+                <View style={styles.billIconWrapper}>
+                  <Ionicons name="receipt-outline" size={18} color={colors.haven.sage[500]} />
+                </View>
+                <View style={styles.billInfo}>
+                  <Text style={styles.billName}>{bill.nickname}</Text>
+                  <Text style={styles.billFrequency}>
+                    {bill.billingFrequency.charAt(0) + bill.billingFrequency.slice(1).toLowerCase()}
+                    {bill.typicalAmount && ` • ~${formatCurrency(bill.typicalAmount)}`}
+                  </Text>
+                </View>
+                {bill.nextDueDate && (
+                  <View style={styles.billDueInfo}>
+                    <Text style={[
+                      styles.billDueText,
+                      isWithinDays(bill.nextDueDate, 7) && styles.warningText
+                    ]}>
+                      Due {formatDate(bill.nextDueDate)}
+                    </Text>
+                    {bill.lastPaidAmount && (
+                      <Text style={styles.billLastPaid}>
+                        Last: {formatCurrency(bill.lastPaidAmount)}
+                      </Text>
+                    )}
+                  </View>
+                )}
+              </View>
+            ))}
+          </Card>
+        )}
+
         {/* Activity History */}
         <View style={styles.activitySection}>
           <View style={styles.activityHeader}>
@@ -809,7 +1046,7 @@ export default function VendorDetailScreen() {
               style={styles.addActivityBtn}
               onPress={() => setShowAddActivity(true)}
             >
-              <Ionicons name="add" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="add" size={20} color={colors.haven.navy[600]} />
               <Text style={styles.addActivityText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -830,7 +1067,7 @@ export default function VendorDetailScreen() {
                     <Ionicons
                       name={getActivityIcon(activity.type) as any}
                       size={20}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.sage[500]}
                     />
                   </View>
                   <View style={styles.activityContent}>
@@ -957,7 +1194,7 @@ export default function VendorDetailScreen() {
                   <Ionicons
                     name={star <= (vendor.rating || 0) ? 'star' : 'star-outline'}
                     size={40}
-                    color={colors.haven.champagne[500]}
+                    color={colors.haven.sage[500]}
                   />
                 </TouchableOpacity>
               ))}
@@ -970,6 +1207,127 @@ export default function VendorDetailScreen() {
             </TouchableOpacity>
           </View>
         </View>
+      </Modal>
+
+      {/* Edit Contact Modal */}
+      <Modal visible={showEditContact} animationType="slide" presentationStyle="pageSheet">
+        <SafeAreaView style={styles.modalContainer}>
+          <View style={styles.modalHeader}>
+            <TouchableOpacity onPress={() => setShowEditContact(false)}>
+              <Text style={styles.modalCancel}>Cancel</Text>
+            </TouchableOpacity>
+            <Text style={styles.modalTitle}>Edit Contact</Text>
+            <TouchableOpacity onPress={handleSaveContact} disabled={isSavingContact}>
+              <Text style={[styles.modalSave, isSavingContact && styles.modalSaveDisabled]}>
+                {isSavingContact ? 'Saving...' : 'Save'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <Text style={styles.inputLabel}>Phone Number</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editPhone}
+              onChangeText={setEditPhone}
+              placeholder="(555) 123-4567"
+              placeholderTextColor={colors.text.tertiary}
+              keyboardType="phone-pad"
+              autoComplete="tel"
+            />
+
+            <Text style={styles.inputLabel}>Email</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editEmail}
+              onChangeText={setEditEmail}
+              placeholder="contact@company.com"
+              placeholderTextColor={colors.text.tertiary}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+            />
+
+            <Text style={styles.inputLabel}>Website</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editWebsite}
+              onChangeText={setEditWebsite}
+              placeholder="https://www.company.com"
+              placeholderTextColor={colors.text.tertiary}
+              keyboardType="url"
+              autoCapitalize="none"
+              autoComplete="url"
+            />
+
+            <Text style={styles.inputLabel}>Account Number</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editAccountNumber}
+              onChangeText={setEditAccountNumber}
+              placeholder="Your account number"
+              placeholderTextColor={colors.text.tertiary}
+            />
+
+            <Text style={styles.inputLabel}>Street Address</Text>
+            <TextInput
+              style={styles.textInput}
+              value={editAddress}
+              onChangeText={setEditAddress}
+              placeholder="123 Main St"
+              placeholderTextColor={colors.text.tertiary}
+              autoComplete="street-address"
+            />
+
+            <View style={styles.addressRow}>
+              <View style={styles.cityField}>
+                <Text style={styles.inputLabel}>City</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editCity}
+                  onChangeText={setEditCity}
+                  placeholder="City"
+                  placeholderTextColor={colors.text.tertiary}
+                />
+              </View>
+              <View style={styles.stateField}>
+                <Text style={styles.inputLabel}>State</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editState}
+                  onChangeText={setEditState}
+                  placeholder="ST"
+                  placeholderTextColor={colors.text.tertiary}
+                  maxLength={2}
+                  autoCapitalize="characters"
+                />
+              </View>
+              <View style={styles.zipField}>
+                <Text style={styles.inputLabel}>ZIP</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={editPostalCode}
+                  onChangeText={setEditPostalCode}
+                  placeholder="12345"
+                  placeholderTextColor={colors.text.tertiary}
+                  keyboardType="number-pad"
+                  maxLength={10}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.inputLabel}>Notes</Text>
+            <TextInput
+              style={[styles.textInput, styles.textArea]}
+              value={editNotes}
+              onChangeText={setEditNotes}
+              placeholder="Add any notes about this vendor..."
+              placeholderTextColor={colors.text.tertiary}
+              multiline
+              numberOfLines={4}
+            />
+          </ScrollView>
+        </SafeAreaView>
       </Modal>
     </View>
   );
@@ -1014,9 +1372,24 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: borderRadius.xl,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.sage[50],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  vendorLogoContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: borderRadius.xl,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.border.light,
+  },
+  vendorLogo: {
+    width: 52,
+    height: 52,
   },
   vendorInfo: {
     flex: 1,
@@ -1066,7 +1439,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.navy[900],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     gap: spacing[1],
@@ -1080,13 +1453,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.navy[50],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     gap: spacing[2],
   },
   scheduleText: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.navy[700],
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
   },
@@ -1112,7 +1485,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   linkText: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.navy[600],
   },
   // New styles for enhanced sections
   sectionHeaderRow: {
@@ -1130,7 +1503,7 @@ const styles = StyleSheet.create({
   },
   editLink: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.navy[600],
     fontWeight: typography.fontWeights.medium,
   },
   infoContent: {
@@ -1204,13 +1577,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing[2],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.navy[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[2],
   },
   checkRatesText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.navy[700],
     fontWeight: typography.fontWeights.medium,
   },
   // Contract styles
@@ -1243,7 +1616,7 @@ const styles = StyleSheet.create({
   },
   autoRenewText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.navy[600],
     fontWeight: typography.fontWeights.medium,
   },
   notesText: {
@@ -1266,7 +1639,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   addActivityText: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.navy[600],
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
   },
@@ -1297,7 +1670,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.sage[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1363,7 +1736,7 @@ const styles = StyleSheet.create({
   modalSave: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[500],
+    color: colors.haven.navy[600],
   },
   modalSaveDisabled: {
     opacity: 0.5,
@@ -1393,7 +1766,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.navy[600],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,
@@ -1450,5 +1823,99 @@ const styles = StyleSheet.create({
   ratingCloseText: {
     fontSize: typography.fontSizes.base,
     color: colors.text.secondary,
+  },
+  // Edit contact modal
+  emptyContactRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[3],
+  },
+  addContactText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.navy[600],
+    fontWeight: typography.fontWeights.medium,
+  },
+  addressRow: {
+    flexDirection: 'row',
+    gap: spacing[2],
+  },
+  cityField: {
+    flex: 2,
+  },
+  stateField: {
+    flex: 1,
+  },
+  zipField: {
+    flex: 1.5,
+  },
+  // Utility actions styles
+  utilityActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: spacing[3],
+  },
+  utilityActionButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: spacing[2],
+  },
+  utilityActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.background.tertiary,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[1],
+  },
+  utilityActionText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeights.medium,
+    textAlign: 'center',
+  },
+  // Bill section styles
+  billRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  billIconWrapper: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.haven.sage[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  billInfo: {
+    flex: 1,
+    marginLeft: spacing[3],
+  },
+  billName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  billFrequency: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
+  },
+  billDueInfo: {
+    alignItems: 'flex-end',
+  },
+  billDueText: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    fontWeight: typography.fontWeights.medium,
+  },
+  billLastPaid: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    marginTop: 2,
   },
 });
