@@ -63,7 +63,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.haven.sage[500],  // Sage - natural, grounded active state
+        tabBarActiveTintColor: colors.haven.navy[600],  // Navy - professional active state
         tabBarInactiveTintColor: colors.gray[400],
         tabBarStyle: {
           backgroundColor: colors.white,

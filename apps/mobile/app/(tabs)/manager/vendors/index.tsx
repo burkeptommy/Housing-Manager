@@ -185,13 +185,13 @@ export default function VendorsScreen() {
         const data = await response.json();
         setDirectoryVendors(data);
       } else {
-        // Use mock data for demo
-        setDirectoryVendors(getMockDirectoryVendors(searchCategory, searchQuery));
+        // API failed - show empty results
+        setDirectoryVendors([]);
       }
     } catch (err) {
       console.error('Search vendors error:', err);
-      // Use mock data on error
-      setDirectoryVendors(getMockDirectoryVendors(searchCategory, searchQuery));
+      // API error - show empty results
+      setDirectoryVendors([]);
     } finally {
       setIsSearching(false);
     }
@@ -243,84 +243,6 @@ export default function VendorsScreen() {
     }
   };
 
-  // Mock data for demo purposes
-  const getMockDirectoryVendors = (category: string, query: string): DirectoryVendor[] => {
-    const mockVendors: DirectoryVendor[] = [
-      {
-        id: 'dir-1',
-        name: 'Elite HVAC Services',
-        category: 'HVAC',
-        address: '123 Main St, Anytown',
-        phone: '(555) 123-4567',
-        rating: 4.8,
-        reviewCount: 142,
-        distance: '2.3 mi',
-        isOpen: true,
-      },
-      {
-        id: 'dir-2',
-        name: 'Quick Fix Plumbing',
-        category: 'PLUMBING',
-        address: '456 Oak Ave, Anytown',
-        phone: '(555) 234-5678',
-        rating: 4.6,
-        reviewCount: 89,
-        distance: '3.1 mi',
-        isOpen: true,
-      },
-      {
-        id: 'dir-3',
-        name: 'Bright Spark Electric',
-        category: 'ELECTRICAL',
-        address: '789 Elm St, Anytown',
-        phone: '(555) 345-6789',
-        rating: 4.9,
-        reviewCount: 203,
-        distance: '1.8 mi',
-        isOpen: false,
-      },
-      {
-        id: 'dir-4',
-        name: 'Green Thumb Landscaping',
-        category: 'LANDSCAPING',
-        address: '321 Pine Rd, Anytown',
-        phone: '(555) 456-7890',
-        rating: 4.7,
-        reviewCount: 67,
-        distance: '4.2 mi',
-        isOpen: true,
-      },
-      {
-        id: 'dir-5',
-        name: 'Sparkle Clean Pro',
-        category: 'CLEANING',
-        address: '654 Maple Dr, Anytown',
-        phone: '(555) 567-8901',
-        rating: 4.5,
-        reviewCount: 156,
-        distance: '2.9 mi',
-        isOpen: true,
-      },
-      {
-        id: 'dir-6',
-        name: 'Crystal Pool Care',
-        category: 'POOL_SPA',
-        address: '987 Cedar Ln, Anytown',
-        phone: '(555) 678-9012',
-        rating: 4.8,
-        reviewCount: 78,
-        distance: '5.1 mi',
-        isOpen: true,
-      },
-    ];
-
-    return mockVendors.filter(v => {
-      const matchesCategory = category === 'all' || v.category === category;
-      const matchesQuery = !query || v.name.toLowerCase().includes(query.toLowerCase());
-      return matchesCategory && matchesQuery;
-    });
-  };
-
   // =============================================================================
   // HANDLERS
   // =============================================================================
@@ -347,9 +269,10 @@ export default function VendorsScreen() {
   };
 
   const handleSchedule = (vendor: Vendor) => {
+    // Navigate to vendor chat so messages show in the Messages tab
     router.push({
-      pathname: '/(tabs)/manager/new-request',
-      params: { vendorId: vendor.id, vendorName: vendor.displayName },
+      pathname: '/(tabs)/manager/vendors/chat/[id]',
+      params: { id: vendor.id },
     } as any);
   };
 
@@ -990,7 +913,7 @@ const styles = StyleSheet.create({
   vendorActionPrimary: {
     flex: 1,
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.navy[800],
   },
   vendorActionText: {
     fontSize: typography.fontSizes.sm,

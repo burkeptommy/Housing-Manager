@@ -94,21 +94,52 @@ interface FamilyData {
 }
 
 // =============================================================================
-// MOCK DATA (matches web)
+// TYPES FOR REAL DATA
 // =============================================================================
 
-const mockWeather = { temp: 68, condition: 'sunny' as const };
+interface TodayNote {
+  id: string;
+  type: 'bill' | 'maintenance' | 'service' | 'activity' | 'event';
+  icon: string;
+  text: string;
+  color: string;
+  priority: number;
+}
 
-const mockTodayNotes = [
-  { id: 'trash', icon: 'trash-outline' as const, text: 'Trash day tomorrow - bins out?', color: colors.status.warning },
-  { id: 'package', icon: 'cube-outline' as const, text: 'Amazon delivery expected 2-5pm', color: colors.haven.navy[500] },
-  { id: 'soccer', icon: 'calendar-outline' as const, text: "Emma's soccer practice 4pm", color: colors.haven.champagne[500] },
-];
+interface AlfredEmailCase {
+  id: string;
+  caseNumber: string;
+  fromEmail: string;
+  subject: string;
+  status: 'RECEIVED' | 'PROCESSING' | 'AWAITING_INPUT' | 'IN_PROGRESS' | 'COMPLETED' | 'ARCHIVED';
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+  summary: string | null;
+  detectedIntent: string | null;
+  receivedAt: string;
+}
 
-const mockHealthFactors = {
-  helping: ['HVAC serviced recently', 'All bills current', 'No overdue maintenance'],
-  hurting: ['Gutter cleaning due soon'],
-};
+interface TodayNotesResponse {
+  notes: TodayNote[];
+  isEmpty: boolean;
+  counts: {
+    bills: number;
+    maintenance: number;
+    services: number;
+    activities: number;
+    events: number;
+  };
+}
+
+interface HealthFactorsResponse {
+  score: number;
+  maxScore: number;
+  grade: string;
+  factors: {
+    helping: string[];
+    needsAttention: string[];
+  };
+  recommendations: string[];
+}
 
 // =============================================================================
 // HELPERS
@@ -119,15 +150,6 @@ function getGreeting(): string {
   if (hour < 12) return 'Good morning';
   if (hour < 17) return 'Good afternoon';
   return 'Good evening';
-}
-
-function getWeatherIcon(condition: string): keyof typeof Ionicons.glyphMap {
-  switch (condition) {
-    case 'sunny': return 'sunny-outline';
-    case 'cloudy': return 'cloud-outline';
-    case 'rainy': return 'rainy-outline';
-    default: return 'partly-sunny-outline';
-  }
 }
 
 function getHealthColor(score: number) {
@@ -174,6 +196,44 @@ function formatRelativeTime(dateString: string) {
   return `${diffDays}d ago`;
 }
 
+// Get color based on Alfred email case status
+function getAlfredStatusColor(status: string): string {
+  switch (status) {
+    case 'AWAITING_INPUT':
+      return colors.status.warning;
+    case 'COMPLETED':
+      return colors.status.success;
+    case 'IN_PROGRESS':
+    case 'PROCESSING':
+      return colors.haven.champagne[500];
+    default:
+      return colors.haven.navy[500];
+  }
+}
+
+// Get icon based on detected intent
+function getAlfredIntentIcon(intent: string | null): string {
+  if (!intent) return 'mail-outline';
+  const intentLower = intent.toLowerCase();
+  if (intentLower.includes('calendar') || intentLower.includes('event') || intentLower.includes('schedule'))
+    return 'calendar-outline';
+  if (intentLower.includes('bill') || intentLower.includes('invoice') || intentLower.includes('payment'))
+    return 'card-outline';
+  if (intentLower.includes('vendor') || intentLower.includes('service'))
+    return 'business-outline';
+  if (intentLower.includes('shipping') || intentLower.includes('delivery'))
+    return 'cube-outline';
+  if (intentLower.includes('warranty'))
+    return 'shield-checkmark-outline';
+  if (intentLower.includes('hoa'))
+    return 'home-outline';
+  if (intentLower.includes('school') || intentLower.includes('camp'))
+    return 'school-outline';
+  if (intentLower.includes('medical') || intentLower.includes('prescription'))
+    return 'medkit-outline';
+  return 'mail-outline';
+}
+
 // Get emoji and background color based on activity category
 function getActivityConfig(category: string): { emoji: string; bgColor: string } {
   const configs: Record<string, { emoji: string; bgColor: string }> = {
@@ -202,6 +262,10 @@ export default function DashboardScreen() {
   const [data, setData] = useState<DashboardResponse | null>(null);
   const [familyData, setFamilyData] = useState<FamilyData | null>(null);
   const [onboardingData, setOnboardingData] = useState<OnboardingChecklistData | null>(null);
+  const [todayNotes, setTodayNotes] = useState<TodayNotesResponse | null>(null);
+  const [healthFactors, setHealthFactors] = useState<HealthFactorsResponse | null>(null);
+  const [alfredCases, setAlfredCases] = useState<AlfredEmailCase[]>([]);
+  const [alfredNeedsInput, setAlfredNeedsInput] = useState(0);
   const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
@@ -221,8 +285,8 @@ export default function DashboardScreen() {
         return;
       }
 
-      // Fetch dashboard, family, and onboarding data in parallel
-      const [dashboardRes, familyRes, onboardingRes] = await Promise.all([
+      // Fetch dashboard, family, onboarding, today's notes, health factors, and Alfred cases in parallel
+      const [dashboardRes, familyRes, onboardingRes, todayRes, healthRes, alfredRes] = await Promise.all([
         fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -230,6 +294,15 @@ export default function DashboardScreen() {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/onboarding`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/today`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/health`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/alfred/cases?limit=5`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -249,6 +322,26 @@ export default function DashboardScreen() {
       if (onboardingRes.ok) {
         const onboarding = await onboardingRes.json();
         setOnboardingData(onboarding);
+      }
+
+      if (todayRes.ok) {
+        const today = await todayRes.json();
+        setTodayNotes(today);
+      }
+
+      if (healthRes.ok) {
+        const health = await healthRes.json();
+        setHealthFactors(health);
+      }
+
+      if (alfredRes.ok) {
+        const cases = await alfredRes.json();
+        setAlfredCases(Array.isArray(cases) ? cases : []);
+        // Count cases needing user input
+        const needsInput = (Array.isArray(cases) ? cases : []).filter(
+          (c: AlfredEmailCase) => c.status === 'AWAITING_INPUT'
+        ).length;
+        setAlfredNeedsInput(needsInput);
       }
 
       setError(null);
@@ -312,13 +405,9 @@ export default function DashboardScreen() {
             colors={[colors.haven.navy[950], colors.haven.navy[900]]}
             style={[styles.heroGradient, { paddingTop: insets.top + spacing[2] }]}
           >
-            {/* Date and Weather Row */}
+            {/* Date Row */}
             <View style={styles.heroTop}>
               <Text style={styles.heroDate}>{today}</Text>
-              <View style={styles.weatherBadge}>
-                <Ionicons name={getWeatherIcon(mockWeather.condition)} size={20} color={colors.white} />
-                <Text style={styles.weatherTemp}>{mockWeather.temp}°</Text>
-              </View>
             </View>
 
             {/* Greeting */}
@@ -361,29 +450,45 @@ export default function DashboardScreen() {
         </View>
 
         {/* Health Score Details (expandable) */}
-        {showHealthDetails && (
+        {showHealthDetails && healthFactors && (
           <AnimatedCard style={styles.healthDetailsCard} delay={0}>
             <Text style={styles.healthDetailsTitle}>What affects your score</Text>
             <View style={styles.healthFactors}>
-              <View style={styles.healthFactorSection}>
-                <View style={styles.healthFactorHeader}>
-                  <Ionicons name="trending-up" size={16} color={colors.status.success} />
-                  <Text style={styles.healthFactorLabel}>Helping</Text>
+              {healthFactors.factors?.helping && healthFactors.factors.helping.length > 0 && (
+                <View style={styles.healthFactorSection}>
+                  <View style={styles.healthFactorHeader}>
+                    <Ionicons name="trending-up" size={16} color={colors.status.success} />
+                    <Text style={styles.healthFactorLabel}>Helping</Text>
+                  </View>
+                  {healthFactors.factors.helping.map((item, i) => (
+                    <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
+                  ))}
                 </View>
-                {mockHealthFactors.helping.map((item, i) => (
-                  <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
-                ))}
-              </View>
-              <View style={styles.healthFactorSection}>
-                <View style={styles.healthFactorHeader}>
-                  <Ionicons name="trending-down" size={16} color={colors.status.warning} />
-                  <Text style={styles.healthFactorLabel}>Needs Attention</Text>
+              )}
+              {healthFactors.factors?.needsAttention && healthFactors.factors.needsAttention.length > 0 && (
+                <View style={styles.healthFactorSection}>
+                  <View style={styles.healthFactorHeader}>
+                    <Ionicons name="trending-down" size={16} color={colors.status.warning} />
+                    <Text style={styles.healthFactorLabel}>Needs Attention</Text>
+                  </View>
+                  {healthFactors.factors.needsAttention.map((item, i) => (
+                    <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
+                  ))}
                 </View>
-                {mockHealthFactors.hurting.map((item, i) => (
-                  <Text key={i} style={styles.healthFactorItem}>• {item}</Text>
-                ))}
-              </View>
+              )}
+              {(!healthFactors.factors?.helping || healthFactors.factors.helping.length === 0) &&
+               (!healthFactors.factors?.needsAttention || healthFactors.factors.needsAttention.length === 0) && (
+                <Text style={styles.healthFactorItem}>No detailed factors available yet. Complete your home setup to see more insights.</Text>
+              )}
             </View>
+            {healthFactors.recommendations && healthFactors.recommendations.length > 0 && (
+              <View style={styles.recommendationsSection}>
+                <Text style={styles.healthFactorLabel}>Top Recommendations</Text>
+                {healthFactors.recommendations.slice(0, 3).map((rec, i) => (
+                  <Text key={i} style={styles.healthFactorItem}>• {rec}</Text>
+                ))}
+              </View>
+            )}
           </AnimatedCard>
         )}
 
@@ -399,16 +504,28 @@ export default function DashboardScreen() {
         <AnimatedCard style={styles.notesCard} delay={100}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>Today's Notes</Text>
-            <Badge label={`${mockTodayNotes.length}`} variant="info" />
+            {todayNotes && todayNotes.notes.length > 0 && (
+              <Badge label={`${todayNotes.notes.length}`} variant="info" />
+            )}
           </View>
-          {mockTodayNotes.map((note) => (
-            <View key={note.id} style={styles.noteRow}>
-              <View style={[styles.noteIcon, { backgroundColor: note.color + '20' }]}>
-                <Ionicons name={note.icon} size={16} color={note.color} />
+          {todayNotes && todayNotes.notes.length > 0 ? (
+            todayNotes.notes.map((note) => (
+              <View key={note.id} style={styles.noteRow}>
+                <View style={[styles.noteIcon, { backgroundColor: note.color + '20' }]}>
+                  <Ionicons name={note.icon as keyof typeof Ionicons.glyphMap} size={16} color={note.color} />
+                </View>
+                <Text style={styles.noteText}>{note.text}</Text>
               </View>
-              <Text style={styles.noteText}>{note.text}</Text>
+            ))
+          ) : (
+            <View style={styles.emptyNotesContainer}>
+              <Ionicons name="checkmark-circle-outline" size={32} color={colors.status.success} />
+              <Text style={styles.emptyNotesTitle}>All caught up!</Text>
+              <Text style={styles.emptyNotesSubtitle}>
+                No bills due, maintenance tasks, or events for today
+              </Text>
             </View>
-          ))}
+          )}
         </AnimatedCard>
 
         {/* Family Status - Always show with add option */}
@@ -463,6 +580,63 @@ export default function DashboardScreen() {
               <Text style={styles.familyRole} numberOfLines={1}>Member</Text>
             </TouchableOpacity>
           </ScrollView>
+        </AnimatedCard>
+
+        {/* Alfred Email Activity */}
+        <AnimatedCard style={styles.alfredCard} delay={175}>
+          <View style={styles.cardHeader}>
+            <View style={styles.alfredHeaderLeft}>
+              <Text style={styles.cardTitle}>Alfred Activity</Text>
+              {alfredNeedsInput > 0 && (
+                <Badge label={`${alfredNeedsInput} needs input`} variant="warning" size="sm" />
+              )}
+            </View>
+            <TouchableOpacity onPress={() => router.push('/(tabs)/settings/alfred-cases' as any)}>
+              <Text style={styles.seeAllLink}>View All</Text>
+            </TouchableOpacity>
+          </View>
+          {alfredCases.length > 0 ? (
+            alfredCases.slice(0, 3).map((emailCase, index) => (
+              <TouchableOpacity
+                key={emailCase.id}
+                style={[styles.alfredCaseRow, index < Math.min(alfredCases.length, 3) - 1 && styles.alfredCaseBorder]}
+                onPress={() => router.push(`/(tabs)/settings/alfred-case/${emailCase.id}` as any)}
+              >
+                <View style={[styles.alfredCaseIcon, { backgroundColor: getAlfredStatusColor(emailCase.status) + '15' }]}>
+                  <Ionicons
+                    name={getAlfredIntentIcon(emailCase.detectedIntent) as any}
+                    size={20}
+                    color={getAlfredStatusColor(emailCase.status)}
+                  />
+                </View>
+                <View style={styles.alfredCaseContent}>
+                  <Text style={styles.alfredCaseSubject} numberOfLines={1}>{emailCase.subject}</Text>
+                  <Text style={styles.alfredCaseFrom} numberOfLines={1}>{emailCase.fromEmail}</Text>
+                </View>
+                <View style={styles.alfredCaseMeta}>
+                  {emailCase.status === 'AWAITING_INPUT' ? (
+                    <Badge label="Action" variant="warning" size="sm" />
+                  ) : (
+                    <Text style={styles.alfredCaseTime}>{formatRelativeTime(emailCase.receivedAt)}</Text>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.alfredEmptyContainer}>
+              <Ionicons name="mail-outline" size={32} color={colors.gray[300]} />
+              <Text style={styles.alfredEmptyTitle}>No emails yet</Text>
+              <Text style={styles.alfredEmptyText}>
+                CC Alfred on your emails to get started
+              </Text>
+              <TouchableOpacity
+                style={styles.alfredSetupButton}
+                onPress={() => router.push('/(tabs)/settings/alfred-email' as any)}
+              >
+                <Text style={styles.alfredSetupButtonText}>Set Up Alfred Email</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </AnimatedCard>
 
         {/* Pending Approvals Alert */}
@@ -647,20 +821,6 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.haven.champagne[200],
   },
-  weatherBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing[1],
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: spacing[3],
-    paddingVertical: spacing[1],
-    borderRadius: borderRadius.full,
-  },
-  weatherTemp: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.white,
-  },
   heroGreeting: {
     fontSize: 28,
     fontWeight: typography.fontWeights.bold,
@@ -781,6 +941,27 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSizes.sm,
     color: colors.text.primary,
+  },
+  emptyNotesContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing[4],
+    gap: spacing[2],
+  },
+  emptyNotesTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  emptyNotesSubtitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  recommendationsSection: {
+    marginTop: spacing[4],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
   },
 
   // Family Card
@@ -1030,5 +1211,81 @@ const styles = StyleSheet.create({
   activityEmptyText: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.tertiary,
+  },
+
+  // Alfred Activity Card
+  alfredCard: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
+    padding: spacing[4],
+  },
+  alfredHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+  },
+  alfredCaseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[3],
+    gap: spacing[3],
+  },
+  alfredCaseBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border.light,
+  },
+  alfredCaseIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  alfredCaseContent: {
+    flex: 1,
+  },
+  alfredCaseSubject: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  alfredCaseFrom: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  alfredCaseMeta: {
+    alignItems: 'flex-end',
+  },
+  alfredCaseTime: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+  },
+  alfredEmptyContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing[6],
+    gap: spacing[2],
+  },
+  alfredEmptyTitle: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.primary,
+  },
+  alfredEmptyText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+  },
+  alfredSetupButton: {
+    marginTop: spacing[3],
+    paddingHorizontal: spacing[4],
+    paddingVertical: spacing[2],
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: borderRadius.lg,
+  },
+  alfredSetupButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
   },
 });
