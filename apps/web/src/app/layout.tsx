@@ -1,12 +1,21 @@
 import type { Metadata, Viewport } from 'next';
-import { Inter } from 'next/font/google';
+import { Inter, Playfair_Display } from 'next/font/google';
 
 import { AuthProvider } from '@/contexts/auth-context';
 import { QueryProvider } from '@/lib/query-client';
 
 import './globals.css';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+});
+
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  variable: '--font-playfair',
+  weight: ['400', '500', '600', '700'],
+});
 
 export const metadata: Metadata = {
   title: {
@@ -98,7 +107,7 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
-      <body className={inter.className}>
+      <body className={`${inter.variable} ${playfair.variable} font-sans`}>
         <QueryProvider>
           <AuthProvider>{children}</AuthProvider>
         </QueryProvider>

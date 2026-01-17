@@ -12,7 +12,7 @@
   }
 
   body {
-    @apply font-sans text-warm-800 bg-warm-50;
+    @apply font-sans text-warm-800 bg-sage-50;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
@@ -131,9 +131,9 @@
     @apply text-white/70;
   }
 
-  /* Champagne accent card */
-  .card-champagne {
-    @apply bg-gradient-to-br from-champagne-100 to-champagne-200 rounded-2xl border border-champagne-300;
+  /* Sage accent card */
+  .card-sage {
+    @apply bg-gradient-to-br from-sage-50 to-sage-100 rounded-2xl border border-sage-200;
   }
 
   /* Sidebar styles */
@@ -188,7 +188,7 @@
   }
 
   .btn-white {
-    @apply btn px-5 py-2.5 bg-white text-haven-700 shadow-lg hover:bg-champagne-50;
+    @apply btn px-5 py-2.5 bg-white text-haven-700 shadow-lg hover:bg-sage-50;
   }
 
   .btn-outline-light {
@@ -251,8 +251,12 @@
   }
 
   .badge-premium {
-    @apply bg-gradient-to-r from-champagne-100 to-champagne-200 text-champagne-700
-           ring-1 ring-inset ring-champagne-400/30;
+    @apply bg-gradient-to-r from-sage-100 to-sage-200 text-sage-700
+           ring-1 ring-inset ring-sage-400/30;
+  }
+
+  .badge-sage {
+    @apply bg-sage-100 text-sage-700 ring-1 ring-inset ring-sage-500/20;
   }
 
   .badge-navy {
@@ -437,8 +441,8 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-haven-700 to-haven-600;
   }
 
-  .text-gradient-champagne {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-champagne-500 to-champagne-400;
+  .text-gradient-sage {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-sage-500 to-sage-400;
   }
 
   /* Staggered animations */
