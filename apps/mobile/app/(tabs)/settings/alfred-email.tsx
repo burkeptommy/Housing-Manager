@@ -204,16 +204,22 @@ export default function AlfredEmailSettingsScreen() {
             ) : (
               <View style={styles.configureContainer}>
                 <Ionicons
-                  name="mail-outline"
+                  name="home-outline"
                   size={32}
                   color={colors.haven.navy[400]}
                 />
                 <Text style={styles.configureText}>
-                  Your unique Alfred email address will be generated based on your property address.
+                  Your Alfred email address is generated from your property address.
                 </Text>
                 <Text style={styles.configureNote}>
-                  Contact your Haven team to set up your Alfred email.
+                  Complete your home profile to get your unique Alfred email.
                 </Text>
+                <TouchableOpacity
+                  style={styles.setupButton}
+                  onPress={() => router.push('/(tabs)/settings' as any)}
+                >
+                  <Text style={styles.setupButtonText}>Go to Settings</Text>
+                </TouchableOpacity>
               </View>
             )}
           </View>
@@ -494,6 +500,18 @@ const styles = StyleSheet.create({
     color: colors.haven.navy[400],
     textAlign: 'center',
     fontStyle: 'italic',
+  },
+  setupButton: {
+    marginTop: spacing[3],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[4],
+    backgroundColor: colors.haven.navy[800],
+    borderRadius: borderRadius.md,
+  },
+  setupButtonText: {
+    color: colors.white,
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
   },
   emailAddress: {
     fontSize: typography.fontSizes.base,
