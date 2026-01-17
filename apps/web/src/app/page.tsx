@@ -48,109 +48,119 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* HERO SECTION */}
       {/* ================================================================== */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-haven-navy-800 via-haven-navy-900 to-haven-navy-950 min-h-[100dvh] sm:min-h-0 pt-20 sm:pt-32 pb-8 sm:pb-24 flex flex-col justify-center">
-        {/* Background decoration */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-haven-navy-700 rounded-full blur-3xl opacity-20" />
-          <div className="absolute top-1/2 -left-20 w-72 h-72 bg-sage-300/20 rounded-full blur-3xl opacity-30" />
-        </div>
+      <section className="relative overflow-hidden min-h-[100dvh] sm:min-h-0 flex flex-col justify-center">
+        {/* Rich gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-haven-navy-900 via-haven-navy-950 to-[#050a14]" />
 
-        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 flex-1 flex items-center">
+        {/* Subtle radial glow */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(164,180,148,0.12),transparent)]" />
+
+        {/* Subtle grid pattern for texture */}
+        <div
+          className="absolute inset-0 opacity-[0.03]"
+          style={{
+            backgroundImage: `linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
+                             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)`,
+            backgroundSize: '48px 48px'
+          }}
+        />
+
+        {/* Floating ambient orbs */}
+        <div className="absolute top-20 right-[15%] w-[350px] h-[350px] rounded-full
+                        bg-gradient-to-br from-sage-400/8 to-transparent blur-3xl animate-float hidden sm:block" />
+        <div className="absolute bottom-32 left-[10%] w-[250px] h-[250px] rounded-full
+                        bg-gradient-to-tr from-haven-navy-600/20 to-transparent blur-3xl animate-float-slow hidden sm:block" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-24 sm:pt-32 pb-8 sm:pb-24 flex-1 flex items-center">
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
             {/* Left - Copy */}
             <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-              {/* Badge - Meet Alfred */}
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white rounded-full mb-5 sm:mb-6">
-                <Image src="/alfred-icon.svg" alt="Alfred" width={20} height={20} />
-                <span className="text-sm font-medium text-haven-navy-900">Meet Alfred</span>
-                <span className="hidden sm:inline text-haven-navy-400">|</span>
-                <span className="hidden sm:inline text-sm text-haven-navy-700">Your Home Manager</span>
+              {/* Badge */}
+              <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-white/10 backdrop-blur-sm
+                              rounded-full border border-white/10 mb-6">
+                <div className="w-2 h-2 rounded-full bg-sage-400 animate-pulse" />
+                <span className="text-sm font-medium text-white/90">Meet Alfred</span>
+                <span className="text-white/30 mx-1 hidden sm:inline">•</span>
+                <span className="text-sm text-sage-300/90 hidden sm:inline">Your Home Manager</span>
               </div>
 
               {/* H1 */}
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-white tracking-tight leading-[1.1] font-serif">
-                Your home, finally
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl xl:text-7xl font-bold tracking-tight leading-[1.05] font-serif">
+                <span className="text-white">Your home, finally</span>
                 <br />
-                <span className="text-sage-300">under control.</span>
+                <span className="bg-gradient-to-r from-sage-300 via-sage-200 to-sage-400
+                                 bg-clip-text text-transparent">under control.</span>
               </h1>
 
               {/* Subheadline */}
-              <p className="mt-4 sm:mt-6 text-lg sm:text-xl text-haven-100 max-w-xl mx-auto lg:mx-0">
+              <p className="mt-6 text-lg sm:text-xl text-white/70 max-w-xl leading-relaxed">
                 <span className="sm:hidden">Alfred tracks bills, schedules maintenance, finds savings, and consolidates everything into one monthly payment.</span>
-                <span className="hidden sm:inline">Alfred tracks your bills, reminds you before things break, finds savings you&apos;re missing, and consolidates everything into one monthly payment. Stop managing. Start living.</span>
+                <span className="hidden sm:inline">Alfred tracks your bills, reminds you before things break, finds savings you&apos;re missing, and consolidates everything into one monthly payment. <span className="text-white/90 font-medium">Stop managing. Start living.</span></span>
               </p>
 
-              {/* Mobile value props */}
-              <div className="flex sm:hidden flex-col gap-2 mt-5 w-full max-w-xs">
-                <div className="flex items-center gap-3 text-white/90">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
-                  <span className="text-sm">One bill for everything</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/90">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
-                  <span className="text-sm">Never miss maintenance</span>
-                </div>
-                <div className="flex items-center gap-3 text-white/90">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300 flex-shrink-0" />
-                  <span className="text-sm">Handyman who knows your home</span>
-                </div>
-              </div>
-
-              {/* Desktop value props */}
-              <div className="hidden sm:flex mt-6 flex-wrap justify-center lg:justify-start gap-4 text-sm">
-                <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300" />
-                  One bill for everything
-                </span>
-                <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300" />
-                  Never miss maintenance
-                </span>
-                <span className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="w-5 h-5 text-sage-300" />
-                  Handyman who knows your home
-                </span>
+              {/* Value props */}
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 mt-6 w-full max-w-md sm:max-w-none">
+                {[
+                  'One bill for everything',
+                  'Never miss maintenance',
+                  'Handyman who knows your home',
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-2.5 text-white/80">
+                    <div className="w-5 h-5 rounded-full bg-sage-500/20 flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-sage-300" />
+                    </div>
+                    <span className="text-sm">{item}</span>
+                  </div>
+                ))}
               </div>
 
               {/* Price */}
-              <div className="mt-6 sm:mt-6 flex items-center gap-3 sm:gap-4">
+              <div className="mt-6 flex items-center gap-4">
                 <div className="flex items-baseline gap-1">
                   <span className="text-3xl sm:text-4xl font-bold text-white">$39</span>
-                  <span className="text-lg sm:text-xl text-white/70">/mo</span>
+                  <span className="text-lg sm:text-xl text-white/60">/mo</span>
                 </div>
-                <span className="text-sm text-sage-300">Cancel anytime</span>
+                <span className="text-sm text-sage-300 font-medium">Cancel anytime</span>
               </div>
 
               {/* CTAs */}
-              <div className="mt-6 sm:mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
                 <Link
                   href="/onboarding/welcome"
-                  className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 bg-white text-haven-navy-900 font-semibold rounded-xl hover:bg-sage-50 transition-all shadow-lg text-base sm:text-lg flex items-center justify-center gap-2"
+                  className="group relative w-full sm:w-auto px-8 py-4 bg-white text-haven-navy-900
+                             font-semibold rounded-xl overflow-hidden transition-all duration-300
+                             hover:shadow-[0_8px_32px_rgba(255,255,255,0.2)] hover:-translate-y-0.5"
                 >
-                  Get Started
-                  <ArrowRight className="w-5 h-5" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    Get Started
+                    <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
+                  </span>
                 </Link>
                 <a
                   href="#how-it-works"
-                  className="w-full sm:w-auto px-6 sm:px-8 py-3.5 sm:py-4 border-2 border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition-colors text-base sm:text-lg text-center"
+                  className="w-full sm:w-auto px-8 py-4 bg-white/5 backdrop-blur-sm
+                             border border-white/20 text-white font-semibold rounded-xl
+                             transition-all duration-300 hover:bg-white/10 hover:border-white/30
+                             flex items-center justify-center gap-2"
                 >
                   See How It Works
                 </a>
               </div>
 
-              {/* Trust indicators - compact on mobile */}
-              <div className="mt-6 sm:mt-8 pt-5 sm:pt-8 border-t border-white/20 flex flex-wrap items-center justify-center lg:justify-start gap-4 sm:gap-6">
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/70">
-                  <Shield className="w-4 h-4" />
-                  <span>Bank-Level Security</span>
-                </div>
-                <div className="flex items-center gap-2 text-xs sm:text-sm text-white/70">
-                  <Star className="w-4 h-4 text-sage-300 fill-current" />
-                  <span>4.9/5 Rating</span>
-                </div>
-                <div className="hidden sm:flex items-center gap-2 text-sm text-white/70">
-                  <Award className="w-4 h-4" />
-                  <span>500+ Homes Managed</span>
+              {/* Trust indicators */}
+              <div className="mt-10 pt-8 border-t border-white/10">
+                <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 sm:gap-4">
+                  {[
+                    { icon: Shield, text: 'Bank-Level Security', filled: false },
+                    { icon: Star, text: '4.9/5 Rating', filled: true },
+                    { icon: Award, text: '500+ Homes Managed', filled: false },
+                  ].map((item, i) => (
+                    <div key={i} className={`flex items-center gap-2 px-3 py-1.5 rounded-full
+                                            bg-white/5 border border-white/10 ${i === 2 ? 'hidden sm:flex' : ''}`}>
+                      <item.icon className={`w-4 h-4 ${item.filled ? 'text-sage-300 fill-sage-300' : 'text-white/60'}`} />
+                      <span className="text-xs sm:text-sm text-white/80 font-medium">{item.text}</span>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -163,8 +173,8 @@ export default function MarketingPage() {
         </div>
 
         {/* Scroll indicator on mobile */}
-        <div className="sm:hidden flex justify-center pb-4 mt-auto">
-          <a href="#how-it-works" className="flex flex-col items-center gap-1 text-white/50 animate-bounce">
+        <div className="sm:hidden flex justify-center pb-6 mt-auto">
+          <a href="#how-it-works" className="flex flex-col items-center gap-1 text-white/40 animate-bounce">
             <span className="text-xs">Scroll to learn more</span>
             <ChevronDown className="w-5 h-5" />
           </a>
@@ -172,12 +182,18 @@ export default function MarketingPage() {
       </section>
 
       {/* ================================================================== */}
-      {/* HOW IT WORKS - Expanded for full home management value */}
+      {/* HOW IT WORKS */}
       {/* ================================================================== */}
-      <section id="how-it-works" className="py-16 sm:py-24 bg-white">
+      <section id="how-it-works" className="py-20 sm:py-32 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sage-100
+                            rounded-full text-sage-700 text-sm font-medium mb-4">
+              <Sparkles className="w-4 h-4" />
+              Simple Setup
+            </div>
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               How Alfred Works
             </h2>
             <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
@@ -185,7 +201,7 @@ export default function MarketingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="grid md:grid-cols-3 gap-8 lg:gap-12">
             {[
               {
                 step: '1',
@@ -206,29 +222,38 @@ export default function MarketingPage() {
                 Icon: Bell,
               },
             ].map((item, idx) => (
-              <div key={idx} className="relative">
+              <div key={idx} className="relative group">
                 {idx < 2 && (
-                  <div className="hidden md:block absolute top-12 left-[60%] w-[80%] h-0.5 bg-gradient-to-r from-sage-300 to-transparent" />
+                  <div className="hidden md:block absolute top-14 left-[60%] w-[80%] h-px
+                                  bg-gradient-to-r from-sage-300 to-transparent" />
                 )}
                 <div className="text-center">
-                  <div className="relative inline-flex mb-4">
-                    <div className="w-20 h-20 rounded-2xl bg-sage-100 text-sage-700 flex items-center justify-center shadow-lg">
-                      <item.Icon className="w-9 h-9" />
+                  <div className="relative inline-flex mb-6">
+                    <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-sage-100 to-sage-50
+                                    text-sage-700 flex items-center justify-center shadow-elegant
+                                    group-hover:shadow-elegant-lg transition-all duration-500
+                                    group-hover:-translate-y-1">
+                      <item.Icon className="w-10 h-10" />
                     </div>
-                    <span className="absolute -top-2 -right-2 w-7 h-7 bg-haven-navy-900 text-white rounded-full flex items-center justify-center font-bold text-sm shadow-md">
+                    <span className="absolute -top-2 -right-2 w-8 h-8 bg-haven-navy-900 text-white
+                                     rounded-full flex items-center justify-center font-bold text-sm
+                                     shadow-lg ring-4 ring-white">
                       {item.step}
                     </span>
                   </div>
-                  <h3 className="text-xl font-semibold text-warm-900 mb-2">{item.title}</h3>
-                  <p className="text-warm-600">{item.description}</p>
+                  <h3 className="text-xl font-bold text-haven-navy-900 mb-3">{item.title}</h3>
+                  <p className="text-warm-600 leading-relaxed">{item.description}</p>
                 </div>
               </div>
             ))}
           </div>
 
           {/* Email examples grid */}
-          <div className="bg-sage-50 rounded-2xl p-6 border border-sage-200 mt-12">
-            <h3 className="text-lg font-semibold text-warm-900 mb-4 text-center">Emails Alfred handles for you</h3>
+          <div className="bg-gradient-to-br from-sage-50 to-sage-100/50 rounded-3xl p-8
+                          border border-sage-200 mt-16 shadow-elegant">
+            <h3 className="text-xl font-bold text-haven-navy-900 mb-6 text-center">
+              Emails Alfred handles for you
+            </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
               {[
                 { icon: Zap, label: 'Utility Bills', example: 'Eversource, CNG, Water' },
@@ -240,9 +265,15 @@ export default function MarketingPage() {
                 { icon: Receipt, label: 'Subscriptions', example: 'Lawn care, security' },
                 { icon: MessageCircle, label: 'Quotes & Estimates', example: 'Any vendor quote' },
               ].map((item, i) => (
-                <div key={i} className="text-center p-3 rounded-xl bg-white">
-                  <item.icon className="w-6 h-6 mx-auto text-sage-600 mb-2" />
-                  <p className="font-medium text-warm-900 text-sm">{item.label}</p>
+                <div key={i} className="group text-center p-4 rounded-xl bg-white shadow-elegant
+                                        hover:shadow-elegant-lg transition-all duration-300
+                                        hover:-translate-y-0.5">
+                  <div className="w-10 h-10 mx-auto mb-3 rounded-xl bg-sage-100
+                                  flex items-center justify-center
+                                  group-hover:scale-105 transition-transform duration-300">
+                    <item.icon className="w-5 h-5 text-sage-600" />
+                  </div>
+                  <p className="font-semibold text-haven-navy-900 text-sm">{item.label}</p>
                   <p className="text-xs text-warm-500 mt-1">{item.example}</p>
                 </div>
               ))}
@@ -254,10 +285,11 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* WHAT ALFRED DOES - 6 Feature Cards */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-white">
+      <section className="py-20 sm:py-32 bg-cream-100">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               What Alfred Does for You
             </h2>
             <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
@@ -266,71 +298,40 @@ export default function MarketingPage() {
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Card 1 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                <Mail className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">Reads Your Emails</h3>
-              <p className="text-warm-600">
-                Forward any home email and Alfred extracts dates, amounts, and action items automatically.
-              </p>
-            </div>
+            {[
+              { icon: Mail, color: 'blue', title: 'Reads Your Emails', description: 'Forward any home email and Alfred extracts dates, amounts, and action items automatically.' },
+              { icon: TrendingDown, color: 'green', title: 'Finds Savings', description: 'Alfred monitors your bills and alerts you to better rates, unnecessary charges, and money-saving opportunities.' },
+              { icon: Clock, color: 'amber', title: 'Never Forgets', description: "Maintenance reminders, warranty expirations, filter changes — Alfred tracks it all so you don't have to." },
+              { icon: BookOpen, color: 'purple', title: 'Builds Your Home Manual', description: "Every system, appliance, paint color, and vendor — documented and searchable. Your home's complete digital memory." },
+              { icon: Receipt, color: 'navy', title: 'One Bill', description: 'All your home expenses consolidated into a single monthly payment. No more juggling seven different due dates.' },
+              { icon: HelpCircle, color: 'sage', title: 'Answers Anything', description: '"When was the roof last inspected?" "What\'s the model number of my water heater?" Alfred knows.' },
+            ].map((card, i) => {
+              const colorClasses: Record<string, { bg: string; text: string }> = {
+                blue: { bg: 'bg-blue-100', text: 'text-blue-600' },
+                green: { bg: 'bg-emerald-100', text: 'text-emerald-600' },
+                amber: { bg: 'bg-amber-100', text: 'text-amber-600' },
+                purple: { bg: 'bg-purple-100', text: 'text-purple-600' },
+                navy: { bg: 'bg-haven-100', text: 'text-haven-700' },
+                sage: { bg: 'bg-sage-100', text: 'text-sage-600' },
+              };
+              const colors = colorClasses[card.color];
 
-            {/* Card 2 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-                <TrendingDown className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">Finds Savings</h3>
-              <p className="text-warm-600">
-                Alfred monitors your bills and alerts you to better rates, unnecessary charges, and money-saving opportunities.
-              </p>
-            </div>
-
-            {/* Card 3 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
-                <Clock className="w-6 h-6 text-amber-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">Never Forgets</h3>
-              <p className="text-warm-600">
-                Maintenance reminders, warranty expirations, filter changes — Alfred tracks it all so you don&apos;t have to.
-              </p>
-            </div>
-
-            {/* Card 4 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-                <BookOpen className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">Builds Your Home Manual</h3>
-              <p className="text-warm-600">
-                Every system, appliance, paint color, and vendor — documented and searchable. Your home&apos;s complete digital memory.
-              </p>
-            </div>
-
-            {/* Card 5 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center mb-4">
-                <Receipt className="w-6 h-6 text-haven-700" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">One Bill</h3>
-              <p className="text-warm-600">
-                All your home expenses consolidated into a single monthly payment. No more juggling seven different due dates.
-              </p>
-            </div>
-
-            {/* Card 6 */}
-            <div className="bg-warm-50 rounded-2xl p-6 border border-warm-100">
-              <div className="w-12 h-12 bg-sage-100 rounded-xl flex items-center justify-center mb-4">
-                <HelpCircle className="w-6 h-6 text-sage-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">Answers Anything</h3>
-              <p className="text-warm-600">
-                &quot;When was the roof last inspected?&quot; &quot;What&apos;s the model number of my water heater?&quot; Alfred knows.
-              </p>
-            </div>
+              return (
+                <div key={i} className="group bg-white rounded-2xl p-8
+                                        shadow-elegant hover:shadow-elegant-lg
+                                        border border-warm-100 hover:border-sage-200
+                                        transition-all duration-500
+                                        hover:-translate-y-1">
+                  <div className={`w-14 h-14 rounded-xl ${colors.bg}
+                                  flex items-center justify-center mb-6
+                                  group-hover:scale-105 transition-transform duration-300`}>
+                    <card.icon className={`w-7 h-7 ${colors.text}`} />
+                  </div>
+                  <h3 className="text-xl font-bold text-haven-navy-900 mb-3">{card.title}</h3>
+                  <p className="text-warm-600 leading-relaxed">{card.description}</p>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -338,22 +339,27 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* HANDYMAN SECTION - Dark Background */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-navy-900 to-haven-navy-950">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+      <section className="relative py-20 sm:py-32 bg-gradient-to-b from-haven-navy-950 to-haven-navy-900 overflow-hidden">
+        {/* Subtle glow accent */}
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px]
+                        bg-[radial-gradient(ellipse_at_center,rgba(164,180,148,0.08),transparent)] blur-3xl" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div>
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full mb-4">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-sage-400/10
+                              border border-sage-400/20 rounded-full mb-6">
                 <Hammer className="w-4 h-4 text-sage-300" />
-                <span className="text-sm font-medium text-white">Haven Handyman</span>
+                <span className="text-sm font-medium text-sage-300">Haven Handyman</span>
               </div>
-              <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+              <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 font-serif tracking-tight">
                 A Real Handyman Who Knows Your Home
               </h2>
-              <p className="text-lg text-haven-100 mb-8">
+              <p className="text-lg text-white/70 mb-8 leading-relaxed">
                 No more explaining your home&apos;s quirks to every contractor. Your Haven handyman has access to your complete home profile and maintenance history.
               </p>
 
-              <div className="space-y-4">
+              <ul className="space-y-4 mb-10">
                 {[
                   'Background-checked and insured',
                   'Knows your home systems before they arrive',
@@ -361,66 +367,68 @@ export default function MarketingPage() {
                   'Can handle 90% of small repairs',
                   'Escalates to specialists when needed',
                 ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-3">
-                    <CheckCircle2 className="w-5 h-5 text-sage-400 flex-shrink-0" />
-                    <span className="text-white">{item}</span>
-                  </div>
+                  <li key={i} className="flex items-start gap-3">
+                    <div className="mt-0.5 w-5 h-5 rounded-full bg-sage-500/20
+                                    flex items-center justify-center flex-shrink-0">
+                      <Check className="w-3 h-3 text-sage-300" />
+                    </div>
+                    <span className="text-white/80">{item}</span>
+                  </li>
                 ))}
-              </div>
+              </ul>
 
-              <div className="mt-8 flex flex-wrap gap-6">
-                <div className="bg-white rounded-xl px-4 py-3">
+              <div className="flex flex-wrap gap-4">
+                <div className="bg-white rounded-xl px-5 py-4 shadow-elegant-lg">
                   <p className="text-haven-navy-900 font-bold text-2xl">$99</p>
                   <p className="text-haven-navy-700 text-sm">per visit (Essentials)</p>
                 </div>
-                <div className="bg-white rounded-xl px-4 py-3">
-                  <p className="text-haven-700 font-bold text-2xl">Included</p>
+                <div className="bg-white rounded-xl px-5 py-4 shadow-elegant-lg">
+                  <p className="text-sage-600 font-bold text-2xl">Included</p>
                   <p className="text-haven-navy-700 text-sm">with Haven ($749+)</p>
                 </div>
               </div>
             </div>
 
             {/* Handyman Profile Card */}
-            <div className="bg-white rounded-2xl p-6 shadow-xl">
+            <div className="bg-white rounded-2xl p-8 shadow-elegant-xl">
               <div className="flex items-start gap-4 mb-6">
-                <div className="w-20 h-20 bg-warm-200 rounded-xl flex items-center justify-center">
+                <div className="w-20 h-20 bg-gradient-to-br from-warm-200 to-warm-100
+                                rounded-xl flex items-center justify-center">
                   <Wrench className="w-10 h-10 text-warm-500" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-warm-900">Mike Rodriguez</h3>
+                  <h3 className="text-xl font-bold text-haven-navy-900">Mike Rodriguez</h3>
                   <p className="text-warm-600">Your Haven Handyman</p>
-                  <div className="flex items-center gap-1 mt-1">
+                  <div className="flex items-center gap-1 mt-2">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className="w-4 h-4 text-sage-500 fill-current" />
+                      <Star key={i} className="w-4 h-4 text-sage-500 fill-sage-500" />
                     ))}
-                    <span className="text-sm text-warm-500 ml-1">4.9 (127 reviews)</span>
+                    <span className="text-sm text-warm-500 ml-2">4.9 (127 reviews)</span>
                   </div>
                 </div>
               </div>
 
               <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-warm-700">
-                  <MapPin className="w-5 h-5 text-warm-400" />
-                  <span>Serves Greater Hartford area</span>
-                </div>
-                <div className="flex items-center gap-3 text-warm-700">
-                  <Clock className="w-5 h-5 text-warm-400" />
-                  <span>15+ years experience</span>
-                </div>
-                <div className="flex items-center gap-3 text-warm-700">
-                  <Shield className="w-5 h-5 text-warm-400" />
-                  <span>Background checked & insured</span>
-                </div>
+                {[
+                  { icon: MapPin, text: 'Serves Greater Hartford area' },
+                  { icon: Clock, text: '15+ years experience' },
+                  { icon: Shield, text: 'Background checked & insured' },
+                ].map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 text-warm-700">
+                    <item.icon className="w-5 h-5 text-warm-400" />
+                    <span>{item.text}</span>
+                  </div>
+                ))}
               </div>
 
-              <div className="bg-sage-50 rounded-xl p-4 border border-sage-200">
+              <div className="bg-sage-50 rounded-xl p-5 border border-sage-200">
                 <div className="flex items-start gap-3">
                   <Quote className="w-5 h-5 text-sage-500 flex-shrink-0 mt-0.5" />
                   <div>
-                    <p className="text-warm-700 italic">
+                    <p className="text-warm-700 italic leading-relaxed">
                       &quot;Mike already knew about our old furnace before he arrived. Fixed it in half the time!&quot;
                     </p>
-                    <p className="text-sm text-warm-500 mt-2">— The Morrison Family</p>
+                    <p className="text-sm text-warm-500 mt-3 font-medium">— The Morrison Family</p>
                   </div>
                 </div>
               </div>
@@ -432,10 +440,11 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* USE CASES */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-warm-50">
+      <section className="py-20 sm:py-32 bg-sage-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               Is Haven Right for You?
             </h2>
             <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
@@ -444,95 +453,80 @@ export default function MarketingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            {/* The Newcomer */}
-            <div className="bg-white rounded-2xl p-6 border border-warm-200 relative">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
-                <Home className="w-6 h-6 text-blue-600" />
+            {[
+              {
+                icon: Home,
+                iconBg: 'bg-blue-100',
+                iconColor: 'text-blue-600',
+                title: 'The Newcomer',
+                description: 'Just bought a home and feeling overwhelmed by all the things you need to track, remember, and maintain.',
+                features: ['Build your home manual from scratch', 'Get maintenance reminders automatically', 'One bill from day one'],
+                price: '$39',
+                plan: 'Essentials + Alfred',
+                featured: false,
+              },
+              {
+                icon: TrendingDown,
+                iconBg: 'bg-emerald-100',
+                iconColor: 'text-emerald-600',
+                title: 'The Optimizer',
+                description: "You're organized but tired of missing things. You know you're paying too much but don't have time to shop around.",
+                features: ['Find savings automatically', 'Never miss a payment again', 'Track everything in one place'],
+                price: '$39',
+                plan: 'Essentials + Alfred',
+                featured: true,
+              },
+              {
+                icon: Phone,
+                iconBg: 'bg-purple-100',
+                iconColor: 'text-purple-600',
+                title: 'The Busy Bee',
+                description: "You don't have time to make calls, get quotes, or schedule contractors. You need someone to handle it.",
+                features: ['Text to get anything done', 'We call, schedule, and coordinate', 'Human manager + Alfred'],
+                price: '$349',
+                plan: 'Haven Lite',
+                featured: false,
+              },
+            ].map((card, i) => (
+              <div key={i} className={`group bg-white rounded-2xl p-8 relative
+                                       shadow-elegant hover:shadow-elegant-lg
+                                       transition-all duration-500 hover:-translate-y-1
+                                       ${card.featured
+                                         ? 'ring-2 ring-sage-400 shadow-elegant-lg'
+                                         : 'border border-warm-200'}`}>
+                {card.featured && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <div className="px-4 py-1.5 bg-sage-500 text-white text-xs font-bold
+                                    rounded-full shadow-lg">
+                      Most Popular
+                    </div>
+                  </div>
+                )}
+                <div className={`w-14 h-14 ${card.iconBg} rounded-xl flex items-center justify-center mb-6
+                                group-hover:scale-105 transition-transform duration-300`}>
+                  <card.icon className={`w-7 h-7 ${card.iconColor}`} />
+                </div>
+                <h3 className="text-xl font-bold text-haven-navy-900 mb-3">{card.title}</h3>
+                <p className="text-warm-600 mb-6 leading-relaxed">{card.description}</p>
+                <ul className="space-y-3 mb-8">
+                  {card.features.map((feature, j) => (
+                    <li key={j} className="flex items-start gap-3">
+                      <div className="mt-0.5 w-5 h-5 rounded-full bg-sage-100
+                                      flex items-center justify-center flex-shrink-0">
+                        <Check className="w-3 h-3 text-sage-600" />
+                      </div>
+                      <span className="text-sm text-warm-700">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="pt-6 border-t border-warm-100">
+                  <p className="text-2xl font-bold text-haven-navy-900">
+                    {card.price}<span className="text-base font-normal text-warm-500">/mo</span>
+                  </p>
+                  <p className="text-sm text-warm-500 mt-1">{card.plan}</p>
+                </div>
               </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">The Newcomer</h3>
-              <p className="text-warm-600 mb-4">
-                Just bought a home and feeling overwhelmed by all the things you need to track, remember, and maintain.
-              </p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Build your home manual from scratch
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Get maintenance reminders automatically
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  One bill from day one
-                </li>
-              </ul>
-              <div className="pt-4 border-t border-warm-100">
-                <p className="text-2xl font-bold text-haven-700">$39<span className="text-base font-normal text-warm-500">/mo</span></p>
-                <p className="text-sm text-warm-500">Essentials + Alfred</p>
-              </div>
-            </div>
-
-            {/* The Optimizer - Most Popular */}
-            <div className="bg-white rounded-2xl p-6 border-2 border-sage-400 relative">
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-full shadow-lg">
-                Most Popular
-              </div>
-              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
-                <TrendingDown className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">The Optimizer</h3>
-              <p className="text-warm-600 mb-4">
-                You&apos;re organized but tired of missing things. You know you&apos;re paying too much but don&apos;t have time to shop around.
-              </p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Find savings automatically
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Never miss a payment again
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Track everything in one place
-                </li>
-              </ul>
-              <div className="pt-4 border-t border-warm-100">
-                <p className="text-2xl font-bold text-haven-700">$39<span className="text-base font-normal text-warm-500">/mo</span></p>
-                <p className="text-sm text-warm-500">Essentials + Alfred</p>
-              </div>
-            </div>
-
-            {/* The Busy Bee */}
-            <div className="bg-white rounded-2xl p-6 border border-warm-200 relative">
-              <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center mb-4">
-                <Phone className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-bold text-warm-900 mb-2">The Busy Bee</h3>
-              <p className="text-warm-600 mb-4">
-                You don&apos;t have time to make calls, get quotes, or schedule contractors. You need someone to handle it.
-              </p>
-              <ul className="space-y-2 mb-6">
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Text to get anything done
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  We call, schedule, and coordinate
-                </li>
-                <li className="flex items-center gap-2 text-sm text-warm-700">
-                  <Check className="w-4 h-4 text-green-500" />
-                  Human manager + Alfred
-                </li>
-              </ul>
-              <div className="pt-4 border-t border-warm-100">
-                <p className="text-2xl font-bold text-haven-700">$349<span className="text-base font-normal text-warm-500">/mo</span></p>
-                <p className="text-sm text-warm-500">Haven Lite</p>
-              </div>
-            </div>
+            ))}
           </div>
         </div>
       </section>
@@ -540,22 +534,27 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* ONE BILL SECTION - Dark Background */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-navy-900 to-haven-navy-950">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-white">
+      <section className="relative py-20 sm:py-32 bg-gradient-to-b from-haven-navy-900 to-haven-navy-950 overflow-hidden">
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[600px]
+                        bg-[radial-gradient(ellipse_at_center,rgba(164,180,148,0.06),transparent)] blur-3xl" />
+
+        <div className="relative max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white font-serif tracking-tight">
               One Bill. Seriously.
             </h2>
-            <p className="mt-4 text-lg text-haven-100 max-w-2xl mx-auto">
+            <p className="mt-4 text-lg text-white/70 max-w-2xl mx-auto">
               Stop juggling seven different payment due dates. Haven consolidates everything into one simple monthly payment.
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-8 items-center">
+          <div className="grid md:grid-cols-2 gap-8 items-stretch">
             {/* Before */}
-            <div className="bg-white/5 backdrop-blur rounded-2xl p-6 border border-white/10">
-              <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-red-500/20 rounded-full flex items-center justify-center text-sm">✗</span>
+            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+              <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-3">
+                <span className="w-7 h-7 bg-red-500/20 rounded-full flex items-center justify-center">
+                  <span className="text-red-400 text-sm">✗</span>
+                </span>
                 Before Haven
               </h3>
               <div className="space-y-3">
@@ -568,37 +567,43 @@ export default function MarketingPage() {
                   { name: 'Security', date: '20th', amount: '$45' },
                   { name: 'Pest Control', date: 'Quarterly', amount: '$120' },
                 ].map((bill, i) => (
-                  <div key={i} className="flex items-center justify-between py-2 border-b border-white/10 last:border-0">
+                  <div key={i} className="flex items-center justify-between py-3
+                                          border-b border-white/10 last:border-0">
                     <span className="text-white/70">{bill.name}</span>
                     <div className="flex items-center gap-4">
-                      <span className="text-xs text-white/50">Due: {bill.date}</span>
+                      <span className="text-xs text-white/50 bg-white/5 px-2 py-1 rounded">
+                        Due: {bill.date}
+                      </span>
                       <span className="text-white font-medium">{bill.amount}</span>
                     </div>
                   </div>
                 ))}
               </div>
-              <div className="mt-4 pt-4 border-t border-white/20 flex justify-between">
-                <span className="text-white/70">7 different payments</span>
-                <span className="text-red-400 font-bold">7 chances to be late</span>
+              <div className="mt-6 pt-6 border-t border-white/20 flex justify-between items-center">
+                <span className="text-white/60">7 different payments</span>
+                <span className="text-red-400 font-bold text-sm">7 chances to be late</span>
               </div>
             </div>
 
             {/* After */}
-            <div className="bg-white rounded-2xl p-6">
-              <h3 className="text-xl font-bold text-haven-navy-900 mb-4 flex items-center gap-2">
-                <span className="w-6 h-6 bg-haven-700 rounded-full flex items-center justify-center text-white text-sm">✓</span>
+            <div className="bg-white rounded-2xl p-8 shadow-elegant-xl">
+              <h3 className="text-xl font-bold text-haven-navy-900 mb-6 flex items-center gap-3">
+                <span className="w-7 h-7 bg-sage-500 rounded-full flex items-center justify-center">
+                  <Check className="w-4 h-4 text-white" />
+                </span>
                 With Haven
               </h3>
-              <div className="flex items-center justify-center py-12">
+              <div className="flex items-center justify-center py-16">
                 <div className="text-center">
-                  <p className="text-6xl font-bold text-haven-700">1</p>
-                  <p className="text-haven-navy-900 text-xl mt-2">Monthly Bill</p>
-                  <p className="text-haven-navy-700 mt-1">Same day every month</p>
+                  <p className="text-7xl font-bold bg-gradient-to-r from-sage-600 to-sage-500
+                                bg-clip-text text-transparent">1</p>
+                  <p className="text-haven-navy-900 text-2xl font-semibold mt-3">Monthly Bill</p>
+                  <p className="text-warm-600 mt-2">Same day every month</p>
                 </div>
               </div>
-              <div className="mt-4 pt-4 border-t border-warm-200 flex justify-between items-center">
-                <span className="text-haven-navy-700">All bills included</span>
-                <span className="text-haven-700 font-bold flex items-center gap-2">
+              <div className="mt-6 pt-6 border-t border-warm-200 flex justify-between items-center">
+                <span className="text-warm-600">All bills included</span>
+                <span className="text-sage-600 font-bold flex items-center gap-2">
                   <CheckCircle2 className="w-5 h-5" />
                   Never late
                 </span>
@@ -611,10 +616,11 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* PRICING */}
       {/* ================================================================== */}
-      <section id="pricing" className="py-16 sm:py-24 bg-white">
+      <section id="pricing" className="py-20 sm:py-32 bg-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               Simple, Transparent Pricing
             </h2>
             <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
@@ -622,27 +628,33 @@ export default function MarketingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-8">
-            {/* Essentials - START HERE */}
-            <div className="bg-white rounded-2xl p-6 border-2 border-sage-400 relative shadow-xl overflow-hidden">
-              <div className="h-2 bg-gradient-to-r from-sage-400 to-sage-500 absolute top-0 left-0 right-0" />
-              <div className="absolute -top-0 left-1/2 -translate-x-1/2 px-4 py-1.5 bg-sage-500 text-white text-sm font-bold rounded-b-full shadow-lg">
-                Start Here
+          <div className="grid md:grid-cols-3 gap-6 mb-12">
+            {/* Essentials - Featured */}
+            <div className="relative p-8 rounded-2xl bg-gradient-to-b from-haven-navy-900 to-haven-navy-950
+                            text-white ring-2 ring-sage-400 shadow-elegant-xl">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+                <div className="px-4 py-1.5 bg-sage-500 text-white text-xs font-bold
+                                rounded-full shadow-lg">
+                  Start Here
+                </div>
               </div>
-              <div className="flex items-center gap-3 mb-4 mt-4">
-                <div className="w-10 h-10 bg-sage-100 rounded-xl flex items-center justify-center">
-                  <Sparkles className="w-5 h-5 text-sage-600" />
+
+              <div className="flex items-center gap-3 mb-4 mt-2">
+                <div className="w-12 h-12 bg-sage-500/20 rounded-xl flex items-center justify-center">
+                  <Sparkles className="w-6 h-6 text-sage-300" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-warm-900">Essentials</h3>
-                  <p className="text-sm text-warm-500">Alfred + Core Features</p>
+                  <h3 className="text-xl font-bold text-white">Essentials</h3>
+                  <p className="text-sage-300 text-sm">Alfred + Core Features</p>
                 </div>
               </div>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-haven-700">$39</span>
-                <span className="text-warm-500">/month</span>
+
+              <div className="flex items-baseline gap-1 mt-6 mb-8">
+                <span className="text-4xl font-bold text-white">$39</span>
+                <span className="text-white/60">/month</span>
               </div>
-              <ul className="space-y-3 mb-6">
+
+              <ul className="space-y-3 mb-8">
                 {[
                   'Alfred email processing',
                   'One consolidated bill',
@@ -652,36 +664,43 @@ export default function MarketingPage() {
                   'Savings finder',
                   'Handyman visits ($99/each)',
                 ].map((feature, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-warm-700">
-                    <Check className="w-5 h-5 text-sage-500 flex-shrink-0" />
-                    {feature}
+                  <li key={i} className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-sage-300 mt-0.5 flex-shrink-0" />
+                    <span className="text-white/80 text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
+
               <Link
                 href="/onboarding/welcome"
-                className="block w-full py-3 px-4 bg-haven-navy-900 text-white font-semibold rounded-xl text-center hover:bg-haven-navy-800 transition-colors"
+                className="block w-full py-3.5 bg-white text-haven-navy-900
+                           font-semibold rounded-xl text-center
+                           hover:bg-sage-50 transition-colors"
               >
                 Get Started
               </Link>
             </div>
 
             {/* Haven Lite */}
-            <div className="bg-white rounded-2xl p-6 border border-warm-200">
+            <div className="p-8 rounded-2xl bg-white border border-warm-200
+                            shadow-elegant hover:shadow-elegant-lg hover:border-sage-200
+                            transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-haven-100 rounded-xl flex items-center justify-center">
-                  <MessageCircle className="w-5 h-5 text-haven-700" />
+                <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center">
+                  <MessageCircle className="w-6 h-6 text-haven-700" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-warm-900">Haven Lite</h3>
-                  <p className="text-sm text-warm-500">Text-based Support</p>
+                  <h3 className="text-xl font-bold text-haven-navy-900">Haven Lite</h3>
+                  <p className="text-warm-500 text-sm">Text-based Support</p>
                 </div>
               </div>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-haven-700">$349</span>
+
+              <div className="flex items-baseline gap-1 mt-6 mb-8">
+                <span className="text-4xl font-bold text-haven-navy-900">$349</span>
                 <span className="text-warm-500">/month</span>
               </div>
-              <ul className="space-y-3 mb-6">
+
+              <ul className="space-y-3 mb-8">
                 {[
                   'Everything in Essentials',
                   'Dedicated home manager',
@@ -690,36 +709,43 @@ export default function MarketingPage() {
                   'Quote comparison',
                   'Handyman visits ($79/each)',
                 ].map((feature, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-warm-700">
-                    <Check className="w-4 h-4 text-haven-700" />
-                    {feature}
+                  <li key={i} className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-sage-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-warm-700 text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
+
               <Link
                 href="/onboarding/welcome?plan=lite"
-                className="block w-full py-3 px-4 bg-warm-100 text-warm-700 font-semibold rounded-xl text-center hover:bg-warm-200 transition-colors"
+                className="block w-full py-3.5 bg-haven-navy-900 text-white
+                           font-semibold rounded-xl text-center
+                           hover:bg-haven-navy-800 transition-colors"
               >
                 Choose Lite
               </Link>
             </div>
 
             {/* Haven */}
-            <div className="bg-white rounded-2xl p-6 border border-warm-200">
+            <div className="p-8 rounded-2xl bg-white border border-warm-200
+                            shadow-elegant hover:shadow-elegant-lg hover:border-sage-200
+                            transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 bg-haven-100 rounded-xl flex items-center justify-center">
-                  <Phone className="w-5 h-5 text-haven-700" />
+                <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center">
+                  <Phone className="w-6 h-6 text-haven-700" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-warm-900">Haven</h3>
-                  <p className="text-sm text-warm-500">Proactive Management</p>
+                  <h3 className="text-xl font-bold text-haven-navy-900">Haven</h3>
+                  <p className="text-warm-500 text-sm">Proactive Management</p>
                 </div>
               </div>
-              <div className="mb-6">
-                <span className="text-4xl font-bold text-haven-700">$749</span>
+
+              <div className="flex items-baseline gap-1 mt-6 mb-8">
+                <span className="text-4xl font-bold text-haven-navy-900">$749</span>
                 <span className="text-warm-500">/month</span>
               </div>
-              <ul className="space-y-3 mb-6">
+
+              <ul className="space-y-3 mb-8">
                 {[
                   'Everything in Lite',
                   'Phone & video support',
@@ -728,15 +754,18 @@ export default function MarketingPage() {
                   'Project management',
                   'Handyman visits included',
                 ].map((feature, i) => (
-                  <li key={i} className="flex items-center gap-2 text-sm text-warm-700">
-                    <Check className="w-4 h-4 text-haven-700" />
-                    {feature}
+                  <li key={i} className="flex items-start gap-3">
+                    <Check className="w-5 h-5 text-sage-500 mt-0.5 flex-shrink-0" />
+                    <span className="text-warm-700 text-sm">{feature}</span>
                   </li>
                 ))}
               </ul>
+
               <Link
                 href="/onboarding/welcome?plan=haven"
-                className="block w-full py-3 px-4 bg-warm-100 text-warm-700 font-semibold rounded-xl text-center hover:bg-warm-200 transition-colors"
+                className="block w-full py-3.5 bg-haven-navy-900 text-white
+                           font-semibold rounded-xl text-center
+                           hover:bg-haven-navy-800 transition-colors"
               >
                 Choose Haven
               </Link>
@@ -747,7 +776,8 @@ export default function MarketingPage() {
           <div className="text-center">
             <button
               onClick={() => setShowPremiumTiers(!showPremiumTiers)}
-              className="inline-flex items-center gap-2 text-haven-700 hover:text-haven-800 font-medium"
+              className="inline-flex items-center gap-2 text-haven-navy-700 hover:text-haven-navy-900
+                         font-medium transition-colors"
             >
               {showPremiumTiers ? 'Hide' : 'Show'} premium tiers
               {showPremiumTiers ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
@@ -755,31 +785,37 @@ export default function MarketingPage() {
 
             {showPremiumTiers && (
               <div className="grid md:grid-cols-2 gap-6 mt-8 max-w-3xl mx-auto">
-                {/* Haven+ */}
-                <div className="bg-warm-50 rounded-2xl p-6 border border-warm-200 text-left">
-                  <h3 className="text-xl font-bold text-warm-900 mb-1">Haven+</h3>
-                  <p className="text-sm text-warm-500 mb-4">Lifestyle Services</p>
-                  <p className="text-3xl font-bold text-haven-700 mb-4">$1,499<span className="text-base font-normal text-warm-500">/mo</span></p>
-                  <ul className="space-y-2 text-sm text-warm-600">
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Everything in Haven</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Travel coordination</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Event planning support</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Seasonal home prep</li>
-                  </ul>
-                </div>
-
-                {/* Estate */}
-                <div className="bg-warm-50 rounded-2xl p-6 border border-warm-200 text-left">
-                  <h3 className="text-xl font-bold text-warm-900 mb-1">Estate</h3>
-                  <p className="text-sm text-warm-500 mb-4">White Glove Service</p>
-                  <p className="text-3xl font-bold text-haven-700 mb-4">$3,499<span className="text-base font-normal text-warm-500">/mo</span></p>
-                  <ul className="space-y-2 text-sm text-warm-600">
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Everything in Haven+</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Multi-property support</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> Dedicated estate manager</li>
-                    <li className="flex items-center gap-2"><Check className="w-4 h-4 text-haven-700" /> 24/7 emergency response</li>
-                  </ul>
-                </div>
+                {[
+                  {
+                    title: 'Haven+',
+                    subtitle: 'Lifestyle Services',
+                    price: '$1,499',
+                    features: ['Everything in Haven', 'Travel coordination', 'Event planning support', 'Seasonal home prep'],
+                  },
+                  {
+                    title: 'Estate',
+                    subtitle: 'White Glove Service',
+                    price: '$3,499',
+                    features: ['Everything in Haven+', 'Multi-property support', 'Dedicated estate manager', '24/7 emergency response'],
+                  },
+                ].map((tier, i) => (
+                  <div key={i} className="bg-cream-100 rounded-2xl p-6 border border-warm-200 text-left
+                                          shadow-elegant hover:shadow-elegant-lg transition-all duration-500">
+                    <h3 className="text-xl font-bold text-haven-navy-900 mb-1">{tier.title}</h3>
+                    <p className="text-sm text-warm-500 mb-4">{tier.subtitle}</p>
+                    <p className="text-3xl font-bold text-haven-navy-900 mb-4">
+                      {tier.price}<span className="text-base font-normal text-warm-500">/mo</span>
+                    </p>
+                    <ul className="space-y-2">
+                      {tier.features.map((f, j) => (
+                        <li key={j} className="flex items-center gap-2 text-sm text-warm-600">
+                          <Check className="w-4 h-4 text-sage-500" />
+                          {f}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))}
               </div>
             )}
           </div>
@@ -789,15 +825,16 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* TESTIMONIALS */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-b from-sage-50 to-sage-100/50">
+      <section className="py-20 sm:py-32 bg-gradient-to-b from-sage-50 to-white">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               Real Homeowners. Real Results.
             </h2>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
+          <div className="grid md:grid-cols-3 gap-6 mb-16">
             {[
               {
                 quote: "We just bought our first home and were completely overwhelmed. Alfred helped us build our home manual from scratch. Now we know when everything was installed and when it needs service.",
@@ -818,20 +855,24 @@ export default function MarketingPage() {
                 avatar: "JW",
               },
             ].map((testimonial, i) => (
-              <div key={i} className="bg-white rounded-2xl p-6 border border-warm-200">
-                <div className="flex items-center gap-1 mb-4">
+              <div key={i} className="bg-white rounded-2xl p-8 shadow-elegant hover:shadow-elegant-lg
+                                      border border-warm-100 transition-all duration-500">
+                <div className="flex gap-1 mb-4">
                   {[...Array(5)].map((_, j) => (
-                    <Star key={j} className="w-4 h-4 text-sage-500 fill-current" />
+                    <Star key={j} className="w-4 h-4 text-sage-500 fill-sage-500" />
                   ))}
                 </div>
-                <p className="text-warm-700 mb-6">&quot;{testimonial.quote}&quot;</p>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-haven-100 rounded-full flex items-center justify-center text-haven-700 font-semibold text-sm">
-                    {testimonial.avatar}
+                <p className="text-warm-700 leading-relaxed italic mb-6">
+                  &quot;{testimonial.quote}&quot;
+                </p>
+                <div className="flex items-center gap-3 pt-4 border-t border-warm-100">
+                  <div className="w-10 h-10 rounded-full bg-haven-navy-100
+                                  flex items-center justify-center">
+                    <span className="text-sm font-bold text-haven-navy-700">{testimonial.avatar}</span>
                   </div>
                   <div>
-                    <p className="font-semibold text-warm-900">{testimonial.name}</p>
-                    <p className="text-sm text-warm-500">{testimonial.role}</p>
+                    <div className="font-semibold text-haven-navy-900">{testimonial.name}</div>
+                    <div className="text-sm text-warm-500">{testimonial.role}</div>
                   </div>
                 </div>
               </div>
@@ -839,7 +880,7 @@ export default function MarketingPage() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { value: '$400', label: 'Avg. savings found/year' },
               { value: '500+', label: 'Homes managed' },
@@ -847,8 +888,9 @@ export default function MarketingPage() {
               { value: '1', label: 'Bill to pay' },
             ].map((stat, i) => (
               <div key={i} className="text-center">
-                <p className="text-3xl sm:text-4xl font-bold text-haven-700">{stat.value}</p>
-                <p className="text-warm-600 mt-1">{stat.label}</p>
+                <p className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-haven-navy-900 to-haven-navy-700
+                              bg-clip-text text-transparent">{stat.value}</p>
+                <p className="text-warm-600 mt-2">{stat.label}</p>
               </div>
             ))}
           </div>
@@ -858,10 +900,11 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* FAQ */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-white">
+      <section className="py-20 sm:py-32 bg-white">
         <div className="max-w-3xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-warm-900">
+          <div className="text-center mb-16">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
+                           tracking-tight font-serif">
               Questions? We&apos;ve Got Answers.
             </h2>
           </div>
@@ -897,23 +940,30 @@ export default function MarketingPage() {
                 a: 'No long-term contracts. Cancel anytime. We believe you should stay because Haven makes your life easier, not because you\'re locked in.',
               },
             ].map((faq, i) => (
-              <div key={i} className="border border-warm-200 rounded-xl overflow-hidden">
+              <div
+                key={i}
+                className={`rounded-2xl border transition-all duration-300
+                           ${openFaq === i
+                             ? 'bg-sage-50 border-sage-200 shadow-elegant'
+                             : 'bg-white border-warm-200 hover:border-warm-300'}`}
+              >
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full px-6 py-4 flex items-center justify-between text-left hover:bg-warm-50 transition-colors"
+                  className="w-full flex items-center justify-between p-6 text-left"
                 >
-                  <span className="font-semibold text-warm-900">{faq.q}</span>
-                  {openFaq === i ? (
-                    <ChevronUp className="w-5 h-5 text-warm-400" />
-                  ) : (
-                    <ChevronDown className="w-5 h-5 text-warm-400" />
-                  )}
-                </button>
-                {openFaq === i && (
-                  <div className="px-6 pb-4">
-                    <p className="text-warm-600">{faq.a}</p>
+                  <span className="font-semibold text-haven-navy-900 pr-4">{faq.q}</span>
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center
+                                  flex-shrink-0 transition-all duration-300
+                                  ${openFaq === i
+                                    ? 'bg-sage-500 text-white rotate-180'
+                                    : 'bg-warm-100 text-warm-600'}`}>
+                    <ChevronDown className="w-5 h-5" />
                   </div>
-                )}
+                </button>
+                <div className={`overflow-hidden transition-all duration-300
+                                ${openFaq === i ? 'max-h-96 pb-6' : 'max-h-0'}`}>
+                  <p className="px-6 text-warm-600 leading-relaxed">{faq.a}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -923,43 +973,47 @@ export default function MarketingPage() {
       {/* ================================================================== */}
       {/* FINAL CTA */}
       {/* ================================================================== */}
-      <section className="py-16 sm:py-24 bg-gradient-to-br from-haven-navy-900 to-haven-navy-950">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-          <h2 className="text-3xl sm:text-4xl font-bold text-white mb-4">
+      <section className="relative py-20 sm:py-32 bg-gradient-to-b from-haven-navy-950 to-haven-navy-900 overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_60%_50%_at_50%_50%,rgba(164,180,148,0.08),transparent)]" />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 text-center">
+          <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6 font-serif tracking-tight">
             Ready to take control of your home?
           </h2>
-          <p className="text-lg text-haven-100 mb-8 max-w-2xl mx-auto">
+          <p className="text-lg sm:text-xl text-white/70 mb-10 max-w-2xl mx-auto leading-relaxed">
             One bill. One app. A handyman who knows your home. Join 500+ families who stopped managing and started living.
           </p>
           <Link
             href="/onboarding/welcome"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-white text-haven-navy-900 font-semibold rounded-xl hover:bg-sage-50 transition-colors shadow-lg text-lg"
+            className="group inline-flex items-center gap-2 px-8 py-4 bg-white text-haven-navy-900
+                       font-semibold rounded-xl transition-all duration-300
+                       hover:shadow-[0_8px_32px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 text-lg"
           >
             Get Started with Alfred — $39/mo
-            <ArrowRight className="w-5 h-5" />
+            <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
           </Link>
-          <p className="mt-4 text-sm text-haven-200">No contracts. Cancel anytime.</p>
+          <p className="mt-6 text-sm text-white/50">No contracts. Cancel anytime.</p>
         </div>
       </section>
 
       {/* ================================================================== */}
       {/* FOOTER */}
       {/* ================================================================== */}
-      <footer className="bg-haven-navy-900 py-12">
+      <footer className="bg-haven-navy-950 py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="grid md:grid-cols-4 gap-8 mb-12">
             <div>
               <div className="flex items-center gap-2 mb-4">
                 <Image src="/icon-white.svg" alt="Haven" width={28} height={28} />
                 <span className="text-xl font-bold text-white">Haven</span>
               </div>
-              <p className="text-haven-200 text-sm">
+              <p className="text-white/50 text-sm leading-relaxed">
                 Stop managing your home. Start living in it.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Product</h4>
-              <ul className="space-y-2 text-sm text-haven-200">
+              <ul className="space-y-3 text-sm text-white/50">
                 <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
                 <li><a href="#pricing" className="hover:text-white transition-colors">Pricing</a></li>
                 <li><Link href="/onboarding/welcome" className="hover:text-white transition-colors">Get Started</Link></li>
@@ -967,7 +1021,7 @@ export default function MarketingPage() {
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Company</h4>
-              <ul className="space-y-2 text-sm text-haven-200">
+              <ul className="space-y-3 text-sm text-white/50">
                 <li><a href="#" className="hover:text-white transition-colors">About</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Blog</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Careers</a></li>
@@ -975,22 +1029,22 @@ export default function MarketingPage() {
             </div>
             <div>
               <h4 className="font-semibold text-white mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm text-haven-200">
+              <ul className="space-y-3 text-sm text-white/50">
                 <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
                 <li><a href="#" className="hover:text-white transition-colors">Terms of Service</a></li>
               </ul>
             </div>
           </div>
-          <div className="pt-8 border-t border-haven-navy-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-            <p className="text-sm text-haven-300">© 2026 Haven Home. All rights reserved.</p>
+          <div className="pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <p className="text-sm text-white/40">© 2026 Haven Home. All rights reserved.</p>
             <div className="flex items-center gap-4">
-              <a href="#" className="text-haven-200 hover:text-white transition-colors">
+              <a href="#" className="text-white/40 hover:text-white transition-colors">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 4.557c-.883.392-1.832.656-2.828.775 1.017-.609 1.798-1.574 2.165-2.724-.951.564-2.005.974-3.127 1.195-.897-.957-2.178-1.555-3.594-1.555-3.179 0-5.515 2.966-4.797 6.045-4.091-.205-7.719-2.165-10.148-5.144-1.29 2.213-.669 5.108 1.523 6.574-.806-.026-1.566-.247-2.229-.616-.054 2.281 1.581 4.415 3.949 4.89-.693.188-1.452.232-2.224.084.626 1.956 2.444 3.379 4.6 3.419-2.07 1.623-4.678 2.348-7.29 2.04 2.179 1.397 4.768 2.212 7.548 2.212 9.142 0 14.307-7.721 13.995-14.646.962-.695 1.797-1.562 2.457-2.549z"/></svg>
               </a>
-              <a href="#" className="text-haven-200 hover:text-white transition-colors">
+              <a href="#" className="text-white/40 hover:text-white transition-colors">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0c-6.627 0-12 5.373-12 12s5.373 12 12 12 12-5.373 12-12-5.373-12-12-12zm3 8h-1.35c-.538 0-.65.221-.65.778v1.222h2l-.209 2h-1.791v7h-3v-7h-2v-2h2v-2.308c0-1.769.931-2.692 3.029-2.692h1.971v3z"/></svg>
               </a>
-              <a href="#" className="text-haven-200 hover:text-white transition-colors">
+              <a href="#" className="text-white/40 hover:text-white transition-colors">
                 <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/></svg>
               </a>
             </div>
