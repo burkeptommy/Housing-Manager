@@ -75,13 +75,12 @@ export default function MarketingPage() {
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center w-full">
             {/* Left - Copy */}
             <div className="flex flex-col items-center lg:items-start text-center lg:text-left">
-              {/* Badge */}
+              {/* Badge - Haven brand focused, NOT Alfred */}
               <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-white/10 backdrop-blur-sm
                               rounded-full border border-white/10 mb-6">
-                <div className="w-2 h-2 rounded-full bg-sage-400 animate-pulse" />
-                <span className="text-sm font-medium text-white/90">Meet Alfred</span>
-                <span className="text-white/30 mx-1 hidden sm:inline">•</span>
-                <span className="text-sm text-sage-300/90 hidden sm:inline">Your Home Manager</span>
+                <span className="text-sm font-medium text-white/90">
+                  One Bill. One Contact. Zero Hassle.
+                </span>
               </div>
 
               {/* H1 */}
@@ -92,20 +91,20 @@ export default function MarketingPage() {
                                  bg-clip-text text-transparent">under control.</span>
               </h1>
 
-              {/* Subheadline */}
-              <p className="mt-6 text-lg sm:text-xl text-white/70 max-w-xl leading-relaxed">
-                <span className="sm:hidden">Alfred tracks bills, schedules maintenance, finds savings, and consolidates everything into one monthly payment.</span>
-                <span className="hidden sm:inline">Alfred tracks your bills, reminds you before things break, finds savings you&apos;re missing, and consolidates everything into one monthly payment. <span className="text-white/90 font-medium">Stop managing. Start living.</span></span>
+              {/* Subheadline - Focus on OUTCOMES, not who does them */}
+              <p className="mt-6 text-base sm:text-lg lg:text-xl text-white/70 max-w-xl leading-relaxed">
+                <span className="sm:hidden">Track your bills. Get reminded before things break. Find savings you&apos;re missing. One monthly payment for everything.</span>
+                <span className="hidden sm:inline">Track your bills. Get reminded before things break. Find savings you&apos;re missing. One monthly payment for everything. <span className="text-white/90 font-medium">Stop managing. Start living.</span></span>
               </p>
 
               {/* Value props */}
-              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 mt-6 w-full max-w-md sm:max-w-none">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-3 sm:gap-4 mt-6 w-full max-w-md sm:max-w-none justify-center lg:justify-start">
                 {[
                   'One bill for everything',
                   'Never miss maintenance',
                   'Handyman who knows your home',
                 ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2.5 text-white/80">
+                  <div key={i} className="flex items-center justify-center lg:justify-start gap-2.5 text-white/80">
                     <div className="w-5 h-5 rounded-full bg-sage-500/20 flex items-center justify-center flex-shrink-0">
                       <Check className="w-3 h-3 text-sage-300" />
                     </div>
@@ -114,17 +113,8 @@ export default function MarketingPage() {
                 ))}
               </div>
 
-              {/* Price */}
-              <div className="mt-6 flex items-center gap-4">
-                <div className="flex items-baseline gap-1">
-                  <span className="text-3xl sm:text-4xl font-bold text-white">$39</span>
-                  <span className="text-lg sm:text-xl text-white/60">/mo</span>
-                </div>
-                <span className="text-sm text-sage-300 font-medium">Cancel anytime</span>
-              </div>
-
-              {/* CTAs */}
-              <div className="mt-8 flex flex-col sm:flex-row items-center gap-3 sm:gap-4 w-full sm:w-auto">
+              {/* CTAs - Price IN the button */}
+              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-3 sm:gap-4 w-full sm:w-auto">
                 <Link
                   href="/onboarding/welcome"
                   className="group relative w-full sm:w-auto px-8 py-4 bg-white text-haven-navy-900
@@ -132,7 +122,7 @@ export default function MarketingPage() {
                              hover:shadow-[0_8px_32px_rgba(255,255,255,0.2)] hover:-translate-y-0.5"
                 >
                   <span className="relative flex items-center justify-center gap-2">
-                    Get Started
+                    Start for $39/mo
                     <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
                   </span>
                 </Link>
@@ -147,8 +137,13 @@ export default function MarketingPage() {
                 </a>
               </div>
 
+              {/* Small print below CTA */}
+              <p className="mt-4 text-sm text-white/50 text-center lg:text-left">
+                No contracts. Cancel anytime.
+              </p>
+
               {/* Trust indicators */}
-              <div className="mt-10 pt-8 border-t border-white/10">
+              <div className="mt-6 pt-6 border-t border-white/10">
                 <div className="flex flex-wrap items-center justify-center lg:justify-start gap-3 sm:gap-4">
                   {[
                     { icon: Shield, text: 'Bank-Level Security', filled: false },
@@ -182,21 +177,22 @@ export default function MarketingPage() {
       </section>
 
       {/* ================================================================== */}
-      {/* HOW IT WORKS */}
+      {/* HOW IT WORKS - This is where Alfred gets introduced! */}
       {/* ================================================================== */}
-      <section id="how-it-works" className="py-20 sm:py-32 bg-white">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6">
-          <div className="text-center mb-16">
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-sage-100
+      <section id="how-it-works" className="py-16 sm:py-24 lg:py-32 bg-white">
+        <div className="max-w-6xl mx-auto px-5 sm:px-6">
+          <div className="text-center mb-12 sm:mb-16">
+            {/* "Meet Alfred" badge - Alfred's introduction */}
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-sage-100
                             rounded-full text-sage-700 text-sm font-medium mb-4">
               <Sparkles className="w-4 h-4" />
-              Simple Setup
+              Meet Alfred
             </div>
             <h2 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-haven-navy-900
                            tracking-tight font-serif">
               How Alfred Works
             </h2>
-            <p className="mt-4 text-lg text-warm-600 max-w-2xl mx-auto">
+            <p className="mt-4 text-base sm:text-lg text-warm-600 max-w-2xl mx-auto">
               Add your home once. Alfred handles everything else — tracking, reminders, bills, and more.
             </p>
           </div>
@@ -377,14 +373,21 @@ export default function MarketingPage() {
                 ))}
               </ul>
 
-              <div className="flex flex-wrap gap-4">
-                <div className="bg-white rounded-xl px-5 py-4 shadow-elegant-lg">
-                  <p className="text-haven-navy-900 font-bold text-2xl">$99</p>
-                  <p className="text-haven-navy-700 text-sm">per visit (Essentials)</p>
+              {/* Pricing badges - UPDATED per spec */}
+              <div className="flex flex-wrap justify-center lg:justify-start gap-4">
+                <div className="px-5 py-3 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10">
+                  <span className="text-white/50 text-xs sm:text-sm block">Essentials</span>
+                  <div className="text-xl sm:text-2xl font-bold text-white">
+                    $99<span className="text-sm font-normal text-white/50">/visit</span>
+                  </div>
                 </div>
-                <div className="bg-white rounded-xl px-5 py-4 shadow-elegant-lg">
-                  <p className="text-sage-600 font-bold text-2xl">Included</p>
-                  <p className="text-haven-navy-700 text-sm">with Haven ($749+)</p>
+                <div className="px-5 py-3 bg-sage-400/10 backdrop-blur-sm rounded-xl border border-sage-400/20">
+                  <span className="text-sage-300 text-xs sm:text-sm block">Lite $349+</span>
+                  <div className="text-xl sm:text-2xl font-bold text-white">Quarterly</div>
+                </div>
+                <div className="px-5 py-3 bg-sage-400/10 backdrop-blur-sm rounded-xl border border-sage-400/20">
+                  <span className="text-sage-300 text-xs sm:text-sm block">Haven $749+</span>
+                  <div className="text-xl sm:text-2xl font-bold text-white">Monthly</div>
                 </div>
               </div>
             </div>
@@ -628,13 +631,18 @@ export default function MarketingPage() {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-3 gap-6 mb-12">
+          {/* Pricing cards - horizontal scroll on mobile */}
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 pb-4 -mx-5 px-5
+                          sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:gap-6 lg:gap-8
+                          sm:overflow-visible sm:mx-0 sm:px-0 sm:pb-0
+                          max-w-5xl sm:mx-auto mb-12">
             {/* Essentials - Featured */}
-            <div className="relative p-8 rounded-2xl bg-gradient-to-b from-haven-navy-900 to-haven-navy-950
+            <div className="flex-shrink-0 w-[85%] snap-start sm:w-auto relative p-6 sm:p-8 rounded-2xl
+                            bg-gradient-to-b from-haven-navy-900 to-haven-navy-950
                             text-white ring-2 ring-sage-400 shadow-elegant-xl">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2">
+              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <div className="px-4 py-1.5 bg-sage-500 text-white text-xs font-bold
-                                rounded-full shadow-lg">
+                                rounded-full shadow-lg whitespace-nowrap">
                   Start Here
                 </div>
               </div>
@@ -682,8 +690,9 @@ export default function MarketingPage() {
             </div>
 
             {/* Haven Lite */}
-            <div className="p-8 rounded-2xl bg-white border border-warm-200
-                            shadow-elegant hover:shadow-elegant-lg hover:border-sage-200
+            <div className="flex-shrink-0 w-[85%] snap-start sm:w-auto p-6 sm:p-8 rounded-2xl
+                            bg-white border border-warm-200 shadow-elegant
+                            hover:shadow-elegant-lg hover:border-sage-200
                             transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center">
@@ -707,7 +716,7 @@ export default function MarketingPage() {
                   'Text-based coordination',
                   'Vendor vetting & scheduling',
                   'Quote comparison',
-                  'Handyman visits ($79/each)',
+                  'Quarterly handyman visit included',
                 ].map((feature, i) => (
                   <li key={i} className="flex items-start gap-3">
                     <Check className="w-5 h-5 text-sage-500 mt-0.5 flex-shrink-0" />
@@ -727,25 +736,26 @@ export default function MarketingPage() {
             </div>
 
             {/* Haven */}
-            <div className="p-8 rounded-2xl bg-white border border-warm-200
-                            shadow-elegant hover:shadow-elegant-lg hover:border-sage-200
+            <div className="flex-shrink-0 w-[85%] snap-start sm:w-auto p-6 sm:p-8 rounded-2xl
+                            bg-white border border-warm-200 shadow-elegant
+                            hover:shadow-elegant-lg hover:border-sage-200
                             transition-all duration-500">
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center">
                   <Phone className="w-6 h-6 text-haven-700" />
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold text-haven-navy-900">Haven</h3>
+                  <h3 className="text-lg sm:text-xl font-bold text-haven-navy-900">Haven</h3>
                   <p className="text-warm-500 text-sm">Proactive Management</p>
                 </div>
               </div>
 
-              <div className="flex items-baseline gap-1 mt-6 mb-8">
-                <span className="text-4xl font-bold text-haven-navy-900">$749</span>
+              <div className="flex items-baseline gap-1 mt-5 sm:mt-6 mb-6 sm:mb-8">
+                <span className="text-3xl sm:text-4xl font-bold text-haven-navy-900">$749</span>
                 <span className="text-warm-500">/month</span>
               </div>
 
-              <ul className="space-y-3 mb-8">
+              <ul className="space-y-3 mb-6 sm:mb-8">
                 {[
                   'Everything in Lite',
                   'Phone & video support',
@@ -989,7 +999,7 @@ export default function MarketingPage() {
                        font-semibold rounded-xl transition-all duration-300
                        hover:shadow-[0_8px_32px_rgba(255,255,255,0.2)] hover:-translate-y-0.5 text-lg"
           >
-            Get Started with Alfred — $39/mo
+            Get Started — $39/mo
             <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
           </Link>
           <p className="mt-6 text-sm text-white/50">No contracts. Cancel anytime.</p>
