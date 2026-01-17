@@ -20,7 +20,7 @@ export default async function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 100%)',
+          background: 'linear-gradient(135deg, #0a1929 0%, #050a14 100%)',
           fontFamily: 'system-ui, sans-serif',
           position: 'relative',
           overflow: 'hidden',
@@ -30,13 +30,12 @@ export default async function Image() {
         <div
           style={{
             position: 'absolute',
-            top: '50%',
+            top: '40%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '800px',
-            height: '800px',
-            background: 'radial-gradient(circle, rgba(125, 142, 116, 0.12) 0%, transparent 60%)',
-            borderRadius: '50%',
+            width: '900px',
+            height: '600px',
+            background: 'radial-gradient(ellipse, rgba(164, 180, 148, 0.08) 0%, transparent 60%)',
           }}
         />
 
@@ -51,37 +50,29 @@ export default async function Image() {
             zIndex: 1,
           }}
         >
-          {/* Alfred House Logo */}
+          {/* Haven Logo - Simple roof peak */}
           <svg
-            width="140"
-            height="140"
-            viewBox="0 0 120 120"
+            width="100"
+            height="80"
+            viewBox="0 0 100 80"
             fill="none"
-            style={{ marginBottom: '32px' }}
+            style={{ marginBottom: '40px' }}
           >
-            {/* A-frame house - White */}
-            <path d="M60 12L99 96H84L60 45L36 96H21L60 12Z" fill="#ffffff" />
-            {/* Inner warmth - Sage */}
-            <path d="M60 51L77 89H43L60 51Z" fill="#7D8E74" />
-            {/* Window cutout */}
-            <rect x="54" y="63" width="12" height="9" rx="1.5" fill="#0F172A" />
-            {/* Door cutout */}
-            <rect x="56" y="75" width="8" height="14" rx="1.5" fill="#0F172A" />
-            {/* Sparkle */}
+            {/* Simple roof/house peak - clean Haven branding */}
             <path
-              d="M93 27L95.5 33.5L102 36L95.5 38.5L93 45L90.5 38.5L84 36L90.5 33.5L93 27Z"
-              fill="#7D8E74"
+              d="M50 0L100 70H75L50 30L25 70H0L50 0Z"
+              fill="#ffffff"
             />
           </svg>
 
           {/* Brand name */}
           <span
             style={{
-              fontSize: '72px',
+              fontSize: '80px',
               fontWeight: 700,
               color: 'white',
-              letterSpacing: '-0.02em',
-              marginBottom: '16px',
+              letterSpacing: '-0.03em',
+              marginBottom: '20px',
             }}
           >
             Haven
@@ -90,23 +81,23 @@ export default async function Image() {
           {/* Tagline */}
           <span
             style={{
-              fontSize: '28px',
+              fontSize: '32px',
               color: '#A4B494',
               fontWeight: 500,
-              marginBottom: '32px',
+              marginBottom: '16px',
             }}
           >
             Your home, finally under control.
           </span>
 
-          {/* Subtext */}
+          {/* Value prop */}
           <span
             style={{
-              fontSize: '20px',
-              color: 'rgba(255, 255, 255, 0.6)',
+              fontSize: '22px',
+              color: 'rgba(255, 255, 255, 0.5)',
             }}
           >
-            One bill. One app. Everything handled.
+            One bill. One contact. Zero hassle.
           </span>
         </div>
       </div>
