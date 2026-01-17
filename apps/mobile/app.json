@@ -18,12 +18,13 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.havenhome.app",
-      "buildNumber": "49",
+      "buildNumber": "56",
       "infoPlist": {
         "NSCameraUsageDescription": "Haven needs camera access to scan documents and take photos for your home manager.",
         "NSPhotoLibraryUsageDescription": "Haven needs photo library access to upload documents and photos.",
         "NSFaceIDUsageDescription": "Haven uses Face ID for secure, quick login to your account.",
         "NSLocationWhenInUseUsageDescription": "Haven uses your location to find local service providers.",
+        "NSCalendarsUsageDescription": "Haven needs calendar access to show your events and help manage your schedule.",
         "LSApplicationQueriesSchemes": [
           "plaidlink"
         ],
@@ -78,7 +79,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#c4a574"
+          "color": "#7D8E74"
         }
       ],
       [
@@ -95,7 +96,13 @@
       ],
       "expo-asset",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "Haven needs calendar access to show your events and help manage your schedule."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
@@ -111,7 +118,7 @@
     "owner": "havenhome",
     "runtimeVersion": "1.0.0",
     "updates": {
-      "url": "https://u.expo.dev/0e7ef088-efd9-4488-9e33-218ee1f341c4"
+      "enabled": false
     }
   }
 }
