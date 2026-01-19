@@ -1,7 +1,7 @@
 # HAVEN HOME - PROJECT INSTRUCTIONS
 ## Master Context for All Development Conversations
 
-**Last Updated:** December 24, 2025
+**Last Updated:** January 14, 2026
 **Project Location:** `/Users/tomburke/Projects/Housing-Manager/`
 
 ---
@@ -19,38 +19,92 @@ Haven is a **full-service home management platform**. Unlike apps that give home
 - **Results**, not more to-do lists
 
 ### Service Tiers
-| Tier | Price | Key Features |
-|------|-------|--------------|
-| Essentials | $39/mo | Bill consolidation, tracking, reminders |
-| Lite | $349/mo | + Text-based manager, reactive support |
-| Haven | $749/mo | + Proactive manager, monthly handyman |
-| Haven+ | $1,499/mo | + Lifestyle services, errands |
-| Estate | $3,499/mo | + Multi-property, white-glove |
+| Tier | Price | Key Features | Target % of Users |
+|------|-------|--------------|-------------------|
+| **Essentials** | $39/mo | AI Home Manager (Alfred), bill tracking, reminders | 90-99% |
+| Lite | $349/mo | + Human text-based manager, reactive support | |
+| Haven | $749/mo | + Proactive manager, monthly handyman | |
+| Haven+ | $1,499/mo | + Lifestyle services, errands | |
+| Estate | $3,499/mo | + Multi-property, white-glove | |
+
+**Strategic Note:** Essentials tier with Alfred (AI) is the primary offering. Human managers are positioned as premium upgrades.
 
 ---
 
-# SECTION 2: TECH STACK
+# SECTION 2: ALFRED - THE AI HOME MANAGER
+
+Alfred is Haven's AI-powered personal assistant. He's the core differentiator for the Essentials tier.
+
+## Alfred's Capabilities
+
+### 1. Email Processing (CC Alfred Feature)
+**Email:** `{address}@alfred.havenhome.dev` (e.g., `38BedfordRoad@alfred.havenhome.dev`)
+
+Users CC or forward any email to Alfred, and he:
+- **Extracts calendar events** - camps, appointments, deadlines
+- **Tracks bills** - invoices, due dates, amounts
+- **Updates vendors** - contact info, quotes, warranties
+- **Reads attachments** - PDFs, inspection reports, invoices
+- **Asks clarifying questions** - "Which child is this camp for?"
+- **Creates a Case** for every email (audit trail)
+
+**Case System:**
+- Every email creates a trackable case (ALF-2026-000001)
+- Full activity log for audit trail
+- Status: RECEIVED → PROCESSING → AWAITING_INPUT → COMPLETED
+- Users can view all cases in the app
+
+### 2. Chat Interface
+- Natural conversation about home management
+- Proactive setup questions for new users
+- Quick actions via buttons
+- Context-aware suggestions
+
+### 3. Smart Prompts Throughout App
+- Empty state suggestions when data is missing
+- Setup checklist for new users
+- Contextual help based on what's incomplete
+
+---
+
+# SECTION 3: TECH STACK
 
 ```
 /Users/tomburke/Projects/Housing-Manager/
 ├── apps/
 │   ├── api/          # NestJS backend (port 4000)
 │   │   └── prisma/   # Schema + migrations + seed
-│   ├── mobile/       # Expo React Native
+│   ├── mobile/       # Expo React Native (iOS)
 │   └── web/          # Next.js 15 App Router (port 3000)
 ├── packages/
 │   ├── config/       # Shared ESLint, TypeScript configs
 │   ├── core/         # Shared types, schemas, constants
 │   └── ui/           # Shared React components
+├── prompts/          # Claude Code implementation prompts
 ```
 
 ### Technologies
-- **Frontend:** Next.js 15, React 18, Tailwind CSS, Radix UI
-- **Mobile:** Expo/React Native
+- **Frontend Web:** Next.js 15, React 18, Tailwind CSS, Radix UI
+- **Mobile:** Expo/React Native, NativeWind, Firebase Auth
 - **Backend:** NestJS 10, Prisma ORM, PostgreSQL
-- **Auth:** JWT with refresh token rotation
-- **Payments:** Stripe (Issuing, Connect, Billing)
-- **Deploy:** Google Cloud Run
+- **Auth:** Firebase Authentication (Apple, Google, Email)
+- **Payments:** Stripe (Issuing, Connect, Billing), RevenueCat (mobile subscriptions)
+- **AI:** Anthropic Claude API
+- **Email:** SendGrid (inbound parse for Alfred)
+- **Deploy:** Google Cloud Run (API), TestFlight (iOS)
+
+### Key Integrations
+| Service | Purpose | Status |
+|---------|---------|--------|
+| Firebase Auth | Apple/Google/Email sign-in | ✅ Complete |
+| Google Places API | Address autocomplete | ✅ Complete |
+| ATTOM Data API | Property data enrichment | ✅ Complete |
+| Plaid | Bank connection, bill detection | ✅ Complete |
+| RevenueCat | Mobile subscription management | ✅ Complete |
+| SendGrid Inbound Parse | Alfred email processing | ✅ Configured |
+| Claude API | AI parsing and chat | ✅ Complete |
+| Google Calendar API | Calendar sync | ✅ Complete |
+| expo-calendar | iOS calendar access | ✅ Complete |
 
 ### Commands
 ```bash
@@ -59,20 +113,153 @@ pnpm dev:api          # Start API (localhost:4000)
 pnpm dev:mobile       # Start Expo
 
 cd apps/api
-pnpm prisma:migrate:dev   # Run migrations
-pnpm prisma:seed          # Seed demo data
-pnpm prisma:studio        # Database GUI
+pnpm prisma migrate dev   # Run migrations
+pnpm prisma db seed       # Seed demo data
+pnpm prisma studio        # Database GUI
 
-pnpm build            # Build all
-pnpm test             # Run tests
-pnpm lint             # Lint code
+cd apps/mobile
+npx expo start --clear    # Start Expo dev server
+eas build --platform ios --profile production --auto-submit  # TestFlight build
 ```
 
 ---
 
-# SECTION 3: CANONICAL DEMO DATA ⭐ CRITICAL
+# SECTION 4: MOBILE APP - COMPLETE FEATURE LIST
 
-**This is the single source of truth. All mock data must match this exactly.**
+## Implemented Features (January 2026)
+
+### Authentication & Onboarding
+- ✅ Apple Sign-In (captures name on first sign-in)
+- ✅ Google Sign-In
+- ✅ Email/Password authentication
+- ✅ Address autocomplete (Google Places)
+- ✅ Property data enrichment (ATTOM API)
+- ✅ Name capture from social auth
+- ✅ Onboarding flow with property setup
+
+### Home Dashboard
+- ✅ Home Health Score (real calculation)
+- ✅ Today's Notes (real data from calendar/bills/tasks)
+- ✅ Setup Checklist for new users
+- ✅ Empty states with helpful prompts
+- ✅ Quick actions
+
+### Family Management
+- ✅ Family members list
+- ✅ Add/edit family members
+- ✅ Children with school, activities, allergies
+- ✅ Pets with vet info
+- ✅ Vehicles
+- ✅ Staff (nanny, housekeeper, etc.)
+- ✅ Permission-based editing (owner vs member)
+
+### Property & Home
+- ✅ Property details from ATTOM
+- ✅ Zones (rooms/areas)
+- ✅ Systems per zone (HVAC, appliances, etc.)
+- ✅ Home profile editing
+
+### Bills & Money
+- ✅ Bills list (real data)
+- ✅ Plaid bank connection
+- ✅ Bill detection from transactions
+- ✅ Payment tracking
+- ✅ Empty states prompting setup
+
+### Maintenance
+- ✅ Maintenance tasks
+- ✅ Systems tracking
+- ✅ Service scheduling
+- ✅ Empty states
+
+### Vendors
+- ✅ Vendor list
+- ✅ Add/edit vendors
+- ✅ Category organization
+- ✅ Contact info
+
+### Calendar
+- ✅ Google Calendar sync (OAuth)
+- ✅ iOS Calendar sync (device access)
+- ✅ Calendar settings screen
+- ✅ Calendar picker for iOS
+
+### Alfred (AI Assistant)
+- ✅ Chat interface
+- ✅ Email processing (CC Alfred) - IN PROGRESS
+- ✅ Cases tracking - IN PROGRESS
+- ✅ Proactive questions
+
+### Settings
+- ✅ Profile editing
+- ✅ Calendar sync settings
+- ✅ Alfred email settings
+- ✅ Authorized senders management
+- ✅ Subscription management (RevenueCat)
+
+### UI/UX
+- ✅ Navy + Champagne color scheme
+- ✅ Tab bar navigation
+- ✅ Consistent headers
+- ✅ Empty state components
+- ✅ Loading states
+- ✅ Pull to refresh
+
+---
+
+# SECTION 5: API ENDPOINTS
+
+## Core Modules
+
+### Authentication (`/auth`)
+- POST `/auth/firebase` - Firebase token exchange
+- POST `/auth/register` - Email registration
+- GET `/auth/me` - Current user
+
+### Households (`/households`)
+- GET `/households/:id` - Get household
+- PATCH `/households/:id` - Update household
+- GET `/households/:id/vendors` - Household vendors
+
+### Family (`/family`)
+- GET `/family/household/:id` - Get family members
+- POST `/family/household/:id/members` - Add member
+- PATCH `/family/household/:id/member/:memberId` - Edit member
+- DELETE `/family/household/:id/member/:memberId` - Remove member
+
+### Dashboard (`/dashboard`)
+- GET `/dashboard/household/:id/today` - Today's notes
+- GET `/dashboard/household/:id/health` - Health score
+- GET `/dashboard/household/:id/setup-status` - Setup checklist
+
+### Calendars (`/calendars`)
+- GET `/calendars/connections` - List connected calendars
+- POST `/calendars/connect/google` - Connect Google Calendar
+- POST `/calendars/connect/apple` - Connect iOS Calendar
+- DELETE `/calendars/disconnect/:provider` - Disconnect
+- GET `/calendars/events` - Get events
+
+### Alfred Email (`/alfred`)
+- POST `/alfred/inbound-email` - SendGrid webhook (no auth)
+- GET `/alfred/email-address` - Get household's Alfred email
+- GET `/alfred/authorized-emails` - List authorized senders
+- POST `/alfred/authorized-emails` - Add authorized sender
+- DELETE `/alfred/authorized-emails/:id` - Remove sender
+- GET `/alfred/cases` - List email cases
+- GET `/alfred/cases/:id` - Case details
+- POST `/alfred/cases/:id/respond` - Answer Alfred's question
+
+### Bills & Plaid (`/plaid`, `/bills`)
+- POST `/plaid/create-link-token` - Start Plaid Link
+- POST `/plaid/exchange-token` - Complete connection
+- GET `/bills/household/:id` - Get bills
+
+### Users (`/users`)
+- PATCH `/users/profile` - Update profile
+
+---
+
+# SECTION 6: CANONICAL DEMO DATA
 
 ## Primary Demo Family: THE MORRISONS
 
@@ -81,6 +268,7 @@ pnpm lint             # Lint code
 |-------|-------|
 | **Home Name** | Inspiration Farm |
 | **Address** | 38 Bedford Road, Greenwich, CT 06831 |
+| **Alfred Email** | 38BedfordRoad@alfred.havenhome.dev |
 | **Specs** | 5 bed, 5.5 bath, 5,765 sqft, 2.0 acres |
 | **Home Health** | 94/100 (Excellent) |
 
@@ -105,250 +293,160 @@ pnpm lint             # Lint code
 | Vehicles | 2022 Toyota Highlander, 2024 Mercedes GLE 450 |
 
 ### Children
-
-**Emma Morrison**
-- Age: 12 years old, 7th Grade
-- School: Greenwich Country Day School ($4,500/mo)
-- Allergies: Peanuts, Tree nuts
-- Activities: Soccer, Piano
-
-**Jack Morrison**
-- Age: 8 years old, 3rd Grade
-- School: North Street School
-- Activities: Little League, Piano, Art class
+- **Emma Morrison** - 12 years old, 7th Grade, Greenwich Country Day School, Soccer + Piano, Allergies: Peanuts/Tree nuts
+- **Jack Morrison** - 8 years old, 3rd Grade, North Street School, Little League + Piano + Art
 
 ### Pet
-
-**Max** - Golden Retriever, 4 years old
-- Vet: Dr. Williams, Westlake Animal Hospital
-- Food: Blue Buffalo (30 lbs/mo)
-- Monthly cost: $150
+- **Max** - Golden Retriever, 4 years old, Dr. Williams at Westlake Animal Hospital
 
 ### Staff
+- **Maria Garcia** - Nanny, Greenwich Elite Nannies, $1,500/week
 
-**Maria Garcia** - Nanny
-- Agency: Greenwich Elite Nannies
-- Phone: (203) 555-0199
-- Weekly stipend: $1,500
-- Schedule: Mon-Thu 7am-6pm, Fri 7am-3pm
-
----
-
-## Haven Team Credentials
-
-### Home Manager
-| Field | Value |
-|-------|-------|
-| **Name** | Sarah Chen |
-| **Email** | sarah@haven.app |
-| **Password** | Manager123! |
-| **Title** | Your Home Manager |
-
-### Handymen
-| Name | Email | Password | Region |
-|------|-------|----------|--------|
-| Mike Rodriguez | mike@haven.app | Handy123! | Connecticut (Primary) |
-| Carlos Reyes | carlos@haven.app | Handy123! | NY/CA |
-| Maria Santos | maria@haven.app | Handy123! | Floater |
-
-### Vendor
-| Field | Value |
-|-------|-------|
-| **Company** | Ace Roofing Co. |
-| **Email** | vendor@aceroofing.example.com |
-| **Password** | AceRoof123! |
-
-### Admin
-| Field | Value |
-|-------|-------|
-| **Email** | admin@haven.app |
-| **Password** | Admin123! |
+### Haven Team
+| Role | Name | Email | Password |
+|------|------|-------|----------|
+| Home Manager | Sarah Chen | sarah@haven.app | Manager123! |
+| Handyman | Mike Rodriguez | mike@haven.app | Handy123! |
+| Admin | - | admin@haven.app | Admin123! |
 
 ---
 
-## Secondary Properties (Multi-Property Demo)
-
-| Property | Address | Owner |
-|----------|---------|-------|
-| Johnson Family Home | 45 Fox Meadow Road, Scarsdale, NY 10583 | Alice Johnson |
-| Malibu Mansion | 27400 Pacific Coast Hwy, Malibu, CA 90265 | Bob Morrison |
-| Beverly Hills Estate | 1200 Sunset Blvd, Beverly Hills, CA 90210 | Bob Morrison |
-
----
-
-# SECTION 4: DESIGN SYSTEM
+# SECTION 7: DESIGN SYSTEM
 
 ## Color Palette
 
 ### ⚠️ CRITICAL: NO BRIGHT GREEN
-The old brand used bright/lime green. This is **DEPRECATED**. Use Navy + Champagne + White only.
+Use Navy + Champagne + White only.
 
-### Navy (Primary Brand Color)
-```
-navy-950: #0a1929  ← Sidebar background
-navy-900: #102a43  ← Primary headings, buttons
-navy-800: #243b53  ← Secondary buttons, emphasis
-navy-700: #334e68  ← Hover states
-navy-600: #486581  ← Tertiary elements
-navy-100-300: Light backgrounds, borders
-```
+### Navy (Primary)
+- navy-950: #0a1929 (backgrounds)
+- navy-900: #102a43 (headings, buttons)
+- navy-800: #243b53 (secondary)
 
-### Champagne (Accent Color)
-```
-champagne-500: #c4a574  ← Primary accent, CTAs
-champagne-400: #d4c4a5  ← Hover states
-champagne-300: #e9dcc4  ← Light accents
-champagne-100: #faf6ed  ← Subtle backgrounds
-```
-
-### Quick Reference
-| Element | Color |
-|---------|-------|
-| Sidebar background | navy-950 (#0a1929) |
-| Sidebar text | gray-300, white on active |
-| Page background | gray-50 |
-| Card background | white |
-| Primary text | navy-900 |
-| Secondary text | gray-500 |
-| Primary button | navy-900 |
-| Accent/CTA button | champagne-500 |
-| Success indicator | Muted green (sparingly) |
-
-### Color Replacement Map (Green → Haven)
-| Old | New |
-|-----|-----|
-| bg-green-500 | bg-haven-champagne-500 |
-| bg-green-600 | bg-haven-navy-800 |
-| bg-emerald-500 | bg-haven-champagne-500 |
-| text-green-600 | text-haven-champagne-600 |
-| #10b981 | #c4a574 |
-| #22c55e | #c4a574 |
-
-**Exception:** Keep muted green ONLY for explicit success states (checkmarks, "Paid", "Confirmed").
+### Champagne (Accent)
+- champagne-500: #c4a574 (CTAs, accents)
+- champagne-400: #d4c4a5 (hover)
+- champagne-100: #faf6ed (subtle backgrounds)
 
 ---
 
-# SECTION 5: APP STRUCTURE
+# SECTION 8: ENVIRONMENT VARIABLES
 
-## User Portals & Routes
-
-| Portal | Route | Users |
-|--------|-------|-------|
-| Homeowner | `/app/*` | Bob, Alice, family |
-| Manager | `/manager/*` | Sarah Chen |
-| Handyman | `/handyman/*` | Mike, Carlos, Maria |
-| Vendor | `/vendor/*` | Ace Roofing |
-| Admin | `/admin/*` | Platform Admin |
-
-## Homeowner Navigation
-```
-Dashboard          → /app           (Daily overview, action items)
-Sarah              → /app/sarah     (Manager hub, approvals)
-Messages           → /app/messages  (Unified inbox)
-Calendar           → /app/calendar  (Family schedule)
-Your Home          → /app/home      (Property details)
-Family             → /app/family    (Members, vehicles, staff)
-Projects           → /app/projects  (Home improvements)
-Maintenance        → /app/maintenance (Systems, service)
-Find Pros          → /app/find-pros (Contractor directory)
-Money              → /app/money     (Bills, statements)
-Tasks              → /app/tasks     (Household tasks)
-Inventory          → /app/inventory (Shopping lists)
-My Profile         → /app/profile   (User settings)
-Settings           → /app/settings  (App preferences)
-```
-
----
-
-# SECTION 6: KNOWN ISSUES TO FIX
-
-### Data Inconsistencies
-1. **seed.ts** uses Burke family, **frontend mock** uses Morrison → Standardize to MORRISON
-2. **My Profile** shows "Bob Smith" and "The Chen Family" → Should be Bob Morrison, The Morrison Family
-3. **Settings** shows "The Miller Residence" → Should be Inspiration Farm
-4. **Tasks page** shows "Jake" → Should be "Jack" (or use consistently as nickname)
-
-### Design Inconsistencies
-1. Some pages still have bright green accents → Replace with champagne
-2. Some dark sections have dark text → Ensure light text on dark backgrounds
-
-### Audit Commands
+## API (`apps/api/.env`)
 ```bash
-# Find remaining green
-grep -rn --include="*.tsx" -E "(bg-green|text-green|bg-emerald|text-emerald)" apps/web/src/
+DATABASE_URL=postgresql://...
+JWT_SECRET=...
+FIREBASE_PROJECT_ID=home-manager-480616
+FIREBASE_CLIENT_EMAIL=...
+FIREBASE_PRIVATE_KEY=...
+STRIPE_SECRET_KEY=sk_test_...
+PLAID_CLIENT_ID=...
+PLAID_SECRET=...
+PLAID_ENV=sandbox
+ANTHROPIC_API_KEY=sk-ant-api03-...
+SENDGRID_API_KEY=SG....
+ALFRED_EMAIL_DOMAIN=alfred.havenhome.dev
+CALENDAR_ENCRYPTION_KEY=... (32 chars)
+GOOGLE_MAPS_API_KEY=...
+```
 
-# Find dark-on-dark contrast issues
-grep -rn --include="*.tsx" -A5 "bg-haven-navy-950\|bg-haven-navy-900" apps/web/src/ | grep "text-gray-[5-9]"
+## Mobile (`apps/mobile/.env`)
+```bash
+EXPO_PUBLIC_API_URL=https://api.havenhome.dev/api
+EXPO_PUBLIC_FIREBASE_API_KEY=...
+EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID=...
+EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID=...
+EXPO_PUBLIC_REVENUECAT_API_KEY=...
 ```
 
 ---
 
-# SECTION 7: KEY REMINDERS
+# SECTION 9: PROMPTS DIRECTORY
 
-## Always Remember
-1. **Family name is MORRISON** (not Burke, Smith, or Miller)
-2. **Property is 38 Bedford Road, Greenwich, CT**
-3. **Manager is Sarah Chen** (sarah@haven.app)
-4. **Primary Handyman is Mike Rodriguez** (mike@haven.app)
-5. **Colors are Navy + Champagne + White** (NO GREEN)
-6. **Children are Emma (12) and Jack (8)**
+All implementation prompts are in `/Users/tomburke/Projects/Housing-Manager/prompts/`
 
-## Before Making Changes
-1. Check this document for correct demo data
-2. Verify color changes match the palette
-3. Ensure text contrast on dark backgrounds
-4. Run `pnpm build` to verify no errors
+### Recent/Active Prompts
+| Prompt | Purpose | Status |
+|--------|---------|--------|
+| `FIX-profile-family-editing.md` | Profile update bug, social auth name capture | ✅ Complete |
+| `FIX-remove-hardcoded-data.md` | Real data, empty states, setup checklist | ✅ Complete |
+| `IMPLEMENT-calendar-sync.md` | Google + iOS calendar sync | ✅ Complete |
+| `IMPLEMENT-alfred-email.md` | Alfred email CC feature, case system | 🔄 Ready |
 
-## File Locations for Common Fixes
-- **Sidebar:** `apps/web/src/app/app/layout.tsx`
-- **Homepage:** `apps/web/src/app/page.tsx`
-- **Dashboard:** `apps/web/src/app/app/page.tsx`
-- **Family page:** `apps/web/src/app/app/family/page.tsx`
-- **Tailwind config:** `apps/web/tailwind.config.ts`
-- **Global styles:** `apps/web/src/app/globals.css`
-- **Seed data:** `apps/api/prisma/seed.ts`
+### Mobile Development Prompts (M01-M12)
+Located in `prompts/mobile/` - comprehensive mobile app development from foundation to TestFlight.
 
 ---
 
-# SECTION 8: DOCUMENTATION INDEX
+# SECTION 10: CURRENT STATUS (January 2026)
 
-These detailed documents are available in the project root:
+## Completed This Session
+- ✅ Profile & family editing fixes (API deployed)
+- ✅ Remove hard-coded data from app
+- ✅ Empty state components created
+- ✅ Calendar sync (Google + iOS)
+- ✅ Database migration reset and clean init
+- ✅ SendGrid inbound parse configured
+- ✅ Alfred email prompt created
 
-| Document | Purpose |
-|----------|---------|
-| `HAVEN_BUSINESS_PLAN.md` | Full business plan, market analysis, financials |
-| `HAVEN_TECHNICAL_SPEC.md` | Architecture, data models, API endpoints |
-| `HAVEN_DEMO_DATA.md` | Complete canonical demo data |
-| `HAVEN_DESIGN_SYSTEM_V2.md` | Full color palette, typography, components |
-| `HAVEN_PROJECT_CONTEXT.md` | Quick reference for conversations |
-| `CLAUDE_CODE_COLOR_MIGRATION.md` | Green → Navy/Champagne migration guide |
-| `CLAUDE_CODE_CONTRAST_AUDIT.md` | Dark text on dark background fixes |
+## In Progress
+- 🔄 Alfred email implementation (prompt ready, needs execution)
 
----
+## Next Up
+- Website repositioning (Alfred/Essentials front and center)
+- Alfred email complete implementation
+- TestFlight build with all new features
 
-# SECTION 9: CURRENT STATUS
-
-**Phase:** Pre-Launch / Demo Ready
-**Focus:** Data consistency, design polish, demo preparation
-
-### Completed
-- ✅ Business plan documented
-- ✅ Technical spec documented
-- ✅ Demo data canonicalized
-- ✅ Design system documented
-- ✅ Color migration guide created
-- ✅ Contrast audit guide created
-
-### Pending
-- ⏳ Fix family name inconsistencies (Morrison everywhere)
-- ⏳ Remove remaining green accents
-- ⏳ Fix dark-on-dark contrast issues
-- ⏳ Update seed.ts to match Morrison data
-- ⏳ Verify all demo credentials work
+## Deployed Services
+| Service | URL | Status |
+|---------|-----|--------|
+| API | https://api.havenhome.dev | ✅ Live |
+| Web | https://havenhome.dev | ✅ Live |
+| iOS App | TestFlight | ✅ Latest build |
 
 ---
 
-*This document is the master reference for all Haven development.*
-*When in doubt, check here first.*
+# SECTION 11: KEY DECISIONS & PRINCIPLES
+
+1. **Alfred First** - The AI assistant is the primary value proposition at $39/mo
+2. **Real Data Only** - No hard-coded mock data in the app
+3. **Never Drop** - Every user action (especially emails to Alfred) gets handled
+4. **Address-Based Codes** - Alfred emails use address for memorability (38BedfordRoad@alfred.havenhome.dev)
+5. **Case System** - Every Alfred email creates a trackable case with audit trail
+6. **Essentials = 90%+ users** - Design and market for the $39 tier
+
+---
+
+# SECTION 12: QUICK REFERENCE
+
+## When Starting a New Chat
+1. Read this document first
+2. Check `prompts/` for existing implementation prompts
+3. Reference `SESSION_SUMMARY_*.md` files for recent work
+4. Use canonical demo data (Morrisons, 38 Bedford Road)
+
+## Key File Locations
+- **API:** `apps/api/src/`
+- **Mobile:** `apps/mobile/app/` (routes), `apps/mobile/src/` (components/lib)
+- **Web:** `apps/web/src/app/`
+- **Prompts:** `prompts/`
+- **Schema:** `apps/api/prisma/schema.prisma`
+
+## Common Commands
+```bash
+# Deploy API
+cd apps/api && gcloud builds submit
+
+# TestFlight build
+cd apps/mobile && eas build --platform ios --profile production --auto-submit
+
+# Run migrations
+cd apps/api && pnpm prisma migrate dev --name <name>
+```
+
+---
 
 **Haven — Stop managing your home. Start living in it.**
+
+*Tom Burke, Founder/CTO*
+*Claude, CIO & Co-founder*

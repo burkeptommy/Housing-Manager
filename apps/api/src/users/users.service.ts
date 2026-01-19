@@ -12,7 +12,7 @@ import { randomBytes } from 'crypto';
 import { PrismaService } from '../prisma';
 import { AuthPayload } from '../firebase';
 
-import { UserDto, AdminUpdateUserDto, UserListQueryDto } from './dto';
+import { UserDto, UpdateUserDto, AdminUpdateUserDto, UserListQueryDto } from './dto';
 
 export interface PaginatedUsers {
   data: UserDto[];
@@ -143,6 +143,44 @@ export class UsersService {
         ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
         ...(dto.email && { email: dto.email.toLowerCase() }),
         ...(dto.role && { role: dto.role }),
+      },
+    });
+
+    return this.mapToDto(updatedUser);
+  }
+
+  /**
+   * Update current user's profile (for authenticated users)
+   */
+  async updateProfile(userId: string, dto: UpdateUserDto): Promise<UserDto> {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User not found`);
+    }
+
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(dto.firstName && { firstName: dto.firstName }),
+        ...(dto.lastName && { lastName: dto.lastName }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+        ...(dto.avatarUrl !== undefined && { avatarUrl: dto.avatarUrl }),
+      },
+    });
+
+    // Also update the corresponding FamilyMember if one exists
+    await this.prisma.familyMember.updateMany({
+      where: {
+        email: user.email.toLowerCase(),
+      },
+      data: {
+        ...(dto.firstName && { firstName: dto.firstName }),
+        ...(dto.lastName && { lastName: dto.lastName }),
+        ...(dto.phone !== undefined && { phone: dto.phone }),
+        ...(dto.avatarUrl !== undefined && { photoUrl: dto.avatarUrl }),
       },
     });
 

@@ -288,48 +288,283 @@ export class DashboardService {
    * Calculate home health score based on various factors
    */
   async calculateHealthScore(householdId: string): Promise<number> {
-    let score = 100;
+    const healthResult = await this.homeHealthService.calculateHealthScore(householdId);
+    return healthResult.score;
+  }
 
-    // Check for overdue maintenance
-    const overdueAssets = await this.prisma.propertyAsset.count({
+  /**
+   * Get full health score with factors breakdown
+   */
+  async getFullHealthScore(householdId: string) {
+    const healthResult = await this.homeHealthService.calculateHealthScore(householdId);
+
+    // Group factors by positive/negative for easier UI display
+    const helping = healthResult.factors
+      .filter(f => f.status === 'positive')
+      .map(f => f.description);
+
+    const needsAttention = healthResult.factors
+      .filter(f => f.status === 'negative')
+      .map(f => f.description);
+
+    return {
+      score: healthResult.score,
+      maxScore: healthResult.maxScore,
+      grade: healthResult.grade,
+      factors: {
+        helping,
+        needsAttention,
+      },
+      recommendations: healthResult.recommendations,
+      detailedFactors: healthResult.factors,
+    };
+  }
+
+  /**
+   * Get today's notes aggregated from various sources
+   */
+  async getTodaysNotes(householdId: string) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    const nextWeek = new Date(today);
+    nextWeek.setDate(nextWeek.getDate() + 7);
+
+    const notes: Array<{
+      id: string;
+      type: 'bill' | 'maintenance' | 'service' | 'activity' | 'event';
+      icon: string;
+      text: string;
+      color: string;
+      priority: number;
+    }> = [];
+
+    // 1. Bills due in the next 3 days
+    const currentDay = today.getDate();
+    const threeDaysFromNow = new Date(today);
+    threeDaysFromNow.setDate(threeDaysFromNow.getDate() + 3);
+    const threeDaysDay = threeDaysFromNow.getDate();
+
+    const billsDue = await this.prisma.comprehensiveBill.findMany({
       where: {
         householdId,
-        isActive: true,
-        nextServiceDate: { lt: new Date() },
+        status: 'ACTIVE',
+        dueDay: {
+          gte: currentDay,
+          lte: threeDaysDay,
+        },
       },
+      take: 5,
     });
-    score -= overdueAssets * 5;
 
-    // Check for assets in poor condition
-    const poorConditionAssets = await this.prisma.propertyAsset.count({
+    billsDue.forEach(bill => {
+      const daysUntilDue = (bill.dueDay || 0) - currentDay;
+      const dueText = daysUntilDue === 0 ? 'today' : daysUntilDue === 1 ? 'tomorrow' : `in ${daysUntilDue} days`;
+      notes.push({
+        id: `bill-${bill.id}`,
+        type: 'bill',
+        icon: 'card-outline',
+        text: `${bill.name} due ${dueText}`,
+        color: daysUntilDue === 0 ? '#dc2626' : '#c4a574',
+        priority: daysUntilDue === 0 ? 1 : 2,
+      });
+    });
+
+    // 2. Maintenance tasks due soon
+    const maintenanceTasks = await this.prisma.maintenanceTask.findMany({
       where: {
         householdId,
-        isActive: true,
-        condition: { in: ['Poor', 'Needs Replacement'] },
+        status: { in: ['PENDING', 'DUE_SOON', 'OVERDUE'] },
+        dueDate: { lte: nextWeek },
       },
+      take: 5,
+      orderBy: { dueDate: 'asc' },
     });
-    score -= poorConditionAssets * 10;
 
-    // Check for pending work orders
-    const pendingWorkOrders = await this.prisma.workOrder.count({
+    maintenanceTasks.forEach(task => {
+      const isOverdue = task.status === 'OVERDUE' || (task.dueDate && task.dueDate < today);
+      notes.push({
+        id: `maintenance-${task.id}`,
+        type: 'maintenance',
+        icon: 'construct-outline',
+        text: isOverdue ? `${task.title} is overdue` : `${task.title} due soon`,
+        color: isOverdue ? '#dc2626' : '#f59e0b',
+        priority: isOverdue ? 1 : 3,
+      });
+    });
+
+    // 3. Scheduled services today/tomorrow
+    const upcomingServices = await this.prisma.serviceRequest.findMany({
       where: {
         householdId,
-        status: { in: ['REQUESTED', 'SCHEDULED', 'OPEN'] },
+        scheduledDate: {
+          gte: today,
+          lt: tomorrow,
+        },
+        status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS', 'SCHEDULED'] },
       },
+      include: {
+        vendor: { select: { displayName: true } },
+      },
+      take: 3,
     });
-    score -= pendingWorkOrders * 3;
 
-    // Check for open service requests
-    const openServiceRequests = await this.prisma.serviceRequest.count({
+    upcomingServices.forEach(service => {
+      const time = service.scheduledDate
+        ? new Date(service.scheduledDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        : '';
+      notes.push({
+        id: `service-${service.id}`,
+        type: 'service',
+        icon: 'hammer-outline',
+        text: `${service.vendor?.displayName || 'Service'} ${time ? `at ${time}` : 'scheduled today'}`,
+        color: '#3b82f6',
+        priority: 2,
+      });
+    });
+
+    // 4. Family activities today
+    const familyActivities = await this.prisma.kidActivity.findMany({
+      where: { householdId },
+      include: {
+        familyMember: { select: { firstName: true } },
+      },
+      take: 5,
+    });
+
+    // Check if any activities have schedules that mention today's day
+    const todayDayName = today.toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    familyActivities.forEach(activity => {
+      if (activity.schedule?.toLowerCase().includes(todayDayName)) {
+        notes.push({
+          id: `activity-${activity.id}`,
+          type: 'activity',
+          icon: 'calendar-outline',
+          text: `${activity.familyMember?.firstName || 'Family'}'s ${activity.name}`,
+          color: '#c4a574',
+          priority: 4,
+        });
+      }
+    });
+
+    // 5. Family events today
+    const familyEvents = await this.prisma.familyEvent.findMany({
       where: {
         householdId,
-        status: { in: ['SUBMITTED', 'ASSIGNED', 'IN_PROGRESS'] },
+        startDate: {
+          gte: today,
+          lt: tomorrow,
+        },
       },
+      take: 5,
     });
-    score -= openServiceRequests * 2;
 
-    // Ensure score is between 0 and 100
-    return Math.max(0, Math.min(100, score));
+    familyEvents.forEach(event => {
+      const time = event.startDate
+        ? new Date(event.startDate).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+        : '';
+      notes.push({
+        id: `event-${event.id}`,
+        type: 'event',
+        icon: 'calendar-outline',
+        text: `${event.title}${time ? ` at ${time}` : ''}`,
+        color: event.color || '#627d98',
+        priority: 3,
+      });
+    });
+
+    // Sort by priority
+    notes.sort((a, b) => a.priority - b.priority);
+
+    return {
+      notes: notes.slice(0, 10),
+      isEmpty: notes.length === 0,
+      counts: {
+        bills: billsDue.length,
+        maintenance: maintenanceTasks.length,
+        services: upcomingServices.length,
+        activities: familyActivities.filter(a =>
+          a.schedule?.toLowerCase().includes(todayDayName)
+        ).length,
+        events: familyEvents.length,
+      },
+    };
+  }
+
+  /**
+   * Get setup/onboarding status for a household
+   * Returns completion status for each setup step
+   */
+  async getSetupStatus(householdId: string) {
+    const [
+      user,
+      homeProfile,
+      familyMemberCount,
+      vendorCount,
+      documentCount,
+      hasHvacSystem,
+      hasElectricVendor,
+    ] = await Promise.all([
+      // Get household owner
+      this.prisma.household.findUnique({
+        where: { id: householdId },
+        include: { owner: { select: { firstName: true, lastName: true } } },
+      }),
+      // Get home profile
+      this.prisma.homeProfile.findUnique({
+        where: { householdId },
+      }),
+      // Family members count
+      this.prisma.familyMember.count({
+        where: { householdId },
+      }),
+      // Vendors count
+      this.prisma.householdVendor.count({
+        where: { householdId },
+      }),
+      // Documents count
+      this.prisma.document.count({
+        where: { householdId },
+      }),
+      // Check for HVAC system
+      this.prisma.propertyAsset.count({
+        where: { householdId, category: 'HVAC', isActive: true },
+      }),
+      // Check for electric vendor - look in household vendors
+      this.prisma.householdVendor.count({
+        where: {
+          householdId,
+          vendor: {
+            category: 'UTILITY',
+          },
+        },
+      }),
+    ]);
+
+    // Calculate completion
+    const items = {
+      profile: !!(user?.owner?.firstName && user?.owner?.lastName),
+      property: !!(homeProfile?.bedrooms && homeProfile?.bathrooms),
+      heating: hasHvacSystem > 0,
+      electricity: hasElectricVendor > 0,
+      family: familyMemberCount > 1, // More than just the owner
+      documents: documentCount > 0,
+      vendors: vendorCount > 0,
+    };
+
+    const completedCount = Object.values(items).filter(Boolean).length;
+    const totalCount = Object.keys(items).length;
+
+    return {
+      items,
+      completedCount,
+      totalCount,
+      progress: completedCount / totalCount,
+      isComplete: completedCount === totalCount,
+    };
   }
 
   /**

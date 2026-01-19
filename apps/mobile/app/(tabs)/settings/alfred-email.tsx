@@ -146,7 +146,7 @@ export default function AlfredEmailSettingsScreen() {
   if (isLoading) {
     return (
       <View style={styles.fullContainer}>
-        <AppHeader title="Personal Assistant" showBack />
+        <AppHeader title="Personal Assistant" showBack onBackPress={() => router.push('/(tabs)')} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
         </View>
@@ -156,7 +156,7 @@ export default function AlfredEmailSettingsScreen() {
 
   return (
     <View style={styles.fullContainer}>
-      <AppHeader title="Personal Assistant" showBack />
+      <AppHeader title="Personal Assistant" showBack onBackPress={() => router.push('/(tabs)')} />
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}

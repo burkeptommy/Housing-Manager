@@ -574,25 +574,29 @@ export class FamilyController {
     @Param('householdId') householdId: string,
     @Param('memberId') memberId: string,
   ) {
-    // Verify user has access to this household
-    const userHasAccess =
-      req.user.householdId === householdId ||
+    // Check if user is system admin
+    const isSystemAdmin =
       req.user.role === 'ADMIN' ||
       req.user.role === 'HOME_MANAGER' ||
       req.user.role === 'MANAGER';
 
-    if (!userHasAccess) {
-      const membership = await this.prisma.householdMember.findFirst({
-        where: {
-          householdId,
-          userId: req.user.id,
-          status: 'ACTIVE',
-        },
-      });
+    // Check household membership and role
+    const membership = await this.prisma.householdMember.findFirst({
+      where: {
+        householdId,
+        userId: req.user.id,
+        status: 'ACTIVE',
+      },
+    });
 
-      if (!membership) {
-        throw new Error('Access denied to this household');
-      }
+    if (!membership && !isSystemAdmin) {
+      throw new Error('Access denied to this household');
+    }
+
+    // Only OWNER can delete family members
+    const isOwner = membership?.role === 'OWNER';
+    if (!isSystemAdmin && !isOwner) {
+      throw new Error('Only the household owner can remove family members');
     }
 
     // Verify the family member exists and belongs to this household
@@ -619,25 +623,29 @@ export class FamilyController {
     @Param('householdId') householdId: string,
     @Body() dto: CreateFamilyMemberDto,
   ) {
-    // Verify user has access to this household
-    const userHasAccess =
-      req.user.householdId === householdId ||
+    // Check if user is system admin
+    const isSystemAdmin =
       req.user.role === 'ADMIN' ||
       req.user.role === 'HOME_MANAGER' ||
       req.user.role === 'MANAGER';
 
-    if (!userHasAccess) {
-      const membership = await this.prisma.householdMember.findFirst({
-        where: {
-          householdId,
-          userId: req.user.id,
-          status: 'ACTIVE',
-        },
-      });
+    // Check household membership and role
+    const membership = await this.prisma.householdMember.findFirst({
+      where: {
+        householdId,
+        userId: req.user.id,
+        status: 'ACTIVE',
+      },
+    });
 
-      if (!membership) {
-        throw new Error('Access denied to this household');
-      }
+    if (!membership && !isSystemAdmin) {
+      throw new Error('Access denied to this household');
+    }
+
+    // Only OWNER can add new family members
+    const isOwner = membership?.role === 'OWNER';
+    if (!isSystemAdmin && !isOwner) {
+      throw new Error('Only the household owner can add family members');
     }
 
     // Create the family member
@@ -682,26 +690,32 @@ export class FamilyController {
     @Param('memberId') memberId: string,
     @Body() dto: UpdateFamilyMemberDto,
   ) {
-    // Verify user has access to this household
-    const userHasAccess =
-      req.user.householdId === householdId ||
+    // Get current user info
+    const currentUser = await this.prisma.user.findUnique({
+      where: { id: req.user.id },
+      select: { email: true },
+    });
+
+    // Check if user is system admin
+    const isSystemAdmin =
       req.user.role === 'ADMIN' ||
       req.user.role === 'HOME_MANAGER' ||
       req.user.role === 'MANAGER';
 
-    if (!userHasAccess) {
-      const membership = await this.prisma.householdMember.findFirst({
-        where: {
-          householdId,
-          userId: req.user.id,
-          status: 'ACTIVE',
-        },
-      });
+    // Check household membership and role
+    const membership = await this.prisma.householdMember.findFirst({
+      where: {
+        householdId,
+        userId: req.user.id,
+        status: 'ACTIVE',
+      },
+    });
 
-      if (!membership) {
-        throw new Error('Access denied to this household');
-      }
+    if (!membership && !isSystemAdmin) {
+      throw new Error('Access denied to this household');
     }
+
+    const isOwner = membership?.role === 'OWNER';
 
     // Verify the family member exists and belongs to this household
     const existingMember = await this.prisma.familyMember.findUnique({
@@ -710,6 +724,17 @@ export class FamilyController {
 
     if (!existingMember || existingMember.householdId !== householdId) {
       throw new Error('Family member not found');
+    }
+
+    // Permission check: Only OWNER can edit any family member
+    // Regular members can only edit their own FamilyMember record (matched by email)
+    const isOwnProfile =
+      currentUser?.email &&
+      existingMember.email &&
+      currentUser.email.toLowerCase() === existingMember.email.toLowerCase();
+
+    if (!isSystemAdmin && !isOwner && !isOwnProfile) {
+      throw new Error('You can only edit your own profile. Contact the household owner to edit other family members.');
     }
 
     // Update the family member
@@ -742,6 +767,19 @@ export class FamilyController {
         notes: dto.notes,
       },
     });
+
+    // If updating name and this member has a linked User account, update User record too
+    if ((dto.firstName || dto.lastName || dto.phone || dto.photoUrl) && existingMember.email) {
+      await this.prisma.user.updateMany({
+        where: { email: existingMember.email.toLowerCase() },
+        data: {
+          ...(dto.firstName && { firstName: dto.firstName }),
+          ...(dto.lastName && { lastName: dto.lastName }),
+          ...(dto.phone !== undefined && { phone: dto.phone }),
+          ...(dto.photoUrl !== undefined && { avatarUrl: dto.photoUrl }),
+        },
+      });
+    }
 
     return familyMember;
   }

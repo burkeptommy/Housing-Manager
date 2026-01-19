@@ -139,11 +139,19 @@ interface MemberDetail {
 export default function MemberDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const { householdInfo } = useAuth();
+  const { householdInfo, user } = useAuth();
   const [member, setMember] = useState<MemberDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Permission check: Can the current user edit this family member?
+  // OWNER can edit anyone, regular members can only edit their own profile
+  const isOwner = householdInfo?.role === 'OWNER';
+  const isOwnProfile = user?.email && member?.email &&
+    user.email.toLowerCase() === member.email.toLowerCase();
+  const canEdit = isOwner || isOwnProfile;
+  const canDelete = isOwner; // Only owner can delete
 
   // Modal states
   const [showContactModal, setShowContactModal] = useState(false);
@@ -569,11 +577,11 @@ export default function MemberDetailScreen() {
       <Stack.Screen
         options={{
           title: fullName,
-          headerRight: () => (
+          headerRight: canEdit ? () => (
             <TouchableOpacity onPress={() => router.push(`/(tabs)/family/member/edit/${id}` as any)}>
               <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
             </TouchableOpacity>
-          ),
+          ) : undefined,
         }}
       />
       <ScrollView
@@ -642,11 +650,11 @@ export default function MemberDetailScreen() {
 
         {/* Contact Info */}
         <Card style={styles.section}>
-          <SectionHeader title="CONTACT INFORMATION" action="Edit" onAction={() => handleEditSection('contact')} />
+          <SectionHeader title="CONTACT INFORMATION" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('contact') : undefined} />
           <InfoRow icon="call-outline" label="Phone" value={member.phone} onPress={member.phone ? handleCall : undefined} />
           <InfoRow icon="mail-outline" label="Email" value={member.email} onPress={member.email ? handleEmail : undefined} />
           <InfoRow icon="calendar-outline" label="Birthday" value={formatDate(member.birthDate)} />
-          {!member.phone && !member.email && !member.birthDate && (
+          {canEdit && !member.phone && !member.email && !member.birthDate && (
             <EmptyPrompt text="Add contact information" onPress={() => handleEditSection('contact')} />
           )}
         </Card>
@@ -667,7 +675,7 @@ export default function MemberDetailScreen() {
         {/* School Info (Children) */}
         {isChild && (
           <Card style={styles.section}>
-            <SectionHeader title="SCHOOL" action="Edit" onAction={() => handleEditSection('school')} />
+            <SectionHeader title="SCHOOL" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('school') : undefined} />
             {member.school || member.schoolGrade ? (
               <>
                 <InfoRow icon="school-outline" label="School" value={member.school} />
@@ -678,25 +686,26 @@ export default function MemberDetailScreen() {
                 <InfoRow icon="time-outline" label="Pickup" value={member.pickupTime} />
                 <InfoRow icon="call-outline" label="School Phone" value={member.schoolPhone} onPress={member.schoolPhone ? () => Linking.openURL(`tel:${member.schoolPhone}`) : undefined} />
               </>
-            ) : (
+            ) : canEdit ? (
               <EmptyPrompt text="Add school information" onPress={() => handleEditSection('school')} />
-            )}
+            ) : null}
           </Card>
         )}
 
         {/* Activities (for children - sports, activities) */}
         {isChild && (
           <Card style={styles.section}>
-            <SectionHeader title="ACTIVITIES & SPORTS" action="+ Add" onAction={() => handleEditSection('activities')} />
+            <SectionHeader title="ACTIVITIES & SPORTS" action={canEdit ? "+ Add" : undefined} onAction={canEdit ? () => handleEditSection('activities') : undefined} />
             {member.activities && member.activities.length > 0 ? (
               member.activities.map((activity) => (
                 <TouchableOpacity
                   key={activity.id}
                   style={styles.activityItem}
-                  onPress={() => {
+                  onPress={canEdit ? () => {
                     setEditingActivity(activity);
                     setShowActivityModal(true);
-                  }}
+                  } : undefined}
+                  disabled={!canEdit}
                 >
                   <View style={styles.activityIcon}>
                     <Ionicons
@@ -715,11 +724,13 @@ export default function MemberDetailScreen() {
                       <Text style={styles.activityLocation}>{activity.location}</Text>
                     )}
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+                  {canEdit && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
                 </TouchableOpacity>
               ))
-            ) : (
+            ) : canEdit ? (
               <EmptyPrompt text="Add activities and sports" onPress={() => handleEditSection('activities')} />
+            ) : (
+              <Text style={styles.emptyText}>No activities added</Text>
             )}
           </Card>
         )}
@@ -727,7 +738,7 @@ export default function MemberDetailScreen() {
         {/* Work Info (Adults) */}
         {isAdult && (
           <Card style={styles.section}>
-            <SectionHeader title="WORK" action="Edit" onAction={() => handleEditSection('work')} />
+            <SectionHeader title="WORK" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('work') : undefined} />
             {member.employer || member.occupation ? (
               <>
                 <InfoRow icon="business-outline" label="Employer" value={member.employer} />
@@ -737,25 +748,26 @@ export default function MemberDetailScreen() {
                 <InfoRow icon="location-outline" label="Office" value={member.workAddress} />
                 <InfoRow icon="time-outline" label="Schedule" value={member.workSchedule} />
               </>
-            ) : (
+            ) : canEdit ? (
               <EmptyPrompt text="Add work information" onPress={() => handleEditSection('work')} />
-            )}
+            ) : null}
           </Card>
         )}
 
         {/* Memberships (Adults) */}
         {isAdult && (
           <Card style={styles.section}>
-            <SectionHeader title="MEMBERSHIPS" action="+ Add" onAction={() => handleEditSection('memberships')} />
+            <SectionHeader title="MEMBERSHIPS" action={canEdit ? "+ Add" : undefined} onAction={canEdit ? () => handleEditSection('memberships') : undefined} />
             {member.memberships && member.memberships.length > 0 ? (
               member.memberships.map((membership) => (
                 <TouchableOpacity
                   key={membership.id}
                   style={styles.membershipRow}
-                  onPress={() => {
+                  onPress={canEdit ? () => {
                     setEditingMembership(membership);
                     setShowMembershipModal(true);
-                  }}
+                  } : undefined}
+                  disabled={!canEdit}
                 >
                   <View style={styles.membershipIcon}>
                     <Ionicons name={getMembershipIcon(membership.type)} size={18} color={colors.haven.champagne[500]} />
@@ -769,11 +781,13 @@ export default function MemberDetailScreen() {
                       <Text style={styles.membershipFee}>${membership.monthlyFee}/month</Text>
                     )}
                   </View>
-                  <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+                  {canEdit && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
                 </TouchableOpacity>
               ))
-            ) : (
+            ) : canEdit ? (
               <EmptyPrompt text="Add gym, club, or other memberships" onPress={() => handleEditSection('memberships')} />
+            ) : (
+              <Text style={styles.emptyText}>No memberships added</Text>
             )}
           </Card>
         )}
@@ -781,15 +795,16 @@ export default function MemberDetailScreen() {
         {/* Activities/Memberships (Adults - clubs, gyms) */}
         {isAdult && member.activities && member.activities.length > 0 && (
           <Card style={styles.section}>
-            <SectionHeader title="ACTIVITIES" action="+ Add" onAction={() => handleEditSection('activities')} />
+            <SectionHeader title="ACTIVITIES" action={canEdit ? "+ Add" : undefined} onAction={canEdit ? () => handleEditSection('activities') : undefined} />
             {member.activities.map((activity) => (
               <TouchableOpacity
                 key={activity.id}
                 style={styles.activityItem}
-                onPress={() => {
+                onPress={canEdit ? () => {
                   setEditingActivity(activity);
                   setShowActivityModal(true);
-                }}
+                } : undefined}
+                disabled={!canEdit}
               >
                 <View style={styles.activityIcon}>
                   <Ionicons
@@ -808,7 +823,7 @@ export default function MemberDetailScreen() {
                     <Text style={styles.activityLocation}>{activity.location}</Text>
                   )}
                 </View>
-                <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />
+                {canEdit && <Ionicons name="chevron-forward" size={16} color={colors.text.tertiary} />}
               </TouchableOpacity>
             ))}
           </Card>
@@ -816,21 +831,23 @@ export default function MemberDetailScreen() {
 
         {/* Emergency Contact */}
         <Card style={styles.section}>
-          <SectionHeader title="EMERGENCY CONTACT" action="Edit" onAction={() => handleEditSection('emergency')} />
+          <SectionHeader title="EMERGENCY CONTACT" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('emergency') : undefined} />
           {member.emergencyContact ? (
             <>
               <InfoRow icon="person-outline" label="Name" value={member.emergencyContact} />
               <InfoRow icon="people-outline" label="Relationship" value={member.emergencyContactRelationship} />
               <InfoRow icon="call-outline" label="Phone" value={member.emergencyContactPhone} onPress={member.emergencyContactPhone ? () => Linking.openURL(`tel:${member.emergencyContactPhone}`) : undefined} />
             </>
-          ) : (
+          ) : canEdit ? (
             <EmptyPrompt text="Add emergency contact" onPress={() => handleEditSection('emergency')} />
+          ) : (
+            <Text style={styles.emptyText}>No emergency contact added</Text>
           )}
         </Card>
 
         {/* Medical Information */}
         <Card style={styles.section}>
-          <SectionHeader title="MEDICAL INFORMATION" action="Edit" onAction={() => handleEditSection('medical')} />
+          <SectionHeader title="MEDICAL INFORMATION" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('medical') : undefined} />
           {member.primaryDoctorName || member.bloodType || member.insuranceProvider ? (
             <>
               <InfoRow icon="medkit-outline" label="Primary Doctor" value={member.primaryDoctorName} />
@@ -848,15 +865,17 @@ export default function MemberDetailScreen() {
                 </View>
               )}
             </>
-          ) : (
+          ) : canEdit ? (
             <EmptyPrompt text="Add medical information" onPress={() => handleEditSection('medical')} />
+          ) : (
+            <Text style={styles.emptyText}>No medical information added</Text>
           )}
         </Card>
 
         {/* Preferences (optional) */}
         {(member.dietaryRestrictions?.length || member.clothingSize || member.interests?.length) && (
           <Card style={styles.section}>
-            <SectionHeader title="PREFERENCES" action="Edit" onAction={() => handleEditSection('preferences')} />
+            <SectionHeader title="PREFERENCES" action={canEdit ? "Edit" : undefined} onAction={canEdit ? () => handleEditSection('preferences') : undefined} />
             {member.dietaryRestrictions && member.dietaryRestrictions.length > 0 && (
               <View style={styles.detailRow}>
                 <Ionicons name="restaurant-outline" size={18} color={colors.text.tertiary} />
@@ -880,11 +899,13 @@ export default function MemberDetailScreen() {
           </Card>
         )}
 
-        {/* Danger Zone */}
-        <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
-          <Ionicons name="trash-outline" size={20} color={colors.status.error} />
-          <Text style={styles.deleteButtonText}>Remove Family Member</Text>
-        </TouchableOpacity>
+        {/* Danger Zone - Only show for household owner */}
+        {canDelete && (
+          <TouchableOpacity style={styles.deleteButton} onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={20} color={colors.status.error} />
+            <Text style={styles.deleteButtonText}>Remove Family Member</Text>
+          </TouchableOpacity>
+        )}
       </ScrollView>
 
       {/* Focused Edit Modals */}

@@ -489,8 +489,13 @@ h1.page-title,
   font-family: 'Playfair Display', Georgia, serif;
 }
 
-body, h2, h3, h4, h5, h6, p, span, div, a, button, input, textarea, select, label {
+body, h2, h3, h4, h5, h6, p, div, a, button, input, textarea, select, label {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Spans inherit from parent - allows font-serif on h1 to cascade to child spans */
+span {
+  font-family: inherit;
 }
 
 .font-serif {

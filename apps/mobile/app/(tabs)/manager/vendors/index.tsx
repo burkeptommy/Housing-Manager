@@ -10,6 +10,7 @@ import {
   TextInput,
   ActivityIndicator,
   Alert,
+  Image,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -31,8 +32,11 @@ interface Vendor {
   contactName?: string;
   phone?: string;
   email?: string;
+  websiteUrl?: string;
+  logoUrl?: string;
   rating?: number;
   isFavorite?: boolean;
+  _logoError?: boolean; // Track logo load errors locally
 }
 
 interface DirectoryVendor {
@@ -285,17 +289,33 @@ export default function VendorsScreen() {
   // RENDER FUNCTIONS
   // =============================================================================
 
+  const handleLogoError = (vendorId: string) => {
+    // Mark this vendor's logo as failed so we show the icon instead
+    setVendors(prev => prev.map(v =>
+      v.id === vendorId ? { ...v, _logoError: true } : v
+    ));
+  };
+
   const renderVendor = ({ item }: { item: Vendor }) => (
     <TouchableOpacity onPress={() => handleVendorPress(item)} activeOpacity={0.7}>
       <Card style={styles.vendorCard}>
         <View style={styles.vendorHeader}>
-          <View style={styles.vendorIcon}>
-            <Ionicons
-              name={getCategoryIcon(item.category) as any}
-              size={24}
-              color={colors.haven.champagne[500]}
+          {item.logoUrl && !item._logoError ? (
+            <Image
+              source={{ uri: item.logoUrl }}
+              style={styles.vendorLogo}
+              resizeMode="contain"
+              onError={() => handleLogoError(item.id)}
             />
-          </View>
+          ) : (
+            <View style={styles.vendorIcon}>
+              <Ionicons
+                name={getCategoryIcon(item.category) as any}
+                size={24}
+                color={colors.haven.champagne[500]}
+              />
+            </View>
+          )}
           <View style={styles.vendorInfo}>
             <Text style={styles.vendorName}>{item.displayName}</Text>
             <Text style={styles.vendorCategory}>{item.category.replace(/_/g, ' ')}</Text>
@@ -845,6 +865,14 @@ const styles = StyleSheet.create({
     backgroundColor: colors.haven.champagne[50],
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  vendorLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.border.light,
   },
   vendorInfo: {
     flex: 1,

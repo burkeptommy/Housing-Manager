@@ -137,6 +137,106 @@ export function ErrorEmptyState({ onRetry }: { onRetry?: () => void }) {
   );
 }
 
+// Bills Empty States
+export function NoBillsEmptyState({ onAction, onSecondaryAction }: { onAction?: () => void; onSecondaryAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="card-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No bills detected yet"
+      description="Connect your bank to auto-detect bills, or add them manually to track your home expenses."
+      actionLabel="Connect Bank"
+      onAction={onAction}
+      secondaryActionLabel="Add Manually"
+      onSecondaryAction={onSecondaryAction}
+    />
+  );
+}
+
+// Family Empty States
+export function NoFamilyEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="people-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="Add your household"
+      description="Keep track of family members, their activities, medical info, and emergency contacts all in one place."
+      actionLabel="Add Family Member"
+      onAction={onAction}
+    />
+  );
+}
+
+// Vendors Empty States
+export function NoVendorsEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="business-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No vendors added"
+      description="Add your service providers like plumbers, electricians, and landscapers for quick access when you need them."
+      actionLabel="Add Vendor"
+      onAction={onAction}
+    />
+  );
+}
+
+// Home Systems Empty States
+export function NoSystemsEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="construct-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No home systems documented"
+      description="Add your HVAC, plumbing, and other systems to get maintenance reminders and track service history."
+      actionLabel="Add System"
+      onAction={onAction}
+    />
+  );
+}
+
+// Pets Empty State
+export function NoPetsEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="paw-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No pets added"
+      description="Track your furry friends' vet visits, medications, and care instructions."
+      actionLabel="Add Pet"
+      onAction={onAction}
+    />
+  );
+}
+
+// Vehicles Empty State
+export function NoVehiclesEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="car-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No vehicles added"
+      description="Track maintenance, registration, and insurance for your vehicles."
+      actionLabel="Add Vehicle"
+      onAction={onAction}
+    />
+  );
+}
+
+// Activities Empty State
+export function NoActivitiesEmptyState({ onAction }: { onAction?: () => void }) {
+  return (
+    <EmptyState
+      icon="calendar-outline"
+      iconColor={colors.haven.champagne[500]}
+      title="No activities added"
+      description="Track sports, lessons, and other activities for your family members."
+      actionLabel="Add Activity"
+      onAction={onAction}
+    />
+  );
+}
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,

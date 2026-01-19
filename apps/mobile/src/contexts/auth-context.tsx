@@ -587,10 +587,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // New user - need to collect address
-      // Parse name from Apple (they may not provide it on subsequent sign-ins)
-      let firstName = '';
-      let lastName = '';
-      if (result.user?.displayName) {
+      // Use firstName/lastName directly from Apple (captured on first sign-in)
+      // Fall back to parsing displayName if not available
+      let firstName = result.user?.firstName || '';
+      let lastName = result.user?.lastName || '';
+
+      // Fallback: parse from displayName if firstName/lastName are empty
+      if (!firstName && !lastName && result.user?.displayName) {
         const nameParts = result.user.displayName.split(' ');
         firstName = nameParts[0] || '';
         lastName = nameParts.slice(1).join(' ') || '';
@@ -627,9 +630,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
 
       // New user - need to collect address
-      let firstName = '';
-      let lastName = '';
-      if (result.user?.displayName) {
+      // Use firstName/lastName directly from Google
+      // Fall back to parsing displayName if not available
+      let firstName = result.user?.firstName || '';
+      let lastName = result.user?.lastName || '';
+
+      // Fallback: parse from displayName if firstName/lastName are empty
+      if (!firstName && !lastName && result.user?.displayName) {
         const nameParts = result.user.displayName.split(' ');
         firstName = nameParts[0] || '';
         lastName = nameParts.slice(1).join(' ') || '';

@@ -15,6 +15,7 @@ import { randomBytes } from 'crypto';
 
 import { PrismaService } from '../prisma';
 import { PropertyEnrichmentService } from '../property/property-enrichment.service';
+import { generateUniqueAlfredEmailCode } from '../alfred-email/utils';
 
 import {
   RegisterDto,
@@ -123,6 +124,11 @@ export class AuthService {
 
     const passwordHash = await this.hashPassword(dto.password);
 
+    // Generate Alfred email code from address
+    const alfredEmailCode = dto.address.addressLine1
+      ? await generateUniqueAlfredEmailCode(this.prisma, dto.address.addressLine1)
+      : null;
+
     // Create user, household, home profile in a transaction
     const result = await this.prisma.$transaction(async (tx) => {
       // 1. Create user
@@ -136,13 +142,14 @@ export class AuthService {
         },
       });
 
-      // 2. Create household
+      // 2. Create household with Alfred email code
       const household = await tx.household.create({
         data: {
           name: `The ${dto.lastName} Family`,
           ownerId: user.id,
           subscriptionPlan: 'ESSENTIALS',
           subscriptionStatus: 'ACTIVE',
+          alfredEmailCode,
           members: {
             create: {
               userId: user.id,
@@ -205,36 +212,70 @@ export class AuthService {
     userAgent?: string,
     ipAddress?: string,
   ): Promise<{ user: UserResponseDto; householdId: string; message: string }> {
+    // Check if user already exists (may have been auto-created by FirebaseAuthGuard)
     const existingUser = await this.prisma.user.findUnique({
       where: { email: dto.email.toLowerCase() },
+      include: {
+        householdMembers: {
+          where: { status: 'ACTIVE' },
+        },
+      },
     });
 
-    if (existingUser) {
-      throw new ConflictException('A user with this email already exists');
+    // If user exists AND already has a household, they're already registered
+    if (existingUser && existingUser.householdMembers.length > 0) {
+      throw new ConflictException('A user with this email already exists and has a household');
     }
 
-    // Create user, household, home profile in a transaction
-    // No password hash needed - Firebase handles auth
-    const result = await this.prisma.$transaction(async (tx) => {
-      // 1. Create user (no password hash for social auth)
-      const user = await tx.user.create({
-        data: {
-          email: dto.email.toLowerCase(),
-          passwordHash: '', // Empty - social auth via Firebase
-          firstName: dto.firstName,
-          lastName: dto.lastName,
-          role: UserRole.HOMEOWNER,
-          emailVerified: true, // Social providers verify email
-        },
-      });
+    // Generate Alfred email code from address
+    const alfredEmailCode = dto.address.addressLine1
+      ? await generateUniqueAlfredEmailCode(this.prisma, dto.address.addressLine1)
+      : null;
 
-      // 2. Create household with utility info from ATTOM
+    // Create household and home profile in a transaction
+    // User may already exist (auto-created by FirebaseAuthGuard) or need to be created
+    const result = await this.prisma.$transaction(async (tx) => {
+      // 1. Get or create user
+      let userId: string;
+      let userRecord: User;
+
+      if (!existingUser) {
+        // Create new user (no password hash for social auth)
+        userRecord = await tx.user.create({
+          data: {
+            email: dto.email.toLowerCase(),
+            passwordHash: '', // Empty - social auth via Firebase
+            firstName: dto.firstName,
+            lastName: dto.lastName,
+            role: UserRole.HOMEOWNER,
+            emailVerified: true, // Social providers verify email
+          },
+        });
+        userId = userRecord.id;
+      } else {
+        userId = existingUser.id;
+        // Update existing user with name if not set
+        if (!existingUser.firstName || !existingUser.lastName) {
+          userRecord = await tx.user.update({
+            where: { id: existingUser.id },
+            data: {
+              firstName: dto.firstName || existingUser.firstName,
+              lastName: dto.lastName || existingUser.lastName,
+            },
+          });
+        } else {
+          userRecord = existingUser;
+        }
+      }
+
+      // 2. Create household with utility info from ATTOM and Alfred email code
       const household = await tx.household.create({
         data: {
           name: `The ${dto.lastName} Family`,
-          ownerId: user.id,
+          ownerId: userId,
           subscriptionPlan: 'ESSENTIALS',
           subscriptionStatus: 'ACTIVE',
+          alfredEmailCode,
           // Utility/system data from ATTOM (if available)
           waterSource: dto.propertyDetails?.waterType ?? undefined,
           sewerType: dto.propertyDetails?.sewerType ?? undefined,
@@ -243,7 +284,7 @@ export class AuthService {
           enrichmentData: dto.propertyDetails ? { ...dto.propertyDetails } : undefined,
           members: {
             create: {
-              userId: user.id,
+              userId: userId,
               role: 'OWNER',
               status: 'ACTIVE',
               joinedAt: new Date(),
@@ -283,7 +324,7 @@ export class AuthService {
         },
       });
 
-      return { user, household };
+      return { user: userRecord, household };
     });
 
     // 5. Trigger ATTOM enrichment in background (async - don't wait)

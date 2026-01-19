@@ -8,6 +8,7 @@ import { VendorCategory, VendorActivityType, ActorType, ActivityAction, Activity
 
 import { PrismaService } from '../prisma';
 import { ActivityService } from '../activity/activity.service';
+import { getLogoUrlFromWebsite } from '../utils/logo-fetcher';
 
 import {
   CreateVendorDto,
@@ -31,6 +32,12 @@ export class HouseholdVendorsService {
   ): Promise<VendorResponseDto> {
     await this.verifyHouseholdAccess(householdId, userId);
 
+    // Auto-fetch logo from website URL if not provided
+    let logoUrl = dto.logoUrl;
+    if (!logoUrl && dto.websiteUrl) {
+      logoUrl = getLogoUrlFromWebsite(dto.websiteUrl);
+    }
+
     // Create the vendor
     const vendor = await this.prisma.vendor.create({
       data: {
@@ -43,6 +50,7 @@ export class HouseholdVendorsService {
         phone: dto.phone,
         email: dto.email,
         websiteUrl: dto.websiteUrl,
+        logoUrl,
         addressLine1: dto.addressLine1,
         addressLine2: dto.addressLine2,
         city: dto.city,
@@ -205,6 +213,13 @@ export class HouseholdVendorsService {
       throw new NotFoundException(`Vendor with ID ${id} not found`);
     }
 
+    // Auto-fetch logo when websiteUrl changes (and logoUrl not explicitly set)
+    let logoUrl: string | null | undefined = dto.logoUrl;
+    if (logoUrl === undefined && dto.websiteUrl !== undefined && dto.websiteUrl !== existing.websiteUrl) {
+      // Website URL changed, auto-fetch new logo
+      logoUrl = getLogoUrlFromWebsite(dto.websiteUrl);
+    }
+
     const vendor = await this.prisma.vendor.update({
       where: { id },
       data: {
@@ -216,6 +231,7 @@ export class HouseholdVendorsService {
         ...(dto.phone !== undefined && { phone: dto.phone }),
         ...(dto.email !== undefined && { email: dto.email }),
         ...(dto.websiteUrl !== undefined && { websiteUrl: dto.websiteUrl }),
+        ...(logoUrl !== undefined && { logoUrl }),
         ...(dto.addressLine1 !== undefined && { addressLine1: dto.addressLine1 }),
         ...(dto.addressLine2 !== undefined && { addressLine2: dto.addressLine2 }),
         ...(dto.city !== undefined && { city: dto.city }),
@@ -511,6 +527,7 @@ export class HouseholdVendorsService {
       phone: vendor.phone,
       email: vendor.email,
       websiteUrl: vendor.websiteUrl,
+      logoUrl: vendor.logoUrl,
       addressLine1: vendor.addressLine1,
       addressLine2: vendor.addressLine2,
       city: vendor.city,

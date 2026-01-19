@@ -261,6 +261,18 @@ export default function SettingsScreen() {
           <Text style={styles.sectionTitle}>Connected Services</Text>
           <Card style={styles.settingsCard}>
             <SettingRow
+              icon="mail-outline"
+              title="Alfred Email Assistant"
+              subtitle="CC Alfred to auto-organize emails"
+              onPress={() => router.push('/(tabs)/settings/alfred-email' as any)}
+            />
+            <SettingRow
+              icon="calendar-outline"
+              title="Calendar Sync"
+              subtitle="Connect Google or Apple calendars"
+              onPress={() => router.push('/(tabs)/settings/calendars' as any)}
+            />
+            <SettingRow
               icon="card-outline"
               title="Connected Banks"
               subtitle="Manage linked accounts"

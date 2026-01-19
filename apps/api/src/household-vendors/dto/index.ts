@@ -57,6 +57,11 @@ export class CreateVendorDto {
   @IsUrl()
   websiteUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Logo URL (auto-fetched from website if not provided)' })
+  @IsOptional()
+  @IsUrl()
+  logoUrl?: string;
+
   @ApiPropertyOptional({ description: 'Address line 1' })
   @IsOptional()
   @IsString()
@@ -132,6 +137,11 @@ export class UpdateVendorDto {
   @IsUrl()
   websiteUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Logo URL (auto-fetched from website if not provided)' })
+  @IsOptional()
+  @IsUrl()
+  logoUrl?: string;
+
   @ApiPropertyOptional({ description: 'Address line 1' })
   @IsOptional()
   @IsString()
@@ -198,6 +208,9 @@ export class VendorResponseDto {
 
   @ApiPropertyOptional()
   websiteUrl?: string | null;
+
+  @ApiPropertyOptional({ description: 'Logo URL (auto-fetched from website)' })
+  logoUrl?: string | null;
 
   @ApiPropertyOptional()
   addressLine1?: string | null;

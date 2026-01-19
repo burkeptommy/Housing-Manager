@@ -23,6 +23,8 @@ export interface GoogleAuthResult {
     uid: string;
     email: string | null;
     displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
     photoURL: string | null;
   };
   error?: string;
@@ -169,12 +171,23 @@ export async function handleGoogleAuthResponse(
     const userCredential = await signInWithCredential(auth, credential);
     const user = userCredential.user;
 
+    // Parse firstName and lastName from displayName
+    let firstName: string | null = null;
+    let lastName: string | null = null;
+    if (user.displayName) {
+      const nameParts = user.displayName.trim().split(' ');
+      firstName = nameParts[0] || null;
+      lastName = nameParts.slice(1).join(' ') || null;
+    }
+
     return {
       success: true,
       user: {
         uid: user.uid,
         email: user.email,
         displayName: user.displayName,
+        firstName,
+        lastName,
         photoURL: user.photoURL,
       },
     };

@@ -54,15 +54,76 @@ interface Conversation {
 }
 
 // =============================================================================
-// INITIAL MESSAGE
+// SETUP STATUS TYPES
 // =============================================================================
 
-const INITIAL_MESSAGE: Message = {
-  id: '1',
-  role: 'alfred',
-  content: "Hi! I'm Alfred, your AI Home Manager. I can help you with:\n\n• Scheduling vendors and maintenance\n• Answering home care questions\n• Managing your maintenance checklist\n• Booking a handyman ($50/visit)\n\nWhat can I help you with today?",
-  timestamp: new Date(),
-};
+interface SetupStatus {
+  isComplete: boolean;
+  completedCount: number;
+  totalCount: number;
+  progress: number;
+  items: {
+    profile: boolean;
+    property: boolean;
+    heating: boolean;
+    electricity: boolean;
+    family: boolean;
+    documents: boolean;
+    vendors: boolean;
+  };
+}
+
+// =============================================================================
+// INITIAL MESSAGE GENERATOR
+// =============================================================================
+
+function getInitialMessage(setupStatus: SetupStatus | null, firstName: string): Message {
+  // If setup is complete or no status, show default message
+  if (!setupStatus || setupStatus.isComplete) {
+    return {
+      id: '1',
+      role: 'alfred',
+      content: `Hi ${firstName}! I'm Alfred, your AI Home Manager. I can help you with:\n\n• Scheduling vendors and maintenance\n• Answering home care questions\n• Managing your maintenance checklist\n• Booking a handyman ($50/visit)\n\nWhat can I help you with today?`,
+      timestamp: new Date(),
+    };
+  }
+
+  // Generate onboarding questions based on missing setup items
+  const missingItems: string[] = [];
+  const quickReplies: string[] = [];
+
+  if (!setupStatus.items.heating) {
+    missingItems.push("What type of heating system do you have? (gas furnace, heat pump, boiler, etc.)");
+    quickReplies.push("Gas furnace");
+    quickReplies.push("Heat pump");
+    quickReplies.push("Other heating");
+  } else if (!setupStatus.items.electricity) {
+    missingItems.push("Who provides your electricity?");
+    quickReplies.push("Tell Alfred my electric provider");
+  } else if (!setupStatus.items.vendors) {
+    missingItems.push("Do you have a preferred HVAC technician or plumber you'd like to save?");
+    quickReplies.push("Add a vendor");
+    quickReplies.push("Skip for now");
+  } else if (!setupStatus.items.documents) {
+    missingItems.push("Would you like to upload any home documents? (warranties, manuals, insurance)");
+    quickReplies.push("Upload a document");
+    quickReplies.push("Skip for now");
+  }
+
+  const progressText = `\n\n📊 Setup Progress: ${setupStatus.completedCount}/${setupStatus.totalCount} complete`;
+
+  const content = missingItems.length > 0
+    ? `Hi ${firstName}! I'm Alfred, your AI Home Manager. Let me help you set up your home profile.\n\n${missingItems[0]}${progressText}`
+    : `Hi ${firstName}! I'm Alfred, your AI Home Manager. Your home profile is almost complete!${progressText}\n\nWhat can I help you with today?`;
+
+  return {
+    id: '1',
+    role: 'alfred',
+    content,
+    timestamp: new Date(),
+    quickReplies: quickReplies.length > 0 ? quickReplies : undefined,
+  };
+}
 
 // =============================================================================
 // ALFRED MANAGER SCREEN WITH TABS
@@ -71,26 +132,74 @@ const INITIAL_MESSAGE: Message = {
 export default function ManagerScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { householdInfo } = useAuth();
+  const { householdInfo, user } = useAuth();
   const { isEssentials } = useSubscription();
   const { prefill } = useLocalSearchParams<{ prefill?: string }>();
 
   // Tab state
   const [activeTab, setActiveTab] = useState<TabType>('alfred');
 
+  // Setup status for proactive onboarding
+  const [setupStatus, setSetupStatus] = useState<SetupStatus | null>(null);
+  const [isLoadingSetup, setIsLoadingSetup] = useState(true);
+
   // Alfred Chat state
   const scrollViewRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
-  const [messages, setMessages] = useState<Message[]>([INITIAL_MESSAGE]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const hasHandledPrefill = useRef(false);
+  const hasInitializedMessages = useRef(false);
 
   // Messages state
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Fetch setup status for proactive onboarding
+  useEffect(() => {
+    const fetchSetupStatus = async () => {
+      if (!householdInfo?.id) {
+        setIsLoadingSetup(false);
+        return;
+      }
+
+      try {
+        const token = await getIdToken(true);
+        if (!token) {
+          setIsLoadingSetup(false);
+          return;
+        }
+
+        const response = await fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}/setup-status`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setSetupStatus(data);
+        }
+      } catch (err) {
+        console.error('Failed to fetch setup status:', err);
+      } finally {
+        setIsLoadingSetup(false);
+      }
+    };
+
+    fetchSetupStatus();
+  }, [householdInfo?.id]);
+
+  // Initialize messages with dynamic greeting based on setup status
+  useEffect(() => {
+    if (!isLoadingSetup && !hasInitializedMessages.current) {
+      const firstName = user?.firstName || 'there';
+      const initialMessage = getInitialMessage(setupStatus, firstName);
+      setMessages([initialMessage]);
+      hasInitializedMessages.current = true;
+    }
+  }, [isLoadingSetup, setupStatus, user?.firstName]);
 
   // Handle prefill when screen comes into focus
   useFocusEffect(
@@ -152,30 +261,13 @@ export default function ManagerScreen() {
         const data = await response.json();
         setConversations(data);
       } else {
-        // Mock data for demo
-        setConversations([
-          {
-            id: '1',
-            vendorName: 'Ace Roofing',
-            vendorCategory: 'ROOFING',
-            lastMessage: 'We can come out next Tuesday at 10am',
-            lastMessageAt: new Date(Date.now() - 3600000).toISOString(),
-            unreadCount: 1,
-            vendorId: 'v1',
-          },
-          {
-            id: '2',
-            vendorName: 'Green Thumb Landscaping',
-            vendorCategory: 'LANDSCAPING',
-            lastMessage: 'The spring cleanup is complete',
-            lastMessageAt: new Date(Date.now() - 86400000).toISOString(),
-            unreadCount: 0,
-            vendorId: 'v2',
-          },
-        ]);
+        // API failed - show empty state
+        setConversations([]);
       }
     } catch (err) {
       console.error('Fetch conversations error:', err);
+      // API error - show empty state
+      setConversations([]);
     } finally {
       setIsLoadingConversations(false);
       setIsRefreshing(false);

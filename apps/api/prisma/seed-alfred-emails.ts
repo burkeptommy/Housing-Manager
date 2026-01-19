@@ -86,14 +86,22 @@ async function main() {
   // ============================================================================
   console.log('\n📨 Creating example email cases...');
 
-  // Clear existing email cases (delete by case number pattern to avoid conflicts)
-  await prisma.emailCase.deleteMany({
-    where: {
-      caseNumber: {
-        startsWith: 'ALF-2026-0000',
-      },
-    },
+  // Clear existing email cases and their activities (delete by case number pattern to avoid conflicts)
+  const existingCases = await prisma.emailCase.findMany({
+    where: { caseNumber: { startsWith: 'ALF-2026-0000' } },
+    select: { id: true },
   });
+
+  if (existingCases.length > 0) {
+    // Delete activities first (cascade should handle this, but being explicit)
+    await prisma.emailCaseActivity.deleteMany({
+      where: { caseId: { in: existingCases.map(c => c.id) } },
+    });
+
+    await prisma.emailCase.deleteMany({
+      where: { caseNumber: { startsWith: 'ALF-2026-0000' } },
+    });
+  }
 
   const now = new Date();
   const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
@@ -152,7 +160,7 @@ Bethel Pediatrics
       ])),
       resolvedAt: new Date(oneWeekAgo.getTime() + 60000),
     },
-    // In Progress case - Vendor quote
+    // Awaiting Input case - Vendor quote needs confirmation
     {
       householdId: household.id,
       caseNumber: 'ALF-2026-000003',
@@ -179,12 +187,20 @@ Please let us know which date works best.
 Best,
 Mike at CT Chimney Sweeps`,
       receivedAt: fiveDaysAgo,
-      status: EmailCaseStatus.IN_PROGRESS,
+      status: EmailCaseStatus.AWAITING_INPUT,
       priority: EmailCasePriority.NORMAL,
-      summary: 'Chimney cleaning quote: $450 for both chimneys',
+      summary: 'Chimney cleaning quote: $450 for both chimneys. Three dates available.',
       detectedIntent: 'VENDOR_QUOTE',
+      pendingQuestion: "I found a quote for chimney cleaning at $450. Would you like me to schedule this service and add it to your calendar?",
+      questionOptions: JSON.parse(JSON.stringify([
+        'Yes, schedule for Feb 4th (morning)',
+        'Yes, schedule for Feb 6th (afternoon)',
+        'Yes, schedule for Feb 10th',
+        'No thanks, I\'ll handle this myself',
+      ])),
       actionsTaken: JSON.parse(JSON.stringify([
-        { type: 'vendor_matched', description: 'Matched to existing maintenance task: Annual Chimney Cleaning' },
+        { type: 'vendor_matched', description: 'Matched to vendor: CT Chimney Sweeps' },
+        { type: 'quote_extracted', description: 'Extracted quote: $450 for 2 chimneys' },
       ])),
     },
     // Awaiting Input - School registration
@@ -264,6 +280,216 @@ Blue Fox Landscaping`,
   }
 
   console.log(`✅ Created ${emailCases.length} example email cases`);
+
+  // ============================================================================
+  // 4. CREATE ACTIVITY TIMELINE FOR EACH CASE
+  // ============================================================================
+  console.log('\n📝 Creating activity timelines...');
+
+  // Get created cases
+  const createdCases = await prisma.emailCase.findMany({
+    where: { caseNumber: { startsWith: 'ALF-2026-0000' } },
+    orderBy: { caseNumber: 'asc' },
+  });
+
+  // Activities for Case 1 (Eversource Bill - Completed)
+  const case1 = createdCases.find(c => c.caseNumber === 'ALF-2026-000001');
+  if (case1) {
+    await prisma.emailCaseActivity.createMany({
+      data: [
+        {
+          caseId: case1.id,
+          type: 'CASE_CREATED',
+          description: 'Email received from Eversource Energy',
+          actor: 'system',
+          actorName: 'System',
+          createdAt: new Date(case1.receivedAt.getTime()),
+        },
+        {
+          caseId: case1.id,
+          type: 'EMAIL_PARSED',
+          description: 'Detected bill payment email. Amount: $187.42, Due: January 25, 2026',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case1.receivedAt.getTime() + 5000),
+        },
+        {
+          caseId: case1.id,
+          type: 'BILL_CREATED',
+          description: 'Added bill to tracking: Eversource Electric - $187.42 due Jan 25',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case1.receivedAt.getTime() + 10000),
+        },
+        {
+          caseId: case1.id,
+          type: 'REMINDER_CREATED',
+          description: 'Set payment reminder for January 22, 2026 (3 days before due)',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case1.receivedAt.getTime() + 15000),
+        },
+        {
+          caseId: case1.id,
+          type: 'STATUS_CHANGED',
+          description: 'Case completed - bill tracked and reminder set',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case1.receivedAt.getTime() + 20000),
+        },
+      ],
+    });
+  }
+
+  // Activities for Case 2 (Pediatrician Appointment - Completed)
+  const case2 = createdCases.find(c => c.caseNumber === 'ALF-2026-000002');
+  if (case2) {
+    await prisma.emailCaseActivity.createMany({
+      data: [
+        {
+          caseId: case2.id,
+          type: 'CASE_CREATED',
+          description: 'Email received from Bethel Pediatrics',
+          actor: 'system',
+          actorName: 'System',
+          createdAt: new Date(case2.receivedAt.getTime()),
+        },
+        {
+          caseId: case2.id,
+          type: 'EMAIL_PARSED',
+          description: 'Detected appointment confirmation for Blake Burke on Jan 28 at 10:30 AM',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case2.receivedAt.getTime() + 5000),
+        },
+        {
+          caseId: case2.id,
+          type: 'CALENDAR_EVENT_CREATED',
+          description: "Added to family calendar: Blake's Well-Child Visit with Dr. Sarah Chen",
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case2.receivedAt.getTime() + 10000),
+        },
+        {
+          caseId: case2.id,
+          type: 'REMINDER_CREATED',
+          description: 'Set reminders: 1 day before and 1 hour before appointment',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case2.receivedAt.getTime() + 15000),
+        },
+        {
+          caseId: case2.id,
+          type: 'STATUS_CHANGED',
+          description: 'Case completed - event added to calendar with reminders',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case2.receivedAt.getTime() + 20000),
+        },
+      ],
+    });
+  }
+
+  // Activities for Case 3 (Chimney Quote - Awaiting Input)
+  const case3 = createdCases.find(c => c.caseNumber === 'ALF-2026-000003');
+  if (case3) {
+    await prisma.emailCaseActivity.createMany({
+      data: [
+        {
+          caseId: case3.id,
+          type: 'CASE_CREATED',
+          description: 'Email received from CT Chimney Sweeps',
+          actor: 'system',
+          actorName: 'System',
+          createdAt: new Date(case3.receivedAt.getTime()),
+        },
+        {
+          caseId: case3.id,
+          type: 'EMAIL_PARSED',
+          description: 'Detected vendor quote: $450 for chimney cleaning (2 chimneys). 3 available dates.',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case3.receivedAt.getTime() + 5000),
+        },
+        {
+          caseId: case3.id,
+          type: 'VENDOR_UPDATED',
+          description: 'Matched email to vendor: CT Chimney Sweeps',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case3.receivedAt.getTime() + 10000),
+        },
+        {
+          caseId: case3.id,
+          type: 'QUESTION_ASKED',
+          description: 'Asking for approval to schedule chimney cleaning appointment',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case3.receivedAt.getTime() + 15000),
+        },
+      ],
+    });
+  }
+
+  // Activities for Case 4 (Pre-K Registration - Awaiting Input)
+  const case4 = createdCases.find(c => c.caseNumber === 'ALF-2026-000004');
+  if (case4) {
+    await prisma.emailCaseActivity.createMany({
+      data: [
+        {
+          caseId: case4.id,
+          type: 'CASE_CREATED',
+          description: 'Email received from Bethel Public Schools',
+          actor: 'system',
+          actorName: 'System',
+          createdAt: new Date(case4.receivedAt.getTime()),
+        },
+        {
+          caseId: case4.id,
+          type: 'EMAIL_PARSED',
+          description: 'Detected school registration notice. Deadline: March 1. Open house: Feb 15. Fee: $150',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case4.receivedAt.getTime() + 5000),
+        },
+        {
+          caseId: case4.id,
+          type: 'QUESTION_ASKED',
+          description: 'Asking for approval to add dates to calendar and create document checklist',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case4.receivedAt.getTime() + 10000),
+        },
+      ],
+    });
+  }
+
+  // Activities for Case 5 (Snow Plowing - Processing)
+  const case5 = createdCases.find(c => c.caseNumber === 'ALF-2026-000005');
+  if (case5) {
+    await prisma.emailCaseActivity.createMany({
+      data: [
+        {
+          caseId: case5.id,
+          type: 'CASE_CREATED',
+          description: 'Email received from Blue Fox Landscaping',
+          actor: 'system',
+          actorName: 'System',
+          createdAt: new Date(case5.receivedAt.getTime()),
+        },
+        {
+          caseId: case5.id,
+          type: 'EMAIL_PARSED',
+          description: 'Detected service update: Snow plowing scheduled for Friday morning',
+          actor: 'alfred',
+          actorName: 'Alfred',
+          createdAt: new Date(case5.receivedAt.getTime() + 5000),
+        },
+      ],
+    });
+  }
+
+  console.log('✅ Created activity timelines for all cases');
 
   // ============================================================================
   // SUMMARY

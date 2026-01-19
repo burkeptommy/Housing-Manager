@@ -134,6 +134,7 @@ interface Vendor {
   phone?: string;
   email?: string;
   websiteUrl?: string;
+  logoUrl?: string;
   addressLine1?: string;
   addressLine2?: string;
   city?: string;
@@ -273,15 +274,15 @@ export default function VendorDetailScreen() {
   const [editAccountNumber, setEditAccountNumber] = useState('');
   const [isSavingContact, setIsSavingContact] = useState(false);
 
-  // Logo state
+  // Logo state - prefer API-provided logoUrl, fallback to client-side extraction
   const [logoError, setLogoError] = useState(false);
   const vendorDomain = vendor ? extractDomain(vendor.websiteUrl) : null;
-  const logoUrl = !logoError ? getLogoUrl(vendorDomain) : null;
+  const logoUrl = !logoError ? (vendor?.logoUrl || getLogoUrl(vendorDomain)) : null;
 
-  // Reset logo error when vendor website changes
+  // Reset logo error when vendor website or logo changes
   useEffect(() => {
     setLogoError(false);
-  }, [vendor?.websiteUrl]);
+  }, [vendor?.websiteUrl, vendor?.logoUrl]);
 
   const fetchVendor = useCallback(async () => {
     if (!householdInfo?.id || !id) return;

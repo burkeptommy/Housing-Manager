@@ -38,8 +38,23 @@ export class DashboardController {
   @ApiOperation({ summary: 'Get home health score for a household' })
   @ApiParam({ name: 'householdId', description: 'Household ID' })
   async getHomeHealth(@Param('householdId') householdId: string) {
-    const score = await this.dashboardService.calculateHealthScore(householdId);
-    return { score };
+    return this.dashboardService.getFullHealthScore(householdId);
+  }
+
+  @Get('household/:householdId/today')
+  @ApiOperation({ summary: 'Get today\'s notes and reminders for a household' })
+  @ApiParam({ name: 'householdId', description: 'Household ID' })
+  @ApiResponse({ status: 200, description: 'Today\'s notes aggregated from various sources' })
+  async getTodaysNotes(@Param('householdId') householdId: string) {
+    return this.dashboardService.getTodaysNotes(householdId);
+  }
+
+  @Get('household/:householdId/setup-status')
+  @ApiOperation({ summary: 'Get setup/onboarding status for a household' })
+  @ApiParam({ name: 'householdId', description: 'Household ID' })
+  @ApiResponse({ status: 200, description: 'Setup checklist status' })
+  async getSetupStatus(@Param('householdId') householdId: string) {
+    return this.dashboardService.getSetupStatus(householdId);
   }
 
   @Get('household/:householdId/upcoming')

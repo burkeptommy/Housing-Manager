@@ -24,7 +24,7 @@ import {
   InviteUserDto,
   AcceptInviteDto,
 } from './users.service';
-import { UserDto, AdminUpdateUserDto, UserListQueryDto } from './dto';
+import { UserDto, UpdateUserDto, AdminUpdateUserDto, UserListQueryDto } from './dto';
 
 /**
  * Me Controller - User profile and household management
@@ -88,6 +88,19 @@ export class MeFeaturesController {
   @ApiOperation({ summary: 'Get pending household invites for current user' })
   async getPendingInvites(@CurrentUser() user: AuthPayload) {
     return this.usersService.getPendingInvites(user.email);
+  }
+
+  /**
+   * Update current user's profile
+   */
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  async updateMyProfile(
+    @CurrentUser() user: AuthPayload,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserDto> {
+    return this.usersService.updateProfile(user.userId, dto);
   }
 
   /**
@@ -156,6 +169,31 @@ export class HouseholdInvitesController {
     @Body() dto: { name: string; description?: string },
   ) {
     return this.usersService.createHousehold(user.userId, dto);
+  }
+}
+
+/**
+ * User Profile Controller - For authenticated users to update their own profile
+ * Uses Firebase Auth
+ */
+@ApiTags('User Profile')
+@ApiBearerAuth()
+@Controller('users')
+@UseGuards(FirebaseAuthGuard)
+export class UserProfileController {
+  constructor(private readonly usersService: UsersService) {}
+
+  /**
+   * Update current user's profile
+   */
+  @Patch('profile')
+  @ApiOperation({ summary: 'Update current user profile' })
+  @ApiResponse({ status: 200, description: 'Profile updated successfully' })
+  async updateProfile(
+    @CurrentUser() user: AuthPayload,
+    @Body() dto: UpdateUserDto,
+  ): Promise<UserDto> {
+    return this.usersService.updateProfile(user.userId, dto);
   }
 }
 

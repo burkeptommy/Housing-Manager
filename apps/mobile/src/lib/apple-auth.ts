@@ -19,6 +19,8 @@ export interface AppleAuthResult {
     uid: string;
     email: string | null;
     displayName: string | null;
+    firstName: string | null;
+    lastName: string | null;
   };
   error?: string;
 }
@@ -106,14 +108,26 @@ export async function signInWithApple(): Promise<AppleAuthResult> {
     const userCredential = await signInWithCredential(auth, firebaseCredential);
     const user = userCredential.user;
 
-    // Apple only provides name on first sign in, so we need to handle that
+    // Apple only provides name on first sign in, so we need to capture it
     let displayName = user.displayName;
-    if (!displayName && credential.fullName) {
+    let firstName: string | null = null;
+    let lastName: string | null = null;
+
+    // Capture name from Apple credential (only available on first sign-in)
+    if (credential.fullName) {
       const { givenName, familyName } = credential.fullName;
+      firstName = givenName || null;
+      lastName = familyName || null;
       if (givenName || familyName) {
         displayName = [givenName, familyName].filter(Boolean).join(' ');
-        // Note: You might want to update the user profile here
       }
+    }
+
+    // Fallback: try to parse from Firebase displayName
+    if (!firstName && !lastName && user.displayName) {
+      const nameParts = user.displayName.trim().split(' ');
+      firstName = nameParts[0] || null;
+      lastName = nameParts.slice(1).join(' ') || null;
     }
 
     return {
@@ -122,6 +136,8 @@ export async function signInWithApple(): Promise<AppleAuthResult> {
         uid: user.uid,
         email: user.email,
         displayName,
+        firstName,
+        lastName,
       },
     };
   } catch (error: any) {
