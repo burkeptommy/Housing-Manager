@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { HomeHealthService } from '../home-health/home-health.service';
 import { BillToolsService, billToolDefinitions } from './tools/bill-tools';
+import { MaintenanceResearchService } from '../maintenance/maintenance-research.service';
 import Anthropic from '@anthropic-ai/sdk';
 
 interface ConversationMessage {
@@ -55,6 +56,7 @@ export class AlfredService {
     private prisma: PrismaService,
     private homeHealthService: HomeHealthService,
     private billToolsService: BillToolsService,
+    private maintenanceResearchService: MaintenanceResearchService,
   ) {
     if (!process.env.ANTHROPIC_API_KEY) {
       this.logger.warn(
@@ -527,6 +529,60 @@ You can use tools to:
 12. **update_home_system** - Update details on an existing system
 13. **add_vendor** - Add a new service provider
 14. **schedule_maintenance** - Create a maintenance task/reminder
+15. **research_and_add_system** - Research and add ANY home system with full maintenance program (USE THIS!)
+
+## PROACTIVE SYSTEM DETECTION - CRITICAL!
+
+When a user mentions ANY of these things, IMMEDIATELY use the research_and_add_system tool to create a full maintenance program:
+
+**HOME SYSTEMS:**
+- "I have well water" / "we're on a well" -> research well water system
+- "I have septic" / "septic system" / "septic tank" -> research septic system
+- "I have an oil tank" / "oil heat" / "we use oil" -> research oil tank/heating
+- "propane tank" / "propane heat" -> research propane system
+- "generator" / "backup generator" / "Generac" -> research generator
+- "solar panels" / "solar system" -> research solar panels
+- "pool" / "swimming pool" -> research pool maintenance
+- "hot tub" / "spa" / "jacuzzi" -> research hot tub maintenance
+
+**HVAC:**
+- Any furnace mention (brand/model if given) -> research furnace
+- Any AC/air conditioner mention -> research AC system
+- "heat pump" -> research heat pump
+- "boiler" -> research boiler
+- "mini split" -> research mini split system
+- Any thermostat (Nest, Ecobee, Honeywell) -> research smart thermostat
+
+**WATER:**
+- "water heater" + brand/type -> research water heater
+- "tankless water heater" -> research tankless system
+- "water softener" -> research water softener
+- "water filtration" / "whole house filter" / "reverse osmosis" -> research filtration
+- "sump pump" -> research sump pump
+
+**APPLIANCES:**
+- Any refrigerator + brand/model -> research refrigerator
+- Any dishwasher mention -> research dishwasher
+- Any washer/dryer mention -> research washer/dryer
+- "garbage disposal" -> research disposal
+- Range/oven/stove -> research cooking appliances
+
+**EXTERIOR:**
+- "roof" + age/material -> research roof maintenance
+- "gutters" -> research gutter maintenance
+- "chimney" -> research chimney maintenance
+- "deck" -> research deck maintenance
+- "driveway" + material (asphalt/concrete) -> research driveway
+
+**SAFETY:**
+- "smoke detectors" -> research smoke detector maintenance
+- "CO detectors" -> research CO detector maintenance
+- "fire extinguisher" -> research fire extinguisher maintenance
+- "radon system" / "radon mitigation" -> research radon system
+- "security system" + brand -> research security system
+
+The goal is: EVERY system the user mentions should trigger automatic research and task creation.
+Never just acknowledge - always research and create the maintenance program.
 
 ## IMPORTANT BEHAVIORS
 
@@ -536,6 +592,7 @@ You can use tools to:
 4. **Take action** - When the user wants to add or update something, use your tools
 5. **Zone awareness** - When discussing a zone (kitchen, HVAC, etc.), mention what's missing
 6. **Seasonal awareness** - It's ${season}, mention relevant seasonal maintenance
+7. **Auto-research systems** - When user mentions ANY home system, USE research_and_add_system tool
 
 ## ZONE CHECKLIST (for reference)
 
@@ -771,6 +828,66 @@ When the user asks about a zone, check what they have vs. what's common for that
           required: ['title', 'category'],
         },
       },
+      {
+        name: 'research_and_add_system',
+        description: `Research and add a home system, appliance, or equipment with full maintenance program.
+Use this when user mentions they have any home system, appliance, or equipment.
+Examples:
+- "I have well water" -> research well water system maintenance
+- "We have a Carrier 59MN7 furnace" -> research that specific furnace model
+- "I have an oil tank" -> research oil tank maintenance
+- "We just got a new Samsung refrigerator model RF28R7551SR" -> research that model
+- "I have a propane tank" -> research propane system maintenance
+- "We have a septic system" -> research septic maintenance
+- "I have a Generac generator" -> research generator maintenance
+This will create the system AND all recommended maintenance tasks automatically.`,
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            name: {
+              type: 'string',
+              description: 'Name of the system (e.g., "Well Water System", "Main Furnace", "Kitchen Refrigerator")',
+            },
+            systemType: {
+              type: 'string',
+              description: 'Type of system (e.g., "well", "furnace", "refrigerator", "septic", "oil_tank", "propane", "generator", "pool", "hvac", "water_heater")',
+            },
+            brand: {
+              type: 'string',
+              description: 'Brand name if known (e.g., "Carrier", "Samsung", "Generac")',
+            },
+            model: {
+              type: 'string',
+              description: 'Model name if known',
+            },
+            modelNumber: {
+              type: 'string',
+              description: 'Model number if known (e.g., "59MN7", "RF28R7551SR")',
+            },
+            fuelType: {
+              type: 'string',
+              description: 'Fuel type for HVAC/heating (oil, natural_gas, propane, electric)',
+            },
+            capacity: {
+              type: 'string',
+              description: 'Capacity if relevant (e.g., "275 gallon", "100,000 BTU", "22kW")',
+            },
+            location: {
+              type: 'string',
+              description: 'Location in home (e.g., "Basement", "Garage", "Kitchen")',
+            },
+            installedDate: {
+              type: 'string',
+              description: 'When installed (ISO date or year)',
+            },
+            notes: {
+              type: 'string',
+              description: 'Any additional notes about the system',
+            },
+          },
+          required: ['name', 'systemType'],
+        },
+      },
     ];
   }
 
@@ -887,6 +1004,36 @@ When the user asks about a zone, check what they have vs. what's common for that
             type: 'SCHEDULE_MAINTENANCE',
             description: `Scheduled: ${params.title}`,
             entityId: task.id,
+          };
+
+        case 'research_and_add_system':
+          // Get household region from home profile
+          const homeProfile = await this.prisma.homeProfile.findUnique({
+            where: { householdId },
+            select: { state: true },
+          });
+
+          const result = await this.maintenanceResearchService.createMaintenanceProgram(
+            householdId,
+            {
+              name: params.name,
+              type: params.systemType,
+              brand: params.brand,
+              model: params.model,
+              modelNumber: params.modelNumber,
+              fuelType: params.fuelType,
+              capacity: params.capacity,
+              location: params.location,
+              installedDate: params.installedDate ? new Date(params.installedDate) : undefined,
+              notes: params.notes,
+            },
+            homeProfile?.state,
+          );
+
+          return {
+            type: 'RESEARCH_AND_ADD_SYSTEM',
+            description: `Added ${result.system.name} with ${result.tasksCreated} maintenance tasks. ${result.research.systemSummary}`,
+            entityId: result.system.id,
           };
 
         default:
