@@ -37,3 +37,7 @@ export * from './OnboardingChecklist';
 // Empty State Components
 export * from './EmptyStateCard';
 export * from './SuggestionBanner';
+
+// Walkthrough Components
+export * from './FreeWalkthroughBanner';
+export * from './WalkthroughScheduleModal';

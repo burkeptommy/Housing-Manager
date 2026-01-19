@@ -146,4 +146,12 @@ export class MaintenanceController {
   ) {
     return this.maintenanceService.updateChecklist(taskId, body.steps);
   }
+
+  /**
+   * Get maintenance budget for a household
+   */
+  @Get('budget/:householdId')
+  async getBudget(@Param('householdId') householdId: string) {
+    return this.maintenanceService.getBudget(householdId);
+  }
 }

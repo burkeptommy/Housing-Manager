@@ -460,4 +460,251 @@ export class MaintenanceService {
       },
     });
   }
+
+  /**
+   * Get maintenance budget for a household
+   */
+  async getBudget(householdId: string) {
+    const now = new Date();
+    const startOfYear = new Date(now.getFullYear(), 0, 1);
+    const endOfYear = new Date(now.getFullYear(), 11, 31);
+
+    // Get all tasks and systems
+    const [tasks, systems, completedTasks] = await Promise.all([
+      this.prisma.maintenanceTask.findMany({
+        where: { householdId },
+        include: {
+          homeSystem: {
+            select: { id: true, name: true, type: true },
+          },
+        },
+      }),
+      this.prisma.homeSystem.findMany({
+        where: { householdId },
+        select: {
+          id: true,
+          name: true,
+          type: true,
+          maintenanceResearch: true,
+        },
+      }),
+      this.prisma.maintenanceTask.findMany({
+        where: {
+          householdId,
+          status: 'COMPLETED',
+          completedAt: { gte: startOfYear, lte: now },
+        },
+        include: {
+          homeSystem: { select: { id: true, name: true, type: true } },
+        },
+      }),
+    ]);
+
+    // Calculate estimated annual budget from systems' research data
+    let totalEstimated = 0;
+    const bySystem: {
+      systemId: string;
+      systemName: string;
+      systemType: string;
+      estimated: number;
+      spent: number;
+      upcoming: number;
+    }[] = [];
+
+    for (const system of systems) {
+      const research = system.maintenanceResearch as any;
+      const estimated = research?.annualBudget || this.getDefaultBudget(system.type);
+
+      // Calculate spent on this system
+      const systemCompletedTasks = completedTasks.filter(
+        (t) => t.homeSystemId === system.id,
+      );
+      const spent = systemCompletedTasks.reduce(
+        (sum, t) => sum + (t.actualCost || 0),
+        0,
+      );
+
+      // Calculate upcoming costs for this system
+      const upcomingTasks = tasks.filter(
+        (t) =>
+          t.homeSystemId === system.id &&
+          t.status !== 'COMPLETED' &&
+          t.status !== 'SKIPPED' &&
+          t.nextDueDate &&
+          t.nextDueDate >= now &&
+          t.nextDueDate <= endOfYear,
+      );
+      const upcoming = upcomingTasks.reduce(
+        (sum, t) => sum + (t.estimatedCost || 0),
+        0,
+      );
+
+      totalEstimated += estimated;
+      bySystem.push({
+        systemId: system.id,
+        systemName: system.name,
+        systemType: system.type,
+        estimated,
+        spent,
+        upcoming,
+      });
+    }
+
+    // Calculate spent YTD
+    const spentYTD = completedTasks.reduce(
+      (sum, t) => sum + (t.actualCost || 0),
+      0,
+    );
+
+    // Calculate upcoming costs
+    const upcomingTasks = tasks.filter(
+      (t) =>
+        t.status !== 'COMPLETED' &&
+        t.status !== 'SKIPPED' &&
+        t.nextDueDate &&
+        t.nextDueDate >= now &&
+        t.nextDueDate <= endOfYear,
+    );
+    const upcoming = upcomingTasks.reduce(
+      (sum, t) => sum + (t.estimatedCost || 0),
+      0,
+    );
+
+    // Group by category
+    const byCategory: {
+      category: string;
+      estimated: number;
+      spent: number;
+      upcoming: number;
+    }[] = [];
+
+    const categoryMap = new Map<
+      string,
+      { estimated: number; spent: number; upcoming: number }
+    >();
+
+    for (const task of tasks) {
+      const category = task.category;
+      const existing = categoryMap.get(category) || {
+        estimated: 0,
+        spent: 0,
+        upcoming: 0,
+      };
+
+      if (task.status === 'COMPLETED' && task.completedAt && task.completedAt >= startOfYear) {
+        existing.spent += task.actualCost || 0;
+      }
+
+      if (
+        task.status !== 'COMPLETED' &&
+        task.status !== 'SKIPPED' &&
+        task.nextDueDate &&
+        task.nextDueDate >= now &&
+        task.nextDueDate <= endOfYear
+      ) {
+        existing.upcoming += task.estimatedCost || 0;
+      }
+
+      existing.estimated += task.estimatedCost || 0;
+      categoryMap.set(category, existing);
+    }
+
+    for (const [category, data] of categoryMap.entries()) {
+      byCategory.push({
+        category,
+        ...data,
+      });
+    }
+
+    // Upcoming tasks with details
+    const upcomingTasksDetail = upcomingTasks
+      .filter((t) => t.estimatedCost && t.estimatedCost > 0)
+      .sort((a, b) => {
+        if (!a.nextDueDate) return 1;
+        if (!b.nextDueDate) return -1;
+        return a.nextDueDate.getTime() - b.nextDueDate.getTime();
+      })
+      .slice(0, 10)
+      .map((t) => ({
+        id: t.id,
+        title: t.title,
+        dueDate: t.nextDueDate?.toISOString(),
+        estimatedCost: t.estimatedCost || 0,
+        systemName: t.homeSystem?.name || 'General',
+      }));
+
+    // Monthly spending (last 12 months)
+    const monthlySpending: { month: string; amount: number }[] = [];
+    for (let i = 11; i >= 0; i--) {
+      const monthStart = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthEnd = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+
+      const monthTasks = completedTasks.filter(
+        (t) =>
+          t.completedAt &&
+          t.completedAt >= monthStart &&
+          t.completedAt <= monthEnd,
+      );
+
+      const amount = monthTasks.reduce(
+        (sum, t) => sum + (t.actualCost || 0),
+        0,
+      );
+
+      monthlySpending.push({
+        month: monthStart.toLocaleDateString('en-US', {
+          month: 'short',
+          year: 'numeric',
+        }),
+        amount,
+      });
+    }
+
+    return {
+      total: totalEstimated,
+      estimated: totalEstimated,
+      spentYTD,
+      upcoming,
+      byCategory: byCategory.sort((a, b) => b.estimated - a.estimated),
+      bySystem: bySystem.sort((a, b) => b.estimated - a.estimated),
+      upcomingTasks: upcomingTasksDetail,
+      monthlySpending,
+    };
+  }
+
+  /**
+   * Get default annual maintenance budget based on system type
+   */
+  private getDefaultBudget(systemType: string): number {
+    const defaults: Record<string, number> = {
+      FURNACE: 200,
+      AIR_CONDITIONER: 200,
+      HEAT_PUMP: 250,
+      BOILER: 200,
+      WATER_HEATER: 100,
+      ROOF: 150,
+      GUTTERS: 100,
+      ELECTRICAL_PANEL: 50,
+      PLUMBING: 150,
+      SEPTIC_SYSTEM: 300,
+      WELL_SYSTEM: 150,
+      POOL: 500,
+      HOT_TUB: 300,
+      GARAGE_DOOR: 100,
+      CHIMNEY: 150,
+      DECK: 100,
+      FENCE: 50,
+      DRIVEWAY: 50,
+      WINDOWS: 50,
+      REFRIGERATOR: 50,
+      DISHWASHER: 50,
+      WASHER: 50,
+      DRYER: 50,
+      OVEN_RANGE: 50,
+      GENERATOR: 150,
+      SOLAR_PANELS: 100,
+      EV_CHARGER: 50,
+    };
+    return defaults[systemType] || 100;
+  }
 }

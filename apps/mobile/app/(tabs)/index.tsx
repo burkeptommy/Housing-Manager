@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/auth-context';
 import { useSubscription } from '../../src/contexts/subscription-context';
-import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard, OnboardingChecklist, OnboardingChecklistData } from '../../src/components';
+import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard, OnboardingChecklist, OnboardingChecklistData, FreeWalkthroughBanner } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { API_BASE_URL } from '../../src/lib/api';
 import { getIdToken } from '../../src/lib/firebase';
@@ -269,6 +269,18 @@ export default function DashboardScreen() {
   const [showOnboardingChecklist, setShowOnboardingChecklist] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showHealthDetails, setShowHealthDetails] = useState(false);
+  const [budgetData, setBudgetData] = useState<{
+    estimated: number;
+    spentYTD: number;
+    upcoming: number;
+  } | null>(null);
+  const [walkthroughCounts, setWalkthroughCounts] = useState<{
+    systemCount: number;
+    vendorCount: number;
+    billCount: number;
+    zipCode?: string;
+    createdAt?: string;
+  } | null>(null);
 
   const fetchDashboard = useCallback(async () => {
     if (!householdInfo?.id) {
@@ -285,8 +297,8 @@ export default function DashboardScreen() {
         return;
       }
 
-      // Fetch dashboard, family, onboarding, today's notes, health factors, and Alfred cases in parallel
-      const [dashboardRes, familyRes, onboardingRes, todayRes, healthRes, alfredRes] = await Promise.all([
+      // Fetch dashboard, family, onboarding, today's notes, health factors, Alfred cases, and budget in parallel
+      const [dashboardRes, familyRes, onboardingRes, todayRes, healthRes, alfredRes, budgetRes] = await Promise.all([
         fetch(`${API_BASE_URL}/dashboard/household/${householdInfo.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -303,6 +315,9 @@ export default function DashboardScreen() {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch(`${API_BASE_URL}/alfred/cases?limit=5`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        fetch(`${API_BASE_URL}/maintenance/budget/${householdInfo.id}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
@@ -322,6 +337,14 @@ export default function DashboardScreen() {
       if (onboardingRes.ok) {
         const onboarding = await onboardingRes.json();
         setOnboardingData(onboarding);
+        // Extract counts for walkthrough banner
+        setWalkthroughCounts({
+          systemCount: onboarding.items?.find((i: any) => i.id === 'systems')?.current || 0,
+          vendorCount: onboarding.items?.find((i: any) => i.id === 'vendors')?.current || 0,
+          billCount: onboarding.items?.find((i: any) => i.id === 'bills')?.current || 0,
+          zipCode: onboarding.homeProfile?.zipCode,
+          createdAt: onboarding.createdAt,
+        });
       }
 
       if (todayRes.ok) {
@@ -342,6 +365,15 @@ export default function DashboardScreen() {
           (c: AlfredEmailCase) => c.status === 'AWAITING_INPUT'
         ).length;
         setAlfredNeedsInput(needsInput);
+      }
+
+      if (budgetRes.ok) {
+        const budget = await budgetRes.json();
+        setBudgetData({
+          estimated: budget.estimated || 0,
+          spentYTD: budget.spentYTD || 0,
+          upcoming: budget.upcoming || 0,
+        });
       }
 
       setError(null);
@@ -500,6 +532,18 @@ export default function DashboardScreen() {
           />
         )}
 
+        {/* Free Walkthrough Banner - for qualifying users */}
+        {householdInfo?.id && walkthroughCounts && (
+          <FreeWalkthroughBanner
+            householdId={householdInfo.id}
+            systemCount={walkthroughCounts.systemCount}
+            vendorCount={walkthroughCounts.vendorCount}
+            billCount={walkthroughCounts.billCount}
+            zipCode={walkthroughCounts.zipCode}
+            createdAt={walkthroughCounts.createdAt || new Date().toISOString()}
+          />
+        )}
+
         {/* Today's Notes */}
         <AnimatedCard style={styles.notesCard} delay={100}>
           <View style={styles.cardHeader}>
@@ -527,6 +571,42 @@ export default function DashboardScreen() {
             </View>
           )}
         </AnimatedCard>
+
+        {/* Annual Maintenance Budget */}
+        {budgetData && budgetData.estimated > 0 && (
+          <AnimatedCard style={styles.budgetCard} delay={125}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Annual Maintenance Budget</Text>
+              <TouchableOpacity onPress={() => router.push('/(tabs)/maintenance/budget' as any)}>
+                <Text style={styles.seeAllLink}>Details</Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.budgetAmounts}>
+              <View style={styles.budgetItem}>
+                <Text style={styles.budgetLabel}>Estimated</Text>
+                <Text style={styles.budgetValue}>{formatCurrency(budgetData.estimated)}</Text>
+              </View>
+              <View style={styles.budgetDivider} />
+              <View style={styles.budgetItem}>
+                <Text style={styles.budgetLabel}>Spent YTD</Text>
+                <Text style={styles.budgetValue}>{formatCurrency(budgetData.spentYTD)}</Text>
+              </View>
+              <View style={styles.budgetDivider} />
+              <View style={styles.budgetItem}>
+                <Text style={styles.budgetLabel}>Upcoming</Text>
+                <Text style={styles.budgetValue}>{formatCurrency(budgetData.upcoming)}</Text>
+              </View>
+            </View>
+            <View style={styles.budgetProgress}>
+              <View
+                style={[
+                  styles.budgetProgressFill,
+                  { width: `${Math.min((budgetData.spentYTD / budgetData.estimated) * 100, 100)}%` },
+                ]}
+              />
+            </View>
+          </AnimatedCard>
+        )}
 
         {/* Family Status - Always show with add option */}
         <AnimatedCard style={styles.familyCard} delay={150}>
@@ -962,6 +1042,49 @@ const styles = StyleSheet.create({
     paddingTop: spacing[3],
     borderTopWidth: 1,
     borderTopColor: colors.border.light,
+  },
+
+  // Budget Card
+  budgetCard: {
+    marginHorizontal: spacing[4],
+    marginTop: spacing[4],
+    padding: spacing[4],
+  },
+  budgetAmounts: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  budgetItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  budgetLabel: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+  },
+  budgetValue: {
+    fontSize: typography.fontSizes.lg,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.text.primary,
+    marginTop: spacing[1],
+  },
+  budgetDivider: {
+    width: 1,
+    height: 32,
+    backgroundColor: colors.border.light,
+  },
+  budgetProgress: {
+    height: 6,
+    backgroundColor: colors.haven.champagne[100],
+    borderRadius: 3,
+    marginTop: spacing[4],
+    overflow: 'hidden',
+  },
+  budgetProgressFill: {
+    height: '100%',
+    backgroundColor: colors.haven.champagne[500],
+    borderRadius: 3,
   },
 
   // Family Card

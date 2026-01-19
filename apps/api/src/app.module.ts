@@ -57,6 +57,7 @@ import { HomeModule } from './home/home.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CalendarsModule } from './calendars/calendars.module';
 import { AlfredEmailModule } from './alfred-email/alfred-email.module';
+import { WalkthroughModule } from './walkthrough/walkthrough.module';
 
 @Module({
   imports: [
@@ -118,6 +119,7 @@ import { AlfredEmailModule } from './alfred-email/alfred-email.module';
     PaymentsModule,
     CalendarsModule,
     AlfredEmailModule,
+    WalkthroughModule,
   ],
   controllers: [AppController],
   providers: [AppService],

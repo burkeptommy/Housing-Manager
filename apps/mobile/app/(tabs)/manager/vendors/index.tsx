@@ -539,7 +539,7 @@ export default function VendorsScreen() {
           <Ionicons name="search-outline" size={20} color={colors.text.tertiary} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search by name or service..."
+            placeholder="What service do you need?"
             placeholderTextColor={colors.text.tertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -584,57 +584,62 @@ export default function VendorsScreen() {
             </TouchableOpacity>
           )}
         />
-
-        {/* Search Button */}
-        <TouchableOpacity
-          style={styles.searchButton}
-          onPress={searchVendors}
-          disabled={isSearching}
-        >
-          {isSearching ? (
-            <ActivityIndicator size="small" color={colors.white} />
-          ) : (
-            <>
-              <Ionicons name="search" size={20} color={colors.white} />
-              <Text style={styles.searchButtonText}>Find Vendors Near Me</Text>
-            </>
-          )}
-        </TouchableOpacity>
       </View>
 
-      {/* Results */}
-      {isSearching ? (
-        <View style={styles.searchingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
-          <Text style={styles.searchingText}>Searching for vendors...</Text>
+      {/* Alfred Find Vendors CTA */}
+      <View style={styles.alfredFindContainer}>
+        <View style={styles.alfredFindIcon}>
+          <Ionicons name="sparkles" size={48} color={colors.haven.champagne[500]} />
         </View>
-      ) : (
-        <FlatList
-          data={directoryVendors}
-          renderItem={renderDirectoryVendor}
-          keyExtractor={item => item.id}
-          contentContainerStyle={styles.listContent}
-          ListEmptyComponent={
-            hasSearched ? (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="search-outline" size={48} color={colors.haven.navy[300]} />
-                <Text style={styles.emptyTitle}>No vendors found</Text>
-                <Text style={styles.emptyText}>
-                  Try adjusting your search or selecting a different category
-                </Text>
-              </View>
-            ) : (
-              <View style={styles.emptyContainer}>
-                <Ionicons name="compass-outline" size={48} color={colors.haven.navy[300]} />
-                <Text style={styles.emptyTitle}>Find Local Vendors</Text>
-                <Text style={styles.emptyText}>
-                  Search for trusted service providers in your area. Filter by category or search by name.
-                </Text>
-              </View>
-            )
-          }
-        />
-      )}
+        <Text style={styles.alfredFindTitle}>Let Haven Find the Right Vendor</Text>
+        <Text style={styles.alfredFindSubtitle}>
+          Tell us what you need and we'll research and recommend vetted local professionals - no searching required.
+        </Text>
+
+        <TouchableOpacity
+          style={styles.alfredFindButton}
+          onPress={() => {
+            const categoryLabel = searchCategory !== 'all'
+              ? VENDOR_CATEGORIES.find(c => c.id === searchCategory)?.label?.toLowerCase() || searchCategory.toLowerCase()
+              : 'service provider';
+            const prefillText = searchQuery.trim()
+              ? `Find me a ${categoryLabel}: ${searchQuery.trim()}`
+              : `Find me a ${categoryLabel}`;
+            router.push({
+              pathname: '/(tabs)/manager/new-request',
+              params: { prefill: prefillText },
+            } as any);
+          }}
+        >
+          <Ionicons name="sparkles" size={20} color={colors.white} />
+          <Text style={styles.alfredFindButtonText}>
+            {searchQuery ? `Find ${searchQuery}` : 'Request Vendor Recommendation'}
+          </Text>
+        </TouchableOpacity>
+
+        <Text style={styles.alfredFindNote}>
+          We typically respond within 24 hours with 2-3 vetted options
+        </Text>
+      </View>
+
+      {/* Or Add Manually */}
+      <View style={styles.orDivider}>
+        <View style={styles.orLine} />
+        <Text style={styles.orText}>or</Text>
+        <View style={styles.orLine} />
+      </View>
+
+      {/* Manual Add Section */}
+      <View style={styles.manualAddSection}>
+        <Text style={styles.manualAddTitle}>Already have a vendor in mind?</Text>
+        <TouchableOpacity
+          style={styles.manualAddButton}
+          onPress={handleAddVendor}
+        >
+          <Ionicons name="add-circle-outline" size={18} color={colors.haven.champagne[600]} />
+          <Text style={styles.manualAddButtonText}>Add Vendor Manually</Text>
+        </TouchableOpacity>
+      </View>
     </>
   );
 
@@ -998,5 +1003,97 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.25,
     shadowRadius: 4,
     elevation: 5,
+  },
+  // Alfred Find Vendors styles
+  alfredFindContainer: {
+    alignItems: 'center',
+    padding: spacing[6],
+    paddingTop: spacing[8],
+  },
+  alfredFindIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.haven.champagne[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing[4],
+  },
+  alfredFindTitle: {
+    fontSize: typography.fontSizes.xl,
+    fontWeight: typography.fontWeights.bold,
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: spacing[2],
+  },
+  alfredFindSubtitle: {
+    fontSize: typography.fontSizes.base,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    paddingHorizontal: spacing[4],
+    marginBottom: spacing[5],
+  },
+  alfredFindButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.haven.champagne[500],
+    paddingVertical: spacing[4],
+    paddingHorizontal: spacing[6],
+    borderRadius: borderRadius.lg,
+    gap: spacing[2],
+    width: '100%',
+  },
+  alfredFindButtonText: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
+  },
+  alfredFindNote: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    marginTop: spacing[3],
+    textAlign: 'center',
+  },
+  orDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing[6],
+    marginVertical: spacing[4],
+  },
+  orLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: colors.border.light,
+  },
+  orText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    paddingHorizontal: spacing[4],
+  },
+  manualAddSection: {
+    alignItems: 'center',
+    paddingHorizontal: spacing[6],
+    paddingBottom: spacing[6],
+  },
+  manualAddTitle: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing[3],
+  },
+  manualAddButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.haven.champagne[50],
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[5],
+    borderRadius: borderRadius.lg,
+    gap: spacing[2],
+  },
+  manualAddButtonText: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.champagne[600],
   },
 });
