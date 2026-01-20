@@ -22,6 +22,7 @@ import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
 import { EditRegistrationModal } from '../../../../src/components/forms/EditRegistrationModal';
 import { EditInsuranceModal } from '../../../../src/components/forms/EditInsuranceModal';
+import { AddServiceHistoryModal } from '../../../../src/components/forms/AddServiceHistoryModal';
 
 // =============================================================================
 // TYPES
@@ -90,6 +91,46 @@ interface ServiceProvider {
   type: string;
   phone?: string | null;
   address?: string | null;
+}
+
+// AI-Researched Maintenance Intelligence Types
+interface MaintenanceItem {
+  type: string;
+  name: string;
+  description: string;
+  intervalMiles: number;
+  intervalMonths?: number;
+  estimatedCostLow: number;
+  estimatedCostHigh: number;
+  priority: 'CRITICAL' | 'IMPORTANT' | 'RECOMMENDED';
+  diyDifficulty: 'EASY' | 'MODERATE' | 'PROFESSIONAL_REQUIRED';
+  warningSignsToWatch: string[];
+  // Calculated fields from API
+  lastServiceDate?: string | null;
+  lastServiceMileage?: number | null;
+  lastServiceCost?: number | null;
+  dueMileage: number;
+  dueDate?: string | null;
+  milesUntilDue: number;
+  daysUntilDue?: number | null;
+  status: 'ok' | 'due_soon' | 'overdue';
+}
+
+interface RecallInfo {
+  campaignNumber: string;
+  component: string;
+  summary: string;
+  consequence: string;
+  remedy: string;
+  dateIssued: string;
+}
+
+interface MaintenanceDueResponse {
+  currentMileage: number;
+  items: MaintenanceItem[];
+  recalls: RecallInfo[];
+  tips: string[];
+  specificNotes: string[];
 }
 
 interface VehicleDetail {
@@ -341,9 +382,14 @@ export default function VehicleDetailScreen() {
   const [showRegistrationModal, setShowRegistrationModal] = useState(false);
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
+  const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [newProviderName, setNewProviderName] = useState('');
   const [newProviderType, setNewProviderType] = useState('mechanic');
   const [newProviderPhone, setNewProviderPhone] = useState('');
+
+  // AI Maintenance Intelligence
+  const [maintenanceDue, setMaintenanceDue] = useState<MaintenanceDueResponse | null>(null);
+  const [isLoadingMaintenance, setIsLoadingMaintenance] = useState(false);
 
   const fetchVehicle = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
@@ -382,9 +428,45 @@ export default function VehicleDetailScreen() {
     }
   }, [id, householdInfo?.id]);
 
+  // Fetch AI-powered maintenance due schedule
+  const fetchMaintenanceDue = useCallback(async () => {
+    if (!id) return;
+
+    setIsLoadingMaintenance(true);
+    try {
+      const token = await getIdToken(true);
+      if (!token) return;
+
+      const response = await fetch(
+        `${API_BASE_URL}/family/vehicles/${id}/maintenance-due`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data: MaintenanceDueResponse = await response.json();
+        setMaintenanceDue(data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch maintenance due:', err);
+    } finally {
+      setIsLoadingMaintenance(false);
+    }
+  }, [id]);
+
   useEffect(() => {
     fetchVehicle();
   }, [fetchVehicle]);
+
+  useEffect(() => {
+    if (vehicle) {
+      fetchMaintenanceDue();
+    }
+  }, [vehicle, fetchMaintenanceDue]);
 
   const handleDelete = async () => {
     Alert.alert(
@@ -622,6 +704,28 @@ export default function VehicleDetailScreen() {
     return 'ok';
   };
 
+  // Get icon for maintenance item type
+  const getMaintenanceIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+    const iconMap: Record<string, keyof typeof Ionicons.glyphMap> = {
+      'OIL_CHANGE': 'water-outline',
+      'TIRE_ROTATION': 'ellipse-outline',
+      'TIRE_REPLACEMENT': 'ellipse',
+      'BRAKE_INSPECTION': 'disc-outline',
+      'BRAKE_PAD_REPLACEMENT': 'disc',
+      'AIR_FILTER': 'funnel-outline',
+      'CABIN_AIR_FILTER': 'leaf-outline',
+      'TRANSMISSION_FLUID': 'cog-outline',
+      'COOLANT_FLUSH': 'thermometer-outline',
+      'SPARK_PLUGS': 'flash-outline',
+      'BATTERY': 'battery-charging-outline',
+      'SERPENTINE_BELT': 'repeat-outline',
+      'TIMING_BELT': 'timer-outline',
+      'WHEEL_ALIGNMENT': 'navigate-outline',
+      'WIPER_BLADES': 'rainy-outline',
+    };
+    return iconMap[type.toUpperCase()] || 'construct-outline';
+  };
+
   // Get service type icon and label
   const getServiceTypeInfo = (type: ServiceRecord['type']) => {
     const typeConfig = {
@@ -846,10 +950,96 @@ export default function VehicleDetailScreen() {
           )}
         </Card>
 
-        {/* Maintenance Due */}
+        {/* AI-Powered Maintenance Due */}
         <Card style={styles.section}>
           <SectionHeader title="MAINTENANCE DUE" />
-          {hasMaintenanceData ? (
+          {isLoadingMaintenance ? (
+            <View style={styles.maintenanceLoadingContainer}>
+              <Text style={styles.maintenanceLoadingText}>
+                Researching maintenance schedule for your {vehicle.year} {vehicle.make} {vehicle.model}...
+              </Text>
+            </View>
+          ) : maintenanceDue && maintenanceDue.items.length > 0 ? (
+            <>
+              {/* Show overdue and due soon items first */}
+              {maintenanceDue.items
+                .filter(item => item.status === 'overdue' || item.status === 'due_soon')
+                .slice(0, 5)
+                .map((item, index) => (
+                  <View
+                    key={`${item.type}-${index}`}
+                    style={[
+                      helperStyles.maintenanceAlert,
+                      { borderLeftColor: item.status === 'overdue' ? colors.status.error : colors.status.warning }
+                    ]}
+                  >
+                    <View style={helperStyles.maintenanceIcon}>
+                      <Ionicons
+                        name={getMaintenanceIcon(item.type)}
+                        size={20}
+                        color={item.status === 'overdue' ? colors.status.error : colors.status.warning}
+                      />
+                    </View>
+                    <View style={helperStyles.maintenanceContent}>
+                      <Text style={helperStyles.maintenanceLabel}>{item.name}</Text>
+                      {item.lastServiceDate && (
+                        <Text style={helperStyles.maintenanceDate}>
+                          Last: {new Date(item.lastServiceDate).toLocaleDateString()}
+                          {item.lastServiceMileage ? ` @ ${item.lastServiceMileage.toLocaleString()} mi` : ''}
+                        </Text>
+                      )}
+                      <Text style={[
+                        helperStyles.maintenanceDate,
+                        { color: item.status === 'overdue' ? colors.status.error : colors.status.warning }
+                      ]}>
+                        {item.milesUntilDue < 0
+                          ? `${Math.abs(item.milesUntilDue).toLocaleString()} miles overdue`
+                          : `Due in ${item.milesUntilDue.toLocaleString()} miles`}
+                      </Text>
+                      <Text style={helperStyles.maintenanceInterval}>
+                        Est. ${item.estimatedCostLow}-${item.estimatedCostHigh}
+                      </Text>
+                    </View>
+                    <Badge
+                      label={item.status === 'overdue' ? 'Overdue' : 'Due Soon'}
+                      variant={item.status === 'overdue' ? 'error' : 'warning'}
+                    />
+                  </View>
+                ))}
+              {/* Show upcoming OK items (collapsed) */}
+              {maintenanceDue.items.filter(item => item.status === 'ok').length > 0 && (
+                <View style={styles.upcomingSection}>
+                  <Text style={styles.upcomingLabel}>
+                    {maintenanceDue.items.filter(item => item.status === 'ok').length} upcoming maintenance items
+                  </Text>
+                </View>
+              )}
+              {/* Recalls */}
+              {maintenanceDue.recalls && maintenanceDue.recalls.length > 0 && (
+                <View style={styles.recallsSection}>
+                  <View style={styles.recallHeader}>
+                    <Ionicons name="warning" size={18} color={colors.status.error} />
+                    <Text style={styles.recallTitle}>Active Recalls ({maintenanceDue.recalls.length})</Text>
+                  </View>
+                  {maintenanceDue.recalls.map((recall, index) => (
+                    <View key={`recall-${index}`} style={styles.recallItem}>
+                      <Text style={styles.recallComponent}>{recall.component}</Text>
+                      <Text style={styles.recallSummary}>{recall.summary}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {/* Tips */}
+              {maintenanceDue.tips && maintenanceDue.tips.length > 0 && (
+                <View style={styles.tipsSection}>
+                  <Text style={styles.tipsLabel}>Tips for your {vehicle.make}</Text>
+                  {maintenanceDue.tips.slice(0, 2).map((tip, index) => (
+                    <Text key={`tip-${index}`} style={styles.tipText}>• {tip}</Text>
+                  ))}
+                </View>
+              )}
+            </>
+          ) : hasMaintenanceData ? (
             <>
               {vehicle.maintenance?.lastOilChange && (
                 <MaintenanceAlert
@@ -862,36 +1052,12 @@ export default function VehicleDetailScreen() {
                   status={getMaintenanceStatus(vehicle.maintenance.nextOilChangeDue)}
                 />
               )}
-              {vehicle.maintenance?.lastTireRotation && (
-                <MaintenanceAlert
-                  type="tires"
-                  lastService={vehicle.maintenance.lastTireRotation}
-                  interval={vehicle.maintenance.tireRotationInterval
-                    ? `Every ${vehicle.maintenance.tireRotationInterval.toLocaleString()} miles`
-                    : undefined}
-                  status="ok"
-                />
-              )}
-              {vehicle.maintenance?.lastInspection && (
-                <MaintenanceAlert
-                  type="inspection"
-                  lastService={vehicle.maintenance.lastInspection}
-                  nextDue={vehicle.maintenance.inspectionDue}
-                  status={getMaintenanceStatus(vehicle.maintenance.inspectionDue)}
-                />
-              )}
-              {vehicle.maintenance?.lastBrakeService && (
-                <MaintenanceAlert
-                  type="brakes"
-                  lastService={vehicle.maintenance.lastBrakeService}
-                  status="ok"
-                />
-              )}
             </>
           ) : (
             <View style={styles.noMaintenanceContainer}>
               <Text style={styles.noMaintenanceText}>
-                No maintenance records yet. Add service history to track maintenance schedules.
+                Add service history to track maintenance schedules.
+                Alfred will research manufacturer recommendations for your vehicle.
               </Text>
             </View>
           )}
@@ -902,7 +1068,7 @@ export default function VehicleDetailScreen() {
           <SectionHeader
             title="SERVICE HISTORY"
             action="+ Add"
-            onAction={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}
+            onAction={() => setShowAddServiceModal(true)}
           />
           {vehicle.serviceHistory && vehicle.serviceHistory.length > 0 ? (
             <>
@@ -944,7 +1110,7 @@ export default function VehicleDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add service record"
-              onPress={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}
+              onPress={() => setShowAddServiceModal(true)}
             />
           )}
         </Card>
@@ -1061,6 +1227,17 @@ export default function VehicleDetailScreen() {
           insurancePolicyNumber: vehicle.insurance?.policyNumber || vehicle.insurancePolicyNumber,
           insuranceExpiresAt: vehicle.insurance?.expiresAt || vehicle.insuranceExpiry,
           insuranceDocUrl: vehicle.insuranceDocUrl,
+        }}
+      />
+
+      <AddServiceHistoryModal
+        visible={showAddServiceModal}
+        onClose={() => setShowAddServiceModal(false)}
+        vehicleId={id!}
+        householdId={householdInfo?.id || ''}
+        onSuccess={() => {
+          fetchVehicle();
+          fetchMaintenanceDue();
         }}
       />
 
@@ -1542,5 +1719,81 @@ const styles = StyleSheet.create({
   typeChipTextActive: {
     color: colors.white,
     fontWeight: typography.fontWeights.medium,
+  },
+  // AI Maintenance Intelligence
+  maintenanceLoadingContainer: {
+    paddingVertical: spacing[4],
+    alignItems: 'center',
+  },
+  maintenanceLoadingText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
+  upcomingSection: {
+    paddingVertical: spacing[3],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.gray[50],
+    borderRadius: borderRadius.md,
+    marginTop: spacing[2],
+  },
+  upcomingLabel: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
+  recallsSection: {
+    marginTop: spacing[4],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  recallHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    marginBottom: spacing[2],
+  },
+  recallTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.status.error,
+  },
+  recallItem: {
+    paddingVertical: spacing[2],
+    paddingLeft: spacing[3],
+    borderLeftWidth: 2,
+    borderLeftColor: colors.status.error,
+    marginBottom: spacing[2],
+  },
+  recallComponent: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.text.primary,
+  },
+  recallSummary: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.secondary,
+    marginTop: 2,
+  },
+  tipsSection: {
+    marginTop: spacing[4],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: colors.border.light,
+  },
+  tipsLabel: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.text.tertiary,
+    textTransform: 'uppercase',
+    marginBottom: spacing[2],
+  },
+  tipText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.text.secondary,
+    marginBottom: spacing[1],
+    lineHeight: 20,
   },
 });

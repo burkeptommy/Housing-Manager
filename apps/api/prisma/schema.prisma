@@ -1323,6 +1323,10 @@ model Vehicle {
   // Photo
   photoUrl String? @map("photo_url")
 
+  // AI-researched maintenance schedule
+  maintenanceSchedule     Json?      @map("maintenance_schedule") // Stores AI-researched schedule
+  maintenanceResearchedAt DateTime?  @map("maintenance_researched_at")
+
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

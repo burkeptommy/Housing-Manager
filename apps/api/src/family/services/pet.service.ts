@@ -139,6 +139,76 @@ export class PetService {
   }
 
   /**
+   * Add a vaccination record
+   */
+  async addVaccination(
+    petId: string,
+    householdId: string,
+    data: {
+      name: string;
+      date: string;
+      expiresAt?: string | null;
+      veterinarian?: string | null;
+      batchNumber?: string | null;
+      notes?: string | null;
+    }
+  ) {
+    await this.findOne(petId, householdId);
+
+    // Create a vet record for the vaccination
+    return this.prisma.petVetRecord.create({
+      data: {
+        petId,
+        visitDate: new Date(data.date),
+        visitType: 'Vaccination',
+        description: `${data.name} vaccination`,
+        vaccinationsGiven: [data.name],
+        nextVaccinationDate: data.expiresAt ? new Date(data.expiresAt) : undefined,
+        vetName: data.veterinarian,
+        notes: data.notes
+          ? `${data.notes}${data.batchNumber ? `\nBatch/Lot: ${data.batchNumber}` : ''}`
+          : data.batchNumber
+            ? `Batch/Lot: ${data.batchNumber}`
+            : undefined,
+      },
+    });
+  }
+
+  /**
+   * Add a medication to the pet
+   */
+  async addMedication(
+    petId: string,
+    householdId: string,
+    data: {
+      name: string;
+      dosage: string;
+      frequency: string;
+      prescribedBy?: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+      reason?: string | null;
+      notes?: string | null;
+    }
+  ) {
+    const pet = await this.findOne(petId, householdId);
+
+    // Build medication string for the array
+    const medString = `${data.name} - ${data.dosage} (${data.frequency})`;
+
+    // Add to medications array
+    const updatedMedications = [...(pet.medications || []), medString];
+
+    // Update pet with new medication
+    return this.prisma.pet.update({
+      where: { id: petId },
+      data: {
+        medications: updatedMedications,
+      },
+    });
+  }
+
+  /**
    * Get pet passport (summary for pet sitters)
    */
   async getPetPassport(id: string, householdId: string) {

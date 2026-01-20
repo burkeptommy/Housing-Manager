@@ -20,6 +20,9 @@ import { getIdToken } from '../../../../src/lib/firebase';
 import { EditPetBasicInfoModal } from '../../../../src/components/forms/EditPetBasicInfoModal';
 import { EditPetVetModal } from '../../../../src/components/forms/EditPetVetModal';
 import { EditPetCareModal } from '../../../../src/components/forms/EditPetCareModal';
+import { AddVaccinationModal } from '../../../../src/components/forms/AddVaccinationModal';
+import { AddMedicationModal } from '../../../../src/components/forms/AddMedicationModal';
+import { EditPetIdModal } from '../../../../src/components/forms/EditPetIdModal';
 
 // =============================================================================
 // TYPES
@@ -250,6 +253,9 @@ export default function PetDetailScreen() {
   const [showBasicInfoModal, setShowBasicInfoModal] = useState(false);
   const [showVetModal, setShowVetModal] = useState(false);
   const [showCareModal, setShowCareModal] = useState(false);
+  const [showVaccinationModal, setShowVaccinationModal] = useState(false);
+  const [showMedicationModal, setShowMedicationModal] = useState(false);
+  const [showIdModal, setShowIdModal] = useState(false);
 
   const fetchPet = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
@@ -411,6 +417,37 @@ export default function PetDetailScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchPet();
+  };
+
+  // Save ID info (microchip, license)
+  const handleSaveIdInfo = async (data: {
+    microchipId?: string | null;
+    licenseNumber?: string | null;
+    licenseExpires?: string | null;
+    registryName?: string | null;
+    registryPhone?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          microchipId: data.microchipId,
+          licenseNum: data.licenseNumber,
+          licenseExpires: data.licenseExpires,
+        }),
       }
     );
 
@@ -620,7 +657,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="VACCINATIONS"
             action="+ Add"
-            onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
+            onAction={() => setShowVaccinationModal(true)}
           />
           {pet.vaccinations && pet.vaccinations.length > 0 ? (
             pet.vaccinations.map((vaccination) => (
@@ -663,7 +700,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add vaccination records"
-              onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
+              onPress={() => setShowVaccinationModal(true)}
             />
           )}
         </Card>
@@ -674,7 +711,7 @@ export default function PetDetailScreen() {
             <SectionHeader
               title="MEDICATIONS"
               action="+ Add"
-              onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
+              onAction={() => setShowMedicationModal(true)}
             />
             {pet.medicationList && pet.medicationList.length > 0 ? (
               pet.medicationList.map((med) => (
@@ -790,7 +827,7 @@ export default function PetDetailScreen() {
           <SectionHeader
             title="IDS & REGISTRATION"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
+            onAction={() => setShowIdModal(true)}
           />
           {pet.microchipId || pet.registration?.microchipId || pet.registration?.licenseNumber ? (
             <>
@@ -816,7 +853,7 @@ export default function PetDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add microchip or license info"
-              onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}
+              onPress={() => setShowIdModal(true)}
             />
           )}
         </Card>
@@ -897,6 +934,33 @@ export default function PetDetailScreen() {
           foodBrand: pet.care?.foodBrand,
           foodType: pet.care?.foodType,
           feedingSchedule: pet.care?.feedingSchedule,
+        }}
+      />
+
+      <AddVaccinationModal
+        visible={showVaccinationModal}
+        onClose={() => setShowVaccinationModal(false)}
+        petId={id!}
+        householdId={householdInfo?.id || ''}
+        onSuccess={fetchPet}
+      />
+
+      <AddMedicationModal
+        visible={showMedicationModal}
+        onClose={() => setShowMedicationModal(false)}
+        petId={id!}
+        householdId={householdInfo?.id || ''}
+        onSuccess={fetchPet}
+      />
+
+      <EditPetIdModal
+        visible={showIdModal}
+        onClose={() => setShowIdModal(false)}
+        onSave={handleSaveIdInfo}
+        initialData={{
+          microchipId: pet.registration?.microchipId || pet.microchipId,
+          licenseNumber: pet.registration?.licenseNumber,
+          licenseExpires: pet.registration?.licenseExpires,
         }}
       />
     </SafeAreaView>

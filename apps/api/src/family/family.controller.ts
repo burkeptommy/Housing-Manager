@@ -16,7 +16,7 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
-import { VehicleService, PetService, HomeSystemService, CalendarService } from './services';
+import { VehicleService, PetService, HomeSystemService, CalendarService, VehicleMaintenanceResearchService } from './services';
 import {
   CreateVehicleDto,
   UpdateVehicleDto,
@@ -46,6 +46,7 @@ export class FamilyController {
     private readonly petService: PetService,
     private readonly homeSystemService: HomeSystemService,
     private readonly calendarService: CalendarService,
+    private readonly vehicleMaintenanceResearchService: VehicleMaintenanceResearchService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -104,6 +105,22 @@ export class FamilyController {
   @Get('vehicles/:id/service-records')
   async getVehicleServiceRecords(@Req() req: any, @Param('id') id: string) {
     return this.vehicleService.getServiceRecords(id, req.user.householdId);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Get('vehicles/:id/maintenance-due')
+  async getVehicleMaintenanceDue(@Req() req: any, @Param('id') id: string) {
+    // Verify user has access to this vehicle
+    await this.vehicleService.findOne(id, req.user.householdId);
+    return this.vehicleMaintenanceResearchService.getMaintenanceDue(id);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('vehicles/:id/refresh-maintenance-research')
+  async refreshVehicleMaintenanceResearch(@Req() req: any, @Param('id') id: string) {
+    // Verify user has access to this vehicle
+    await this.vehicleService.findOne(id, req.user.householdId);
+    return this.vehicleMaintenanceResearchService.refreshMaintenanceResearch(id);
   }
 
   // ==================== PETS ====================
@@ -167,6 +184,42 @@ export class FamilyController {
   @Get('pets/:id/vet-records')
   async getPetVetRecords(@Req() req: any, @Param('id') id: string) {
     return this.petService.getVetRecords(id, req.user.householdId);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('pets/:id/vaccinations')
+  async addPetVaccination(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: {
+      name: string;
+      date: string;
+      expiresAt?: string | null;
+      veterinarian?: string | null;
+      batchNumber?: string | null;
+      notes?: string | null;
+    },
+  ) {
+    return this.petService.addVaccination(id, req.user.householdId, dto);
+  }
+
+  @UseGuards(FirebaseAuthGuard)
+  @Post('pets/:id/medications')
+  async addPetMedication(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() dto: {
+      name: string;
+      dosage: string;
+      frequency: string;
+      prescribedBy?: string | null;
+      startDate?: string | null;
+      endDate?: string | null;
+      reason?: string | null;
+      notes?: string | null;
+    },
+  ) {
+    return this.petService.addMedication(id, req.user.householdId, dto);
   }
 
   // ==================== HOME SYSTEMS ====================
