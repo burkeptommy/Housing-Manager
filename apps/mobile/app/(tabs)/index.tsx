@@ -16,7 +16,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../../src/contexts/auth-context';
 import { useSubscription } from '../../src/contexts/subscription-context';
-import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard, OnboardingChecklist, OnboardingChecklistData, FreeWalkthroughBanner } from '../../src/components';
+import { Card, Badge, DashboardSkeleton, SectionHeader, AnimatedCard, OnboardingChecklist, OnboardingChecklistData } from '../../src/components';
 import { colors, typography, spacing, borderRadius, shadows } from '../../src/lib/theme';
 import { API_BASE_URL } from '../../src/lib/api';
 import { getIdToken } from '../../src/lib/firebase';
@@ -529,18 +529,6 @@ export default function DashboardScreen() {
           <OnboardingChecklist
             data={onboardingData}
             onDismiss={() => setShowOnboardingChecklist(false)}
-          />
-        )}
-
-        {/* Free Walkthrough Banner - for qualifying users */}
-        {householdInfo?.id && walkthroughCounts && (
-          <FreeWalkthroughBanner
-            householdId={householdInfo.id}
-            systemCount={walkthroughCounts.systemCount}
-            vendorCount={walkthroughCounts.vendorCount}
-            billCount={walkthroughCounts.billCount}
-            zipCode={walkthroughCounts.zipCode}
-            createdAt={walkthroughCounts.createdAt || new Date().toISOString()}
           />
         )}
 

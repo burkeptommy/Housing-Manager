@@ -12,7 +12,6 @@ import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../src/contexts/auth-context';
 import { Card, LoadingSpinner, ScreenContainer, Badge } from '../../../src/components';
-import { FreeWalkthroughBanner } from '../../../src/components/FreeWalkthroughBanner';
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
@@ -144,7 +143,7 @@ const getConditionVariant = (condition?: string): 'success' | 'warning' | 'error
 
 export default function HomeManualScreen() {
   const router = useRouter();
-  const { householdInfo, userProfile } = useAuth();
+  const { householdInfo } = useAuth();
   const [tab, setTab] = useState<TabType>('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -256,19 +255,6 @@ export default function HomeManualScreen() {
         </Text>
       </View>
 
-      {/* Free Walkthrough Banner */}
-      {householdInfo?.id && (
-        <FreeWalkthroughBanner
-          householdId={householdInfo.id}
-          systemCount={systems.length}
-          vendorCount={vendors.length}
-          billCount={bills.length}
-          zipCode={homeProfile?.zipCode}
-          createdAt={userProfile?.createdAt || new Date().toISOString()}
-          compact
-        />
-      )}
-
       {/* Property Details */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Property Details</Text>
@@ -371,16 +357,7 @@ export default function HomeManualScreen() {
           </TouchableOpacity>
         </View>
       }
-      ListEmptyComponent={
-        <EmptySystemsWithWalkthroughCTA
-          householdId={householdInfo?.id}
-          zipCode={homeProfile?.zipCode}
-          createdAt={userProfile?.createdAt}
-          systemCount={systems.length}
-          vendorCount={vendors.length}
-          billCount={bills.length}
-        />
-      }
+      ListEmptyComponent={<EmptySystemsState />}
       renderItem={({ item }) => (
         <TouchableOpacity
           onPress={() => router.push(`/(tabs)/home/system/${item.id}` as any)}
@@ -612,21 +589,7 @@ function EmptySystemsCard({ onAddPress }: { onAddPress: () => void }) {
   );
 }
 
-function EmptySystemsWithWalkthroughCTA({
-  householdId,
-  zipCode,
-  createdAt,
-  systemCount,
-  vendorCount,
-  billCount,
-}: {
-  householdId?: string;
-  zipCode?: string;
-  createdAt?: string;
-  systemCount: number;
-  vendorCount: number;
-  billCount: number;
-}) {
+function EmptySystemsState() {
   return (
     <View style={styles.emptyContainer}>
       <Ionicons name="construct-outline" size={48} color={colors.haven.navy[300]} />
@@ -634,17 +597,6 @@ function EmptySystemsWithWalkthroughCTA({
       <Text style={styles.emptyText}>
         Track your home systems to get maintenance reminders and keep everything organized
       </Text>
-
-      {householdId && (
-        <FreeWalkthroughBanner
-          householdId={householdId}
-          systemCount={systemCount}
-          vendorCount={vendorCount}
-          billCount={billCount}
-          zipCode={zipCode}
-          createdAt={createdAt || new Date().toISOString()}
-        />
-      )}
     </View>
   );
 }

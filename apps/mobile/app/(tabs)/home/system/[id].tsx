@@ -732,7 +732,7 @@ const styles = StyleSheet.create({
   },
   warningsCard: {
     padding: spacing[4],
-    backgroundColor: colors.status.warningBackground,
+    backgroundColor: colors.status.warningLight,
   },
   warningRow: {
     flexDirection: 'row',

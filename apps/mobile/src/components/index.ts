@@ -38,6 +38,4 @@ export * from './OnboardingChecklist';
 export * from './EmptyStateCard';
 export * from './SuggestionBanner';
 
-// Walkthrough Components
-export * from './FreeWalkthroughBanner';
-export * from './WalkthroughScheduleModal';
+// Note: Walkthrough components temporarily removed - backend disabled
