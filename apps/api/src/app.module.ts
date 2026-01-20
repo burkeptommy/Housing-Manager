@@ -57,7 +57,8 @@ import { HomeModule } from './home/home.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CalendarsModule } from './calendars/calendars.module';
 import { AlfredEmailModule } from './alfred-email/alfred-email.module';
-import { WalkthroughModule } from './walkthrough/walkthrough.module';
+// TODO: Fix WalkthroughModule schema mismatches before re-enabling
+// import { WalkthroughModule } from './walkthrough/walkthrough.module';
 
 @Module({
   imports: [
@@ -119,7 +120,7 @@ import { WalkthroughModule } from './walkthrough/walkthrough.module';
     PaymentsModule,
     CalendarsModule,
     AlfredEmailModule,
-    WalkthroughModule,
+    // WalkthroughModule, // Disabled until schema fixed
   ],
   controllers: [AppController],
   providers: [AppService],

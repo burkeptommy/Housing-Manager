@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { WalkthroughService } from './walkthrough.service';
 import { RequestWalkthroughDto } from './dto/walkthrough.dto';
-import { FirebaseAuthGuard } from '../auth/firebase-auth.guard';
+import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 
 @Controller('walkthrough')
 export class WalkthroughController {
