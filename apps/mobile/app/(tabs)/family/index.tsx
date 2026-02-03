@@ -315,7 +315,7 @@ export default function FamilyScreen() {
                   <Card style={[styles.memberCard, member.isCurrentUser && styles.currentUserCard]}>
                     <View style={[styles.memberAvatar, member.isCurrentUser && styles.currentUserAvatar]}>
                       <Text style={[styles.memberInitials, member.isCurrentUser && styles.currentUserInitials]}>
-                        {member.name.split(' ').map(n => n[0]).join('')}
+                        {(member.name || '?').split(' ').map(n => n[0]).join('')}
                       </Text>
                     </View>
                     <View style={styles.memberInfo}>

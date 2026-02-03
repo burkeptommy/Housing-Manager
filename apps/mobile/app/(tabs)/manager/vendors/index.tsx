@@ -404,7 +404,7 @@ export default function VendorsScreen() {
           <View style={styles.ratingContainer}>
             <Ionicons name="star" size={14} color={colors.haven.champagne[500]} />
             <Text style={styles.ratingText}>
-              {item.rating.toFixed(1)} ({item.reviewCount} reviews)
+              {item.rating.toFixed(1)} ({item.reviewCount || 0} reviews)
             </Text>
           </View>
         )}

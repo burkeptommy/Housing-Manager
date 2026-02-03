@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { router } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -104,6 +105,30 @@ export default function CasesListScreen() {
     );
   };
 
+  const simulateEmail = async (scenario: string) => {
+    try {
+      const token = await getIdToken();
+      if (!token) return;
+      const res = await fetch(`${API_URL}/alfred/test/simulate-email`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ scenario }),
+      });
+      if (res.ok) {
+        Alert.alert('Test Email Sent', `Simulated "${scenario.replace(/_/g, ' ')}" email. Pull to refresh to see the case.`);
+        fetchCases();
+      } else {
+        const err = await res.json().catch(() => ({}));
+        Alert.alert('Error', err.message || 'Failed to simulate email');
+      }
+    } catch (err) {
+      Alert.alert('Error', 'Could not reach the server');
+    }
+  };
+
   if (isLoading) {
     return (
       <ScreenContainer title="Email Cases" showBack>
@@ -164,6 +189,31 @@ export default function CasesListScreen() {
               Forward or CC Alfred on any email and it'll show up here.
             </Text>
           </View>
+        }
+        ListFooterComponent={
+          __DEV__ ? (
+            <View style={styles.debugSection}>
+              <Text style={styles.debugTitle}>Test Scenarios</Text>
+              <Text style={styles.debugSubtext}>Dev only - simulate inbound emails</Text>
+              {[
+                { key: 'camp_registration', label: 'Camp Registration' },
+                { key: 'utility_bill', label: 'Utility Bill' },
+                { key: 'vendor_quote', label: 'Vendor Quote' },
+                { key: 'appointment', label: 'Appointment' },
+                { key: 'school_event', label: 'School Event' },
+                { key: 'home_inspection', label: 'Home Inspection' },
+              ].map((scenario) => (
+                <TouchableOpacity
+                  key={scenario.key}
+                  style={styles.debugButton}
+                  onPress={() => simulateEmail(scenario.key)}
+                >
+                  <Ionicons name="flask-outline" size={16} color={colors.haven.navy[600]} />
+                  <Text style={styles.debugButtonText}>{scenario.label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null
         }
       />
     </ScreenContainer>
@@ -285,5 +335,43 @@ const styles = StyleSheet.create({
     color: colors.haven.navy[500],
     textAlign: 'center',
     paddingHorizontal: spacing[8],
+  },
+
+  // Debug section
+  debugSection: {
+    marginTop: spacing[6],
+    padding: spacing[4],
+    backgroundColor: colors.slate[50],
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+    borderStyle: 'dashed',
+  },
+  debugTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold as '600',
+    color: colors.slate[600],
+    marginBottom: 2,
+  },
+  debugSubtext: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[400],
+    marginBottom: spacing[3],
+  },
+  debugButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[3],
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.md,
+    marginBottom: spacing[2],
+    borderWidth: 1,
+    borderColor: colors.slate[200],
+  },
+  debugButtonText: {
+    fontSize: typography.fontSizes.sm,
+    color: colors.haven.navy[700],
   },
 });

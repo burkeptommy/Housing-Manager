@@ -9,6 +9,7 @@ import {
   UseGuards,
   Logger,
   HttpCode,
+  ForbiddenException,
 } from '@nestjs/common';
 import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import { CurrentUser } from '../firebase/current-user.decorator';
@@ -158,6 +159,31 @@ export class AlfredEmailController {
     @Body() body: { answer: string; selectedOption?: string },
   ) {
     return this.alfredEmailService.answerQuestion(user, caseId, body);
+  }
+
+  /**
+   * DEV/STAGING ONLY: Simulate an inbound email for testing
+   */
+  @Post('test/simulate-email')
+  @UseGuards(FirebaseAuthGuard)
+  async simulateEmail(
+    @CurrentUser() user: AuthPayload,
+    @Body()
+    body: {
+      scenario:
+        | 'camp_registration'
+        | 'utility_bill'
+        | 'vendor_quote'
+        | 'appointment'
+        | 'school_event'
+        | 'home_inspection';
+    },
+  ) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new ForbiddenException('Test endpoint not available in production');
+    }
+
+    return this.alfredEmailService.simulateTestEmail(user, body.scenario);
   }
 
   /**

@@ -93,26 +93,29 @@ export default function ForecastScreen() {
   const [timeline, setTimeline] = useState<TimelineYear[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
   const [activeTab, setActiveTab] = useState<'systems' | 'timeline'>('systems');
 
   const fetchData = useCallback(async () => {
     try {
+      setFetchError(false);
       const token = await getIdToken(true);
       if (!token) return;
 
       const [forecastRes, timelineRes] = await Promise.all([
         fetch(`${API_BASE_URL}/budgeting/forecast`, {
           headers: { Authorization: `Bearer ${token}` },
-        }),
+        }).catch(() => null),
         fetch(`${API_BASE_URL}/budgeting/forecast/timeline?years=10`, {
           headers: { Authorization: `Bearer ${token}` },
-        }),
+        }).catch(() => null),
       ]);
 
-      if (forecastRes.ok) setData(await forecastRes.json());
-      if (timelineRes.ok) setTimeline(await timelineRes.json());
+      if (forecastRes?.ok) setData(await forecastRes.json());
+      if (timelineRes?.ok) setTimeline(await timelineRes.json());
     } catch (err) {
       console.error('Forecast fetch error:', err);
+      setFetchError(true);
     } finally {
       setIsLoading(false);
     }
@@ -174,6 +177,22 @@ export default function ForecastScreen() {
       {isLoading ? (
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.haven.sage[500]} />
+        </View>
+      ) : fetchError || (!data && timeline.length === 0) ? (
+        <View style={styles.noBankContainer}>
+          <Ionicons name="analytics-outline" size={64} color={colors.haven.navy[300]} />
+          <Text style={styles.noBankTitle}>Home Forecasts</Text>
+          <Text style={styles.noBankText}>
+            Connect your bank to unlock intelligent home forecasting.
+            We'll analyze your spending to predict maintenance costs and system replacements.
+          </Text>
+          <TouchableOpacity
+            style={styles.connectButton}
+            onPress={() => router.push('/(tabs)/money' as any)}
+          >
+            <Ionicons name="link-outline" size={18} color={colors.white} />
+            <Text style={styles.connectButtonText}>Connect Your Bank</Text>
+          </TouchableOpacity>
         </View>
       ) : (
         <View style={styles.content}>
@@ -577,6 +596,42 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
     color: colors.slate[900],
+  },
+
+  // No bank connected
+  noBankContainer: {
+    alignItems: 'center',
+    paddingVertical: spacing[12],
+    paddingHorizontal: spacing[6],
+  },
+  noBankTitle: {
+    fontSize: typography.fontSizes['2xl'],
+    fontWeight: typography.fontWeights.bold,
+    color: colors.slate[800],
+    marginTop: spacing[5],
+  },
+  noBankText: {
+    fontSize: typography.fontSizes.base,
+    color: colors.slate[500],
+    textAlign: 'center',
+    marginTop: spacing[3],
+    lineHeight: 22,
+    maxWidth: 320,
+  },
+  connectButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    backgroundColor: colors.haven.sage[600],
+    paddingHorizontal: spacing[6],
+    paddingVertical: spacing[3],
+    borderRadius: borderRadius.xl,
+    marginTop: spacing[6],
+  },
+  connectButtonText: {
+    fontSize: typography.fontSizes.base,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.white,
   },
 
   // Empty

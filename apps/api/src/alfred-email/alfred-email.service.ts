@@ -941,6 +941,178 @@ export class AlfredEmailService {
     return { success: true };
   }
 
+  /**
+   * Simulate a test email for dev/staging testing
+   */
+  async simulateTestEmail(user: AuthPayload, scenario: string) {
+    const household = await this.getHousehold(user);
+
+    if (!household.alfredEmailCode) {
+      throw new BadRequestException(
+        'Household does not have an Alfred email configured',
+      );
+    }
+
+    const testEmails: Record<string, { from: string; subject: string; text: string }> = {
+      camp_registration: {
+        from: 'info@campwonderland.com',
+        subject: 'Registration Confirmed - Summer Camp 2026',
+        text: `Dear Morrison Family,
+
+Thank you for registering Emma for Camp Wonderland!
+
+Session Details:
+- Dates: June 15-19, 2026
+- Time: 9:00 AM - 3:00 PM daily
+- Location: 45 Camp Road, Greenwich, CT
+
+Registration Fee: $450 (due by March 1, 2026)
+
+What to bring:
+- Sunscreen
+- Water bottle
+- Lunch and snacks
+
+We're excited to have Emma join us!
+
+Best,
+Camp Wonderland Team
+(203) 555-0300`,
+      },
+
+      utility_bill: {
+        from: 'noreply@eversource.com',
+        subject: 'Your Eversource Bill is Ready',
+        text: `Your monthly electric bill is now available.
+
+Account: Morrison, Robert
+Service Address: 146 Putnam Park Rd, Greenwich, CT
+
+Amount Due: $287.43
+Due Date: February 20, 2026
+
+This is higher than your average bill of $215.00.
+
+View and pay at eversource.com or call 800-286-2000.
+
+Thank you for being an Eversource customer.`,
+      },
+
+      vendor_quote: {
+        from: 'mike@acegutters.com',
+        subject: 'Quote for Gutter Cleaning - 146 Putnam Park Rd',
+        text: `Hi Bob,
+
+Thanks for reaching out about gutter cleaning. Here's your quote:
+
+Service: Full gutter cleaning and inspection
+Property: 146 Putnam Park Rd, Greenwich, CT
+Price: $275.00
+
+Includes:
+- Clean all gutters and downspouts
+- Flush downspouts
+- Minor repairs (up to 10 ft of resealing)
+- Inspection report
+
+We can schedule anytime in the next 2 weeks. Quote valid through March 1, 2026.
+
+Let me know if you'd like to proceed!
+
+Mike Rodriguez
+Ace Gutters LLC
+(203) 555-0199
+mike@acegutters.com`,
+      },
+
+      appointment: {
+        from: 'appointments@greenwichdental.com',
+        subject: 'Appointment Reminder - Jack Morrison',
+        text: `This is a reminder of your upcoming appointment:
+
+Patient: Jack Morrison
+Date: February 10, 2026
+Time: 2:30 PM
+Provider: Dr. Sarah Williams
+Type: 6-Month Cleaning
+
+Location:
+Greenwich Dental Care
+123 Main Street, Suite 200
+Greenwich, CT 06830
+
+Please arrive 10 minutes early. Call (203) 555-0400 to reschedule.`,
+      },
+
+      school_event: {
+        from: 'events@gcds.net',
+        subject: 'Save the Date: Spring Concert - March 15',
+        text: `Dear GCDS Families,
+
+Please save the date for our annual Spring Concert!
+
+Event: Spring Concert 2026
+Date: Saturday, March 15, 2026
+Time: 7:00 PM
+Location: Performing Arts Center
+
+Emma Morrison will be performing with the 7th Grade Chorus.
+
+Tickets: $15 adults, free for students
+RSVP by March 10 at gcds.net/springconcert
+
+We hope to see you there!
+
+Greenwich Country Day School
+Music Department`,
+      },
+
+      home_inspection: {
+        from: 'reports@homeinspectpro.com',
+        subject: 'Inspection Report Ready - 146 Putnam Park Rd',
+        text: `Your home inspection report is ready.
+
+Property: 146 Putnam Park Rd, Greenwich, CT 06830
+Inspection Date: January 28, 2026
+Inspector: James Chen, License #HI-2845
+
+Summary Findings:
+- HVAC: Furnace is 18 years old, recommend service
+- Roof: Good condition, 8 years remaining life
+- Water Heater: 12 years old, near end of life (recommend budgeting for replacement)
+- Foundation: No issues
+- Electrical: Panel updated, good condition
+
+Full report attached (simulated).
+
+Please call with any questions: (203) 555-0888
+
+HomeInspect Pro
+Licensed & Insured`,
+      },
+    };
+
+    const emailData = testEmails[scenario];
+    if (!emailData) {
+      throw new BadRequestException(`Unknown scenario: ${scenario}`);
+    }
+
+    // Process as if it came from SendGrid webhook
+    return this.processInboundEmail({
+      from: emailData.from,
+      to: `${household.alfredEmailCode}@${ALFRED_EMAIL_DOMAIN}`,
+      subject: emailData.subject,
+      text: emailData.text,
+      html: undefined,
+      envelope: {
+        to: [`${household.alfredEmailCode}@${ALFRED_EMAIL_DOMAIN}`],
+        from: emailData.from,
+      },
+      attachments: [],
+      messageId: `test_${Date.now()}`,
+    });
+  }
+
   private async getHousehold(user: AuthPayload) {
     if (!user.householdId) {
       throw new BadRequestException('No household found for user');
