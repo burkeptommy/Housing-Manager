@@ -1,7 +1,7 @@
 # HAVEN HOME - PROJECT INSTRUCTIONS
 ## Master Context for All Development Conversations
 
-**Last Updated:** January 14, 2026
+**Last Updated:** February 3, 2026
 **Project Location:** `/Users/tomburke/Projects/Housing-Manager/`
 
 ---
@@ -198,7 +198,7 @@ eas build --platform ios --profile production --auto-submit  # TestFlight build
 - ✅ Subscription management (RevenueCat)
 
 ### UI/UX
-- ✅ Navy + Champagne color scheme
+- ✅ Navy + Sage color scheme
 - ✅ Tab bar navigation
 - ✅ Consistent headers
 - ✅ Empty state components
@@ -315,18 +315,27 @@ eas build --platform ios --profile production --auto-submit  # TestFlight build
 
 ## Color Palette
 
-### ⚠️ CRITICAL: NO BRIGHT GREEN
-Use Navy + Champagne + White only.
+### ⚠️ CRITICAL: NO CHAMPAGNE, NO BRIGHT GREEN
+Use Navy + Sage + White only.
 
 ### Navy (Primary)
-- navy-950: #0a1929 (backgrounds)
-- navy-900: #102a43 (headings, buttons)
+- navy-950: #0a1929 (sidebar backgrounds)
+- navy-900: #102a43 (headings, primary buttons on light backgrounds)
 - navy-800: #243b53 (secondary)
 
-### Champagne (Accent)
-- champagne-500: #c4a574 (CTAs, accents)
-- champagne-400: #d4c4a5 (hover)
-- champagne-100: #faf6ed (subtle backgrounds)
+### Sage (Accent) - NEW January 2026
+- sage-500: #7D8E74 (accent, badges, checkmarks)
+- light-sage: #A4B494 (hover states)
+- soft-green: #F4F6F2 (page backgrounds)
+- cream: #FAFAF7 (card backgrounds)
+
+### Button Rules
+- **Dark/Navy backgrounds:** Use WHITE buttons
+- **Light backgrounds:** Use NAVY buttons
+- **Sage:** For accents, badges, checkmarks ONLY - never primary CTAs
+
+### Design Vibe
+"Natural, grounded, calm. Like a well-organized home with a garden. Modern without being cold." NOT corporate. Elegant, warm, approachable.
 
 ---
 
@@ -378,24 +387,29 @@ Located in `prompts/mobile/` - comprehensive mobile app development from foundat
 
 ---
 
-# SECTION 10: CURRENT STATUS (January 2026)
+# SECTION 10: CURRENT STATUS (February 2026)
 
-## Completed This Session
-- ✅ Profile & family editing fixes (API deployed)
+## Beta Launch Target: February 15, 2026
+
+## Completed
+- ✅ Profile & family editing fixes
 - ✅ Remove hard-coded data from app
 - ✅ Empty state components created
 - ✅ Calendar sync (Google + iOS)
-- ✅ Database migration reset and clean init
 - ✅ SendGrid inbound parse configured
-- ✅ Alfred email prompt created
+- ✅ Plaid integration (sandbox)
+- ✅ Website redesign with sage color scheme
+- ✅ Homepage repositioned (Alfred-first messaging)
 
-## In Progress
-- 🔄 Alfred email implementation (prompt ready, needs execution)
+## In Progress - Priority for Beta
+- 🔄 011b: Fix Firebase auth error (production pages hanging)
+- 🔄 021: Alfred "Always Ask Intent" enhancement
+- 🔄 022: Transform Money into Monarch-style budgeting app
 
-## Next Up
-- Website repositioning (Alfred/Essentials front and center)
-- Alfred email complete implementation
-- TestFlight build with all new features
+## Critical Features for Beta
+1. **Alfred Email** - Always ask user what they want done (conversational + action buttons)
+2. **Money/Budgeting** - Monarch-style categories, spending analysis, home forecasting
+3. **Firebase Auth Fix** - Currently breaking Documents, Banks, Bills pages
 
 ## Deployed Services
 | Service | URL | Status |
@@ -414,6 +428,15 @@ Located in `prompts/mobile/` - comprehensive mobile app development from foundat
 4. **Address-Based Codes** - Alfred emails use address for memorability (38BedfordRoad@alfred.havenhome.dev)
 5. **Case System** - Every Alfred email creates a trackable case with audit trail
 6. **Essentials = 90%+ users** - Design and market for the $39 tier
+7. **Alfred Always Asks** - Never auto-execute actions. Always ask user intent with conversational tone + action buttons + "Something else..." option
+8. **Mobile First** - Prioritize mobile experience for beta testers
+
+## Money/Budgeting Strategy (Phase 1)
+- **Monarch-style budgeting** - Categories, spending analysis, trend tracking
+- **Home forecasting** - System replacement timelines based on age/lifespan
+- **Local comparisons** - "Your electric is 20% above local average"
+- **Alfred research** - Make/model specific maintenance data, recalls
+- **Payment processing deferred** - Phase 2 after beta validation
 
 ---
 

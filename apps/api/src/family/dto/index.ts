@@ -100,6 +100,99 @@ export class CreateFamilyMemberDto {
   @IsString()
   paymentMethod?: string;
 
+  // Staff Compensation
+  @IsOptional()
+  @IsNumber()
+  payAmount?: number;
+
+  @IsOptional()
+  @IsString()
+  payFrequency?: string; // WEEKLY, BIWEEKLY, MONTHLY, YEARLY
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  lastPayDate?: Date;
+
+  @IsOptional()
+  @IsString()
+  agencyName?: string;
+
+  @IsOptional()
+  @IsString()
+  agencyContact?: string;
+
+  @IsOptional()
+  @IsString()
+  agencyPhone?: string;
+
+  // Staff Benefits
+  @IsOptional()
+  @IsBoolean()
+  hasHealthInsurance?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasDentalInsurance?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  paidTimeOffDays?: number;
+
+  @IsOptional()
+  @IsNumber()
+  sickDays?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  hasHolidayPay?: boolean;
+
+  // Staff Reimbursements
+  @IsOptional()
+  @IsBoolean()
+  mileageReimbursement?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  gasReimbursement?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  mealsReimbursement?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  phoneAllowance?: boolean;
+
+  // Staff Documents
+  @IsOptional()
+  @IsBoolean()
+  hasW9?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  hasI9?: boolean;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  backgroundCheckDate?: Date;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  cprCertifiedUntil?: Date;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  firstAidCertifiedUntil?: Date;
+
+  @IsOptional()
+  @IsDate()
+  @Type(() => Date)
+  driversLicenseExpiry?: Date;
+
   // Medical
   @IsOptional()
   @IsArray()
@@ -156,6 +249,14 @@ export class CreateActivityDto {
   @IsOptional()
   @IsString()
   schedule?: string;
+
+  @IsOptional()
+  @IsString()
+  startDate?: string;
+
+  @IsOptional()
+  @IsString()
+  endDate?: string;
 
   @IsOptional()
   @IsNumber()

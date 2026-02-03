@@ -133,6 +133,21 @@ export class AlfredEmailController {
   }
 
   /**
+   * Execute selected action(s) from email case suggestions.
+   * Used in the "always ask intent" flow where Alfred suggests actions
+   * and the user picks which ones to execute.
+   */
+  @Post('cases/:id/execute')
+  @UseGuards(FirebaseAuthGuard)
+  async executeAction(
+    @CurrentUser() user: AuthPayload,
+    @Param('id') caseId: string,
+    @Body() body: { actionTypes: string[]; customRequest?: string },
+  ) {
+    return this.alfredEmailService.executeSelectedActions(user, caseId, body);
+  }
+
+  /**
    * Answer a pending question from Alfred
    */
   @Post('cases/:id/answer')

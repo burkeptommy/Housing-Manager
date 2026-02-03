@@ -541,6 +541,203 @@ ${input.attachments?.length ? `Attachments: ${input.attachments.map((a) => a.fil
   }
 
   /**
+   * Build a friendly Alfred message and suggested action buttons from parsed email data.
+   * Used by the "always ask intent" flow so Alfred never auto-executes.
+   */
+  buildAlfredSuggestions(parsed: ParsedEmailResult, subject: string): {
+    greeting: string;
+    summary: string;
+    suggestedActions: Array<{ label: string; type: string; data: unknown }>;
+    confidence: number;
+  } {
+    const emoji = this.getEmailEmoji(parsed.category);
+    const greeting = `Hey! ${emoji} Got your email about ${this.summarizeSubject(subject)}.`;
+    const summary = parsed.summary || `I found some info in this email.`;
+
+    const actions: Array<{ label: string; type: string; data: unknown }> = [];
+
+    if (parsed.calendarEvents?.length) {
+      const event = parsed.calendarEvents[0];
+      actions.push({
+        label: 'Add to Calendar',
+        type: 'CALENDAR',
+        data: event,
+      });
+    }
+
+    if (parsed.bills?.length) {
+      const bill = parsed.bills[0];
+      const label = bill.amount
+        ? `Track ${bill.vendorName} Bill ($${bill.amount})`
+        : `Track ${bill.vendorName} Bill`;
+      actions.push({ label, type: 'BILL', data: bill });
+    }
+
+    if (parsed.vendorUpdates?.length) {
+      actions.push({
+        label: 'Save Vendor Contact',
+        type: 'VENDOR',
+        data: parsed.vendorUpdates[0],
+      });
+    }
+
+    if (parsed.tasks?.length) {
+      actions.push({
+        label: 'Create Task',
+        type: 'TASK',
+        data: parsed.tasks[0],
+      });
+    }
+
+    if (parsed.documents?.length) {
+      actions.push({
+        label: 'Save Document',
+        type: 'DOCUMENT',
+        data: parsed.documents[0],
+      });
+    }
+
+    if (parsed.reminders?.length) {
+      actions.push({
+        label: 'Set Reminder',
+        type: 'REMINDER',
+        data: parsed.reminders[0],
+      });
+    }
+
+    if (parsed.warranty) {
+      actions.push({
+        label: 'Save Warranty Info',
+        type: 'WARRANTY',
+        data: parsed.warranty,
+      });
+    }
+
+    if (parsed.shipping) {
+      actions.push({
+        label: 'Track Package',
+        type: 'SHIPPING',
+        data: parsed.shipping,
+      });
+    }
+
+    // If multiple action types, offer "All of the Above"
+    if (actions.length >= 2) {
+      actions.push({
+        label: 'All of the Above',
+        type: 'ALL',
+        data: null,
+      });
+    }
+
+    // If no actions detected, offer generic ones
+    if (actions.length === 0) {
+      actions.push(
+        { label: 'Save for Reference', type: 'DOCUMENT', data: { name: subject, category: 'general' } },
+        { label: 'Create Task', type: 'TASK', data: { title: `Follow up: ${subject}`, priority: 'NORMAL' } },
+      );
+    }
+
+    // Always add "Something else..." last
+    actions.push({
+      label: 'Something else...',
+      type: 'CUSTOM',
+      data: null,
+    });
+
+    return {
+      greeting,
+      summary,
+      suggestedActions: actions,
+      confidence: this.estimateConfidence(parsed),
+    };
+  }
+
+  /**
+   * Re-analyze an email case with a custom user instruction.
+   * Used when user selects "Something else..." and provides their own request.
+   */
+  async parseWithCustomIntent(
+    emailCase: { subject: string; bodyText?: string | null; bodyHtml?: string | null },
+    customRequest: string,
+  ): Promise<{
+    greeting: string;
+    summary: string;
+    suggestedActions: Array<{ label: string; type: string; data: unknown }>;
+  }> {
+    const prompt = `You are Alfred, a friendly home management assistant. A user forwarded an email and when I suggested actions, they asked for something specific:
+
+User's request: "${customRequest}"
+
+Original email subject: ${emailCase.subject}
+Original email body: ${emailCase.bodyText || emailCase.bodyHtml || '(no body)'}
+
+Based on the user's request, suggest 1-3 specific actions I can take. Respond with ONLY a JSON object:
+{
+  "greeting": "Short friendly acknowledgment of their request",
+  "summary": "What I understand they want",
+  "suggestedActions": [
+    { "label": "Button Label", "type": "CALENDAR|BILL|VENDOR|TASK|DOCUMENT|REMINDER", "data": { ...relevant data... } },
+    { "label": "Something else...", "type": "CUSTOM", "data": null }
+  ]
+}`;
+
+    try {
+      const response = await this.anthropic.messages.create({
+        model: 'claude-sonnet-4-20250514',
+        max_tokens: 2048,
+        messages: [{ role: 'user', content: prompt }],
+      });
+
+      const content = response.content[0];
+      if (content.type !== 'text') throw new Error('Unexpected response type');
+
+      const jsonMatch = content.text.match(/\{[\s\S]*\}/);
+      if (!jsonMatch) throw new Error('No JSON found in response');
+
+      return JSON.parse(jsonMatch[0]);
+    } catch (error) {
+      this.logger.error(`Failed to parse custom intent: ${error.message}`);
+      return {
+        greeting: `Got it! Let me work on "${customRequest}".`,
+        summary: `I'll try to handle your request.`,
+        suggestedActions: [
+          { label: 'Create Task', type: 'TASK', data: { title: customRequest, priority: 'NORMAL' } },
+          { label: 'Something else...', type: 'CUSTOM', data: null },
+        ],
+      };
+    }
+  }
+
+  private getEmailEmoji(category: string): string {
+    switch (category) {
+      case 'CALENDAR': return '📅';
+      case 'FINANCIAL': return '💵';
+      case 'VENDOR': return '📋';
+      case 'HOME': return '🏠';
+      case 'FAMILY': return '👨‍👩‍👧‍👦';
+      case 'DISPUTE': return '⚠️';
+      case 'INFORMATIONAL': return '📧';
+      default: return '📧';
+    }
+  }
+
+  private summarizeSubject(subject: string): string {
+    // Remove common prefixes like "Fwd:", "Re:", etc.
+    return subject.replace(/^(fwd?|re|fw):\s*/gi, '').trim();
+  }
+
+  private estimateConfidence(parsed: ParsedEmailResult): number {
+    if (parsed.emailType === 'UNKNOWN') return 0.3;
+    let confidence = 0.6;
+    if (parsed.calendarEvents?.length || parsed.bills?.length) confidence += 0.15;
+    if (parsed.amounts?.length || parsed.dates?.length) confidence += 0.1;
+    if (parsed.companies?.length) confidence += 0.05;
+    if (parsed.needsClarification) confidence -= 0.15;
+    return Math.min(Math.max(confidence, 0.1), 0.99);
+  }
+
+  /**
    * Generate a dispute response using Claude
    */
   async generateDisputeResponse(params: {

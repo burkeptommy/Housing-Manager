@@ -8,7 +8,7 @@ import {
   CountryCode,
   TransactionsGetRequest,
 } from 'plaid';
-import { BillCategory, BillingFrequency } from '@prisma/client';
+import { BillCategory, BillingFrequency, PaymentFrequency, BillStatus, BillPaymentMethod, AmountType, PayeeType } from '@prisma/client';
 import { TransactionAnalyzerService } from './transaction-analyzer.service';
 
 @Injectable()
@@ -664,12 +664,59 @@ export class PlaidService {
   }
 
   /**
-   * Confirm a detected bill
+   * Confirm a detected bill and create a ComprehensiveBill entry
    */
   async confirmBill(detectedBillId: string) {
+    // Get the detected bill details
+    const detectedBill = await this.prisma.detectedBill.findUnique({
+      where: { id: detectedBillId },
+    });
+
+    if (!detectedBill) {
+      throw new BadRequestException('Detected bill not found');
+    }
+
+    // Map BillingFrequency to PaymentFrequency
+    const frequencyMap: Record<BillingFrequency, PaymentFrequency> = {
+      WEEKLY: PaymentFrequency.WEEKLY,
+      BIWEEKLY: PaymentFrequency.BIWEEKLY,
+      MONTHLY: PaymentFrequency.MONTHLY,
+      QUARTERLY: PaymentFrequency.QUARTERLY,
+      SEMIANNUALLY: PaymentFrequency.SEMI_ANNUAL,
+      SEMI_ANNUAL: PaymentFrequency.SEMI_ANNUAL,
+      ANNUAL: PaymentFrequency.ANNUAL,
+      PER_VISIT: PaymentFrequency.AS_NEEDED,
+      PER_JOB: PaymentFrequency.AS_NEEDED,
+      IRREGULAR: PaymentFrequency.AS_NEEDED,
+    };
+
+    // Create a ComprehensiveBill from the detected bill
+    const comprehensiveBill = await this.prisma.comprehensiveBill.create({
+      data: {
+        householdId: detectedBill.householdId,
+        name: detectedBill.merchantName,
+        description: `Automatically detected from bank transactions`,
+        category: detectedBill.category,
+        payeeName: detectedBill.merchantName,
+        payeeType: PayeeType.COMPANY,
+        amount: detectedBill.averageAmount,
+        amountType: AmountType.VARIABLE,
+        frequency: frequencyMap[detectedBill.frequency] || PaymentFrequency.MONTHLY,
+        dueDay: detectedBill.dayOfMonth,
+        paymentMethod: BillPaymentMethod.OWNER_AUTOPAY,
+        currentAutopay: true,
+        status: BillStatus.ACTIVE,
+        notes: 'Detected from Plaid bank transactions',
+      },
+    });
+
+    // Update the detected bill with link to ComprehensiveBill
     const bill = await this.prisma.detectedBill.update({
       where: { id: detectedBillId },
-      data: { status: 'CONFIRMED' },
+      data: {
+        status: 'CONFIRMED',
+        linkedBillId: comprehensiveBill.id,
+      },
     });
 
     return bill;

@@ -6,6 +6,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Req,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -15,7 +16,7 @@ import {
   ApiParam,
 } from '@nestjs/swagger';
 
-import { JwtAuthGuard, CurrentUser } from '../auth';
+import { FirebaseAuthGuard } from '../firebase/firebase-auth.guard';
 import { UploadsService } from './uploads.service';
 import {
   SignUploadDto,
@@ -28,7 +29,7 @@ import {
 @ApiTags('Uploads')
 @ApiBearerAuth()
 @Controller('uploads')
-@UseGuards(JwtAuthGuard)
+@UseGuards(FirebaseAuthGuard)
 export class UploadsController {
   constructor(private readonly uploadsService: UploadsService) {}
 
@@ -43,7 +44,7 @@ export class UploadsController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async signUpload(
     @Body() dto: SignUploadDto,
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<SignUploadResponseDto> {
     return this.uploadsService.signUpload(
       {
@@ -52,7 +53,7 @@ export class UploadsController {
         type: dto.type,
         householdId: dto.householdId,
       },
-      userId,
+      req.user.id,
     );
   }
 
@@ -69,11 +70,11 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async completeUpload(
     @Body() dto: CompleteUploadDto,
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<CompleteUploadResponseDto> {
     return this.uploadsService.completeUpload(
       dto.fileAssetId,
-      userId,
+      req.user.id,
       dto.finalUrl,
     );
   }
@@ -91,9 +92,9 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async getFileAsset(
     @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<FileAssetResponseDto> {
-    const asset = await this.uploadsService.getFileAsset(id, userId);
+    const asset = await this.uploadsService.getFileAsset(id, req.user.id);
     return {
       id: asset.id,
       householdId: asset.householdId,
@@ -122,9 +123,9 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async getSignedReadUrl(
     @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<{ url: string }> {
-    const url = await this.uploadsService.getSignedReadUrl(id, userId);
+    const url = await this.uploadsService.getSignedReadUrl(id, req.user.id);
     return { url };
   }
 
@@ -137,9 +138,9 @@ export class UploadsController {
   @ApiResponse({ status: 404, description: 'FileAsset not found' })
   async deleteFileAsset(
     @Param('id') id: string,
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<{ success: boolean }> {
-    await this.uploadsService.deleteFileAsset(id, userId);
+    await this.uploadsService.deleteFileAsset(id, req.user.id);
     return { success: true };
   }
 
@@ -158,14 +159,14 @@ export class UploadsController {
       image: string; // base64
       mimeType: string;
     },
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<{ imageUrl: string }> {
     return this.uploadsService.uploadProfileImage(
       body.entityType,
       body.entityId,
       body.image,
       body.mimeType,
-      userId,
+      req.user.id,
     );
   }
 
@@ -180,12 +181,12 @@ export class UploadsController {
       entityType: 'family-member' | 'pet' | 'household';
       entityId: string;
     },
-    @CurrentUser('id') userId: string,
+    @Req() req: any,
   ): Promise<{ success: boolean }> {
     return this.uploadsService.removeProfileImage(
       body.entityType,
       body.entityId,
-      userId,
+      req.user.id,
     );
   }
 }

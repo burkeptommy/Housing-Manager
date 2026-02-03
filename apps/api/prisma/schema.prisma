@@ -1139,6 +1139,11 @@ model Household {
   authorizedEmails AuthorizedEmail[]
   emailCases       EmailCase[]
 
+  // Budgeting System
+  budget              Budget?
+  budgetTransactions  BudgetTransaction[]
+  systemForecasts     SystemForecast[]
+
   @@index([managerId])
   @@index([assignedHandymanId])
   @@index([h3Index])
@@ -3929,6 +3934,14 @@ enum FamilyMemberType {
   STAFF // Household staff (nanny, housekeeper, caretaker)
 }
 
+// Staff pay frequency
+enum StaffPayFrequency {
+  WEEKLY
+  BIWEEKLY
+  MONTHLY
+  YEARLY
+}
+
 // HouseholdIntake - Main intake session record for Home Manager calls
 model HouseholdIntake {
   id          String @id @default(cuid())
@@ -4024,6 +4037,35 @@ model FamilyMember {
   responsibilities String?   @db.Text
   startDate        DateTime? @map("start_date") @db.Date
   paymentMethod    String?   @map("payment_method") // For staff pay tracking
+
+  // Staff Compensation
+  payAmount        Decimal?  @map("pay_amount") @db.Decimal(10, 2)
+  payFrequency     StaffPayFrequency? @map("pay_frequency")
+  lastPayDate      DateTime? @map("last_pay_date") @db.Date
+  agencyName       String?   @map("agency_name")
+  agencyContact    String?   @map("agency_contact")
+  agencyPhone      String?   @map("agency_phone")
+
+  // Staff Benefits
+  hasHealthInsurance Boolean @default(false) @map("has_health_insurance")
+  hasDentalInsurance Boolean @default(false) @map("has_dental_insurance")
+  paidTimeOffDays    Int?    @map("paid_time_off_days")
+  sickDays           Int?    @map("sick_days")
+  hasHolidayPay      Boolean @default(false) @map("has_holiday_pay")
+
+  // Staff Reimbursements
+  mileageReimbursement Boolean @default(false) @map("mileage_reimbursement")
+  gasReimbursement     Boolean @default(false) @map("gas_reimbursement")
+  mealsReimbursement   Boolean @default(false) @map("meals_reimbursement")
+  phoneAllowance       Boolean @default(false) @map("phone_allowance")
+
+  // Staff Documents
+  hasW9             Boolean   @default(false) @map("has_w9")
+  hasI9             Boolean   @default(false) @map("has_i9")
+  backgroundCheckDate DateTime? @map("background_check_date") @db.Date
+  cprCertifiedUntil   DateTime? @map("cpr_certified_until") @db.Date
+  firstAidCertifiedUntil DateTime? @map("first_aid_certified_until") @db.Date
+  driversLicenseExpiry DateTime? @map("drivers_license_expiry") @db.Date
 
   // Medical (optional for emergency)
   allergies    String[] @default([])
@@ -5457,4 +5499,127 @@ enum EmailCaseActivityType {
   // Errors
   PROCESSING_ERROR
   ACTION_FAILED
+}
+
+// ============================================================================
+// BUDGETING SYSTEM
+// ============================================================================
+
+model Budget {
+  id            String   @id @default(cuid())
+  householdId   String   @unique @map("household_id")
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  name          String   @default("Monthly Budget")
+  monthlyIncome Float?   @map("monthly_income")
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  categories    BudgetCategory[]
+
+  @@map("budgets")
+}
+
+model BudgetCategory {
+  id              String   @id @default(cuid())
+  budgetId        String   @map("budget_id")
+  budget          Budget   @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+
+  categoryId      String   @map("category_id")
+  groupId         String   @map("group_id")
+
+  budgetedAmount  Float    @map("budgeted_amount")
+  isActive        Boolean  @default(true) @map("is_active")
+  rolloverEnabled Boolean  @default(false) @map("rollover_enabled")
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  @@unique([budgetId, categoryId])
+  @@index([budgetId])
+  @@map("budget_categories")
+}
+
+model BudgetTransaction {
+  id                 String   @id @default(cuid())
+  householdId        String   @map("household_id")
+  household          Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  plaidTransactionId String?  @unique @map("plaid_transaction_id")
+  accountId          String?  @map("account_id")
+
+  date               DateTime
+  amount             Float
+  name               String
+  merchantName       String?  @map("merchant_name")
+
+  categoryId         String?  @map("category_id")
+  groupId            String?  @map("group_id")
+  isAutoCategorized  Boolean  @default(false) @map("is_auto_categorized")
+
+  isPending          Boolean  @default(false) @map("is_pending")
+  isHidden           Boolean  @default(false) @map("is_hidden")
+  isRecurring        Boolean  @default(false) @map("is_recurring")
+
+  notes              String?
+
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@index([householdId, date])
+  @@index([householdId, categoryId])
+  @@map("budget_transactions")
+}
+
+model SystemForecast {
+  id            String    @id @default(cuid())
+  householdId   String    @map("household_id")
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  systemId      String?   @map("system_id")
+  systemType    String    @map("system_type")
+  systemName    String    @map("system_name")
+
+  installYear   Int?      @map("install_year")
+  currentAge    Int?      @map("current_age")
+
+  typicalLifespan         Int    @map("typical_lifespan")
+  lifespanMin             Int?   @map("lifespan_min")
+  lifespanMax             Int?   @map("lifespan_max")
+
+  estimatedReplacementCost  Float? @map("estimated_replacement_cost")
+  estimatedMaintenanceCost  Float? @map("estimated_maintenance_cost")
+
+  expectedReplacementYear   Int?   @map("expected_replacement_year")
+  urgency                   String?
+
+  alfredResearchDate  DateTime? @map("alfred_research_date")
+  alfredResearchData  Json?     @map("alfred_research_data")
+
+  notes         String?
+
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([householdId])
+  @@map("system_forecasts")
+}
+
+model LocalCostData {
+  id              String   @id @default(cuid())
+  zipCode         String   @map("zip_code")
+  category        String
+
+  averageMonthly  Float    @map("average_monthly")
+  medianMonthly   Float?   @map("median_monthly")
+  percentile25    Float?   @map("percentile_25")
+  percentile75    Float?   @map("percentile_75")
+
+  sampleSize      Int?     @map("sample_size")
+  lastUpdated     DateTime @map("last_updated")
+  source          String?
+
+  @@unique([zipCode, category])
+  @@map("local_cost_data")
 }

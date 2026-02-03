@@ -19,6 +19,8 @@ import { API_BASE_URL } from '../../../../src/lib/api';
 import { getIdToken } from '../../../../src/lib/firebase';
 import { EditStaffContactModal } from '../../../../src/components/forms/EditStaffContactModal';
 import { EditEmergencyContactModal } from '../../../../src/components/forms/EditEmergencyContactModal';
+import { EditCompensationModal } from '../../../../src/components/forms/EditCompensationModal';
+import { EditBenefitsModal } from '../../../../src/components/forms/EditBenefitsModal';
 
 // =============================================================================
 // TYPES
@@ -307,6 +309,8 @@ export default function StaffDetailScreen() {
   // Modal states
   const [showContactModal, setShowContactModal] = useState(false);
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [showCompensationModal, setShowCompensationModal] = useState(false);
+  const [showBenefitsModal, setShowBenefitsModal] = useState(false);
 
   const fetchStaff = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
@@ -463,6 +467,59 @@ export default function StaffDetailScreen() {
           emergencyContactPhone: data.emergencyContactPhone,
           emergencyContactRelationship: data.emergencyContactRelationship,
         }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save compensation
+  const handleSaveCompensation = async (data: {
+    payAmount?: number | null;
+    payFrequency?: string | null;
+    paymentMethod?: string | null;
+    lastPayDate?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save benefits
+  const handleSaveBenefits = async (data: {
+    hasHealthInsurance?: boolean;
+    hasDentalInsurance?: boolean;
+    paidTimeOffDays?: number | null;
+    sickDays?: number | null;
+    hasHolidayPay?: boolean;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
       }
     );
 
@@ -703,7 +760,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="COMPENSATION"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+            onAction={() => setShowCompensationModal(true)}
           />
           {hasCompensationData ? (
             <>
@@ -731,7 +788,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add compensation details"
-              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+              onPress={() => setShowCompensationModal(true)}
             />
           )}
         </Card>
@@ -741,7 +798,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="BENEFITS YOU PROVIDE"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+            onAction={() => setShowBenefitsModal(true)}
           />
           {hasBenefitsData ? (
             <>
@@ -796,7 +853,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add benefits information"
-              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+              onPress={() => setShowBenefitsModal(true)}
             />
           )}
         </Card>
@@ -984,6 +1041,31 @@ export default function StaffDetailScreen() {
           emergencyContact: staff.staffEmergencyContact?.name,
           emergencyContactPhone: staff.staffEmergencyContact?.phone,
           emergencyContactRelationship: staff.staffEmergencyContact?.relationship,
+        }}
+      />
+
+      <EditCompensationModal
+        visible={showCompensationModal}
+        onClose={() => setShowCompensationModal(false)}
+        onSave={handleSaveCompensation}
+        initialData={{
+          payAmount: staff.compensation?.payAmount,
+          payFrequency: staff.compensation?.payFrequency?.toUpperCase() as any,
+          paymentMethod: staff.compensation?.payMethod,
+          lastPayDate: staff.compensation?.lastPayDate,
+        }}
+      />
+
+      <EditBenefitsModal
+        visible={showBenefitsModal}
+        onClose={() => setShowBenefitsModal(false)}
+        onSave={handleSaveBenefits}
+        initialData={{
+          hasHealthInsurance: staff.compensation?.benefits?.healthInsurance,
+          hasDentalInsurance: staff.compensation?.benefits?.dentalInsurance,
+          paidTimeOffDays: staff.compensation?.benefits?.paidTimeOff,
+          sickDays: staff.compensation?.benefits?.sickDays,
+          hasHolidayPay: staff.compensation?.benefits?.holidayPay,
         }}
       />
     </SafeAreaView>

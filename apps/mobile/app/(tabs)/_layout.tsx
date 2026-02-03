@@ -134,17 +134,13 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="billing"
+        name="money"
         options={{
           title: 'Money',
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="wallet-outline" size={size} color={color} />
           ),
-          headerTitle: 'Bills & Payments',
-          headerStyle: {
-            backgroundColor: colors.haven.navy[950],
-          },
-          headerTintColor: colors.white,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -177,6 +173,7 @@ export default function TabLayout() {
       />
 
       {/* ===== HIDDEN SCREENS (accessible via navigation, not in tab bar) ===== */}
+      <Tabs.Screen name="alfred" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="activity" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="approvals" options={{ href: null, headerShown: false }} />
       <Tabs.Screen name="chat" options={{ href: null, headerShown: false }} />

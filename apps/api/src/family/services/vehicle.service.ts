@@ -35,12 +35,9 @@ export class VehicleService {
         ...(includeInactive ? {} : { isActive: true }),
       },
       include: {
-        serviceRecords: {
+        services: {
           orderBy: { serviceDate: 'desc' },
           take: 5,
-        },
-        preferredVendor: {
-          select: { id: true, displayName: true, phone: true },
         },
       },
       orderBy: { createdAt: 'desc' },
@@ -54,10 +51,9 @@ export class VehicleService {
     const vehicle = await this.prisma.vehicle.findUnique({
       where: { id },
       include: {
-        serviceRecords: {
+        services: {
           orderBy: { serviceDate: 'desc' },
         },
-        preferredVendor: true,
         events: {
           where: {
             startDate: { gte: new Date() },
