@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.secondary,
   },
   headerWrapper: {
-    backgroundColor: colors.haven.purple[950],
+    backgroundColor: colors.haven.purple[500],
   },
   header: {
     height: 56,
