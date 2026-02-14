@@ -48,7 +48,7 @@ export default function ForgotPasswordScreen() {
       <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
         <View style={styles.successContainer}>
           <View style={styles.successIcon}>
-            <Ionicons name="mail" size={48} color={colors.haven.champagne[500]} />
+            <Ionicons name="mail" size={48} color={colors.haven.purple[500]} />
           </View>
           <Text style={styles.successTitle}>Check your email</Text>
           <Text style={styles.successText}>
@@ -174,7 +174,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],

@@ -534,7 +534,7 @@ export default function MemberDetailScreen() {
   // Empty prompt component
   const EmptyPrompt = ({ text, onPress }: { text: string; onPress: () => void }) => (
     <TouchableOpacity style={styles.emptyPrompt} onPress={onPress}>
-      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
       <Text style={styles.emptyPromptText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -579,7 +579,7 @@ export default function MemberDetailScreen() {
           title: fullName,
           headerRight: canEdit ? () => (
             <TouchableOpacity onPress={() => router.push(`/(tabs)/family/member/edit/${id}` as any)}>
-              <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="create-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           ) : undefined,
         }}
@@ -632,7 +632,7 @@ export default function MemberDetailScreen() {
             {member.phone && (
               <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
                 <View style={styles.actionIcon}>
-                  <Ionicons name="call" size={24} color={colors.haven.champagne[500]} />
+                  <Ionicons name="call" size={24} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.actionButtonText}>Call</Text>
               </TouchableOpacity>
@@ -640,7 +640,7 @@ export default function MemberDetailScreen() {
             {member.email && (
               <TouchableOpacity style={styles.actionButton} onPress={handleEmail}>
                 <View style={styles.actionIcon}>
-                  <Ionicons name="mail" size={24} color={colors.haven.champagne[500]} />
+                  <Ionicons name="mail" size={24} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.actionButtonText}>Email</Text>
               </TouchableOpacity>
@@ -711,7 +711,7 @@ export default function MemberDetailScreen() {
                     <Ionicons
                       name={getActivityIcon(activity.type)}
                       size={16}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.activityInfo}>
@@ -770,7 +770,7 @@ export default function MemberDetailScreen() {
                   disabled={!canEdit}
                 >
                   <View style={styles.membershipIcon}>
-                    <Ionicons name={getMembershipIcon(membership.type)} size={18} color={colors.haven.champagne[500]} />
+                    <Ionicons name={getMembershipIcon(membership.type)} size={18} color={colors.haven.purple[500]} />
                   </View>
                   <View style={styles.membershipInfo}>
                     <Text style={styles.membershipName}>{membership.name}</Text>
@@ -810,7 +810,7 @@ export default function MemberDetailScreen() {
                   <Ionicons
                     name={getActivityIcon(activity.type)}
                     size={16}
-                    color={colors.haven.champagne[500]}
+                    color={colors.haven.purple[500]}
                   />
                 </View>
                 <View style={styles.activityInfo}>
@@ -1045,7 +1045,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -1097,7 +1097,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1125,7 +1125,7 @@ const styles = StyleSheet.create({
   },
   sectionAction: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   emptyPrompt: {
@@ -1137,7 +1137,7 @@ const styles = StyleSheet.create({
   },
   emptyPromptText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   alertCard: {
@@ -1176,7 +1176,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -1196,7 +1196,7 @@ const styles = StyleSheet.create({
   },
   membershipFee: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   detailRow: {
@@ -1236,7 +1236,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -1251,7 +1251,7 @@ const styles = StyleSheet.create({
   },
   activityType: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   activitySchedule: {
@@ -1284,7 +1284,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
 });

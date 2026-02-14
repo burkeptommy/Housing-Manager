@@ -27,7 +27,7 @@ export function Navbar() {
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         isScrolled
-          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-warm-100'
+          ? 'bg-white/95 backdrop-blur-md shadow-sm border-b border-neutral-100'
           : 'bg-transparent'
       }`}
     >
@@ -50,7 +50,7 @@ export function Navbar() {
                 href={link.href}
                 className={`text-sm font-medium transition-colors ${
                   isScrolled
-                    ? 'text-warm-600 hover:text-haven-700'
+                    ? 'text-neutral-600 hover:text-haven-700'
                     : 'text-white/90 hover:text-white'
                 }`}
               >
@@ -64,7 +64,7 @@ export function Navbar() {
             <Link
               href="/login"
               className={`text-sm font-medium transition-colors ${
-                isScrolled ? 'text-warm-600 hover:text-haven-700' : 'text-white/90 hover:text-white'
+                isScrolled ? 'text-neutral-600 hover:text-haven-700' : 'text-white/90 hover:text-white'
               }`}
             >
               Sign In
@@ -74,7 +74,7 @@ export function Navbar() {
               className={`px-5 py-2.5 text-sm font-semibold rounded-xl transition-all ${
                 isScrolled
                   ? 'bg-haven-700 text-white hover:bg-haven-800 shadow-sm hover:shadow-md'
-                  : 'bg-white text-haven-700 hover:bg-champagne-50 shadow-lg shadow-black/10'
+                  : 'bg-white text-haven-700 hover:bg-haven-50 shadow-lg shadow-black/10'
               }`}
             >
               Get Started
@@ -85,7 +85,7 @@ export function Navbar() {
           <button
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             className={`lg:hidden p-2 rounded-lg transition-colors ${
-              isScrolled ? 'text-warm-700 hover:bg-warm-100' : 'text-white hover:bg-white/10'
+              isScrolled ? 'text-neutral-700 hover:bg-neutral-100' : 'text-white hover:bg-white/10'
             }`}
             aria-label="Toggle menu"
           >
@@ -95,22 +95,22 @@ export function Navbar() {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden bg-white border-t border-warm-100 py-4 shadow-lg">
+          <div className="lg:hidden bg-white border-t border-neutral-100 py-4 shadow-lg">
             <div className="flex flex-col gap-1">
               {navLinks.map((link) => (
                 <a
                   key={link.href}
                   href={link.href}
-                  className="px-4 py-3 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                  className="px-4 py-3 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   {link.label}
                 </a>
               ))}
-              <div className="border-t border-warm-100 mt-2 pt-2 px-2">
+              <div className="border-t border-neutral-100 mt-2 pt-2 px-2">
                 <Link
                   href="/login"
-                  className="block px-4 py-3 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                  className="block px-4 py-3 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Sign In

@@ -453,7 +453,7 @@ const getCategoryColor = (category: string) => {
     case 'family': return 'bg-pink-100 text-pink-600';
     case 'errands': return 'bg-amber-100 text-amber-600';
     case 'home improvement': return 'bg-indigo-100 text-indigo-600';
-    default: return 'bg-warm-100 text-warm-600';
+    default: return 'bg-neutral-100 text-neutral-600';
   }
 };
 
@@ -461,8 +461,8 @@ const getPriorityStyles = (priority: RequestPriority) => {
   switch (priority) {
     case 'urgent': return { bg: 'bg-red-50', border: 'border-red-200', badge: 'bg-red-100 text-red-700' };
     case 'high': return { bg: 'bg-amber-50', border: 'border-amber-200', badge: 'bg-amber-100 text-amber-700' };
-    case 'normal': return { bg: 'bg-white', border: 'border-warm-200', badge: 'bg-warm-100 text-warm-600' };
-    case 'low': return { bg: 'bg-white', border: 'border-warm-100', badge: 'bg-warm-100 text-warm-500' };
+    case 'normal': return { bg: 'bg-white', border: 'border-neutral-200', badge: 'bg-neutral-100 text-neutral-600' };
+    case 'low': return { bg: 'bg-white', border: 'border-neutral-100', badge: 'bg-neutral-100 text-neutral-500' };
   }
 };
 
@@ -482,7 +482,7 @@ export default function ManagerHubPage() {
   // Show Alfred AI chat for Essentials tier users
   if (!subscriptionLoading && isEssentials) {
     return (
-      <div className="min-h-screen bg-warm-50 pb-24 lg:pb-8">
+      <div className="min-h-screen bg-neutral-50 pb-24 lg:pb-8">
         <div className="max-w-4xl mx-auto px-4 py-6">
           <div className="h-[calc(100vh-180px)] lg:h-[calc(100vh-120px)]">
             <AlfredChat />
@@ -508,9 +508,9 @@ export default function ManagerHubPage() {
   };
 
   return (
-    <div className="min-h-screen bg-warm-50 pb-24 lg:pb-8">
+    <div className="min-h-screen bg-neutral-50 pb-24 lg:pb-8">
       {/* HEADER - Manager Profile Card */}
-      <div className="bg-white border-b border-warm-200">
+      <div className="bg-white border-b border-neutral-200">
         <div className="max-w-6xl mx-auto px-4 py-6">
           <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             {/* Manager Avatar & Status */}
@@ -526,13 +526,13 @@ export default function ManagerHubPage() {
             {/* Manager Info */}
             <div className="flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-xl sm:text-2xl font-bold text-warm-900">{MANAGER.name}</h1>
+                <h1 className="text-xl sm:text-2xl font-bold text-neutral-900">{MANAGER.name}</h1>
                 <span className="px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full flex items-center gap-1">
                   <BadgeCheck className="w-3 h-3" />
                   Your Home Manager
                 </span>
               </div>
-              <p className="text-sm text-warm-500 mt-0.5">
+              <p className="text-sm text-neutral-500 mt-0.5">
                 Managing your home since {MANAGER.startDate} {MANAGER.isOnline ? (
                   <span className="text-green-600 font-medium">Online now</span>
                 ) : (
@@ -548,12 +548,12 @@ export default function ManagerHubPage() {
                 </button>
                 <a
                   href={`tel:${MANAGER.phone}`}
-                  className="flex items-center gap-2 px-4 py-2 border border-warm-200 text-warm-700 text-sm font-medium rounded-xl hover:bg-warm-50 transition-colors"
+                  className="flex items-center gap-2 px-4 py-2 border border-neutral-200 text-neutral-700 text-sm font-medium rounded-xl hover:bg-neutral-50 transition-colors"
                 >
                   <Phone className="w-4 h-4" />
                   <span className="hidden sm:inline">Call</span>
                 </a>
-                <button className="flex items-center gap-2 px-4 py-2 border border-warm-200 text-warm-700 text-sm font-medium rounded-xl hover:bg-warm-50 transition-colors">
+                <button className="flex items-center gap-2 px-4 py-2 border border-neutral-200 text-neutral-700 text-sm font-medium rounded-xl hover:bg-neutral-50 transition-colors">
                   <Video className="w-4 h-4" />
                   <span className="hidden sm:inline">Video</span>
                 </button>
@@ -562,42 +562,42 @@ export default function ManagerHubPage() {
 
             {/* Stats - Desktop */}
             <div className="hidden lg:grid grid-cols-4 gap-4">
-              <div className="text-center px-4 py-2 bg-warm-50 rounded-xl">
-                <p className="text-2xl font-bold text-warm-900">{MANAGER.stats.tasksCompletedThisMonth}</p>
-                <p className="text-xs text-warm-500">Tasks This Month</p>
+              <div className="text-center px-4 py-2 bg-neutral-50 rounded-xl">
+                <p className="text-2xl font-bold text-neutral-900">{MANAGER.stats.tasksCompletedThisMonth}</p>
+                <p className="text-xs text-neutral-500">Tasks This Month</p>
               </div>
-              <div className="text-center px-4 py-2 bg-warm-50 rounded-xl">
-                <p className="text-2xl font-bold text-warm-900">{MANAGER.stats.hoursManaged}h</p>
-                <p className="text-xs text-warm-500">Hours Managed</p>
+              <div className="text-center px-4 py-2 bg-neutral-50 rounded-xl">
+                <p className="text-2xl font-bold text-neutral-900">{MANAGER.stats.hoursManaged}h</p>
+                <p className="text-xs text-neutral-500">Hours Managed</p>
               </div>
-              <div className="text-center px-4 py-2 bg-warm-50 rounded-xl">
-                <p className="text-2xl font-bold text-warm-900">{MANAGER.stats.vendorsCoordinated}</p>
-                <p className="text-xs text-warm-500">Vendors Coordinated</p>
+              <div className="text-center px-4 py-2 bg-neutral-50 rounded-xl">
+                <p className="text-2xl font-bold text-neutral-900">{MANAGER.stats.vendorsCoordinated}</p>
+                <p className="text-xs text-neutral-500">Vendors Coordinated</p>
               </div>
-              <div className="text-center px-4 py-2 bg-warm-50 rounded-xl">
+              <div className="text-center px-4 py-2 bg-neutral-50 rounded-xl">
                 <p className="text-2xl font-bold text-haven-700">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
-                <p className="text-xs text-warm-500">Money Managed</p>
+                <p className="text-xs text-neutral-500">Money Managed</p>
               </div>
             </div>
           </div>
 
           {/* Stats - Mobile */}
           <div className="lg:hidden grid grid-cols-2 sm:grid-cols-4 gap-2 mt-4">
-            <div className="text-center py-2 bg-warm-50 rounded-lg">
-              <p className="text-lg font-bold text-warm-900">{MANAGER.stats.tasksCompletedThisMonth}</p>
-              <p className="text-xs text-warm-500">Tasks</p>
+            <div className="text-center py-2 bg-neutral-50 rounded-lg">
+              <p className="text-lg font-bold text-neutral-900">{MANAGER.stats.tasksCompletedThisMonth}</p>
+              <p className="text-xs text-neutral-500">Tasks</p>
             </div>
-            <div className="text-center py-2 bg-warm-50 rounded-lg">
-              <p className="text-lg font-bold text-warm-900">{MANAGER.stats.hoursManaged}h</p>
-              <p className="text-xs text-warm-500">Hours</p>
+            <div className="text-center py-2 bg-neutral-50 rounded-lg">
+              <p className="text-lg font-bold text-neutral-900">{MANAGER.stats.hoursManaged}h</p>
+              <p className="text-xs text-neutral-500">Hours</p>
             </div>
-            <div className="text-center py-2 bg-warm-50 rounded-lg">
-              <p className="text-lg font-bold text-warm-900">{MANAGER.stats.vendorsCoordinated}</p>
-              <p className="text-xs text-warm-500">Vendors</p>
+            <div className="text-center py-2 bg-neutral-50 rounded-lg">
+              <p className="text-lg font-bold text-neutral-900">{MANAGER.stats.vendorsCoordinated}</p>
+              <p className="text-xs text-neutral-500">Vendors</p>
             </div>
-            <div className="text-center py-2 bg-warm-50 rounded-lg">
+            <div className="text-center py-2 bg-neutral-50 rounded-lg">
               <p className="text-lg font-bold text-haven-700">${(MANAGER.stats.moneyManaged / 1000).toFixed(1)}k</p>
-              <p className="text-xs text-warm-500">Managed</p>
+              <p className="text-xs text-neutral-500">Managed</p>
             </div>
           </div>
         </div>
@@ -611,15 +611,15 @@ export default function ManagerHubPage() {
           <div className="lg:col-span-2 space-y-6">
 
             {/* NEEDS YOUR INPUT - Priority Section */}
-            <div className="bg-white rounded-2xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center">
                     <Bell className="w-5 h-5 text-red-600" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-warm-900">Needs Your Input</h2>
-                    <p className="text-sm text-warm-500">{pendingCount} item{pendingCount !== 1 ? 's' : ''} waiting</p>
+                    <h2 className="font-semibold text-neutral-900">Needs Your Input</h2>
+                    <p className="text-sm text-neutral-500">{pendingCount} item{pendingCount !== 1 ? 's' : ''} waiting</p>
                   </div>
                 </div>
                 {pendingCount > 0 && (
@@ -629,12 +629,12 @@ export default function ManagerHubPage() {
                 )}
               </div>
 
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {requests.length === 0 ? (
                   <div className="p-8 text-center">
                     <CheckCircle2 className="w-12 h-12 text-green-300 mx-auto mb-3" />
-                    <p className="font-medium text-warm-900">All caught up!</p>
-                    <p className="text-sm text-warm-500 mt-1">{MANAGER.firstName} will let you know when she needs your input</p>
+                    <p className="font-medium text-neutral-900">All caught up!</p>
+                    <p className="text-sm text-neutral-500 mt-1">{MANAGER.firstName} will let you know when she needs your input</p>
                   </div>
                 ) : (
                   requests.map((request) => {
@@ -644,7 +644,7 @@ export default function ManagerHubPage() {
                     return (
                       <div
                         key={request.id}
-                        className={`p-4 ${priorityStyles.bg} hover:bg-warm-50 transition-colors cursor-pointer`}
+                        className={`p-4 ${priorityStyles.bg} hover:bg-neutral-50 transition-colors cursor-pointer`}
                         onClick={() => setSelectedRequest(request)}
                       >
                         <div className="flex items-start gap-3">
@@ -658,25 +658,25 @@ export default function ManagerHubPage() {
                             <div className="flex items-start justify-between gap-2">
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 flex-wrap">
-                                  <h3 className="font-medium text-warm-900">{request.title}</h3>
+                                  <h3 className="font-medium text-neutral-900">{request.title}</h3>
                                   {request.priority === 'urgent' && (
                                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${priorityStyles.badge}`}>
                                       Urgent
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-sm text-warm-600 mt-1 line-clamp-2">{request.description}</p>
+                                <p className="text-sm text-neutral-600 mt-1 line-clamp-2">{request.description}</p>
                               </div>
 
                               {request.amount && (
-                                <span className="font-semibold text-warm-900 flex-shrink-0">
+                                <span className="font-semibold text-neutral-900 flex-shrink-0">
                                   ${request.amount.toLocaleString()}
                                 </span>
                               )}
                             </div>
 
                             {/* Meta Info */}
-                            <div className="flex items-center gap-3 mt-2 text-xs text-warm-500">
+                            <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
                               {request.vendor && (
                                 <span className="flex items-center gap-1">
                                   <Wrench className="w-3 h-3" />
@@ -707,7 +707,7 @@ export default function ManagerHubPage() {
                                     e.stopPropagation();
                                     handleDeny(request.id);
                                   }}
-                                  className="flex items-center gap-1.5 px-4 py-2 border border-warm-200 text-warm-600 text-sm font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                                  className="flex items-center gap-1.5 px-4 py-2 border border-neutral-200 text-neutral-600 text-sm font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                                 >
                                   <X className="w-4 h-4" />
                                   Deny
@@ -728,18 +728,18 @@ export default function ManagerHubPage() {
                                     className={`w-full flex items-center justify-between p-3 rounded-lg border text-left transition-colors ${
                                       option.recommended
                                         ? 'border-haven-300 bg-haven-50 hover:bg-haven-100'
-                                        : 'border-warm-200 hover:bg-warm-50'
+                                        : 'border-neutral-200 hover:bg-neutral-50'
                                     }`}
                                   >
                                     <div>
-                                      <p className="text-sm font-medium text-warm-900">{option.label}</p>
+                                      <p className="text-sm font-medium text-neutral-900">{option.label}</p>
                                       {option.description && (
-                                        <p className="text-xs text-warm-500 mt-0.5">{option.description}</p>
+                                        <p className="text-xs text-neutral-500 mt-0.5">{option.description}</p>
                                       )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                       {option.cost && (
-                                        <span className="text-sm text-warm-600">${option.cost}</span>
+                                        <span className="text-sm text-neutral-600">${option.cost}</span>
                                       )}
                                       {option.recommended && (
                                         <span className="px-2 py-0.5 bg-haven-200 text-haven-700 text-xs font-medium rounded-full">
@@ -772,54 +772,54 @@ export default function ManagerHubPage() {
             </div>
 
             {/* WHAT SARAH'S WORKING ON */}
-            <div className="bg-white rounded-2xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
                     <Timer className="w-5 h-5 text-blue-600" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-warm-900">What {MANAGER.firstName}&apos;s Working On</h2>
-                    <p className="text-sm text-warm-500">{IN_PROGRESS_ITEMS.length} active items</p>
+                    <h2 className="font-semibold text-neutral-900">What {MANAGER.firstName}&apos;s Working On</h2>
+                    <p className="text-sm text-neutral-500">{IN_PROGRESS_ITEMS.length} active items</p>
                   </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {IN_PROGRESS_ITEMS.map((item) => {
                   const CategoryIcon = getCategoryIcon(item.category);
                   return (
-                    <div key={item.id} className="p-4 hover:bg-warm-50 transition-colors">
+                    <div key={item.id} className="p-4 hover:bg-neutral-50 transition-colors">
                       <div className="flex items-start gap-3">
                         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${getCategoryColor(item.category)}`}>
                           <CategoryIcon className="w-5 h-5" />
                         </div>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <h3 className="font-medium text-warm-900">{item.title}</h3>
+                            <h3 className="font-medium text-neutral-900">{item.title}</h3>
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full flex-shrink-0 ${
                               item.status === 'in-progress' ? 'bg-blue-100 text-blue-700' :
                               item.status === 'scheduled' ? 'bg-purple-100 text-purple-700' :
                               item.status === 'waiting' ? 'bg-amber-100 text-amber-700' :
-                              'bg-warm-100 text-warm-600'
+                              'bg-neutral-100 text-neutral-600'
                             }`}>
                               {item.status === 'in-progress' ? 'In Progress' :
                                item.status === 'scheduled' ? 'Scheduled' :
                                item.status === 'waiting' ? 'Waiting' : 'On Hold'}
                             </span>
                           </div>
-                          <p className="text-sm text-warm-600 mt-1">{item.description}</p>
+                          <p className="text-sm text-neutral-600 mt-1">{item.description}</p>
 
                           {/* Latest Update */}
                           {item.updates && item.updates[0] && (
-                            <div className="mt-2 p-2 bg-warm-50 rounded-lg">
-                              <p className="text-xs text-warm-500">
+                            <div className="mt-2 p-2 bg-neutral-50 rounded-lg">
+                              <p className="text-xs text-neutral-500">
                                 <span className="font-medium">{item.updates[0].time}:</span> {item.updates[0].message}
                               </p>
                             </div>
                           )}
 
-                          <div className="flex items-center gap-3 mt-2 text-xs text-warm-500">
+                          <div className="flex items-center gap-3 mt-2 text-xs text-neutral-500">
                             {item.vendor && <span>{item.vendor}</span>}
                             {item.estimatedCompletion && (
                               <span className="flex items-center gap-1">
@@ -837,15 +837,15 @@ export default function ManagerHubPage() {
             </div>
 
             {/* THIS WEEK'S ACTIVITY - Completed */}
-            <div className="bg-white rounded-2xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100 flex items-center justify-between">
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100 flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-green-100 flex items-center justify-center">
                     <CheckCircle2 className="w-5 h-5 text-green-600" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-warm-900">This Week&apos;s Activity</h2>
-                    <p className="text-sm text-warm-500">{COMPLETED_ITEMS.length} items completed</p>
+                    <h2 className="font-semibold text-neutral-900">This Week&apos;s Activity</h2>
+                    <p className="text-sm text-neutral-500">{COMPLETED_ITEMS.length} items completed</p>
                   </div>
                 </div>
                 <button
@@ -856,10 +856,10 @@ export default function ManagerHubPage() {
                 </button>
               </div>
 
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {(showAllCompleted ? COMPLETED_ITEMS : COMPLETED_ITEMS.slice(0, 4)).map((item) => {
                   return (
-                    <div key={item.id} className="p-4 hover:bg-warm-50 transition-colors">
+                    <div key={item.id} className="p-4 hover:bg-neutral-50 transition-colors">
                       <div className="flex items-start gap-3">
                         <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center flex-shrink-0">
                           <Check className="w-4 h-4 text-green-600" />
@@ -867,8 +867,8 @@ export default function ManagerHubPage() {
                         <div className="flex-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <h3 className="font-medium text-warm-900 text-sm">{item.title}</h3>
-                              <p className="text-xs text-warm-500 mt-0.5">{item.description}</p>
+                              <h3 className="font-medium text-neutral-900 text-sm">{item.title}</h3>
+                              <p className="text-xs text-neutral-500 mt-0.5">{item.description}</p>
                             </div>
                             {item.savedAmount && (
                               <span className="text-sm font-medium text-green-600 flex-shrink-0">
@@ -876,16 +876,16 @@ export default function ManagerHubPage() {
                               </span>
                             )}
                             {item.cost && !item.savedAmount && (
-                              <span className="text-sm text-warm-600 flex-shrink-0">
+                              <span className="text-sm text-neutral-600 flex-shrink-0">
                                 ${item.cost.toLocaleString()}
                               </span>
                             )}
                           </div>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-warm-400">{item.completedAt}</span>
+                            <span className="text-xs text-neutral-400">{item.completedAt}</span>
                             {item.result && (
                               <>
-                                <span className="text-warm-300"></span>
+                                <span className="text-neutral-300"></span>
                                 <span className="text-xs text-green-600 font-medium">{item.result}</span>
                               </>
                             )}
@@ -903,43 +903,43 @@ export default function ManagerHubPage() {
           <div className="space-y-6">
 
             {/* UPCOMING */}
-            <div className="bg-white rounded-2xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100">
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-purple-100 flex items-center justify-center">
                     <Calendar className="w-5 h-5 text-purple-600" />
                   </div>
                   <div>
-                    <h2 className="font-semibold text-warm-900">Upcoming</h2>
-                    <p className="text-sm text-warm-500">What&apos;s scheduled</p>
+                    <h2 className="font-semibold text-neutral-900">Upcoming</h2>
+                    <p className="text-sm text-neutral-500">What&apos;s scheduled</p>
                   </div>
                 </div>
               </div>
 
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {UPCOMING_ITEMS.map((item) => {
                   const CategoryIcon = getCategoryIcon(item.category);
                   return (
-                    <div key={item.id} className="p-4 hover:bg-warm-50 transition-colors">
+                    <div key={item.id} className="p-4 hover:bg-neutral-50 transition-colors">
                       <div className="flex items-start gap-3">
                         <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${getCategoryColor(item.category)}`}>
                           <CategoryIcon className="w-4 h-4" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-medium text-warm-900 text-sm">{item.title}</h3>
-                          <p className="text-xs text-warm-500 mt-0.5">{item.description}</p>
-                          <div className="flex items-center gap-2 mt-1.5 text-xs text-warm-500">
+                          <h3 className="font-medium text-neutral-900 text-sm">{item.title}</h3>
+                          <p className="text-xs text-neutral-500 mt-0.5">{item.description}</p>
+                          <div className="flex items-center gap-2 mt-1.5 text-xs text-neutral-500">
                             <Calendar className="w-3 h-3" />
-                            <span className="font-medium text-warm-700">{item.scheduledFor}</span>
+                            <span className="font-medium text-neutral-700">{item.scheduledFor}</span>
                             {item.duration && (
                               <>
-                                <span className="text-warm-300"></span>
+                                <span className="text-neutral-300"></span>
                                 <span>{item.duration}</span>
                               </>
                             )}
                           </div>
                           {item.vendor && (
-                            <p className="text-xs text-warm-500 mt-1">{item.vendor}</p>
+                            <p className="text-xs text-neutral-500 mt-1">{item.vendor}</p>
                           )}
                         </div>
                       </div>
@@ -948,7 +948,7 @@ export default function ManagerHubPage() {
                 })}
               </div>
 
-              <div className="p-3 border-t border-warm-100">
+              <div className="p-3 border-t border-neutral-100">
                 <button className="w-full text-sm text-haven-700 font-medium hover:text-haven-800 py-2">
                   View Full Calendar
                 </button>
@@ -956,16 +956,16 @@ export default function ManagerHubPage() {
             </div>
 
             {/* QUICK MESSAGE */}
-            <div className="bg-white rounded-2xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100">
+            <div className="bg-white rounded-2xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-haven-100 flex items-center justify-center">
                       <MessageCircle className="w-5 h-5 text-haven-700" />
                     </div>
                     <div>
-                      <h2 className="font-semibold text-warm-900">Quick Message</h2>
-                      <p className="text-sm text-warm-500">Chat with {MANAGER.firstName}</p>
+                      <h2 className="font-semibold text-neutral-900">Quick Message</h2>
+                      <p className="text-sm text-neutral-500">Chat with {MANAGER.firstName}</p>
                     </div>
                   </div>
                   <button className="text-sm text-haven-700 font-medium hover:text-haven-800">
@@ -975,7 +975,7 @@ export default function ManagerHubPage() {
               </div>
 
               {/* Recent Messages Preview */}
-              <div className="p-4 space-y-3 max-h-64 overflow-y-auto bg-warm-50">
+              <div className="p-4 space-y-3 max-h-64 overflow-y-auto bg-neutral-50">
                 {RECENT_MESSAGES.map((msg) => (
                   <div
                     key={msg.id}
@@ -984,11 +984,11 @@ export default function ManagerHubPage() {
                     <div className={`max-w-[85%] rounded-2xl px-4 py-2 ${
                       msg.sender === 'homeowner'
                         ? 'bg-haven-700 text-white rounded-br-md'
-                        : 'bg-white text-warm-900 rounded-bl-md shadow-sm'
+                        : 'bg-white text-neutral-900 rounded-bl-md shadow-sm'
                     }`}>
                       <p className="text-sm">{msg.content}</p>
                       <p className={`text-xs mt-1 ${
-                        msg.sender === 'homeowner' ? 'text-haven-200' : 'text-warm-400'
+                        msg.sender === 'homeowner' ? 'text-haven-200' : 'text-neutral-400'
                       }`}>
                         {msg.timestamp}
                       </p>
@@ -998,9 +998,9 @@ export default function ManagerHubPage() {
               </div>
 
               {/* Message Input */}
-              <div className="p-3 border-t border-warm-200 bg-white">
+              <div className="p-3 border-t border-neutral-200 bg-white">
                 <div className="flex items-center gap-2">
-                  <button className="p-2 text-warm-400 hover:text-warm-600 transition-colors">
+                  <button className="p-2 text-neutral-400 hover:text-neutral-600 transition-colors">
                     <Paperclip className="w-5 h-5" />
                   </button>
                   <input
@@ -1008,10 +1008,10 @@ export default function ManagerHubPage() {
                     value={messageInput}
                     onChange={(e) => setMessageInput(e.target.value)}
                     placeholder={`Message ${MANAGER.firstName}...`}
-                    className="flex-1 px-4 py-2 bg-warm-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-haven-600"
+                    className="flex-1 px-4 py-2 bg-neutral-50 border-0 rounded-xl text-sm focus:ring-2 focus:ring-haven-600"
                     onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                   />
-                  <button className="p-2 text-warm-400 hover:text-warm-600 transition-colors">
+                  <button className="p-2 text-neutral-400 hover:text-neutral-600 transition-colors">
                     <Mic className="w-5 h-5" />
                   </button>
                   <button
@@ -1063,13 +1063,13 @@ export default function ManagerHubPage() {
             <div className="fixed inset-0 bg-black/50" onClick={() => setSelectedRequest(null)} />
             <div className="relative bg-white w-full sm:max-w-lg sm:rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto rounded-t-2xl">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-warm-200 p-4 flex items-center justify-between">
-                <h3 className="font-semibold text-warm-900">Request Details</h3>
+              <div className="sticky top-0 bg-white border-b border-neutral-200 p-4 flex items-center justify-between">
+                <h3 className="font-semibold text-neutral-900">Request Details</h3>
                 <button
                   onClick={() => setSelectedRequest(null)}
-                  className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+                  className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-warm-400" />
+                  <X className="w-5 h-5 text-neutral-400" />
                 </button>
               </div>
 
@@ -1078,14 +1078,14 @@ export default function ManagerHubPage() {
                 {/* Title & Priority */}
                 <div>
                   <div className="flex items-start gap-2">
-                    <h2 className="text-lg font-semibold text-warm-900 flex-1">{selectedRequest.title}</h2>
+                    <h2 className="text-lg font-semibold text-neutral-900 flex-1">{selectedRequest.title}</h2>
                     {selectedRequest.priority === 'urgent' && (
                       <span className="px-2 py-1 bg-red-100 text-red-700 text-xs font-medium rounded-full">
                         Urgent
                       </span>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 mt-2 text-sm text-warm-500">
+                  <div className="flex items-center gap-2 mt-2 text-sm text-neutral-500">
                     <span className={`px-2 py-0.5 rounded-full text-xs ${getCategoryColor(selectedRequest.category)}`}>
                       {selectedRequest.category}
                     </span>
@@ -1101,8 +1101,8 @@ export default function ManagerHubPage() {
                 </div>
 
                 {/* Description */}
-                <div className="bg-warm-50 rounded-xl p-4">
-                  <p className="text-warm-700 text-sm leading-relaxed">{selectedRequest.description}</p>
+                <div className="bg-neutral-50 rounded-xl p-4">
+                  <p className="text-neutral-700 text-sm leading-relaxed">{selectedRequest.description}</p>
                 </div>
 
                 {/* Amount */}
@@ -1118,17 +1118,17 @@ export default function ManagerHubPage() {
                 {/* Attachments */}
                 {selectedRequest.attachments && selectedRequest.attachments.length > 0 && (
                   <div>
-                    <h4 className="text-sm font-medium text-warm-700 mb-2">Attachments</h4>
+                    <h4 className="text-sm font-medium text-neutral-700 mb-2">Attachments</h4>
                     <div className="space-y-2">
                       {selectedRequest.attachments.map((attachment, idx) => (
                         <a
                           key={idx}
                           href={attachment.url}
-                          className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors"
+                          className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                         >
-                          <FileText className="w-5 h-5 text-warm-500" />
-                          <span className="text-sm text-warm-700 flex-1">{attachment.name}</span>
-                          <ExternalLink className="w-4 h-4 text-warm-400" />
+                          <FileText className="w-5 h-5 text-neutral-500" />
+                          <span className="text-sm text-neutral-700 flex-1">{attachment.name}</span>
+                          <ExternalLink className="w-4 h-4 text-neutral-400" />
                         </a>
                       ))}
                     </div>
@@ -1138,7 +1138,7 @@ export default function ManagerHubPage() {
                 {/* Options */}
                 {selectedRequest.options && (
                   <div>
-                    <h4 className="text-sm font-medium text-warm-700 mb-2">Your Options</h4>
+                    <h4 className="text-sm font-medium text-neutral-700 mb-2">Your Options</h4>
                     <div className="space-y-2">
                       {selectedRequest.options.map((option) => (
                         <button
@@ -1147,19 +1147,19 @@ export default function ManagerHubPage() {
                           className={`w-full text-left p-4 rounded-xl border transition-colors ${
                             option.recommended
                               ? 'border-haven-300 bg-haven-50 hover:bg-haven-100'
-                              : 'border-warm-200 hover:bg-warm-50'
+                              : 'border-neutral-200 hover:bg-neutral-50'
                           }`}
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <p className="font-medium text-warm-900">{option.label}</p>
+                              <p className="font-medium text-neutral-900">{option.label}</p>
                               {option.description && (
-                                <p className="text-sm text-warm-500 mt-1">{option.description}</p>
+                                <p className="text-sm text-neutral-500 mt-1">{option.description}</p>
                               )}
                             </div>
                             <div className="flex flex-col items-end gap-1 ml-3">
                               {option.cost && (
-                                <span className="font-semibold text-warm-900">${option.cost.toLocaleString()}</span>
+                                <span className="font-semibold text-neutral-900">${option.cost.toLocaleString()}</span>
                               )}
                               {option.recommended && (
                                 <span className="px-2 py-0.5 bg-haven-200 text-haven-700 text-xs font-medium rounded-full">
@@ -1177,10 +1177,10 @@ export default function ManagerHubPage() {
 
               {/* Modal Footer - Actions */}
               {!selectedRequest.options && (
-                <div className="sticky bottom-0 bg-white border-t border-warm-200 p-4 flex gap-3">
+                <div className="sticky bottom-0 bg-white border-t border-neutral-200 p-4 flex gap-3">
                   <button
                     onClick={() => handleDeny(selectedRequest.id)}
-                    className="flex-1 py-3 border border-warm-200 text-warm-700 font-medium rounded-xl hover:bg-warm-50 transition-colors"
+                    className="flex-1 py-3 border border-neutral-200 text-neutral-700 font-medium rounded-xl hover:bg-neutral-50 transition-colors"
                   >
                     Deny
                   </button>

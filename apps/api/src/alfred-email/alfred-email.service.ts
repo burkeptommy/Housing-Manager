@@ -1,5 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { EmailParserService } from './email-parser.service';
 import { EmailActionsService } from './email-actions.service';
 import {
@@ -42,6 +43,7 @@ export class AlfredEmailService {
 
   constructor(
     private prisma: PrismaService,
+    private storageService: StorageService,
     private emailParser: EmailParserService,
     private emailActions: EmailActionsService,
   ) {}
@@ -136,16 +138,35 @@ export class AlfredEmailService {
       return { caseId: emailCase.id, caseNumber, status: 'awaiting_authorization' };
     }
 
-    // 5. Store attachments
+    // 5. Store attachments (upload to GCS)
     if (emailData.attachments?.length > 0) {
       for (const attachment of emailData.attachments) {
+        const buffer = Buffer.from(attachment.content, 'base64');
+        let storageUrl: string | undefined;
+
+        try {
+          const uploaded = await this.storageService.uploadBuffer(
+            buffer,
+            household.id,
+            'email-attachments',
+            attachment.filename,
+            attachment.type,
+          );
+          storageUrl = uploaded.url;
+        } catch (uploadError) {
+          this.logger.warn(
+            `Failed to upload attachment "${attachment.filename}" to GCS:`,
+            uploadError,
+          );
+        }
+
         await this.prisma.emailAttachment.create({
           data: {
             caseId: emailCase.id,
             filename: attachment.filename,
             contentType: attachment.type,
-            sizeBytes: Buffer.from(attachment.content, 'base64').length,
-            // TODO: Upload to GCS and store URL
+            sizeBytes: buffer.length,
+            storageUrl,
           },
         });
 
@@ -153,7 +174,7 @@ export class AlfredEmailService {
           data: {
             caseId: emailCase.id,
             type: EmailCaseActivityType.ATTACHMENT_PROCESSED,
-            description: `Attachment "${attachment.filename}" received`,
+            description: `Attachment "${attachment.filename}" ${storageUrl ? 'uploaded' : 'received (upload failed)'}`,
             actor: 'system',
             actorName: 'System',
           },
@@ -234,6 +255,7 @@ export class AlfredEmailService {
             { label: 'Add to Calendar', type: 'CALENDAR', data: { title: emailData.subject } },
             { label: 'Track as Bill', type: 'BILL', data: { vendorName: emailData.subject } },
             { label: 'Save as Document', type: 'DOCUMENT', data: { name: emailData.subject, category: 'general' } },
+            { label: "Have Alfred's team handle this", type: 'ESCALATE', data: { title: `Handle: ${emailData.subject}` } },
             { label: 'Something else...', type: 'CUSTOM', data: null },
           ],
         },
@@ -850,6 +872,94 @@ export class AlfredEmailService {
             actions.push({ type: 'REMINDER', success: true, id: reminder.id });
             break;
           }
+
+          case 'WARRANTY': {
+            const warrantyData = actionOption.data as Record<string, unknown>;
+            const hhForWarranty = await this.prisma.household.findUnique({
+              where: { id: household.id },
+              select: { ownerId: true },
+            });
+            const warrantyDoc = await this.prisma.document.create({
+              data: {
+                householdId: household.id,
+                fileName: `warranty_${((warrantyData.productName as string) || 'product').replace(/[^a-zA-Z0-9]/g, '_')}.pdf`,
+                originalName: `${(warrantyData.productName as string) || 'Product'} Warranty`,
+                mimeType: 'application/pdf',
+                fileSize: 0,
+                storageUrl: '',
+                storagePath: '',
+                category: DocumentCategory.WARRANTY,
+                title: `${(warrantyData.productName as string) || 'Product'} Warranty`,
+                description: (warrantyData.warrantyTerms as string) || undefined,
+                expiresAt: warrantyData.expirationDate ? new Date(warrantyData.expirationDate as string) : undefined,
+                expirationAlert: !!warrantyData.expirationDate,
+                uploadedById: hhForWarranty?.ownerId || '',
+              },
+            });
+            // Set reminder before warranty expires
+            if (warrantyData.expirationDate) {
+              const expDate = new Date(warrantyData.expirationDate as string);
+              const reminderDate = new Date(expDate);
+              reminderDate.setMonth(reminderDate.getMonth() - 1);
+              await this.prisma.reminder.create({
+                data: {
+                  householdId: household.id,
+                  type: ReminderType.BILL_DUE,
+                  scheduledAt: reminderDate,
+                  status: ReminderStatus.PENDING,
+                  channel: ReminderChannel.EMAIL,
+                  payloadJson: { message: `Warranty expiring soon: ${(warrantyData.productName as string) || 'Product'}`, source: 'alfred-email' },
+                },
+              });
+            }
+            actions.push({ type: 'WARRANTY', success: true, id: warrantyDoc.id });
+            break;
+          }
+
+          case 'SHIPPING': {
+            const shippingData = actionOption.data as Record<string, unknown>;
+            // Create a reminder for estimated delivery
+            if (shippingData.estimatedDelivery) {
+              const deliveryReminder = await this.prisma.reminder.create({
+                data: {
+                  householdId: household.id,
+                  type: ReminderType.BILL_DUE,
+                  scheduledAt: new Date(shippingData.estimatedDelivery as string),
+                  status: ReminderStatus.PENDING,
+                  channel: ReminderChannel.EMAIL,
+                  payloadJson: JSON.parse(JSON.stringify({
+                    message: `Package arriving: ${(shippingData.itemDescription as string) || 'Your order'}`,
+                    carrier: shippingData.carrier,
+                    trackingNumber: shippingData.trackingNumber,
+                    source: 'alfred-email',
+                  })),
+                },
+              });
+              actions.push({ type: 'SHIPPING', success: true, id: deliveryReminder.id });
+            } else {
+              // Log tracking info even without delivery date
+              actions.push({ type: 'SHIPPING', success: true });
+            }
+            break;
+          }
+
+          case 'ESCALATE': {
+            // Create a service request for the Haven team to handle behind the scenes
+            const escalateData = actionOption.data as Record<string, unknown>;
+            const serviceRequest = await this.prisma.serviceRequest.create({
+              data: {
+                householdId: household.id,
+                createdById: user.userId,
+                title: (escalateData.title as string) || `Handle email: ${emailCase.subject}`,
+                description: (escalateData.description as string) || `Email forwarded to Alfred requires human handling.\n\nSubject: ${emailCase.subject}\nFrom: ${emailCase.fromEmail}\n\nUser selected: Have Alfred's team handle this.`,
+                status: 'SUBMITTED',
+                priority: 'MEDIUM',
+                quickCategory: 'OTHER',
+              },
+            });
+            actions.push({ type: 'ESCALATE', success: true, id: serviceRequest.id });
+            break;
+          }
         }
 
         // Log each action
@@ -882,6 +992,9 @@ export class AlfredEmailService {
           case 'TASK': return '✅ Created task';
           case 'DOCUMENT': return '📄 Saved document';
           case 'REMINDER': return '⏰ Set reminder';
+          case 'WARRANTY': return '🛡️ Saved warranty info';
+          case 'SHIPPING': return '📦 Tracking package';
+          case 'ESCALATE': return '🤝 Our team is on it';
           default: return `✓ ${a.type}`;
         }
       });

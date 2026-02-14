@@ -228,6 +228,21 @@ export class VendorsController {
     });
   }
 
+  @Get('search')
+  @ApiOperation({ summary: 'Search vendor directory' })
+  @ApiQuery({ name: 'query', required: false })
+  @ApiQuery({ name: 'category', enum: VendorCategory, required: false })
+  @ApiQuery({ name: 'householdId', required: true })
+  @ApiResponse({ status: 200, description: 'Search results' })
+  async searchVendors(
+    @Query('query') query?: string,
+    @Query('category') category?: VendorCategory,
+    @Query('householdId') householdId?: string,
+    @CurrentUser() user?: AuthPayload,
+  ) {
+    return this.vendorsService.searchDirectory(query, category, householdId, user!.userId);
+  }
+
   @Get(':vendorId')
   @ApiOperation({ summary: 'Get a vendor with activities' })
   @ApiParam({ name: 'vendorId', description: 'Vendor ID' })

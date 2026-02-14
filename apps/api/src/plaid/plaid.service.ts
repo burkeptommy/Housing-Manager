@@ -489,16 +489,16 @@ export class PlaidService {
       name.includes('tree') ||
       name.includes('mowing')
     ) {
-      return 'OTHER_BILL'; // TODO: Add LANDSCAPING category
+      return 'LAWN_LANDSCAPE';
     }
     // Housekeeping
     if (name.includes('clean') || name.includes('maid') || name.includes('housekeep')) {
-      return 'OTHER_BILL'; // TODO: Add HOUSEKEEPING category
+      return 'HOUSE_CLEANING';
     }
     // Pool service
-    if (name.includes('pool')) return 'OTHER_BILL';
+    if (name.includes('pool')) return 'POOL_SERVICE';
     // Pest control
-    if (name.includes('pest') || name.includes('exterminator')) return 'OTHER_BILL';
+    if (name.includes('pest') || name.includes('exterminator')) return 'PEST_CONTROL';
     // HOA
     if (name.includes('hoa') || name.includes('homeowner') || name.includes('association')) {
       return 'HOA';

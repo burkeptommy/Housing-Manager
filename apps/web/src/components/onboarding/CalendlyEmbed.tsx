@@ -53,7 +53,7 @@ export function CalendlyEmbed({ url, type, onEventScheduled }: CalendlyEmbedProp
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-2xl z-10">
           <div className="text-center">
-            <Loader2 className="w-8 h-8 text-haven-champagne-500 animate-spin mx-auto mb-3" />
+            <Loader2 className="w-8 h-8 text-haven-500 animate-spin mx-auto mb-3" />
             <p className="text-gray-500">Loading calendar...</p>
           </div>
         </div>

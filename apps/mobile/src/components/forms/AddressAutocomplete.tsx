@@ -177,14 +177,14 @@ export function AddressAutocomplete({
         <Ionicons
           name="location-outline"
           size={20}
-          color={colors.haven.navy[400]}
+          color={colors.haven.purple[400]}
           style={styles.icon}
         />
 
         <TextInput
           style={styles.input}
           placeholder={placeholder}
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={query}
           onChangeText={handleTextChange}
           onFocus={() => {
@@ -203,12 +203,12 @@ export function AddressAutocomplete({
         />
 
         {isLoading && (
-          <ActivityIndicator size="small" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="small" color={colors.haven.purple[500]} />
         )}
 
         {query.length > 0 && !isLoading && (
           <TouchableOpacity onPress={handleClear} style={styles.clearButton}>
-            <Ionicons name="close-circle" size={20} color={colors.haven.navy[400]} />
+            <Ionicons name="close-circle" size={20} color={colors.haven.purple[400]} />
           </TouchableOpacity>
         )}
       </View>
@@ -230,7 +230,7 @@ export function AddressAutocomplete({
                 <Ionicons
                   name="location"
                   size={18}
-                  color={colors.haven.champagne[500]}
+                  color={colors.haven.purple[500]}
                   style={styles.predictionIcon}
                 />
                 <View style={styles.predictionText}>
@@ -273,7 +273,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
   },
   inputFocused: {
-    borderColor: colors.haven.champagne[500],
+    borderColor: colors.haven.purple[500],
     backgroundColor: colors.white,
   },
   inputError: {

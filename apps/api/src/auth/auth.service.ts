@@ -15,6 +15,7 @@ import { randomBytes } from 'crypto';
 
 import { PrismaService } from '../prisma';
 import { PropertyEnrichmentService } from '../property/property-enrichment.service';
+import { PropertyService } from '../property/property.service';
 import { generateUniqueAlfredEmailCode } from '../alfred-email/utils';
 
 import {
@@ -49,6 +50,8 @@ export class AuthService {
     private readonly configService: ConfigService,
     @Inject(forwardRef(() => PropertyEnrichmentService))
     private readonly enrichmentService: PropertyEnrichmentService,
+    @Inject(forwardRef(() => PropertyService))
+    private readonly propertyService: PropertyService,
   ) {
     this.accessTokenExpiresIn = this.configService.get<number>('JWT_ACCESS_EXPIRES_IN', 900); // 15 min
     this.refreshTokenExpiresInDays = this.configService.get<number>('JWT_REFRESH_EXPIRES_DAYS', 7);
@@ -188,12 +191,23 @@ export class AuthService {
       return { user, household };
     });
 
-    // 5. Trigger ATTOM enrichment in background (async - don't wait)
-    this.enrichmentService
-      .enrichHouseholdFromAttom(result.household.id, {})
-      .catch((err) => {
-        this.logger.error(`ATTOM enrichment failed for household ${result.household.id}:`, err);
-      });
+    // 5. Look up property data and trigger enrichment in background (async - don't wait)
+    (async () => {
+      try {
+        const lookupResult = await this.propertyService.lookupByAddress(
+          dto.address.addressLine1,
+          dto.address.city,
+          dto.address.state,
+          dto.address.zipCode,
+        );
+        const propertyData = lookupResult.data;
+        if (propertyData) {
+          await this.enrichmentService.enrichHouseholdFromPropertyData(result.household.id, propertyData);
+        }
+      } catch (err) {
+        this.logger.error(`Property enrichment failed for household ${result.household.id}:`, err);
+      }
+    })();
 
     return {
       user: this.mapUserToResponse(result.user),
@@ -268,7 +282,7 @@ export class AuthService {
         }
       }
 
-      // 2. Create household with utility info from ATTOM and Alfred email code
+      // 2. Create household with utility info and Alfred email code
       const household = await tx.household.create({
         data: {
           name: `The ${dto.lastName} Family`,
@@ -276,7 +290,7 @@ export class AuthService {
           subscriptionPlan: 'ESSENTIALS',
           subscriptionStatus: 'ACTIVE',
           alfredEmailCode,
-          // Utility/system data from ATTOM (if available)
+          // Utility/system data from property lookup (if available)
           waterSource: dto.propertyDetails?.waterType ?? undefined,
           sewerType: dto.propertyDetails?.sewerType ?? undefined,
           heatingFuel: dto.propertyDetails?.heatingFuel ?? undefined,
@@ -293,7 +307,7 @@ export class AuthService {
         },
       });
 
-      // 3. Create home profile with address and property details from ATTOM
+      // 3. Create home profile with address and property details
       await tx.homeProfile.create({
         data: {
           householdId: household.id,
@@ -302,7 +316,7 @@ export class AuthService {
           city: dto.address.city,
           state: dto.address.state,
           postalCode: dto.address.zipCode,
-          // Property details from ATTOM (if available)
+          // Property details from lookup (if available)
           bedrooms: dto.propertyDetails?.bedrooms ?? undefined,
           bathrooms: dto.propertyDetails?.bathrooms ?? undefined,
           squareFeet: dto.propertyDetails?.squareFeet ?? undefined,
@@ -327,12 +341,31 @@ export class AuthService {
       return { user: userRecord, household };
     });
 
-    // 5. Trigger ATTOM enrichment in background (async - don't wait)
-    this.enrichmentService
-      .enrichHouseholdFromAttom(result.household.id, {})
-      .catch((err) => {
-        this.logger.error(`ATTOM enrichment failed for household ${result.household.id}:`, err);
-      });
+    // 5. Trigger property enrichment in background (async - don't wait)
+    if (dto.propertyDetails) {
+      this.enrichmentService
+        .enrichHouseholdFromPropertyData(result.household.id, dto.propertyDetails as any)
+        .catch((err) => {
+          this.logger.error(`Property enrichment failed for household ${result.household.id}:`, err);
+        });
+    } else {
+      // No property details from onboarding — try BatchData lookup
+      (async () => {
+        try {
+          const lookupResult = await this.propertyService.lookupByAddress(
+            dto.address.addressLine1,
+            dto.address.city,
+            dto.address.state,
+            dto.address.zipCode,
+          );
+          if (lookupResult.data) {
+            await this.enrichmentService.enrichHouseholdFromPropertyData(result.household.id, lookupResult.data);
+          }
+        } catch (err) {
+          this.logger.error(`Property enrichment failed for household ${result.household.id}:`, err);
+        }
+      })();
+    }
 
     // 6. Initialize Alfred data gaps based on missing property info
     // Build list of what we don't have

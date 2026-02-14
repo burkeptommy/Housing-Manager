@@ -9,7 +9,7 @@ interface TableProps {
 
 export function Table({ children, className = '' }: TableProps) {
   return (
-    <div className={`bg-white rounded-2xl border border-warm-100 overflow-hidden ${className}`}>
+    <div className={`bg-white rounded-2xl border border-neutral-100 overflow-hidden ${className}`}>
       <table className="w-full">{children}</table>
     </div>
   );
@@ -17,14 +17,14 @@ export function Table({ children, className = '' }: TableProps) {
 
 export function TableHeader({ children }: { children: ReactNode }) {
   return (
-    <thead className="bg-warm-50 border-b border-warm-100">
+    <thead className="bg-neutral-50 border-b border-neutral-100">
       {children}
     </thead>
   );
 }
 
 export function TableBody({ children }: { children: ReactNode }) {
-  return <tbody className="divide-y divide-warm-50">{children}</tbody>;
+  return <tbody className="divide-y divide-neutral-50">{children}</tbody>;
 }
 
 export function TableRow({
@@ -39,7 +39,7 @@ export function TableRow({
   return (
     <tr
       onClick={onClick}
-      className={`${onClick ? 'cursor-pointer hover:bg-warm-50 transition-colors' : ''} ${className}`}
+      className={`${onClick ? 'cursor-pointer hover:bg-neutral-50 transition-colors' : ''} ${className}`}
     >
       {children}
     </tr>
@@ -49,7 +49,7 @@ export function TableRow({
 export function TableHead({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
     <th
-      className={`px-6 py-3 text-left text-xs font-semibold text-warm-600 uppercase tracking-wider ${className}`}
+      className={`px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider ${className}`}
     >
       {children}
     </th>
@@ -64,7 +64,7 @@ export function TableCell({
   className?: string;
 }) {
   return (
-    <td className={`px-6 py-4 text-sm text-warm-700 ${className}`}>
+    <td className={`px-6 py-4 text-sm text-neutral-700 ${className}`}>
       {children}
     </td>
   );
@@ -87,12 +87,12 @@ export function TableEmpty({
       <td colSpan={100}>
         <div className="flex flex-col items-center justify-center py-12 text-center">
           {icon && (
-            <div className="w-12 h-12 rounded-xl bg-warm-100 flex items-center justify-center text-warm-400 mb-3">
+            <div className="w-12 h-12 rounded-xl bg-neutral-100 flex items-center justify-center text-neutral-400 mb-3">
               {icon}
             </div>
           )}
-          <p className="text-warm-900 font-medium">{title}</p>
-          {description && <p className="text-sm text-warm-500 mt-1">{description}</p>}
+          <p className="text-neutral-900 font-medium">{title}</p>
+          {description && <p className="text-sm text-neutral-500 mt-1">{description}</p>}
           {action && <div className="mt-4">{action}</div>}
         </div>
       </td>
@@ -115,8 +115,8 @@ export function SortableHeader({
   return (
     <th
       onClick={onSort}
-      className="px-6 py-3 text-left text-xs font-semibold text-warm-600 uppercase tracking-wider cursor-pointer
-                 hover:text-warm-900 transition-colors group"
+      className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider cursor-pointer
+                 hover:text-neutral-900 transition-colors group"
     >
       <span className="flex items-center gap-1">
         {children}

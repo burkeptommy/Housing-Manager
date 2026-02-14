@@ -37,7 +37,7 @@ export function SectionHeader({
             <Ionicons
               name={actionIcon}
               size={18}
-              color={colors.haven.champagne[500]}
+              color={colors.haven.purple[500]}
               style={actionText ? styles.actionIcon : undefined}
             />
           )}
@@ -77,7 +77,7 @@ const styles = StyleSheet.create({
   actionText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   actionIcon: {
     marginLeft: spacing[1],

@@ -147,7 +147,7 @@ export default function AdminUsersPage() {
         </div>
         <Link
           href="/admin/users/new"
-          className="flex items-center gap-2 px-4 py-2 bg-haven-navy-900 text-white rounded-lg hover:bg-haven-navy-800 transition"
+          className="flex items-center gap-2 px-4 py-2 bg-haven-900 text-white rounded-lg hover:bg-haven-800 transition"
         >
           <Plus className="w-4 h-4" />
           Add User
@@ -164,7 +164,7 @@ export default function AdminUsersPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or email..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
             />
           </div>
         </form>
@@ -175,7 +175,7 @@ export default function AdminUsersPage() {
             setRoleFilter(e.target.value);
             setPage(1);
           }}
-          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+          className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
         >
           <option value="">All Roles</option>
           <option value="ADMIN">Admin</option>
@@ -216,7 +216,7 @@ export default function AdminUsersPage() {
                   {u.householdName ? (
                     <Link
                       href={`/admin/households/${u.householdId}`}
-                      className="text-haven-champagne-600 hover:underline"
+                      className="text-haven-600 hover:underline"
                     >
                       {u.householdName}
                     </Link>

@@ -20,13 +20,13 @@ export default async function Image() {
           flexDirection: 'column',
           alignItems: 'center',
           justifyContent: 'center',
-          background: 'linear-gradient(135deg, #0a1929 0%, #050a14 100%)',
+          background: 'linear-gradient(135deg, #2D006B 0%, #1A0044 100%)',
           fontFamily: 'system-ui, sans-serif',
           position: 'relative',
           overflow: 'hidden',
         }}
       >
-        {/* Subtle sage glow */}
+        {/* Subtle purple glow */}
         <div
           style={{
             position: 'absolute',
@@ -35,7 +35,7 @@ export default async function Image() {
             transform: 'translate(-50%, -50%)',
             width: '900px',
             height: '600px',
-            background: 'radial-gradient(ellipse, rgba(164, 180, 148, 0.08) 0%, transparent 60%)',
+            background: 'radial-gradient(ellipse, rgba(98, 0, 234, 0.12) 0%, transparent 60%)',
           }}
         />
 
@@ -82,7 +82,7 @@ export default async function Image() {
           <span
             style={{
               fontSize: '32px',
-              color: '#A4B494',
+              color: '#B388FF',
               fontWeight: 500,
               marginBottom: '16px',
             }}

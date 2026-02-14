@@ -217,7 +217,7 @@ export default function VaultUploadScreen() {
                 <Image source={{ uri: selectedFile.uri }} style={styles.previewImage} />
               ) : (
                 <View style={styles.filePreview}>
-                  <Ionicons name={getFileIcon() as any} size={48} color={colors.haven.champagne[500]} />
+                  <Ionicons name={getFileIcon() as any} size={48} color={colors.haven.purple[500]} />
                 </View>
               )}
               <View style={styles.fileInfo}>
@@ -238,21 +238,21 @@ export default function VaultUploadScreen() {
               <View style={styles.uploadButtons}>
                 <TouchableOpacity style={styles.uploadOption} onPress={takePhoto}>
                   <View style={styles.uploadOptionIcon}>
-                    <Ionicons name="camera" size={24} color={colors.haven.champagne[500]} />
+                    <Ionicons name="camera" size={24} color={colors.haven.purple[500]} />
                   </View>
                   <Text style={styles.uploadOptionText}>Take Photo</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.uploadOption} onPress={pickImage}>
                   <View style={styles.uploadOptionIcon}>
-                    <Ionicons name="images" size={24} color={colors.haven.champagne[500]} />
+                    <Ionicons name="images" size={24} color={colors.haven.purple[500]} />
                   </View>
                   <Text style={styles.uploadOptionText}>Photo Library</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity style={styles.uploadOption} onPress={pickDocument}>
                   <View style={styles.uploadOptionIcon}>
-                    <Ionicons name="folder-open" size={24} color={colors.haven.champagne[500]} />
+                    <Ionicons name="folder-open" size={24} color={colors.haven.purple[500]} />
                   </View>
                   <Text style={styles.uploadOptionText}>Browse Files</Text>
                 </TouchableOpacity>
@@ -299,7 +299,7 @@ export default function VaultUploadScreen() {
                 <Ionicons
                   name={cat.icon as any}
                   size={20}
-                  color={formData.category === cat.id ? colors.haven.champagne[500] : colors.text.secondary}
+                  color={formData.category === cat.id ? colors.haven.purple[500] : colors.text.secondary}
                 />
                 <Text
                   style={[
@@ -325,7 +325,7 @@ export default function VaultUploadScreen() {
             style={styles.dateButton}
             onPress={() => setShowDatePicker(true)}
           >
-            <Ionicons name="calendar-outline" size={20} color={colors.haven.champagne[500]} />
+            <Ionicons name="calendar-outline" size={20} color={colors.haven.purple[500]} />
             <Text style={styles.dateValue}>
               {formData.expirationDate
                 ? formData.expirationDate.toLocaleDateString('en-US', {
@@ -416,9 +416,9 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
     borderStyle: 'dashed',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   uploadOptionIcon: {
     width: 48,
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
   },
   uploadOptionText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
     textAlign: 'center',
   },
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   changeButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   categoryGrid: {
@@ -493,8 +493,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   categoryItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   categoryLabel: {
     fontSize: typography.fontSizes.xs,
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   dateButton: {

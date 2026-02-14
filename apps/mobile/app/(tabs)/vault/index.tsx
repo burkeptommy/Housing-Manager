@@ -320,7 +320,7 @@ export default function VaultScreen() {
           <Ionicons
             name={(CATEGORY_ICONS[item.category] || CATEGORY_ICONS.default) as any}
             size={24}
-            color={colors.haven.champagne[500]}
+            color={colors.haven.purple[500]}
           />
         </View>
         <View style={styles.documentInfo}>
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -506,8 +506,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   categoryTabActive: {
-    backgroundColor: colors.haven.navy[950],
-    borderColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
+    borderColor: colors.haven.purple[950],
   },
   categoryText: {
     fontSize: typography.fontSizes.sm,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -553,7 +553,7 @@ const styles = StyleSheet.create({
   },
   documentCategory: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   documentSize: {
     fontSize: typography.fontSizes.xs,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',

@@ -164,7 +164,7 @@ export default function ManagerChecklistPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-haven-champagne-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-haven-600 mx-auto mb-4" />
           <p className="text-gray-500">Loading checklist...</p>
         </div>
       </div>
@@ -185,7 +185,7 @@ export default function ManagerChecklistPage() {
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-lg font-semibold text-haven-navy-900">
+                <h1 className="text-lg font-semibold text-haven-900">
                   Intake Checklist
                 </h1>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
@@ -202,7 +202,7 @@ export default function ManagerChecklistPage() {
                 </div>
               )}
               {isSaving && (
-                <div className="flex items-center gap-1 text-xs text-haven-champagne-600">
+                <div className="flex items-center gap-1 text-xs text-haven-600">
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Saving...
                 </div>
@@ -216,14 +216,14 @@ export default function ManagerChecklistPage() {
         {/* Property Card */}
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-haven-champagne-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Home className="w-6 h-6 text-haven-champagne-600" />
+            <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Home className="w-6 h-6 text-haven-600" />
             </div>
             <div className="flex-1">
-              <h2 className="font-semibold text-haven-navy-900">{household?.name}</h2>
+              <h2 className="font-semibold text-haven-900">{household?.name}</h2>
               <p className="text-sm text-gray-500">{household?.address}</p>
             </div>
-            <button className="flex items-center gap-2 px-4 py-2 bg-haven-navy-900 text-white text-sm rounded-lg hover:bg-haven-navy-800 transition">
+            <button className="flex items-center gap-2 px-4 py-2 bg-haven-900 text-white text-sm rounded-lg hover:bg-haven-800 transition">
               <Phone className="w-4 h-4" />
               Call Homeowner
             </button>
@@ -234,7 +234,7 @@ export default function ManagerChecklistPage() {
         <div className="bg-white rounded-xl border border-gray-200 p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-600">Intake Progress</span>
-            <span className="text-sm font-bold text-haven-navy-900">
+            <span className="text-sm font-bold text-haven-900">
               {completedCount} / {totalCount} items
             </span>
           </div>
@@ -285,7 +285,7 @@ export default function ManagerChecklistPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-xl">{category.icon}</span>
                     <div className="text-left">
-                      <span className="font-medium text-haven-navy-900">{category.label}</span>
+                      <span className="font-medium text-haven-900">{category.label}</span>
                       <p className="text-xs text-gray-400">{category.description}</p>
                     </div>
                     <span className="text-sm text-gray-400">
@@ -318,11 +318,11 @@ export default function ManagerChecklistPage() {
                           </div>
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-1">
-                              <p className="font-medium text-haven-navy-900">{item.question}</p>
+                              <p className="font-medium text-haven-900">{item.question}</p>
                               {getPriorityBadge(item.priority)}
                             </div>
                             {item.context && (
-                              <div className="flex items-center gap-1 text-xs text-haven-champagne-600 mb-2">
+                              <div className="flex items-center gap-1 text-xs text-haven-600 mb-2">
                                 <Sparkles className="w-3 h-3" />
                                 {item.context}
                               </div>
@@ -333,7 +333,7 @@ export default function ManagerChecklistPage() {
                               <select
                                 value={item.answer || ''}
                                 onChange={(e) => handleAnswer(item.id, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none transition"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none transition"
                               >
                                 <option value="">Select...</option>
                                 {item.options.map((opt) => (
@@ -349,7 +349,7 @@ export default function ManagerChecklistPage() {
                                   value={item.answer || ''}
                                   onChange={(e) => handleAnswer(item.id, e.target.value)}
                                   placeholder="Vendor name..."
-                                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none transition"
+                                  className="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none transition"
                                 />
                                 <button className="px-3 py-2 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 transition whitespace-nowrap">
                                   + Add to Vendors
@@ -360,7 +360,7 @@ export default function ManagerChecklistPage() {
                                 type="month"
                                 value={item.answer || ''}
                                 onChange={(e) => handleAnswer(item.id, e.target.value)}
-                                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none transition"
+                                className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none transition"
                               />
                             ) : (
                               <input
@@ -368,7 +368,7 @@ export default function ManagerChecklistPage() {
                                 value={item.answer || ''}
                                 onChange={(e) => handleAnswer(item.id, e.target.value)}
                                 placeholder="Enter response..."
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none transition"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none transition"
                               />
                             )}
                           </div>

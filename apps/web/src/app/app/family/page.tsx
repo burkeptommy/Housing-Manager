@@ -759,11 +759,11 @@ function mapToPet(apiPet: Pet): PetMember {
 // Location status config
 const locationConfig: Record<LocationStatus, { color: string; bgColor: string; icon: typeof Home }> = {
   home: { color: 'text-green-700', bgColor: 'bg-green-100', icon: Home },
-  away: { color: 'text-warm-700', bgColor: 'bg-warm-100', icon: Car },
+  away: { color: 'text-neutral-700', bgColor: 'bg-neutral-100', icon: Car },
   school: { color: 'text-blue-700', bgColor: 'bg-blue-100', icon: GraduationCap },
   work: { color: 'text-purple-700', bgColor: 'bg-purple-100', icon: Briefcase },
   activity: { color: 'text-amber-700', bgColor: 'bg-amber-100', icon: Trophy },
-  unknown: { color: 'text-warm-500', bgColor: 'bg-warm-50', icon: MapPin },
+  unknown: { color: 'text-neutral-500', bgColor: 'bg-neutral-50', icon: MapPin },
 };
 
 type AddMemberType = 'adult' | 'child' | 'pet' | 'staff';
@@ -1252,7 +1252,7 @@ export default function FamilyPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
-          <p className="text-warm-500">Loading family data...</p>
+          <p className="text-neutral-500">Loading family data...</p>
         </div>
       </div>
     );
@@ -1267,8 +1267,8 @@ export default function FamilyPage() {
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-warm-900">Family</h1>
-          <p className="text-warm-600 mt-1">Household members, logistics, and lifestyle management</p>
+          <h1 className="text-2xl font-bold text-neutral-900">Family</h1>
+          <p className="text-neutral-600 mt-1">Household members, logistics, and lifestyle management</p>
         </div>
         <div className="flex items-center gap-2">
           <button
@@ -1294,12 +1294,12 @@ export default function FamilyPage() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Bell className="w-5 h-5 text-amber-500" />
-              <h2 className="font-semibold text-warm-900">Smart Alerts</h2>
+              <h2 className="font-semibold text-neutral-900">Smart Alerts</h2>
               <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-medium rounded-full">
                 {smartAlerts.length}
               </span>
             </div>
-            <button className="text-sm text-warm-500 hover:text-warm-700">View All</button>
+            <button className="text-sm text-neutral-500 hover:text-neutral-700">View All</button>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -1338,8 +1338,8 @@ export default function FamilyPage() {
                     <Icon className={`w-5 h-5 ${iconStyles[alert.priority]}`} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-warm-900 text-sm">{alert.title}</p>
-                    <p className="text-xs text-warm-500 mt-0.5">{alert.description}</p>
+                    <p className="font-medium text-neutral-900 text-sm">{alert.title}</p>
+                    <p className="text-xs text-neutral-500 mt-0.5">{alert.description}</p>
                     {alert.action && (
                       <button
                         onClick={alert.action.handler}
@@ -1361,16 +1361,16 @@ export default function FamilyPage() {
       )}
 
       {/* Today's Logistics - Enhanced */}
-      <div className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
-        <div className="p-4 border-b border-warm-200 bg-gradient-to-r from-warm-50 to-white">
+      <div className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
+        <div className="p-4 border-b border-neutral-200 bg-gradient-to-r from-neutral-50 to-white">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
                 <Navigation className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="font-semibold text-warm-900">Today's Logistics</h2>
-                <p className="text-sm text-warm-500">
+                <h2 className="font-semibold text-neutral-900">Today's Logistics</h2>
+                <p className="text-sm text-neutral-500">
                   {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                 </p>
               </div>
@@ -1378,7 +1378,7 @@ export default function FamilyPage() {
             <div className="flex items-center gap-2">
               <button
                 onClick={() => toast('Messaging Maria...')}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-warm-600 hover:bg-warm-100 rounded-lg transition-colors"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
               >
                 <MessageCircle className="w-4 h-4" />
                 Message Maria
@@ -1389,7 +1389,7 @@ export default function FamilyPage() {
 
         {/* Pickup Timeline */}
         <div className="p-4">
-          <h3 className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-3">Pickups & Drop-offs</h3>
+          <h3 className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-3">Pickups & Drop-offs</h3>
           <div className="space-y-3">
             {pickups.sort((a, b) => a.time.localeCompare(b.time)).map((pickup) => {
               const isUnassigned = pickup.status === 'unassigned';
@@ -1397,21 +1397,21 @@ export default function FamilyPage() {
                 <div
                   key={pickup.id}
                   className={`flex items-center gap-4 p-3 rounded-xl ${
-                    isUnassigned ? 'bg-red-50 border border-red-200' : 'bg-warm-50'
+                    isUnassigned ? 'bg-red-50 border border-red-200' : 'bg-neutral-50'
                   }`}
                 >
-                  <div className={`text-center min-w-[60px] ${isUnassigned ? 'text-red-600' : 'text-warm-600'}`}>
+                  <div className={`text-center min-w-[60px] ${isUnassigned ? 'text-red-600' : 'text-neutral-600'}`}>
                     <p className="text-lg font-bold">{pickup.time.split(' ')[0]}</p>
                     <p className="text-xs">{pickup.time.split(' ')[1]}</p>
                   </div>
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-medium text-warm-900">{pickup.childName}</span>
-                      <ArrowRight className="w-3 h-3 text-warm-400" />
-                      <span className="text-sm text-warm-600 truncate">{pickup.activity}</span>
+                      <span className="font-medium text-neutral-900">{pickup.childName}</span>
+                      <ArrowRight className="w-3 h-3 text-neutral-400" />
+                      <span className="text-sm text-neutral-600 truncate">{pickup.activity}</span>
                     </div>
-                    <p className="text-xs text-warm-500 flex items-center gap-1 mt-0.5">
+                    <p className="text-xs text-neutral-500 flex items-center gap-1 mt-0.5">
                       <MapPin className="w-3 h-3" />
                       {pickup.location}
                     </p>
@@ -1439,7 +1439,7 @@ export default function FamilyPage() {
                         <UserCheck className="w-4 h-4 text-emerald-600" />
                       </div>
                       <div className="text-right">
-                        <p className="text-sm font-medium text-warm-900">{pickup.driver}</p>
+                        <p className="text-sm font-medium text-neutral-900">{pickup.driver}</p>
                         <p className={`text-xs ${
                           pickup.status === 'confirmed' ? 'text-green-600' : 'text-amber-600'
                         }`}>
@@ -1458,14 +1458,14 @@ export default function FamilyPage() {
         <div className="px-4 pb-4 flex gap-2 flex-wrap">
           <button
             onClick={() => toast('Arranging backup driver...')}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-warm-600 bg-warm-100 hover:bg-warm-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Arrange Backup
           </button>
           <button
             onClick={() => toast('Opening carpool chat...')}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-warm-600 bg-warm-100 hover:bg-warm-200 rounded-lg transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-neutral-600 bg-neutral-100 hover:bg-neutral-200 rounded-lg transition-colors"
           >
             <Users className="w-4 h-4" />
             Carpool Options
@@ -1478,44 +1478,44 @@ export default function FamilyPage() {
         {/* Sync to Calendar */}
         <button
           onClick={() => setShowSyncModal('calendar')}
-          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-warm-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-neutral-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
         >
           <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
             <Calendar className="w-6 h-6 text-blue-600" />
           </div>
           <div className="flex-1">
-            <p className="font-medium text-warm-900">Sync to Calendar</p>
-            <p className="text-sm text-warm-500">{autoCalendarEvents.length} events from family data</p>
+            <p className="font-medium text-neutral-900">Sync to Calendar</p>
+            <p className="text-sm text-neutral-500">{autoCalendarEvents.length} events from family data</p>
           </div>
-          <ArrowRight className="w-5 h-5 text-warm-400" />
+          <ArrowRight className="w-5 h-5 text-neutral-400" />
         </button>
 
         {/* Sync to Billing */}
         <button
           onClick={() => setShowSyncModal('billing')}
-          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-warm-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+          className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-neutral-200 hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
         >
           <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
             <CreditCard className="w-6 h-6 text-emerald-600" />
           </div>
           <div className="flex-1">
-            <p className="font-medium text-warm-900">Create Bill Accounts</p>
-            <p className="text-sm text-warm-500">{autoBillAccounts.length} recurring bills detected</p>
+            <p className="font-medium text-neutral-900">Create Bill Accounts</p>
+            <p className="text-sm text-neutral-500">{autoBillAccounts.length} recurring bills detected</p>
           </div>
-          <ArrowRight className="w-5 h-5 text-warm-400" />
+          <ArrowRight className="w-5 h-5 text-neutral-400" />
         </button>
       </div>
 
       {/* Financial Roll-up */}
       {showFinancials && (
-        <div className="bg-gradient-to-r from-warm-900 to-warm-800 rounded-xl p-6 text-white">
+        <div className="bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-xl p-6 text-white">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-white/10 rounded-lg flex items-center justify-center">
                 <DollarSign className="w-5 h-5" />
               </div>
               <div>
-                <p className="text-warm-300 text-sm">Monthly Lifestyle Fixed Costs</p>
+                <p className="text-neutral-300 text-sm">Monthly Lifestyle Fixed Costs</p>
                 <p className="text-2xl font-bold">{formatCurrency(monthlyLifestyleCosts)}</p>
               </div>
             </div>
@@ -1523,33 +1523,33 @@ export default function FamilyPage() {
               onClick={() => setShowFinancials(false)}
               className="p-2 hover:bg-white/10 rounded-lg transition-colors"
             >
-              <EyeOff className="w-5 h-5 text-warm-400" />
+              <EyeOff className="w-5 h-5 text-neutral-400" />
             </button>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-warm-400 text-xs">Club Memberships</p>
+              <p className="text-neutral-400 text-xs">Club Memberships</p>
               <p className="font-semibold">
                 {formatCurrency(adults.reduce((sum, a) => sum + a.clubs.reduce((s, c) => s + c.monthlyDues, 0), 0))}
               </p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-warm-400 text-xs">Education & Activities</p>
+              <p className="text-neutral-400 text-xs">Education & Activities</p>
               <p className="font-semibold">
                 {formatCurrency(children.reduce((sum, c) => sum + c.school.tuitionMonthly + c.activities.reduce((s, a) => s + a.monthlyFee, 0), 0))}
               </p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-warm-400 text-xs">Childcare</p>
+              <p className="text-neutral-400 text-xs">Childcare</p>
               <p className="font-semibold">{formatCurrency(staff.reduce((sum, s) => sum + s.weeklyStipend * 4.33, 0))}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-warm-400 text-xs">Pet Care</p>
+              <p className="text-neutral-400 text-xs">Pet Care</p>
               <p className="font-semibold">{formatCurrency(pets.reduce((sum, p) => sum + p.monthlyExpenses, 0))}</p>
             </div>
             <div className="bg-white/10 rounded-lg p-3">
-              <p className="text-warm-400 text-xs">Auto (Loans + Insurance)</p>
+              <p className="text-neutral-400 text-xs">Auto (Loans + Insurance)</p>
               <p className="font-semibold">{formatCurrency(vehicleMonthlyCosts.total)}</p>
             </div>
           </div>
@@ -1559,7 +1559,7 @@ export default function FamilyPage() {
       {!showFinancials && (
         <button
           onClick={() => setShowFinancials(true)}
-          className="w-full py-3 bg-warm-100 text-warm-600 font-medium rounded-xl hover:bg-warm-200 transition-colors flex items-center justify-center gap-2"
+          className="w-full py-3 bg-neutral-100 text-neutral-600 font-medium rounded-xl hover:bg-neutral-200 transition-colors flex items-center justify-center gap-2"
         >
           <Eye className="w-5 h-5" />
           Show Financial Summary
@@ -1569,15 +1569,15 @@ export default function FamilyPage() {
       {/* Adults Section */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Users className="w-5 h-5 text-warm-400" />
-          <h2 className="font-semibold text-warm-900">Adults</h2>
-          <span className="text-sm text-warm-500">({adults.length})</span>
+          <Users className="w-5 h-5 text-neutral-400" />
+          <h2 className="font-semibold text-neutral-900">Adults</h2>
+          <span className="text-sm text-neutral-500">({adults.length})</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {adults.map((adult) => (
-            <div key={adult.id} className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
-              <div className="p-4 border-b border-warm-100">
+            <div key={adult.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
+              <div className="p-4 border-b border-neutral-100">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
                     <div className="w-14 h-14 bg-emerald-100 rounded-full flex items-center justify-center">
@@ -1585,7 +1585,7 @@ export default function FamilyPage() {
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <h3 className="font-semibold text-warm-900">{adult.name}</h3>
+                        <h3 className="font-semibold text-neutral-900">{adult.name}</h3>
                         {adult.isAdmin && (
                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full flex items-center gap-1">
                             <Crown className="w-3 h-3" />
@@ -1593,22 +1593,22 @@ export default function FamilyPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-sm text-warm-500">{adult.role}</p>
+                      <p className="text-sm text-neutral-500">{adult.role}</p>
                       <div className="mt-1">{renderLocationPill(adult.location)}</div>
                     </div>
                   </div>
-                  <button onClick={() => setShowEditModal(adult)} className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors">
+                  <button onClick={() => setShowEditModal(adult)} className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                     <Pencil className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <div className="px-4 py-3 bg-warm-50 flex items-center gap-4">
-                <button className="flex items-center gap-1.5 text-sm text-warm-600 hover:text-emerald-600 transition-colors">
+              <div className="px-4 py-3 bg-neutral-50 flex items-center gap-4">
+                <button className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-emerald-600 transition-colors">
                   <Phone className="w-4 h-4" />
                   {adult.phone || 'No phone'}
                 </button>
-                <button className="flex items-center gap-1.5 text-sm text-warm-600 hover:text-emerald-600 transition-colors">
+                <button className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-emerald-600 transition-colors">
                   <Mail className="w-4 h-4" />
                   {adult.email || 'No email'}
                 </button>
@@ -1616,7 +1616,7 @@ export default function FamilyPage() {
 
               <button
                 onClick={() => toggleCard(adult.id)}
-                className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-warm-600 hover:bg-warm-50 transition-colors"
+                className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-neutral-600 hover:bg-neutral-50 transition-colors"
               >
                 <span>Lifestyle Details</span>
                 {expandedCards.has(adult.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1626,13 +1626,13 @@ export default function FamilyPage() {
                 <div className="px-4 pb-4 space-y-4">
                   {adult.work && (
                     <div>
-                      <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Work</p>
-                      <div className="flex items-start gap-3 p-3 bg-warm-50 rounded-lg">
-                        <Building2 className="w-5 h-5 text-warm-400 flex-shrink-0 mt-0.5" />
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Work</p>
+                      <div className="flex items-start gap-3 p-3 bg-neutral-50 rounded-lg">
+                        <Building2 className="w-5 h-5 text-neutral-400 flex-shrink-0 mt-0.5" />
                         <div>
-                          <p className="font-medium text-warm-900">{adult.work.company}</p>
-                          <p className="text-sm text-warm-500">{adult.work.title}</p>
-                          <p className="text-xs text-warm-400 mt-1">{adult.work.address}</p>
+                          <p className="font-medium text-neutral-900">{adult.work.company}</p>
+                          <p className="text-sm text-neutral-500">{adult.work.title}</p>
+                          <p className="text-xs text-neutral-400 mt-1">{adult.work.address}</p>
                         </div>
                       </div>
                     </div>
@@ -1640,18 +1640,18 @@ export default function FamilyPage() {
 
                   {adult.clubs.length > 0 && (
                     <div>
-                      <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Memberships</p>
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Memberships</p>
                       <div className="space-y-2">
                         {adult.clubs.map((club, idx) => (
-                          <div key={idx} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
+                          <div key={idx} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <Star className="w-5 h-5 text-amber-500" />
                               <div>
-                                <p className="font-medium text-warm-900">{club.name}</p>
-                                <p className="text-xs text-warm-400">{club.type} • {club.membershipId}</p>
+                                <p className="font-medium text-neutral-900">{club.name}</p>
+                                <p className="text-xs text-neutral-400">{club.type} • {club.membershipId}</p>
                               </div>
                             </div>
-                            {showFinancials && <span className="text-sm font-medium text-warm-600">{formatCurrency(club.monthlyDues)}/mo</span>}
+                            {showFinancials && <span className="text-sm font-medium text-neutral-600">{formatCurrency(club.monthlyDues)}/mo</span>}
                           </div>
                         ))}
                       </div>
@@ -1660,12 +1660,12 @@ export default function FamilyPage() {
 
                   {adult.wellness && (
                     <div>
-                      <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Wellness</p>
-                      <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg">
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Wellness</p>
+                      <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
                         <Dumbbell className="w-5 h-5 text-purple-500" />
                         <div>
-                          <p className="font-medium text-warm-900">{adult.wellness.gym}</p>
-                          <p className="text-xs text-warm-400">ID: {adult.wellness.membershipId}</p>
+                          <p className="font-medium text-neutral-900">{adult.wellness.gym}</p>
+                          <p className="text-xs text-neutral-400">ID: {adult.wellness.membershipId}</p>
                         </div>
                       </div>
                     </div>
@@ -1680,9 +1680,9 @@ export default function FamilyPage() {
       {/* Children Section */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Baby className="w-5 h-5 text-warm-400" />
-          <h2 className="font-semibold text-warm-900">Children</h2>
-          <span className="text-sm text-warm-500">({children.length})</span>
+          <Baby className="w-5 h-5 text-neutral-400" />
+          <h2 className="font-semibold text-neutral-900">Children</h2>
+          <span className="text-sm text-neutral-500">({children.length})</span>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1690,20 +1690,20 @@ export default function FamilyPage() {
             const tuitionDue = child.school.tuitionDue ? getDaysUntil(child.school.tuitionDue) : null;
             const sizeOutdated = child.sizes?.lastUpdated && getDaysUntil(child.sizes.lastUpdated) <= -180;
             return (
-              <div key={child.id} className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
-                <div className="p-4 border-b border-warm-100">
+              <div key={child.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
+                <div className="p-4 border-b border-neutral-100">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
                       <div className="w-14 h-14 bg-blue-100 rounded-full flex items-center justify-center">
                         <span className="text-lg font-semibold text-blue-600">{child.initials}</span>
                       </div>
                       <div>
-                        <h3 className="font-semibold text-warm-900">{child.name}</h3>
-                        <p className="text-sm text-warm-500">{child.age} years old • {child.grade}</p>
+                        <h3 className="font-semibold text-neutral-900">{child.name}</h3>
+                        <p className="text-sm text-neutral-500">{child.age} years old • {child.grade}</p>
                         <div className="mt-1">{renderLocationPill(child.location)}</div>
                       </div>
                     </div>
-                    <button onClick={() => setShowEditModal(child)} className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors">
+                    <button onClick={() => setShowEditModal(child)} className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                   </div>
@@ -1716,19 +1716,19 @@ export default function FamilyPage() {
                   </div>
                 )}
 
-                <div className="p-4 border-b border-warm-100">
-                  <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Education</p>
+                <div className="p-4 border-b border-neutral-100">
+                  <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Education</p>
                   <div className="flex items-center justify-between p-3 bg-blue-50 rounded-lg">
                     <div className="flex items-center gap-3">
                       <GraduationCap className="w-5 h-5 text-blue-600" />
                       <div>
-                        <p className="font-medium text-warm-900">{child.school.name}</p>
-                        <p className="text-xs text-warm-500">{child.school.address}</p>
+                        <p className="font-medium text-neutral-900">{child.school.name}</p>
+                        <p className="text-xs text-neutral-500">{child.school.address}</p>
                       </div>
                     </div>
                     {child.school.tuitionMonthly > 0 && showFinancials && (
                       <div className="text-right">
-                        <p className="text-sm font-medium text-warm-900">{formatCurrency(child.school.tuitionMonthly)}/mo</p>
+                        <p className="text-sm font-medium text-neutral-900">{formatCurrency(child.school.tuitionMonthly)}/mo</p>
                         {tuitionDue !== null && tuitionDue <= 7 && (
                           <span className="text-xs text-red-600 font-medium">Due in {tuitionDue} days</span>
                         )}
@@ -1739,7 +1739,7 @@ export default function FamilyPage() {
 
                 <button
                   onClick={() => toggleCard(child.id)}
-                  className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-warm-600 hover:bg-warm-50 transition-colors"
+                  className="w-full px-4 py-3 flex items-center justify-between text-sm font-medium text-neutral-600 hover:bg-neutral-50 transition-colors"
                 >
                   <span>Activities & Support Team</span>
                   {expandedCards.has(child.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
@@ -1749,10 +1749,10 @@ export default function FamilyPage() {
                   <div className="px-4 pb-4 space-y-4">
                     {child.activities.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Activities</p>
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Activities</p>
                         <div className="space-y-2">
                           {child.activities.map((activity, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
+                            <div key={idx} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                               <div className="flex items-center gap-3">
                                 {activity.name.toLowerCase().includes('soccer') || activity.name.toLowerCase().includes('league') ? (
                                   <Trophy className="w-5 h-5 text-amber-500" />
@@ -1764,15 +1764,15 @@ export default function FamilyPage() {
                                   <Star className="w-5 h-5 text-blue-500" />
                                 )}
                                 <div>
-                                  <p className="font-medium text-warm-900">{activity.name}</p>
-                                  <p className="text-xs text-warm-500">{activity.organization}</p>
-                                  {activity.coachName && <p className="text-xs text-warm-400">{activity.coachName}</p>}
-                                  <p className="text-xs text-warm-400 mt-0.5">
+                                  <p className="font-medium text-neutral-900">{activity.name}</p>
+                                  <p className="text-xs text-neutral-500">{activity.organization}</p>
+                                  {activity.coachName && <p className="text-xs text-neutral-400">{activity.coachName}</p>}
+                                  <p className="text-xs text-neutral-400 mt-0.5">
                                     <Timer className="w-3 h-3 inline mr-1" />{activity.schedule}
                                   </p>
                                 </div>
                               </div>
-                              {showFinancials && <span className="text-sm font-medium text-warm-600">{formatCurrency(activity.monthlyFee)}/mo</span>}
+                              {showFinancials && <span className="text-sm font-medium text-neutral-600">{formatCurrency(activity.monthlyFee)}/mo</span>}
                             </div>
                           ))}
                         </div>
@@ -1781,11 +1781,11 @@ export default function FamilyPage() {
 
                     {child.careProvider && (
                       <div>
-                        <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Care Provider</p>
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Care Provider</p>
                         <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg">
                           <Heart className="w-5 h-5 text-purple-600" />
                           <div>
-                            <p className="font-medium text-warm-900">{child.careProvider.name}</p>
+                            <p className="font-medium text-neutral-900">{child.careProvider.name}</p>
                             <p className="text-xs text-purple-600">View Schedule →</p>
                           </div>
                         </div>
@@ -1793,13 +1793,13 @@ export default function FamilyPage() {
                     )}
 
                     <div>
-                      <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Health</p>
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Health</p>
                       <div className="space-y-2">
-                        <div className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg">
+                        <div className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
                           <Stethoscope className="w-5 h-5 text-green-600" />
                           <div>
-                            <p className="font-medium text-warm-900">{child.health.pediatrician}</p>
-                            <p className="text-xs text-warm-400">{child.health.pediatricianPhone}</p>
+                            <p className="font-medium text-neutral-900">{child.health.pediatrician}</p>
+                            <p className="text-xs text-neutral-400">{child.health.pediatricianPhone}</p>
                           </div>
                         </div>
                         {child.health.medications && child.health.medications.length > 0 && (
@@ -1813,7 +1813,7 @@ export default function FamilyPage() {
                     {child.sizes && (
                       <div>
                         <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-medium text-warm-500 uppercase tracking-wide">Sizes</p>
+                          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide">Sizes</p>
                           {sizeOutdated && (
                             <span className="text-xs text-amber-600 flex items-center gap-1">
                               <AlertCircle className="w-3 h-3" />
@@ -1822,20 +1822,20 @@ export default function FamilyPage() {
                           )}
                         </div>
                         <div className="grid grid-cols-3 gap-2">
-                          <div className="p-2 bg-warm-50 rounded-lg text-center">
-                            <Shirt className="w-4 h-4 mx-auto text-warm-400 mb-1" />
-                            <p className="text-xs text-warm-500">Shirt</p>
-                            <p className="font-medium text-warm-900">{child.sizes.shirt}</p>
+                          <div className="p-2 bg-neutral-50 rounded-lg text-center">
+                            <Shirt className="w-4 h-4 mx-auto text-neutral-400 mb-1" />
+                            <p className="text-xs text-neutral-500">Shirt</p>
+                            <p className="font-medium text-neutral-900">{child.sizes.shirt}</p>
                           </div>
-                          <div className="p-2 bg-warm-50 rounded-lg text-center">
-                            <span className="text-warm-400 text-sm">👖</span>
-                            <p className="text-xs text-warm-500">Pants</p>
-                            <p className="font-medium text-warm-900">{child.sizes.pants}</p>
+                          <div className="p-2 bg-neutral-50 rounded-lg text-center">
+                            <span className="text-neutral-400 text-sm">👖</span>
+                            <p className="text-xs text-neutral-500">Pants</p>
+                            <p className="font-medium text-neutral-900">{child.sizes.pants}</p>
                           </div>
-                          <div className="p-2 bg-warm-50 rounded-lg text-center">
-                            <Footprints className="w-4 h-4 mx-auto text-warm-400 mb-1" />
-                            <p className="text-xs text-warm-500">Shoe</p>
-                            <p className="font-medium text-warm-900">{child.sizes.shoe}</p>
+                          <div className="p-2 bg-neutral-50 rounded-lg text-center">
+                            <Footprints className="w-4 h-4 mx-auto text-neutral-400 mb-1" />
+                            <p className="text-xs text-neutral-500">Shoe</p>
+                            <p className="font-medium text-neutral-900">{child.sizes.shoe}</p>
                           </div>
                         </div>
                         {sizeOutdated && (
@@ -1859,16 +1859,16 @@ export default function FamilyPage() {
       {/* Pets Section */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Dog className="w-5 h-5 text-warm-400" />
-          <h2 className="font-semibold text-warm-900">Pets</h2>
-          <span className="text-sm text-warm-500">({pets.length})</span>
+          <Dog className="w-5 h-5 text-neutral-400" />
+          <h2 className="font-semibold text-neutral-900">Pets</h2>
+          <span className="text-sm text-neutral-500">({pets.length})</span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pets.map((pet) => {
             const vaccinesDays = pet.vaccinesDue ? getDaysUntil(pet.vaccinesDue) : null;
             return (
-              <div key={pet.id} className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
+              <div key={pet.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                 <div className="p-4">
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-4">
@@ -1876,12 +1876,12 @@ export default function FamilyPage() {
                         {pet.species === 'cat' ? <Cat className="w-7 h-7 text-amber-600" /> : <Dog className="w-7 h-7 text-amber-600" />}
                       </div>
                       <div>
-                        <h3 className="font-semibold text-warm-900">{pet.name}</h3>
-                        <p className="text-sm text-warm-500">{pet.breed} • {pet.age} years old</p>
+                        <h3 className="font-semibold text-neutral-900">{pet.name}</h3>
+                        <p className="text-sm text-neutral-500">{pet.breed} • {pet.age} years old</p>
                         <div className="mt-1">{renderLocationPill(pet.location)}</div>
                       </div>
                     </div>
-                    <button onClick={() => setShowEditModal(pet)} className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors">
+                    <button onClick={() => setShowEditModal(pet)} className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                       <Pencil className="w-4 h-4" />
                     </button>
                   </div>
@@ -1906,31 +1906,31 @@ export default function FamilyPage() {
                   </div>
                 )}
 
-                <div className="p-4 space-y-3 bg-warm-50">
+                <div className="p-4 space-y-3 bg-neutral-50">
                   <div className="flex items-center gap-3">
-                    <Syringe className="w-4 h-4 text-warm-400" />
+                    <Syringe className="w-4 h-4 text-neutral-400" />
                     <div>
-                      <p className="text-sm font-medium text-warm-900">{pet.vet.name}</p>
-                      <p className="text-xs text-warm-500">{pet.vet.clinic} • {pet.vet.phone}</p>
+                      <p className="text-sm font-medium text-neutral-900">{pet.vet.name}</p>
+                      <p className="text-xs text-neutral-500">{pet.vet.clinic} • {pet.vet.phone}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Utensils className="w-4 h-4 text-warm-400" />
+                    <Utensils className="w-4 h-4 text-neutral-400" />
                     <div>
-                      <p className="text-sm font-medium text-warm-900">{pet.food.brand}</p>
-                      <p className="text-xs text-warm-500">{pet.food.type} • {pet.food.monthlyAmount}/mo</p>
+                      <p className="text-sm font-medium text-neutral-900">{pet.food.brand}</p>
+                      <p className="text-xs text-neutral-500">{pet.food.type} • {pet.food.monthlyAmount}/mo</p>
                     </div>
                   </div>
                   {pet.microchipId && (
                     <div className="flex items-center gap-3">
-                      <Shield className="w-4 h-4 text-warm-400" />
-                      <p className="text-sm text-warm-600">Microchip: {pet.microchipId}</p>
+                      <Shield className="w-4 h-4 text-neutral-400" />
+                      <p className="text-sm text-neutral-600">Microchip: {pet.microchipId}</p>
                     </div>
                   )}
                   {showFinancials && pet.monthlyExpenses > 0 && (
-                    <div className="pt-2 border-t border-warm-200">
-                      <p className="text-xs text-warm-500">Monthly Expenses</p>
-                      <p className="font-semibold text-warm-900">{formatCurrency(pet.monthlyExpenses)}</p>
+                    <div className="pt-2 border-t border-neutral-200">
+                      <p className="text-xs text-neutral-500">Monthly Expenses</p>
+                      <p className="font-semibold text-neutral-900">{formatCurrency(pet.monthlyExpenses)}</p>
                     </div>
                   )}
                 </div>
@@ -1944,9 +1944,9 @@ export default function FamilyPage() {
       {vehicles.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <Car className="w-5 h-5 text-warm-400" />
-            <h2 className="font-semibold text-warm-900">Vehicles</h2>
-            <span className="text-sm text-warm-500">({vehicles.length})</span>
+            <Car className="w-5 h-5 text-neutral-400" />
+            <h2 className="font-semibold text-neutral-900">Vehicles</h2>
+            <span className="text-sm text-neutral-500">({vehicles.length})</span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -1956,9 +1956,9 @@ export default function FamilyPage() {
               const isElectric = vehicle.make === 'Tesla' || vehicle.model.toLowerCase().includes('electric');
 
               return (
-                <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
+                <div key={vehicle.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
                   {/* Vehicle Header */}
-                  <div className="p-4 border-b border-warm-100">
+                  <div className="p-4 border-b border-neutral-100">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div className={`w-14 h-14 rounded-full flex items-center justify-center ${
@@ -1967,18 +1967,18 @@ export default function FamilyPage() {
                           <Car className={`w-7 h-7 ${isElectric ? 'text-green-600' : 'text-blue-600'}`} />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-warm-900">{vehicle.name}</h3>
-                          <p className="text-sm text-warm-500">{vehicle.year} {vehicle.make} {vehicle.model}</p>
+                          <h3 className="font-semibold text-neutral-900">{vehicle.name}</h3>
+                          <p className="text-sm text-neutral-500">{vehicle.year} {vehicle.make} {vehicle.model}</p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs text-warm-400">{vehicle.color}</span>
-                            <span className="text-xs text-warm-400">•</span>
-                            <span className="text-xs font-mono text-warm-500">{vehicle.licensePlate}</span>
+                            <span className="text-xs text-neutral-400">{vehicle.color}</span>
+                            <span className="text-xs text-neutral-400">•</span>
+                            <span className="text-xs font-mono text-neutral-500">{vehicle.licensePlate}</span>
                           </div>
                         </div>
                       </div>
                       <button
                         onClick={() => toggleCard(vehicle.id)}
-                        className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors"
+                        className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
                       >
                         {expandedCards.has(vehicle.id) ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                       </button>
@@ -2008,19 +2008,19 @@ export default function FamilyPage() {
                   )}
 
                   {/* Quick Stats */}
-                  <div className="px-4 py-3 bg-warm-50 grid grid-cols-3 gap-3 text-center border-b border-warm-100">
+                  <div className="px-4 py-3 bg-neutral-50 grid grid-cols-3 gap-3 text-center border-b border-neutral-100">
                     <div>
-                      <p className="text-xs text-warm-500">Mileage</p>
-                      <p className="font-semibold text-warm-900">{vehicle.currentMileage.toLocaleString()}</p>
+                      <p className="text-xs text-neutral-500">Mileage</p>
+                      <p className="font-semibold text-neutral-900">{vehicle.currentMileage.toLocaleString()}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-warm-500">Primary Driver</p>
-                      <p className="font-medium text-warm-700 text-sm">{vehicle.primaryDriverName?.split(' ')[0] || 'Unassigned'}</p>
+                      <p className="text-xs text-neutral-500">Primary Driver</p>
+                      <p className="font-medium text-neutral-700 text-sm">{vehicle.primaryDriverName?.split(' ')[0] || 'Unassigned'}</p>
                     </div>
                     {showFinancials && (
                       <div>
-                        <p className="text-xs text-warm-500">Monthly Cost</p>
-                        <p className="font-semibold text-warm-900">
+                        <p className="text-xs text-neutral-500">Monthly Cost</p>
+                        <p className="font-semibold text-neutral-900">
                           {formatCurrency((vehicle.monthlyPayment || 0) + (vehicle.insuranceMonthly || 0))}
                         </p>
                       </div>
@@ -2032,20 +2032,20 @@ export default function FamilyPage() {
                     <div className="p-4 space-y-4">
                       {/* Registration & Insurance */}
                       <div>
-                        <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Registration & Insurance</p>
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Registration & Insurance</p>
                         <div className="grid grid-cols-2 gap-3">
-                          <div className="p-3 bg-warm-50 rounded-lg">
-                            <p className="text-xs text-warm-500">Registration</p>
-                            <p className="font-medium text-warm-900">
+                          <div className="p-3 bg-neutral-50 rounded-lg">
+                            <p className="text-xs text-neutral-500">Registration</p>
+                            <p className="font-medium text-neutral-900">
                               {vehicle.registrationExpiry ? formatDate(vehicle.registrationExpiry) : 'Not set'}
                             </p>
-                            <p className="text-xs text-warm-400">{vehicle.registrationState}</p>
+                            <p className="text-xs text-neutral-400">{vehicle.registrationState}</p>
                           </div>
-                          <div className="p-3 bg-warm-50 rounded-lg">
-                            <p className="text-xs text-warm-500">Insurance</p>
-                            <p className="font-medium text-warm-900">{vehicle.insuranceProvider || 'Not set'}</p>
+                          <div className="p-3 bg-neutral-50 rounded-lg">
+                            <p className="text-xs text-neutral-500">Insurance</p>
+                            <p className="font-medium text-neutral-900">{vehicle.insuranceProvider || 'Not set'}</p>
                             {vehicle.insuranceMonthly && showFinancials && (
-                              <p className="text-xs text-warm-400">{formatCurrency(vehicle.insuranceMonthly)}/mo</p>
+                              <p className="text-xs text-neutral-400">{formatCurrency(vehicle.insuranceMonthly)}/mo</p>
                             )}
                           </div>
                         </div>
@@ -2054,13 +2054,13 @@ export default function FamilyPage() {
                       {/* Loan Info */}
                       {vehicle.hasLoan && showFinancials && (
                         <div>
-                          <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Loan Details</p>
-                          <div className="p-3 bg-warm-50 rounded-lg">
+                          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Loan Details</p>
+                          <div className="p-3 bg-neutral-50 rounded-lg">
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-sm text-warm-600">{vehicle.lender}</span>
-                              <span className="font-semibold text-warm-900">{formatCurrency(vehicle.monthlyPayment || 0)}/mo</span>
+                              <span className="text-sm text-neutral-600">{vehicle.lender}</span>
+                              <span className="font-semibold text-neutral-900">{formatCurrency(vehicle.monthlyPayment || 0)}/mo</span>
                             </div>
-                            <div className="flex items-center justify-between text-xs text-warm-500">
+                            <div className="flex items-center justify-between text-xs text-neutral-500">
                               <span>Balance: {formatCurrency(vehicle.loanBalance || 0)}</span>
                               {vehicle.loanMaturityDate && (
                                 <span>Payoff: {vehicle.loanMaturityDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</span>
@@ -2072,29 +2072,29 @@ export default function FamilyPage() {
 
                       {/* Service Info */}
                       <div>
-                        <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Service</p>
-                        <div className="p-3 bg-warm-50 rounded-lg space-y-2">
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Service</p>
+                        <div className="p-3 bg-neutral-50 rounded-lg space-y-2">
                           {!isElectric && vehicle.lastOilChange && (
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-warm-600">Last Oil Change</span>
-                              <span className="text-warm-900">
+                              <span className="text-neutral-600">Last Oil Change</span>
+                              <span className="text-neutral-900">
                                 {formatDate(vehicle.lastOilChange)} ({vehicle.oilChangeMileage?.toLocaleString()} mi)
                               </span>
                             </div>
                           )}
                           {vehicle.nextServiceDue && (
                             <div className="flex items-center justify-between text-sm">
-                              <span className="text-warm-600">Next Service</span>
-                              <span className={`font-medium ${serviceDays !== null && serviceDays <= 14 ? 'text-amber-600' : 'text-warm-900'}`}>
+                              <span className="text-neutral-600">Next Service</span>
+                              <span className={`font-medium ${serviceDays !== null && serviceDays <= 14 ? 'text-amber-600' : 'text-neutral-900'}`}>
                                 {formatDate(vehicle.nextServiceDue)}
                                 {vehicle.nextServiceMileage && ` (${vehicle.nextServiceMileage.toLocaleString()} mi)`}
                               </span>
                             </div>
                           )}
                           {vehicle.preferredServiceShop && (
-                            <div className="flex items-center justify-between text-sm pt-2 border-t border-warm-200">
-                              <span className="text-warm-500">Preferred Shop</span>
-                              <span className="text-warm-700">{vehicle.preferredServiceShop}</span>
+                            <div className="flex items-center justify-between text-sm pt-2 border-t border-neutral-200">
+                              <span className="text-neutral-500">Preferred Shop</span>
+                              <span className="text-neutral-700">{vehicle.preferredServiceShop}</span>
                             </div>
                           )}
                         </div>
@@ -2103,18 +2103,18 @@ export default function FamilyPage() {
                       {/* Recent Service History */}
                       {vehicle.serviceHistory && vehicle.serviceHistory.length > 0 && (
                         <div>
-                          <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Recent Service History</p>
+                          <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Recent Service History</p>
                           <div className="space-y-2">
                             {vehicle.serviceHistory.slice(0, 3).map((service) => (
-                              <div key={service.id} className="flex items-center justify-between p-2 bg-warm-50 rounded-lg text-sm">
+                              <div key={service.id} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg text-sm">
                                 <div>
-                                  <p className="font-medium text-warm-900">{service.serviceType}</p>
-                                  <p className="text-xs text-warm-500">
+                                  <p className="font-medium text-neutral-900">{service.serviceType}</p>
+                                  <p className="text-xs text-neutral-500">
                                     {formatDate(service.date)} • {service.mileage.toLocaleString()} mi
                                   </p>
                                 </div>
                                 {showFinancials && service.cost > 0 && (
-                                  <span className="text-warm-600">{formatCurrency(service.cost)}</span>
+                                  <span className="text-neutral-600">{formatCurrency(service.cost)}</span>
                                 )}
                               </div>
                             ))}
@@ -2133,7 +2133,7 @@ export default function FamilyPage() {
                         </button>
                         <button
                           onClick={() => toast('Opening vehicle details...')}
-                          className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-warm-600 bg-warm-100 rounded-lg hover:bg-warm-200 transition-colors"
+                          className="flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium text-neutral-600 bg-neutral-100 rounded-lg hover:bg-neutral-200 transition-colors"
                         >
                           <FileText className="w-4 h-4" />
                           View Details
@@ -2152,17 +2152,17 @@ export default function FamilyPage() {
       {staff.length > 0 && (
         <div>
           <div className="flex items-center gap-2 mb-4">
-            <BadgeCheck className="w-5 h-5 text-warm-400" />
-            <h2 className="font-semibold text-warm-900">Household Staff</h2>
-            <span className="text-sm text-warm-500">({staff.length})</span>
+            <BadgeCheck className="w-5 h-5 text-neutral-400" />
+            <h2 className="font-semibold text-neutral-900">Household Staff</h2>
+            <span className="text-sm text-neutral-500">({staff.length})</span>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {staff.map((s) => {
               const contractDays = s.contractEndDate ? getDaysUntil(s.contractEndDate) : null;
               return (
-                <div key={s.id} className="bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
-                  <div className="p-4 border-b border-warm-100">
+                <div key={s.id} className="bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
+                  <div className="p-4 border-b border-neutral-100">
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center">
@@ -2170,14 +2170,14 @@ export default function FamilyPage() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <h3 className="font-semibold text-warm-900">{s.name}</h3>
+                            <h3 className="font-semibold text-neutral-900">{s.name}</h3>
                             <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs font-medium rounded-full">{s.role}</span>
                           </div>
-                          {s.agency && <p className="text-sm text-warm-500">via {s.agency}</p>}
+                          {s.agency && <p className="text-sm text-neutral-500">via {s.agency}</p>}
                           <div className="mt-1">{renderLocationPill(s.location)}</div>
                         </div>
                       </div>
-                      <button onClick={() => setShowEditModal(s)} className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors">
+                      <button onClick={() => setShowEditModal(s)} className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                         <Pencil className="w-4 h-4" />
                       </button>
                     </div>
@@ -2202,12 +2202,12 @@ export default function FamilyPage() {
                     </div>
                   )}
 
-                  <div className="px-4 py-3 bg-warm-50 flex items-center gap-4 border-b border-warm-100">
-                    <button className="flex items-center gap-1.5 text-sm text-warm-600 hover:text-emerald-600 transition-colors">
+                  <div className="px-4 py-3 bg-neutral-50 flex items-center gap-4 border-b border-neutral-100">
+                    <button className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-emerald-600 transition-colors">
                       <Phone className="w-4 h-4" />
                       {s.phone || 'No phone'}
                     </button>
-                    <button className="flex items-center gap-1.5 text-sm text-warm-600 hover:text-emerald-600 transition-colors">
+                    <button className="flex items-center gap-1.5 text-sm text-neutral-600 hover:text-emerald-600 transition-colors">
                       <MessageCircle className="w-4 h-4" />
                       Message
                     </button>
@@ -2215,13 +2215,13 @@ export default function FamilyPage() {
 
                   {s.schedule.length > 0 && (
                     <div className="p-4">
-                      <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
+                      <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">Weekly Schedule</p>
                       <div className="grid grid-cols-5 gap-1">
                         {s.schedule.map((day, idx) => (
                           <div key={idx} className="text-center p-2 bg-purple-50 rounded-lg">
                             <p className="text-xs font-medium text-purple-700">{day.day.slice(0, 3)}</p>
-                            <p className="text-xs text-warm-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
-                            <p className="text-xs text-warm-600">{day.hours.split(' - ')[1]}</p>
+                            <p className="text-xs text-neutral-600 mt-0.5">{day.hours.split(' - ')[0]}</p>
+                            <p className="text-xs text-neutral-600">{day.hours.split(' - ')[1]}</p>
                           </div>
                         ))}
                       </div>
@@ -2231,10 +2231,10 @@ export default function FamilyPage() {
                   <div className="px-4 pb-4 space-y-3">
                     {s.permissions.length > 0 && (
                       <div>
-                        <p className="text-xs font-medium text-warm-500 uppercase tracking-wide mb-2">App Permissions</p>
+                        <p className="text-xs font-medium text-neutral-500 uppercase tracking-wide mb-2">App Permissions</p>
                         <div className="flex flex-wrap gap-2">
                           {s.permissions.map((perm, idx) => (
-                            <span key={idx} className="flex items-center gap-1 px-2 py-1 bg-warm-100 text-warm-600 text-xs rounded-full">
+                            <span key={idx} className="flex items-center gap-1 px-2 py-1 bg-neutral-100 text-neutral-600 text-xs rounded-full">
                               <Check className="w-3 h-3 text-green-600" />
                               {perm}
                             </span>
@@ -2244,12 +2244,12 @@ export default function FamilyPage() {
                     )}
 
                     {showFinancials && s.weeklyStipend > 0 && (
-                      <div className="pt-3 border-t border-warm-200">
+                      <div className="pt-3 border-t border-neutral-200">
                         <div className="flex items-center justify-between">
-                          <p className="text-sm text-warm-500">Weekly Stipend</p>
-                          <p className="font-semibold text-warm-900">{formatCurrency(s.weeklyStipend)}</p>
+                          <p className="text-sm text-neutral-500">Weekly Stipend</p>
+                          <p className="font-semibold text-neutral-900">{formatCurrency(s.weeklyStipend)}</p>
                         </div>
-                        <p className="text-xs text-warm-400 mt-0.5">
+                        <p className="text-xs text-neutral-400 mt-0.5">
                           Since {s.startDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                         </p>
                       </div>
@@ -2268,19 +2268,19 @@ export default function FamilyPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowEmergencyCard(false)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-warm-200 bg-red-50">
+              <div className="p-6 border-b border-neutral-200 bg-red-50">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                       <Shield className="w-5 h-5 text-red-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-warm-900">Emergency Info Card</h3>
-                      <p className="text-sm text-warm-500">Print for babysitters</p>
+                      <h3 className="text-lg font-semibold text-neutral-900">Emergency Info Card</h3>
+                      <p className="text-sm text-neutral-500">Print for babysitters</p>
                     </div>
                   </div>
                   <button onClick={() => setShowEmergencyCard(false)} className="p-2 hover:bg-red-100 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-warm-400" />
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
@@ -2288,21 +2288,21 @@ export default function FamilyPage() {
               <div className="p-6 space-y-6">
                 {/* Emergency Contacts */}
                 <div>
-                  <h4 className="font-medium text-warm-900 mb-3 flex items-center gap-2">
+                  <h4 className="font-medium text-neutral-900 mb-3 flex items-center gap-2">
                     <Phone className="w-4 h-4 text-red-500" />
                     Emergency Contacts
                   </h4>
-                  <div className="space-y-2 bg-warm-50 p-4 rounded-lg">
+                  <div className="space-y-2 bg-neutral-50 p-4 rounded-lg">
                     {adults.map(a => (
                       <div key={a.id} className="flex justify-between">
                         <span className="font-medium">{a.name}</span>
-                        <span className="text-warm-600">{a.phone}</span>
+                        <span className="text-neutral-600">{a.phone}</span>
                       </div>
                     ))}
-                    <div className="pt-2 mt-2 border-t border-warm-200">
+                    <div className="pt-2 mt-2 border-t border-neutral-200">
                       <div className="flex justify-between">
                         <span className="font-medium">Poison Control</span>
-                        <span className="text-warm-600">1-800-222-1222</span>
+                        <span className="text-neutral-600">1-800-222-1222</span>
                       </div>
                     </div>
                   </div>
@@ -2311,8 +2311,8 @@ export default function FamilyPage() {
                 {/* Kids Info */}
                 {children.map(child => (
                   <div key={child.id}>
-                    <h4 className="font-medium text-warm-900 mb-3">{child.name}</h4>
-                    <div className="space-y-2 bg-warm-50 p-4 rounded-lg text-sm">
+                    <h4 className="font-medium text-neutral-900 mb-3">{child.name}</h4>
+                    <div className="space-y-2 bg-neutral-50 p-4 rounded-lg text-sm">
                       {child.health.allergies.length > 0 && (
                         <div className="p-2 bg-red-100 rounded-lg">
                           <p className="font-medium text-red-700">ALLERGIES: {child.health.allergies.join(', ')}</p>
@@ -2342,15 +2342,15 @@ export default function FamilyPage() {
                 {/* Pet Info */}
                 {pets.length > 0 && (
                   <div>
-                    <h4 className="font-medium text-warm-900 mb-3 flex items-center gap-2">
+                    <h4 className="font-medium text-neutral-900 mb-3 flex items-center gap-2">
                       <Dog className="w-4 h-4 text-amber-500" />
                       Pet Info
                     </h4>
-                    <div className="space-y-2 bg-warm-50 p-4 rounded-lg text-sm">
+                    <div className="space-y-2 bg-neutral-50 p-4 rounded-lg text-sm">
                       {pets.map(pet => (
                         <div key={pet.id}>
                           <p className="font-medium">{pet.name} ({pet.breed})</p>
-                          <p className="text-warm-500">Vet: {pet.vet.clinic} - {pet.vet.phone}</p>
+                          <p className="text-neutral-500">Vet: {pet.vet.clinic} - {pet.vet.phone}</p>
                         </div>
                       ))}
                     </div>
@@ -2359,11 +2359,11 @@ export default function FamilyPage() {
 
                 {/* Home Info */}
                 <div>
-                  <h4 className="font-medium text-warm-900 mb-3 flex items-center gap-2">
-                    <Home className="w-4 h-4 text-warm-500" />
+                  <h4 className="font-medium text-neutral-900 mb-3 flex items-center gap-2">
+                    <Home className="w-4 h-4 text-neutral-500" />
                     Home Info
                   </h4>
-                  <div className="space-y-2 bg-warm-50 p-4 rounded-lg text-sm">
+                  <div className="space-y-2 bg-neutral-50 p-4 rounded-lg text-sm">
                     <div className="flex justify-between">
                       <span>WiFi Password</span>
                       <span className="font-medium font-mono">MillerFamily2024</span>
@@ -2376,10 +2376,10 @@ export default function FamilyPage() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-warm-200 flex gap-3">
+              <div className="p-6 border-t border-neutral-200 flex gap-3">
                 <button
                   onClick={() => toast('Printing emergency card...')}
-                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-warm-100 text-warm-700 font-medium rounded-lg hover:bg-warm-200 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-neutral-100 text-neutral-700 font-medium rounded-lg hover:bg-neutral-200 transition-colors"
                 >
                   <Printer className="w-4 h-4" />
                   Print
@@ -2403,30 +2403,30 @@ export default function FamilyPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowSyncModal(null)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-warm-200">
+              <div className="p-6 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
                       <Calendar className="w-5 h-5 text-blue-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-warm-900">Sync to Calendar</h3>
-                      <p className="text-sm text-warm-500">{autoCalendarEvents.length} events from family data</p>
+                      <h3 className="text-lg font-semibold text-neutral-900">Sync to Calendar</h3>
+                      <p className="text-sm text-neutral-500">{autoCalendarEvents.length} events from family data</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-warm-400" />
+                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
 
               <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
                 {autoCalendarEvents.map((event, idx) => (
-                  <div key={idx} className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg">
+                  <div key={idx} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-warm-900 text-sm">{event.title}</p>
-                      <p className="text-xs text-warm-500">{event.schedule}</p>
+                      <p className="font-medium text-neutral-900 text-sm">{event.title}</p>
+                      <p className="text-xs text-neutral-500">{event.schedule}</p>
                     </div>
                     <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
                       event.type === 'recurring' ? 'bg-blue-100 text-blue-700' :
@@ -2439,10 +2439,10 @@ export default function FamilyPage() {
                 ))}
               </div>
 
-              <div className="p-6 border-t border-warm-200 flex gap-3">
+              <div className="p-6 border-t border-neutral-200 flex gap-3">
                 <button
                   onClick={() => setShowSyncModal(null)}
-                  className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                  className="flex-1 py-2.5 border border-neutral-200 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -2465,40 +2465,40 @@ export default function FamilyPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowSyncModal(null)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-              <div className="p-6 border-b border-warm-200">
+              <div className="p-6 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 bg-emerald-100 rounded-lg flex items-center justify-center">
                       <CreditCard className="w-5 h-5 text-emerald-600" />
                     </div>
                     <div>
-                      <h3 className="text-lg font-semibold text-warm-900">Create Bill Accounts</h3>
-                      <p className="text-sm text-warm-500">{autoBillAccounts.length} recurring bills detected</p>
+                      <h3 className="text-lg font-semibold text-neutral-900">Create Bill Accounts</h3>
+                      <p className="text-sm text-neutral-500">{autoBillAccounts.length} recurring bills detected</p>
                     </div>
                   </div>
-                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-warm-400" />
+                  <button onClick={() => setShowSyncModal(null)} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
 
               <div className="p-6 space-y-4 max-h-[400px] overflow-y-auto">
                 {autoBillAccounts.map((account) => (
-                  <div key={account.id} className="flex items-center gap-3 p-3 bg-warm-50 rounded-lg">
+                  <div key={account.id} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-lg">
                     <CheckCircle2 className="w-5 h-5 text-emerald-500 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-warm-900 text-sm">{account.name}</p>
-                      <p className="text-xs text-warm-500">For {account.recipient}</p>
+                      <p className="font-medium text-neutral-900 text-sm">{account.name}</p>
+                      <p className="text-xs text-neutral-500">For {account.recipient}</p>
                     </div>
                     <div className="text-right">
-                      <p className="font-medium text-warm-900">{formatCurrency(account.amount)}</p>
-                      <p className="text-xs text-warm-500">/{account.frequency}</p>
+                      <p className="font-medium text-neutral-900">{formatCurrency(account.amount)}</p>
+                      <p className="text-xs text-neutral-500">/{account.frequency}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="p-6 border-t border-warm-200">
+              <div className="p-6 border-t border-neutral-200">
                 <div className="flex items-center justify-between mb-4 p-3 bg-emerald-50 rounded-lg">
                   <span className="text-sm font-medium text-emerald-700">Total Monthly</span>
                   <span className="text-lg font-bold text-emerald-700">
@@ -2514,7 +2514,7 @@ export default function FamilyPage() {
                 <div className="flex gap-3">
                   <button
                     onClick={() => setShowSyncModal(null)}
-                    className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                    className="flex-1 py-2.5 border border-neutral-200 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                   >
                     Cancel
                   </button>
@@ -2542,9 +2542,9 @@ export default function FamilyPage() {
               setAddMemberType(null);
             }} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md">
-              <div className="p-6 border-b border-warm-200">
+              <div className="p-6 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-warm-900">
+                  <h3 className="text-lg font-semibold text-neutral-900">
                     {addMemberStep === 'select' ? 'Add Family Member' : `Add ${addMemberType}`}
                   </h3>
                   <button
@@ -2553,9 +2553,9 @@ export default function FamilyPage() {
                       setAddMemberStep('select');
                       setAddMemberType(null);
                     }}
-                    className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+                    className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-warm-400" />
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
@@ -2563,7 +2563,7 @@ export default function FamilyPage() {
               <div className="p-6">
                 {addMemberStep === 'select' ? (
                   <>
-                    <p className="text-sm text-warm-500 mb-4">What type of member would you like to add?</p>
+                    <p className="text-sm text-neutral-500 mb-4">What type of member would you like to add?</p>
                     <div className="grid grid-cols-2 gap-3">
                       {[
                         { type: 'adult' as AddMemberType, icon: User, label: 'Adult', description: 'Invite via email', color: 'emerald' },
@@ -2579,13 +2579,13 @@ export default function FamilyPage() {
                               setAddMemberType(option.type);
                               setAddMemberStep('form');
                             }}
-                            className="flex flex-col items-center p-4 border-2 border-warm-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors text-center"
+                            className="flex flex-col items-center p-4 border-2 border-neutral-200 rounded-xl hover:border-emerald-500 hover:bg-emerald-50/50 transition-colors text-center"
                           >
                             <div className={`w-12 h-12 bg-${option.color}-100 rounded-full flex items-center justify-center mb-2`}>
                               <Icon className={`w-6 h-6 text-${option.color}-600`} />
                             </div>
-                            <p className="font-medium text-warm-900">{option.label}</p>
-                            <p className="text-xs text-warm-500">{option.description}</p>
+                            <p className="font-medium text-neutral-900">{option.label}</p>
+                            <p className="text-xs text-neutral-500">{option.description}</p>
                           </button>
                         );
                       })}
@@ -2614,22 +2614,22 @@ export default function FamilyPage() {
           <div className="flex min-h-full items-center justify-center p-4">
             <div className="fixed inset-0 bg-black/50" onClick={() => setShowEditModal(null)} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-              <div className="p-6 border-b border-warm-200">
+              <div className="p-6 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-warm-900">Edit {showEditModal.name}</h3>
-                  <button onClick={() => setShowEditModal(null)} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-                    <X className="w-5 h-5 text-warm-400" />
+                  <h3 className="text-lg font-semibold text-neutral-900">Edit {showEditModal.name}</h3>
+                  <button onClick={() => setShowEditModal(null)} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
 
               <div className="p-6 space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-2">Name</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-2">Name</label>
                   <input
                     type="text"
                     defaultValue={showEditModal.name}
-                    className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
 
@@ -2637,47 +2637,47 @@ export default function FamilyPage() {
                   <>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-sm font-medium text-warm-700 mb-2">Age</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">Age</label>
                         <input
                           type="number"
                           defaultValue={(showEditModal as ChildMember).age}
-                          className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                         />
                       </div>
                       <div>
-                        <label className="block text-sm font-medium text-warm-700 mb-2">Grade</label>
+                        <label className="block text-sm font-medium text-neutral-700 mb-2">Grade</label>
                         <input
                           type="text"
                           defaultValue={(showEditModal as ChildMember).grade}
-                          className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                         />
                       </div>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-warm-700 mb-2">Sizes (for shopping)</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Sizes (for shopping)</label>
                       <div className="grid grid-cols-3 gap-3">
                         <div>
-                          <label className="block text-xs text-warm-500 mb-1">Shirt</label>
+                          <label className="block text-xs text-neutral-500 mb-1">Shirt</label>
                           <input
                             type="text"
                             defaultValue={(showEditModal as ChildMember).sizes?.shirt}
-                            className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-warm-500 mb-1">Pants</label>
+                          <label className="block text-xs text-neutral-500 mb-1">Pants</label>
                           <input
                             type="text"
                             defaultValue={(showEditModal as ChildMember).sizes?.pants}
-                            className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-warm-500 mb-1">Shoe</label>
+                          <label className="block text-xs text-neutral-500 mb-1">Shoe</label>
                           <input
                             type="text"
                             defaultValue={(showEditModal as ChildMember).sizes?.shoe}
-                            className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
+                            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent text-sm"
                           />
                         </div>
                       </div>
@@ -2688,29 +2688,29 @@ export default function FamilyPage() {
                 {showEditModal.type === 'pet' && (
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-sm font-medium text-warm-700 mb-2">Breed</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Breed</label>
                       <input
                         type="text"
                         defaultValue={(showEditModal as PetMember).breed}
-                        className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-warm-700 mb-2">Age</label>
+                      <label className="block text-sm font-medium text-neutral-700 mb-2">Age</label>
                       <input
                         type="number"
                         defaultValue={(showEditModal as PetMember).age}
-                        className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                        className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                       />
                     </div>
                   </div>
                 )}
               </div>
 
-              <div className="p-6 border-t border-warm-200 flex gap-3">
+              <div className="p-6 border-t border-neutral-200 flex gap-3">
                 <button
                   onClick={() => setShowEditModal(null)}
-                  className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+                  className="flex-1 py-2.5 border border-neutral-200 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
                 >
                   Cancel
                 </button>
@@ -2731,7 +2731,7 @@ export default function FamilyPage() {
 
       {/* Toast */}
       {showToast && (
-        <div className="fixed bottom-20 left-1/2 -tranwarm-x-1/2 z-50 px-4 py-2 bg-warm-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-neutral-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
           {showToast}
         </div>
       )}
@@ -2788,13 +2788,13 @@ function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberForm
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <div>
-        <label className="block text-sm font-medium text-warm-700 mb-2">Name *</label>
+        <label className="block text-sm font-medium text-neutral-700 mb-2">Name *</label>
         <input
           type="text"
           value={name}
           onChange={(e) => setName(e.target.value)}
           required
-          className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+          className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
           placeholder={type === 'pet' ? "Pet's name" : 'Full name'}
         />
       </div>
@@ -2802,11 +2802,11 @@ function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberForm
       {type === 'pet' ? (
         <>
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-2">Type</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">Type</label>
             <select
               value={petType}
               onChange={(e) => setPetType(e.target.value as PetType)}
-              className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
             >
               <option value="DOG">Dog</option>
               <option value="CAT">Cat</option>
@@ -2818,12 +2818,12 @@ function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberForm
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-2">Breed</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">Breed</label>
             <input
               type="text"
               value={breed}
               onChange={(e) => setBreed(e.target.value)}
-              className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               placeholder="e.g., Golden Retriever"
             />
           </div>
@@ -2832,26 +2832,26 @@ function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberForm
         <>
           {(type === 'adult' || type === 'staff') && (
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-2">Email</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-2">Email</label>
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                 placeholder="email@example.com"
               />
               {type === 'adult' && (
-                <p className="text-xs text-warm-500 mt-1">An invitation will be sent to this email</p>
+                <p className="text-xs text-neutral-500 mt-1">An invitation will be sent to this email</p>
               )}
             </div>
           )}
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-2">Phone</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-2">Phone</label>
             <input
               type="tel"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
-              className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               placeholder="(555) 555-5555"
             />
           </div>
@@ -2862,7 +2862,7 @@ function AddMemberForm({ type, onSubmit, onCancel, isSubmitting }: AddMemberForm
         <button
           type="button"
           onClick={onCancel}
-          className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+          className="flex-1 py-2.5 border border-neutral-200 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
         >
           Back
         </button>

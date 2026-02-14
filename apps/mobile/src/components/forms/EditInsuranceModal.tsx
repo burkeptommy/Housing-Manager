@@ -20,9 +20,8 @@ import { ImageUpload } from '../ImageUpload';
 
 interface InsuranceData {
   insuranceProvider?: string | null;
-  insurancePolicyNumber?: string | null;
-  insuranceExpiresAt?: string | null;
-  insuranceDocUrl?: string | null;
+  insurancePolicyNum?: string | null;
+  insuranceExpiry?: string | null;
 }
 
 interface Props {
@@ -34,22 +33,20 @@ interface Props {
 
 export function EditInsuranceModal({ visible, onClose, onSave, initialData }: Props) {
   const [provider, setProvider] = useState(initialData?.insuranceProvider || '');
-  const [policyNumber, setPolicyNumber] = useState(initialData?.insurancePolicyNumber || '');
+  const [policyNumber, setPolicyNumber] = useState(initialData?.insurancePolicyNum || '');
   const [expiresAt, setExpiresAt] = useState<Date | null>(
-    initialData?.insuranceExpiresAt ? new Date(initialData.insuranceExpiresAt) : null
+    initialData?.insuranceExpiry ? new Date(initialData.insuranceExpiry) : null
   );
-  const [insuranceDoc, setInsuranceDoc] = useState<string | null>(
-    initialData?.insuranceDocUrl || null
-  );
+  const [insuranceDoc, setInsuranceDoc] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     if (visible) {
       setProvider(initialData?.insuranceProvider || '');
-      setPolicyNumber(initialData?.insurancePolicyNumber || '');
-      setExpiresAt(initialData?.insuranceExpiresAt ? new Date(initialData.insuranceExpiresAt) : null);
-      setInsuranceDoc(initialData?.insuranceDocUrl || null);
+      setPolicyNumber(initialData?.insurancePolicyNum || '');
+      setExpiresAt(initialData?.insuranceExpiry ? new Date(initialData.insuranceExpiry) : null);
+      setInsuranceDoc(null);
     }
   }, [visible, initialData]);
 
@@ -58,9 +55,8 @@ export function EditInsuranceModal({ visible, onClose, onSave, initialData }: Pr
     try {
       await onSave({
         insuranceProvider: provider.trim() || null,
-        insurancePolicyNumber: policyNumber.trim() || null,
-        insuranceExpiresAt: expiresAt?.toISOString() || null,
-        insuranceDocUrl: insuranceDoc,
+        insurancePolicyNum: policyNumber.trim() || null,
+        insuranceExpiry: expiresAt?.toISOString() || null,
       });
       onClose();
     } catch (err) {

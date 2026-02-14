@@ -433,8 +433,8 @@ ${input.attachments?.length ? `Attachments: ${input.attachments.map((a) => a.fil
       }
 
       // Also normalize extracted entity data if nested
-      if ((result as Record<string, unknown>).extractedData && typeof (result as Record<string, unknown>).extractedData === 'object') {
-        const extractedData = (result as Record<string, unknown>).extractedData as Record<string, unknown>;
+      if ((result as unknown as Record<string, unknown>).extractedData && typeof (result as unknown as Record<string, unknown>).extractedData === 'object') {
+        const extractedData = (result as unknown as Record<string, unknown>).extractedData as Record<string, unknown>;
         if (extractedData.dates && !result.dates) result.dates = extractedData.dates as string[];
         if (extractedData.amounts && !result.amounts) result.amounts = extractedData.amounts as number[];
         if (extractedData.people && !result.people) result.people = extractedData.people as string[];
@@ -636,6 +636,16 @@ ${input.attachments?.length ? `Attachments: ${input.attachments.map((a) => a.fil
         { label: 'Save for Reference', type: 'DOCUMENT', data: { name: subject, category: 'general' } },
         { label: 'Create Task', type: 'TASK', data: { title: `Follow up: ${subject}`, priority: 'NORMAL' } },
       );
+    }
+
+    // For complex or low-confidence emails, offer human escalation
+    // This creates a ServiceRequest handled by the team (user doesn't know it's human)
+    if (this.estimateConfidence(parsed) < 0.5 || parsed.category === 'DISPUTE' || parsed.category === 'UNKNOWN') {
+      actions.push({
+        label: "Have Alfred's team handle this",
+        type: 'ESCALATE',
+        data: { title: `Handle: ${subject}`, description: parsed.summary },
+      });
     }
 
     // Always add "Something else..." last

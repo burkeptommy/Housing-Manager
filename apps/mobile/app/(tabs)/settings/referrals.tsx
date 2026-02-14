@@ -123,7 +123,7 @@ export default function ReferralsScreen() {
       case 'EXPIRED':
         return colors.text.tertiary;
       default:
-        return colors.haven.champagne[500];
+        return colors.haven.purple[500];
     }
   };
 
@@ -145,7 +145,7 @@ export default function ReferralsScreen() {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <Stack.Screen options={{ title: 'Refer a Friend', headerBackTitle: 'Settings' }} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.navy[900]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[900]} />
         </View>
       </SafeAreaView>
     );
@@ -171,7 +171,7 @@ export default function ReferralsScreen() {
         {/* Hero Card */}
         <Card style={styles.heroCard}>
           <View style={styles.heroIcon}>
-            <Ionicons name="gift" size={40} color={colors.haven.champagne[500]} />
+            <Ionicons name="gift" size={40} color={colors.haven.purple[500]} />
           </View>
           <Text style={styles.heroTitle}>Share Haven & Earn $50</Text>
           <Text style={styles.heroSubtitle}>
@@ -206,7 +206,7 @@ export default function ReferralsScreen() {
             <View style={styles.codeRow}>
               <Text style={styles.codeValue}>{stats.referralCode}</Text>
               <TouchableOpacity style={styles.copyButton} onPress={handleCopyCode}>
-                <Ionicons name="copy-outline" size={20} color={colors.haven.navy[900]} />
+                <Ionicons name="copy-outline" size={20} color={colors.haven.purple[900]} />
               </TouchableOpacity>
             </View>
 
@@ -217,7 +217,7 @@ export default function ReferralsScreen() {
               <Text style={styles.linkValue} numberOfLines={1}>
                 {stats.shareUrl}
               </Text>
-              <Ionicons name="copy-outline" size={16} color={colors.haven.champagne[500]} />
+              <Ionicons name="copy-outline" size={16} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           </Card>
         )}
@@ -334,13 +334,13 @@ const styles = StyleSheet.create({
     padding: spacing[6],
     alignItems: 'center',
     marginBottom: spacing[4],
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   heroIcon: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   },
   heroSubtitle: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.champagne[200],
+    color: colors.haven.purple[200],
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -371,7 +371,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   statLabel: {
     fontSize: typography.fontSizes.xs,
@@ -395,7 +395,7 @@ const styles = StyleSheet.create({
   codeValue: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     letterSpacing: 2,
   },
   copyButton: {
@@ -424,14 +424,14 @@ const styles = StyleSheet.create({
   linkValue: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   shareButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing[2],
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     paddingVertical: spacing[4],
     borderRadius: borderRadius.xl,
     marginBottom: spacing[6],
@@ -513,7 +513,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
   stepNumberText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   stepContent: {
     flex: 1,

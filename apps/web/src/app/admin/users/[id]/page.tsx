@@ -124,7 +124,7 @@ export default function EditUserPage() {
               type="text"
               value={form.firstName}
               onChange={(e) => setForm({ ...form, firstName: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
             />
           </div>
           <div>
@@ -133,7 +133,7 @@ export default function EditUserPage() {
               type="text"
               value={form.lastName}
               onChange={(e) => setForm({ ...form, lastName: e.target.value })}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
             />
           </div>
         </div>
@@ -144,7 +144,7 @@ export default function EditUserPage() {
             type="text"
             value={form.displayName}
             onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
           />
         </div>
 
@@ -154,7 +154,7 @@ export default function EditUserPage() {
             type="tel"
             value={form.phone}
             onChange={(e) => setForm({ ...form, phone: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
           />
         </div>
 
@@ -163,7 +163,7 @@ export default function EditUserPage() {
           <select
             value={form.role}
             onChange={(e) => setForm({ ...form, role: e.target.value })}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
           >
             <option value="HOMEOWNER">Homeowner</option>
             <option value="MANAGER">Manager</option>
@@ -177,7 +177,7 @@ export default function EditUserPage() {
           <button
             type="submit"
             disabled={saving}
-            className="flex items-center gap-2 px-6 py-2 bg-haven-navy-900 text-white rounded-lg hover:bg-haven-navy-800 transition disabled:opacity-50"
+            className="flex items-center gap-2 px-6 py-2 bg-haven-900 text-white rounded-lg hover:bg-haven-800 transition disabled:opacity-50"
           >
             {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
             Save Changes
@@ -209,7 +209,7 @@ export default function EditUserPage() {
               <dd>
                 <Link
                   href={`/admin/households/${userData.householdMembers[0].household.id}`}
-                  className="text-haven-champagne-600 hover:underline"
+                  className="text-haven-600 hover:underline"
                 >
                   {userData.householdMembers[0].household.name}
                 </Link>

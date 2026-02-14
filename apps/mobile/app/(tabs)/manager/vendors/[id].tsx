@@ -330,12 +330,10 @@ export default function VendorDetailScreen() {
   };
 
   const handleChat = () => {
-    if (vendor?.householdVendorId) {
-      router.push({
-        pathname: '/(tabs)/manager/vendors/chat/[id]',
-        params: { id: vendor.householdVendorId },
-      });
-    }
+    router.push({
+      pathname: '/(tabs)/manager',
+      params: { prefill: `I need help with my ${vendor?.category?.replace(/_/g, ' ')} vendor ${vendor?.displayName}.` },
+    });
   };
 
   const handleToggleFavorite = async () => {
@@ -469,6 +467,7 @@ export default function VendorDetailScreen() {
             state: editState.trim() || null,
             postalCode: editPostalCode.trim() || null,
             notes: editNotes.trim() || null,
+            accountNumber: editAccountNumber.trim() || null,
           }),
         }
       );
@@ -520,7 +519,7 @@ export default function VendorDetailScreen() {
       <Ionicons
         name={vendor?.isFavorite ? 'star' : 'star-outline'}
         size={24}
-        color={vendor?.isFavorite ? colors.haven.sage[500] : colors.white}
+        color={vendor?.isFavorite ? colors.haven.purple[500] : colors.white}
       />
     </TouchableOpacity>
   );
@@ -583,7 +582,7 @@ export default function VendorDetailScreen() {
               </View>
             ) : (
               <View style={styles.vendorIcon}>
-                <Ionicons name={getVendorIcon(vendor.category)} size={32} color={colors.haven.sage[500]} />
+                <Ionicons name={getVendorIcon(vendor.category)} size={32} color={colors.haven.purple[500]} />
               </View>
             )}
             <View style={styles.vendorInfo}>
@@ -606,7 +605,7 @@ export default function VendorDetailScreen() {
                   key={star}
                   name={star <= (vendor.rating || 0) ? 'star' : 'star-outline'}
                   size={20}
-                  color={colors.haven.sage[500]}
+                  color={colors.haven.purple[500]}
                 />
               ))}
             </View>
@@ -635,7 +634,7 @@ export default function VendorDetailScreen() {
 
           {/* Schedule Button */}
           <TouchableOpacity style={styles.scheduleButton} onPress={handleScheduleService}>
-            <Ionicons name="calendar" size={20} color={colors.haven.navy[700]} />
+            <Ionicons name="calendar" size={20} color={colors.haven.purple[700]} />
             <Text style={styles.scheduleText}>Schedule Service</Text>
           </TouchableOpacity>
         </Card>
@@ -678,7 +677,7 @@ export default function VendorDetailScreen() {
           )}
           {!vendor.phone && !vendor.email && !vendor.websiteUrl && !vendor.addressLine1 && (
             <TouchableOpacity onPress={openEditContact} style={styles.emptyContactRow}>
-              <Ionicons name="add-circle-outline" size={20} color={colors.haven.navy[600]} />
+              <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[600]} />
               <Text style={styles.addContactText}>Add contact information</Text>
             </TouchableOpacity>
           )}
@@ -720,7 +719,7 @@ export default function VendorDetailScreen() {
                 }}
               >
                 <View style={styles.utilityActionIcon}>
-                  <Ionicons name="wallet" size={22} color={colors.haven.navy[600]} />
+                  <Ionicons name="wallet" size={22} color={colors.haven.purple[600]} />
                 </View>
                 <Text style={styles.utilityActionText}>Check Balance</Text>
               </TouchableOpacity>
@@ -729,20 +728,20 @@ export default function VendorDetailScreen() {
                 style={styles.utilityActionButton}
                 onPress={() => {
                   router.push({
-                    pathname: '/(tabs)/manager/vendors/chat/[id]',
-                    params: { id: vendor.householdVendorId || '' },
+                    pathname: '/(tabs)/manager',
+                    params: { prefill: `I need support with my ${vendor.category?.replace(/_/g, ' ')} service from ${vendor.displayName}. Can you help?` },
                   });
                 }}
               >
                 <View style={styles.utilityActionIcon}>
-                  <Ionicons name="help-buoy" size={22} color={colors.haven.sage[500]} />
+                  <Ionicons name="help-buoy" size={22} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.utilityActionText}>Get Support</Text>
               </TouchableOpacity>
             </View>
 
             <TouchableOpacity style={styles.checkRatesButton}>
-              <Ionicons name="sparkles" size={16} color={colors.haven.navy[600]} />
+              <Ionicons name="sparkles" size={16} color={colors.haven.purple[600]} />
               <Text style={styles.checkRatesText}>Ask Alfred to check better rates</Text>
             </TouchableOpacity>
           </Card>
@@ -782,7 +781,7 @@ export default function VendorDetailScreen() {
                     </Text>
                   </View>
                   <View style={styles.speedItem}>
-                    <Ionicons name="arrow-up" size={16} color={colors.haven.sage[500]} />
+                    <Ionicons name="arrow-up" size={16} color={colors.haven.purple[500]} />
                     <Text style={styles.speedValue}>
                       {(vendor.typeSpecificData as InternetVendorData).uploadSpeed || '—'} Mbps
                     </Text>
@@ -974,7 +973,7 @@ export default function VendorDetailScreen() {
                   </Text>
                   {contract.autoRenews && (
                     <View style={styles.autoRenewBadge}>
-                      <Ionicons name="refresh" size={12} color={colors.haven.navy[600]} />
+                      <Ionicons name="refresh" size={12} color={colors.haven.purple[600]} />
                       <Text style={styles.autoRenewText}>Auto-renews</Text>
                     </View>
                   )}
@@ -1010,7 +1009,7 @@ export default function VendorDetailScreen() {
             {vendor.billAccounts.map(bill => (
               <View key={bill.id} style={styles.billRow}>
                 <View style={styles.billIconWrapper}>
-                  <Ionicons name="receipt-outline" size={18} color={colors.haven.sage[500]} />
+                  <Ionicons name="receipt-outline" size={18} color={colors.haven.purple[500]} />
                 </View>
                 <View style={styles.billInfo}>
                   <Text style={styles.billName}>{bill.nickname}</Text>
@@ -1047,7 +1046,7 @@ export default function VendorDetailScreen() {
               style={styles.addActivityBtn}
               onPress={() => setShowAddActivity(true)}
             >
-              <Ionicons name="add" size={20} color={colors.haven.navy[600]} />
+              <Ionicons name="add" size={20} color={colors.haven.purple[600]} />
               <Text style={styles.addActivityText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -1068,7 +1067,7 @@ export default function VendorDetailScreen() {
                     <Ionicons
                       name={getActivityIcon(activity.type) as any}
                       size={20}
-                      color={colors.haven.sage[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.activityContent}>
@@ -1195,7 +1194,7 @@ export default function VendorDetailScreen() {
                   <Ionicons
                     name={star <= (vendor.rating || 0) ? 'star' : 'star-outline'}
                     size={40}
-                    color={colors.haven.sage[500]}
+                    color={colors.haven.purple[500]}
                   />
                 </TouchableOpacity>
               ))}
@@ -1341,7 +1340,7 @@ export default function VendorDetailScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   loadingContainer: {
     flex: 1,
@@ -1373,7 +1372,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: borderRadius.xl,
-    backgroundColor: colors.haven.sage[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1440,7 +1439,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     gap: spacing[1],
@@ -1454,13 +1453,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     gap: spacing[2],
   },
   scheduleText: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
   },
@@ -1486,7 +1485,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   linkText: {
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
   // New styles for enhanced sections
   sectionHeaderRow: {
@@ -1504,7 +1503,7 @@ const styles = StyleSheet.create({
   },
   editLink: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   infoContent: {
@@ -1578,13 +1577,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing[2],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[2],
   },
   checkRatesText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     fontWeight: typography.fontWeights.medium,
   },
   // Contract styles
@@ -1617,7 +1616,7 @@ const styles = StyleSheet.create({
   },
   autoRenewText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   notesText: {
@@ -1640,7 +1639,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   addActivityText: {
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
   },
@@ -1671,7 +1670,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.sage[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1737,7 +1736,7 @@ const styles = StyleSheet.create({
   modalSave: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
   modalSaveDisabled: {
     opacity: 0.5,
@@ -1767,7 +1766,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.navy[600],
+    backgroundColor: colors.haven.purple[600],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,
@@ -1834,7 +1833,7 @@ const styles = StyleSheet.create({
   },
   addContactText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   addressRow: {
@@ -1888,7 +1887,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.sage[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },

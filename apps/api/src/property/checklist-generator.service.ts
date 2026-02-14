@@ -6,7 +6,7 @@ export interface ChecklistItem {
   category: 'systems' | 'utilities' | 'vendors' | 'maintenance' | 'info';
   priority: 'high' | 'medium' | 'low';
   question: string;
-  context?: string; // Why we're asking (from ATTOM data)
+  context?: string; // Why we're asking (from property data)
   dataField: string; // What field this populates
   inputType: 'text' | 'select' | 'date' | 'phone' | 'vendor';
   options?: string[]; // For select type
@@ -17,7 +17,7 @@ export interface ChecklistItem {
 @Injectable()
 export class ChecklistGeneratorService {
   /**
-   * Generates a smart checklist based on ATTOM property data.
+   * Generates a smart checklist based on property data.
    * This creates context-aware questions for the Home Manager to ask during the intro call.
    */
   generateChecklist(

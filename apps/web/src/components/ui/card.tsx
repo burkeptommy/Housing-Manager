@@ -19,9 +19,9 @@ const paddingClasses = {
 export function Card({ children, className = '', hover = false, padding = 'md' }: CardProps) {
   return (
     <div
-      className={`bg-white rounded-2xl border border-warm-100
+      className={`bg-white rounded-2xl border border-neutral-100
                   shadow-[0_1px_3px_rgba(0,0,0,0.05),0_1px_2px_rgba(0,0,0,0.03)]
-                  ${hover ? 'transition-all duration-200 hover:shadow-lg hover:border-warm-200 hover:-translate-y-0.5' : ''}
+                  ${hover ? 'transition-all duration-200 hover:shadow-lg hover:border-neutral-200 hover:-translate-y-0.5' : ''}
                   ${paddingClasses[padding]} ${className}`}
     >
       {children}
@@ -43,8 +43,8 @@ export function CardHeader({
   return (
     <div className={`flex items-start justify-between ${className}`}>
       <div>
-        <h3 className="text-lg font-semibold text-warm-900">{title}</h3>
-        {subtitle && <p className="text-sm text-warm-500 mt-0.5">{subtitle}</p>}
+        <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+        {subtitle && <p className="text-sm text-neutral-500 mt-0.5">{subtitle}</p>}
       </div>
       {action && <div>{action}</div>}
     </div>
@@ -66,7 +66,7 @@ export function CardFooter({
 }) {
   return (
     <div
-      className={`mt-6 pt-4 ${border ? 'border-t border-warm-100' : ''} ${className}`}
+      className={`mt-6 pt-4 ${border ? 'border-t border-neutral-100' : ''} ${className}`}
     >
       {children}
     </div>
@@ -101,15 +101,15 @@ export function StatCard({
   const changeColors = {
     positive: 'text-emerald-600 bg-emerald-50',
     negative: 'text-red-600 bg-red-50',
-    neutral: 'text-warm-600 bg-warm-100',
+    neutral: 'text-neutral-600 bg-neutral-100',
   };
 
   return (
     <Card>
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-medium text-warm-500">{label}</p>
-          <p className="mt-2 text-3xl font-bold text-warm-900">{value}</p>
+          <p className="text-sm font-medium text-neutral-500">{label}</p>
+          <p className="mt-2 text-3xl font-bold text-neutral-900">{value}</p>
           {change && (
             <span className={`inline-flex items-center mt-2 px-2 py-0.5 rounded-full text-xs font-medium ${changeColors[changeType]}`}>
               {change}

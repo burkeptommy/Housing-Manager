@@ -204,7 +204,7 @@ export default function CalendarSettingsScreen() {
     return (
       <ScreenContainer title="Calendar Sync" showBack>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </ScreenContainer>
     );
@@ -243,7 +243,7 @@ export default function CalendarSettingsScreen() {
               </View>
 
               {connectingProvider === provider.id ? (
-                <ActivityIndicator size="small" color={colors.haven.champagne[500]} />
+                <ActivityIndicator size="small" color={colors.haven.purple[500]} />
               ) : provider.connected ? (
                 <View style={styles.connectedBadge}>
                   <Ionicons name="checkmark-circle" size={20} color="#10b981" />
@@ -257,7 +257,7 @@ export default function CalendarSettingsScreen() {
         </View>
 
         <View style={styles.infoBox}>
-          <Ionicons name="information-circle" size={20} color={colors.haven.navy[400]} />
+          <Ionicons name="information-circle" size={20} color={colors.haven.purple[400]} />
           <Text style={styles.infoText}>
             Haven only reads your calendar events. We never modify or delete your events.
           </Text>
@@ -281,7 +281,7 @@ export default function CalendarSettingsScreen() {
               }
             }}
           >
-            <Ionicons name="refresh" size={20} color={colors.haven.navy[600]} />
+            <Ionicons name="refresh" size={20} color={colors.haven.purple[600]} />
             <Text style={styles.syncButtonText}>Sync Now</Text>
           </TouchableOpacity>
         )}
@@ -302,7 +302,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     marginBottom: spacing[6],
     lineHeight: 24,
   },
@@ -332,16 +332,16 @@ const styles = StyleSheet.create({
   providerName: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   providerEmail: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   lastSync: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
     marginTop: 2,
   },
   connectedBadge: {
@@ -356,13 +356,13 @@ const styles = StyleSheet.create({
   },
   connectText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.semibold,
   },
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginTop: spacing[6],
@@ -371,14 +371,14 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     lineHeight: 20,
   },
   syncButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginTop: spacing[4],
@@ -387,6 +387,6 @@ const styles = StyleSheet.create({
   syncButtonText: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
 });

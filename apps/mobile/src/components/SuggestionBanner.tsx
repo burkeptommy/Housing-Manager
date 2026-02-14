@@ -45,15 +45,15 @@ export function SuggestionBanner({
         };
       case 'info':
         return {
-          backgroundColor: colors.haven.navy[50],
-          borderColor: colors.haven.navy[200],
-          iconColor: colors.haven.navy[500],
+          backgroundColor: colors.haven.purple[50],
+          borderColor: colors.haven.purple[200],
+          iconColor: colors.haven.purple[500],
         };
       default:
         return {
-          backgroundColor: colors.haven.champagne[50],
-          borderColor: colors.haven.champagne[200],
-          iconColor: colors.haven.champagne[500],
+          backgroundColor: colors.haven.purple[50],
+          borderColor: colors.haven.purple[200],
+          iconColor: colors.haven.purple[500],
         };
     }
   };

@@ -28,6 +28,7 @@ export interface UserProfile {
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
+  phone: string | null;
   avatarUrl: string | null;
   role: string;
   emailVerified: boolean;
@@ -261,6 +262,7 @@ export class UsersService {
         displayName: user.displayName,
         firstName: user.firstName,
         lastName: user.lastName,
+        phone: user.phone,
         avatarUrl: user.avatarUrl,
         role: user.role,
         emailVerified: user.emailVerified,

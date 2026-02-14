@@ -1265,7 +1265,7 @@ const getCategoryColor = (category: string) => {
     pool: { bg: 'bg-cyan-100', text: 'text-cyan-600' },
     lawn: { bg: 'bg-emerald-100', text: 'text-emerald-600' },
   };
-  return colors[category] || { bg: 'bg-warm-100', text: 'text-warm-600' };
+  return colors[category] || { bg: 'bg-neutral-100', text: 'text-neutral-600' };
 };
 
 const getStatusConfig = (status: string) => {
@@ -1303,19 +1303,19 @@ function SystemDetailModal({ system, onClose }: { system: HomeSystem; onClose: (
       <div className="flex min-h-full items-end sm:items-center justify-center p-0 sm:p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white w-full sm:max-w-2xl sm:rounded-2xl overflow-hidden max-h-[90vh] overflow-y-auto rounded-t-2xl">
-          <div className="sticky top-0 bg-white border-b border-warm-200 z-10">
+          <div className="sticky top-0 bg-white border-b border-neutral-200 z-10">
             <div className="p-4 flex items-start justify-between">
               <div className="flex items-start gap-3">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${category.bg}`}>
                   <CategoryIcon className={`w-6 h-6 ${category.text}`} />
                 </div>
                 <div>
-                  <h2 className="text-lg font-bold text-warm-900">{system.name}</h2>
-                  <p className="text-sm text-warm-500">{system.type}</p>
+                  <h2 className="text-lg font-bold text-neutral-900">{system.name}</h2>
+                  <p className="text-sm text-neutral-500">{system.type}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-warm-100 rounded-lg">
-                <X className="w-5 h-5 text-warm-400" />
+              <button onClick={onClose} className="p-2 hover:bg-neutral-100 rounded-lg">
+                <X className="w-5 h-5 text-neutral-400" />
               </button>
             </div>
             <div className="flex px-4">
@@ -1323,7 +1323,7 @@ function SystemDetailModal({ system, onClose }: { system: HomeSystem; onClose: (
                 <button
                   key={tab.id}
                   onClick={() => setActiveSection(tab.id as any)}
-                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeSection === tab.id ? 'border-haven-600 text-haven-700' : 'border-transparent text-warm-500'}`}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${activeSection === tab.id ? 'border-haven-600 text-haven-700' : 'border-transparent text-neutral-500'}`}
                 >
                   {tab.label}
                 </button>
@@ -1340,25 +1340,25 @@ function SystemDetailModal({ system, onClose }: { system: HomeSystem; onClose: (
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${status.badge}`}>{status.label}</span>
                     </div>
                     <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div><p className="text-warm-500 text-xs">Last Service</p><p className="font-medium">{system.maintenance.lastService}</p></div>
-                      <div><p className="text-warm-500 text-xs">Next Service</p><p className={`font-medium ${status.text}`}>{system.maintenance.nextService}</p></div>
-                      <div><p className="text-warm-500 text-xs">Interval</p><p className="font-medium">{system.maintenance.interval}</p></div>
-                      <div><p className="text-warm-500 text-xs">Time Until Due</p><p className={`font-medium ${status.text}`}>{formatDaysUntilDue(system.maintenance.daysUntilDue)}</p></div>
+                      <div><p className="text-neutral-500 text-xs">Last Service</p><p className="font-medium">{system.maintenance.lastService}</p></div>
+                      <div><p className="text-neutral-500 text-xs">Next Service</p><p className={`font-medium ${status.text}`}>{system.maintenance.nextService}</p></div>
+                      <div><p className="text-neutral-500 text-xs">Interval</p><p className="font-medium">{system.maintenance.interval}</p></div>
+                      <div><p className="text-neutral-500 text-xs">Time Until Due</p><p className={`font-medium ${status.text}`}>{formatDaysUntilDue(system.maintenance.daysUntilDue)}</p></div>
                     </div>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
-                  {system.brand && <div className="p-3 bg-warm-50 rounded-lg"><p className="text-xs text-warm-500">Brand</p><p className="font-medium">{system.brand}</p></div>}
-                  {system.model && <div className="p-3 bg-warm-50 rounded-lg"><p className="text-xs text-warm-500">Model</p><p className="font-medium">{system.model}</p></div>}
-                  {system.warrantyExpiry && <div className="p-3 bg-warm-50 rounded-lg"><p className="text-xs text-warm-500">Warranty Until</p><p className="font-medium">{system.warrantyExpiry}</p></div>}
-                  {system.location && <div className="p-3 bg-warm-50 rounded-lg"><p className="text-xs text-warm-500">Location</p><p className="font-medium">{system.location}</p></div>}
+                  {system.brand && <div className="p-3 bg-neutral-50 rounded-lg"><p className="text-xs text-neutral-500">Brand</p><p className="font-medium">{system.brand}</p></div>}
+                  {system.model && <div className="p-3 bg-neutral-50 rounded-lg"><p className="text-xs text-neutral-500">Model</p><p className="font-medium">{system.model}</p></div>}
+                  {system.warrantyExpiry && <div className="p-3 bg-neutral-50 rounded-lg"><p className="text-xs text-neutral-500">Warranty Until</p><p className="font-medium">{system.warrantyExpiry}</p></div>}
+                  {system.location && <div className="p-3 bg-neutral-50 rounded-lg"><p className="text-xs text-neutral-500">Location</p><p className="font-medium">{system.location}</p></div>}
                 </div>
                 {system.assignedVendor && (
-                  <div className="flex items-center gap-4 p-4 bg-warm-50 rounded-xl">
+                  <div className="flex items-center gap-4 p-4 bg-neutral-50 rounded-xl">
                     <VendorAvatar name={system.assignedVendor.name} size="lg" />
                     <div className="flex-1">
-                      <p className="font-semibold text-warm-900">{system.assignedVendor.name}</p>
-                      <p className="text-sm text-warm-500">{system.assignedVendor.phone}</p>
+                      <p className="font-semibold text-neutral-900">{system.assignedVendor.name}</p>
+                      <p className="text-sm text-neutral-500">{system.assignedVendor.phone}</p>
                     </div>
                     <a href={`tel:${system.assignedVendor.phone}`} className="p-2 bg-haven-100 text-haven-700 rounded-lg"><Phone className="w-5 h-5" /></a>
                   </div>
@@ -1369,31 +1369,31 @@ function SystemDetailModal({ system, onClose }: { system: HomeSystem; onClose: (
             {activeSection === 'history' && (
               <div className="space-y-3">
                 {system.serviceHistory?.length ? system.serviceHistory.map(record => (
-                  <div key={record.id} className="p-4 bg-white border border-warm-200 rounded-xl">
+                  <div key={record.id} className="p-4 bg-white border border-neutral-200 rounded-xl">
                     <div className="flex justify-between mb-2">
                       <p className="font-semibold">{record.date}</p>
                       {record.cost && <span className="font-semibold">${record.cost}</span>}
                     </div>
-                    <p className="text-sm text-warm-600 mb-2">{record.description}</p>
-                    <p className="text-xs text-warm-500">{record.vendor.name} {record.technicianName && `• ${record.technicianName}`}</p>
+                    <p className="text-sm text-neutral-600 mb-2">{record.description}</p>
+                    <p className="text-xs text-neutral-500">{record.vendor.name} {record.technicianName && `• ${record.technicianName}`}</p>
                   </div>
-                )) : <p className="text-center py-8 text-warm-500">No service history</p>}
+                )) : <p className="text-center py-8 text-neutral-500">No service history</p>}
               </div>
             )}
             {activeSection === 'documents' && (
               <div className="space-y-3">
                 {system.documents?.length ? system.documents.map(doc => (
-                  <a key={doc.id} href={doc.url} className="flex items-center gap-4 p-4 bg-warm-50 rounded-xl hover:bg-warm-100">
+                  <a key={doc.id} href={doc.url} className="flex items-center gap-4 p-4 bg-neutral-50 rounded-xl hover:bg-neutral-100">
                     <div className="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center"><FileText className="w-5 h-5 text-red-600" /></div>
-                    <div className="flex-1"><p className="font-medium">{doc.name}</p><p className="text-xs text-warm-500">{doc.type} • {doc.uploadDate}</p></div>
-                    <Download className="w-5 h-5 text-warm-400" />
+                    <div className="flex-1"><p className="font-medium">{doc.name}</p><p className="text-xs text-neutral-500">{doc.type} • {doc.uploadDate}</p></div>
+                    <Download className="w-5 h-5 text-neutral-400" />
                   </a>
-                )) : <p className="text-center py-8 text-warm-500">No documents</p>}
+                )) : <p className="text-center py-8 text-neutral-500">No documents</p>}
               </div>
             )}
           </div>
-          <div className="sticky bottom-0 bg-white border-t border-warm-200 p-4 flex gap-3">
-            <button className="flex-1 py-3 border border-warm-200 text-warm-700 font-medium rounded-xl hover:bg-warm-50">Edit</button>
+          <div className="sticky bottom-0 bg-white border-t border-neutral-200 p-4 flex gap-3">
+            <button className="flex-1 py-3 border border-neutral-200 text-neutral-700 font-medium rounded-xl hover:bg-neutral-50">Edit</button>
             <button className="flex-1 py-3 bg-haven-700 text-white font-medium rounded-xl hover:bg-haven-800">Schedule Service</button>
           </div>
         </div>
@@ -1488,14 +1488,14 @@ export default function YourHomePage() {
       {VEHICLES.map(vehicle => {
         const loan = LOANS.find(l => l.vehicleId === vehicle.id);
         return (
-          <div key={vehicle.id} className="bg-white rounded-2xl border border-warm-200 overflow-hidden">
+          <div key={vehicle.id} className="bg-white rounded-2xl border border-neutral-200 overflow-hidden">
             <div className="flex flex-col sm:flex-row">
               {/* Vehicle Image or Avatar */}
               <div className="sm:w-64 h-48 sm:h-auto overflow-hidden flex-shrink-0">
                 {vehicle.photoUrl ? (
                   <img src={vehicle.photoUrl} alt={vehicle.nickname} className="w-full h-full object-cover" />
                 ) : (
-                  <div className="w-full h-full flex items-center justify-center bg-warm-50">
+                  <div className="w-full h-full flex items-center justify-center bg-neutral-50">
                     <VehicleAvatar
                       make={vehicle.make}
                       model={vehicle.model}
@@ -1508,9 +1508,9 @@ export default function YourHomePage() {
               <div className="flex-1 p-4 sm:p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h3 className="text-xl font-bold text-warm-900">{vehicle.nickname}</h3>
-                    <p className="text-warm-600">{vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim}</p>
-                    <p className="text-sm text-warm-500">{vehicle.color}</p>
+                    <h3 className="text-xl font-bold text-neutral-900">{vehicle.nickname}</h3>
+                    <p className="text-neutral-600">{vehicle.year} {vehicle.make} {vehicle.model} {vehicle.trim}</p>
+                    <p className="text-sm text-neutral-500">{vehicle.color}</p>
                   </div>
                   <span className={`px-3 py-1 text-sm font-medium rounded-full ${vehicle.ownership === 'owned' ? 'bg-green-100 text-green-700' : vehicle.ownership === 'financed' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
                     {vehicle.ownership.charAt(0).toUpperCase() + vehicle.ownership.slice(1)}
@@ -1518,89 +1518,89 @@ export default function YourHomePage() {
                 </div>
                 {/* Quick Stats Row */}
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  <div className="p-3 bg-warm-50 rounded-lg">
-                    <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><Gauge className="w-3.5 h-3.5" />Mileage</div>
-                    <p className="font-bold text-warm-900">{vehicle.mileage.toLocaleString()} mi</p>
+                  <div className="p-3 bg-neutral-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><Gauge className="w-3.5 h-3.5" />Mileage</div>
+                    <p className="font-bold text-neutral-900">{vehicle.mileage.toLocaleString()} mi</p>
                   </div>
-                  <div className="p-3 bg-warm-50 rounded-lg">
-                    <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><CarFront className="w-3.5 h-3.5" />License</div>
-                    <p className="font-mono font-bold text-warm-900">{vehicle.licensePlate} <span className="text-warm-500 text-xs font-normal">{vehicle.state}</span></p>
+                  <div className="p-3 bg-neutral-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><CarFront className="w-3.5 h-3.5" />License</div>
+                    <p className="font-mono font-bold text-neutral-900">{vehicle.licensePlate} <span className="text-neutral-500 text-xs font-normal">{vehicle.state}</span></p>
                   </div>
-                  <div className="p-3 bg-warm-50 rounded-lg">
-                    <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><Zap className="w-3.5 h-3.5" />Fuel Type</div>
-                    <p className="font-bold text-warm-900">{vehicle.fuelType}</p>
+                  <div className="p-3 bg-neutral-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><Zap className="w-3.5 h-3.5" />Fuel Type</div>
+                    <p className="font-bold text-neutral-900">{vehicle.fuelType}</p>
                   </div>
-                  <div className="p-3 bg-warm-50 rounded-lg">
-                    <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><Key className="w-3.5 h-3.5" />VIN</div>
-                    <p className="font-mono text-xs font-bold text-warm-900 truncate">{vehicle.vin}</p>
+                  <div className="p-3 bg-neutral-50 rounded-lg">
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><Key className="w-3.5 h-3.5" />VIN</div>
+                    <p className="font-mono text-xs font-bold text-neutral-900 truncate">{vehicle.vin}</p>
                   </div>
                 </div>
                 {/* Registration & Inspection Row */}
                 <div className="mt-3 grid grid-cols-2 gap-3">
-                  <div className={`p-3 rounded-lg ${new Date(vehicle.registrationExpiry) < new Date() ? 'bg-red-50 border border-red-200' : 'bg-warm-50'}`}>
-                    <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><FileCheck className="w-3.5 h-3.5" />Registration</div>
-                    <p className={`font-bold ${new Date(vehicle.registrationExpiry) < new Date() ? 'text-red-700' : 'text-warm-900'}`}>{vehicle.registrationExpiry}</p>
-                    {vehicle.registrationCost && <p className="text-xs text-warm-500 mt-0.5">{formatCurrency(vehicle.registrationCost)}/year</p>}
+                  <div className={`p-3 rounded-lg ${new Date(vehicle.registrationExpiry) < new Date() ? 'bg-red-50 border border-red-200' : 'bg-neutral-50'}`}>
+                    <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><FileCheck className="w-3.5 h-3.5" />Registration</div>
+                    <p className={`font-bold ${new Date(vehicle.registrationExpiry) < new Date() ? 'text-red-700' : 'text-neutral-900'}`}>{vehicle.registrationExpiry}</p>
+                    {vehicle.registrationCost && <p className="text-xs text-neutral-500 mt-0.5">{formatCurrency(vehicle.registrationCost)}/year</p>}
                   </div>
                   {vehicle.inspectionExpiry ? (
-                    <div className={`p-3 rounded-lg ${new Date(vehicle.inspectionExpiry) < new Date() ? 'bg-red-50 border border-red-200' : 'bg-warm-50'}`}>
-                      <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><BadgeCheck className="w-3.5 h-3.5" />Inspection</div>
-                      <p className={`font-bold ${new Date(vehicle.inspectionExpiry) < new Date() ? 'text-red-700' : 'text-warm-900'}`}>{vehicle.inspectionExpiry}</p>
-                      {vehicle.inspectionType && <p className="text-xs text-warm-500 mt-0.5">{vehicle.inspectionType}</p>}
+                    <div className={`p-3 rounded-lg ${new Date(vehicle.inspectionExpiry) < new Date() ? 'bg-red-50 border border-red-200' : 'bg-neutral-50'}`}>
+                      <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><BadgeCheck className="w-3.5 h-3.5" />Inspection</div>
+                      <p className={`font-bold ${new Date(vehicle.inspectionExpiry) < new Date() ? 'text-red-700' : 'text-neutral-900'}`}>{vehicle.inspectionExpiry}</p>
+                      {vehicle.inspectionType && <p className="text-xs text-neutral-500 mt-0.5">{vehicle.inspectionType}</p>}
                     </div>
                   ) : vehicle.inspectionType && (
                     <div className="p-3 bg-green-50 rounded-lg">
-                      <div className="flex items-center gap-2 text-warm-500 text-xs mb-1"><BadgeCheck className="w-3.5 h-3.5" />Inspection</div>
+                      <div className="flex items-center gap-2 text-neutral-500 text-xs mb-1"><BadgeCheck className="w-3.5 h-3.5" />Inspection</div>
                       <p className="font-bold text-green-700">{vehicle.inspectionType}</p>
                     </div>
                   )}
                 </div>
               </div>
             </div>
-            <div className="border-t border-warm-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-warm-200">
+            <div className="border-t border-neutral-200">
+              <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-neutral-200">
                 {/* Insurance */}
                 <div className="p-4">
-                  <h4 className="font-semibold text-warm-900 mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-blue-600" />Insurance</h4>
+                  <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2"><Shield className="w-4 h-4 text-blue-600" />Insurance</h4>
                   <div className="space-y-2 text-sm">
-                    <div className="flex justify-between"><span className="text-warm-500">Provider</span><span className="font-medium">{vehicle.insuranceProvider}</span></div>
-                    <div className="flex justify-between"><span className="text-warm-500">Policy #</span><span className="font-mono text-warm-700">{vehicle.insurancePolicy}</span></div>
-                    <div className="flex justify-between"><span className="text-warm-500">Premium</span><span className="font-medium">{formatCurrency(vehicle.insurancePremium)}/{vehicle.insuranceFrequency}</span></div>
-                    <div className="flex justify-between"><span className="text-warm-500">Expires</span><span className="font-medium">{vehicle.insuranceExpiry}</span></div>
-                    {vehicle.insuranceDeductible && <div className="flex justify-between"><span className="text-warm-500">Deductible</span><span className="font-medium">{formatCurrency(vehicle.insuranceDeductible)}</span></div>}
+                    <div className="flex justify-between"><span className="text-neutral-500">Provider</span><span className="font-medium">{vehicle.insuranceProvider}</span></div>
+                    <div className="flex justify-between"><span className="text-neutral-500">Policy #</span><span className="font-mono text-neutral-700">{vehicle.insurancePolicy}</span></div>
+                    <div className="flex justify-between"><span className="text-neutral-500">Premium</span><span className="font-medium">{formatCurrency(vehicle.insurancePremium)}/{vehicle.insuranceFrequency}</span></div>
+                    <div className="flex justify-between"><span className="text-neutral-500">Expires</span><span className="font-medium">{vehicle.insuranceExpiry}</span></div>
+                    {vehicle.insuranceDeductible && <div className="flex justify-between"><span className="text-neutral-500">Deductible</span><span className="font-medium">{formatCurrency(vehicle.insuranceDeductible)}</span></div>}
                   </div>
                 </div>
                 {/* Service */}
                 <div className="p-4">
-                  <h4 className="font-semibold text-warm-900 mb-3 flex items-center gap-2"><Wrench className="w-4 h-4 text-orange-600" />Service</h4>
+                  <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2"><Wrench className="w-4 h-4 text-orange-600" />Service</h4>
                   <div className="space-y-2 text-sm">
                     {vehicle.primaryServiceProvider && (
                       <div>
-                        <p className="text-warm-500 text-xs">Service Provider</p>
+                        <p className="text-neutral-500 text-xs">Service Provider</p>
                         <p className="font-medium">{vehicle.primaryServiceProvider.name}</p>
-                        <p className="text-warm-500">{vehicle.primaryServiceProvider.phone}</p>
-                        {vehicle.primaryServiceProvider.address && <p className="text-warm-400 text-xs mt-0.5">{vehicle.primaryServiceProvider.address}</p>}
+                        <p className="text-neutral-500">{vehicle.primaryServiceProvider.phone}</p>
+                        {vehicle.primaryServiceProvider.address && <p className="text-neutral-400 text-xs mt-0.5">{vehicle.primaryServiceProvider.address}</p>}
                       </div>
                     )}
-                    {vehicle.oilChangeInterval && <div className="flex justify-between mt-2"><span className="text-warm-500">Oil Interval</span><span className="font-medium">{vehicle.oilChangeInterval}</span></div>}
-                    {vehicle.lastOilChange && <div className="flex justify-between"><span className="text-warm-500">Last Oil Change</span><span className="font-medium">{vehicle.lastOilChange}</span></div>}
-                    {vehicle.nextOilChange && <div className="flex justify-between"><span className="text-warm-500">Next Oil Change</span><span className="font-medium text-haven-700">{vehicle.nextOilChange}</span></div>}
+                    {vehicle.oilChangeInterval && <div className="flex justify-between mt-2"><span className="text-neutral-500">Oil Interval</span><span className="font-medium">{vehicle.oilChangeInterval}</span></div>}
+                    {vehicle.lastOilChange && <div className="flex justify-between"><span className="text-neutral-500">Last Oil Change</span><span className="font-medium">{vehicle.lastOilChange}</span></div>}
+                    {vehicle.nextOilChange && <div className="flex justify-between"><span className="text-neutral-500">Next Oil Change</span><span className="font-medium text-haven-700">{vehicle.nextOilChange}</span></div>}
                   </div>
                 </div>
                 {/* Loan/Lease */}
                 <div className="p-4">
-                  <h4 className="font-semibold text-warm-900 mb-3 flex items-center gap-2"><Banknote className="w-4 h-4 text-green-600" />{vehicle.ownership === 'leased' ? 'Lease' : 'Loan'}</h4>
+                  <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2"><Banknote className="w-4 h-4 text-green-600" />{vehicle.ownership === 'leased' ? 'Lease' : 'Loan'}</h4>
                   {vehicle.hasLoan && loan ? (
                     <div className="space-y-2 text-sm">
-                      <div className="flex justify-between"><span className="text-warm-500">Lender</span><span className="font-medium">{loan.lender}</span></div>
-                      <div className="flex justify-between"><span className="text-warm-500">Payment</span><span className="font-medium">{formatCurrency(loan.monthlyPayment)}/mo</span></div>
-                      <div className="flex justify-between"><span className="text-warm-500">Balance</span><span className="font-medium">{formatCurrency(loan.currentBalance)}</span></div>
-                      <div className="flex justify-between"><span className="text-warm-500">Rate</span><span className="font-medium">{loan.interestRate}% {loan.interestType}</span></div>
-                      <div className="flex justify-between"><span className="text-warm-500">Maturity</span><span className="text-warm-700">{loan.maturityDate}</span></div>
-                      <div className="flex justify-between"><span className="text-warm-500">Remaining</span><span className="text-warm-700">{loan.remainingPayments} payments</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Lender</span><span className="font-medium">{loan.lender}</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Payment</span><span className="font-medium">{formatCurrency(loan.monthlyPayment)}/mo</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Balance</span><span className="font-medium">{formatCurrency(loan.currentBalance)}</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Rate</span><span className="font-medium">{loan.interestRate}% {loan.interestType}</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Maturity</span><span className="text-neutral-700">{loan.maturityDate}</span></div>
+                      <div className="flex justify-between"><span className="text-neutral-500">Remaining</span><span className="text-neutral-700">{loan.remainingPayments} payments</span></div>
                       <div className="mt-2">
-                        <div className="h-2 bg-warm-100 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${loan.percentPaid}%` }} /></div>
-                        <p className="text-xs text-warm-500 mt-1">{loan.percentPaid}% paid</p>
+                        <div className="h-2 bg-neutral-100 rounded-full overflow-hidden"><div className="h-full bg-green-500 rounded-full" style={{ width: `${loan.percentPaid}%` }} /></div>
+                        <p className="text-xs text-neutral-500 mt-1">{loan.percentPaid}% paid</p>
                       </div>
                     </div>
                   ) : (
@@ -1611,8 +1611,8 @@ export default function YourHomePage() {
             </div>
             {/* Service History */}
             {vehicle.serviceHistory.length > 0 && (
-              <div className="border-t border-warm-200 p-4">
-                <h4 className="font-semibold text-warm-900 mb-3 flex items-center gap-2"><History className="w-4 h-4 text-warm-400" />Service History ({vehicle.serviceHistory.length})</h4>
+              <div className="border-t border-neutral-200 p-4">
+                <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2"><History className="w-4 h-4 text-neutral-400" />Service History ({vehicle.serviceHistory.length})</h4>
                 <div className="space-y-2">
                   {vehicle.serviceHistory.slice(0, 5).map(record => {
                     const typeBadge = {
@@ -1624,17 +1624,17 @@ export default function YourHomePage() {
                       inspection: { bg: 'bg-green-100', text: 'text-green-700', label: 'Inspection' },
                       installation: { bg: 'bg-cyan-100', text: 'text-cyan-700', label: 'Install' },
                       replacement: { bg: 'bg-pink-100', text: 'text-pink-700', label: 'Replace' },
-                    }[record.type] || { bg: 'bg-warm-100', text: 'text-warm-700', label: record.type };
+                    }[record.type] || { bg: 'bg-neutral-100', text: 'text-neutral-700', label: record.type };
                     return (
-                      <div key={record.id} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
+                      <div key={record.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${typeBadge.bg} ${typeBadge.text}`}>{typeBadge.label}</span>
                           </div>
-                          <p className="font-medium text-warm-900 text-sm">{record.description}</p>
-                          <p className="text-xs text-warm-500">{record.date} • {record.vendor.name} {record.mileage && `• ${record.mileage.toLocaleString()} mi`}</p>
+                          <p className="font-medium text-neutral-900 text-sm">{record.description}</p>
+                          <p className="text-xs text-neutral-500">{record.date} • {record.vendor.name} {record.mileage && `• ${record.mileage.toLocaleString()} mi`}</p>
                         </div>
-                        {record.cost !== undefined && <span className={`font-medium text-sm ${record.cost === 0 ? 'text-green-600' : 'text-warm-700'}`}>{record.cost === 0 ? 'Included' : formatCurrency(record.cost)}</span>}
+                        {record.cost !== undefined && <span className={`font-medium text-sm ${record.cost === 0 ? 'text-green-600' : 'text-neutral-700'}`}>{record.cost === 0 ? 'Included' : formatCurrency(record.cost)}</span>}
                       </div>
                     );
                   })}
@@ -1643,12 +1643,12 @@ export default function YourHomePage() {
             )}
             {/* Documents */}
             {vehicle.documents.length > 0 && (
-              <div className="border-t border-warm-200 p-4">
-                <h4 className="font-semibold text-warm-900 mb-3 flex items-center gap-2"><FileText className="w-4 h-4 text-warm-400" />Documents ({vehicle.documents.length})</h4>
+              <div className="border-t border-neutral-200 p-4">
+                <h4 className="font-semibold text-neutral-900 mb-3 flex items-center gap-2"><FileText className="w-4 h-4 text-neutral-400" />Documents ({vehicle.documents.length})</h4>
                 <div className="flex flex-wrap gap-2">
                   {vehicle.documents.map(doc => (
-                    <a key={doc.id} href={doc.url} className="inline-flex items-center gap-2 px-3 py-2 bg-warm-50 hover:bg-warm-100 rounded-lg text-sm">
-                      <FileText className="w-4 h-4 text-red-500" /><span className="text-warm-700">{doc.name}</span>
+                    <a key={doc.id} href={doc.url} className="inline-flex items-center gap-2 px-3 py-2 bg-neutral-50 hover:bg-neutral-100 rounded-lg text-sm">
+                      <FileText className="w-4 h-4 text-red-500" /><span className="text-neutral-700">{doc.name}</span>
                     </a>
                   ))}
                 </div>
@@ -1656,7 +1656,7 @@ export default function YourHomePage() {
             )}
             {/* Notes */}
             {vehicle.notes && (
-              <div className="border-t border-warm-200 p-4 bg-amber-50">
+              <div className="border-t border-neutral-200 p-4 bg-amber-50">
                 <p className="text-sm text-amber-800 flex items-start gap-2"><Info className="w-4 h-4 flex-shrink-0 mt-0.5" />{vehicle.notes}</p>
               </div>
             )}
@@ -1673,60 +1673,60 @@ export default function YourHomePage() {
     <div className="space-y-6">
       {/* Summary Cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white rounded-xl border border-warm-200 p-4">
-          <p className="text-sm text-warm-500 mb-1">Monthly Payments</p>
-          <p className="text-2xl font-bold text-warm-900">{formatCurrency(totalMonthlyDebt)}</p>
+        <div className="bg-white rounded-xl border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500 mb-1">Monthly Payments</p>
+          <p className="text-2xl font-bold text-neutral-900">{formatCurrency(totalMonthlyDebt)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-warm-200 p-4">
-          <p className="text-sm text-warm-500 mb-1">Total Debt</p>
-          <p className="text-2xl font-bold text-warm-900">{formatCurrency(totalDebtBalance)}</p>
+        <div className="bg-white rounded-xl border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500 mb-1">Total Debt</p>
+          <p className="text-2xl font-bold text-neutral-900">{formatCurrency(totalDebtBalance)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-warm-200 p-4">
-          <p className="text-sm text-warm-500 mb-1">Annual Insurance</p>
-          <p className="text-2xl font-bold text-warm-900">{formatCurrency(totalAnnualInsurance)}</p>
+        <div className="bg-white rounded-xl border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500 mb-1">Annual Insurance</p>
+          <p className="text-2xl font-bold text-neutral-900">{formatCurrency(totalAnnualInsurance)}</p>
         </div>
-        <div className="bg-white rounded-xl border border-warm-200 p-4">
-          <p className="text-sm text-warm-500 mb-1">Property Taxes</p>
-          <p className="text-2xl font-bold text-warm-900">{formatCurrency(PROPERTY_TAX.annualAmount)}/yr</p>
+        <div className="bg-white rounded-xl border border-neutral-200 p-4">
+          <p className="text-sm text-neutral-500 mb-1">Property Taxes</p>
+          <p className="text-2xl font-bold text-neutral-900">{formatCurrency(PROPERTY_TAX.annualAmount)}/yr</p>
         </div>
       </div>
 
       {/* Loans */}
       <div>
-        <h3 className="text-lg font-bold text-warm-900 mb-4 flex items-center gap-2"><Landmark className="w-5 h-5 text-warm-400" />Loans & Mortgages</h3>
+        <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2"><Landmark className="w-5 h-5 text-neutral-400" />Loans & Mortgages</h3>
         <div className="space-y-4">
           {LOANS.map(loan => (
-            <div key={loan.id} className="bg-white rounded-xl border border-warm-200 overflow-hidden">
+            <div key={loan.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
               <div className="p-4 sm:p-6">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${loan.type === 'mortgage' ? 'bg-blue-100 text-blue-700' : loan.type === 'heloc' ? 'bg-purple-100 text-purple-700' : loan.type === 'auto' ? 'bg-green-100 text-green-700' : loan.type === 'student' ? 'bg-amber-100 text-amber-700' : 'bg-warm-100 text-warm-700'}`}>
+                      <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${loan.type === 'mortgage' ? 'bg-blue-100 text-blue-700' : loan.type === 'heloc' ? 'bg-purple-100 text-purple-700' : loan.type === 'auto' ? 'bg-green-100 text-green-700' : loan.type === 'student' ? 'bg-amber-100 text-amber-700' : 'bg-neutral-100 text-neutral-700'}`}>
                         {loan.type.toUpperCase()} {loan.subtype && `• ${loan.subtype}`}
                       </span>
                     </div>
-                    <h4 className="text-lg font-bold text-warm-900">{loan.nickname}</h4>
-                    <p className="text-warm-500">{loan.lender} • {loan.accountNumber}</p>
+                    <h4 className="text-lg font-bold text-neutral-900">{loan.nickname}</h4>
+                    <p className="text-neutral-500">{loan.lender} • {loan.accountNumber}</p>
                   </div>
                   <div className="text-left sm:text-right">
-                    <p className="text-2xl font-bold text-warm-900">{formatCurrency(loan.currentBalance)}</p>
-                    <p className="text-sm text-warm-500">of {formatCurrency(loan.originalAmount)} original</p>
+                    <p className="text-2xl font-bold text-neutral-900">{formatCurrency(loan.currentBalance)}</p>
+                    <p className="text-sm text-neutral-500">of {formatCurrency(loan.originalAmount)} original</p>
                   </div>
                 </div>
                 <div className="mt-4">
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="text-warm-500">Paid: {formatCurrency(loan.paidAmount)}</span>
+                    <span className="text-neutral-500">Paid: {formatCurrency(loan.paidAmount)}</span>
                     <span className="font-medium text-haven-700">{loan.percentPaid}%</span>
                   </div>
-                  <div className="h-3 bg-warm-100 rounded-full overflow-hidden">
+                  <div className="h-3 bg-neutral-100 rounded-full overflow-hidden">
                     <div className="h-full bg-haven-700 rounded-full" style={{ width: `${loan.percentPaid}%` }} />
                   </div>
                 </div>
                 <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-4">
-                  <div><p className="text-xs text-warm-500">Interest Rate</p><p className="font-semibold">{loan.interestRate}% <span className="text-xs font-normal text-warm-500">{loan.interestType}</span></p></div>
-                  <div><p className="text-xs text-warm-500">Monthly Payment</p><p className="font-semibold">{formatCurrency(loan.monthlyPayment)}</p></div>
-                  <div><p className="text-xs text-warm-500">Next Payment</p><p className="font-semibold">{loan.nextPaymentDate}</p></div>
-                  <div><p className="text-xs text-warm-500">Remaining</p><p className="font-semibold">{loan.remainingPayments} payments</p></div>
+                  <div><p className="text-xs text-neutral-500">Interest Rate</p><p className="font-semibold">{loan.interestRate}% <span className="text-xs font-normal text-neutral-500">{loan.interestType}</span></p></div>
+                  <div><p className="text-xs text-neutral-500">Monthly Payment</p><p className="font-semibold">{formatCurrency(loan.monthlyPayment)}</p></div>
+                  <div><p className="text-xs text-neutral-500">Next Payment</p><p className="font-semibold">{loan.nextPaymentDate}</p></div>
+                  <div><p className="text-xs text-neutral-500">Remaining</p><p className="font-semibold">{loan.remainingPayments} payments</p></div>
                 </div>
                 {loan.includesEscrow && (
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
@@ -1740,11 +1740,11 @@ export default function YourHomePage() {
                 )}
                 <div className="mt-4 flex items-center gap-4 text-sm">
                   {loan.autopayEnabled && <span className="flex items-center gap-1 text-green-600"><CheckCircle2 className="w-4 h-4" />Autopay enabled</span>}
-                  {loan.paymentMethod && <span className="text-warm-500">{loan.paymentMethod}</span>}
+                  {loan.paymentMethod && <span className="text-neutral-500">{loan.paymentMethod}</span>}
                 </div>
               </div>
               {(loan.lenderPhone || loan.lenderWebsite) && (
-                <div className="border-t border-warm-200 px-4 py-3 bg-warm-50 flex items-center gap-4 text-sm">
+                <div className="border-t border-neutral-200 px-4 py-3 bg-neutral-50 flex items-center gap-4 text-sm">
                   {loan.lenderPhone && <a href={`tel:${loan.lenderPhone}`} className="flex items-center gap-1 text-haven-700"><Phone className="w-4 h-4" />{loan.lenderPhone}</a>}
                   {loan.lenderWebsite && <a href={`https://${loan.lenderWebsite}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-haven-700"><Globe className="w-4 h-4" />{loan.lenderWebsite}</a>}
                 </div>
@@ -1756,53 +1756,53 @@ export default function YourHomePage() {
 
       {/* Insurance */}
       <div>
-        <h3 className="text-lg font-bold text-warm-900 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-warm-400" />Insurance Policies</h3>
+        <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2"><Shield className="w-5 h-5 text-neutral-400" />Insurance Policies</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {INSURANCE_POLICIES.map(policy => (
-            <div key={policy.id} className="bg-white rounded-xl border border-warm-200 overflow-hidden">
+            <div key={policy.id} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
               <div className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${policy.type === 'homeowners' ? 'bg-blue-100' : policy.type === 'auto' ? 'bg-green-100' : policy.type === 'umbrella' ? 'bg-purple-100' : policy.type === 'life' ? 'bg-pink-100' : 'bg-warm-100'}`}>
-                      {policy.type === 'homeowners' ? <Home className="w-5 h-5 text-blue-600" /> : policy.type === 'auto' ? <Car className="w-5 h-5 text-green-600" /> : policy.type === 'umbrella' ? <Shield className="w-5 h-5 text-purple-600" /> : policy.type === 'life' ? <Heart className="w-5 h-5 text-pink-600" /> : <Shield className="w-5 h-5 text-warm-600" />}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${policy.type === 'homeowners' ? 'bg-blue-100' : policy.type === 'auto' ? 'bg-green-100' : policy.type === 'umbrella' ? 'bg-purple-100' : policy.type === 'life' ? 'bg-pink-100' : 'bg-neutral-100'}`}>
+                      {policy.type === 'homeowners' ? <Home className="w-5 h-5 text-blue-600" /> : policy.type === 'auto' ? <Car className="w-5 h-5 text-green-600" /> : policy.type === 'umbrella' ? <Shield className="w-5 h-5 text-purple-600" /> : policy.type === 'life' ? <Heart className="w-5 h-5 text-pink-600" /> : <Shield className="w-5 h-5 text-neutral-600" />}
                     </div>
                     <div>
-                      <h4 className="font-semibold text-warm-900 capitalize">{policy.type} Insurance</h4>
-                      <p className="text-sm text-warm-500">{policy.provider}</p>
+                      <h4 className="font-semibold text-neutral-900 capitalize">{policy.type} Insurance</h4>
+                      <p className="text-sm text-neutral-500">{policy.provider}</p>
                     </div>
                   </div>
                   {policy.autoRenew && <span className="px-2 py-1 bg-green-100 text-green-700 text-xs font-medium rounded-full flex items-center gap-1"><RefreshCw className="w-3 h-3" />Auto-renew</span>}
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><p className="text-warm-500 text-xs">Policy #</p><p className="font-mono text-warm-700">{policy.policyNumber}</p></div>
-                  <div><p className="text-warm-500 text-xs">Premium</p><p className="font-semibold">{formatCurrency(policy.premium)}/{policy.premiumFrequency}</p></div>
-                  {policy.coverage && <div><p className="text-warm-500 text-xs">Coverage</p><p className="font-semibold">{formatCurrency(policy.coverage)}</p></div>}
-                  {policy.deductible && <div><p className="text-warm-500 text-xs">Deductible</p><p className="font-semibold">{formatCurrency(policy.deductible)}</p></div>}
-                  <div className="col-span-2"><p className="text-warm-500 text-xs">Coverage Period</p><p className="font-medium">{policy.effectiveDate} - {policy.expiryDate}</p></div>
+                  <div><p className="text-neutral-500 text-xs">Policy #</p><p className="font-mono text-neutral-700">{policy.policyNumber}</p></div>
+                  <div><p className="text-neutral-500 text-xs">Premium</p><p className="font-semibold">{formatCurrency(policy.premium)}/{policy.premiumFrequency}</p></div>
+                  {policy.coverage && <div><p className="text-neutral-500 text-xs">Coverage</p><p className="font-semibold">{formatCurrency(policy.coverage)}</p></div>}
+                  {policy.deductible && <div><p className="text-neutral-500 text-xs">Deductible</p><p className="font-semibold">{formatCurrency(policy.deductible)}</p></div>}
+                  <div className="col-span-2"><p className="text-neutral-500 text-xs">Coverage Period</p><p className="font-medium">{policy.effectiveDate} - {policy.expiryDate}</p></div>
                 </div>
                 {policy.coverageDetails && (
-                  <div className="mt-3 pt-3 border-t border-warm-100">
-                    <p className="text-xs text-warm-500 mb-2">Coverage Details</p>
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <p className="text-xs text-neutral-500 mb-2">Coverage Details</p>
                     <div className="space-y-1">
                       {policy.coverageDetails.slice(0, 4).map((detail, idx) => (
-                        <p key={idx} className="text-sm text-warm-600 flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />{detail}</p>
+                        <p key={idx} className="text-sm text-neutral-600 flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />{detail}</p>
                       ))}
                     </div>
                   </div>
                 )}
                 {policy.coveredItems && (
-                  <div className="mt-3 pt-3 border-t border-warm-100">
-                    <p className="text-xs text-warm-500 mb-2">Covered Items</p>
+                  <div className="mt-3 pt-3 border-t border-neutral-100">
+                    <p className="text-xs text-neutral-500 mb-2">Covered Items</p>
                     <div className="flex flex-wrap gap-1">
-                      {policy.coveredItems.map((item, idx) => <span key={idx} className="px-2 py-1 bg-warm-100 text-warm-600 text-xs rounded-full">{item}</span>)}
+                      {policy.coveredItems.map((item, idx) => <span key={idx} className="px-2 py-1 bg-neutral-100 text-neutral-600 text-xs rounded-full">{item}</span>)}
                     </div>
                   </div>
                 )}
               </div>
               {policy.agentName && (
-                <div className="border-t border-warm-200 px-4 py-3 bg-warm-50">
-                  <p className="text-xs text-warm-500 mb-1">Agent</p>
-                  <p className="font-medium text-warm-900">{policy.agentName}</p>
+                <div className="border-t border-neutral-200 px-4 py-3 bg-neutral-50">
+                  <p className="text-xs text-neutral-500 mb-1">Agent</p>
+                  <p className="font-medium text-neutral-900">{policy.agentName}</p>
                   <div className="flex items-center gap-3 mt-1 text-sm">
                     {policy.agentPhone && <a href={`tel:${policy.agentPhone}`} className="text-haven-700">{policy.agentPhone}</a>}
                     {policy.agentEmail && <a href={`mailto:${policy.agentEmail}`} className="text-haven-700">{policy.agentEmail}</a>}
@@ -1816,23 +1816,23 @@ export default function YourHomePage() {
 
       {/* Property Tax */}
       <div>
-        <h3 className="text-lg font-bold text-warm-900 mb-4 flex items-center gap-2"><Receipt className="w-5 h-5 text-warm-400" />Property Tax</h3>
-        <div className="bg-white rounded-xl border border-warm-200 p-4 sm:p-6">
+        <h3 className="text-lg font-bold text-neutral-900 mb-4 flex items-center gap-2"><Receipt className="w-5 h-5 text-neutral-400" />Property Tax</h3>
+        <div className="bg-white rounded-xl border border-neutral-200 p-4 sm:p-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            <div><p className="text-warm-500 text-xs">Annual Amount</p><p className="text-xl font-bold text-warm-900">{formatCurrency(PROPERTY_TAX.annualAmount)}</p></div>
-            <div><p className="text-warm-500 text-xs">Assessed Value</p><p className="text-xl font-bold text-warm-900">{formatCurrency(PROPERTY_TAX.assessedValue)}</p></div>
-            <div><p className="text-warm-500 text-xs">Mill Rate</p><p className="text-xl font-bold text-warm-900">{PROPERTY_TAX.taxRate}</p></div>
-            <div><p className="text-warm-500 text-xs">Next Payment</p><p className="text-xl font-bold text-haven-700">{PROPERTY_TAX.nextPaymentDate}</p><p className="text-sm text-warm-500">{formatCurrency(PROPERTY_TAX.nextPaymentAmount)}</p></div>
+            <div><p className="text-neutral-500 text-xs">Annual Amount</p><p className="text-xl font-bold text-neutral-900">{formatCurrency(PROPERTY_TAX.annualAmount)}</p></div>
+            <div><p className="text-neutral-500 text-xs">Assessed Value</p><p className="text-xl font-bold text-neutral-900">{formatCurrency(PROPERTY_TAX.assessedValue)}</p></div>
+            <div><p className="text-neutral-500 text-xs">Mill Rate</p><p className="text-xl font-bold text-neutral-900">{PROPERTY_TAX.taxRate}</p></div>
+            <div><p className="text-neutral-500 text-xs">Next Payment</p><p className="text-xl font-bold text-haven-700">{PROPERTY_TAX.nextPaymentDate}</p><p className="text-sm text-neutral-500">{formatCurrency(PROPERTY_TAX.nextPaymentAmount)}</p></div>
           </div>
           {PROPERTY_TAX.paidThroughEscrow && <div className="flex items-center gap-2 text-sm text-green-600 mb-4"><CheckCircle2 className="w-4 h-4" />Paid through mortgage escrow</div>}
-          <div className="border-t border-warm-200 pt-4">
-            <p className="text-sm font-medium text-warm-700 mb-2">Payment History</p>
+          <div className="border-t border-neutral-200 pt-4">
+            <p className="text-sm font-medium text-neutral-700 mb-2">Payment History</p>
             <div className="space-y-2">
               {PROPERTY_TAX.paymentHistory.map((payment, idx) => (
-                <div key={idx} className="flex items-center justify-between p-2 bg-warm-50 rounded-lg text-sm">
-                  <span className="text-warm-600">{payment.period}</span>
-                  <span className="text-warm-500">{payment.date}</span>
-                  <span className="font-medium text-warm-900">{formatCurrency(payment.amount)}</span>
+                <div key={idx} className="flex items-center justify-between p-2 bg-neutral-50 rounded-lg text-sm">
+                  <span className="text-neutral-600">{payment.period}</span>
+                  <span className="text-neutral-500">{payment.date}</span>
+                  <span className="font-medium text-neutral-900">{formatCurrency(payment.amount)}</span>
                 </div>
               ))}
             </div>
@@ -1880,7 +1880,7 @@ export default function YourHomePage() {
       case 'csv':
         return { bg: 'bg-green-100', icon: FileText, color: 'text-green-600' };
       default:
-        return { bg: 'bg-warm-100', icon: FileText, color: 'text-warm-600' };
+        return { bg: 'bg-neutral-100', icon: FileText, color: 'text-neutral-600' };
     }
   };
 
@@ -1896,19 +1896,19 @@ export default function YourHomePage() {
         {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
               type="text"
               value={documentSearch}
               onChange={(e) => setDocumentSearch(e.target.value)}
               placeholder="Search documents..."
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-haven-700"
+              className="w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-haven-700"
             />
           </div>
           <select
             value={documentCategory}
             onChange={(e) => setDocumentCategory(e.target.value)}
-            className="px-4 py-2.5 border border-warm-200 rounded-xl bg-white"
+            className="px-4 py-2.5 border border-neutral-200 rounded-xl bg-white"
           >
             {documentCategories.map(cat => <option key={cat} value={cat}>{cat === 'all' ? 'All Categories' : cat}</option>)}
           </select>
@@ -1919,10 +1919,10 @@ export default function YourHomePage() {
 
         {/* Stats */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="bg-white rounded-xl border border-warm-200 p-3"><p className="text-2xl font-bold text-warm-900">{DOCUMENTS.length}</p><p className="text-sm text-warm-500">Total Documents</p></div>
-          <div className="bg-white rounded-xl border border-warm-200 p-3"><p className="text-2xl font-bold text-warm-900">{documentCategories.length - 1}</p><p className="text-sm text-warm-500">Categories</p></div>
-          <div className="bg-white rounded-xl border border-warm-200 p-3"><p className="text-2xl font-bold text-amber-600">{DOCUMENTS.filter(d => d.expiryDate).length}</p><p className="text-sm text-warm-500">Expiring Docs</p></div>
-          <div className="bg-white rounded-xl border border-warm-200 p-3"><p className="text-2xl font-bold text-haven-700">{DOCUMENTS.filter(d => d.isFavorite).length}</p><p className="text-sm text-warm-500">Favorites</p></div>
+          <div className="bg-white rounded-xl border border-neutral-200 p-3"><p className="text-2xl font-bold text-neutral-900">{DOCUMENTS.length}</p><p className="text-sm text-neutral-500">Total Documents</p></div>
+          <div className="bg-white rounded-xl border border-neutral-200 p-3"><p className="text-2xl font-bold text-neutral-900">{documentCategories.length - 1}</p><p className="text-sm text-neutral-500">Categories</p></div>
+          <div className="bg-white rounded-xl border border-neutral-200 p-3"><p className="text-2xl font-bold text-amber-600">{DOCUMENTS.filter(d => d.expiryDate).length}</p><p className="text-sm text-neutral-500">Expiring Docs</p></div>
+          <div className="bg-white rounded-xl border border-neutral-200 p-3"><p className="text-2xl font-bold text-haven-700">{DOCUMENTS.filter(d => d.isFavorite).length}</p><p className="text-sm text-neutral-500">Favorites</p></div>
         </div>
 
         {/* Favorites */}
@@ -1935,7 +1935,7 @@ export default function YourHomePage() {
                 const FileIcon = ft.icon;
                 return (
                   <a key={doc.id} href={doc.url} className="flex items-center gap-2 px-3 py-2 bg-white hover:bg-amber-100 rounded-lg text-sm border border-amber-200">
-                    <FileIcon className={`w-4 h-4 ${ft.color}`} /><span className="text-warm-700">{doc.name}</span><Download className="w-4 h-4 text-warm-400" />
+                    <FileIcon className={`w-4 h-4 ${ft.color}`} /><span className="text-neutral-700">{doc.name}</span><Download className="w-4 h-4 text-neutral-400" />
                   </a>
                 );
               })}
@@ -1945,32 +1945,32 @@ export default function YourHomePage() {
 
         {/* Documents by Category */}
         {Object.entries(groupedDocs).map(([category, docs]) => (
-          <div key={category} className="bg-white rounded-xl border border-warm-200 overflow-hidden">
+          <div key={category} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
             <button
               onClick={() => toggleCategory(category)}
-              className="w-full p-4 border-b border-warm-100 bg-warm-50 flex items-center justify-between hover:bg-warm-100 transition-colors"
+              className="w-full p-4 border-b border-neutral-100 bg-neutral-50 flex items-center justify-between hover:bg-neutral-100 transition-colors"
             >
-              <h3 className="font-semibold text-warm-900 flex items-center gap-2"><FolderOpen className="w-5 h-5 text-warm-400" />{category}</h3>
+              <h3 className="font-semibold text-neutral-900 flex items-center gap-2"><FolderOpen className="w-5 h-5 text-neutral-400" />{category}</h3>
               <div className="flex items-center gap-2">
-                <span className="text-sm text-warm-500">{docs.length} files</span>
-                {expandedCategories.has(category) ? <ChevronUp className="w-5 h-5 text-warm-400" /> : <ChevronDown className="w-5 h-5 text-warm-400" />}
+                <span className="text-sm text-neutral-500">{docs.length} files</span>
+                {expandedCategories.has(category) ? <ChevronUp className="w-5 h-5 text-neutral-400" /> : <ChevronDown className="w-5 h-5 text-neutral-400" />}
               </div>
             </button>
             {expandedCategories.has(category) && (
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {docs.map(doc => {
                   const ft = getFileTypeIcon(doc.fileType);
                   const FileIcon = ft.icon;
                   return (
-                    <div key={doc.id} className="p-4 flex items-center gap-4 hover:bg-warm-50 group">
+                    <div key={doc.id} className="p-4 flex items-center gap-4 hover:bg-neutral-50 group">
                       <div className={`w-10 h-10 rounded-lg ${ft.bg} flex items-center justify-center`}><FileIcon className={`w-5 h-5 ${ft.color}`} /></div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2">
-                          <p className="font-medium text-warm-900 truncate">{doc.name}</p>
+                          <p className="font-medium text-neutral-900 truncate">{doc.name}</p>
                           {doc.isFavorite && <Star className="w-4 h-4 text-amber-500 fill-current flex-shrink-0" />}
                           {doc.expiryDate && <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs rounded-full flex-shrink-0">Exp: {doc.expiryDate}</span>}
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-warm-500">
+                        <div className="flex items-center gap-2 text-sm text-neutral-500">
                           <span className="uppercase text-xs font-medium">{doc.fileType}</span><span>•</span>
                           <span>{doc.fileSize}</span><span>•</span><span>{doc.uploadDate}</span>
                           {doc.subcategory && <><span>•</span><span>{doc.subcategory}</span></>}
@@ -1980,7 +1980,7 @@ export default function YourHomePage() {
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                         <a href={doc.url} className="p-2 text-haven-700 hover:bg-haven-50 rounded-lg"><Eye className="w-5 h-5" /></a>
                         <a href={doc.url} download className="p-2 text-haven-700 hover:bg-haven-50 rounded-lg"><Download className="w-5 h-5" /></a>
-                        <button className="p-2 text-warm-400 hover:bg-warm-100 rounded-lg"><MoreVertical className="w-5 h-5" /></button>
+                        <button className="p-2 text-neutral-400 hover:bg-neutral-100 rounded-lg"><MoreVertical className="w-5 h-5" /></button>
                       </div>
                     </div>
                   );
@@ -1992,9 +1992,9 @@ export default function YourHomePage() {
 
         {filteredDocuments.length === 0 && (
           <div className="text-center py-12">
-            <FileText className="w-12 h-12 text-warm-300 mx-auto mb-3" />
-            <p className="text-warm-500">No documents found</p>
-            <p className="text-sm text-warm-400">Try adjusting your search or filters</p>
+            <FileText className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
+            <p className="text-neutral-500">No documents found</p>
+            <p className="text-sm text-neutral-400">Try adjusting your search or filters</p>
           </div>
         )}
       </div>
@@ -2017,21 +2017,21 @@ export default function YourHomePage() {
           <button
             key={filter.id}
             onClick={() => setMaintenanceFilter(filter.id as any)}
-            className={`p-4 rounded-xl border transition-colors ${maintenanceFilter === filter.id ? 'bg-haven-50 border-haven-300' : 'bg-white border-warm-200'}`}
+            className={`p-4 rounded-xl border transition-colors ${maintenanceFilter === filter.id ? 'bg-haven-50 border-haven-300' : 'bg-white border-neutral-200'}`}
           >
-            <p className={`text-2xl font-bold ${filter.color || 'text-warm-900'}`}>{filter.count}</p>
-            <p className={`text-xs ${filter.color || 'text-warm-500'}`}>{filter.label}</p>
+            <p className={`text-2xl font-bold ${filter.color || 'text-neutral-900'}`}>{filter.count}</p>
+            <p className={`text-xs ${filter.color || 'text-neutral-500'}`}>{filter.label}</p>
           </button>
         ))}
       </div>
       <div className="flex gap-3">
         <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
-          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search systems..." className="w-full pl-10 pr-4 py-2.5 border border-warm-200 rounded-xl" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
+          <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder="Search systems..." className="w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-xl" />
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setViewMode('cards')} className={`p-2.5 rounded-lg border ${viewMode === 'cards' ? 'bg-haven-100 border-haven-300' : 'border-warm-200'}`}><LayoutGrid className="w-5 h-5" /></button>
-          <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg border ${viewMode === 'list' ? 'bg-haven-100 border-haven-300' : 'border-warm-200'}`}><List className="w-5 h-5" /></button>
+          <button onClick={() => setViewMode('cards')} className={`p-2.5 rounded-lg border ${viewMode === 'cards' ? 'bg-haven-100 border-haven-300' : 'border-neutral-200'}`}><LayoutGrid className="w-5 h-5" /></button>
+          <button onClick={() => setViewMode('list')} className={`p-2.5 rounded-lg border ${viewMode === 'list' ? 'bg-haven-100 border-haven-300' : 'border-neutral-200'}`}><List className="w-5 h-5" /></button>
         </div>
       </div>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -2053,17 +2053,17 @@ export default function YourHomePage() {
                 <div className="flex items-start gap-3">
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${category.bg}`}><CategoryIcon className={`w-5 h-5 ${category.text}`} /></div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-warm-900 truncate">{system.name}</h3>
-                    <p className="text-sm text-warm-500">{system.brand && system.model ? `${system.brand} ${system.model}` : getCategoryLabel(system.category)}</p>
+                    <h3 className="font-semibold text-neutral-900 truncate">{system.name}</h3>
+                    <p className="text-sm text-neutral-500">{system.brand && system.model ? `${system.brand} ${system.model}` : getCategoryLabel(system.category)}</p>
                   </div>
                 </div>
                 {system.installYear && system.expectedLifespan && (
                   <div className="mt-4">
-                    <div className="flex items-center justify-between text-xs text-warm-500 mb-1">
+                    <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
                       <span>Lifespan</span>
                       <span>Year {ageYears} of {system.expectedLifespan}</span>
                     </div>
-                    <div className="w-full bg-warm-100 rounded-full h-2">
+                    <div className="w-full bg-neutral-100 rounded-full h-2">
                       <div
                         className={`h-2 rounded-full transition-all ${
                           lifespanPercent > 80 ? 'bg-red-500' : lifespanPercent > 60 ? 'bg-amber-500' : 'bg-green-500'
@@ -2074,13 +2074,13 @@ export default function YourHomePage() {
                   </div>
                 )}
                 <div className="mt-4 space-y-2 text-sm">
-                  <div className="flex justify-between"><span className="text-warm-500">Last Service</span><span className="font-medium">{system.maintenance?.lastService}</span></div>
-                  <div className="flex justify-between"><span className="text-warm-500">Next Service</span><span className={`font-medium ${status.text}`}>{system.maintenance?.nextService}</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Last Service</span><span className="font-medium">{system.maintenance?.lastService}</span></div>
+                  <div className="flex justify-between"><span className="text-neutral-500">Next Service</span><span className={`font-medium ${status.text}`}>{system.maintenance?.nextService}</span></div>
                 </div>
                 {system.assignedVendor && (
-                  <div className="mt-4 pt-3 border-t border-warm-100 flex items-center gap-2">
+                  <div className="mt-4 pt-3 border-t border-neutral-100 flex items-center gap-2">
                     <VendorAvatar name={system.assignedVendor.name} size="sm" />
-                    <p className="text-sm text-warm-700 truncate">{system.assignedVendor.name}</p>
+                    <p className="text-sm text-neutral-700 truncate">{system.assignedVendor.name}</p>
                   </div>
                 )}
               </div>
@@ -2127,7 +2127,7 @@ export default function YourHomePage() {
         {/* Home Health Score Card */}
         <div className={`rounded-2xl p-6 shadow-soft border ${healthColors.bg} ${healthColors.border}`}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-warm-900">Home Health</h2>
+            <h2 className="font-semibold text-neutral-900">Home Health</h2>
             <button onClick={() => setActiveTab('maintenance')} className="text-sm text-haven-700 hover:text-haven-800">View Details</button>
           </div>
 
@@ -2156,7 +2156,7 @@ export default function YourHomePage() {
               </svg>
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <span className={`text-4xl font-bold ${healthColors.text}`}>{homeHealthScore}</span>
-                <span className="text-sm text-warm-500">/ 100</span>
+                <span className="text-sm text-neutral-500">/ 100</span>
               </div>
             </div>
           </div>
@@ -2171,15 +2171,15 @@ export default function YourHomePage() {
           {/* Health Breakdown */}
           <div className="space-y-3">
             <div className="flex items-center justify-between text-sm">
-              <span className="text-warm-600">Systems needing attention</span>
+              <span className="text-neutral-600">Systems needing attention</span>
               <span className="font-medium text-amber-600">{maintenanceStats.dueSoon}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-warm-600">Overdue maintenance</span>
+              <span className="text-neutral-600">Overdue maintenance</span>
               <span className="font-medium text-red-600">{maintenanceStats.overdue}</span>
             </div>
             <div className="flex items-center justify-between text-sm">
-              <span className="text-warm-600">On track</span>
+              <span className="text-neutral-600">On track</span>
               <span className="font-medium text-green-600">{maintenanceStats.onTrack}</span>
             </div>
           </div>
@@ -2187,30 +2187,30 @@ export default function YourHomePage() {
 
         {/* Quick Stats */}
         <div className="grid grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl border border-warm-200 p-4">
-            <p className="text-2xl font-bold text-warm-900">{HOME_SYSTEMS.length}</p>
-            <p className="text-sm text-warm-500">Systems Tracked</p>
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <p className="text-2xl font-bold text-neutral-900">{HOME_SYSTEMS.length}</p>
+            <p className="text-sm text-neutral-500">Systems Tracked</p>
           </div>
-          <div className="bg-white rounded-xl border border-warm-200 p-4">
-            <p className="text-2xl font-bold text-warm-900">{VENDORS.length}</p>
-            <p className="text-sm text-warm-500">Vendors</p>
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <p className="text-2xl font-bold text-neutral-900">{VENDORS.length}</p>
+            <p className="text-sm text-neutral-500">Vendors</p>
           </div>
-          <div className="bg-white rounded-xl border border-warm-200 p-4">
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
             <p className="text-2xl font-bold text-green-600">$3,400+</p>
-            <p className="text-sm text-warm-500">Saved This Year</p>
+            <p className="text-sm text-neutral-500">Saved This Year</p>
           </div>
-          <div className="bg-white rounded-xl border border-warm-200 p-4">
-            <p className="text-2xl font-bold text-warm-900">{DOCUMENTS.length}</p>
-            <p className="text-sm text-warm-500">Documents</p>
+          <div className="bg-white rounded-xl border border-neutral-200 p-4">
+            <p className="text-2xl font-bold text-neutral-900">{DOCUMENTS.length}</p>
+            <p className="text-sm text-neutral-500">Documents</p>
           </div>
         </div>
       </div>
 
       {/* Middle Column - Systems Overview */}
       <div className="space-y-6">
-        <div className="bg-white rounded-2xl border border-warm-200 p-6 shadow-soft">
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-soft">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-warm-900">Systems Status</h2>
+            <h2 className="font-semibold text-neutral-900">Systems Status</h2>
             <button onClick={() => setActiveTab('systems')} className="text-sm text-haven-700 hover:text-haven-800">View All</button>
           </div>
 
@@ -2225,7 +2225,7 @@ export default function YourHomePage() {
               return (
                 <div
                   key={system.id}
-                  className="p-3 rounded-xl border border-warm-100 hover:border-warm-200 cursor-pointer transition-colors"
+                  className="p-3 rounded-xl border border-neutral-100 hover:border-neutral-200 cursor-pointer transition-colors"
                   onClick={() => setSelectedSystem(system)}
                 >
                   <div className="flex items-center gap-3 mb-2">
@@ -2233,7 +2233,7 @@ export default function YourHomePage() {
                       <CategoryIcon className={`w-4 h-4 ${category.text}`} />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium text-warm-900 truncate text-sm">{system.name}</p>
+                      <p className="font-medium text-neutral-900 truncate text-sm">{system.name}</p>
                     </div>
                     <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${status.bg} ${status.text}`}>
                       {status.label}
@@ -2241,10 +2241,10 @@ export default function YourHomePage() {
                   </div>
                   {system.installYear && system.expectedLifespan && (
                     <div className="ml-11">
-                      <div className="flex items-center justify-between text-xs text-warm-400 mb-1">
+                      <div className="flex items-center justify-between text-xs text-neutral-400 mb-1">
                         <span>Year {ageYears} of {system.expectedLifespan}</span>
                       </div>
-                      <div className="w-full bg-warm-100 rounded-full h-1.5">
+                      <div className="w-full bg-neutral-100 rounded-full h-1.5">
                         <div
                           className={`h-1.5 rounded-full transition-all ${
                             lifespanPercent > 80 ? 'bg-red-500' : lifespanPercent > 60 ? 'bg-amber-500' : 'bg-green-500'
@@ -2264,22 +2264,22 @@ export default function YourHomePage() {
       {/* Right Column - Activity & Upcoming */}
       <div className="space-y-6">
         {/* Upcoming Maintenance */}
-        <div className="bg-white rounded-2xl border border-warm-200 p-6 shadow-soft">
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-soft">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-warm-900">Upcoming</h2>
+            <h2 className="font-semibold text-neutral-900">Upcoming</h2>
             <button onClick={() => setActiveTab('maintenance')} className="text-sm text-haven-700 hover:text-haven-800">View All</button>
           </div>
 
           <div className="space-y-3">
             {upcomingMaintenance.length > 0 ? upcomingMaintenance.map(item => (
-              <div key={item.id} className="flex items-center gap-3 p-3 bg-warm-50 rounded-xl">
+              <div key={item.id} className="flex items-center gap-3 p-3 bg-neutral-50 rounded-xl">
                 <div className="w-12 text-center">
-                  <p className="text-lg font-bold text-warm-900">{new Date(item.date).getDate()}</p>
-                  <p className="text-xs text-warm-500 uppercase">{new Date(item.date).toLocaleDateString('en-US', { month: 'short' })}</p>
+                  <p className="text-lg font-bold text-neutral-900">{new Date(item.date).getDate()}</p>
+                  <p className="text-xs text-neutral-500 uppercase">{new Date(item.date).toLocaleDateString('en-US', { month: 'short' })}</p>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-warm-900 truncate">{item.title}</p>
-                  <p className="text-sm text-warm-500">{item.vendor}</p>
+                  <p className="font-medium text-neutral-900 truncate">{item.title}</p>
+                  <p className="text-sm text-neutral-500">{item.vendor}</p>
                 </div>
                 <span className={`text-xs px-2 py-1 rounded-full ${
                   item.confirmed ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'
@@ -2288,15 +2288,15 @@ export default function YourHomePage() {
                 </span>
               </div>
             )) : (
-              <p className="text-sm text-warm-500 text-center py-4">No upcoming maintenance in the next 30 days</p>
+              <p className="text-sm text-neutral-500 text-center py-4">No upcoming maintenance in the next 30 days</p>
             )}
           </div>
         </div>
 
         {/* Recent Activity */}
-        <div className="bg-white rounded-2xl border border-warm-200 p-6 shadow-soft">
+        <div className="bg-white rounded-2xl border border-neutral-200 p-6 shadow-soft">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-warm-900">Recent Activity</h2>
+            <h2 className="font-semibold text-neutral-900">Recent Activity</h2>
           </div>
 
           <div className="space-y-4">
@@ -2305,20 +2305,20 @@ export default function YourHomePage() {
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
                   activity.type === 'service' ? 'bg-blue-100' :
                   activity.type === 'payment' ? 'bg-green-100' :
-                  'bg-warm-100'
+                  'bg-neutral-100'
                 }`}>
                   <activity.icon className={`w-4 h-4 ${
                     activity.type === 'service' ? 'text-blue-600' :
                     activity.type === 'payment' ? 'text-green-600' :
-                    'text-warm-600'
+                    'text-neutral-600'
                   }`} />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-warm-900">{activity.title}</p>
-                  <p className="text-xs text-warm-500">{activity.date}</p>
+                  <p className="text-sm text-neutral-900">{activity.title}</p>
+                  <p className="text-xs text-neutral-500">{activity.date}</p>
                 </div>
                 {activity.amount && (
-                  <span className="text-sm font-medium text-warm-900">${activity.amount}</span>
+                  <span className="text-sm font-medium text-neutral-900">${activity.amount}</span>
                 )}
               </div>
             ))}
@@ -2335,20 +2335,20 @@ export default function YourHomePage() {
         const categoryColor = getCategoryColor(category);
         const CategoryIcon = getCategoryIcon(category);
         return (
-          <div key={category} className="bg-white rounded-xl border border-warm-200 overflow-hidden">
-            <button onClick={() => toggleCategory(category)} className="w-full flex items-center justify-between p-4 hover:bg-warm-50">
+          <div key={category} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+            <button onClick={() => toggleCategory(category)} className="w-full flex items-center justify-between p-4 hover:bg-neutral-50">
               <div className="flex items-center gap-3">
                 <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${categoryColor.bg}`}><CategoryIcon className={`w-5 h-5 ${categoryColor.text}`} /></div>
-                <div className="text-left"><h3 className="font-semibold text-warm-900">{getCategoryLabel(category)}</h3><p className="text-sm text-warm-500">{systems.length} items</p></div>
+                <div className="text-left"><h3 className="font-semibold text-neutral-900">{getCategoryLabel(category)}</h3><p className="text-sm text-neutral-500">{systems.length} items</p></div>
               </div>
-              {isExpanded ? <ChevronUp className="w-5 h-5 text-warm-400" /> : <ChevronDown className="w-5 h-5 text-warm-400" />}
+              {isExpanded ? <ChevronUp className="w-5 h-5 text-neutral-400" /> : <ChevronDown className="w-5 h-5 text-neutral-400" />}
             </button>
             {isExpanded && (
-              <div className="border-t border-warm-200 divide-y divide-warm-100">
+              <div className="border-t border-neutral-200 divide-y divide-neutral-100">
                 {systems.map(system => (
-                  <button key={system.id} onClick={() => setSelectedSystem(system)} className="w-full flex items-center justify-between p-4 hover:bg-warm-50 text-left">
-                    <div><p className="font-medium text-warm-900">{system.name}</p><p className="text-sm text-warm-500">{system.brand} {system.model}</p></div>
-                    <ChevronRight className="w-5 h-5 text-warm-400" />
+                  <button key={system.id} onClick={() => setSelectedSystem(system)} className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 text-left">
+                    <div><p className="font-medium text-neutral-900">{system.name}</p><p className="text-sm text-neutral-500">{system.brand} {system.model}</p></div>
+                    <ChevronRight className="w-5 h-5 text-neutral-400" />
                   </button>
                 ))}
               </div>
@@ -2362,18 +2362,18 @@ export default function YourHomePage() {
   const renderVendors = () => (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {VENDORS.map(vendor => (
-        <div key={vendor.id} className="bg-white rounded-xl border border-warm-200 p-4">
+        <div key={vendor.id} className="bg-white rounded-xl border border-neutral-200 p-4">
           <div className="flex items-start gap-4">
             <VendorAvatar name={vendor.name} size="lg" />
             <div className="flex-1">
               <div className="flex items-start justify-between">
-                <div><h3 className="font-semibold text-warm-900">{vendor.name}</h3><p className="text-sm text-warm-500">{vendor.category}</p></div>
+                <div><h3 className="font-semibold text-neutral-900">{vendor.name}</h3><p className="text-sm text-neutral-500">{vendor.category}</p></div>
                 {vendor.isPreferred && <span className="px-2 py-0.5 bg-haven-100 text-haven-700 text-xs font-medium rounded-full">Preferred</span>}
               </div>
-              <div className="flex items-center gap-1 mt-2"><Star className="w-4 h-4 text-amber-500 fill-amber-500" /><span className="text-sm font-medium">{vendor.rating}</span><span className="text-sm text-warm-500">({vendor.reviewCount})</span></div>
+              <div className="flex items-center gap-1 mt-2"><Star className="w-4 h-4 text-amber-500 fill-amber-500" /><span className="text-sm font-medium">{vendor.rating}</span><span className="text-sm text-neutral-500">({vendor.reviewCount})</span></div>
               <div className="mt-3 flex gap-2">
                 <a href={`tel:${vendor.phone}`} className="flex-1 flex items-center justify-center gap-2 py-2 bg-haven-50 text-haven-700 rounded-lg text-sm font-medium"><Phone className="w-4 h-4" />Call</a>
-                <button className="flex-1 flex items-center justify-center gap-2 py-2 border border-warm-200 text-warm-700 rounded-lg text-sm font-medium"><MessageCircle className="w-4 h-4" />Message</button>
+                <button className="flex-1 flex items-center justify-center gap-2 py-2 border border-neutral-200 text-neutral-700 rounded-lg text-sm font-medium"><MessageCircle className="w-4 h-4" />Message</button>
               </div>
             </div>
           </div>
@@ -2386,8 +2386,8 @@ export default function YourHomePage() {
   // MAIN RENDER
   // ============================================================================
   return (
-    <div className="min-h-screen bg-warm-50 pb-24 lg:pb-8">
-      <div className="bg-white border-b border-warm-200">
+    <div className="min-h-screen bg-neutral-50 pb-24 lg:pb-8">
+      <div className="bg-white border-b border-neutral-200">
         <div className="max-w-7xl mx-auto">
           <div className="relative h-48 sm:h-64 overflow-hidden bg-gradient-to-br from-haven-700 to-haven-800">
             <img
@@ -2419,7 +2419,7 @@ export default function YourHomePage() {
                 const isActive = activeTab === tab.id;
                 const badge = tab.id === 'maintenance' && (maintenanceStats.overdue + maintenanceStats.dueSoon) > 0 ? maintenanceStats.overdue + maintenanceStats.dueSoon : null;
                 return (
-                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${isActive ? 'border-haven-700 text-haven-700' : 'border-transparent text-warm-500'}`}>
+                  <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${isActive ? 'border-haven-700 text-haven-700' : 'border-transparent text-neutral-500'}`}>
                     <Icon className="w-4 h-4" />{tab.label}
                     {badge && <span className="px-1.5 py-0.5 text-xs font-bold bg-red-500 text-white rounded-full">{badge}</span>}
                   </button>

@@ -333,15 +333,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   typeItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   typeLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   typeLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   frequencyRow: {
@@ -359,15 +359,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   frequencyItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   frequencyLabel: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.secondary,
   },
   frequencyLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   deleteButton: {

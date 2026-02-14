@@ -23,6 +23,7 @@ import { getIdToken } from '../../../../src/lib/firebase';
 import { EditRegistrationModal } from '../../../../src/components/forms/EditRegistrationModal';
 import { EditInsuranceModal } from '../../../../src/components/forms/EditInsuranceModal';
 import { AddServiceHistoryModal } from '../../../../src/components/forms/AddServiceHistoryModal';
+import { UpdateMileageModal } from '../../../../src/components/forms/UpdateMileageModal';
 
 // =============================================================================
 // TYPES
@@ -147,7 +148,7 @@ interface VehicleDetail {
   insuranceExpiry?: string | null;
   insuranceDocUrl?: string | null;
   insuranceProvider?: string | null;
-  insurancePolicyNumber?: string | null;
+  insurancePolicyNum?: string | null;
   notes?: string | null;
   // Enhanced fields
   registration?: Registration;
@@ -217,7 +218,7 @@ interface EmptyPromptProps {
 function EmptyPrompt({ text, onPress }: EmptyPromptProps) {
   return (
     <TouchableOpacity style={helperStyles.emptyPrompt} onPress={onPress} disabled={!onPress}>
-      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
       <Text style={helperStyles.emptyPromptText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -292,7 +293,7 @@ const helperStyles = StyleSheet.create({
   sectionAction: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   infoRow: {
     flexDirection: 'row',
@@ -328,7 +329,7 @@ const helperStyles = StyleSheet.create({
   },
   emptyPromptText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   maintenanceAlert: {
     flexDirection: 'row',
@@ -383,6 +384,7 @@ export default function VehicleDetailScreen() {
   const [showInsuranceModal, setShowInsuranceModal] = useState(false);
   const [showAddProviderModal, setShowAddProviderModal] = useState(false);
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
+  const [showMileageModal, setShowMileageModal] = useState(false);
   const [newProviderName, setNewProviderName] = useState('');
   const [newProviderType, setNewProviderType] = useState('mechanic');
   const [newProviderPhone, setNewProviderPhone] = useState('');
@@ -512,15 +514,14 @@ export default function VehicleDetailScreen() {
   const handleSaveRegistration = async (data: {
     licensePlate?: string | null;
     vin?: string | null;
-    state?: string | null;
-    expiresAt?: string | null;
-    registrationDocUrl?: string | null;
+    registrationState?: string | null;
+    registrationExpiry?: string | null;
   }) => {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}`,
+      `${API_BASE_URL}/family/vehicles/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -530,9 +531,8 @@ export default function VehicleDetailScreen() {
         body: JSON.stringify({
           licensePlate: data.licensePlate,
           vin: data.vin,
-          registrationState: data.state,
-          registrationExpiry: data.expiresAt,
-          registrationDocUrl: data.registrationDocUrl,
+          registrationState: data.registrationState,
+          registrationExpiry: data.registrationExpiry,
         }),
       }
     );
@@ -544,15 +544,14 @@ export default function VehicleDetailScreen() {
   // Save insurance data
   const handleSaveInsurance = async (data: {
     insuranceProvider?: string | null;
-    insurancePolicyNumber?: string | null;
-    insuranceExpiresAt?: string | null;
-    insuranceDocUrl?: string | null;
+    insurancePolicyNum?: string | null;
+    insuranceExpiry?: string | null;
   }) => {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}`,
+      `${API_BASE_URL}/family/vehicles/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -561,15 +560,44 @@ export default function VehicleDetailScreen() {
         },
         body: JSON.stringify({
           insuranceProvider: data.insuranceProvider,
-          insurancePolicyNumber: data.insurancePolicyNumber,
-          insuranceExpiry: data.insuranceExpiresAt,
-          insuranceDocUrl: data.insuranceDocUrl,
+          insurancePolicyNum: data.insurancePolicyNum,
+          insuranceExpiry: data.insuranceExpiry,
         }),
       }
     );
 
     if (!response.ok) throw new Error('Failed to save');
     await fetchVehicle();
+  };
+
+  // Save mileage data
+  const handleSaveMileage = async (data: {
+    currentMileage?: number | null;
+    lastOilChange?: string | null;
+    oilChangeMileage?: number | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/vehicles/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          currentMileage: data.currentMileage,
+          lastOilChange: data.lastOilChange,
+          oilChangeMileage: data.oilChangeMileage,
+        }),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchVehicle();
+    fetchMaintenanceDue();
   };
 
   // Add service provider
@@ -767,7 +795,7 @@ export default function VehicleDetailScreen() {
           title: 'Vehicle',
           headerRight: () => (
             <TouchableOpacity onPress={() => router.push(`/(tabs)/family/vehicle/edit/${id}` as any)}>
-              <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="create-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           ),
         }}
@@ -787,7 +815,7 @@ export default function VehicleDetailScreen() {
         {/* Hero Card */}
         <Card style={styles.heroCard}>
           <View style={styles.vehicleImagePlaceholder}>
-            <Ionicons name="car" size={64} color={colors.haven.champagne[500]} />
+            <Ionicons name="car" size={64} color={colors.haven.purple[500]} />
           </View>
           <Text style={styles.vehicleName}>{vehicleName}</Text>
           {vehicle.name && (
@@ -799,10 +827,21 @@ export default function VehicleDetailScreen() {
               <Text style={styles.colorText}>{vehicle.color}</Text>
             </View>
           )}
-          {vehicle.status?.currentMileage && (
-            <Text style={styles.mileage}>
-              {vehicle.status.currentMileage.toLocaleString()} miles
-            </Text>
+          {vehicle.status?.currentMileage ? (
+            <TouchableOpacity onPress={() => setShowMileageModal(true)}>
+              <Text style={styles.mileage}>
+                {vehicle.status.currentMileage.toLocaleString()} miles
+              </Text>
+              <Text style={styles.mileageHint}>Tap to update</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.addMileageButton}
+              onPress={() => setShowMileageModal(true)}
+            >
+              <Ionicons name="speedometer-outline" size={16} color={colors.haven.purple[500]} />
+              <Text style={styles.addMileageText}>Add Mileage</Text>
+            </TouchableOpacity>
           )}
         </Card>
 
@@ -859,7 +898,7 @@ export default function VehicleDetailScreen() {
               )}
               {vehicle.registrationDocUrl && (
                 <TouchableOpacity style={styles.documentButton}>
-                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.champagne[500]} />
+                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.purple[500]} />
                   <Text style={styles.documentButtonText}>View Registration Document</Text>
                 </TouchableOpacity>
               )}
@@ -889,7 +928,7 @@ export default function VehicleDetailScreen() {
               <InfoRow
                 icon="document-outline"
                 label="Policy #"
-                value={vehicle.insurance?.policyNumber || vehicle.insurancePolicyNumber}
+                value={vehicle.insurance?.policyNumber || vehicle.insurancePolicyNum}
                 mono
               />
               {(vehicle.insurance?.expiresAt || vehicle.insuranceExpiry) && (
@@ -919,7 +958,7 @@ export default function VehicleDetailScreen() {
               )}
               {vehicle.insurance?.agentName && (
                 <View style={styles.agentCard}>
-                  <Ionicons name="person-outline" size={20} color={colors.haven.navy[600]} />
+                  <Ionicons name="person-outline" size={20} color={colors.haven.purple[600]} />
                   <View style={styles.agentInfo}>
                     <Text style={styles.agentName}>{vehicle.insurance.agentName}</Text>
                     {vehicle.insurance.agentPhone && (
@@ -937,7 +976,7 @@ export default function VehicleDetailScreen() {
               />
               {vehicle.insuranceDocUrl && (
                 <TouchableOpacity style={styles.documentButton}>
-                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.champagne[500]} />
+                  <Ionicons name="document-attach-outline" size={18} color={colors.haven.purple[500]} />
                   <Text style={styles.documentButtonText}>View Insurance Card</Text>
                 </TouchableOpacity>
               )}
@@ -1055,10 +1094,17 @@ export default function VehicleDetailScreen() {
             </>
           ) : (
             <View style={styles.noMaintenanceContainer}>
+              <Ionicons name="speedometer-outline" size={32} color={colors.text.tertiary} />
               <Text style={styles.noMaintenanceText}>
-                Add service history to track maintenance schedules.
-                Alfred will research manufacturer recommendations for your vehicle.
+                Add your current mileage so Alfred can research manufacturer-recommended maintenance intervals for your vehicle.
               </Text>
+              <TouchableOpacity
+                style={styles.addMileagePromptButton}
+                onPress={() => setShowMileageModal(true)}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={colors.haven.purple[500]} />
+                <Text style={styles.addMileagePromptText}>Update Mileage</Text>
+              </TouchableOpacity>
             </View>
           )}
         </Card>
@@ -1077,7 +1123,7 @@ export default function VehicleDetailScreen() {
                 return (
                   <TouchableOpacity key={service.id} style={styles.serviceRow}>
                     <View style={styles.serviceIcon}>
-                      <Ionicons name={typeInfo.icon} size={18} color={colors.haven.navy[600]} />
+                      <Ionicons name={typeInfo.icon} size={18} color={colors.haven.purple[600]} />
                     </View>
                     <View style={styles.serviceContent}>
                       <Text style={styles.serviceType}>{service.description || typeInfo.label}</Text>
@@ -1103,7 +1149,7 @@ export default function VehicleDetailScreen() {
                   <Text style={styles.seeAllText}>
                     See all {vehicle.serviceHistory.length} records
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.haven.purple[500]} />
                 </TouchableOpacity>
               )}
             </>
@@ -1161,7 +1207,7 @@ export default function VehicleDetailScreen() {
               {vehicle.serviceProviders.map((provider) => (
                 <View key={provider.id} style={styles.providerRow}>
                   <View style={styles.providerIcon}>
-                    <Ionicons name="construct-outline" size={18} color={colors.haven.navy[600]} />
+                    <Ionicons name="construct-outline" size={18} color={colors.haven.purple[600]} />
                   </View>
                   <View style={styles.providerContent}>
                     <Text style={styles.providerName}>{provider.name}</Text>
@@ -1212,9 +1258,8 @@ export default function VehicleDetailScreen() {
         initialData={{
           licensePlate: vehicle.registration?.licensePlate || vehicle.licensePlate,
           vin: vehicle.vin,
-          state: vehicle.registration?.state,
-          expiresAt: vehicle.registration?.expiresAt || vehicle.registrationExpiry,
-          registrationDocUrl: vehicle.registrationDocUrl,
+          registrationState: vehicle.registration?.state || (vehicle as any).registrationState,
+          registrationExpiry: vehicle.registration?.expiresAt || vehicle.registrationExpiry,
         }}
       />
 
@@ -1224,9 +1269,8 @@ export default function VehicleDetailScreen() {
         onSave={handleSaveInsurance}
         initialData={{
           insuranceProvider: vehicle.insurance?.provider || vehicle.insuranceProvider,
-          insurancePolicyNumber: vehicle.insurance?.policyNumber || vehicle.insurancePolicyNumber,
-          insuranceExpiresAt: vehicle.insurance?.expiresAt || vehicle.insuranceExpiry,
-          insuranceDocUrl: vehicle.insuranceDocUrl,
+          insurancePolicyNum: vehicle.insurance?.policyNumber || vehicle.insurancePolicyNum,
+          insuranceExpiry: vehicle.insurance?.expiresAt || vehicle.insuranceExpiry,
         }}
       />
 
@@ -1239,6 +1283,18 @@ export default function VehicleDetailScreen() {
           fetchVehicle();
           fetchMaintenanceDue();
         }}
+      />
+
+      <UpdateMileageModal
+        visible={showMileageModal}
+        onClose={() => setShowMileageModal(false)}
+        onSave={handleSaveMileage}
+        initialData={{
+          currentMileage: vehicle.status?.currentMileage,
+          lastOilChange: vehicle.maintenance?.lastOilChange,
+          oilChangeMileage: vehicle.maintenance?.lastOilChangeMileage,
+        }}
+        vehicleName={vehicleName}
       />
 
       {/* Add Service Provider Modal */}
@@ -1353,7 +1409,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -1371,7 +1427,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: borderRadius.xl,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],
@@ -1414,6 +1470,29 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.text.tertiary,
     marginTop: spacing[2],
+    textAlign: 'center',
+  },
+  mileageHint: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.haven.purple[500],
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  addMileageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[1],
+    marginTop: spacing[3],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[4],
+    backgroundColor: colors.haven.purple[50],
+    borderRadius: borderRadius.full,
+  },
+  addMileageText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.purple[500],
   },
   // Sections
   section: {
@@ -1457,7 +1536,7 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[2],
   },
@@ -1471,18 +1550,35 @@ const styles = StyleSheet.create({
   },
   agentPhone: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   // Maintenance
   noMaintenanceContainer: {
-    paddingVertical: spacing[3],
+    paddingVertical: spacing[4],
+    alignItems: 'center',
   },
   noMaintenanceText: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.tertiary,
     textAlign: 'center',
     lineHeight: 20,
+    marginTop: spacing[2],
+    marginBottom: spacing[3],
+  },
+  addMileagePromptButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[2],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[4],
+    backgroundColor: colors.haven.purple[50],
+    borderRadius: borderRadius.lg,
+  },
+  addMileagePromptText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.purple[500],
   },
   // Service history
   serviceRow: {
@@ -1497,7 +1593,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1538,7 +1634,7 @@ const styles = StyleSheet.create({
   seeAllText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   // Financing balance
   balanceRow: {
@@ -1547,7 +1643,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[3],
   },
@@ -1587,14 +1683,14 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[3],
   },
   documentButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   // Service Providers
   providerRow: {
@@ -1609,7 +1705,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1629,7 +1725,7 @@ const styles = StyleSheet.create({
   },
   providerPhone: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   removeProviderButton: {
@@ -1710,7 +1806,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,

@@ -687,7 +687,7 @@ const getEventColor = (event: CalendarEvent) => {
     case 'health':
       return { bg: 'bg-red-50', border: 'border-red-500', text: 'text-red-700', icon: 'text-red-600' };
     default:
-      return { bg: 'bg-warm-50', border: 'border-warm-400', text: 'text-warm-700', icon: 'text-warm-600' };
+      return { bg: 'bg-neutral-50', border: 'border-neutral-400', text: 'text-neutral-700', icon: 'text-neutral-600' };
   }
 };
 
@@ -726,7 +726,7 @@ function ManagerBadge({ name, small = false }: { name: string; small?: boolean }
 function SyncedBadge({ source }: { source: SyncSource }) {
   const icon = getSyncSourceIcon(source);
   return (
-    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-warm-100 text-warm-600 rounded text-[10px] font-medium">
+    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-neutral-100 text-neutral-600 rounded text-[10px] font-medium">
       {icon} Synced
     </span>
   );
@@ -808,19 +808,19 @@ function CalendarSyncPanel({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-warm-200">
+        <div className="p-6 border-b border-neutral-200">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
                 <Link2 className="w-5 h-5 text-emerald-600" />
               </div>
               <div>
-                <h2 className="text-lg font-bold text-warm-900">Calendar Sync</h2>
-                <p className="text-sm text-warm-500">Connect your calendars</p>
+                <h2 className="text-lg font-bold text-neutral-900">Calendar Sync</h2>
+                <p className="text-sm text-neutral-500">Connect your calendars</p>
               </div>
             </div>
-            <button onClick={onClose} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-              <X className="w-5 h-5 text-warm-500" />
+            <button onClick={onClose} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-neutral-500" />
             </button>
           </div>
         </div>
@@ -841,15 +841,15 @@ function CalendarSyncPanel({
 
           {/* Google Calendar */}
           <div className="space-y-3">
-            <h3 className="font-medium text-warm-900">Google Calendar</h3>
-            <div className="flex items-center justify-between p-4 border border-warm-200 rounded-xl">
+            <h3 className="font-medium text-neutral-900">Google Calendar</h3>
+            <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-warm-200">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-neutral-200">
                   <span className="text-2xl">🔵</span>
                 </div>
                 <div>
-                  <p className="font-medium text-warm-900">Google Calendar</p>
-                  <p className="text-sm text-warm-500">
+                  <p className="font-medium text-neutral-900">Google Calendar</p>
+                  <p className="text-sm text-neutral-500">
                     {googleConnected ? 'Connected - 2 calendars synced' : 'Not connected'}
                   </p>
                 </div>
@@ -858,7 +858,7 @@ function CalendarSyncPanel({
                 onClick={() => setGoogleConnected(!googleConnected)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   googleConnected
-                    ? 'bg-warm-100 text-warm-700 hover:bg-warm-200'
+                    ? 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     : 'bg-emerald-600 text-white hover:bg-emerald-700'
                 }`}
               >
@@ -869,15 +869,15 @@ function CalendarSyncPanel({
 
           {/* Apple Calendar */}
           <div className="space-y-3">
-            <h3 className="font-medium text-warm-900">Apple Calendar</h3>
-            <div className="flex items-center justify-between p-4 border border-warm-200 rounded-xl">
+            <h3 className="font-medium text-neutral-900">Apple Calendar</h3>
+            <div className="flex items-center justify-between p-4 border border-neutral-200 rounded-xl">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-warm-200">
+                <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center border border-neutral-200">
                   <span className="text-2xl">🍎</span>
                 </div>
                 <div>
-                  <p className="font-medium text-warm-900">Apple iCloud</p>
-                  <p className="text-sm text-warm-500">
+                  <p className="font-medium text-neutral-900">Apple iCloud</p>
+                  <p className="text-sm text-neutral-500">
                     {appleConnected ? 'Connected - Family calendar synced' : 'Not connected'}
                   </p>
                 </div>
@@ -886,7 +886,7 @@ function CalendarSyncPanel({
                 onClick={() => setAppleConnected(!appleConnected)}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
                   appleConnected
-                    ? 'bg-warm-100 text-warm-700 hover:bg-warm-200'
+                    ? 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     : 'bg-emerald-600 text-white hover:bg-emerald-700'
                 }`}
               >
@@ -897,8 +897,8 @@ function CalendarSyncPanel({
 
           {/* iCal Feed URL */}
           <div className="space-y-3">
-            <h3 className="font-medium text-warm-900">Subscribe via URL</h3>
-            <p className="text-sm text-warm-500">
+            <h3 className="font-medium text-neutral-900">Subscribe via URL</h3>
+            <p className="text-sm text-neutral-500">
               Use this URL to subscribe in any calendar app that supports iCal.
             </p>
             <div className="flex items-center gap-2">
@@ -906,11 +906,11 @@ function CalendarSyncPanel({
                 type="text"
                 readOnly
                 value={icalUrl}
-                className="flex-1 px-3 py-2 bg-warm-50 border border-warm-200 rounded-lg text-sm text-warm-600 font-mono truncate"
+                className="flex-1 px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg text-sm text-neutral-600 font-mono truncate"
               />
               <button
                 onClick={handleCopyUrl}
-                className="flex items-center gap-2 px-4 py-2 bg-warm-100 text-warm-700 rounded-lg hover:bg-warm-200 transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-neutral-100 text-neutral-700 rounded-lg hover:bg-neutral-200 transition-colors"
               >
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
                 {copied ? 'Copied!' : 'Copy'}
@@ -919,9 +919,9 @@ function CalendarSyncPanel({
           </div>
 
           {/* Sync Status */}
-          <div className="p-4 bg-warm-50 rounded-xl">
+          <div className="p-4 bg-neutral-50 rounded-xl">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-warm-600">
+              <div className="flex items-center gap-2 text-sm text-neutral-600">
                 <RefreshCw className="w-4 h-4" />
                 Last synced 2 minutes ago
               </div>
@@ -964,7 +964,7 @@ function FilterPills({
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
               isActive
                 ? 'bg-emerald-600 text-white'
-                : 'bg-white border border-warm-200 text-warm-600 hover:bg-warm-50'
+                : 'bg-white border border-neutral-200 text-neutral-600 hover:bg-neutral-50'
             }`}
           >
             <Icon className="w-4 h-4" />
@@ -982,14 +982,14 @@ function WeatherBadge({ weather, large = false }: { weather: DayWeather; large?:
   if (large) {
     return (
       <div className="flex items-center gap-2 px-3 py-2 bg-white/80 backdrop-blur-sm rounded-lg">
-        <Icon className={`w-5 h-5 ${weather.icon === 'sun' ? 'text-amber-500' : weather.icon === 'rain' ? 'text-blue-500' : 'text-warm-400'}`} />
-        <span className="text-sm font-medium text-warm-700">{weather.temp}°F</span>
+        <Icon className={`w-5 h-5 ${weather.icon === 'sun' ? 'text-amber-500' : weather.icon === 'rain' ? 'text-blue-500' : 'text-neutral-400'}`} />
+        <span className="text-sm font-medium text-neutral-700">{weather.temp}°F</span>
       </div>
     );
   }
   return (
-    <div className="flex items-center gap-1 text-xs text-warm-500">
-      <Icon className={`w-4 h-4 ${weather.icon === 'sun' ? 'text-amber-500' : 'text-warm-400'}`} />
+    <div className="flex items-center gap-1 text-xs text-neutral-500">
+      <Icon className={`w-4 h-4 ${weather.icon === 'sun' ? 'text-amber-500' : 'text-neutral-400'}`} />
       <span>{weather.temp}°</span>
     </div>
   );
@@ -1054,7 +1054,7 @@ function EventBlock({ event, onClick }: { event: CalendarEvent; onClick: () => v
         )}
       </div>
       {event.startTime && (
-        <p className="text-xs text-warm-500">{formatTime(event.startTime)}</p>
+        <p className="text-xs text-neutral-500">{formatTime(event.startTime)}</p>
       )}
       {needsAttention && (
         <div className="flex items-center gap-1 mt-1 text-xs text-red-600">
@@ -1084,7 +1084,7 @@ function MobileTimeSlot({
   const hasEvents = events.length > 0;
 
   return (
-    <div className={`relative border-b border-warm-100 ${isCurrentHour ? 'bg-red-50/30' : ''}`}>
+    <div className={`relative border-b border-neutral-100 ${isCurrentHour ? 'bg-red-50/30' : ''}`}>
       {isCurrentHour && (
         <div
           className="absolute left-0 right-0 z-10 flex items-center pointer-events-none"
@@ -1097,7 +1097,7 @@ function MobileTimeSlot({
 
       <div className="flex min-h-[72px]">
         <div className="w-16 flex-shrink-0 py-2 px-2 text-right">
-          <span className={`text-xs font-medium ${isCurrentHour ? 'text-red-600' : 'text-warm-400'}`}>
+          <span className={`text-xs font-medium ${isCurrentHour ? 'text-red-600' : 'text-neutral-400'}`}>
             {timeLabel}
           </span>
         </div>
@@ -1126,7 +1126,7 @@ function MobileTimeSlot({
                         <ManagerBadge name={event.createdByName || MANAGER_NAME} small />
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-warm-500 mt-0.5">
+                    <div className="flex items-center gap-2 text-xs text-neutral-500 mt-0.5">
                       {event.startTime && (
                         <span>{formatTime(event.startTime)}{event.endTime && ` - ${formatTime(event.endTime)}`}</span>
                       )}
@@ -1138,14 +1138,14 @@ function MobileTimeSlot({
                       )}
                     </div>
                   </div>
-                  {event.isRecurring && <Repeat className="w-4 h-4 text-warm-400 flex-shrink-0" />}
+                  {event.isRecurring && <Repeat className="w-4 h-4 text-neutral-400 flex-shrink-0" />}
                   {needsAttention && <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0" />}
                 </button>
               );
             })
           ) : (
             <div className="h-8 flex items-center">
-              <span className="text-xs text-warm-300 italic">Free time</span>
+              <span className="text-xs text-neutral-300 italic">Free time</span>
             </div>
           )}
         </div>
@@ -1189,7 +1189,7 @@ function MobileDaySelector({
                 ? 'bg-emerald-600 text-white'
                 : isTodayDate
                 ? 'bg-emerald-100 text-emerald-700'
-                : 'bg-white border border-warm-200 text-warm-700 hover:bg-warm-50'
+                : 'bg-white border border-neutral-200 text-neutral-700 hover:bg-neutral-50'
             } ${attention ? 'ring-2 ring-red-400' : ''}`}
           >
             {attention && (
@@ -1203,8 +1203,8 @@ function MobileDaySelector({
             <span className="text-lg font-bold">{date.getDate()}</span>
             {WeatherIconComponent && weather && (
               <div className="flex items-center gap-0.5">
-                <WeatherIconComponent className={`w-3 h-3 ${isSelected ? 'text-white/80' : weather.icon === 'sun' ? 'text-amber-500' : 'text-warm-400'}`} />
-                <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-warm-500'}`}>{weather.temp}°</span>
+                <WeatherIconComponent className={`w-3 h-3 ${isSelected ? 'text-white/80' : weather.icon === 'sun' ? 'text-amber-500' : 'text-neutral-400'}`} />
+                <span className={`text-[10px] ${isSelected ? 'text-white/80' : 'text-neutral-500'}`}>{weather.temp}°</span>
               </div>
             )}
           </button>
@@ -1253,45 +1253,45 @@ function AddEventModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl shadow-xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-warm-200">
+        <div className="p-6 border-b border-neutral-200">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-warm-900">Add Event</h2>
-            <button onClick={onClose} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-              <X className="w-5 h-5 text-warm-500" />
+            <h2 className="text-xl font-bold text-neutral-900">Add Event</h2>
+            <button onClick={onClose} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+              <X className="w-5 h-5 text-neutral-500" />
             </button>
           </div>
           {selectedDate && (
-            <p className="text-sm text-warm-500 mt-1">{formatDateLong(selectedDate)}</p>
+            <p className="text-sm text-neutral-500 mt-1">{formatDateLong(selectedDate)}</p>
           )}
         </div>
 
         <div className="p-6">
           {!eventType ? (
             <div className="space-y-4">
-              <p className="text-sm text-warm-600 mb-4">What would you like to add?</p>
+              <p className="text-sm text-neutral-600 mb-4">What would you like to add?</p>
               <button
                 onClick={() => setEventType('family')}
-                className="w-full flex items-center gap-4 p-4 border border-warm-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 border border-neutral-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
               >
                 <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
                   <Users className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-warm-900">Family Event</p>
-                  <p className="text-sm text-warm-500">Sports, parties, appointments, travel</p>
+                  <p className="font-medium text-neutral-900">Family Event</p>
+                  <p className="text-sm text-neutral-500">Sports, parties, appointments, travel</p>
                 </div>
               </button>
 
               <Link
                 href="/app/requests"
-                className="w-full flex items-center gap-4 p-4 border border-warm-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
+                className="w-full flex items-center gap-4 p-4 border border-neutral-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition-colors text-left"
               >
                 <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <Sparkles className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-warm-900">Request Service</p>
-                  <p className="text-sm text-warm-500">Ask {MANAGER_NAME} to schedule something</p>
+                  <p className="font-medium text-neutral-900">Request Service</p>
+                  <p className="text-sm text-neutral-500">Ask {MANAGER_NAME} to schedule something</p>
                 </div>
               </Link>
             </div>
@@ -1306,47 +1306,47 @@ function AddEventModal({
               </button>
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">Event Title</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Event Title</label>
                 <input
                   type="text"
                   placeholder="e.g., Soccer Practice"
-                  className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1">Start Time</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">Start Time</label>
                   <input
                     type="time"
-                    className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 mb-1">End Time</label>
+                  <label className="block text-sm font-medium text-neutral-700 mb-1">End Time</label>
                   <input
                     type="time"
-                    className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-1">Location</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-1">Location</label>
                 <input
                   type="text"
                   placeholder="e.g., Oak Park Soccer Fields"
-                  className="w-full px-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-full px-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-2">Repeat</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Repeat</label>
                 <div className="flex flex-wrap gap-2">
                   {['Never', 'Weekly', 'Bi-Weekly', 'Monthly'].map((option) => (
                     <button
                       key={option}
-                      className="px-4 py-2 border border-warm-200 rounded-lg text-sm text-warm-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+                      className="px-4 py-2 border border-neutral-200 rounded-lg text-sm text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
                     >
                       {option}
                     </button>
@@ -1355,14 +1355,14 @@ function AddEventModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 mb-2">Who&apos;s Attending?</label>
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Who&apos;s Attending?</label>
                 <div className="flex flex-wrap gap-2">
                   {mockFamilyMembers.map((member) => (
                     <button
                       key={member.id}
-                      className="flex items-center gap-2 px-3 py-2 border border-warm-200 rounded-lg text-sm text-warm-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
+                      className="flex items-center gap-2 px-3 py-2 border border-neutral-200 rounded-lg text-sm text-neutral-600 hover:border-emerald-300 hover:bg-emerald-50 transition-colors"
                     >
-                      <div className="w-6 h-6 rounded-full bg-warm-200 overflow-hidden">
+                      <div className="w-6 h-6 rounded-full bg-neutral-200 overflow-hidden">
                         <img src={member.avatar} alt="" className="w-full h-full object-cover" />
                       </div>
                       {member.name}
@@ -1411,14 +1411,14 @@ function EventDetailModal({
                 <Icon className={`w-6 h-6 ${colors.icon}`} />
               </div>
               <div>
-                <h2 className="text-xl font-bold text-warm-900">{event.title}</h2>
-                <p className="text-sm text-warm-500 capitalize">
+                <h2 className="text-xl font-bold text-neutral-900">{event.title}</h2>
+                <p className="text-sm text-neutral-500 capitalize">
                   {event.category} {event.layer === 'house' ? '• Service' : '• Family'}
                 </p>
               </div>
             </div>
             <button onClick={onClose} className="p-2 hover:bg-white/50 rounded-lg transition-colors">
-              <X className="w-5 h-5 text-warm-500" />
+              <X className="w-5 h-5 text-neutral-500" />
             </button>
           </div>
 
@@ -1471,14 +1471,14 @@ function EventDetailModal({
             <AttentionBadge description={event.actionDescription} />
           )}
 
-          <div className="flex items-center gap-3 text-warm-700">
-            <CalendarIcon className="w-5 h-5 text-warm-400" />
+          <div className="flex items-center gap-3 text-neutral-700">
+            <CalendarIcon className="w-5 h-5 text-neutral-400" />
             <span>{formatDateLong(event.startDate)}</span>
           </div>
 
           {event.startTime && (
-            <div className="flex items-center gap-3 text-warm-700">
-              <Clock className="w-5 h-5 text-warm-400" />
+            <div className="flex items-center gap-3 text-neutral-700">
+              <Clock className="w-5 h-5 text-neutral-400" />
               <span>
                 {formatTime(event.startTime)}
                 {event.endTime && ` - ${formatTime(event.endTime)}`}
@@ -1487,36 +1487,36 @@ function EventDetailModal({
           )}
 
           {event.isAllDay && (
-            <div className="flex items-center gap-3 text-warm-700">
-              <Clock className="w-5 h-5 text-warm-400" />
+            <div className="flex items-center gap-3 text-neutral-700">
+              <Clock className="w-5 h-5 text-neutral-400" />
               <span>All Day</span>
             </div>
           )}
 
           {event.location && (
-            <div className="flex items-center gap-3 text-warm-700">
-              <MapPin className="w-5 h-5 text-warm-400" />
+            <div className="flex items-center gap-3 text-neutral-700">
+              <MapPin className="w-5 h-5 text-neutral-400" />
               <span>{event.location}</span>
             </div>
           )}
 
           {event.isRecurring && (
-            <div className="flex items-center gap-3 text-warm-700">
-              <Repeat className="w-5 h-5 text-warm-400" />
+            <div className="flex items-center gap-3 text-neutral-700">
+              <Repeat className="w-5 h-5 text-neutral-400" />
               <span className="capitalize">{event.recurrence}</span>
             </div>
           )}
 
           {event.attendees && event.attendees.length > 0 && (
-            <div className="flex items-center gap-3 text-warm-700">
-              <Users className="w-5 h-5 text-warm-400" />
+            <div className="flex items-center gap-3 text-neutral-700">
+              <Users className="w-5 h-5 text-neutral-400" />
               <span>{event.attendees.join(', ')}</span>
             </div>
           )}
 
           {event.description && (
-            <div className="pt-2 border-t border-warm-200">
-              <p className="text-warm-600">{event.description}</p>
+            <div className="pt-2 border-t border-neutral-200">
+              <p className="text-neutral-600">{event.description}</p>
             </div>
           )}
 
@@ -1548,7 +1548,7 @@ function EventDetailModal({
           )}
           <button
             onClick={onClose}
-            className="flex-1 py-2.5 border border-warm-200 text-warm-700 font-medium rounded-lg hover:bg-warm-50 transition-colors"
+            className="flex-1 py-2.5 border border-neutral-200 text-neutral-700 font-medium rounded-lg hover:bg-neutral-50 transition-colors"
           >
             Close
           </button>
@@ -1717,26 +1717,26 @@ export default function CalendarPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-warm-900">Calendar</h1>
-          <p className="text-warm-500 mt-1">Your home and family schedule</p>
+          <h1 className="text-2xl font-bold text-neutral-900">Calendar</h1>
+          <p className="text-neutral-500 mt-1">Your home and family schedule</p>
         </div>
 
         <div className="flex items-center gap-2">
           {/* Sync Button */}
           <button
             onClick={() => setShowSyncPanel(true)}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-warm-200 rounded-lg text-sm font-medium text-warm-700 hover:bg-warm-50 transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-neutral-200 rounded-lg text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
           >
             <Link2 className="w-4 h-4" />
             <span className="hidden sm:inline">Sync</span>
           </button>
 
           {/* View Mode Toggle - Desktop Only */}
-          <div className="hidden md:flex items-center gap-2 bg-warm-100 p-1 rounded-lg">
+          <div className="hidden md:flex items-center gap-2 bg-neutral-100 p-1 rounded-lg">
             <button
               onClick={() => setViewMode('month')}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'month' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-600 hover:text-warm-900'
+                viewMode === 'month' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <LayoutGrid className="w-4 h-4" />
@@ -1745,7 +1745,7 @@ export default function CalendarPage() {
             <button
               onClick={() => setViewMode('week')}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'week' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-600 hover:text-warm-900'
+                viewMode === 'week' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <CalendarIcon className="w-4 h-4" />
@@ -1754,7 +1754,7 @@ export default function CalendarPage() {
             <button
               onClick={() => setViewMode('agenda')}
               className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                viewMode === 'agenda' ? 'bg-white shadow-sm text-warm-900' : 'text-warm-600 hover:text-warm-900'
+                viewMode === 'agenda' ? 'bg-white shadow-sm text-neutral-900' : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <List className="w-4 h-4" />
@@ -1767,7 +1767,7 @@ export default function CalendarPage() {
       {/* Smart Reminders (from Manager) */}
       {activeReminders.length > 0 && (
         <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm font-medium text-warm-700">
+          <div className="flex items-center gap-2 text-sm font-medium text-neutral-700">
             <Bell className="w-4 h-4 text-amber-500" />
             Reminders from {MANAGER_NAME}
           </div>
@@ -1795,13 +1795,13 @@ export default function CalendarPage() {
         />
 
         {/* Weather Header - Sticky */}
-        <div className="sticky top-0 z-10 bg-gradient-to-b from-warm-100 to-warm-50 -mx-4 px-4 py-3 border-b border-warm-200 mt-4">
+        <div className="sticky top-0 z-10 bg-gradient-to-b from-neutral-100 to-neutral-50 -mx-4 px-4 py-3 border-b border-neutral-200 mt-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-semibold text-warm-900">
+              <p className="font-semibold text-neutral-900">
                 {isToday(selectedMobileDate) ? 'Today' : formatDateLong(selectedMobileDate)}
               </p>
-              <p className="text-sm text-warm-500">
+              <p className="text-sm text-neutral-500">
                 {getEventsForDate(selectedMobileDate).length} events scheduled
               </p>
             </div>
@@ -1825,7 +1825,7 @@ export default function CalendarPage() {
         </div>
 
         {/* Mobile Schedule View */}
-        <div ref={mobileAgendaRef} className="mt-4 bg-white rounded-xl border border-warm-200 overflow-hidden max-h-[60vh] overflow-y-auto">
+        <div ref={mobileAgendaRef} className="mt-4 bg-white rounded-xl border border-neutral-200 overflow-hidden max-h-[60vh] overflow-y-auto">
           {timeSlots.map((hour) => {
             const hourEvents = getEventsForHour(selectedMobileDate, hour);
             const isCurrentHour = isToday(selectedMobileDate) && currentTime.getHours() === hour;
@@ -1845,17 +1845,17 @@ export default function CalendarPage() {
       </div>
 
       {/* ========== DESKTOP VIEW ========== */}
-      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-warm-200 overflow-hidden">
+      <div className="hidden md:block bg-white rounded-xl shadow-sm border border-neutral-200 overflow-hidden">
         {/* Calendar Navigation */}
-        <div className="flex items-center justify-between p-4 border-b border-warm-200">
+        <div className="flex items-center justify-between p-4 border-b border-neutral-200">
           <div className="flex items-center gap-2">
-            <button onClick={navigatePrev} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-              <ChevronLeft className="w-5 h-5 text-warm-600" />
+            <button onClick={navigatePrev} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+              <ChevronLeft className="w-5 h-5 text-neutral-600" />
             </button>
-            <button onClick={navigateNext} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-              <ChevronRight className="w-5 h-5 text-warm-600" />
+            <button onClick={navigateNext} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+              <ChevronRight className="w-5 h-5 text-neutral-600" />
             </button>
-            <h2 className="text-lg font-semibold text-warm-900 ml-2">{formatHeader()}</h2>
+            <h2 className="text-lg font-semibold text-neutral-900 ml-2">{formatHeader()}</h2>
           </div>
           <button
             onClick={goToToday}
@@ -1869,9 +1869,9 @@ export default function CalendarPage() {
         {viewMode === 'month' && (
           <div>
             {/* Day Headers */}
-            <div className="grid grid-cols-7 border-b border-warm-200">
+            <div className="grid grid-cols-7 border-b border-neutral-200">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                <div key={day} className="py-3 text-center text-sm font-medium text-warm-500 border-r border-warm-200 last:border-r-0">
+                <div key={day} className="py-3 text-center text-sm font-medium text-neutral-500 border-r border-neutral-200 last:border-r-0">
                   {day}
                 </div>
               ))}
@@ -1881,7 +1881,7 @@ export default function CalendarPage() {
             <div className="grid grid-cols-7">
               {monthDates.map((date, index) => {
                 if (!date) {
-                  return <div key={`empty-${index}`} className="h-32 bg-warm-50 border-b border-r border-warm-200" />;
+                  return <div key={`empty-${index}`} className="h-32 bg-neutral-50 border-b border-r border-neutral-200" />;
                 }
 
                 const dayEvents = getEventsForDate(date);
@@ -1895,14 +1895,14 @@ export default function CalendarPage() {
                       setSelectedDate(date);
                       setShowAddModal(true);
                     }}
-                    className={`h-32 p-2 border-b border-r border-warm-200 cursor-pointer hover:bg-warm-50 transition-colors ${
+                    className={`h-32 p-2 border-b border-r border-neutral-200 cursor-pointer hover:bg-neutral-50 transition-colors ${
                       isTodayDate ? 'bg-emerald-50/30' : ''
                     } ${attention ? 'ring-2 ring-inset ring-red-400' : ''}`}
                   >
                     <div className="flex items-center justify-between">
                       <div
                         className={`text-sm font-medium ${
-                          isTodayDate ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white' : 'text-warm-700'
+                          isTodayDate ? 'w-7 h-7 flex items-center justify-center rounded-full bg-emerald-600 text-white' : 'text-neutral-700'
                         }`}
                       >
                         {date.getDate()}
@@ -1917,7 +1917,7 @@ export default function CalendarPage() {
                         <EventChip key={event.id} event={event} />
                       ))}
                       {dayEvents.length > 3 && (
-                        <p className="text-xs text-warm-500 pl-1">+{dayEvents.length - 3} more</p>
+                        <p className="text-xs text-neutral-500 pl-1">+{dayEvents.length - 3} more</p>
                       )}
                     </div>
                   </div>
@@ -1931,14 +1931,14 @@ export default function CalendarPage() {
         {viewMode === 'week' && (
           <div>
             {/* Weather Row */}
-            <div className="grid grid-cols-8 border-b border-warm-200 bg-gradient-to-b from-warm-50 to-white">
-              <div className="py-2 px-3 text-xs text-warm-500 font-medium border-r border-warm-200">Weather</div>
+            <div className="grid grid-cols-8 border-b border-neutral-200 bg-gradient-to-b from-neutral-50 to-white">
+              <div className="py-2 px-3 text-xs text-neutral-500 font-medium border-r border-neutral-200">Weather</div>
               {weekDates.map((date) => {
                 const weather = mockWeather.find((w) => isSameDay(w.date, date));
                 return (
                   <div
                     key={date.toISOString()}
-                    className={`py-2 px-2 flex justify-center border-r border-warm-200 ${isToday(date) ? 'bg-emerald-50/50' : ''}`}
+                    className={`py-2 px-2 flex justify-center border-r border-neutral-200 ${isToday(date) ? 'bg-emerald-50/50' : ''}`}
                   >
                     {weather && <WeatherBadge weather={weather} />}
                   </div>
@@ -1947,20 +1947,20 @@ export default function CalendarPage() {
             </div>
 
             {/* Day Headers with attention indicator */}
-            <div className="grid grid-cols-8 border-b border-warm-200">
-              <div className="py-3 px-3 border-r border-warm-200" />
+            <div className="grid grid-cols-8 border-b border-neutral-200">
+              <div className="py-3 px-3 border-r border-neutral-200" />
               {weekDates.map((date) => {
                 const isTodayDate = isToday(date);
                 const attention = dateNeedsAttention(date);
                 return (
                   <div
                     key={date.toISOString()}
-                    className={`py-3 text-center border-r border-warm-200 relative ${isTodayDate ? 'bg-emerald-50/50' : ''} ${
+                    className={`py-3 text-center border-r border-neutral-200 relative ${isTodayDate ? 'bg-emerald-50/50' : ''} ${
                       attention ? 'ring-2 ring-inset ring-red-400' : ''
                     }`}
                   >
-                    <p className="text-xs text-warm-500 uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
-                    <p className={`text-lg font-semibold mt-0.5 ${isTodayDate ? 'text-emerald-600' : 'text-warm-900'}`}>{date.getDate()}</p>
+                    <p className="text-xs text-neutral-500 uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</p>
+                    <p className={`text-lg font-semibold mt-0.5 ${isTodayDate ? 'text-emerald-600' : 'text-neutral-900'}`}>{date.getDate()}</p>
                     {attention && (
                       <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" />
                     )}
@@ -1973,10 +1973,10 @@ export default function CalendarPage() {
             <div ref={weekViewRef} className="relative h-[600px] overflow-y-auto">
               <div className="grid grid-cols-8">
                 {/* Time Labels */}
-                <div className="border-r border-warm-200">
+                <div className="border-r border-neutral-200">
                   {timeSlots.map((hour) => (
                     <div key={hour} className="h-16 px-2 flex items-start justify-end pt-1">
-                      <span className="text-xs text-warm-400">
+                      <span className="text-xs text-neutral-400">
                         {hour === 12 ? '12 PM' : hour > 12 ? `${hour - 12} PM` : `${hour} AM`}
                       </span>
                     </div>
@@ -1989,9 +1989,9 @@ export default function CalendarPage() {
                   const isTodayDate = isToday(date);
 
                   return (
-                    <div key={date.toISOString()} className={`relative border-r border-warm-200 ${isTodayDate ? 'bg-emerald-50/30' : ''}`}>
+                    <div key={date.toISOString()} className={`relative border-r border-neutral-200 ${isTodayDate ? 'bg-emerald-50/30' : ''}`}>
                       {timeSlots.map((hour) => (
-                        <div key={hour} className="h-16 border-b border-warm-100" />
+                        <div key={hour} className="h-16 border-b border-neutral-100" />
                       ))}
 
                       {isTodayDate && <NowIndicator />}
@@ -2036,7 +2036,7 @@ export default function CalendarPage() {
                   <div className="flex items-center gap-3 mb-3">
                     <div
                       className={`relative w-12 h-12 rounded-xl flex flex-col items-center justify-center ${
-                        isToday(date) ? 'bg-emerald-600 text-white' : 'bg-warm-100 text-warm-700'
+                        isToday(date) ? 'bg-emerald-600 text-white' : 'bg-neutral-100 text-neutral-700'
                       } ${attention ? 'ring-2 ring-red-400' : ''}`}
                     >
                       <span className="text-xs uppercase">{date.toLocaleDateString('en-US', { weekday: 'short' })}</span>
@@ -2046,10 +2046,10 @@ export default function CalendarPage() {
                       )}
                     </div>
                     <div>
-                      <p className={`font-medium ${isToday(date) ? 'text-emerald-600' : 'text-warm-900'}`}>
+                      <p className={`font-medium ${isToday(date) ? 'text-emerald-600' : 'text-neutral-900'}`}>
                         {isToday(date) ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'long' })}
                       </p>
-                      <p className="text-sm text-warm-500">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
+                      <p className="text-sm text-neutral-500">{date.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })}</p>
                     </div>
                   </div>
 
@@ -2078,12 +2078,12 @@ export default function CalendarPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="font-medium text-warm-900 truncate">{event.title}</p>
+                              <p className="font-medium text-neutral-900 truncate">{event.title}</p>
                               {event.createdByRole === 'MANAGER' && (
                                 <ManagerBadge name={event.createdByName || MANAGER_NAME} small />
                               )}
                             </div>
-                            <div className="flex items-center gap-3 mt-1 text-sm text-warm-500">
+                            <div className="flex items-center gap-3 mt-1 text-sm text-neutral-500">
                               {event.startTime && (
                                 <span className="flex items-center gap-1">
                                   <Clock className="w-3.5 h-3.5" />
@@ -2100,7 +2100,7 @@ export default function CalendarPage() {
                               )}
                             </div>
                           </div>
-                          {event.isRecurring && <Repeat className="w-4 h-4 text-warm-400 flex-shrink-0" />}
+                          {event.isRecurring && <Repeat className="w-4 h-4 text-neutral-400 flex-shrink-0" />}
                           {needsAttention && (
                             <div className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-600 rounded-full text-xs font-medium">
                               <AlertTriangle className="w-3 h-3" />
@@ -2119,31 +2119,31 @@ export default function CalendarPage() {
       </div>
 
       {/* Legend - Desktop Only */}
-      <div className="hidden md:flex flex-wrap items-center gap-4 px-4 py-3 bg-white rounded-xl border border-warm-200">
-        <span className="text-sm font-medium text-warm-700">Legend:</span>
+      <div className="hidden md:flex flex-wrap items-center gap-4 px-4 py-3 bg-white rounded-xl border border-neutral-200">
+        <span className="text-sm font-medium text-neutral-700">Legend:</span>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 border-l-2 border-emerald-500 bg-emerald-50 rounded" />
-          <span className="text-sm text-warm-600">House/Service</span>
+          <span className="text-sm text-neutral-600">House/Service</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-blue-50 border-l-2 border-blue-500 rounded" />
-          <span className="text-sm text-warm-600">Family/Kids</span>
+          <span className="text-sm text-neutral-600">Family/Kids</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-pink-50 border-l-2 border-pink-500 rounded" />
-          <span className="text-sm text-warm-600">Social</span>
+          <span className="text-sm text-neutral-600">Social</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-purple-50 border-l-2 border-purple-500 rounded" />
-          <span className="text-sm text-warm-600">Travel</span>
+          <span className="text-sm text-neutral-600">Travel</span>
         </div>
         <div className="flex items-center gap-2">
           <UserCheck className="w-4 h-4 text-amber-500" />
-          <span className="text-sm text-warm-600">Added by {MANAGER_NAME}</span>
+          <span className="text-sm text-neutral-600">Added by {MANAGER_NAME}</span>
         </div>
         <div className="flex items-center gap-2">
           <div className="w-4 h-4 bg-red-50 ring-2 ring-red-400 rounded" />
-          <span className="text-sm text-warm-600">Needs Attention</span>
+          <span className="text-sm text-neutral-600">Needs Attention</span>
         </div>
       </div>
 
@@ -2160,7 +2160,7 @@ export default function CalendarPage() {
 
       {/* Toast */}
       {showToast && (
-        <div className="fixed bottom-20 left-1/2 -tranwarm-x-1/2 z-50 px-4 py-2 bg-warm-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 bg-neutral-900 text-white rounded-lg shadow-lg text-sm animate-fade-in">
           {showToast}
         </div>
       )}

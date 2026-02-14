@@ -154,7 +154,7 @@ export default function CaseDetailScreen() {
     return (
       <ScreenContainer title="Case Details" showBack>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.sage[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </ScreenContainer>
     );
@@ -178,7 +178,7 @@ export default function CaseDetailScreen() {
         {/* Email Info Card */}
         <View style={styles.emailCard}>
           <View style={styles.emailHeader}>
-            <Ionicons name="mail" size={20} color={colors.haven.sage[500]} />
+            <Ionicons name="mail" size={20} color={colors.haven.purple[500]} />
             <Text style={styles.emailSubject} numberOfLines={2}>
               {emailCase.subject}
             </Text>
@@ -238,7 +238,7 @@ export default function CaseDetailScreen() {
                     <Ionicons
                       name={getActionIcon(action.type)}
                       size={20}
-                      color={isSelected ? colors.white : colors.haven.navy[700]}
+                      color={isSelected ? colors.white : colors.haven.purple[700]}
                     />
                     <Text
                       style={[
@@ -263,7 +263,7 @@ export default function CaseDetailScreen() {
                 <TextInput
                   style={styles.customInput}
                   placeholder="e.g., Create a reminder for next week"
-                  placeholderTextColor={colors.haven.navy[400]}
+                  placeholderTextColor={colors.haven.purple[400]}
                   value={customRequest}
                   onChangeText={setCustomRequest}
                   multiline
@@ -341,7 +341,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   errorText: {
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     fontSize: typography.fontSizes.base,
   },
   emailCard: {
@@ -362,16 +362,16 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold as '600',
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   emailFrom: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     marginBottom: spacing[1],
   },
   emailDate: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
   },
   alfredSection: {
     paddingHorizontal: spacing[4],
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.sage[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -399,17 +399,17 @@ const styles = StyleSheet.create({
   alfredName: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold as '600',
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   alfredBubble: {
-    backgroundColor: colors.haven.sage[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     borderTopLeftRadius: 4,
   },
   alfredMessage: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[800],
+    color: colors.haven.purple[800],
     lineHeight: 24,
   },
   actionsSection: {
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
   },
   actionsLabel: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginBottom: spacing[3],
     textAlign: 'center',
   },
@@ -435,8 +435,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   actionButtonSelected: {
-    backgroundColor: colors.haven.navy[900],
-    borderColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
+    borderColor: colors.haven.purple[900],
   },
   actionButtonCustom: {
     borderStyle: 'dashed' as const,
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium as '500',
-    color: colors.haven.navy[800],
+    color: colors.haven.purple[800],
   },
   actionButtonTextSelected: {
     color: colors.white,
@@ -455,17 +455,17 @@ const styles = StyleSheet.create({
   },
   customInputLabel: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     marginBottom: spacing[2],
   },
   customInput: {
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
     borderRadius: borderRadius.lg,
     padding: spacing[3],
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     minHeight: 80,
     textAlignVertical: 'top',
   },
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: spacing[2],
-    backgroundColor: colors.haven.sage[500],
+    backgroundColor: colors.haven.purple[500],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginTop: spacing[4],
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
   completedSection: {
     margin: spacing[4],
     padding: spacing[4],
-    backgroundColor: colors.haven.sage[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
   },
   completedHeader: {
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
   },
   completedNotes: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     marginBottom: spacing[3],
     lineHeight: 22,
   },
@@ -520,7 +520,7 @@ const styles = StyleSheet.create({
   },
   completedActionText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     textTransform: 'capitalize',
   },
 });

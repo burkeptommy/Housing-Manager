@@ -301,7 +301,7 @@ export default function MessageDetailScreen() {
 
         <View style={styles.inputContainer}>
           <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-            <Ionicons name="camera" size={24} color={colors.haven.navy[600]} />
+            <Ionicons name="camera" size={24} color={colors.haven.purple[600]} />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -387,7 +387,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[2],
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: spacing[1],
   },
   userBubble: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderBottomRightRadius: spacing[1],
   },
   messageText: {
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   userTime: {
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
   },
   messageImage: {
     width: 200,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: spacing[2],

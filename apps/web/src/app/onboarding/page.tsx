@@ -27,7 +27,7 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">
-        <Loader2 className="w-10 h-10 text-haven-champagne-500 animate-spin mx-auto mb-4" />
+        <Loader2 className="w-10 h-10 text-haven-500 animate-spin mx-auto mb-4" />
         <p className="text-gray-500">Loading...</p>
       </div>
     </div>

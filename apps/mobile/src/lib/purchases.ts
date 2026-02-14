@@ -60,7 +60,7 @@ export const TIER_INFO = {
       'Document storage',
       'Maintenance calendar',
     ],
-    color: '#627d98',
+    color: '#7C4DFF',
   },
   lite: {
     name: 'Lite',
@@ -74,7 +74,7 @@ export const TIER_INFO = {
       'Vendor coordination',
     ],
     recommended: false,
-    color: '#c4a574',
+    color: '#6200EA',
   },
   haven: {
     name: 'Haven',
@@ -88,7 +88,7 @@ export const TIER_INFO = {
       'Seasonal maintenance',
     ],
     recommended: true,
-    color: '#c4a574',
+    color: '#6200EA',
   },
   haven_plus: {
     name: 'Haven+',
@@ -101,7 +101,7 @@ export const TIER_INFO = {
       'Errand running',
       'Lifestyle concierge',
     ],
-    color: '#102a43',
+    color: '#2D006B',
   },
   estate: {
     name: 'Estate',
@@ -114,7 +114,7 @@ export const TIER_INFO = {
       'Dedicated manager',
       'White-glove service',
     ],
-    color: '#102a43',
+    color: '#2D006B',
   },
 } as const;
 

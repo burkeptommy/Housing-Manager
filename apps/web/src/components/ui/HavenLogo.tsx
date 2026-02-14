@@ -2,7 +2,7 @@
 
 interface HavenLogoProps {
   variant?: 'icon' | 'wordmark';
-  color?: 'white' | 'navy';
+  color?: 'white' | 'purple';
   size?: 'sm' | 'md' | 'lg';
   className?: string;
 }
@@ -15,7 +15,7 @@ const sizeClasses = {
 
 export function HavenLogo({
   variant = 'icon',
-  color = 'navy',
+  color = 'purple',
   size = 'md',
   className = ''
 }: HavenLogoProps) {
@@ -32,7 +32,7 @@ export function HavenLogo({
     );
   }
 
-  const src = color === 'white' ? '/icon-white.svg' : '/icon-navy.svg';
+  const src = color === 'white' ? '/icon-white.svg' : '/icon-purple.svg';
   return (
     <img
       src={src}
@@ -44,15 +44,15 @@ export function HavenLogo({
 
 // Simple icon component for places that need just the icon in a container
 export function HavenIcon({
-  color = 'navy',
+  color = 'purple',
   size = 32,
   className = ''
 }: {
-  color?: 'white' | 'navy';
+  color?: 'white' | 'purple';
   size?: number;
   className?: string;
 }) {
-  const src = color === 'white' ? '/icon-white.svg' : '/icon-navy.svg';
+  const src = color === 'white' ? '/icon-white.svg' : '/icon-purple.svg';
   return (
     <img
       src={src}

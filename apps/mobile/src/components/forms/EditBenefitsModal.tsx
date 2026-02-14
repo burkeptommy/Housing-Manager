@@ -96,8 +96,8 @@ export function EditBenefitsModal({ visible, onClose, onSave, initialData }: Pro
               <Switch
                 value={hasHealthInsurance}
                 onValueChange={setHasHealthInsurance}
-                trackColor={{ false: colors.gray[300], true: colors.haven.champagne[300] }}
-                thumbColor={hasHealthInsurance ? colors.haven.champagne[500] : colors.gray[100]}
+                trackColor={{ false: colors.gray[300], true: colors.haven.purple[300] }}
+                thumbColor={hasHealthInsurance ? colors.haven.purple[500] : colors.gray[100]}
               />
             </View>
 
@@ -109,8 +109,8 @@ export function EditBenefitsModal({ visible, onClose, onSave, initialData }: Pro
               <Switch
                 value={hasDentalInsurance}
                 onValueChange={setHasDentalInsurance}
-                trackColor={{ false: colors.gray[300], true: colors.haven.champagne[300] }}
-                thumbColor={hasDentalInsurance ? colors.haven.champagne[500] : colors.gray[100]}
+                trackColor={{ false: colors.gray[300], true: colors.haven.purple[300] }}
+                thumbColor={hasDentalInsurance ? colors.haven.purple[500] : colors.gray[100]}
               />
             </View>
 
@@ -141,8 +141,8 @@ export function EditBenefitsModal({ visible, onClose, onSave, initialData }: Pro
               <Switch
                 value={hasHolidayPay}
                 onValueChange={setHasHolidayPay}
-                trackColor={{ false: colors.gray[300], true: colors.haven.champagne[300] }}
-                thumbColor={hasHolidayPay ? colors.haven.champagne[500] : colors.gray[100]}
+                trackColor={{ false: colors.gray[300], true: colors.haven.purple[300] }}
+                thumbColor={hasHolidayPay ? colors.haven.purple[500] : colors.gray[100]}
               />
             </View>
           </ScrollView>

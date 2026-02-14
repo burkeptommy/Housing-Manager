@@ -342,7 +342,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,

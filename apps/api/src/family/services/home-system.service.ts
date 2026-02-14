@@ -18,12 +18,11 @@ export class HomeSystemService {
         householdId,
         ...dto,
         purchasePrice: dto.purchasePrice ? new Prisma.Decimal(dto.purchasePrice) : undefined,
-        monthlyServiceCost: dto.monthlyServiceCost ? new Prisma.Decimal(dto.monthlyServiceCost) : undefined,
-        tankCapacityGallons: dto.tankCapacityGallons ? new Prisma.Decimal(dto.tankCapacityGallons) : undefined,
-        currentTankLevel: dto.currentTankLevel ? new Prisma.Decimal(dto.currentTankLevel) : undefined,
+        tankCapacity: dto.tankCapacity ? new Prisma.Decimal(dto.tankCapacity) : undefined,
+        estimatedRemaining: dto.estimatedRemaining ? new Prisma.Decimal(dto.estimatedRemaining) : undefined,
       },
       include: {
-        preferredVendor: {
+        serviceVendor: {
           select: { id: true, displayName: true, phone: true },
         },
       },
@@ -44,12 +43,12 @@ export class HomeSystemService {
           orderBy: { serviceDate: 'desc' },
           take: 3,
         },
-        preferredVendor: {
+        serviceVendor: {
           select: { id: true, displayName: true, phone: true },
         },
       },
       orderBy: [
-        { systemType: 'asc' },
+        { type: 'asc' },
         { name: 'asc' },
       ],
     });
@@ -62,7 +61,7 @@ export class HomeSystemService {
     return this.prisma.homeSystem.findMany({
       where: {
         householdId,
-        systemType,
+        type: systemType,
         isActive: true,
       },
       include: {
@@ -70,7 +69,7 @@ export class HomeSystemService {
           orderBy: { serviceDate: 'desc' },
           take: 5,
         },
-        preferredVendor: {
+        serviceVendor: {
           select: { id: true, displayName: true, phone: true },
         },
       },
@@ -92,10 +91,10 @@ export class HomeSystemService {
             },
           },
         },
-        preferredVendor: true,
-        workOrders: {
+        serviceVendor: true,
+        maintenanceTasks: {
           where: {
-            status: { in: ['OPEN', 'SCHEDULED', 'IN_PROGRESS'] },
+            status: { in: ['PENDING', 'SCHEDULED', 'IN_PROGRESS'] },
           },
           orderBy: { createdAt: 'desc' },
           take: 5,
@@ -125,12 +124,11 @@ export class HomeSystemService {
       data: {
         ...dto,
         purchasePrice: dto.purchasePrice ? new Prisma.Decimal(dto.purchasePrice) : undefined,
-        monthlyServiceCost: dto.monthlyServiceCost ? new Prisma.Decimal(dto.monthlyServiceCost) : undefined,
-        tankCapacityGallons: dto.tankCapacityGallons ? new Prisma.Decimal(dto.tankCapacityGallons) : undefined,
-        currentTankLevel: dto.currentTankLevel ? new Prisma.Decimal(dto.currentTankLevel) : undefined,
+        tankCapacity: dto.tankCapacity ? new Prisma.Decimal(dto.tankCapacity) : undefined,
+        estimatedRemaining: dto.estimatedRemaining ? new Prisma.Decimal(dto.estimatedRemaining) : undefined,
       },
       include: {
-        preferredVendor: {
+        serviceVendor: {
           select: { id: true, displayName: true, phone: true },
         },
       },
@@ -158,9 +156,20 @@ export class HomeSystemService {
     const record = await this.prisma.homeSystemService.create({
       data: {
         homeSystemId: systemId,
-        ...dto,
-        cost: dto.cost ? new Prisma.Decimal(dto.cost) : undefined,
-        partsReplaced: dto.partsReplaced as Prisma.InputJsonValue,
+        serviceDate: dto.serviceDate,
+        serviceType: dto.serviceType,
+        description: dto.description,
+        technicianName: dto.technicianName,
+        partsReplaced: dto.partsReplaced || [],
+        laborCost: dto.laborCost ? new Prisma.Decimal(dto.laborCost) : undefined,
+        partsCost: dto.partsCost ? new Prisma.Decimal(dto.partsCost) : undefined,
+        totalCost: dto.totalCost ? new Prisma.Decimal(dto.totalCost) : undefined,
+        vendorId: dto.vendorId,
+        vendorName: dto.vendorName,
+        invoiceUrl: dto.invoiceUrl,
+        receiptUrl: dto.receiptUrl,
+        nextServiceDate: dto.nextServiceDate,
+        recommendations: dto.recommendations,
       },
     });
 
@@ -170,13 +179,12 @@ export class HomeSystemService {
     };
 
     if (dto.nextServiceDate) {
-      updateData.nextServiceDue = dto.nextServiceDate;
+      updateData.nextMaintenanceDate = dto.nextServiceDate;
     }
 
-    // If filter was replaced, update filter date
-    if (dto.filterReplaced) {
+    // If service type indicates filter change, update filter date
+    if (dto.serviceType?.toLowerCase().includes('filter')) {
       updateData.lastFilterChange = dto.serviceDate;
-      updateData.nextFilterChange = dto.nextServiceDate;
     }
 
     await this.prisma.homeSystem.update({
@@ -213,8 +221,8 @@ export class HomeSystemService {
     return this.prisma.homeSystem.update({
       where: { id },
       data: {
-        currentTankLevel: new Prisma.Decimal(level),
-        lastTankReading: new Date(),
+        estimatedRemaining: new Prisma.Decimal(level),
+        lastFillDate: new Date(),
       },
     });
   }
@@ -233,68 +241,67 @@ export class HomeSystemService {
           orderBy: { serviceDate: 'desc' },
           take: 1,
         },
-        preferredVendor: {
+        serviceVendor: {
           select: { id: true, displayName: true, phone: true },
         },
       },
-      orderBy: { systemType: 'asc' },
+      orderBy: { type: 'asc' },
     });
 
     // Group by category
     const hvac = systems.filter(s =>
-      ['FURNACE', 'AIR_CONDITIONER', 'HEAT_PUMP', 'BOILER', 'THERMOSTAT'].includes(s.systemType)
+      ['FURNACE', 'AIR_CONDITIONER', 'HEAT_PUMP', 'BOILER', 'THERMOSTAT'].includes(s.type)
     );
     const water = systems.filter(s =>
-      ['WATER_HEATER', 'WATER_SOFTENER', 'WELL_PUMP', 'SUMP_PUMP'].includes(s.systemType)
+      ['WATER_HEATER', 'WATER_SOFTENER', 'WELL_PUMP', 'SUMP_PUMP'].includes(s.type)
     );
     const electrical = systems.filter(s =>
-      ['ELECTRICAL_PANEL', 'GENERATOR', 'SOLAR_PANELS', 'BATTERY_STORAGE'].includes(s.systemType)
+      ['ELECTRICAL_PANEL', 'GENERATOR', 'SOLAR_PANELS', 'BATTERY_STORAGE'].includes(s.type)
     );
     const kitchen = systems.filter(s =>
-      ['REFRIGERATOR', 'DISHWASHER', 'OVEN_RANGE', 'MICROWAVE', 'GARBAGE_DISPOSAL'].includes(s.systemType)
+      ['REFRIGERATOR', 'DISHWASHER', 'OVEN_RANGE', 'MICROWAVE', 'GARBAGE_DISPOSAL'].includes(s.type)
     );
     const laundry = systems.filter(s =>
-      ['WASHER', 'DRYER'].includes(s.systemType)
+      ['WASHER', 'DRYER'].includes(s.type)
     );
     const outdoor = systems.filter(s =>
-      ['IRRIGATION_SYSTEM', 'POOL_EQUIPMENT', 'HOT_TUB', 'LAWN_MOWER'].includes(s.systemType)
+      ['IRRIGATION_SYSTEM', 'POOL_EQUIPMENT', 'HOT_TUB', 'LAWN_MOWER'].includes(s.type)
     );
     const safety = systems.filter(s =>
-      ['SMOKE_DETECTOR', 'CO_DETECTOR', 'SECURITY_SYSTEM', 'FIRE_EXTINGUISHER'].includes(s.systemType)
+      ['SMOKE_DETECTOR', 'CO_DETECTOR', 'SECURITY_SYSTEM', 'FIRE_EXTINGUISHER'].includes(s.type)
     );
     const other = systems.filter(s =>
-      ['GARAGE_DOOR_OPENER', 'CEILING_FAN', 'FIREPLACE', 'OTHER'].includes(s.systemType)
+      ['GARAGE_DOOR_OPENER', 'CEILING_FAN', 'FIREPLACE', 'OTHER'].includes(s.type)
     );
 
     // Format system info for display
     const formatSystem = (system: typeof systems[0]) => ({
       id: system.id,
-      type: system.systemType,
+      type: system.type,
       name: system.name,
       brand: system.brand,
       model: system.model,
       serialNumber: system.serialNumber,
-      installDate: system.installDate,
+      installDate: system.installedDate,
       warrantyExpires: system.warrantyExpires,
       lastServiceDate: system.lastServiceDate,
-      nextServiceDue: system.nextServiceDue,
+      nextServiceDue: system.nextMaintenanceDate,
       condition: system.condition,
       location: system.location,
       notes: system.notes,
       // Utility info
-      utilityProvider: system.utilityProvider,
-      accountNumber: system.accountNumber,
-      monthlyServiceCost: system.monthlyServiceCost,
+      utilityProvider: system.serviceProvider,
+      accountNumber: system.serviceAccountNumber,
       // Tank info (for propane, oil, etc.)
-      tankCapacity: system.tankCapacityGallons,
-      currentTankLevel: system.currentTankLevel,
-      lastTankReading: system.lastTankReading,
+      tankCapacity: system.tankCapacity,
+      currentTankLevel: system.estimatedRemaining,
+      lastFillDate: system.lastFillDate,
       // Filter info
       filterSize: system.filterSize,
       lastFilterChange: system.lastFilterChange,
-      nextFilterChange: system.nextFilterChange,
+      filterChangeIntervalMonths: system.filterChangeIntervalMonths,
       // Vendor
-      preferredVendor: system.preferredVendor,
+      serviceVendor: (system as any).serviceVendor,
       // Last service
       lastService: system.serviceHistory[0] ? {
         date: system.serviceHistory[0].serviceDate,
@@ -339,7 +346,7 @@ export class HomeSystemService {
     const now = new Date();
 
     for (const system of systems) {
-      const systemName = system.name || system.systemType;
+      const systemName = system.name || system.type;
 
       // Check warranty expiration
       if (system.warrantyExpires) {
@@ -348,7 +355,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'WARRANTY',
             message: `Warranty expired`,
             severity: 'low',
@@ -357,7 +364,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'WARRANTY',
             message: `Warranty expires in ${Math.ceil(daysUntilExpiry)} days`,
             severity: 'low',
@@ -366,13 +373,13 @@ export class HomeSystemService {
       }
 
       // Check service due
-      if (system.nextServiceDue) {
-        const daysUntilService = (system.nextServiceDue.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      if (system.nextMaintenanceDate) {
+        const daysUntilService = (system.nextMaintenanceDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
         if (daysUntilService <= 0) {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'SERVICE',
             message: `Service overdue`,
             severity: 'high',
@@ -381,7 +388,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'SERVICE',
             message: `Service due in ${Math.ceil(daysUntilService)} days`,
             severity: 'medium',
@@ -389,14 +396,17 @@ export class HomeSystemService {
         }
       }
 
-      // Check filter change
-      if (system.nextFilterChange) {
-        const daysUntilFilter = (system.nextFilterChange.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      // Check filter change (compute next filter date from last change + interval)
+      const nextFilterDate = system.lastFilterChange && system.filterChangeIntervalMonths
+        ? new Date(new Date(system.lastFilterChange).setMonth(system.lastFilterChange.getMonth() + system.filterChangeIntervalMonths))
+        : null;
+      if (nextFilterDate) {
+        const daysUntilFilter = (nextFilterDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
         if (daysUntilFilter <= 0) {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'FILTER',
             message: `Filter change overdue`,
             severity: 'medium',
@@ -405,7 +415,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'FILTER',
             message: `Filter change due in ${Math.ceil(daysUntilFilter)} days`,
             severity: 'low',
@@ -414,13 +424,13 @@ export class HomeSystemService {
       }
 
       // Check tank level
-      if (system.tankCapacityGallons && system.currentTankLevel) {
-        const levelPercent = Number(system.currentTankLevel) / Number(system.tankCapacityGallons) * 100;
+      if (system.tankCapacity && system.estimatedRemaining) {
+        const levelPercent = Number(system.estimatedRemaining) / Number(system.tankCapacity) * 100;
         if (levelPercent <= 10) {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'TANK_LEVEL',
             message: `Tank critically low (${Math.round(levelPercent)}%)`,
             severity: 'high',
@@ -429,7 +439,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'TANK_LEVEL',
             message: `Tank level low (${Math.round(levelPercent)}%)`,
             severity: 'medium',
@@ -442,7 +452,7 @@ export class HomeSystemService {
         alerts.push({
           systemId: system.id,
           systemName,
-          systemType: system.systemType,
+          systemType: system.type,
           type: 'CONDITION',
           message: `Needs repair`,
           severity: 'high',
@@ -450,14 +460,14 @@ export class HomeSystemService {
       }
 
       // Check safety equipment (smoke/CO detectors) - recommend annual check
-      if (['SMOKE_DETECTOR', 'CO_DETECTOR', 'FIRE_EXTINGUISHER'].includes(system.systemType)) {
+      if (['SMOKE_DETECTOR', 'CO_DETECTOR', 'FIRE_EXTINGUISHER'].includes(system.type)) {
         if (system.lastServiceDate) {
           const daysSinceService = (now.getTime() - system.lastServiceDate.getTime()) / (1000 * 60 * 60 * 24);
           if (daysSinceService > 365) {
             alerts.push({
               systemId: system.id,
               systemName,
-              systemType: system.systemType,
+              systemType: system.type,
               type: 'SAFETY_CHECK',
               message: `Annual safety check overdue`,
               severity: 'high',
@@ -467,7 +477,7 @@ export class HomeSystemService {
           alerts.push({
             systemId: system.id,
             systemName,
-            systemType: system.systemType,
+            systemType: system.type,
             type: 'SAFETY_CHECK',
             message: `No service record - schedule safety check`,
             severity: 'medium',

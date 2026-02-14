@@ -189,7 +189,7 @@ function AreaFilter({ areas, selected, onSelect }: { areas: string[]; selected: 
         className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
           selected === 'all'
             ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
-            : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+            : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
         }`}
       >
         All Areas
@@ -201,7 +201,7 @@ function AreaFilter({ areas, selected, onSelect }: { areas: string[]; selected: 
           className={`px-4 py-2 rounded-xl text-sm font-semibold transition-all ${
             selected === area
               ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20'
-              : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+              : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           {area}
@@ -224,7 +224,7 @@ function JobCard({ job, onClaim, isClaiming }: { job: VendorJobBoardItem; onClai
             <div>
               <Link
                 href={`/vendor/jobs/${job.id}`}
-                className="text-lg font-bold text-warm-900 hover:text-orange-600 transition-colors"
+                className="text-lg font-bold text-neutral-900 hover:text-orange-600 transition-colors"
               >
                 {job.title}
               </Link>
@@ -238,18 +238,18 @@ function JobCard({ job, onClaim, isClaiming }: { job: VendorJobBoardItem; onClai
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xl font-bold text-warm-900">
+              <p className="text-xl font-bold text-neutral-900">
                 {formatCurrency(job.estimatedCost)}
               </p>
-              <p className="text-xs text-warm-500">Estimated</p>
+              <p className="text-xs text-neutral-500">Estimated</p>
             </div>
           </div>
 
-          <p className="text-warm-600 text-sm mb-4 line-clamp-2">
+          <p className="text-neutral-600 text-sm mb-4 line-clamp-2">
             {job.description}
           </p>
 
-          <div className="flex items-center gap-4 text-sm text-warm-500">
+          <div className="flex items-center gap-4 text-sm text-neutral-500">
             <span className="flex items-center gap-1.5">
               <Home className="w-4 h-4" />
               {job.household.name}
@@ -289,11 +289,11 @@ function JobCard({ job, onClaim, isClaiming }: { job: VendorJobBoardItem; onClai
 function EmptyJobs() {
   return (
     <Card className="text-center py-12">
-      <div className="w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mx-auto mb-4">
-        <ClipboardList className="w-8 h-8 text-warm-400" />
+      <div className="w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+        <ClipboardList className="w-8 h-8 text-neutral-400" />
       </div>
-      <h3 className="text-lg font-bold text-warm-900 mb-2">No open jobs</h3>
-      <p className="text-warm-600">
+      <h3 className="text-lg font-bold text-neutral-900 mb-2">No open jobs</h3>
+      <p className="text-neutral-600">
         Check back later for new job opportunities in your area.
       </p>
     </Card>
@@ -348,7 +348,7 @@ export default function JobBoardPage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-orange-600" />
-          <p className="text-warm-500">Loading job board...</p>
+          <p className="text-neutral-500">Loading job board...</p>
         </div>
       </div>
     );
@@ -371,8 +371,8 @@ export default function JobBoardPage() {
       {/* Job List */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-warm-900">Available Jobs</h2>
-          <span className="text-sm text-warm-500">{filteredJobs.length} jobs</span>
+          <h2 className="text-lg font-bold text-neutral-900">Available Jobs</h2>
+          <span className="text-sm text-neutral-500">{filteredJobs.length} jobs</span>
         </div>
 
         {filteredJobs.length === 0 ? (

@@ -53,7 +53,7 @@ export function AlfredSuggestions({ onSelect }: AlfredSuggestionsProps) {
             <Ionicons
               name={suggestion.icon}
               size={16}
-              color={colors.haven.champagne[600]}
+              color={colors.haven.purple[600]}
               style={styles.icon}
             />
             <Text style={styles.text} numberOfLines={1}>
@@ -90,17 +90,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   icon: {
     marginRight: spacing[2],
   },
   text: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
     maxWidth: 180,
   },

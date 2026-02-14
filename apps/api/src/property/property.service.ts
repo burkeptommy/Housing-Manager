@@ -70,16 +70,16 @@ export interface PropertyLookupResult {
 @Injectable()
 export class PropertyService {
   private readonly logger = new Logger(PropertyService.name);
-  private readonly attomApiKey: string;
-  private readonly baseUrl = 'https://api.gateway.attomdata.com/propertyapi/v1.0.0';
+  private readonly batchDataApiKey: string;
+  private readonly baseUrl = 'https://api.batchdata.com/api/v1';
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.attomApiKey = this.configService.get<string>('ATTOM_API_KEY') || '';
-    if (!this.attomApiKey) {
-      this.logger.warn('ATTOM_API_KEY not configured - property lookup disabled');
+    this.batchDataApiKey = this.configService.get<string>('BATCHDATA_API_KEY') || '';
+    if (!this.batchDataApiKey) {
+      this.logger.warn('BATCHDATA_API_KEY not configured - property lookup disabled');
     }
   }
 
@@ -89,24 +89,31 @@ export class PropertyService {
     state: string,
     zip: string,
   ): Promise<PropertyLookupResult> {
-    if (!this.attomApiKey) {
+    if (!this.batchDataApiKey) {
       return { success: false, data: null, error: 'Property lookup not configured' };
     }
 
     try {
-      // Format address for ATTOM API
-      const address1 = encodeURIComponent(street);
-      const address2 = encodeURIComponent(`${city}, ${state} ${zip}`);
-
-      const url = `${this.baseUrl}/property/expandedprofile?address1=${address1}&address2=${address2}`;
+      const url = `${this.baseUrl}/property/lookup/all-attributes`;
 
       this.logger.log(`Looking up property: ${street}, ${city}, ${state} ${zip}`);
 
       const response = await firstValueFrom(
-        this.httpService.get(url, {
+        this.httpService.post(url, {
+          requests: [
+            {
+              address: {
+                street,
+                city,
+                state,
+                zip,
+              },
+            },
+          ],
+        }, {
           headers: {
-            'Accept': 'application/json',
-            'APIKey': this.attomApiKey,
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.batchDataApiKey}`,
           },
           timeout: 15000,
         })
@@ -114,34 +121,37 @@ export class PropertyService {
 
       const data = response.data;
 
-      // Check for ATTOM status
-      if (!data || data.status?.code !== 0) {
-        const errorMsg = data?.status?.msg || 'Property not found';
-        this.logger.warn(`ATTOM API returned: ${errorMsg}`);
+      // Log full raw response at debug level for field discovery
+      this.logger.debug('BatchData raw response:', JSON.stringify(data));
+
+      // Check BatchData response status
+      if (!data || data.status?.code !== 200) {
+        const errorMsg = data?.status?.message || 'Property not found';
+        this.logger.warn(`BatchData API returned: ${errorMsg}`);
         return { success: false, data: null, error: errorMsg };
       }
 
       // Extract property from response
-      const property = data.property?.[0];
+      const property = data.results?.properties?.[0];
       if (!property) {
         return { success: false, data: null, error: 'No property data returned' };
       }
 
-      // Parse the ATTOM response into our format
-      const propertyDetails = this.parseAttomProperty(property);
+      // Parse the BatchData response into our format
+      const propertyDetails = this.parseBatchDataProperty(property);
 
       this.logger.log(`Property found: ${propertyDetails.bedrooms} bed, ${propertyDetails.bathrooms} bath, ${propertyDetails.squareFeet} sqft`);
 
       return { success: true, data: propertyDetails };
     } catch (error: any) {
-      this.logger.error('ATTOM property lookup failed:', error.message);
+      this.logger.error('BatchData property lookup failed:', error.message);
 
-      // Check for specific ATTOM error responses
+      // Check for specific BatchData error responses
       if (error.response?.data?.status) {
         return {
           success: false,
           data: null,
-          error: error.response.data.status.msg || 'ATTOM API error'
+          error: error.response.data.status.message || 'BatchData API error'
         };
       }
 
@@ -153,21 +163,15 @@ export class PropertyService {
     }
   }
 
-  private parseAttomProperty(property: any): PropertyDetails {
+  private parseBatchDataProperty(property: any): PropertyDetails {
     const building = property.building || {};
     const lot = property.lot || {};
     const utilities = property.utilities || {};
-    const summary = property.summary || {};
-    const rooms = building.rooms || {};
-    const interior = building.interior || {};
-    const construction = building.construction || {};
-    const parking = building.parking || {};
+    const general = property.general || {};
     const assessment = property.assessment || {};
-    const sale = property.sale || {};
-    const location = property.location || {};
     const address = property.address || {};
-    const buildingSize = building.size || {};
-    const buildingSummary = building.summary || {};
+    const deedHistory: any[] = property.deedHistory || [];
+    const tax = property.tax || {};
 
     const parsedInt = (val: any): number | null => {
       if (val === undefined || val === null || val === '') return null;
@@ -181,62 +185,85 @@ export class PropertyService {
       return isNaN(num) ? null : num;
     };
 
+    // Find last sale with a non-zero price from deed history
+    const lastSale = [...deedHistory]
+      .reverse()
+      .find((d: any) => d.salePrice && Number(d.salePrice) > 0);
+
+    const lotSizeSqFt = parsedInt(lot.lotSizeSquareFeet);
+    const lotAcres = parsedFloat(lot.lotSizeAcres) ??
+      (lotSizeSqFt ? Math.round((lotSizeSqFt / 43560) * 100) / 100 : null);
+
+    const fullBaths = parsedInt(building.fullBathroomCount);
+    const calculatedBaths = parsedFloat(building.calculatedBathroomCount) ?? parsedFloat(building.bathroomCount);
+    const halfBaths = (calculatedBaths !== null && fullBaths !== null)
+      ? Math.round(calculatedBaths - fullBaths)
+      : null;
+
+    const poolVal = building.pool || '';
+    const hasPool = poolVal && typeof poolVal === 'string'
+      ? poolVal.toLowerCase().includes('pool') && !poolVal.toLowerCase().includes('no pool')
+      : null;
+
     return {
       // Basic Info
-      bedrooms: parsedInt(rooms.beds),
-      bathrooms: parsedFloat(rooms.bathsTotal),
-      bathsFull: parsedInt(rooms.bathsFull),
-      bathsHalf: parsedInt(rooms.bathsPartial),
-      squareFeet: parsedInt(buildingSize.livingSize) || parsedInt(buildingSize.universalSize),
-      lotSizeSquareFeet: parsedInt(lot.lotSize2),
-      lotSizeAcres: parsedFloat(lot.lotSize1),
-      yearBuilt: parsedInt(summary.yearBuilt),
+      bedrooms: parsedInt(building.bedroomCount) ??
+        (parsedInt(building.roomCount) !== null && parsedInt(building.bathroomCount) !== null
+          ? (parsedInt(building.roomCount)! - parsedInt(building.bathroomCount)!)
+          : null),
+      bathrooms: calculatedBaths ?? parsedFloat(building.bathroomCount),
+      bathsFull: fullBaths,
+      bathsHalf: halfBaths,
+      squareFeet: parsedInt(building.livingAreaSquareFeet) ?? parsedInt(building.totalBuildingAreaSquareFeet),
+      lotSizeSquareFeet: lotSizeSqFt,
+      lotSizeAcres: lotAcres,
+      yearBuilt: parsedInt(building.yearBuilt),
 
       // Property Type
-      propertyType: summary.propType || summary.propertyType || null,
-      propertySubType: summary.propSubType || null,
+      propertyType: general.propertyTypeCategory || null,
+      propertySubType: general.propertyTypeDetail || null,
 
       // Building Details
-      stories: parsedFloat(buildingSummary.levels),
-      constructionType: construction.condition || null,
-      foundationType: null, // Not in this response
-      roofType: null, // Not in this response
-      roofMaterial: null,
-      exteriorWalls: construction.wallType || null,
+      stories: parsedFloat(building.storyCount),
+      constructionType: building.constructionType || null,
+      foundationType: building.foundationType || null,
+      roofType: building.roofType || null,
+      roofMaterial: building.roofCover || null,
+      exteriorWalls: building.exteriorWalls || null,
 
       // Systems (HVAC)
-      heatingType: utilities.heatingType || null,
-      heatingFuel: utilities.heatingFuel || null,
-      coolingType: utilities.coolingType || null,
+      heatingType: building.heatSource || null,
+      heatingFuel: building.heatFuel || null,
+      coolingType: building.airConditioningSource || null,
 
       // Utilities
-      waterType: null,
-      sewerType: null,
+      waterType: building.waterSource || utilities.waterSource || null,
+      sewerType: building.sewerType || utilities.sewerType || null,
 
       // Features
-      fireplaces: parsedInt(interior.fplcCount),
-      garage: parking.garageType || null,
-      garageSpaces: parsedInt(parking.garageSize),
-      pool: lot.poolType ? !lot.poolType.toLowerCase().includes('no pool') : null,
-      poolType: lot.poolType || null,
+      fireplaces: parsedInt(building.fireplaceCount),
+      garage: building.garage || null,
+      garageSpaces: parsedInt(building.garageParkingSpaceCount),
+      pool: hasPool,
+      poolType: poolVal || null,
 
       // Additional Rooms
-      totalRooms: parsedInt(rooms.roomsTotal),
-      basementType: null,
+      totalRooms: parsedInt(building.roomCount),
+      basementType: building.basementType || null,
 
       // Valuation
-      assessedValue: parsedInt(assessment.assessed?.assdTtlValue),
-      marketValue: parsedInt(assessment.market?.mktTtlValue),
-      taxAmount: parsedInt(assessment.tax?.taxAmt),
+      assessedValue: parsedInt(assessment.totalAssessedValue),
+      marketValue: parsedInt(assessment.totalMarketValue),
+      taxAmount: parsedInt(tax.totalTaxAmount) ?? parsedInt(assessment.taxAmount),
 
       // Sale Info
-      lastSalePrice: parsedInt(sale.amount?.saleAmt),
-      lastSaleDate: sale.saleTransDate || null,
+      lastSalePrice: lastSale ? parsedInt(lastSale.salePrice) : null,
+      lastSaleDate: lastSale?.saleDate || null,
 
       // Location
-      verifiedAddress: address.oneLine || null,
-      latitude: parsedFloat(location.latitude),
-      longitude: parsedFloat(location.longitude),
+      verifiedAddress: address.street || null,
+      latitude: parsedFloat(address.latitude),
+      longitude: parsedFloat(address.longitude),
     };
   }
 }

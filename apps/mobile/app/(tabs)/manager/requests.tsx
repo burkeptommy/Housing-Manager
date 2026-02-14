@@ -197,7 +197,7 @@ export default function RequestsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>No requests</Text>
             <Text style={styles.emptyText}>
               {filter === 'active' ? 'No active requests' : 'No requests yet'}
@@ -226,7 +226,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   filterTabActive: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   filterText: {
     fontSize: typography.fontSizes.sm,

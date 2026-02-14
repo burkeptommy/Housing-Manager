@@ -277,9 +277,9 @@ export default function ApprovalsScreen() {
       case 'urgent':
         return colors.status.error;
       case 'high':
-        return colors.haven.champagne[600];
+        return colors.haven.purple[600];
       case 'normal':
-        return colors.haven.navy[600];
+        return colors.haven.purple[600];
       default:
         return colors.text.tertiary;
     }
@@ -429,7 +429,7 @@ export default function ApprovalsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="checkmark-circle" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="checkmark-circle" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>All caught up!</Text>
             <Text style={styles.emptyText}>
               {filter === 'pending' ? 'No pending approvals' : 'No approvals yet'}
@@ -476,7 +476,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   filterTabActive: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   filterText: {
     fontSize: typography.fontSizes.sm,
@@ -560,7 +560,7 @@ const styles = StyleSheet.create({
   },
   approvalVendor: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   approvalAmount: {

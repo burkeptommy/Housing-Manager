@@ -94,7 +94,7 @@ export function TierComparisonModal({ onClose }: TierComparisonModalProps) {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
           <div>
-            <h2 className="text-xl font-bold text-haven-navy-900">Compare plans</h2>
+            <h2 className="text-xl font-bold text-haven-900">Compare plans</h2>
             <p className="text-sm text-gray-500">Choose the level of service that&apos;s right for you</p>
           </div>
           <button
@@ -114,26 +114,26 @@ export function TierComparisonModal({ onClose }: TierComparisonModalProps) {
                 className={cn(
                   'rounded-2xl border-2 p-5 relative flex flex-col',
                   tier.popular
-                    ? 'border-haven-champagne-500 bg-haven-champagne-50'
+                    ? 'border-haven-500 bg-haven-50'
                     : 'border-gray-200 bg-white'
                 )}
               >
                 {/* Popular Badge */}
                 {tier.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-haven-champagne-500 text-haven-navy-900 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-haven-500 text-haven-900 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
                     <Star className="w-3 h-3" />
                     Most Popular
                   </div>
                 )}
 
                 {/* Tier Name */}
-                <h3 className="text-lg font-bold text-haven-navy-900 mt-1">
+                <h3 className="text-lg font-bold text-haven-900 mt-1">
                   {tier.name}
                 </h3>
 
                 {/* Price */}
                 <div className="mt-2">
-                  <span className="text-3xl font-bold text-haven-navy-900">
+                  <span className="text-3xl font-bold text-haven-900">
                     ${tier.price}
                   </span>
                   <span className="text-gray-500">/mo</span>
@@ -165,7 +165,7 @@ export function TierComparisonModal({ onClose }: TierComparisonModalProps) {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-500">
               All plans include free onboarding call or home visit.{' '}
-              <a href="tel:508-333-8630" className="text-haven-champagne-600 hover:underline font-medium">
+              <a href="tel:508-333-8630" className="text-haven-600 hover:underline font-medium">
                 Call us
               </a>
               {' '}to discuss which plan is right for you.

@@ -279,7 +279,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray[100],
   },
   chipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   chipText: {
     fontSize: typography.fontSizes.sm,

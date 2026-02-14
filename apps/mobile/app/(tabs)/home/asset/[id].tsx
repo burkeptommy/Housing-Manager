@@ -72,13 +72,13 @@ const CATEGORY_ICONS: Record<AssetCategory, keyof typeof Ionicons.glyphMap> = {
 };
 
 const CATEGORY_COLORS: Record<AssetCategory, string> = {
-  APPLIANCE: colors.haven.champagne[500],
+  APPLIANCE: colors.haven.purple[500],
   HVAC: colors.red[500],
   PLUMBING: colors.blue[500],
   ELECTRICAL: colors.amber[500],
   STRUCTURAL: colors.gray[600],
   FURNITURE: colors.indigo[500],
-  ELECTRONICS: colors.haven.navy[500],
+  ELECTRONICS: colors.haven.purple[500],
   OUTDOOR: colors.green[500],
   VEHICLE: colors.slate[600],
   SAFETY: colors.emerald[500],
@@ -105,7 +105,7 @@ function getCategoryLabel(category: AssetCategory): string {
 function getConditionColor(condition: string | null): string {
   switch (condition) {
     case 'Excellent': return colors.status.success;
-    case 'Good': return colors.haven.navy[500];
+    case 'Good': return colors.haven.purple[500];
     case 'Fair': return colors.status.warning;
     case 'Needs Service': return colors.status.error;
     default: return colors.gray[400];
@@ -474,7 +474,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {

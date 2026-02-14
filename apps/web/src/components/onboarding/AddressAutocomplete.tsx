@@ -190,12 +190,12 @@ export function AddressAutocomplete({
           placeholder={placeholder}
           className={cn(
             'w-full pl-11 pr-4 py-3 rounded-xl border transition-all outline-none',
-            'focus:ring-2 focus:ring-haven-champagne-200',
+            'focus:ring-2 focus:ring-haven-200',
             error
               ? 'border-red-300 focus:border-red-500'
               : isSelected
                 ? 'border-green-300 focus:border-green-500'
-                : 'border-gray-300 focus:border-haven-champagne-500'
+                : 'border-gray-300 focus:border-haven-500'
           )}
         />
       </div>

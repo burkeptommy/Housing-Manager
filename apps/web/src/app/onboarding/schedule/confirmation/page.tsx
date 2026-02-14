@@ -44,7 +44,7 @@ function ConfirmationContent() {
             <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <div className="absolute -top-1 -right-1 w-8 h-8 bg-haven-champagne-500 rounded-full flex items-center justify-center">
+            <div className="absolute -top-1 -right-1 w-8 h-8 bg-haven-500 rounded-full flex items-center justify-center">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
           </div>
@@ -52,7 +52,7 @@ function ConfirmationContent() {
 
         {/* Message */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-haven-navy-900 mb-3">
+          <h1 className="text-3xl font-bold text-haven-900 mb-3">
             {currentConfig.title}
           </h1>
           <p className="text-gray-600">
@@ -63,11 +63,11 @@ function ConfirmationContent() {
         {/* Appointment Card */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
           <div className="flex items-start gap-4">
-            <div className="w-12 h-12 bg-haven-champagne-100 rounded-xl flex items-center justify-center flex-shrink-0">
-              <Icon className="w-6 h-6 text-haven-champagne-600" />
+            <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center flex-shrink-0">
+              <Icon className="w-6 h-6 text-haven-600" />
             </div>
             <div className="flex-1">
-              <h3 className="font-semibold text-haven-navy-900">
+              <h3 className="font-semibold text-haven-900">
                 {type === 'visit' ? 'Home Visit' : type === 'virtual' ? 'Virtual Walkthrough' : 'Onboarding Call'}
               </h3>
               <p className="text-gray-500 text-sm mt-1">
@@ -83,7 +83,7 @@ function ConfirmationContent() {
         </div>
 
         {/* What's Next */}
-        <div className="bg-haven-navy-900 text-white rounded-2xl p-6 mb-8">
+        <div className="bg-haven-900 text-white rounded-2xl p-6 mb-8">
           <h3 className="font-semibold mb-2">What&apos;s next?</h3>
           <p className="text-white/80 text-sm">
             {currentConfig.nextStep}
@@ -95,7 +95,7 @@ function ConfirmationContent() {
           {type !== 'visit' && (
             <Link
               href="/app"
-              className="w-full py-4 px-6 bg-haven-champagne-500 hover:bg-haven-champagne-600 text-haven-navy-900 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
+              className="w-full py-4 px-6 bg-haven-500 hover:bg-haven-600 text-haven-900 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors"
             >
               Start entering info now
               <ArrowRight className="w-4 h-4" />
@@ -112,7 +112,7 @@ function ConfirmationContent() {
         {/* Contact Info */}
         <p className="text-center text-sm text-gray-500 mt-8">
           Questions? Call us at{' '}
-          <a href="tel:508-333-8630" className="text-haven-navy-900 font-medium hover:underline">
+          <a href="tel:508-333-8630" className="text-haven-900 font-medium hover:underline">
             (508) 333-8630
           </a>
         </p>
@@ -125,7 +125,7 @@ export default function ScheduleConfirmationPage() {
   return (
     <Suspense fallback={
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-haven-champagne-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-haven-500 border-t-transparent rounded-full animate-spin" />
       </div>
     }>
       <ConfirmationContent />

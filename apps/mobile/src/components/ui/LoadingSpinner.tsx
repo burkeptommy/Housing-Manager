@@ -12,7 +12,7 @@ interface LoadingSpinnerProps {
 
 export function LoadingSpinner({
   size = 'large',
-  color = colors.haven.champagne[500],
+  color = colors.haven.purple[500],
   message,
   fullScreen = false,
   style,

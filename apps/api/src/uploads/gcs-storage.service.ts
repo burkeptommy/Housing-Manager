@@ -182,7 +182,7 @@ export class GcsStorageService {
    * Generate a profile photo path
    */
   generateProfilePhotoPath(
-    entityType: 'family-member' | 'pet' | 'household',
+    entityType: 'family-member' | 'pet' | 'household' | 'user' | 'vehicle',
     entityId: string,
   ): string {
     const uniqueId = uuidv4().slice(0, 8);

@@ -126,6 +126,36 @@ export function DetailSkeleton() {
   );
 }
 
+export function MoneySkeleton() {
+  return (
+    <View style={styles.dashboardContainer}>
+      {/* Hero Card */}
+      <View style={[styles.card, { backgroundColor: '#4c1d95', marginBottom: spacing[4] }]}>
+        <Skeleton width={80} height={12} style={{ alignSelf: 'center', opacity: 0.3 }} />
+        <Skeleton width={160} height={36} style={{ alignSelf: 'center', marginTop: spacing[2], opacity: 0.3 }} />
+        <Skeleton width={120} height={12} style={{ alignSelf: 'center', marginTop: spacing[2], opacity: 0.3 }} />
+        <Skeleton height={6} borderRadius={3} style={{ marginTop: spacing[3], opacity: 0.3 }} />
+        <Skeleton height={40} borderRadius={br.md} style={{ marginTop: spacing[3], opacity: 0.2 }} />
+      </View>
+
+      {/* Quick Stats */}
+      <View style={{ flexDirection: 'row', gap: spacing[3], marginBottom: spacing[4] }}>
+        <Skeleton height={36} borderRadius={br.full} style={{ flex: 1 }} />
+        <Skeleton height={36} borderRadius={br.full} style={{ flex: 1 }} />
+        <Skeleton height={36} borderRadius={br.full} style={{ flex: 1 }} />
+      </View>
+
+      {/* Section */}
+      <View style={styles.card}>
+        <Skeleton width={100} height={16} style={{ marginBottom: spacing[3] }} />
+        <SkeletonListItem />
+        <SkeletonListItem />
+        <SkeletonListItem />
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
   skeleton: {
     backgroundColor: colors.gray[200],

@@ -312,7 +312,7 @@ export default function VendorsScreen() {
               <Ionicons
                 name={getCategoryIcon(item.category) as any}
                 size={24}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
             </View>
           )}
@@ -335,7 +335,7 @@ export default function VendorsScreen() {
                 key={star}
                 name={star <= item.rating! ? 'star' : 'star-outline'}
                 size={14}
-                color={star <= item.rating! ? colors.haven.champagne[500] : colors.text.tertiary}
+                color={star <= item.rating! ? colors.haven.purple[500] : colors.text.tertiary}
               />
             ))}
             <Text style={styles.ratingText}>{item.rating.toFixed(1)}</Text>
@@ -348,7 +348,7 @@ export default function VendorsScreen() {
               style={styles.vendorAction}
               onPress={() => handleCallVendor(item.phone!)}
             >
-              <Ionicons name="call-outline" size={18} color={colors.haven.champagne[500]} />
+              <Ionicons name="call-outline" size={18} color={colors.haven.purple[500]} />
               <Text style={styles.vendorActionText}>Call</Text>
             </TouchableOpacity>
           )}
@@ -357,7 +357,7 @@ export default function VendorsScreen() {
               style={styles.vendorAction}
               onPress={() => handleEmailVendor(item.email!)}
             >
-              <Ionicons name="mail-outline" size={18} color={colors.haven.champagne[500]} />
+              <Ionicons name="mail-outline" size={18} color={colors.haven.purple[500]} />
               <Text style={styles.vendorActionText}>Email</Text>
             </TouchableOpacity>
           )}
@@ -382,7 +382,7 @@ export default function VendorsScreen() {
           <Ionicons
             name={getCategoryIcon(item.category) as any}
             size={24}
-            color={colors.haven.champagne[500]}
+            color={colors.haven.purple[500]}
           />
         </View>
         <View style={styles.vendorInfo}>
@@ -402,7 +402,7 @@ export default function VendorsScreen() {
       <View style={styles.directoryMeta}>
         {item.rating && (
           <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color={colors.haven.champagne[500]} />
+            <Ionicons name="star" size={14} color={colors.haven.purple[500]} />
             <Text style={styles.ratingText}>
               {item.rating.toFixed(1)} ({item.reviewCount || 0} reviews)
             </Text>
@@ -422,7 +422,7 @@ export default function VendorsScreen() {
             style={styles.vendorAction}
             onPress={() => handleCallVendor(item.phone!)}
           >
-            <Ionicons name="call-outline" size={18} color={colors.haven.champagne[500]} />
+            <Ionicons name="call-outline" size={18} color={colors.haven.purple[500]} />
             <Text style={styles.vendorActionText}>Call</Text>
           </TouchableOpacity>
         )}
@@ -483,7 +483,7 @@ export default function VendorsScreen() {
       {/* Alfred Info Banner */}
       {isEssentials && (
         <View style={styles.alfredBanner}>
-          <Ionicons name="sparkles" size={20} color={colors.haven.champagne[500]} />
+          <Ionicons name="sparkles" size={20} color={colors.haven.purple[500]} />
           <Text style={styles.alfredBannerText}>
             Alfred can schedule any of these vendors for you. Just ask!
           </Text>
@@ -507,7 +507,7 @@ export default function VendorsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="business-outline" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="business-outline" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>No vendors yet</Text>
             <Text style={styles.emptyText}>
               {selectedCategory === 'all'
@@ -589,7 +589,7 @@ export default function VendorsScreen() {
       {/* Alfred Find Vendors CTA */}
       <View style={styles.alfredFindContainer}>
         <View style={styles.alfredFindIcon}>
-          <Ionicons name="sparkles" size={48} color={colors.haven.champagne[500]} />
+          <Ionicons name="sparkles" size={48} color={colors.haven.purple[500]} />
         </View>
         <Text style={styles.alfredFindTitle}>Let Haven Find the Right Vendor</Text>
         <Text style={styles.alfredFindSubtitle}>
@@ -636,7 +636,7 @@ export default function VendorsScreen() {
           style={styles.manualAddButton}
           onPress={handleAddVendor}
         >
-          <Ionicons name="add-circle-outline" size={18} color={colors.haven.champagne[600]} />
+          <Ionicons name="add-circle-outline" size={18} color={colors.haven.purple[600]} />
           <Text style={styles.manualAddButtonText}>Add Vendor Manually</Text>
         </TouchableOpacity>
       </View>
@@ -666,7 +666,7 @@ export default function VendorsScreen() {
           <Ionicons
             name="briefcase-outline"
             size={18}
-            color={activeTab === 'my-vendors' ? colors.haven.champagne[500] : colors.text.secondary}
+            color={activeTab === 'my-vendors' ? colors.haven.purple[500] : colors.text.secondary}
           />
           <Text style={[styles.tabText, activeTab === 'my-vendors' && styles.tabTextActive]}>
             My Vendors
@@ -684,7 +684,7 @@ export default function VendorsScreen() {
           <Ionicons
             name="search-outline"
             size={18}
-            color={activeTab === 'find-vendors' ? colors.haven.champagne[500] : colors.text.secondary}
+            color={activeTab === 'find-vendors' ? colors.haven.purple[500] : colors.text.secondary}
           />
           <Text style={[styles.tabText, activeTab === 'find-vendors' && styles.tabTextActive]}>
             Find Vendors
@@ -706,7 +706,7 @@ export default function VendorsScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   loadingContainer: {
     flex: 1,
@@ -739,7 +739,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: colors.haven.champagne[500],
+    borderBottomColor: colors.haven.purple[500],
   },
   tabText: {
     fontSize: typography.fontSizes.sm,
@@ -747,10 +747,10 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   tabTextActive: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   tabBadge: {
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.full,
@@ -758,7 +758,7 @@ const styles = StyleSheet.create({
   tabBadgeText: {
     fontSize: typography.fontSizes.xs,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   filterContainer: {
     backgroundColor: colors.white,
@@ -779,7 +779,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   filterChipSelected: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   filterChipText: {
     fontSize: typography.fontSizes.sm,
@@ -815,7 +815,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     marginTop: spacing[3],
@@ -840,7 +840,7 @@ const styles = StyleSheet.create({
   alfredBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[3],
     marginHorizontal: spacing[4],
     marginTop: spacing[4],
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
   alfredBannerText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   listContent: {
     padding: spacing[4],
@@ -867,7 +867,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -940,17 +940,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     gap: spacing[1],
   },
   vendorActionPrimary: {
     flex: 1,
     justifyContent: 'center',
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
   },
   vendorActionText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   vendorActionTextPrimary: {
@@ -976,7 +976,7 @@ const styles = StyleSheet.create({
   emptyAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,
@@ -995,7 +995,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -1014,7 +1014,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],
@@ -1038,7 +1038,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[4],
     paddingHorizontal: spacing[6],
     borderRadius: borderRadius.lg,
@@ -1085,7 +1085,7 @@ const styles = StyleSheet.create({
   manualAddButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,
@@ -1094,6 +1094,6 @@ const styles = StyleSheet.create({
   manualAddButtonText: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
 });

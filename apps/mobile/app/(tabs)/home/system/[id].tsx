@@ -242,7 +242,7 @@ export default function SystemDetailScreen() {
     return (
       <ScreenContainer title="System" onBackPress={() => router.back()}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={colors.haven.navy[300]} />
+          <Ionicons name="alert-circle-outline" size={48} color={colors.haven.purple[300]} />
           <Text style={styles.errorText}>System not found</Text>
         </View>
       </ScreenContainer>
@@ -262,7 +262,7 @@ export default function SystemDetailScreen() {
             <Ionicons
               name={getSystemIcon(system.type) as any}
               size={32}
-              color={colors.haven.champagne[500]}
+              color={colors.haven.purple[500]}
             />
           </View>
           <Text style={styles.systemName}>{system.name}</Text>
@@ -331,7 +331,7 @@ export default function SystemDetailScreen() {
             </Card>
           ) : (
             <Card style={styles.emptyCard}>
-              <Ionicons name="calendar-outline" size={24} color={colors.haven.navy[300]} />
+              <Ionicons name="calendar-outline" size={24} color={colors.haven.purple[300]} />
               <Text style={styles.emptyText}>No maintenance tasks scheduled</Text>
             </Card>
           )}
@@ -378,7 +378,7 @@ export default function SystemDetailScreen() {
                 style={styles.addVendorButton}
                 onPress={() => router.push('/(tabs)/manager/vendors' as any)}
               >
-                <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[600]} />
+                <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[600]} />
                 <Text style={styles.addVendorText}>Add a service provider for this system</Text>
               </TouchableOpacity>
             </Card>
@@ -397,7 +397,7 @@ export default function SystemDetailScreen() {
                   <Ionicons
                     name={doc.type === 'PDF' ? 'document-text-outline' : 'image-outline'}
                     size={20}
-                    color={colors.haven.champagne[500]}
+                    color={colors.haven.purple[500]}
                   />
                 </View>
                 <View style={styles.documentInfo}>
@@ -412,7 +412,7 @@ export default function SystemDetailScreen() {
                 style={styles.addVendorButton}
                 onPress={() => router.push('/(tabs)/settings/vault' as any)}
               >
-                <Ionicons name="cloud-upload-outline" size={20} color={colors.haven.champagne[600]} />
+                <Ionicons name="cloud-upload-outline" size={20} color={colors.haven.purple[600]} />
                 <Text style={styles.addVendorText}>Upload manual, warranty, or receipt</Text>
               </TouchableOpacity>
             </Card>
@@ -440,7 +440,7 @@ export default function SystemDetailScreen() {
             ))
           ) : (
             <Card style={styles.emptyCard}>
-              <Ionicons name="time-outline" size={24} color={colors.haven.navy[300]} />
+              <Ionicons name="time-outline" size={24} color={colors.haven.purple[300]} />
               <Text style={styles.emptyText}>No service history yet</Text>
             </Card>
           )}
@@ -453,7 +453,7 @@ export default function SystemDetailScreen() {
             <Card style={styles.tipsCard}>
               {system.maintenanceResearch.efficiencyTips.map((tip, index) => (
                 <View key={index} style={styles.tipRow}>
-                  <Ionicons name="bulb-outline" size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name="bulb-outline" size={16} color={colors.haven.purple[500]} />
                   <Text style={styles.tipText}>{tip}</Text>
                 </View>
               ))}
@@ -485,6 +485,23 @@ export default function SystemDetailScreen() {
             </Card>
           </View>
         )}
+
+        {/* Quick Actions */}
+        <View style={styles.quickActionsSection}>
+          <TouchableOpacity
+            style={styles.coralActionButton}
+            onPress={() => {
+              const prompt = `I need to schedule service for my ${system.name}${system.brand ? ` (${system.brand})` : ''}. Can you help me find a vendor and get this scheduled?`;
+              router.push({
+                pathname: '/(tabs)/manager/chat',
+                params: { prefillMessage: prompt },
+              });
+            }}
+          >
+            <Ionicons name="calendar-outline" size={20} color={colors.white} />
+            <Text style={styles.coralActionText}>Schedule Service</Text>
+          </TouchableOpacity>
+        </View>
 
         {/* Spacer */}
         <View style={{ height: spacing[6] }} />
@@ -539,7 +556,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
@@ -574,7 +591,7 @@ const styles = StyleSheet.create({
   },
   sectionAction: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   detailsCard: {
@@ -638,7 +655,7 @@ const styles = StyleSheet.create({
   budgetValue: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   vendorCard: {
     flexDirection: 'row',
@@ -669,7 +686,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -771,7 +788,30 @@ const styles = StyleSheet.create({
   },
   addVendorText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
+  },
+  quickActionsSection: {
+    paddingHorizontal: spacing[4],
+    marginTop: spacing[4],
+  },
+  coralActionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing[2],
+    backgroundColor: colors.haven.coral[500],
+    paddingVertical: spacing[4],
+    borderRadius: borderRadius.xl,
+    shadowColor: colors.haven.coral[500],
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  coralActionText: {
+    fontSize: typography.fontSizes.base,
+    fontFamily: 'Nunito_600SemiBold',
+    color: colors.white,
   },
 });

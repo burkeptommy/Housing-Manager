@@ -90,7 +90,7 @@ function SchedulePageContent() {
           <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-6">
             <MapPin className="w-8 h-8 text-amber-600" />
           </div>
-          <h1 className="text-2xl font-bold text-haven-navy-900 mb-3">
+          <h1 className="text-2xl font-bold text-haven-900 mb-3">
             We&apos;re not in your area yet
           </h1>
           <p className="text-gray-600 mb-6">
@@ -100,7 +100,7 @@ function SchedulePageContent() {
           <div className="space-y-3">
             <Link
               href="/onboarding/schedule?type=virtual"
-              className="block w-full py-3 px-4 bg-haven-navy-900 text-white rounded-xl font-medium hover:bg-haven-navy-800 transition-colors"
+              className="block w-full py-3 px-4 bg-haven-900 text-white rounded-xl font-medium hover:bg-haven-800 transition-colors"
             >
               Schedule Virtual Walkthrough
             </Link>
@@ -122,7 +122,7 @@ function SchedulePageContent() {
         {/* Back Link */}
         <Link
           href="/onboarding/choose-path"
-          className="inline-flex items-center gap-2 text-gray-500 hover:text-haven-navy-900 mb-8 transition-colors"
+          className="inline-flex items-center gap-2 text-gray-500 hover:text-haven-900 mb-8 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to options
@@ -132,10 +132,10 @@ function SchedulePageContent() {
           {/* Left Column - Info */}
           <div className="lg:col-span-2">
             <div className="sticky top-8">
-              <div className="w-14 h-14 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mb-4">
-                <Icon className="w-7 h-7 text-haven-champagne-600" />
+              <div className="w-14 h-14 bg-haven-100 rounded-2xl flex items-center justify-center mb-4">
+                <Icon className="w-7 h-7 text-haven-600" />
               </div>
-              <h1 className="text-2xl font-bold text-haven-navy-900 mb-3">
+              <h1 className="text-2xl font-bold text-haven-900 mb-3">
                 {currentConfig.title}
               </h1>
               <p className="text-gray-600 mb-6">
@@ -154,11 +154,11 @@ function SchedulePageContent() {
 
               {/* Service Area Note for Visits */}
               {type === 'visit' && (
-                <div className="mt-6 p-4 bg-haven-champagne-50 rounded-xl">
+                <div className="mt-6 p-4 bg-haven-50 rounded-xl">
                   <div className="flex items-start gap-3">
-                    <MapPin className="w-5 h-5 text-haven-champagne-600 flex-shrink-0 mt-0.5" />
+                    <MapPin className="w-5 h-5 text-haven-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-sm font-medium text-haven-navy-900">
+                      <p className="text-sm font-medium text-haven-900">
                         Service Area
                       </p>
                       <p className="text-sm text-gray-600 mt-1">
@@ -179,7 +179,7 @@ function SchedulePageContent() {
                   <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
                     <CheckCircle className="w-8 h-8 text-green-600" />
                   </div>
-                  <h2 className="text-xl font-bold text-haven-navy-900 mb-2">
+                  <h2 className="text-xl font-bold text-haven-900 mb-2">
                     You&apos;re all set!
                   </h2>
                   <p className="text-gray-600">
@@ -206,7 +206,7 @@ export default function SchedulePage() {
     <Suspense fallback={
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-4 border-haven-champagne-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-8 h-8 border-4 border-haven-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading...</p>
         </div>
       </div>

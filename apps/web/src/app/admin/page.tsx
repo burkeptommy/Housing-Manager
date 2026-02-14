@@ -37,7 +37,7 @@ interface DashboardStats {
 const tierColors: Record<string, string> = {
   ESSENTIALS: 'bg-gray-100 text-gray-700',
   LITE: 'bg-blue-100 text-blue-700',
-  HAVEN: 'bg-haven-champagne-100 text-haven-champagne-700',
+  HAVEN: 'bg-haven-100 text-haven-700',
   'HAVEN+': 'bg-purple-100 text-purple-700',
   ESTATE: 'bg-amber-100 text-amber-700',
 };
@@ -211,7 +211,7 @@ export default function AdminDashboardPage() {
       <div className="bg-white rounded-xl p-6 shadow-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="font-semibold text-gray-900">Recent Activity</h2>
-          <Link href="/admin/activity" className="text-sm text-haven-champagne-600 hover:underline">
+          <Link href="/admin/activity" className="text-sm text-haven-600 hover:underline">
             View all
           </Link>
         </div>

@@ -18,7 +18,7 @@ export default function ManagerLayout() {
         options={{
           headerShown: true,
           title: 'Ask Alfred',
-          headerStyle: { backgroundColor: colors.haven.navy[900] },
+          headerStyle: { backgroundColor: colors.haven.purple[500] },
           headerTintColor: colors.white,
           headerBackTitle: 'Back',
         }}
@@ -30,7 +30,7 @@ export default function ManagerLayout() {
         options={{
           headerShown: true,
           title: 'Chat',
-          headerStyle: { backgroundColor: colors.haven.navy[900] },
+          headerStyle: { backgroundColor: colors.haven.purple[500] },
           headerTintColor: colors.white,
           headerBackTitle: 'Back',
         }}

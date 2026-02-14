@@ -350,7 +350,7 @@ export default function IntakeWorkbenchPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-haven-champagne-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-haven-600 mx-auto mb-4" />
           <p className="text-gray-500">Loading intake workbench...</p>
         </div>
       </div>
@@ -363,7 +363,7 @@ export default function IntakeWorkbenchPage() {
         <div className="text-center">
           <AlertCircle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <p className="text-gray-600 mb-4">Session not found</p>
-          <Link href="/manager/onboarding" className="text-haven-champagne-600 hover:underline">
+          <Link href="/manager/onboarding" className="text-haven-600 hover:underline">
             Back to Queue
           </Link>
         </div>
@@ -387,7 +387,7 @@ export default function IntakeWorkbenchPage() {
                 <ArrowLeft className="w-5 h-5" />
               </Link>
               <div>
-                <h1 className="text-xl font-bold text-haven-navy-900">
+                <h1 className="text-xl font-bold text-haven-900">
                   {homeowner?.displayName || `${homeowner?.firstName || ''} ${homeowner?.lastName || ''}`.trim() || 'Unknown'}
                 </h1>
                 <p className="text-sm text-gray-500">
@@ -427,7 +427,7 @@ export default function IntakeWorkbenchPage() {
                   intakeSections.forEach((section) => saveSection(section.id));
                 }}
                 disabled={saving}
-                className="flex items-center gap-2 px-4 py-2 bg-haven-navy-900 text-white rounded-lg hover:bg-haven-navy-800 transition disabled:opacity-50"
+                className="flex items-center gap-2 px-4 py-2 bg-haven-900 text-white rounded-lg hover:bg-haven-800 transition disabled:opacity-50"
               >
                 <Save className="w-4 h-4" />
                 {saving ? 'Saving...' : 'Save Progress'}
@@ -435,7 +435,7 @@ export default function IntakeWorkbenchPage() {
 
               <button
                 onClick={completeIntake}
-                className="flex items-center gap-2 px-4 py-2 bg-haven-champagne-500 text-haven-navy-900 rounded-lg hover:bg-haven-champagne-400 transition"
+                className="flex items-center gap-2 px-4 py-2 bg-haven-500 text-haven-900 rounded-lg hover:bg-haven-400 transition"
               >
                 <CheckCircle className="w-4 h-4" />
                 Complete
@@ -478,7 +478,7 @@ export default function IntakeWorkbenchPage() {
                   <div className="flex items-center gap-3">
                     <span className="text-2xl">{section.icon}</span>
                     <div className="text-left">
-                      <div className="font-semibold text-haven-navy-900">{section.title}</div>
+                      <div className="font-semibold text-haven-900">{section.title}</div>
                       <div className="text-sm text-gray-500">{section.description}</div>
                     </div>
                   </div>
@@ -519,7 +519,7 @@ export default function IntakeWorkbenchPage() {
                                 value={formData[section.id]?.[question.id] || ''}
                                 onChange={(e) => updateField(section.id, question.id, e.target.value)}
                                 placeholder={question.placeholder}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
                               />
                             )}
 
@@ -528,7 +528,7 @@ export default function IntakeWorkbenchPage() {
                                 type="number"
                                 value={formData[section.id]?.[question.id] || ''}
                                 onChange={(e) => updateField(section.id, question.id, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
                               />
                             )}
 
@@ -539,7 +539,7 @@ export default function IntakeWorkbenchPage() {
                                   type="number"
                                   value={formData[section.id]?.[question.id] || ''}
                                   onChange={(e) => updateField(section.id, question.id, e.target.value)}
-                                  className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                                  className="w-full pl-7 pr-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
                                 />
                               </div>
                             )}
@@ -548,7 +548,7 @@ export default function IntakeWorkbenchPage() {
                               <select
                                 value={formData[section.id]?.[question.id] || ''}
                                 onChange={(e) => updateField(section.id, question.id, e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
                               >
                                 <option value="">Select...</option>
                                 {question.options?.map((opt) => (
@@ -564,7 +564,7 @@ export default function IntakeWorkbenchPage() {
                                   onClick={() => updateField(section.id, question.id, true)}
                                   className={`flex-1 py-2 rounded-lg border transition ${
                                     formData[section.id]?.[question.id] === true
-                                      ? 'bg-haven-champagne-500 border-haven-champagne-500 text-haven-navy-900'
+                                      ? 'bg-haven-500 border-haven-500 text-haven-900'
                                       : 'border-gray-200 hover:bg-gray-50'
                                   }`}
                                 >
@@ -589,7 +589,7 @@ export default function IntakeWorkbenchPage() {
                                 value={formData[section.id]?.[question.id] || ''}
                                 onChange={(e) => updateField(section.id, question.id, e.target.value)}
                                 placeholder={question.placeholder}
-                                className="w-full px-3 py-2 border border-gray-200 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                                className="w-full px-3 py-2 border border-gray-200 rounded-lg h-24 resize-none focus:outline-none focus:ring-2 focus:ring-haven-500"
                               />
                             )}
                           </div>
@@ -600,7 +600,7 @@ export default function IntakeWorkbenchPage() {
                     <div className="mt-4 pt-4 border-t border-gray-100">
                       <button
                         onClick={() => saveSection(section.id)}
-                        className="text-sm text-haven-champagne-600 hover:underline"
+                        className="text-sm text-haven-600 hover:underline"
                       >
                         Save {section.title}
                       </button>
@@ -615,7 +615,7 @@ export default function IntakeWorkbenchPage() {
           <div className="space-y-4">
             {/* Progress */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-haven-navy-900 mb-4">Progress</h3>
+              <h3 className="font-semibold text-haven-900 mb-4">Progress</h3>
               <div className="space-y-3">
                 {intakeSections.map((section) => (
                   <div key={section.id}>
@@ -625,7 +625,7 @@ export default function IntakeWorkbenchPage() {
                     </div>
                     <div className="w-full bg-gray-100 rounded-full h-1.5">
                       <div
-                        className="bg-haven-champagne-500 h-1.5 rounded-full transition-all"
+                        className="bg-haven-500 h-1.5 rounded-full transition-all"
                         style={{ width: `${calculateSectionProgress(section.id)}%` }}
                       />
                     </div>
@@ -635,22 +635,22 @@ export default function IntakeWorkbenchPage() {
             </div>
 
             {/* Monthly Funding Calculator */}
-            <div className="bg-haven-navy-900 rounded-xl p-5 text-white">
+            <div className="bg-haven-900 rounded-xl p-5 text-white">
               <div className="flex items-center gap-2 mb-4">
-                <Calculator className="w-5 h-5 text-haven-champagne-300" />
+                <Calculator className="w-5 h-5 text-haven-300" />
                 <h3 className="font-semibold">Monthly Haven Funding</h3>
               </div>
               <div className="text-3xl font-bold mb-2">
                 ${calculateMonthlyFunding().toLocaleString()}
               </div>
-              <p className="text-sm text-haven-champagne-300">
+              <p className="text-sm text-haven-300">
                 Includes 10% buffer for variable bills
               </p>
             </div>
 
             {/* Homeowner Info */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-haven-navy-900 mb-4">Contact</h3>
+              <h3 className="font-semibold text-haven-900 mb-4">Contact</h3>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
                   <span className="text-gray-500">Name</span>
@@ -677,11 +677,11 @@ export default function IntakeWorkbenchPage() {
 
             {/* Call Notes */}
             <div className="bg-white rounded-xl border border-gray-200 p-5">
-              <h3 className="font-semibold text-haven-navy-900 mb-4">Call Notes</h3>
+              <h3 className="font-semibold text-haven-900 mb-4">Call Notes</h3>
               <textarea
                 value={callNotes}
                 onChange={(e) => setCallNotes(e.target.value)}
-                className="w-full h-32 p-3 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+                className="w-full h-32 p-3 border border-gray-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-haven-500"
                 placeholder="Notes from the call..."
               />
             </div>

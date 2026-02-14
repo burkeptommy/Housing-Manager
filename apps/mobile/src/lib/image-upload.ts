@@ -4,7 +4,7 @@ import { API_BASE_URL } from './api';
 import { getIdToken } from './firebase';
 import { Alert } from 'react-native';
 
-export type EntityType = 'family-member' | 'pet' | 'household';
+export type EntityType = 'family-member' | 'pet' | 'household' | 'user' | 'vehicle';
 
 /**
  * Request camera permissions

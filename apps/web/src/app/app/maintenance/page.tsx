@@ -678,7 +678,7 @@ function ActiveAlertCard({ alert }: { alert: MaintenanceAlert }) {
               </span>
             )}
           </div>
-          <p className="text-sm text-warm-600 mb-2">{alert.assetName}</p>
+          <p className="text-sm text-neutral-600 mb-2">{alert.assetName}</p>
           <div className="flex items-center gap-2 text-sm">
             <span>{getStatusEmoji()}</span>
             <span className="text-emerald-700 font-medium">{alert.managerMessage}</span>
@@ -696,24 +696,24 @@ function UpcomingServiceCard({ services }: { services: ScheduledService[] }) {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-warm-200 overflow-hidden">
-      <div className="p-4 border-b border-warm-200 flex items-center gap-2">
+    <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="p-4 border-b border-neutral-200 flex items-center gap-2">
         <Calendar className="w-5 h-5 text-emerald-600" />
-        <h3 className="font-semibold text-warm-900">Upcoming Service</h3>
-        <span className="text-sm text-warm-500">Auto-scheduled by {HOUSING_MANAGER.name}</span>
+        <h3 className="font-semibold text-neutral-900">Upcoming Service</h3>
+        <span className="text-sm text-neutral-500">Auto-scheduled by {HOUSING_MANAGER.name}</span>
       </div>
-      <div className="divide-y divide-warm-100">
+      <div className="divide-y divide-neutral-100">
         {services.map((service) => (
           <div key={service.id} className="flex items-center gap-4 px-4 py-3">
             <div className="w-16 text-center">
-              <p className="text-sm font-medium text-warm-900">{formatDate(service.date)}</p>
+              <p className="text-sm font-medium text-neutral-900">{formatDate(service.date)}</p>
             </div>
             <div className="flex-1">
-              <p className="font-medium text-warm-900">{service.serviceType}</p>
-              <p className="text-sm text-warm-500">{service.assetName}</p>
+              <p className="font-medium text-neutral-900">{service.serviceType}</p>
+              <p className="text-sm text-neutral-500">{service.assetName}</p>
             </div>
             <div className="text-right">
-              <p className="text-sm text-warm-700">{service.vendorName}</p>
+              <p className="text-sm text-neutral-700">{service.vendorName}</p>
               {service.isConfirmed ? (
                 <span className="text-xs text-emerald-600">✓ Confirmed</span>
               ) : (
@@ -780,11 +780,11 @@ function HandymanVisitCard({
   onRequestQuote: (item: string) => void;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-warm-200 overflow-hidden">
-      <div className="p-4 border-b border-warm-200 flex items-center gap-3">
+    <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+      <div className="p-4 border-b border-neutral-200 flex items-center gap-3">
         <ClipboardCheck className="w-5 h-5 text-emerald-600" />
-        <h3 className="font-semibold text-warm-900">Recent Handyman Visit</h3>
-        <span className="text-sm text-warm-500">
+        <h3 className="font-semibold text-neutral-900">Recent Handyman Visit</h3>
+        <span className="text-sm text-neutral-500">
           {visit.date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
       </div>
@@ -798,7 +798,7 @@ function HandymanVisitCard({
             )}
           </div>
           <div>
-            <p className="font-medium text-warm-900">{visit.handymanName} completed monthly maintenance:</p>
+            <p className="font-medium text-neutral-900">{visit.handymanName} completed monthly maintenance:</p>
           </div>
         </div>
 
@@ -806,7 +806,7 @@ function HandymanVisitCard({
           {visit.tasksCompleted.map((task, idx) => (
             <div key={idx} className="flex items-center gap-2 text-sm">
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span className="text-warm-700">{task}</span>
+              <span className="text-neutral-700">{task}</span>
             </div>
           ))}
         </div>
@@ -823,7 +823,7 @@ function HandymanVisitCard({
           {visit.photos && visit.photos.length > 0 && (
             <button
               onClick={onViewPhotos}
-              className="flex items-center gap-2 px-3 py-2 border border-warm-200 text-warm-700 text-sm font-medium rounded-lg hover:bg-warm-50 transition-colors"
+              className="flex items-center gap-2 px-3 py-2 border border-neutral-200 text-neutral-700 text-sm font-medium rounded-lg hover:bg-neutral-50 transition-colors"
             >
               <Camera className="w-4 h-4" />
               View photos
@@ -861,7 +861,7 @@ function AssetCard({
   return (
     <div
       className={`bg-white rounded-xl shadow-sm border overflow-hidden cursor-pointer hover:shadow-md transition-shadow ${
-        isOverdue ? 'border-red-300' : 'border-warm-200'
+        isOverdue ? 'border-red-300' : 'border-neutral-200'
       }`}
       onClick={onClick}
     >
@@ -874,17 +874,17 @@ function AssetCard({
             {healthStyle.label}
           </span>
         </div>
-        <h3 className="font-semibold text-warm-900">{asset.name}</h3>
-        <p className="text-sm text-warm-500">{asset.brand} {asset.model && `• ${asset.model}`}</p>
+        <h3 className="font-semibold text-neutral-900">{asset.name}</h3>
+        <p className="text-sm text-neutral-500">{asset.brand} {asset.model && `• ${asset.model}`}</p>
       </div>
 
       {/* Lifespan Bar */}
       <div className="px-4 pb-3">
-        <div className="flex items-center justify-between text-xs text-warm-500 mb-1">
+        <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
           <span>Lifespan</span>
           <span>Year {ageYears} of {asset.expectedLifespan}</span>
         </div>
-        <div className="w-full bg-warm-100 rounded-full h-2">
+        <div className="w-full bg-neutral-100 rounded-full h-2">
           <div
             className={`h-2 rounded-full transition-all ${
               agePercent > 80 ? 'bg-red-500' : agePercent > 60 ? 'bg-amber-500' : 'bg-emerald-500'
@@ -895,14 +895,14 @@ function AssetCard({
       </div>
 
       {/* Manager-focused footer */}
-      <div className={`px-4 py-3 border-t ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-warm-50 border-warm-100'}`}>
+      <div className={`px-4 py-3 border-t ${isOverdue ? 'bg-red-50 border-red-200' : 'bg-neutral-50 border-neutral-100'}`}>
         <div className="space-y-1">
           {asset.lastServiceVendor && (
-            <p className="text-xs text-warm-500">
+            <p className="text-xs text-neutral-500">
               Last serviced by {asset.lastServiceVendor}
             </p>
           )}
-          <p className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-warm-600'}`}>
+          <p className={`text-sm ${isOverdue ? 'text-red-700 font-medium' : 'text-neutral-600'}`}>
             {isOverdue
               ? `${HOUSING_MANAGER.name} is scheduling service`
               : asset.nextServiceMonth
@@ -921,19 +921,19 @@ function VerifiedVendorsSection({ vendors }: { vendors: TrustedVendor[] }) {
   const otherVendors = vendors.filter(v => !v.isPreferred);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
       <div className="flex items-center gap-2 mb-4">
         <BadgeCheck className="w-5 h-5 text-emerald-600" />
-        <h2 className="font-semibold text-warm-900">Your Verified Vendors</h2>
+        <h2 className="font-semibold text-neutral-900">Your Verified Vendors</h2>
       </div>
-      <p className="text-sm text-warm-500 mb-4">
+      <p className="text-sm text-neutral-500 mb-4">
         {HOUSING_MANAGER.name} has relationships with {vendors.length} verified vendors for your home.
         All scheduling and coordination goes through Haven.
       </p>
 
       {preferredVendors.length > 0 && (
         <div className="mb-4">
-          <p className="text-xs font-medium text-warm-500 uppercase mb-2">Preferred</p>
+          <p className="text-xs font-medium text-neutral-500 uppercase mb-2">Preferred</p>
           <div className="grid grid-cols-2 gap-2">
             {preferredVendors.map((vendor) => (
               <div key={vendor.id} className="flex items-center gap-3 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
@@ -941,9 +941,9 @@ function VerifiedVendorsSection({ vendors }: { vendors: TrustedVendor[] }) {
                   <span className="text-xs font-semibold text-emerald-700">{vendor.initials}</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-warm-900 text-sm truncate">{vendor.company}</p>
+                  <p className="font-medium text-neutral-900 text-sm truncate">{vendor.company}</p>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-warm-500">{vendor.trade}</span>
+                    <span className="text-xs text-neutral-500">{vendor.trade}</span>
                     <div className="flex items-center gap-0.5 text-amber-500">
                       <Star className="w-3 h-3 fill-current" />
                       <span className="text-xs">{vendor.rating}</span>
@@ -958,10 +958,10 @@ function VerifiedVendorsSection({ vendors }: { vendors: TrustedVendor[] }) {
 
       {otherVendors.length > 0 && (
         <div>
-          <p className="text-xs font-medium text-warm-500 uppercase mb-2">Other Vendors ({otherVendors.length})</p>
+          <p className="text-xs font-medium text-neutral-500 uppercase mb-2">Other Vendors ({otherVendors.length})</p>
           <div className="flex flex-wrap gap-2">
             {otherVendors.map((vendor) => (
-              <span key={vendor.id} className="px-3 py-1.5 bg-warm-100 text-warm-600 text-sm rounded-full">
+              <span key={vendor.id} className="px-3 py-1.5 bg-neutral-100 text-neutral-600 text-sm rounded-full">
                 {vendor.company}
               </span>
             ))}
@@ -1022,30 +1022,30 @@ function ServiceHistorySection({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+    <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
-          <Clock className="w-5 h-5 text-warm-400" />
-          <h2 className="font-semibold text-warm-900">Service History</h2>
+          <Clock className="w-5 h-5 text-neutral-400" />
+          <h2 className="font-semibold text-neutral-900">Service History</h2>
         </div>
       </div>
 
       {/* Filters */}
       <div className="flex gap-2 mb-4">
         <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-warm-400" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
           <input
             type="text"
             placeholder="Search history..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm border border-warm-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
           />
         </div>
         <select
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-warm-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="px-3 py-2 text-sm border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"
         >
           <option value="all">All Assets</option>
           {assets.map(asset => (
@@ -1056,7 +1056,7 @@ function ServiceHistorySection({
 
       {/* Timeline */}
       <div className="relative">
-        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-warm-200" />
+        <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-neutral-200" />
         <div className="space-y-4">
           {filteredHistory.slice(0, 5).map((record) => {
             const isExpanded = expanded.has(record.id);
@@ -1069,24 +1069,24 @@ function ServiceHistorySection({
                 <div className="cursor-pointer" onClick={() => toggleExpand(record.id)}>
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-medium text-warm-900">{record.serviceType}</p>
-                      <p className="text-sm text-warm-500">{record.assetName}</p>
+                      <p className="font-medium text-neutral-900">{record.serviceType}</p>
+                      <p className="text-sm text-neutral-500">{record.assetName}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-warm-500">{formatDate(record.date)}</p>
+                      <p className="text-sm text-neutral-500">{formatDate(record.date)}</p>
                       {record.cost !== undefined && (
-                        <p className="text-sm font-medium text-warm-900">{formatCurrency(record.cost)}</p>
+                        <p className="text-sm font-medium text-neutral-900">{formatCurrency(record.cost)}</p>
                       )}
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-2 p-3 bg-warm-50 rounded-lg">
-                      <p className="text-sm text-warm-600 mb-2">{record.description}</p>
+                    <div className="mt-2 p-3 bg-neutral-50 rounded-lg">
+                      <p className="text-sm text-neutral-600 mb-2">{record.description}</p>
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
                           {record.vendor && (
-                            <span className="text-xs text-warm-500">by {record.vendor}</span>
+                            <span className="text-xs text-neutral-500">by {record.vendor}</span>
                           )}
                           <span className="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">
                             {getScheduledByLabel(record.scheduledBy)}
@@ -1110,9 +1110,9 @@ function ServiceHistorySection({
 
       {filteredHistory.length === 0 && (
         <div className="text-center py-8">
-          <Clock className="w-12 h-12 text-warm-300 mx-auto mb-3" />
-          <p className="text-warm-600 font-medium">No service records</p>
-          <p className="text-sm text-warm-500 mt-1">{HOUSING_MANAGER.name} will log all services here</p>
+          <Clock className="w-12 h-12 text-neutral-300 mx-auto mb-3" />
+          <p className="text-neutral-600 font-medium">No service records</p>
+          <p className="text-sm text-neutral-500 mt-1">{HOUSING_MANAGER.name} will log all services here</p>
         </div>
       )}
     </div>
@@ -1138,27 +1138,27 @@ function AssetDetailModal({
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50" onClick={onClose} />
         <div className="relative bg-white rounded-xl shadow-xl w-full max-w-lg">
-          <div className="p-6 border-b border-warm-200">
+          <div className="p-6 border-b border-neutral-200">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 bg-emerald-100 rounded-xl flex items-center justify-center">
                   <AssetIcon className="w-7 h-7 text-emerald-600" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-warm-900">{asset.name}</h3>
-                  <p className="text-sm text-warm-500">{asset.brand} {asset.model}</p>
+                  <h3 className="text-lg font-semibold text-neutral-900">{asset.name}</h3>
+                  <p className="text-sm text-neutral-500">{asset.brand} {asset.model}</p>
                 </div>
               </div>
-              <button onClick={onClose} className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-                <X className="w-5 h-5 text-warm-400" />
+              <button onClick={onClose} className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-neutral-400" />
               </button>
             </div>
           </div>
 
           <div className="p-6 space-y-4">
             {/* Health Status */}
-            <div className="flex items-center justify-between p-4 bg-warm-50 rounded-lg">
-              <span className="text-warm-600">Health Status</span>
+            <div className="flex items-center justify-between p-4 bg-neutral-50 rounded-lg">
+              <span className="text-neutral-600">Health Status</span>
               <span className={`px-3 py-1 rounded-full text-sm font-medium ${healthStyle.bgColor} ${healthStyle.color}`}>
                 {healthStyle.label}
               </span>
@@ -1166,53 +1166,53 @@ function AssetDetailModal({
 
             {/* Details Grid */}
             <div className="grid grid-cols-2 gap-4">
-              <div className="p-3 bg-warm-50 rounded-lg">
-                <p className="text-xs text-warm-500">Install Date</p>
-                <p className="font-medium text-warm-900">{formatDate(asset.installDate)}</p>
+              <div className="p-3 bg-neutral-50 rounded-lg">
+                <p className="text-xs text-neutral-500">Install Date</p>
+                <p className="font-medium text-neutral-900">{formatDate(asset.installDate)}</p>
               </div>
-              <div className="p-3 bg-warm-50 rounded-lg">
-                <p className="text-xs text-warm-500">Expected Lifespan</p>
-                <p className="font-medium text-warm-900">{asset.expectedLifespan} years</p>
+              <div className="p-3 bg-neutral-50 rounded-lg">
+                <p className="text-xs text-neutral-500">Expected Lifespan</p>
+                <p className="font-medium text-neutral-900">{asset.expectedLifespan} years</p>
               </div>
               {asset.location && (
-                <div className="p-3 bg-warm-50 rounded-lg">
-                  <p className="text-xs text-warm-500">Location</p>
-                  <p className="font-medium text-warm-900">{asset.location}</p>
+                <div className="p-3 bg-neutral-50 rounded-lg">
+                  <p className="text-xs text-neutral-500">Location</p>
+                  <p className="font-medium text-neutral-900">{asset.location}</p>
                 </div>
               )}
               {asset.warrantyExpires && (
-                <div className="p-3 bg-warm-50 rounded-lg">
-                  <p className="text-xs text-warm-500">Warranty Until</p>
-                  <p className="font-medium text-warm-900">{formatDate(asset.warrantyExpires)}</p>
+                <div className="p-3 bg-neutral-50 rounded-lg">
+                  <p className="text-xs text-neutral-500">Warranty Until</p>
+                  <p className="font-medium text-neutral-900">{formatDate(asset.warrantyExpires)}</p>
                 </div>
               )}
               {asset.serialNumber && (
-                <div className="p-3 bg-warm-50 rounded-lg col-span-2">
-                  <p className="text-xs text-warm-500">Serial Number</p>
-                  <p className="font-medium text-warm-900 font-mono">{asset.serialNumber}</p>
+                <div className="p-3 bg-neutral-50 rounded-lg col-span-2">
+                  <p className="text-xs text-neutral-500">Serial Number</p>
+                  <p className="font-medium text-neutral-900 font-mono">{asset.serialNumber}</p>
                 </div>
               )}
             </div>
 
             {/* Service Info */}
-            <div className="border-t border-warm-200 pt-4">
-              <h4 className="font-medium text-warm-900 mb-3">Service Schedule</h4>
+            <div className="border-t border-neutral-200 pt-4">
+              <h4 className="font-medium text-neutral-900 mb-3">Service Schedule</h4>
               <div className="space-y-2">
                 {asset.lastService && (
                   <div className="flex items-center justify-between">
-                    <span className="text-warm-600">Last Service</span>
+                    <span className="text-neutral-600">Last Service</span>
                     <div className="text-right">
-                      <p className="font-medium text-warm-900">{formatDate(asset.lastService)}</p>
+                      <p className="font-medium text-neutral-900">{formatDate(asset.lastService)}</p>
                       {asset.lastServiceVendor && (
-                        <p className="text-xs text-warm-500">by {asset.lastServiceVendor}</p>
+                        <p className="text-xs text-neutral-500">by {asset.lastServiceVendor}</p>
                       )}
                     </div>
                   </div>
                 )}
                 <div className="flex items-center justify-between">
-                  <span className="text-warm-600">Next Service</span>
+                  <span className="text-neutral-600">Next Service</span>
                   <div className="text-right">
-                    <p className={`font-medium ${isOverdue ? 'text-red-600' : 'text-warm-900'}`}>
+                    <p className={`font-medium ${isOverdue ? 'text-red-600' : 'text-neutral-900'}`}>
                       {asset.nextServiceMonth || 'Not scheduled'}
                     </p>
                     <p className="text-xs text-emerald-600">{HOUSING_MANAGER.name} will schedule</p>
@@ -1222,15 +1222,15 @@ function AssetDetailModal({
             </div>
 
             {asset.notes && (
-              <div className="border-t border-warm-200 pt-4">
-                <h4 className="font-medium text-warm-900 mb-2">Notes</h4>
-                <p className="text-sm text-warm-600">{asset.notes}</p>
+              <div className="border-t border-neutral-200 pt-4">
+                <h4 className="font-medium text-neutral-900 mb-2">Notes</h4>
+                <p className="text-sm text-neutral-600">{asset.notes}</p>
               </div>
             )}
           </div>
 
-          <div className="p-6 border-t border-warm-200 bg-warm-50 rounded-b-xl">
-            <p className="text-sm text-warm-600 text-center">
+          <div className="p-6 border-t border-neutral-200 bg-neutral-50 rounded-b-xl">
+            <p className="text-sm text-neutral-600 text-center">
               All maintenance is scheduled and coordinated by {HOUSING_MANAGER.name}
             </p>
           </div>
@@ -1383,7 +1383,7 @@ export default function MaintenancePage() {
       {toast && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
           <div className={`flex items-center gap-3 px-4 py-3 rounded-lg shadow-lg ${
-            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-warm-800 text-white'
+            toast.type === 'success' ? 'bg-emerald-600 text-white' : 'bg-neutral-800 text-white'
           }`}>
             {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
             <span className="font-medium">{toast.message}</span>
@@ -1393,8 +1393,8 @@ export default function MaintenancePage() {
 
       {/* Header */}
       <div>
-        <h1 className="text-2xl lg:text-3xl font-bold text-warm-900">Home Maintenance</h1>
-        <p className="text-warm-500 mt-1">We fix it before it breaks. {HOUSING_MANAGER.name} handles all scheduling.</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-neutral-900">Home Maintenance</h1>
+        <p className="text-neutral-500 mt-1">We fix it before it breaks. {HOUSING_MANAGER.name} handles all scheduling.</p>
       </div>
 
       {/* Manager Summary */}
@@ -1406,7 +1406,7 @@ export default function MaintenancePage() {
       {/* Health Score + Active Items */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Health Score Gauge */}
-        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6 flex flex-col items-center">
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6 flex flex-col items-center">
           <div className="relative">
             {isLoading ? (
               <div className="w-48 h-48 flex items-center justify-center">
@@ -1431,11 +1431,11 @@ export default function MaintenancePage() {
               <div className="absolute inset-0 flex flex-col items-center justify-center">
                 <Activity className={`w-6 h-6 ${getHealthScoreColor(healthScore)} mb-1`} />
                 <span className={`text-4xl font-bold ${getHealthScoreColor(healthScore)}`}>{healthScore}</span>
-                <span className="text-sm text-warm-500">Home Health</span>
+                <span className="text-sm text-neutral-500">Home Health</span>
               </div>
             )}
           </div>
-          <p className="text-sm text-warm-500 mt-4 text-center">
+          <p className="text-sm text-neutral-500 mt-4 text-center">
             {healthScore >= 90 ? 'Your home is in excellent condition!' :
              healthScore >= 70 ? 'A few items being handled.' :
              healthScore >= 50 ? 'Several maintenance tasks in progress.' :
@@ -1445,7 +1445,7 @@ export default function MaintenancePage() {
 
         {/* Active Items */}
         <div className="lg:col-span-2 space-y-4">
-          <h3 className="font-semibold text-warm-900">Active Items ({activeAlerts.length})</h3>
+          <h3 className="font-semibold text-neutral-900">Active Items ({activeAlerts.length})</h3>
           {activeAlerts.map(alert => (
             <ActiveAlertCard key={alert.id} alert={alert} />
           ))}
@@ -1466,14 +1466,14 @@ export default function MaintenancePage() {
 
       {/* Auto-Generated Maintenance Calendar */}
       {maintenanceTasks.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-warm-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
           <div className="flex items-center justify-between mb-6">
             <div>
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5 text-emerald-600" />
-                <h2 className="font-semibold text-warm-900">Maintenance Calendar</h2>
+                <h2 className="font-semibold text-neutral-900">Maintenance Calendar</h2>
               </div>
-              <p className="text-sm text-warm-500 mt-1">
+              <p className="text-sm text-neutral-500 mt-1">
                 {taskSummary?.total || maintenanceTasks.length} tasks identified for your home
               </p>
             </div>
@@ -1498,21 +1498,21 @@ export default function MaintenancePage() {
           {/* Summary Cards */}
           {taskSummary && (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-warm-50 rounded-lg p-4 text-center">
-                <p className="text-2xl font-bold text-warm-900">{taskSummary.total}</p>
-                <p className="text-sm text-warm-500">Total Tasks</p>
+              <div className="bg-neutral-50 rounded-lg p-4 text-center">
+                <p className="text-2xl font-bold text-neutral-900">{taskSummary.total}</p>
+                <p className="text-sm text-neutral-500">Total Tasks</p>
               </div>
               <div className="bg-amber-50 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-amber-600">{taskSummary.dueSoon}</p>
-                <p className="text-sm text-warm-500">Due Soon</p>
+                <p className="text-sm text-neutral-500">Due Soon</p>
               </div>
               <div className="bg-red-50 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-red-600">{taskSummary.overdue}</p>
-                <p className="text-sm text-warm-500">Overdue</p>
+                <p className="text-sm text-neutral-500">Overdue</p>
               </div>
               <div className="bg-emerald-50 rounded-lg p-4 text-center">
                 <p className="text-2xl font-bold text-emerald-600">{taskSummary.completed}</p>
-                <p className="text-sm text-warm-500">Completed</p>
+                <p className="text-sm text-neutral-500">Completed</p>
               </div>
             </div>
           )}
@@ -1540,16 +1540,16 @@ export default function MaintenancePage() {
                 <div
                   key={task.id}
                   className={`flex items-center justify-between p-4 rounded-lg border ${
-                    isOverdue ? 'border-red-200 bg-red-50' : 'border-warm-200 bg-warm-50'
+                    isOverdue ? 'border-red-200 bg-red-50' : 'border-neutral-200 bg-neutral-50'
                   }`}
                 >
                   <div className="flex items-center gap-4">
-                    <div className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[task.category] || 'bg-warm-100 text-warm-700'}`}>
+                    <div className={`px-2 py-1 rounded text-xs font-medium ${categoryColors[task.category] || 'bg-neutral-100 text-neutral-700'}`}>
                       {task.category}
                     </div>
                     <div>
-                      <p className="font-medium text-warm-900">{task.title}</p>
-                      <div className="flex items-center gap-3 text-sm text-warm-500">
+                      <p className="font-medium text-neutral-900">{task.title}</p>
+                      <div className="flex items-center gap-3 text-sm text-neutral-500">
                         <span>{task.frequency?.replace('_', ' ')}</span>
                         {task.seasonalTiming && task.seasonalTiming !== 'ANY' && (
                           <span className="capitalize">{task.seasonalTiming.toLowerCase()}</span>
@@ -1562,7 +1562,7 @@ export default function MaintenancePage() {
                   </div>
                   <div className="flex items-center gap-3">
                     {task.nextDueDate && (
-                      <div className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : isDueSoon ? 'text-amber-600' : 'text-warm-500'}`}>
+                      <div className={`text-sm ${isOverdue ? 'text-red-600 font-medium' : isDueSoon ? 'text-amber-600' : 'text-neutral-500'}`}>
                         {isOverdue ? 'Overdue' : new Date(task.nextDueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
                       </div>
                     )}
@@ -1607,9 +1607,9 @@ export default function MaintenancePage() {
       {/* Assets Grid */}
       <div>
         <div className="flex items-center gap-2 mb-4">
-          <Settings className="w-5 h-5 text-warm-400" />
-          <h2 className="font-semibold text-warm-900">Your Home Systems</h2>
-          <span className="text-sm text-warm-500">({assets.length})</span>
+          <Settings className="w-5 h-5 text-neutral-400" />
+          <h2 className="font-semibold text-neutral-900">Your Home Systems</h2>
+          <span className="text-sm text-neutral-500">({assets.length})</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {assets.map((asset) => (

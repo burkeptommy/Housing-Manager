@@ -1,6 +1,6 @@
 import { Stack } from 'expo-router';
 
-const NAVY = '#0a1929';
+const PURPLE = '#6200EA';
 
 export default function VaultLayout() {
   return (
@@ -8,11 +8,11 @@ export default function VaultLayout() {
       screenOptions={{
         headerShown: true,
         headerStyle: {
-          backgroundColor: NAVY,
+          backgroundColor: PURPLE,
         },
         headerTintColor: '#ffffff',
         headerTitleStyle: {
-          fontWeight: '600',
+          fontFamily: 'Nunito_600SemiBold',
         },
         headerBackTitle: '',
       }}

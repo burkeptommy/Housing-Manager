@@ -189,7 +189,7 @@ export function AddZoneModal({
                     <Ionicons
                       name={zt.icon}
                       size={18}
-                      color={type === zt.value ? colors.haven.champagne[600] : colors.text.tertiary}
+                      color={type === zt.value ? colors.haven.purple[600] : colors.text.tertiary}
                     />
                     <Text
                       style={[
@@ -345,8 +345,8 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   typeButtonActive: {
-    backgroundColor: colors.haven.champagne[50],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   typeButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   typeButtonTextActive: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',

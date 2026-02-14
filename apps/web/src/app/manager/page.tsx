@@ -339,9 +339,9 @@ function UrgentAlertCard({ item }: { item: UrgentItem }) {
         <span className="text-xs text-white/80">{item.timeAgo}</span>
       </div>
       <div className="p-4">
-        <h4 className="font-bold text-warm-900 mb-1">{item.title}</h4>
-        <p className="text-sm text-warm-600 mb-1">{item.description}</p>
-        <p className="text-xs text-warm-400">{item.address}</p>
+        <h4 className="font-bold text-neutral-900 mb-1">{item.title}</h4>
+        <p className="text-sm text-neutral-600 mb-1">{item.description}</p>
+        <p className="text-xs text-neutral-400">{item.address}</p>
         <div className="flex flex-wrap gap-2 mt-4">
           {item.actions.map((action, index) => (
             <Button
@@ -369,7 +369,7 @@ function UrgentSection({ items }: { items: UrgentItem[] }) {
           <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-red-400 opacity-75" />
           <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
         </span>
-        <h2 className="text-lg font-bold text-warm-900">Urgent Attention Required</h2>
+        <h2 className="text-lg font-bold text-neutral-900">Urgent Attention Required</h2>
         <Badge variant="error">{items.length}</Badge>
       </div>
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -394,22 +394,22 @@ function ScheduleBlockCard({ block }: { block: ScheduleBlock }) {
   const Icon = style.icon;
 
   return (
-    <div className={`flex items-start gap-4 p-4 hover:bg-warm-50 transition-colors rounded-xl`}>
+    <div className={`flex items-start gap-4 p-4 hover:bg-neutral-50 transition-colors rounded-xl`}>
       <div className="text-right min-w-[60px]">
-        <p className="text-lg font-bold text-warm-900">{block.time.split(' ')[0]}</p>
-        <p className="text-xs text-warm-500 uppercase">{block.time.split(' ')[1]}</p>
+        <p className="text-lg font-bold text-neutral-900">{block.time.split(' ')[0]}</p>
+        <p className="text-xs text-neutral-500 uppercase">{block.time.split(' ')[1]}</p>
       </div>
       <div className={`flex-1 rounded-xl p-4 border-l-4 ${style.border} ${style.bg}`}>
         <div className="flex items-start justify-between">
           <div className="flex items-start gap-3">
             <div className="p-2 bg-white rounded-lg shadow-sm">
-              <Icon className="w-4 h-4 text-warm-600" />
+              <Icon className="w-4 h-4 text-neutral-600" />
             </div>
             <div>
-              <p className="font-semibold text-warm-900">{block.title}</p>
-              <p className="text-sm text-warm-600">{block.household}</p>
+              <p className="font-semibold text-neutral-900">{block.title}</p>
+              <p className="text-sm text-neutral-600">{block.household}</p>
               {block.vendor && (
-                <p className="text-xs text-warm-500 mt-1">Vendor: {block.vendor}</p>
+                <p className="text-xs text-neutral-500 mt-1">Vendor: {block.vendor}</p>
               )}
             </div>
           </div>
@@ -418,12 +418,12 @@ function ScheduleBlockCard({ block }: { block: ScheduleBlock }) {
         {block.accessInfo && (
           <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/50">
             {block.accessInfo.gate && (
-              <span className="flex items-center gap-1.5 text-xs text-warm-600 bg-white px-2 py-1 rounded-lg">
+              <span className="flex items-center gap-1.5 text-xs text-neutral-600 bg-white px-2 py-1 rounded-lg">
                 <Key className="w-3 h-3" /> {block.accessInfo.gate}
               </span>
             )}
             {block.accessInfo.dog && (
-              <span className="flex items-center gap-1.5 text-xs text-warm-600 bg-white px-2 py-1 rounded-lg">
+              <span className="flex items-center gap-1.5 text-xs text-neutral-600 bg-white px-2 py-1 rounded-lg">
                 <Dog className="w-3 h-3" /> {block.accessInfo.dog}
               </span>
             )}
@@ -454,18 +454,18 @@ function TaskItemCard({
   const { variant, label } = statusBadge[task.status];
 
   return (
-    <div className={`flex items-start gap-3 p-4 hover:bg-warm-50 transition-colors rounded-xl ${completed ? 'opacity-50' : ''}`}>
+    <div className={`flex items-start gap-3 p-4 hover:bg-neutral-50 transition-colors rounded-xl ${completed ? 'opacity-50' : ''}`}>
       <input
         type="checkbox"
         checked={completed}
         onChange={onToggle}
-        className="mt-1 w-4 h-4 rounded border-warm-300 text-indigo-600 focus:ring-indigo-500"
+        className="mt-1 w-4 h-4 rounded border-neutral-300 text-indigo-600 focus:ring-indigo-500"
       />
       <div className="flex-1 min-w-0">
-        <p className={`font-medium text-warm-900 ${completed ? 'line-through' : ''}`}>
+        <p className={`font-medium text-neutral-900 ${completed ? 'line-through' : ''}`}>
           {task.title}
         </p>
-        <p className="text-sm text-warm-500 mt-0.5">
+        <p className="text-sm text-neutral-500 mt-0.5">
           {task.household} • Due: <span className={task.status === 'overdue' ? 'text-red-600 font-medium' : ''}>{task.dueDate}</span>
         </p>
       </div>
@@ -491,12 +491,12 @@ function HouseholdCard({ household }: { household: HouseholdStatus }) {
   return (
     <Link
       href={`/manager/households/${household.id}`}
-      className="group p-5 rounded-2xl border border-warm-100 hover:border-indigo-200 hover:shadow-lg transition-all bg-white"
+      className="group p-5 rounded-2xl border border-neutral-100 hover:border-indigo-200 hover:shadow-lg transition-all bg-white"
     >
       <div className="flex items-start justify-between mb-3">
         <div>
-          <h4 className="font-bold text-warm-900 group-hover:text-indigo-600 transition-colors">{household.name}</h4>
-          <p className="text-sm text-warm-500">{household.address}</p>
+          <h4 className="font-bold text-neutral-900 group-hover:text-indigo-600 transition-colors">{household.name}</h4>
+          <p className="text-sm text-neutral-500">{household.address}</p>
         </div>
         <span className={`w-3 h-3 rounded-full ${statusColors[household.status].bg} ring-4 ${statusColors[household.status].ring}`} />
       </div>
@@ -511,7 +511,7 @@ function HouseholdCard({ household }: { household: HouseholdStatus }) {
           <Badge variant="neutral" size="sm">{household.taskCount} tasks</Badge>
         )}
       </div>
-      <div className="flex items-center justify-between text-xs text-warm-500 pt-3 border-t border-warm-50">
+      <div className="flex items-center justify-between text-xs text-neutral-500 pt-3 border-t border-neutral-50">
         <span>Last contact: {household.lastContact}</span>
         {household.unreadMessages > 0 && (
           <span className="flex items-center gap-1 text-indigo-600">
@@ -536,18 +536,18 @@ function ActivityItemCard({ activity }: { activity: Activity }) {
   const Icon = style.icon;
 
   return (
-    <div className="flex items-start gap-3 p-4 hover:bg-warm-50 transition-colors rounded-xl">
+    <div className="flex items-start gap-3 p-4 hover:bg-neutral-50 transition-colors rounded-xl">
       <div className={`p-2 rounded-lg ${style.color}`}>
         <Icon className="w-3 h-3 text-white" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="text-sm text-warm-900">
+        <p className="text-sm text-neutral-900">
           <span className="font-semibold">{activity.household}</span>{' '}
-          <span className="text-warm-600">{activity.action}</span>
+          <span className="text-neutral-600">{activity.action}</span>
         </p>
-        <p className="text-sm text-warm-500">{activity.detail}</p>
+        <p className="text-sm text-neutral-500">{activity.detail}</p>
       </div>
-      <span className="text-xs text-warm-400 whitespace-nowrap">{activity.timeAgo}</span>
+      <span className="text-xs text-neutral-400 whitespace-nowrap">{activity.timeAgo}</span>
     </div>
   );
 }
@@ -676,7 +676,7 @@ export default function ManagerDashboardPage() {
       <div className="flex items-center justify-center min-h-[400px]">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-          <p className="text-warm-500">Loading dashboard...</p>
+          <p className="text-neutral-500">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -705,12 +705,12 @@ export default function ManagerDashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Today's Schedule */}
         <Card padding="none">
-          <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-100 rounded-lg">
                 <Calendar className="w-4 h-4 text-indigo-600" />
               </div>
-              <h3 className="font-bold text-warm-900">Today's Schedule</h3>
+              <h3 className="font-bold text-neutral-900">Today's Schedule</h3>
             </div>
             <Link href="/manager/calendar" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
               View Week <ChevronRight className="w-4 h-4" />
@@ -725,14 +725,14 @@ export default function ManagerDashboardPage() {
 
         {/* Task Queue */}
         <Card padding="none">
-          <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+          <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="p-2 bg-indigo-100 rounded-lg">
                 <CheckSquare className="w-4 h-4 text-indigo-600" />
               </div>
-              <h3 className="font-bold text-warm-900">My Task Queue</h3>
+              <h3 className="font-bold text-neutral-900">My Task Queue</h3>
             </div>
-            <select className="text-sm border border-warm-200 rounded-lg px-3 py-1.5 text-warm-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
+            <select className="text-sm border border-neutral-200 rounded-lg px-3 py-1.5 text-neutral-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500">
               <option>All Tasks</option>
               <option>Due Today</option>
               <option>Overdue</option>
@@ -742,7 +742,7 @@ export default function ManagerDashboardPage() {
             {/* From Homeowners */}
             <div className="px-4 py-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">From Homeowners</span>
+                <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">From Homeowners</span>
                 <Badge variant="info" size="sm">{mockTasks.fromHomeowners.length}</Badge>
               </div>
             </div>
@@ -758,7 +758,7 @@ export default function ManagerDashboardPage() {
             {/* System Generated */}
             <div className="px-4 py-2 mt-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-warm-500 uppercase tracking-wider">System Generated</span>
+                <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">System Generated</span>
                 <Badge variant="neutral" size="sm">{mockTasks.systemGenerated.length}</Badge>
               </div>
             </div>
@@ -776,12 +776,12 @@ export default function ManagerDashboardPage() {
 
       {/* Household Status Grid */}
       <Card padding="none">
-        <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-100 rounded-lg">
               <Users className="w-4 h-4 text-indigo-600" />
             </div>
-            <h3 className="font-bold text-warm-900">My Households</h3>
+            <h3 className="font-bold text-neutral-900">My Households</h3>
           </div>
           <Link href="/manager/households" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
             View All <ChevronRight className="w-4 h-4" />
@@ -796,15 +796,15 @@ export default function ManagerDashboardPage() {
 
       {/* Activity Feed */}
       <Card padding="none">
-        <div className="px-6 py-4 border-b border-warm-100 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-neutral-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="p-2 bg-indigo-100 rounded-lg">
               <Bell className="w-4 h-4 text-indigo-600" />
             </div>
-            <h3 className="font-bold text-warm-900">Recent Activity</h3>
+            <h3 className="font-bold text-neutral-900">Recent Activity</h3>
           </div>
           <select
-            className="text-sm border border-warm-200 rounded-lg px-3 py-1.5 text-warm-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+            className="text-sm border border-neutral-200 rounded-lg px-3 py-1.5 text-neutral-600 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
             value={activityFilter}
             onChange={(e) => setActivityFilter(e.target.value as typeof activityFilter)}
           >
@@ -819,7 +819,7 @@ export default function ManagerDashboardPage() {
             <ActivityItemCard key={activity.id} activity={activity} />
           ))}
         </div>
-        <div className="px-6 py-4 border-t border-warm-100">
+        <div className="px-6 py-4 border-t border-neutral-100">
           <Link href="/manager/activity" className="text-sm text-indigo-600 hover:text-indigo-700 font-medium flex items-center gap-1">
             View Full Activity Log <ChevronRight className="w-4 h-4" />
           </Link>

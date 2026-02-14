@@ -35,7 +35,7 @@ export function EmptyStateCard({
         <Ionicons
           name={icon}
           size={compact ? 28 : 40}
-          color={colors.haven.champagne[500]}
+          color={colors.haven.purple[500]}
         />
       </View>
 
@@ -49,7 +49,7 @@ export function EmptyStateCard({
           style={styles.alfredPrompt}
           onPress={() => router.push('/(tabs)/manager')}
         >
-          <Ionicons name="sparkles" size={16} color={colors.haven.champagne[500]} />
+          <Ionicons name="sparkles" size={16} color={colors.haven.purple[500]} />
           <Text style={styles.alfredPromptText}>{alfredPrompt}</Text>
         </TouchableOpacity>
       )}
@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 36,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],
@@ -136,12 +136,12 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.full,
   },
   alfredPromptText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   actionsContainer: {
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   actionButtonPrimary: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   actionButtonText: {
     fontSize: typography.fontSizes.sm,

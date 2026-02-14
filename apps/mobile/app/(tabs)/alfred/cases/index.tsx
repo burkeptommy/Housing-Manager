@@ -97,7 +97,7 @@ export default function CasesListScreen() {
         </Text>
         {isActive && (
           <View style={styles.actionNeeded}>
-            <Ionicons name="chatbubble" size={14} color={colors.haven.sage[600]} />
+            <Ionicons name="chatbubble" size={14} color={colors.haven.purple[600]} />
             <Text style={styles.actionNeededText}>Alfred needs your input</Text>
           </View>
         )}
@@ -133,7 +133,7 @@ export default function CasesListScreen() {
     return (
       <ScreenContainer title="Email Cases" showBack>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.sage[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </ScreenContainer>
     );
@@ -183,7 +183,7 @@ export default function CasesListScreen() {
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="mail-open-outline" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="mail-open-outline" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>No emails yet</Text>
             <Text style={styles.emptyText}>
               Forward or CC Alfred on any email and it'll show up here.
@@ -208,7 +208,7 @@ export default function CasesListScreen() {
                   style={styles.debugButton}
                   onPress={() => simulateEmail(scenario.key)}
                 >
-                  <Ionicons name="flask-outline" size={16} color={colors.haven.navy[600]} />
+                  <Ionicons name="flask-outline" size={16} color={colors.haven.purple[600]} />
                   <Text style={styles.debugButtonText}>{scenario.label}</Text>
                 </TouchableOpacity>
               ))}
@@ -244,18 +244,18 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   filterTabActive: {
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
   },
   filterText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
   },
   filterTextActive: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     fontWeight: typography.fontWeights.medium as '500',
   },
   filterBadge: {
-    backgroundColor: colors.haven.sage[500],
+    backgroundColor: colors.haven.purple[500],
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 10,
@@ -288,25 +288,25 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   statusActive: {
-    backgroundColor: colors.haven.sage[500],
+    backgroundColor: colors.haven.purple[500],
   },
   statusCompleted: {
-    backgroundColor: colors.haven.navy[300],
+    backgroundColor: colors.haven.purple[300],
   },
   caseNumber: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     fontFamily: 'monospace',
   },
   caseDate: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
   },
   caseSubject: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium as '500',
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[2],
   },
   actionNeeded: {
@@ -316,7 +316,7 @@ const styles = StyleSheet.create({
   },
   actionNeededText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.sage[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium as '500',
   },
   emptyContainer: {
@@ -326,13 +326,13 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold as '600',
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     marginTop: spacing[4],
     marginBottom: spacing[2],
   },
   emptyText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     textAlign: 'center',
     paddingHorizontal: spacing[8],
   },
@@ -372,6 +372,6 @@ const styles = StyleSheet.create({
   },
   debugButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
 });

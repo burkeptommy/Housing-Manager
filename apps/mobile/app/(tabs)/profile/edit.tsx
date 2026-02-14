@@ -74,7 +74,7 @@ export default function EditProfileScreen() {
         }),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update profile');
       }
 

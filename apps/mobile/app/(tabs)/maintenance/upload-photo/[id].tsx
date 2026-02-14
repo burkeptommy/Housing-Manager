@@ -195,7 +195,7 @@ export default function UploadPhotoScreen() {
           <Card style={styles.taskCard}>
             <View style={styles.taskHeader}>
               <View style={styles.taskIcon}>
-                <Ionicons name="construct-outline" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="construct-outline" size={24} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.taskInfo}>
                 <Text style={styles.taskTitle} numberOfLines={1}>{task.title}</Text>
@@ -225,7 +225,7 @@ export default function UploadPhotoScreen() {
                 <Ionicons
                   name={type === 'before' ? 'arrow-back-circle' : type === 'after' ? 'arrow-forward-circle' : 'alert-circle'}
                   size={20}
-                  color={photoType === type ? colors.haven.champagne[500] : colors.text.secondary}
+                  color={photoType === type ? colors.haven.purple[500] : colors.text.secondary}
                 />
                 <Text
                   style={[
@@ -251,7 +251,7 @@ export default function UploadPhotoScreen() {
               onPress={takePhoto}
               disabled={photos.length >= 5}
             >
-              <Ionicons name="camera" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="camera" size={24} color={colors.haven.purple[500]} />
               <Text style={styles.uploadButtonText}>Take Photo</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -259,7 +259,7 @@ export default function UploadPhotoScreen() {
               onPress={pickImage}
               disabled={photos.length >= 5}
             >
-              <Ionicons name="images" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="images" size={24} color={colors.haven.purple[500]} />
               <Text style={styles.uploadButtonText}>Choose from Library</Text>
             </TouchableOpacity>
           </View>
@@ -292,7 +292,7 @@ export default function UploadPhotoScreen() {
 
           {photos.length === 0 && (
             <View style={styles.emptyPhotos}>
-              <Ionicons name="image-outline" size={48} color={colors.haven.navy[300]} />
+              <Ionicons name="image-outline" size={48} color={colors.haven.purple[300]} />
               <Text style={styles.emptyText}>No photos added yet</Text>
               <Text style={styles.emptySubtext}>Take or choose photos to document this task</Text>
             </View>
@@ -352,7 +352,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -397,15 +397,15 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   typeButtonSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   typeLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   typeLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   uploadButtons: {
@@ -422,13 +422,13 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
     borderStyle: 'dashed',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   uploadButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   photoGrid: {
@@ -454,7 +454,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: spacing[2],
     left: spacing[2],
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.sm,

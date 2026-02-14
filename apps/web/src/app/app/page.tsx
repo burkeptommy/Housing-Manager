@@ -228,8 +228,8 @@ function HeroGreeting({ userName, weather, houseHealth }: HeroGreetingProps) {
     <div className="relative overflow-hidden rounded-2xl sm:rounded-3xl bg-gradient-to-br from-haven-700 via-haven-700 to-haven-800 p-4 sm:p-8 text-white mb-6 sm:mb-8">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-10">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
-        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full tranwarm-y-1/2 -tranwarm-x-1/2" />
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
+        <div className="absolute bottom-0 left-0 w-64 h-64 bg-white rounded-full translate-y-1/2 -translate-x-1/2" />
       </div>
 
       <div className="relative">
@@ -251,7 +251,7 @@ function HeroGreeting({ userName, weather, houseHealth }: HeroGreetingProps) {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-6">
           {/* Home Health - Full width on mobile, semantic colors */}
           <div className={`col-span-2 sm:col-span-1 ${healthColors.bg} ${healthColors.border} border rounded-xl px-4 py-3`}>
-            <p className="text-warm-500 text-xs font-medium">Home Health</p>
+            <p className="text-neutral-500 text-xs font-medium">Home Health</p>
             <div className="flex items-center gap-2">
               <p className={`text-2xl font-bold ${healthColors.text}`}>{houseHealth.score}%</p>
               <span className={`px-1.5 py-0.5 rounded text-xs font-medium ${healthColors.badge}`}>
@@ -260,13 +260,13 @@ function HeroGreeting({ userName, weather, houseHealth }: HeroGreetingProps) {
             </div>
           </div>
           {/* Items Handled - Champagne */}
-          <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
-            <p className="text-champagne-600 text-xs font-medium">Items Handled</p>
+          <div className="bg-haven-100 border border-haven-200 rounded-xl px-4 py-3">
+            <p className="text-haven-600 text-xs font-medium">Items Handled</p>
             <p className="text-2xl font-bold text-haven-700">{houseHealth.itemsHandled}</p>
           </div>
           {/* Next Service - Champagne */}
-          <div className="bg-champagne-100 border border-champagne-200 rounded-xl px-4 py-3">
-            <p className="text-champagne-600 text-xs font-medium">Next Service</p>
+          <div className="bg-haven-100 border border-haven-200 rounded-xl px-4 py-3">
+            <p className="text-haven-600 text-xs font-medium">Next Service</p>
             <p className="text-lg font-semibold text-haven-700">Jan 7</p>
           </div>
         </div>
@@ -284,13 +284,13 @@ function TodayNotesCard({ notes }: { notes: TodayNote[] }) {
         {notes.map((note) => {
           const Icon = note.icon;
           return (
-            <div key={note.id} className="flex items-center gap-3 p-3 rounded-xl bg-warm-50 hover:bg-warm-100 transition-colors">
+            <div key={note.id} className="flex items-center gap-3 p-3 rounded-xl bg-neutral-50 hover:bg-neutral-100 transition-colors">
               <div className={`p-2 rounded-lg bg-white ${note.iconColor}`}>
                 <Icon className="w-4 h-4" />
               </div>
-              <span className="flex-1 text-sm text-warm-700">{note.text}</span>
+              <span className="flex-1 text-sm text-neutral-700">{note.text}</span>
               {note.time && (
-                <span className="text-xs text-warm-400">{note.time}</span>
+                <span className="text-xs text-neutral-400">{note.time}</span>
               )}
             </div>
           );
@@ -324,20 +324,20 @@ function DecisionCard({ item, onDismiss }: { item: ActionItem; onDismiss: (id: s
       {/* Content */}
       <div className="p-5">
         <div className="flex items-start justify-between mb-3">
-          <h3 className="text-lg font-bold text-warm-900">{item.title}</h3>
+          <h3 className="text-lg font-bold text-neutral-900">{item.title}</h3>
           {item.amount && (
-            <span className="text-xl font-bold text-warm-900">${item.amount.toLocaleString()}</span>
+            <span className="text-xl font-bold text-neutral-900">${item.amount.toLocaleString()}</span>
           )}
         </div>
-        <p className="text-warm-600 text-sm mb-4">{item.description}</p>
+        <p className="text-neutral-600 text-sm mb-4">{item.description}</p>
 
         {/* Manager Note */}
-        <div className="bg-warm-50 rounded-xl p-4 mb-5">
+        <div className="bg-neutral-50 rounded-xl p-4 mb-5">
           <div className="flex items-start gap-3">
             <ManagerAvatar size="sm" />
             <div>
-              <span className="text-xs font-medium text-warm-500">Sarah says:</span>
-              <p className="text-sm text-warm-700 mt-0.5">{item.managerNote}</p>
+              <span className="text-xs font-medium text-neutral-500">Sarah says:</span>
+              <p className="text-sm text-neutral-700 mt-0.5">{item.managerNote}</p>
             </div>
           </div>
         </div>
@@ -376,8 +376,8 @@ function RespondCard({ item, onDismiss }: { item: ActionItem; onDismiss: (id: st
         </button>
       </div>
 
-      <h3 className="text-lg font-bold text-warm-900 mb-1">{item.title}</h3>
-      <p className="text-sm text-warm-600 mb-4">{item.description}</p>
+      <h3 className="text-lg font-bold text-neutral-900 mb-1">{item.title}</h3>
+      <p className="text-sm text-neutral-600 mb-4">{item.description}</p>
 
       {/* Manager Note */}
       <div className="flex items-start gap-3 p-3 bg-amber-50 rounded-xl mb-4">
@@ -412,11 +412,11 @@ function AllCaughtUpCard({
         <div className="w-20 h-20 bg-white rounded-2xl flex items-center justify-center mx-auto mb-5 shadow-lg shadow-emerald-500/10">
           <Sparkles className="w-10 h-10 text-emerald-500" />
         </div>
-        <h2 className="text-2xl font-bold text-warm-900 mb-2">All caught up!</h2>
-        <p className="text-warm-600 mb-1">
-          Sarah is handling <span className="font-semibold text-warm-900">{itemsHandled} items</span> in the background.
+        <h2 className="text-2xl font-bold text-neutral-900 mb-2">All caught up!</h2>
+        <p className="text-neutral-600 mb-1">
+          Sarah is handling <span className="font-semibold text-neutral-900">{itemsHandled} items</span> in the background.
         </p>
-        <p className="text-warm-600 mb-6">
+        <p className="text-neutral-600 mb-6">
           Your home is <span className="font-semibold text-emerald-600">{healthScore}% healthy</span>. Next service: {nextService}.
         </p>
         <p className="text-3xl">☀️ Enjoy your day!</p>
@@ -443,8 +443,8 @@ function ManagerStatusCard({
             <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white" />
           </div>
           <div>
-            <h3 className="font-bold text-warm-900">{manager.name}</h3>
-            <p className="text-sm text-warm-500">Your Home Manager</p>
+            <h3 className="font-bold text-neutral-900">{manager.name}</h3>
+            <p className="text-sm text-neutral-500">Your Home Manager</p>
           </div>
         </div>
         <Badge variant="success" icon={<span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}>
@@ -454,14 +454,14 @@ function ManagerStatusCard({
 
       {/* Currently Working On */}
       {tasks.length > 0 && (
-        <div className="bg-warm-50 rounded-xl p-4 mb-4">
-          <p className="text-xs font-semibold text-warm-500 uppercase tracking-wider mb-3">Currently working on</p>
+        <div className="bg-neutral-50 rounded-xl p-4 mb-4">
+          <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider mb-3">Currently working on</p>
           <div className="space-y-2">
             {tasks.map((task) => (
               <div key={task.id} className="flex items-center gap-2 text-sm">
                 <Clock className="w-4 h-4 text-haven-700" />
-                <span className="text-warm-700">{task.task}</span>
-                <span className="text-warm-400">• {task.progress}</span>
+                <span className="text-neutral-700">{task.task}</span>
+                <span className="text-neutral-400">• {task.progress}</span>
               </div>
             ))}
           </div>
@@ -494,24 +494,24 @@ function FamilyLogisticsCard({ members }: { members: FamilyMemberStatus[] }) {
             work: 'bg-blue-100 text-blue-600',
             school: 'bg-purple-100 text-purple-600',
             activity: 'bg-amber-100 text-amber-600',
-            away: 'bg-warm-100 text-warm-600',
+            away: 'bg-neutral-100 text-neutral-600',
           };
 
           return (
-            <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-warm-50 transition-colors">
+            <div key={member.id} className="flex items-center gap-3 p-3 rounded-xl hover:bg-neutral-50 transition-colors">
               {/* Avatar */}
               <Avatar name={member.name} type={member.avatarType} size="md" />
 
               {/* Name & Status */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-warm-900">{member.name}</span>
+                  <span className="font-semibold text-neutral-900">{member.name}</span>
                   <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${locationColors[member.location]}`}>
                     <LocationIcon className="w-3 h-3" />
                     {member.locationLabel}
                   </span>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-warm-500">
+                <div className="flex items-center gap-2 text-sm text-neutral-500">
                   {member.until && <span>{member.until}</span>}
                   {member.pickupBy && <span>• {member.pickupBy}</span>}
                 </div>
@@ -519,7 +519,7 @@ function FamilyLogisticsCard({ members }: { members: FamilyMemberStatus[] }) {
 
               {/* Vehicle */}
               {member.vehicle && (
-                <div className="flex items-center gap-1.5 text-sm text-warm-500 bg-warm-100 px-2 py-1 rounded-lg">
+                <div className="flex items-center gap-1.5 text-sm text-neutral-500 bg-neutral-100 px-2 py-1 rounded-lg">
                   <Car className="w-4 h-4" />
                   <span>{member.vehicle}</span>
                 </div>
@@ -555,7 +555,7 @@ function HouseHealthCard({ health }: HouseHealthCardProps) {
           <div className={`p-2 rounded-lg ${healthColors.bg}`}>
             <Heart className={`w-5 h-5 ${healthColors.icon}`} />
           </div>
-          <h3 className="font-bold text-warm-900">House Health</h3>
+          <h3 className="font-bold text-neutral-900">House Health</h3>
         </div>
         <div className="text-right">
           <span className={`text-2xl font-bold ${healthColors.text}`}>{health.score}%</span>
@@ -564,23 +564,23 @@ function HouseHealthCard({ health }: HouseHealthCardProps) {
       </div>
 
       {/* Progress Bar */}
-      <div className="h-2 bg-warm-100 rounded-full mb-4 overflow-hidden">
+      <div className="h-2 bg-neutral-100 rounded-full mb-4 overflow-hidden">
         <div
           className={`h-full ${healthColors.progress} rounded-full transition-all duration-500`}
           style={{ width: `${health.score}%` }}
         />
       </div>
 
-      <p className="text-sm text-warm-600 mb-3">
-        <span className="font-semibold text-warm-900">Sarah is handling:</span>
+      <p className="text-sm text-neutral-600 mb-3">
+        <span className="font-semibold text-neutral-900">Sarah is handling:</span>
       </p>
       <div className="space-y-2 mb-4">
         {health.handlingItems.map((item) => (
-          <div key={item.id} className="flex items-center gap-3 p-2 bg-warm-50 rounded-lg">
+          <div key={item.id} className="flex items-center gap-3 p-2 bg-neutral-50 rounded-lg">
             {item.status === 'scheduling' && <Clock className="w-4 h-4 text-amber-500" />}
             {item.status === 'ordered' && <Package className="w-4 h-4 text-blue-500" />}
             {item.status === 'complete' && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-            <span className="text-sm text-warm-700">{item.task}</span>
+            <span className="text-sm text-neutral-700">{item.task}</span>
             <Badge variant={item.status === 'scheduling' ? 'warning' : item.status === 'ordered' ? 'info' : 'success'} size="sm">
               {item.status}
             </Badge>
@@ -628,30 +628,30 @@ function QuickActionsCard({ onOpenRequest }: { onOpenRequest: () => void }) {
       <div className="grid grid-cols-3 gap-3 mt-4">
         <Link
           href="/app/messages"
-          className="flex flex-col items-center gap-2 p-4 bg-warm-50 rounded-xl hover:bg-warm-100 transition-colors group"
+          className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors group"
         >
           <div className="p-2 bg-white rounded-lg shadow-sm group-hover:shadow transition-shadow">
-            <MessageCircle className="w-5 h-5 text-warm-600" />
+            <MessageCircle className="w-5 h-5 text-neutral-600" />
           </div>
-          <span className="text-xs font-medium text-warm-600">Messages</span>
+          <span className="text-xs font-medium text-neutral-600">Messages</span>
         </Link>
         <Link
           href="/app/billing"
-          className="flex flex-col items-center gap-2 p-4 bg-warm-50 rounded-xl hover:bg-warm-100 transition-colors group"
+          className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors group"
         >
           <div className="p-2 bg-white rounded-lg shadow-sm group-hover:shadow transition-shadow">
-            <FileText className="w-5 h-5 text-warm-600" />
+            <FileText className="w-5 h-5 text-neutral-600" />
           </div>
-          <span className="text-xs font-medium text-warm-600">Statement</span>
+          <span className="text-xs font-medium text-neutral-600">Statement</span>
         </Link>
         <Link
           href="/app/calendar"
-          className="flex flex-col items-center gap-2 p-4 bg-warm-50 rounded-xl hover:bg-warm-100 transition-colors group"
+          className="flex flex-col items-center gap-2 p-4 bg-neutral-50 rounded-xl hover:bg-neutral-100 transition-colors group"
         >
           <div className="p-2 bg-white rounded-lg shadow-sm group-hover:shadow transition-shadow">
-            <Calendar className="w-5 h-5 text-warm-600" />
+            <Calendar className="w-5 h-5 text-neutral-600" />
           </div>
-          <span className="text-xs font-medium text-warm-600">Calendar</span>
+          <span className="text-xs font-medium text-neutral-600">Calendar</span>
         </Link>
       </div>
     </Card>
@@ -670,16 +670,16 @@ function RequestModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
   ];
 
   return (
-    <div className="fixed inset-0 bg-warm-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-neutral-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full animate-in fade-in zoom-in-95 duration-200">
-        <div className="p-6 border-b border-warm-100">
+        <div className="p-6 border-b border-neutral-100">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold text-warm-900">How can Sarah help?</h2>
+            <h2 className="text-xl font-bold text-neutral-900">How can Sarah help?</h2>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-warm-100 rounded-xl transition-colors"
+              className="p-2 hover:bg-neutral-100 rounded-xl transition-colors"
             >
-              <X className="w-5 h-5 text-warm-500" />
+              <X className="w-5 h-5 text-neutral-500" />
             </button>
           </div>
         </div>
@@ -691,23 +691,23 @@ function RequestModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
               <button
                 key={request.label}
                 onClick={onClose}
-                className={`flex flex-col items-center gap-3 p-5 rounded-xl transition-all border border-warm-100 ${request.hoverBg} hover:border-warm-200 hover:shadow-sm`}
+                className={`flex flex-col items-center gap-3 p-5 rounded-xl transition-all border border-neutral-100 ${request.hoverBg} hover:border-neutral-200 hover:shadow-sm`}
               >
                 <div className={`p-3 rounded-xl ${request.color}`}>
                   <Icon className="w-6 h-6" />
                 </div>
-                <span className="text-sm font-medium text-warm-700 text-center">{request.label}</span>
+                <span className="text-sm font-medium text-neutral-700 text-center">{request.label}</span>
               </button>
             );
           })}
         </div>
 
-        <div className="p-4 border-t border-warm-100">
+        <div className="p-4 border-t border-neutral-100">
           <div className="relative">
             <input
               type="text"
               placeholder="Or just tell me what you need..."
-              className="w-full px-4 py-3 pr-12 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600/20 focus:border-haven-700 transition-all"
+              className="w-full px-4 py-3 pr-12 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-haven-600/20 focus:border-haven-700 transition-all"
             />
             <button className="absolute right-3 top-1/2 -translate-y-1/2 p-2 bg-haven-700 rounded-lg text-white hover:bg-haven-800 transition-colors">
               <Mic className="w-4 h-4" />
@@ -722,21 +722,21 @@ function RequestModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => voi
 // Manager Contact Footer (Premium)
 function ManagerContactFooter({ manager }: { manager: typeof mockManager }) {
   return (
-    <div className="relative overflow-hidden bg-gradient-to-br from-warm-900 via-warm-800 to-warm-900 rounded-2xl p-6 text-white">
+    <div className="relative overflow-hidden bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 rounded-2xl p-6 text-white">
       {/* Background Pattern */}
       <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 tranwarm-x-1/2" />
+        <div className="absolute top-0 right-0 w-64 h-64 bg-white rounded-full -translate-y-1/2 translate-x-1/2" />
       </div>
 
       <div className="relative flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="relative">
             <ManagerAvatar size="xl" />
-            <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-warm-900" />
+            <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-neutral-900" />
           </div>
           <div>
             <h3 className="text-lg font-bold text-white">{manager.name}</h3>
-            <p className="text-warm-400">Your Home Manager</p>
+            <p className="text-neutral-400">Your Home Manager</p>
           </div>
         </div>
 

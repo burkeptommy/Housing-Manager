@@ -170,10 +170,10 @@ export default function PropertyPage() {
 
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Building2 className="w-7 h-7 text-haven-champagne-600" />
+        <div className="w-14 h-14 bg-haven-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Building2 className="w-7 h-7 text-haven-600" />
         </div>
-        <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">
+        <h1 className="text-2xl font-bold text-haven-900 mb-2">
           Let&apos;s start with your property
         </h1>
         <p className="text-gray-600">Enter your address and basic property details.</p>
@@ -193,9 +193,9 @@ export default function PropertyPage() {
         {/* Address Section */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-haven-navy-900">Address</h3>
+            <h3 className="font-medium text-haven-900">Address</h3>
             {isEnrichingProperty && (
-              <div className="flex items-center gap-2 text-sm text-haven-champagne-600">
+              <div className="flex items-center gap-2 text-sm text-haven-600">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 Looking up property details...
               </div>
@@ -293,7 +293,7 @@ export default function PropertyPage() {
         {/* Property Details */}
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium text-haven-navy-900">Property Details</h3>
+            <h3 className="font-medium text-haven-900">Property Details</h3>
             {wasAutoEnriched && (
               <div className="flex items-center gap-2 text-sm text-emerald-600">
                 <Sparkles className="w-4 h-4" />
@@ -356,33 +356,33 @@ export default function PropertyPage() {
 
         {/* Inspection Upload */}
         <div className="space-y-4">
-          <h3 className="font-medium text-haven-navy-900">Home Inspection (optional)</h3>
+          <h3 className="font-medium text-haven-900">Home Inspection (optional)</h3>
           <p className="text-sm text-gray-500">
             Upload a recent inspection if you have one. We&apos;ll extract system details
             automatically.
           </p>
 
           {!uploadedFile ? (
-            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-haven-champagne-500 transition-colors cursor-pointer group">
+            <label className="block border-2 border-dashed border-gray-200 rounded-xl p-8 text-center hover:border-haven-500 transition-colors cursor-pointer group">
               <input
                 type="file"
                 className="sr-only"
                 accept=".pdf,.jpg,.jpeg,.png"
                 onChange={handleFileUpload}
               />
-              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-haven-champagne-500" />
+              <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2 group-hover:text-haven-500" />
               <p className="text-sm text-gray-600">
-                Drag & drop or <span className="text-haven-champagne-600 font-medium">browse</span>
+                Drag & drop or <span className="text-haven-600 font-medium">browse</span>
               </p>
               <p className="text-xs text-gray-400 mt-1">PDF, JPG, or PNG up to 10MB</p>
             </label>
           ) : (
             <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl">
-              <div className="w-10 h-10 bg-haven-champagne-100 rounded-lg flex items-center justify-center">
-                <FileText className="w-5 h-5 text-haven-champagne-600" />
+              <div className="w-10 h-10 bg-haven-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-haven-600" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-haven-navy-900 truncate">
+                <p className="text-sm font-medium text-haven-900 truncate">
                   {uploadedFile.name}
                 </p>
                 <p className="text-xs text-gray-500">
@@ -419,13 +419,13 @@ export default function PropertyPage() {
       <div className="flex justify-between mt-8">
         <Link
           href="/onboarding/choose-path"
-          className="text-gray-600 hover:text-haven-navy-900 py-3 px-4 font-medium transition-colors"
+          className="text-gray-600 hover:text-haven-900 py-3 px-4 font-medium transition-colors"
         >
           ← Back
         </Link>
         <button
           onClick={handleContinue}
-          className="bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
+          className="bg-haven-900 hover:bg-haven-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
         >
           Continue
           <ArrowRight className="w-4 h-4" />

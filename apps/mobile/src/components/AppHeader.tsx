@@ -13,14 +13,14 @@ interface AppHeaderProps {
   textColor?: string;
 }
 
-const NAVY = '#0a1929';
+const PURPLE = '#6200EA';
 
 export function AppHeader({
   title,
   showBack = false,
   onBackPress,
   rightAction,
-  backgroundColor = NAVY,
+  backgroundColor = PURPLE,
   textColor = '#ffffff',
 }: AppHeaderProps) {
   const router = useRouter();
@@ -92,6 +92,6 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '600',
+    fontFamily: 'Nunito_600SemiBold',
   },
 });

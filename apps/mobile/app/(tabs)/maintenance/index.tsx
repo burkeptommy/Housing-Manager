@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 // Removed react-native-reanimated to fix Worklets crash
 import { useAuth } from '../../../src/contexts/auth-context';
 import { Card, Badge, SkeletonList, NoMaintenanceEmptyState, ErrorEmptyState } from '../../../src/components';
+import { AppHeader } from '../../../src/components/AppHeader';
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
@@ -210,7 +211,7 @@ export default function MaintenanceScreen() {
       case 'overdue': return colors.status.error;
       case 'due': return colors.status.warning;
       case 'completed': return colors.status.success;
-      default: return colors.haven.champagne[500];
+      default: return colors.haven.purple[500];
     }
   };
 
@@ -391,7 +392,7 @@ export default function MaintenanceScreen() {
 
       {item.assignedTo && (
         <View style={styles.assignedContainer}>
-          <Ionicons name="person-outline" size={14} color={colors.haven.champagne[600]} />
+          <Ionicons name="person-outline" size={14} color={colors.haven.purple[600]} />
           <Text style={styles.assignedText}>{item.assignedTo} is handling this</Text>
         </View>
       )}
@@ -478,6 +479,7 @@ export default function MaintenanceScreen() {
   if (isLoading) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
+        <AppHeader title="Tasks" />
         <View style={styles.filterContainer}>
           {['All', 'Upcoming', 'Overdue'].map((label, i) => (
             <View key={label} style={[styles.filterTab, i === 0 && styles.filterTabActive]}>
@@ -493,6 +495,7 @@ export default function MaintenanceScreen() {
   if (error && tasks.length === 0) {
     return (
       <SafeAreaView style={styles.container} edges={['bottom']}>
+        <AppHeader title="Tasks" />
         <ErrorEmptyState onRetry={fetchTasks} />
       </SafeAreaView>
     );
@@ -500,6 +503,7 @@ export default function MaintenanceScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <AppHeader title="Tasks" />
       {/* Top-level Tabs */}
       <View style={styles.topTabsContainer}>
         <TouchableOpacity
@@ -509,7 +513,7 @@ export default function MaintenanceScreen() {
           <Ionicons
             name="list-outline"
             size={18}
-            color={activeTab === 'tasks' ? colors.haven.navy[900] : colors.text.tertiary}
+            color={activeTab === 'tasks' ? colors.haven.purple[900] : colors.text.tertiary}
           />
           <Text style={[styles.topTabText, activeTab === 'tasks' && styles.topTabTextActive]}>
             Tasks
@@ -522,7 +526,7 @@ export default function MaintenanceScreen() {
           <Ionicons
             name="hardware-chip-outline"
             size={18}
-            color={activeTab === 'systems' ? colors.haven.navy[900] : colors.text.tertiary}
+            color={activeTab === 'systems' ? colors.haven.purple[900] : colors.text.tertiary}
           />
           <Text style={[styles.topTabText, activeTab === 'systems' && styles.topTabTextActive]}>
             Systems
@@ -616,7 +620,7 @@ export default function MaintenanceScreen() {
                   style={styles.addSystemButton}
                   onPress={() => router.push('/(tabs)/manager/new-request' as any)}
                 >
-                  <Ionicons name="add" size={18} color={colors.haven.champagne[500]} />
+                  <Ionicons name="add" size={18} color={colors.haven.purple[500]} />
                   <Text style={styles.addSystemText}>Add</Text>
                 </TouchableOpacity>
               </View>
@@ -675,7 +679,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -697,7 +701,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   filterTabActive: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   filterText: {
     fontSize: typography.fontSizes.sm,
@@ -784,7 +788,7 @@ const styles = StyleSheet.create({
   },
   assignedText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   progressContainer: {
     marginTop: spacing[3],
@@ -805,7 +809,7 @@ const styles = StyleSheet.create({
   progressCount: {
     fontSize: typography.fontSizes.xs,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   progressBar: {
     height: 6,
@@ -815,7 +819,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderRadius: borderRadius.full,
   },
   emptyContainer: {
@@ -854,7 +858,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   topTabActive: {
-    borderBottomColor: colors.haven.navy[900],
+    borderBottomColor: colors.haven.purple[900],
   },
   topTabText: {
     fontSize: typography.fontSizes.base,
@@ -862,7 +866,7 @@ const styles = StyleSheet.create({
     color: colors.text.tertiary,
   },
   topTabTextActive: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     fontWeight: typography.fontWeights.semibold,
   },
   // Systems view
@@ -979,13 +983,13 @@ const styles = StyleSheet.create({
     gap: spacing[1],
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
   },
   addSystemText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   emptySystemsContainer: {
     alignItems: 'center',
@@ -1011,7 +1015,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   addFirstSystemText: {

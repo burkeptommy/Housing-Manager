@@ -178,7 +178,7 @@ interface EmptyPromptProps {
 function EmptyPrompt({ text, onPress }: EmptyPromptProps) {
   return (
     <TouchableOpacity style={helperStyles.emptyPrompt} onPress={onPress} disabled={!onPress}>
-      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
       <Text style={helperStyles.emptyPromptText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -201,7 +201,7 @@ const helperStyles = StyleSheet.create({
   sectionAction: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   infoRow: {
     flexDirection: 'row',
@@ -226,7 +226,7 @@ const helperStyles = StyleSheet.create({
     color: colors.status.error,
   },
   linkText: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   emptyPrompt: {
     flexDirection: 'row',
@@ -236,7 +236,7 @@ const helperStyles = StyleSheet.create({
   },
   emptyPromptText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
 });
 
@@ -322,7 +322,7 @@ export default function PetDetailScreen() {
               }
 
               const response = await fetch(
-                `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+                `${API_BASE_URL}/family/pets/${id}`,
                 {
                   method: 'DELETE',
                   headers: {
@@ -355,7 +355,7 @@ export default function PetDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      `${API_BASE_URL}/family/pets/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -383,7 +383,7 @@ export default function PetDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      `${API_BASE_URL}/family/pets/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -409,7 +409,7 @@ export default function PetDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      `${API_BASE_URL}/family/pets/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -436,7 +436,7 @@ export default function PetDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`,
+      `${API_BASE_URL}/family/pets/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -527,7 +527,7 @@ export default function PetDetailScreen() {
           title: 'Pet',
           headerRight: () => (
             <TouchableOpacity onPress={() => router.push(`/(tabs)/family/pet/edit/${id}` as any)}>
-              <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="create-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           ),
         }}
@@ -547,7 +547,7 @@ export default function PetDetailScreen() {
         {/* Hero Card */}
         <Card style={styles.heroCard}>
           <View style={styles.petIconContainer}>
-            <Ionicons name={petIcon} size={56} color={colors.haven.champagne[500]} />
+            <Ionicons name={petIcon} size={56} color={colors.haven.purple[500]} />
           </View>
           <Text style={styles.petName}>{pet.name}</Text>
           <View style={styles.badgeRow}>
@@ -623,7 +623,7 @@ export default function PetDetailScreen() {
               {(pet.vet?.nextVisit || pet.nextVetVisit) && (
                 <View style={styles.appointmentRow}>
                   <View style={styles.appointmentInfo}>
-                    <Ionicons name="calendar" size={18} color={colors.haven.navy[600]} />
+                    <Ionicons name="calendar" size={18} color={colors.haven.purple[600]} />
                     <View style={styles.appointmentContent}>
                       <Text style={styles.appointmentLabel}>Next Appointment</Text>
                       <Text style={styles.appointmentDate}>
@@ -671,7 +671,7 @@ export default function PetDetailScreen() {
                     size={18}
                     color={isVaccinationExpired(vaccination.expiresAt)
                       ? colors.status.error
-                      : colors.haven.navy[600]}
+                      : colors.haven.purple[600]}
                   />
                 </View>
                 <View style={styles.vaccinationContent}>
@@ -717,7 +717,7 @@ export default function PetDetailScreen() {
               pet.medicationList.map((med) => (
                 <View key={med.id} style={styles.medicationRow}>
                   <View style={styles.medicationIcon}>
-                    <Ionicons name="medkit-outline" size={18} color={colors.haven.champagne[500]} />
+                    <Ionicons name="medkit-outline" size={18} color={colors.haven.purple[500]} />
                   </View>
                   <View style={styles.medicationContent}>
                     <Text style={styles.medicationName}>{med.name}</Text>
@@ -729,7 +729,7 @@ export default function PetDetailScreen() {
             ) : pet.medications ? (
               <View style={styles.medicationRow}>
                 <View style={styles.medicationIcon}>
-                  <Ionicons name="medkit-outline" size={18} color={colors.haven.champagne[500]} />
+                  <Ionicons name="medkit-outline" size={18} color={colors.haven.purple[500]} />
                 </View>
                 <View style={styles.medicationContent}>
                   <Text style={styles.medicationName}>{pet.medications}</Text>
@@ -750,7 +750,7 @@ export default function PetDetailScreen() {
             <>
               {(pet.care?.foodBrand || pet.care?.foodType) && (
                 <View style={styles.careCard}>
-                  <Ionicons name="restaurant-outline" size={20} color={colors.haven.navy[600]} />
+                  <Ionicons name="restaurant-outline" size={20} color={colors.haven.purple[600]} />
                   <View style={styles.careContent}>
                     <Text style={styles.careLabel}>Food</Text>
                     {pet.care?.foodBrand && (
@@ -784,7 +784,7 @@ export default function PetDetailScreen() {
                       style={styles.callButton}
                       onPress={() => Linking.openURL(`tel:${pet.care?.groomerPhone}`)}
                     >
-                      <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                      <Ionicons name="call-outline" size={20} color={colors.haven.purple[500]} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -801,7 +801,7 @@ export default function PetDetailScreen() {
                       style={styles.callButton}
                       onPress={() => Linking.openURL(`tel:${pet.care?.walkerPhone}`)}
                     >
-                      <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                      <Ionicons name="call-outline" size={20} color={colors.haven.purple[500]} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -998,7 +998,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -1016,7 +1016,7 @@ const styles = StyleSheet.create({
     width: 120,
     height: 120,
     borderRadius: 60,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[4],
@@ -1073,7 +1073,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[2],
   },
@@ -1109,7 +1109,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1150,7 +1150,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.full,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1179,7 +1179,7 @@ const styles = StyleSheet.create({
     gap: spacing[3],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[2],
   },

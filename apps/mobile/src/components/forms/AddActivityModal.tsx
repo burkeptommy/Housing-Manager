@@ -218,7 +218,7 @@ export function AddActivityModal({
                     <Ionicons
                       name={at.icon as any}
                       size={18}
-                      color={type === at.value ? colors.haven.champagne[600] : colors.text.tertiary}
+                      color={type === at.value ? colors.haven.purple[600] : colors.text.tertiary}
                     />
                     <Text style={[styles.typeButtonText, type === at.value && styles.typeButtonTextActive]}>
                       {at.label}
@@ -408,8 +408,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   memberButtonActive: {
-    backgroundColor: colors.haven.navy[50],
-    borderColor: colors.haven.navy[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   memberButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -417,7 +417,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   memberButtonTextActive: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   typeGrid: {
     flexDirection: 'row',
@@ -436,8 +436,8 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   typeButtonActive: {
-    backgroundColor: colors.haven.champagne[50],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   typeButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   typeButtonTextActive: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',

@@ -42,14 +42,14 @@ export default function ReviewPage() {
     <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
       <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-haven-champagne-100 rounded-xl flex items-center justify-center">
+          <div className="w-10 h-10 bg-haven-100 rounded-xl flex items-center justify-center">
             {icon}
           </div>
-          <h3 className="font-semibold text-haven-navy-900">{title}</h3>
+          <h3 className="font-semibold text-haven-900">{title}</h3>
         </div>
         <Link
           href={editHref}
-          className="text-sm text-haven-champagne-600 hover:text-haven-champagne-700 font-medium flex items-center gap-1"
+          className="text-sm text-haven-600 hover:text-haven-700 font-medium flex items-center gap-1"
         >
           <Pencil className="w-4 h-4" />
           Edit
@@ -69,10 +69,10 @@ export default function ReviewPage() {
     <div className="max-w-2xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <ClipboardCheck className="w-7 h-7 text-haven-champagne-600" />
+        <div className="w-14 h-14 bg-haven-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <ClipboardCheck className="w-7 h-7 text-haven-600" />
         </div>
-        <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">Review your information</h1>
+        <h1 className="text-2xl font-bold text-haven-900 mb-2">Review your information</h1>
         <p className="text-gray-600">
           Take a moment to review everything before we get you set up.
         </p>
@@ -83,14 +83,14 @@ export default function ReviewPage() {
         {/* Property Section */}
         {renderSection(
           'Property',
-          <Building2 className="w-5 h-5 text-haven-champagne-600" />,
+          <Building2 className="w-5 h-5 text-haven-600" />,
           '/onboarding/wizard/property',
           data.property && (
             <div className="space-y-3">
               <div className="flex items-start gap-3">
                 <MapPin className="w-5 h-5 text-gray-400 mt-0.5" />
                 <div>
-                  <p className="font-medium text-haven-navy-900">
+                  <p className="font-medium text-haven-900">
                     {data.property.propertyName || data.property.address.formatted}
                   </p>
                   {data.property.propertyName && (
@@ -133,12 +133,12 @@ export default function ReviewPage() {
         {/* Bills Section */}
         {renderSection(
           'Bills & Accounts',
-          <Receipt className="w-5 h-5 text-haven-champagne-600" />,
+          <Receipt className="w-5 h-5 text-haven-600" />,
           '/onboarding/wizard/bills',
           data.bills.length > 0 && (
             <div className="space-y-4">
               {/* Monthly Total */}
-              <div className="bg-haven-navy-900 text-white rounded-xl p-4">
+              <div className="bg-haven-900 text-white rounded-xl p-4">
                 <div className="flex items-center justify-between">
                   <span className="text-white/70 text-sm">Estimated Monthly Total</span>
                   <span className="text-xl font-bold">{formatCurrency(monthlyTotal)}</span>
@@ -157,9 +157,9 @@ export default function ReviewPage() {
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600">{catInfo?.label || bill.category}</span>
                         <span className="text-gray-400">—</span>
-                        <span className="text-haven-navy-900 font-medium">{bill.provider}</span>
+                        <span className="text-haven-900 font-medium">{bill.provider}</span>
                       </div>
-                      <span className="text-haven-navy-900 font-medium">
+                      <span className="text-haven-900 font-medium">
                         {formatCurrency(bill.amount)}/{bill.frequency === 'monthly' ? 'mo' : bill.frequency}
                       </span>
                     </div>
@@ -174,7 +174,7 @@ export default function ReviewPage() {
         {/* Systems Section */}
         {renderSection(
           'Home Systems & Appliances',
-          <Settings className="w-5 h-5 text-haven-champagne-600" />,
+          <Settings className="w-5 h-5 text-haven-600" />,
           '/onboarding/wizard/systems',
           (data.systems.length > 0 || data.appliances.length > 0) && (
             <div className="space-y-4">
@@ -191,7 +191,7 @@ export default function ReviewPage() {
                           className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg"
                         >
                           <Check className="w-4 h-4 text-green-500" />
-                          <span className="text-sm text-haven-navy-900">{catInfo?.label}</span>
+                          <span className="text-sm text-haven-900">{catInfo?.label}</span>
                           {system.brand && (
                             <span className="text-xs text-gray-500">({system.brand})</span>
                           )}
@@ -215,7 +215,7 @@ export default function ReviewPage() {
                           className="flex items-center gap-2 bg-gray-100 px-3 py-2 rounded-lg"
                         >
                           <Check className="w-4 h-4 text-green-500" />
-                          <span className="text-sm text-haven-navy-900">{catInfo?.label}</span>
+                          <span className="text-sm text-haven-900">{catInfo?.label}</span>
                           {appliance.brand && (
                             <span className="text-xs text-gray-500">({appliance.brand})</span>
                           )}
@@ -233,7 +233,7 @@ export default function ReviewPage() {
         {/* Family Section */}
         {renderSection(
           'Family & Household',
-          <Users className="w-5 h-5 text-haven-champagne-600" />,
+          <Users className="w-5 h-5 text-haven-600" />,
           '/onboarding/wizard/family',
           (data.familyMembers.length > 0 ||
             data.vehicles.length > 0 ||
@@ -246,7 +246,7 @@ export default function ReviewPage() {
                   <Users className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500 mb-1">{data.familyMembers.length} family members</p>
-                    <p className="text-haven-navy-900">
+                    <p className="text-haven-900">
                       {data.familyMembers.map((m) => `${m.firstName} ${m.lastName}`).join(', ')}
                     </p>
                   </div>
@@ -259,7 +259,7 @@ export default function ReviewPage() {
                   <Car className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500 mb-1">{data.vehicles.length} vehicles</p>
-                    <p className="text-haven-navy-900">
+                    <p className="text-haven-900">
                       {data.vehicles.map((v) => `${v.year} ${v.make} ${v.model}`).join(', ')}
                     </p>
                   </div>
@@ -272,7 +272,7 @@ export default function ReviewPage() {
                   <PawPrint className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500 mb-1">{data.pets.length} pets</p>
-                    <p className="text-haven-navy-900">
+                    <p className="text-haven-900">
                       {data.pets
                         .map((p) => `${p.name} (${p.species}${p.breed ? `, ${p.breed}` : ''})`)
                         .join(', ')}
@@ -287,7 +287,7 @@ export default function ReviewPage() {
                   <Briefcase className="w-5 h-5 text-gray-400 mt-0.5" />
                   <div>
                     <p className="text-sm text-gray-500 mb-1">{data.staff.length} household staff</p>
-                    <p className="text-haven-navy-900">
+                    <p className="text-haven-900">
                       {data.staff
                         .map(
                           (s) =>
@@ -310,8 +310,8 @@ export default function ReviewPage() {
       </div>
 
       {/* Completion Summary */}
-      <div className="mt-8 bg-haven-champagne-50 border border-haven-champagne-200 rounded-2xl p-6">
-        <h3 className="font-semibold text-haven-navy-900 mb-3">Ready to get started!</h3>
+      <div className="mt-8 bg-haven-50 border border-haven-200 rounded-2xl p-6">
+        <h3 className="font-semibold text-haven-900 mb-3">Ready to get started!</h3>
         <p className="text-sm text-gray-600 mb-4">
           You&apos;ve provided great information about your home. In the next step, you&apos;ll
           schedule an activation call with your dedicated Home Manager to finalize everything.
@@ -344,14 +344,14 @@ export default function ReviewPage() {
       <div className="flex justify-between mt-8">
         <Link
           href="/onboarding/wizard/family"
-          className="text-gray-600 hover:text-haven-navy-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
+          className="text-gray-600 hover:text-haven-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <button
           onClick={handleContinue}
-          className="bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
+          className="bg-haven-900 hover:bg-haven-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
         >
           Continue to Activation
           <ArrowRight className="w-4 h-4" />

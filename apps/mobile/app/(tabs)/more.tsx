@@ -10,6 +10,7 @@ import { useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../src/contexts/auth-context';
+import { AppHeader } from '../../src/components/AppHeader';
 import { colors, typography, spacing, borderRadius } from '../../src/lib/theme';
 
 interface MenuItem {
@@ -35,7 +36,6 @@ const MENU_SECTIONS: { title: string; items: MenuItem[] }[] = [
   {
     title: 'Financial',
     items: [
-      { id: 'billing', title: 'Bills & Payments', icon: 'receipt-outline', route: '/(tabs)/billing' },
       { id: 'approvals', title: 'Approvals', icon: 'checkmark-circle-outline', route: '/(tabs)/approvals' },
     ],
   },
@@ -59,6 +59,7 @@ export default function MoreScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={['bottom']}>
+      <AppHeader title="More" />
       <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* User Info */}
         <View style={styles.userSection}>
@@ -94,7 +95,7 @@ export default function MoreScreen() {
                     <Ionicons
                       name={item.icon as any}
                       size={22}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.menuContent}>
@@ -152,7 +153,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -160,7 +161,7 @@ const styles = StyleSheet.create({
   userInitials: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   userInfo: {
     flex: 1,
@@ -212,7 +213,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],

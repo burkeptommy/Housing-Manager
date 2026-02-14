@@ -27,7 +27,9 @@ interface DocumentDetail {
   category: string;
   subcategory?: string | null;
   description?: string | null;
-  fileUrl: string;
+  fileUrl?: string;
+  storageUrl?: string;
+  downloadUrl?: string;
   fileName: string;
   fileSize: number;
   mimeType: string;
@@ -89,6 +91,10 @@ export default function DocumentDetailScreen() {
       }
 
       const data: DocumentDetail = await response.json();
+      // Normalize URL field - API returns storageUrl/downloadUrl, not fileUrl
+      if (!data.fileUrl) {
+        data.fileUrl = data.downloadUrl || data.storageUrl;
+      }
       setDocument(data);
       setError(null);
     } catch (err) {
@@ -243,7 +249,7 @@ export default function DocumentDetailScreen() {
           title: 'Document',
           headerRight: () => (
             <TouchableOpacity onPress={() => Alert.alert('Edit', 'Edit metadata coming soon')}>
-              <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="create-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           ),
         }}
@@ -263,7 +269,7 @@ export default function DocumentDetailScreen() {
             <Image source={{ uri: document.fileUrl }} style={styles.imagePreview} resizeMode="contain" />
           ) : (
             <View style={styles.fileIconContainer}>
-              <Ionicons name={getFileIcon(document.mimeType) as any} size={64} color={colors.haven.champagne[500]} />
+              <Ionicons name={getFileIcon(document.mimeType) as any} size={64} color={colors.haven.purple[500]} />
               <Text style={styles.fileType}>{document.mimeType.split('/')[1]?.toUpperCase() || 'FILE'}</Text>
             </View>
           )}
@@ -340,11 +346,11 @@ export default function DocumentDetailScreen() {
         {/* Actions */}
         <View style={styles.actionButtons}>
           <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
-            <Ionicons name="share-outline" size={24} color={colors.haven.navy[700]} />
+            <Ionicons name="share-outline" size={24} color={colors.haven.purple[700]} />
             <Text style={styles.actionButtonText}>Share</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleDownload}>
-            <Ionicons name="download-outline" size={24} color={colors.haven.navy[700]} />
+            <Ionicons name="download-outline" size={24} color={colors.haven.purple[700]} />
             <Text style={styles.actionButtonText}>Download</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={handleDelete}>
@@ -388,7 +394,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -410,7 +416,7 @@ const styles = StyleSheet.create({
   fileIconContainer: {
     width: '100%',
     height: 160,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -419,13 +425,13 @@ const styles = StyleSheet.create({
   fileType: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: spacing[2],
   },
   viewButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,
@@ -493,14 +499,14 @@ const styles = StyleSheet.create({
     marginTop: spacing[2],
   },
   tag: {
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[1],
     borderRadius: borderRadius.full,
   },
   tagText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   actionButtons: {
     flexDirection: 'row',
@@ -515,7 +521,7 @@ const styles = StyleSheet.create({
   },
   actionButtonText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     fontWeight: typography.fontWeights.medium,
   },
 });

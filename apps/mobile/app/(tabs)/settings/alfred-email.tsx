@@ -148,7 +148,7 @@ export default function AlfredEmailSettingsScreen() {
       <View style={styles.fullContainer}>
         <AppHeader title="Personal Assistant" showBack onBackPress={() => router.push('/(tabs)')} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </View>
     );
@@ -163,7 +163,7 @@ export default function AlfredEmailSettingsScreen() {
       >
         {/* Intro */}
         <View style={styles.introCard}>
-          <Ionicons name="mail" size={32} color={colors.haven.champagne[500]} />
+          <Ionicons name="mail" size={32} color={colors.haven.purple[500]} />
           <Text style={styles.introTitle}>CC Alfred on Any Email</Text>
           <Text style={styles.introText}>
             Forward or CC Alfred on emails about camps, bills, appointments,
@@ -184,7 +184,7 @@ export default function AlfredEmailSettingsScreen() {
                     <Ionicons
                       name="copy-outline"
                       size={20}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                     <Text style={styles.emailActionText}>Copy</Text>
                   </TouchableOpacity>
@@ -195,7 +195,7 @@ export default function AlfredEmailSettingsScreen() {
                     <Ionicons
                       name="share-outline"
                       size={20}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                     <Text style={styles.emailActionText}>Share</Text>
                   </TouchableOpacity>
@@ -206,7 +206,7 @@ export default function AlfredEmailSettingsScreen() {
                 <Ionicons
                   name="home-outline"
                   size={32}
-                  color={colors.haven.navy[400]}
+                  color={colors.haven.purple[400]}
                 />
                 <Text style={styles.configureText}>
                   Your Alfred email address is generated from your property address.
@@ -272,7 +272,7 @@ export default function AlfredEmailSettingsScreen() {
         >
           <View style={styles.historyButtonContent}>
             <View style={styles.historyButtonIcon}>
-              <Ionicons name="time-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="time-outline" size={24} color={colors.haven.purple[500]} />
             </View>
             <View style={styles.historyButtonText}>
               <Text style={styles.historyButtonTitle}>View Email History</Text>
@@ -292,7 +292,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name={showAddForm ? 'close' : 'add-circle'}
                 size={24}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
             </TouchableOpacity>
           </View>
@@ -305,7 +305,7 @@ export default function AlfredEmailSettingsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Email address"
-                placeholderTextColor={colors.haven.navy[400]}
+                placeholderTextColor={colors.haven.purple[400]}
                 value={newEmail}
                 onChangeText={setNewEmail}
                 keyboardType="email-address"
@@ -314,7 +314,7 @@ export default function AlfredEmailSettingsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="Label (optional, e.g., 'Work Email')"
-                placeholderTextColor={colors.haven.navy[400]}
+                placeholderTextColor={colors.haven.purple[400]}
                 value={newLabel}
                 onChangeText={setNewLabel}
               />
@@ -370,7 +370,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name="calendar"
                 size={20}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
               <Text style={styles.exampleText}>
                 Camp registrations & school events
@@ -380,7 +380,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name="receipt"
                 size={20}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
               <Text style={styles.exampleText}>
                 Bills, invoices & payment reminders
@@ -390,7 +390,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name="construct"
                 size={20}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
               <Text style={styles.exampleText}>Home inspection reports</Text>
             </View>
@@ -398,7 +398,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name="people"
                 size={20}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
               <Text style={styles.exampleText}>Vendor correspondence</Text>
             </View>
@@ -406,7 +406,7 @@ export default function AlfredEmailSettingsScreen() {
               <Ionicons
                 name="chatbubbles"
                 size={20}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
               <Text style={styles.exampleText}>
                 Dispute responses (with your approval)
@@ -422,7 +422,7 @@ export default function AlfredEmailSettingsScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   scrollContainer: {
     flex: 1,
@@ -439,7 +439,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.secondary,
   },
   introCard: {
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[6],
     marginBottom: spacing[4],
     borderRadius: borderRadius.xl,
@@ -448,13 +448,13 @@ const styles = StyleSheet.create({
   introTitle: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginTop: spacing[3],
     marginBottom: spacing[2],
   },
   introText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     textAlign: 'center',
     lineHeight: 24,
   },
@@ -469,12 +469,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[2],
   },
   sectionSubtitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginBottom: spacing[3],
   },
   emailCard: {
@@ -491,13 +491,13 @@ const styles = StyleSheet.create({
   },
   configureText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     textAlign: 'center',
     lineHeight: 20,
   },
   configureNote: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
     textAlign: 'center',
     fontStyle: 'italic',
   },
@@ -505,7 +505,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[3],
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[4],
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
     borderRadius: borderRadius.md,
   },
   setupButtonText: {
@@ -516,7 +516,7 @@ const styles = StyleSheet.create({
   emailAddress: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     fontFamily: 'monospace',
     marginBottom: spacing[3],
   },
@@ -531,7 +531,7 @@ const styles = StyleSheet.create({
   },
   emailActionText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   stepsContainer: {
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -560,15 +560,15 @@ const styles = StyleSheet.create({
   stepTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   stepText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   addForm: {
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[4],
@@ -577,14 +577,14 @@ const styles = StyleSheet.create({
   input: {
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
     borderRadius: borderRadius.lg,
     padding: spacing[3],
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   addButton: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     padding: spacing[3],
     borderRadius: borderRadius.lg,
     alignItems: 'center',
@@ -614,16 +614,16 @@ const styles = StyleSheet.create({
   },
   emailItemAddress: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   emailItemLabel: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   emptyText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
     fontStyle: 'italic',
   },
   examplesContainer: {
@@ -636,7 +636,7 @@ const styles = StyleSheet.create({
   },
   exampleText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   historyButton: {
     flexDirection: 'row',
@@ -658,7 +658,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: borderRadius.lg,
-    backgroundColor: `${colors.haven.champagne[500]}15`,
+    backgroundColor: `${colors.haven.purple[500]}15`,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -668,11 +668,11 @@ const styles = StyleSheet.create({
   historyButtonTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   historyButtonSubtitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
 });

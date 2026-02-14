@@ -42,7 +42,7 @@ convert_svg adaptive-icon.svg adaptive-icon.png 1024
 # Splash screen (maintain aspect ratio for largest dimension)
 echo "  → splash.png (1284x2778)"
 if [ "$CONVERTER" = "imagemagick" ]; then
-    convert -background "#0a1929" -density 300 splash.svg -resize 1284x2778 splash.png
+    convert -background "#6200EA" -density 300 splash.svg -resize 1284x2778 splash.png
 else
     rsvg-convert -w 1284 -h 2778 splash.svg -o splash.png
 fi

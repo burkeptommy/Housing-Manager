@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#e2e8f0',
   },
   placeholder: {
-    backgroundColor: '#c4a574',
+    backgroundColor: '#6200EA',
     alignItems: 'center',
     justifyContent: 'center',
   },

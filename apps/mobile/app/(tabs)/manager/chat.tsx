@@ -435,7 +435,7 @@ export default function ManagerChatScreen() {
                 disabled={isAnswering}
               >
                 {isAnswering ? (
-                  <ActivityIndicator size="small" color={colors.haven.navy[900]} />
+                  <ActivityIndicator size="small" color={colors.haven.purple[900]} />
                 ) : (
                   <Text style={styles.choiceButtonText}>{choice.label}</Text>
                 )}
@@ -495,7 +495,7 @@ export default function ManagerChatScreen() {
 
         <View style={styles.inputContainer}>
           <TouchableOpacity style={styles.attachButton} onPress={pickImage}>
-            <Ionicons name="camera" size={24} color={colors.haven.navy[600]} />
+            <Ionicons name="camera" size={24} color={colors.haven.purple[600]} />
           </TouchableOpacity>
           <TextInput
             style={styles.input}
@@ -561,7 +561,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -584,7 +584,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[2],
@@ -605,7 +605,7 @@ const styles = StyleSheet.create({
     marginLeft: spacing[2],
   },
   userBubble: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderBottomRightRadius: spacing[1],
   },
   messageText: {
@@ -622,7 +622,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   userTime: {
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
   },
   messageImage: {
     width: 200,
@@ -656,7 +656,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: spacing[2],
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: borderRadius.full,
     borderWidth: 1.5,
-    borderColor: colors.haven.navy[900],
+    borderColor: colors.haven.purple[900],
   },
   choiceButtonDisabled: {
     opacity: 0.6,
@@ -686,6 +686,6 @@ const styles = StyleSheet.create({
   choiceButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
 });

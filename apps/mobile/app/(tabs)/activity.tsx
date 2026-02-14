@@ -140,7 +140,7 @@ export default function ActivityScreen() {
           <View style={styles.headerRight} />
         </View>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </View>
     );
@@ -263,10 +263,10 @@ export default function ActivityScreen() {
 const styles = StyleSheet.create({
   safeAreaWrapper: {
     flex: 1,
-    backgroundColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
   },
   safeAreaTop: {
-    backgroundColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
   },
   container: {
     flex: 1,
@@ -278,7 +278,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
   },
   backButton: {
     width: 40,
@@ -327,7 +327,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   filterChipActive: {
-    backgroundColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
   },
   filterChipEmoji: {
     fontSize: 14,
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {

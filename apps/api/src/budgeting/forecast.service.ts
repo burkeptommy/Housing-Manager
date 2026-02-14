@@ -68,13 +68,18 @@ export class ForecastService {
     });
 
     if (forecasts.length === 0) {
-      // Auto-generate from property assets
+      // Auto-generate from property assets and home systems
       await this.generateForecastsFromSystems(householdId);
+      // Check for end-of-life systems
+      await this.detectEndOfLife(householdId);
       return this.prisma.systemForecast.findMany({
         where: { householdId },
         orderBy: { expectedReplacementYear: 'asc' },
       });
     }
+
+    // Refresh end-of-life detection on each view
+    await this.detectEndOfLife(householdId);
 
     return forecasts;
   }
@@ -88,8 +93,23 @@ export class ForecastService {
       where: { householdId },
     });
 
+    // Also query HomeSystem records - these have install dates and detailed system info
+    const homeSystems = await this.prisma.homeSystem.findMany({
+      where: { householdId, isActive: true },
+    });
+
+    // Look up local cost data for the household's zip code
+    const zipCode = homeProfile?.postalCode;
+    const localCosts = zipCode
+      ? await this.prisma.localCostData.findMany({
+          where: { zipCode },
+        })
+      : [];
+    const localCostMap = new Map(localCosts.map((c) => [c.category, c]));
+
     const currentYear = new Date().getFullYear();
 
+    // Generate forecasts from PropertyAssets
     for (const asset of assets) {
       const systemType = this.mapAssetToSystemType(asset.category, asset.name);
       if (!systemType || !SYSTEM_LIFESPANS[systemType]) continue;
@@ -109,6 +129,12 @@ export class ForecastService {
       else if (remainingYears <= 2) urgency = 'HIGH';
       else if (remainingYears <= 5) urgency = 'MEDIUM';
 
+      // Use local cost data if available, otherwise fall back to national average
+      const localCost = localCostMap.get(systemType);
+      const estimatedCost = localCost
+        ? Number(localCost.medianMonthly) * 12 // Use annual from monthly median as proxy
+        : lifespan.avgCost;
+
       // Check if forecast already exists for this asset
       const existing = await this.prisma.systemForecast.findFirst({
         where: { householdId, systemId: asset.id },
@@ -121,6 +147,7 @@ export class ForecastService {
             currentAge,
             urgency,
             expectedReplacementYear,
+            estimatedReplacementCost: estimatedCost,
           },
         });
       } else {
@@ -135,13 +162,144 @@ export class ForecastService {
             typicalLifespan: lifespan.typical,
             lifespanMin: lifespan.min,
             lifespanMax: lifespan.max,
-            estimatedReplacementCost: lifespan.avgCost,
+            estimatedReplacementCost: estimatedCost,
             expectedReplacementYear,
             urgency,
           },
         });
       }
     }
+
+    // Generate forecasts from HomeSystems (these may not overlap with PropertyAssets)
+    for (const system of homeSystems) {
+      // Skip if we already have a forecast for this system (from maintenance research)
+      const existingForecast = await this.prisma.systemForecast.findFirst({
+        where: { householdId, systemId: system.id },
+      });
+      if (existingForecast) continue;
+
+      const systemType = this.mapHomeSystemType(system.type);
+      if (!systemType || !SYSTEM_LIFESPANS[systemType]) continue;
+
+      const lifespan = SYSTEM_LIFESPANS[systemType];
+
+      const installYear = system.installedDate
+        ? new Date(system.installedDate).getFullYear()
+        : homeProfile?.yearBuilt || currentYear - Math.floor(lifespan.typical / 2);
+
+      const currentAge = currentYear - installYear;
+      const expectedReplacementYear = installYear + lifespan.typical;
+
+      let urgency = 'LOW';
+      const remainingYears = expectedReplacementYear - currentYear;
+      if (remainingYears <= 0) urgency = 'CRITICAL';
+      else if (remainingYears <= 2) urgency = 'HIGH';
+      else if (remainingYears <= 5) urgency = 'MEDIUM';
+
+      // Use local cost data if available
+      const localCost = localCostMap.get(systemType);
+      const estimatedCost = localCost
+        ? Number(localCost.medianMonthly) * 12
+        : lifespan.avgCost;
+
+      await this.prisma.systemForecast.create({
+        data: {
+          householdId,
+          systemId: system.id,
+          systemType,
+          systemName: system.name || this.getSystemDisplayName(systemType),
+          installYear,
+          currentAge,
+          typicalLifespan: lifespan.typical,
+          lifespanMin: lifespan.min,
+          lifespanMax: lifespan.max,
+          estimatedReplacementCost: estimatedCost,
+          expectedReplacementYear,
+          urgency,
+        },
+      });
+    }
+  }
+
+  /**
+   * Detect systems nearing end-of-life and create replacement planning reminders
+   */
+  async detectEndOfLife(householdId: string) {
+    const forecasts = await this.prisma.systemForecast.findMany({
+      where: { householdId },
+    });
+
+    const currentYear = new Date().getFullYear();
+    const alerts: Array<{
+      forecastId: string;
+      systemName: string;
+      urgency: string;
+      remainingYears: number;
+      estimatedCost: number;
+    }> = [];
+
+    for (const forecast of forecasts) {
+      const remainingYears = forecast.expectedReplacementYear - currentYear;
+      const lifespanPercent = forecast.currentAge / forecast.typicalLifespan;
+
+      // Flag systems at 80%+ of expected lifespan
+      if (lifespanPercent >= 0.8 || remainingYears <= 3) {
+        let urgency = forecast.urgency || 'LOW';
+        if (remainingYears <= 0) urgency = 'CRITICAL';
+        else if (remainingYears <= 2) urgency = 'HIGH';
+        else if (remainingYears <= 5) urgency = 'MEDIUM';
+
+        // Update urgency if changed
+        if (urgency !== forecast.urgency) {
+          await this.prisma.systemForecast.update({
+            where: { id: forecast.id },
+            data: { urgency, currentAge: forecast.currentAge },
+          });
+        }
+
+        // Create a maintenance task for replacement planning if one doesn't exist
+        if (remainingYears <= 2) {
+          const existingTask = await this.prisma.maintenanceTask.findFirst({
+            where: {
+              householdId,
+              title: { contains: `${forecast.systemName} replacement` },
+              status: { in: ['UPCOMING', 'PENDING', 'SCHEDULED', 'IN_PROGRESS'] },
+            },
+          });
+
+          if (!existingTask) {
+            await this.prisma.maintenanceTask.create({
+              data: {
+                householdId,
+                title: `Plan ${forecast.systemName} replacement`,
+                description: remainingYears <= 0
+                  ? `Your ${forecast.systemName} is past its typical ${forecast.typicalLifespan}-year lifespan. Consider budgeting ~$${forecast.estimatedReplacementCost?.toLocaleString() || 'unknown'} for replacement.`
+                  : `Your ${forecast.systemName} is expected to need replacement within ${remainingYears} year${remainingYears === 1 ? '' : 's'}. Estimated cost: ~$${forecast.estimatedReplacementCost?.toLocaleString() || 'unknown'}.`,
+                category: 'GENERAL',
+                frequency: 'ONE_TIME',
+                priority: remainingYears <= 0 ? 'URGENT' : 'HIGH',
+                status: 'UPCOMING',
+                source: 'SYSTEM_GENERATED',
+                sourceSystem: 'Forecast',
+                dueDate: new Date(currentYear + Math.max(remainingYears, 0), 0, 15),
+                nextDueDate: new Date(currentYear + Math.max(remainingYears, 0), 0, 15),
+                estimatedCost: forecast.estimatedReplacementCost || undefined,
+              },
+            });
+          }
+        }
+
+        alerts.push({
+          forecastId: forecast.id,
+          systemName: forecast.systemName,
+          urgency,
+          remainingYears,
+          estimatedCost: forecast.estimatedReplacementCost || 0,
+        });
+      }
+    }
+
+    return alerts;
   }
 
   async getForecastTimeline(user: AuthPayload, years: number) {
@@ -275,12 +433,13 @@ ${asset?.brand ? `Brand: ${asset.brand}` : ''}
 ${asset?.model ? `Model: ${asset.model}` : ''}
 ${forecast.installYear ? `Install Year: ${forecast.installYear}` : ''}
 Location: ${homeProfile?.city || 'Unknown'}, ${homeProfile?.state || 'US'}
+${homeProfile?.postalCode ? `ZIP Code: ${homeProfile.postalCode}` : ''}
 
 Please provide:
 1. Expected lifespan for this specific make/model (if known)
 2. Common issues/failure points for this age
 3. Any recalls or known problems
-4. Estimated replacement cost in this area
+4. Estimated replacement cost for this specific area/zip code (factor in local labor rates and material costs)
 5. Recommended maintenance to extend life
 6. Signs that replacement is needed
 
@@ -341,6 +500,35 @@ Return as JSON:
       typicalLifespan: data.typical,
       avgCost: data.avgCost,
     }));
+  }
+
+  private mapHomeSystemType(type: string): string | null {
+    const mapping: Record<string, string> = {
+      FURNACE: 'HVAC_FURNACE',
+      BOILER: 'HVAC_FURNACE',
+      AIR_CONDITIONER: 'HVAC_AC',
+      HEAT_PUMP: 'HVAC_HEAT_PUMP',
+      MINI_SPLIT: 'HVAC_AC',
+      WATER_HEATER: 'WATER_HEATER_TANK',
+      WELL_PUMP: 'WELL_PUMP',
+      SEPTIC_SYSTEM: 'SEPTIC',
+      SEPTIC_TANK: 'SEPTIC',
+      GARAGE_DOOR_OPENER: 'GARAGE_DOOR',
+      DISHWASHER: 'APPLIANCE_DISHWASHER',
+      WASHER: 'APPLIANCE_WASHER',
+      DRYER: 'APPLIANCE_DRYER',
+      REFRIGERATOR: 'APPLIANCE_REFRIGERATOR',
+      OVEN_RANGE: 'APPLIANCE_OVEN',
+      POOL_EQUIPMENT: 'POOL_PUMP',
+      POOL_HEATER: 'POOL_HEATER',
+      GENERATOR: 'GENERATOR',
+      WINDOWS: 'WINDOWS',
+      DECK: 'DECK',
+      ROOF: 'ROOF_ASPHALT',
+      SOLAR_PANELS: 'GENERATOR',
+      DRIVEWAY: 'DRIVEWAY_ASPHALT',
+    };
+    return mapping[type] || null;
   }
 
   private mapAssetToSystemType(category: string, name: string): string | null {

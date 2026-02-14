@@ -240,7 +240,7 @@ export default function ChecklistScreen() {
                     <Ionicons
                       name="hammer-outline"
                       size={12}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                     <Text style={styles.handymanText}>Handyman</Text>
                   </View>
@@ -331,7 +331,7 @@ export default function ChecklistScreen() {
               <Ionicons
                 name="sparkles"
                 size={24}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
             </TouchableOpacity>
           ),
@@ -395,7 +395,7 @@ export default function ChecklistScreen() {
             <Ionicons
               name={activeTab === 'completed' ? 'checkmark-circle' : 'checkbox-outline'}
               size={48}
-              color={colors.haven.navy[300]}
+              color={colors.haven.purple[300]}
             />
             <Text style={styles.emptyTitle}>
               {activeTab === 'due'
@@ -418,7 +418,7 @@ export default function ChecklistScreen() {
       {/* Alfred CTA */}
       <View style={styles.alfredCTA}>
         <View style={styles.alfredIcon}>
-          <Ionicons name="sparkles" size={20} color={colors.haven.champagne[500]} />
+          <Ionicons name="sparkles" size={20} color={colors.haven.purple[500]} />
         </View>
         <View style={styles.alfredContent}>
           <Text style={styles.alfredTitle}>Need help?</Text>
@@ -464,7 +464,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   statLabel: {
     fontSize: typography.fontSizes.xs,
@@ -490,7 +490,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing[1],
   },
   tabActive: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   tabText: {
     fontSize: typography.fontSizes.sm,
@@ -521,7 +521,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   categoryChipSelected: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   categoryChipText: {
     fontSize: typography.fontSizes.sm,
@@ -596,14 +596,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[1],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     paddingHorizontal: spacing[2],
     paddingVertical: spacing[0.5],
     borderRadius: borderRadius.full,
   },
   handymanText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   costRow: {
@@ -652,7 +652,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },

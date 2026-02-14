@@ -64,11 +64,11 @@ function getSenderName(message: SupportMessage): string {
 function getRoleBadgeColor(role: SenderRole): string {
   switch (role) {
     case 'HOME_MANAGER':
-      return colors.accent[500];
+      return colors.haven.purple[500];
     case 'SYSTEM':
       return colors.slate[500];
     default:
-      return colors.primary[500];
+      return colors.haven.purple[500];
   }
 }
 
@@ -354,7 +354,7 @@ function ChatView({
   if (isLoading && !conversation) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color={colors.primary[600]} />
+        <ActivityIndicator size="large" color={colors.haven.purple[600]} />
       </View>
     );
   }
@@ -624,7 +624,7 @@ export default function ChatScreen() {
       {/* Conversations List */}
       {isLoading && conversations.length === 0 ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[600]} />
         </View>
       ) : (
         <FlatList
@@ -642,7 +642,7 @@ export default function ChatScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={handleRefresh}
-              tintColor={colors.primary[600]}
+              tintColor={colors.haven.purple[600]}
             />
           }
           ListEmptyComponent={
@@ -713,7 +713,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   newButton: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.lg,
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     color: colors.slate[700],
   },
   unreadBadge: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     minWidth: 20,
     height: 20,
     borderRadius: 10,
@@ -847,7 +847,7 @@ const styles = StyleSheet.create({
   },
   backText: {
     fontSize: typography.fontSizes.base,
-    color: colors.primary[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   chatHeaderContent: {
@@ -911,7 +911,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing[2],
   },
   bubbleOwn: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     borderBottomRightRadius: borderRadius.sm,
   },
   bubbleOther: {
@@ -940,7 +940,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   messageTimeOwn: {
-    color: colors.primary[200],
+    color: colors.haven.purple[200],
     textAlign: 'right',
   },
   messageTimeOther: {
@@ -1003,7 +1003,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1095,7 +1095,7 @@ const styles = StyleSheet.create({
   },
   modalSend: {
     fontSize: typography.fontSizes.base,
-    color: colors.primary[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.semibold,
   },
   modalSendDisabled: {

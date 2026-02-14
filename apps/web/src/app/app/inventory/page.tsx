@@ -111,7 +111,7 @@ const CATEGORIES: Record<ItemCategory, { label: string; icon: typeof Apple; colo
   beverages: { label: 'Beverages', icon: Wine, color: 'text-purple-600 bg-purple-50' },
   pantry: { label: 'Pantry', icon: BoxIcon, color: 'text-orange-600 bg-orange-50' },
   frozen: { label: 'Frozen', icon: Snowflake, color: 'text-cyan-600 bg-cyan-50' },
-  household: { label: 'Household', icon: Home, color: 'text-warm-600 bg-warm-50' },
+  household: { label: 'Household', icon: Home, color: 'text-neutral-600 bg-neutral-50' },
   health: { label: 'Health & Beauty', icon: Pill, color: 'text-pink-600 bg-pink-50' },
   baby: { label: 'Baby', icon: Baby, color: 'text-sky-600 bg-sky-50' },
   pet: { label: 'Pet Supplies', icon: Dog, color: 'text-yellow-600 bg-yellow-50' },
@@ -291,7 +291,7 @@ function getStatusIcon(status: ShoppingStatus) {
 
 function getStatusColor(status: ShoppingStatus) {
   switch (status) {
-    case 'NEEDED': return 'bg-warm-100 text-warm-700';
+    case 'NEEDED': return 'bg-neutral-100 text-neutral-700';
     case 'IN_CART': return 'bg-blue-100 text-blue-700';
     case 'ORDERED': return 'bg-amber-100 text-amber-700';
     case 'DELIVERED': return 'bg-emerald-100 text-emerald-700';
@@ -350,9 +350,9 @@ function QuickAddInput({
   };
 
   return (
-    <div className="bg-white rounded-2xl border border-warm-200 shadow-sm overflow-hidden">
+    <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
       <div className="p-4 pb-2">
-        <h2 className="text-lg font-semibold text-warm-900 mb-3">What do you need?</h2>
+        <h2 className="text-lg font-semibold text-neutral-900 mb-3">What do you need?</h2>
         <div className="flex items-center gap-3">
           <input
             ref={inputRef}
@@ -361,7 +361,7 @@ function QuickAddInput({
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Paper towels, batteries, dog food..."
-            className="flex-1 text-lg bg-transparent border-none outline-none placeholder:text-warm-400"
+            className="flex-1 text-lg bg-transparent border-none outline-none placeholder:text-neutral-400"
             disabled={isSubmitting}
           />
           <button
@@ -369,7 +369,7 @@ function QuickAddInput({
             className={`p-2 rounded-full transition-colors ${
               isListening
                 ? 'bg-red-100 text-red-600 animate-pulse'
-                : 'bg-warm-100 text-warm-500 hover:bg-warm-200'
+                : 'bg-neutral-100 text-neutral-500 hover:bg-neutral-200'
             }`}
             disabled={isSubmitting}
           >
@@ -394,13 +394,13 @@ function QuickAddInput({
       </div>
 
       <div className="px-4 pb-4">
-        <p className="text-xs text-warm-500 mb-2">Tip: Separate with commas or say &quot;and&quot;</p>
+        <p className="text-xs text-neutral-500 mb-2">Tip: Separate with commas or say &quot;and&quot;</p>
         <div className="flex flex-wrap gap-2">
           {QUICK_PICKS.map((pick) => (
             <button
               key={pick}
               onClick={() => handleQuickPick(pick)}
-              className="px-3 py-1.5 bg-warm-50 text-warm-600 rounded-full text-sm hover:bg-warm-100 transition-colors"
+              className="px-3 py-1.5 bg-neutral-50 text-neutral-600 rounded-full text-sm hover:bg-neutral-100 transition-colors"
               disabled={isSubmitting}
             >
               + {pick}
@@ -473,19 +473,19 @@ function ListStatusCard({
           ? 'bg-emerald-50 border-2 border-emerald-500'
           : list.isDeliveredToday
           ? 'bg-emerald-50 border border-emerald-200'
-          : 'bg-white border border-warm-200 hover:border-warm-300'
+          : 'bg-white border border-neutral-200 hover:border-neutral-300'
       }`}
     >
-      <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-100' : 'bg-warm-100'}`}>
-        <ListIcon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-warm-600'}`} />
+      <div className={`p-2 rounded-lg ${isActive ? 'bg-emerald-100' : 'bg-neutral-100'}`}>
+        <ListIcon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-neutral-600'}`} />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-warm-900">{list.name}</div>
-        <div className="text-sm text-warm-500">{list.itemCount} items</div>
+        <div className="font-medium text-neutral-900">{list.name}</div>
+        <div className="text-sm text-neutral-500">{list.itemCount} items</div>
       </div>
       <div className="text-right">
         <div className="text-lg">{getStatusEmoji()}</div>
-        <div className="text-xs text-warm-500">{list.statusMessage}</div>
+        <div className="text-xs text-neutral-500">{list.statusMessage}</div>
       </div>
     </button>
   );
@@ -520,8 +520,8 @@ function InventoryLevelCard({
         <CatIcon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-medium text-warm-900 text-sm">{item.name}</div>
-        <div className="text-xs text-warm-500">{item.currentLevel} {item.unit} remaining</div>
+        <div className="font-medium text-neutral-900 text-sm">{item.name}</div>
+        <div className="text-xs text-neutral-500">{item.currentLevel} {item.unit} remaining</div>
       </div>
       <div className="text-sm">
         {getStatusIcon()} <span className={item.isLow ? 'text-amber-700' : 'text-emerald-700'}>{getStatusText()}</span>
@@ -564,13 +564,13 @@ function AutoReorderCard({
   };
 
   return (
-    <div className={`flex items-center gap-3 p-4 rounded-xl border ${item.enabled ? 'bg-white border-warm-200' : 'bg-warm-50 border-warm-100'}`}>
+    <div className={`flex items-center gap-3 p-4 rounded-xl border ${item.enabled ? 'bg-white border-neutral-200' : 'bg-neutral-50 border-neutral-100'}`}>
       <div className={`p-2 rounded-lg ${catConfig.color}`}>
         <CatIcon className="w-4 h-4" />
       </div>
       <div className="flex-1 min-w-0">
-        <div className={`font-medium ${item.enabled ? 'text-warm-900' : 'text-warm-500'}`}>{item.name}</div>
-        <div className="text-xs text-warm-500 flex items-center gap-2">
+        <div className={`font-medium ${item.enabled ? 'text-neutral-900' : 'text-neutral-500'}`}>{item.name}</div>
+        <div className="text-xs text-neutral-500 flex items-center gap-2">
           <span>{getFrequencyLabel()}</span>
           {item.nextOrder && item.enabled && (
             <>
@@ -584,7 +584,7 @@ function AutoReorderCard({
         {item.enabled ? (
           <ToggleRight className="w-10 h-6 text-emerald-600" />
         ) : (
-          <ToggleLeft className="w-10 h-6 text-warm-400" />
+          <ToggleLeft className="w-10 h-6 text-neutral-400" />
         )}
       </button>
     </div>
@@ -605,7 +605,7 @@ function DeliveredToast({
   }, [onDismiss]);
 
   return (
-    <div className="fixed top-4 left-1/2 -tranwarm-x-1/2 z-[60] animate-in slide-in-from-top-2">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] animate-in slide-in-from-top-2">
       <div className="flex items-center gap-3 px-4 py-3 bg-emerald-600 text-white rounded-xl shadow-lg">
         <CheckCircle2 className="w-5 h-5" />
         <span className="font-medium">{list.name} delivered! 📦</span>
@@ -644,10 +644,10 @@ function ListDetailView({
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-warm-200 p-4">
+      <div className="bg-white rounded-xl border border-neutral-200 p-4">
         <button
           onClick={onBack}
-          className="flex items-center gap-2 text-warm-600 hover:text-warm-900 mb-3"
+          className="flex items-center gap-2 text-neutral-600 hover:text-neutral-900 mb-3"
         >
           <ChevronRight className="w-4 h-4 rotate-180" />
           <span className="text-sm">Back to lists</span>
@@ -659,7 +659,7 @@ function ListDetailView({
               <ListIcon className="w-6 h-6 text-emerald-600" />
             </div>
             <div>
-              <h2 className="font-semibold text-warm-900 text-lg">{list.name}</h2>
+              <h2 className="font-semibold text-neutral-900 text-lg">{list.name}</h2>
               <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium mt-1 ${getStatusColor(list.status)}`}>
                 {getStatusIcon(list.status)}
                 {list.statusMessage}
@@ -669,8 +669,8 @@ function ListDetailView({
 
           {list.status === 'DELIVERED' && totalCost > 0 && (
             <div className="text-right">
-              <div className="text-2xl font-bold text-warm-900">${totalCost.toFixed(2)}</div>
-              <div className="text-sm text-warm-500">Total cost</div>
+              <div className="text-2xl font-bold text-neutral-900">${totalCost.toFixed(2)}</div>
+              <div className="text-sm text-neutral-500">Total cost</div>
             </div>
           )}
         </div>
@@ -681,26 +681,26 @@ function ListDetailView({
         const catConfig = CATEGORIES[category as ItemCategory];
         const CatIcon = catConfig.icon;
         return (
-          <div key={category} className="bg-white rounded-xl border border-warm-200 overflow-hidden">
-            <div className={`flex items-center gap-2 px-4 py-2 ${catConfig.color} border-b border-warm-100`}>
+          <div key={category} className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+            <div className={`flex items-center gap-2 px-4 py-2 ${catConfig.color} border-b border-neutral-100`}>
               <CatIcon className="w-4 h-4" />
               <span className="font-medium text-sm">{catConfig.label}</span>
               <span className="text-xs opacity-60">({categoryItems.length})</span>
             </div>
-            <div className="divide-y divide-warm-100">
+            <div className="divide-y divide-neutral-100">
               {categoryItems.map(item => (
                 <div key={item.id} className="flex items-center gap-3 px-4 py-3">
                   <div className={`w-6 h-6 rounded-full flex items-center justify-center ${
-                    item.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-600' : 'bg-warm-100 text-warm-400'
+                    item.status === 'DELIVERED' ? 'bg-emerald-100 text-emerald-600' : 'bg-neutral-100 text-neutral-400'
                   }`}>
                     {item.status === 'DELIVERED' ? <Check className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
                   </div>
                   <div className="flex-1">
-                    <div className="font-medium text-warm-900">{item.name}</div>
-                    <div className="text-sm text-warm-500">{item.quantity}</div>
+                    <div className="font-medium text-neutral-900">{item.name}</div>
+                    <div className="text-sm text-neutral-500">{item.quantity}</div>
                   </div>
                   {item.cost && (
-                    <div className="text-sm font-medium text-warm-700">${item.cost.toFixed(2)}</div>
+                    <div className="text-sm font-medium text-neutral-700">${item.cost.toFixed(2)}</div>
                   )}
                 </div>
               ))}
@@ -821,18 +821,18 @@ export default function InventoryPage() {
     <div className="pb-32 lg:pb-8 max-w-4xl mx-auto">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl lg:text-3xl font-bold text-warm-900">Shopping</h1>
-        <p className="text-warm-500 mt-1">Add items and {HOUSING_MANAGER.name} handles procurement</p>
+        <h1 className="text-2xl lg:text-3xl font-bold text-neutral-900">Shopping</h1>
+        <p className="text-neutral-500 mt-1">Add items and {HOUSING_MANAGER.name} handles procurement</p>
       </div>
 
       {/* View Mode Tabs */}
-      <div className="flex bg-warm-100 rounded-lg p-1 mb-6">
+      <div className="flex bg-neutral-100 rounded-lg p-1 mb-6">
         <button
           onClick={() => setViewMode('shopping')}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             viewMode === 'shopping'
-              ? 'bg-white text-warm-900 shadow-sm'
-              : 'text-warm-600 hover:text-warm-900'
+              ? 'bg-white text-neutral-900 shadow-sm'
+              : 'text-neutral-600 hover:text-neutral-900'
           }`}
         >
           <ShoppingCart className="w-4 h-4" />
@@ -842,8 +842,8 @@ export default function InventoryPage() {
           onClick={() => setViewMode('inventory')}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors relative ${
             viewMode === 'inventory'
-              ? 'bg-white text-warm-900 shadow-sm'
-              : 'text-warm-600 hover:text-warm-900'
+              ? 'bg-white text-neutral-900 shadow-sm'
+              : 'text-neutral-600 hover:text-neutral-900'
           }`}
         >
           <Package className="w-4 h-4" />
@@ -858,8 +858,8 @@ export default function InventoryPage() {
           onClick={() => setViewMode('auto-reorder')}
           className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
             viewMode === 'auto-reorder'
-              ? 'bg-white text-warm-900 shadow-sm'
-              : 'text-warm-600 hover:text-warm-900'
+              ? 'bg-white text-neutral-900 shadow-sm'
+              : 'text-neutral-600 hover:text-neutral-900'
           }`}
         >
           <RefreshCw className="w-4 h-4" />
@@ -884,7 +884,7 @@ export default function InventoryPage() {
 
           {/* Shopping Lists Status */}
           <div className="mt-6">
-            <h2 className="text-lg font-semibold text-warm-900 mb-4">Your Lists</h2>
+            <h2 className="text-lg font-semibold text-neutral-900 mb-4">Your Lists</h2>
             <div className="space-y-3">
               {lists.map(list => (
                 <ListStatusCard
@@ -911,13 +911,13 @@ export default function InventoryPage() {
         <>
           {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search inventory..."
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
+              className="w-full pl-10 pr-4 py-2.5 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-white"
             />
           </div>
 
@@ -937,12 +937,12 @@ export default function InventoryPage() {
           )}
 
           {/* Inventory List */}
-          <div className="bg-white rounded-xl border border-warm-200 overflow-hidden">
-            <div className="p-4 border-b border-warm-200 flex items-center justify-between">
-              <h2 className="font-semibold text-warm-900">Household Inventory</h2>
-              <span className="text-sm text-warm-500">{inventory.length} items tracked</span>
+          <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
+            <div className="p-4 border-b border-neutral-200 flex items-center justify-between">
+              <h2 className="font-semibold text-neutral-900">Household Inventory</h2>
+              <span className="text-sm text-neutral-500">{inventory.length} items tracked</span>
             </div>
-            <div className="divide-y divide-warm-100">
+            <div className="divide-y divide-neutral-100">
               {filteredInventory.map(item => (
                 <InventoryLevelCard
                   key={item.id}
@@ -983,7 +983,7 @@ export default function InventoryPage() {
           </div>
 
           {/* Add New Auto-Reorder */}
-          <button className="w-full mt-4 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-warm-300 rounded-xl text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors">
+          <button className="w-full mt-4 flex items-center justify-center gap-2 p-4 border-2 border-dashed border-neutral-300 rounded-xl text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors">
             <Plus className="w-5 h-5" />
             Add auto-reorder item
           </button>

@@ -423,17 +423,12 @@ export class CreateVehicleDto {
   @IsOptional()
   @IsDate()
   @Type(() => Date)
-  insuranceExpires?: Date;
+  insuranceExpiry?: Date;
 
   @IsOptional()
   @IsDate()
   @Type(() => Date)
-  registrationExpires?: Date;
-
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  inspectionExpires?: Date;
+  registrationExpiry?: Date;
 
   @IsOptional()
   @IsDate()
@@ -475,24 +470,23 @@ export class UpdateVehicleDto extends CreateVehicleDto {
   @IsOptional()
   @IsDate()
   @Type(() => Date)
-  lastOilChangeDate?: Date;
+  lastOilChange?: Date;
 
   @IsOptional()
   @IsInt()
-  lastOilChangeMileage?: number;
-
-  @IsOptional()
-  @IsDate()
-  @Type(() => Date)
-  lastTireRotationDate?: Date;
-
-  @IsOptional()
-  @IsInt()
-  lastTireRotationMileage?: number;
+  oilChangeMileage?: number;
 
   @IsOptional()
   @IsString()
-  preferredServiceVendorId?: string;
+  preferredServiceShop?: string;
+
+  @IsOptional()
+  @IsString()
+  photoUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  registrationState?: string;
 }
 
 export class CreateVehicleServiceRecordDto {
@@ -509,7 +503,7 @@ export class CreateVehicleServiceRecordDto {
 
   @IsOptional()
   @IsInt()
-  mileageAtService?: number;
+  mileageAt?: number;
 
   @IsOptional()
   @IsNumber()
@@ -517,11 +511,7 @@ export class CreateVehicleServiceRecordDto {
 
   @IsOptional()
   @IsString()
-  vendorName?: string;
-
-  @IsOptional()
-  @IsString()
-  vendorId?: string;
+  shopName?: string;
 
   @IsOptional()
   @IsString()

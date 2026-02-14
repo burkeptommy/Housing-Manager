@@ -53,7 +53,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-warm-900/50 backdrop-blur-sm animate-in fade-in duration-200"
+        className="absolute inset-0 bg-neutral-900/50 backdrop-blur-sm animate-in fade-in duration-200"
         onClick={onClose}
       />
 
@@ -66,8 +66,8 @@ export function Modal({
         {(title || showClose) && (
           <div className="flex items-start justify-between p-6 pb-0">
             <div>
-              {title && <h2 className="text-lg font-semibold text-warm-900">{title}</h2>}
-              {description && <p className="text-sm text-warm-500 mt-1">{description}</p>}
+              {title && <h2 className="text-lg font-semibold text-neutral-900">{title}</h2>}
+              {description && <p className="text-sm text-neutral-500 mt-1">{description}</p>}
             </div>
             {showClose && (
               <IconButton
@@ -110,13 +110,13 @@ export function ConfirmDialog({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="sm" showClose={false}>
       <div className="text-center">
-        <h3 className="text-lg font-semibold text-warm-900">{title}</h3>
-        <p className="mt-2 text-sm text-warm-500">{description}</p>
+        <h3 className="text-lg font-semibold text-neutral-900">{title}</h3>
+        <p className="mt-2 text-sm text-neutral-500">{description}</p>
         <div className="flex gap-3 mt-6">
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 text-sm font-medium text-warm-700 bg-warm-100 rounded-xl
-                       hover:bg-warm-200 transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-medium text-neutral-700 bg-neutral-100 rounded-xl
+                       hover:bg-neutral-200 transition-colors"
           >
             {cancelLabel}
           </button>

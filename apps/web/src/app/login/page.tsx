@@ -90,7 +90,7 @@ export default function LoginPage() {
   if (isLoading && !isSubmitting) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-haven-champagne-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-haven-500 border-t-transparent rounded-full animate-spin" />
       </div>
     );
   }
@@ -98,11 +98,11 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-haven-navy-950 text-white flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-haven-950 text-white flex-col justify-between p-12 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-haven-champagne-500 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-haven-champagne-500 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+          <div className="absolute top-0 left-0 w-96 h-96 bg-haven-500 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-haven-500 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
         </div>
 
         {/* Logo */}
@@ -121,7 +121,7 @@ export default function LoginPage() {
           <h1 className="text-4xl font-bold leading-tight text-white">
             Stop managing your home.
             <br />
-            <span className="text-haven-champagne-400">Start living in it.</span>
+            <span className="text-haven-400">Start living in it.</span>
           </h1>
           <p className="text-lg text-white/70 max-w-md">
             One payment. One contact. Zero hassle. Your dedicated Home Manager handles everything.
@@ -130,15 +130,15 @@ export default function LoginPage() {
           {/* Feature Pills */}
           <div className="flex flex-wrap gap-3 pt-4">
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-              <Shield className="w-4 h-4 text-haven-champagne-400" />
+              <Shield className="w-4 h-4 text-haven-400" />
               <span className="text-sm">Bill Management</span>
             </div>
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-              <Clock className="w-4 h-4 text-haven-champagne-400" />
+              <Clock className="w-4 h-4 text-haven-400" />
               <span className="text-sm">24/7 Support</span>
             </div>
             <div className="flex items-center gap-2 bg-white/10 rounded-full px-4 py-2">
-              <Users className="w-4 h-4 text-haven-champagne-400" />
+              <Users className="w-4 h-4 text-haven-400" />
               <span className="text-sm">Dedicated Manager</span>
             </div>
           </div>
@@ -150,7 +150,7 @@ export default function LoginPage() {
             &quot;Haven gave me back my weekends. No more chasing contractors or juggling bills.&quot;
           </blockquote>
           <div className="mt-3 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-haven-champagne-500/20 flex items-center justify-center text-haven-champagne-400 font-semibold">
+            <div className="w-10 h-10 rounded-full bg-haven-500/20 flex items-center justify-center text-haven-400 font-semibold">
               SM
             </div>
             <div>
@@ -177,7 +177,7 @@ export default function LoginPage() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-haven-navy-900">Welcome back</h2>
+            <h2 className="text-3xl font-bold text-haven-900">Welcome back</h2>
             <p className="text-gray-600 mt-2">Sign in to your Haven account</p>
           </div>
 
@@ -198,7 +198,7 @@ export default function LoginPage() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-200 outline-none transition-all"
+                  className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-500 focus:ring-2 focus:ring-haven-200 outline-none transition-all"
                   placeholder="you@example.com"
                   required
                   autoComplete="email"
@@ -214,7 +214,7 @@ export default function LoginPage() {
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-200 outline-none transition-all pr-12"
+                    className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-500 focus:ring-2 focus:ring-haven-200 outline-none transition-all pr-12"
                     placeholder="Enter your password"
                     required
                     autoComplete="current-password"
@@ -234,7 +234,7 @@ export default function LoginPage() {
             <div className="flex justify-end">
               <Link
                 href="/forgot-password"
-                className="text-sm text-haven-champagne-600 hover:text-haven-champagne-700 font-medium"
+                className="text-sm text-haven-600 hover:text-haven-700 font-medium"
               >
                 Forgot password?
               </Link>
@@ -244,7 +244,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-haven-900 hover:bg-haven-800 text-white py-3 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -288,7 +288,7 @@ export default function LoginPage() {
             Don&apos;t have an account?{' '}
             <Link
               href="/onboarding/welcome"
-              className="text-haven-navy-900 hover:text-haven-navy-700 font-semibold"
+              className="text-haven-900 hover:text-haven-700 font-semibold"
             >
               Get started
             </Link>
@@ -297,7 +297,7 @@ export default function LoginPage() {
           {/* Support */}
           <p className="text-center text-sm text-gray-400 mt-6">
             Need help?{' '}
-            <a href="tel:508-333-8630" className="text-haven-champagne-600 hover:underline">
+            <a href="tel:508-333-8630" className="text-haven-600 hover:underline">
               (508) 333-8630
             </a>
           </p>

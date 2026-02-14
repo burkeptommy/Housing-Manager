@@ -192,16 +192,16 @@ function TaskCard({ task, onCheckIn, isCheckingIn, hasActiveTask }: { task: Hand
       <div className="flex items-start justify-between gap-4">
         <div className="flex-1">
           <div className="flex items-center gap-2 mb-2">
-            <h3 className="font-bold text-warm-900">{task.title}</h3>
+            <h3 className="font-bold text-neutral-900">{task.title}</h3>
             <Badge variant={status.variant} size="sm">{status.label}</Badge>
             {task.billingType === 'INCLUSIVE' && (
               <Badge variant="info" size="sm">CONCIERGE</Badge>
             )}
           </div>
-          <p className="text-sm text-warm-600">{task.householdName}</p>
-          <p className="text-xs text-warm-500 mt-1">{task.householdAddress}</p>
+          <p className="text-sm text-neutral-600">{task.householdName}</p>
+          <p className="text-xs text-neutral-500 mt-1">{task.householdAddress}</p>
 
-          <div className="flex items-center gap-4 mt-4 text-sm text-warm-500">
+          <div className="flex items-center gap-4 mt-4 text-sm text-neutral-500">
             <span className="flex items-center gap-1.5">
               <Clock className="w-4 h-4" />
               {formatTime(task.scheduledStart)}
@@ -235,12 +235,12 @@ function HouseholdCard({ household }: { household: { id: string; name: string; a
           <Home className="w-6 h-6 text-teal-600" />
         </div>
         <div className="flex-1">
-          <h3 className="font-semibold text-warm-900">{household.name}</h3>
-          <p className="text-sm text-warm-500">{household.address}</p>
+          <h3 className="font-semibold text-neutral-900">{household.name}</h3>
+          <p className="text-sm text-neutral-500">{household.address}</p>
         </div>
         <div className="text-right">
-          <p className="text-xs text-warm-500 uppercase tracking-wider">Next Visit</p>
-          <p className="text-sm font-semibold text-warm-700">
+          <p className="text-xs text-neutral-500 uppercase tracking-wider">Next Visit</p>
+          <p className="text-sm font-semibold text-neutral-700">
             {new Date(household.nextVisitDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
           </p>
         </div>
@@ -256,8 +256,8 @@ function EmptyTasks() {
       <div className="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
         <CheckCircle className="w-8 h-8 text-emerald-600" />
       </div>
-      <h3 className="text-lg font-bold text-warm-900 mb-2">All done for today!</h3>
-      <p className="text-warm-600">
+      <h3 className="text-lg font-bold text-neutral-900 mb-2">All done for today!</h3>
+      <p className="text-neutral-600">
         Great work! Check your schedule for upcoming tasks.
       </p>
       <Link href="/handyman/schedule">
@@ -466,7 +466,7 @@ export default function HandymanDashboardPage() {
       <div className="flex items-center justify-center h-64">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-teal-600" />
-          <p className="text-warm-500">Loading dashboard...</p>
+          <p className="text-neutral-500">Loading dashboard...</p>
         </div>
       </div>
     );
@@ -498,7 +498,7 @@ export default function HandymanDashboardPage() {
       {/* Today's Tasks */}
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-warm-900">Today's Tasks</h2>
+          <h2 className="text-lg font-bold text-neutral-900">Today's Tasks</h2>
           <Link
             href="/handyman/schedule"
             className="text-sm text-teal-600 hover:text-teal-700 font-medium flex items-center gap-1"
@@ -526,7 +526,7 @@ export default function HandymanDashboardPage() {
 
       {/* Assigned Households */}
       <div>
-        <h2 className="text-lg font-bold text-warm-900 mb-4">Your Households</h2>
+        <h2 className="text-lg font-bold text-neutral-900 mb-4">Your Households</h2>
         <div className="grid gap-4 lg:grid-cols-2">
           {dashboard.assignedHouseholds.map((household) => (
             <HouseholdCard key={household.id} household={household} />
@@ -543,18 +543,18 @@ export default function HandymanDashboardPage() {
       >
         {activeTask && (
           <div className="space-y-6">
-            <Card className="bg-warm-50 border-0">
-              <h3 className="font-bold text-warm-900">{activeTask.title}</h3>
-              <p className="text-sm text-warm-500 mt-1">{activeTask.householdName}</p>
+            <Card className="bg-neutral-50 border-0">
+              <h3 className="font-bold text-neutral-900">{activeTask.title}</h3>
+              <p className="text-sm text-neutral-500 mt-1">{activeTask.householdName}</p>
               <div className="flex items-center gap-4 mt-3 text-sm">
-                <span className="text-warm-600">
+                <span className="text-neutral-600">
                   Time: <span className="font-semibold">{formatElapsedTime()}</span>
                 </span>
               </div>
             </Card>
 
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Hours Worked (Optional)
               </label>
               <input
@@ -564,13 +564,13 @@ export default function HandymanDashboardPage() {
                 value={checkOutHours}
                 onChange={(e) => setCheckOutHours(e.target.value)}
                 placeholder={`Auto-calculated: ${formatElapsedTime()}`}
-                className="w-full px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
+                className="w-full px-4 py-2.5 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all"
               />
-              <p className="text-xs text-warm-500 mt-1">Leave blank to use elapsed time</p>
+              <p className="text-xs text-neutral-500 mt-1">Leave blank to use elapsed time</p>
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-2">
+              <label className="block text-sm font-medium text-neutral-700 mb-2">
                 Completion Notes (Optional)
               </label>
               <textarea
@@ -578,7 +578,7 @@ export default function HandymanDashboardPage() {
                 onChange={(e) => setCheckOutNotes(e.target.value)}
                 placeholder="Any notes about the completed work..."
                 rows={3}
-                className="w-full px-4 py-3 border border-warm-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-none"
+                className="w-full px-4 py-3 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 transition-all resize-none"
               />
             </div>
 

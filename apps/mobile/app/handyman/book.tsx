@@ -156,7 +156,7 @@ export default function BookHandymanScreen() {
           <Ionicons
             name={service.icon}
             size={24}
-            color={isSelected ? colors.white : colors.haven.champagne[500]}
+            color={isSelected ? colors.white : colors.haven.purple[500]}
           />
         </View>
 
@@ -205,7 +205,7 @@ export default function BookHandymanScreen() {
               <Ionicons
                 name="sparkles"
                 size={24}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
             </TouchableOpacity>
           ),
@@ -219,7 +219,7 @@ export default function BookHandymanScreen() {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.headerIcon}>
-            <Ionicons name="hammer" size={32} color={colors.haven.champagne[500]} />
+            <Ionicons name="hammer" size={32} color={colors.haven.purple[500]} />
           </View>
           <View style={styles.headerContent}>
             <Text style={styles.headerTitle}>On-Demand Handyman</Text>
@@ -316,7 +316,7 @@ export default function BookHandymanScreen() {
           <Ionicons
             name="chatbubble-ellipses-outline"
             size={24}
-            color={colors.haven.navy[900]}
+            color={colors.haven.purple[900]}
           />
           <View style={styles.otherRequestContent}>
             <Text style={styles.otherRequestText}>Something else?</Text>
@@ -478,7 +478,7 @@ export default function BookHandymanScreen() {
           <Ionicons
             name="information-circle"
             size={20}
-            color={colors.haven.navy[400]}
+            color={colors.haven.purple[400]}
           />
           <Text style={styles.infoText}>
             Alfred will find an available handyman and confirm the appointment with
@@ -552,7 +552,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: borderRadius.xl,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   categoryChipSelected: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   categoryChipText: {
     fontSize: typography.fontSizes.sm,
@@ -632,19 +632,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   serviceCardSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   serviceIcon: {
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
   serviceIconSelected: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   serviceContent: {
     flex: 1,
@@ -687,13 +687,13 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   checkboxSelected: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   otherRequest: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.xl,
     marginBottom: spacing[5],
@@ -705,7 +705,7 @@ const styles = StyleSheet.create({
   otherRequestText: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   otherRequestSubtext: {
     fontSize: typography.fontSizes.sm,
@@ -726,8 +726,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   dateCardSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   dateDayName: {
     fontSize: typography.fontSizes.xs,
@@ -736,7 +736,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[1],
   },
   dateDayNameSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   dateDay: {
     fontSize: typography.fontSizes.lg,
@@ -744,7 +744,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   dateDaySelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   timeSlots: {
     gap: spacing[2],
@@ -760,8 +760,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   timeSlotSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   timeSlotLabel: {
     fontSize: typography.fontSizes.base,
@@ -769,14 +769,14 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   timeSlotLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   timeSlotTime: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   timeSlotTimeSelected: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   notesCard: {
     padding: spacing[4],
@@ -838,7 +838,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   estimatedTime: {
     flexDirection: 'row',
@@ -857,7 +857,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     padding: spacing[4],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.xl,
     gap: spacing[3],
   },
@@ -881,7 +881,7 @@ const styles = StyleSheet.create({
   footerTotal: {
     fontSize: typography.fontSizes.xl,
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   footerTasks: {
     fontSize: typography.fontSizes.sm,

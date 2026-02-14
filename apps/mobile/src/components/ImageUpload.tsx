@@ -107,7 +107,7 @@ export function ImageUpload({
       ]}
     >
       {loading ? (
-        <ActivityIndicator size="small" color={colors.haven.champagne[500]} />
+        <ActivityIndicator size="small" color={colors.haven.purple[500]} />
       ) : currentImage ? (
         <>
           <Image
@@ -129,7 +129,7 @@ export function ImageUpload({
         </>
       ) : (
         <View style={styles.placeholder}>
-          <Ionicons name="camera-outline" size={size === 'small' ? 20 : 28} color={colors.haven.champagne[500]} />
+          <Ionicons name="camera-outline" size={size === 'small' ? 20 : 28} color={colors.haven.purple[500]} />
           <Text style={[styles.placeholderText, size === 'small' && styles.placeholderTextSmall]}>
             {placeholder}
           </Text>
@@ -162,7 +162,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
   },
   placeholderText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
     textAlign: 'center',
   },

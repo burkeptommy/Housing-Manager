@@ -17,6 +17,7 @@ import { Card, Button, Input, LoadingSpinner, AppHeader } from '../../../src/com
 import { colors, typography, spacing, borderRadius } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
+import { uploadProfileImage } from '../../../src/lib/image-upload';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -71,9 +72,18 @@ export default function ProfileScreen() {
         return;
       }
 
-      // TODO: Backend endpoint needed - PATCH /api/users/profile
-      // Request body: { firstName, lastName, phone, avatarUrl }
-      // This should be implemented in apps/api/src/users/users.controller.ts
+      // Upload avatar if user picked a new local image
+      let avatarUrl = avatar;
+      if (avatar && avatar.startsWith('file://') && user?.id) {
+        try {
+          avatarUrl = await uploadProfileImage('user', user.id, avatar);
+          setAvatar(avatarUrl);
+        } catch (uploadErr) {
+          console.error('Avatar upload error:', uploadErr);
+          // Continue saving other fields even if upload fails
+        }
+      }
+
       const response = await fetch(`${API_BASE_URL}/users/profile`, {
         method: 'PATCH',
         headers: {
@@ -84,19 +94,13 @@ export default function ProfileScreen() {
           firstName: formData.firstName,
           lastName: formData.lastName,
           phone: formData.phone,
+          avatarUrl: avatarUrl || null,
         }),
       });
 
       if (!response.ok) {
-        // 404 means endpoint not implemented yet
-        if (response.status === 404) {
-          // For now, just save locally and show success
-          await refreshMe();
-          setIsEditing(false);
-          Alert.alert('Success', 'Profile updated successfully');
-          return;
-        }
-        throw new Error('Failed to update profile');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Failed to update profile');
       }
 
       await refreshMe();
@@ -243,7 +247,7 @@ export default function ProfileScreen() {
           <Card style={styles.propertyCard}>
             <View style={styles.propertyHeader}>
               <View style={styles.propertyIcon}>
-                <Ionicons name="home" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="home" size={24} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.propertyInfo}>
                 <Text style={styles.propertyName}>{householdInfo.name}</Text>
@@ -291,7 +295,7 @@ export default function ProfileScreen() {
 function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
   return (
     <View style={infoStyles.row}>
-      <Ionicons name={icon as any} size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name={icon as any} size={20} color={colors.haven.purple[500]} />
       <View style={infoStyles.content}>
         <Text style={infoStyles.label}>{label}</Text>
         <Text style={infoStyles.value}>{value}</Text>
@@ -326,7 +330,7 @@ const infoStyles = StyleSheet.create({
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   scrollContainer: {
     flex: 1,
@@ -355,14 +359,14 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarInitials: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
   avatarEditBadge: {
     position: 'absolute',
@@ -371,7 +375,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 3,
@@ -418,7 +422,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -439,14 +443,14 @@ const styles = StyleSheet.create({
   subscriptionBadge: {
     marginTop: spacing[2],
     alignSelf: 'flex-start',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.sm,
   },
   subscriptionText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   statsCard: {

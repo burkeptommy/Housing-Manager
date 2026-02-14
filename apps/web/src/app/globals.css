@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@300;400;500;600;700;800&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -12,30 +12,30 @@
   }
 
   body {
-    @apply font-sans text-warm-800 bg-sage-50;
+    @apply font-sans text-neutral-800 bg-neutral-50;
     font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
   }
 
   .dark body {
-    @apply bg-warm-900 text-warm-100;
+    @apply bg-neutral-900 text-neutral-100;
   }
 
-  /* ONLY h1 gets serif font - main page titles only */
+  /* All headings use sans-serif with extrabold */
   h1 {
-    @apply font-serif tracking-tight text-warm-900;
+    @apply font-sans font-extrabold tracking-tight text-neutral-900;
   }
 
   /* All other headings use sans-serif */
   h2, h3, h4, h5, h6 {
-    @apply font-sans font-semibold tracking-tight text-warm-900;
+    @apply font-sans font-semibold tracking-tight text-neutral-900;
   }
 
   .dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6 {
-    @apply text-warm-50;
+    @apply text-neutral-50;
   }
 
   ::selection {
-    @apply bg-haven-200 text-haven-900;
+    @apply bg-haven-100 text-haven-900;
   }
 
   ::-webkit-scrollbar {
@@ -48,11 +48,11 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-warm-300 rounded-full;
+    @apply bg-neutral-300 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    @apply bg-warm-400;
+    @apply bg-neutral-400;
   }
 
   input, textarea, select {
@@ -71,49 +71,50 @@
 @layer components {
   /* Cards */
   .card {
-    @apply bg-white rounded-2xl border border-warm-200 shadow-soft p-6 transition-all duration-300;
+    @apply bg-white rounded-2xl border border-neutral-200 shadow-soft p-6 transition-all duration-300;
   }
 
   .dark .card {
-    @apply bg-warm-800 border-warm-700;
+    @apply bg-neutral-800 border-neutral-700;
   }
 
   .card-hover {
-    @apply hover:shadow-soft-lg hover:border-warm-300 hover:-translate-y-0.5;
+    @apply hover:shadow-soft-lg hover:border-neutral-300 hover:-translate-y-0.5;
   }
 
   .card-interactive {
     @apply card card-hover cursor-pointer active:scale-[0.99];
   }
 
-  /* Page title - serif only for main page headings */
+  /* Page title */
   .page-title {
-    @apply font-serif text-2xl sm:text-3xl font-bold text-warm-900;
+    @apply font-sans font-extrabold text-2xl sm:text-3xl text-neutral-900;
   }
 
-  /* Navy gradient cards - white text */
-  .card-navy {
+  /* Purple gradient cards - white text */
+  .card-purple {
     @apply bg-gradient-to-br from-haven-700 to-haven-800 rounded-2xl border-0 text-white;
   }
 
-  .card-navy h1,
-  .card-navy h2,
-  .card-navy h3,
-  .card-navy h4,
-  .card-navy .card-title,
-  .card-navy .stat-value {
+  .card-purple h1,
+  .card-purple h2,
+  .card-purple h3,
+  .card-purple h4,
+  .card-purple .card-title,
+  .card-purple .stat-value {
     @apply text-white;
   }
 
-  .card-navy p,
-  .card-navy .card-description,
-  .card-navy .stat-label {
+  .card-purple p,
+  .card-purple .card-description,
+  .card-purple .stat-label {
     @apply text-white/80;
   }
 
+
   /* Dark charcoal cards - white text */
   .card-dark {
-    @apply bg-gradient-to-br from-warm-800 to-warm-900 rounded-2xl border-0 text-white;
+    @apply bg-gradient-to-br from-neutral-800 to-neutral-900 rounded-2xl border-0 text-white;
   }
 
   .card-dark h1,
@@ -131,9 +132,9 @@
     @apply text-white/70;
   }
 
-  /* Sage accent card */
-  .card-sage {
-    @apply bg-gradient-to-br from-sage-50 to-sage-100 rounded-2xl border border-sage-200;
+  /* Coral accent card */
+  .card-coral {
+    @apply bg-gradient-to-br from-coral-50 to-coral-100 rounded-2xl border border-coral-400/20;
   }
 
   /* Sidebar styles */
@@ -165,20 +166,20 @@
   }
 
   .btn-secondary {
-    @apply btn px-5 py-2.5 bg-white text-warm-700 border border-warm-200
-           shadow-sm hover:bg-warm-50 hover:border-warm-300 hover:text-warm-900;
+    @apply btn px-5 py-2.5 bg-white text-neutral-700 border border-neutral-200
+           shadow-sm hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900;
   }
 
   .dark .btn-secondary {
-    @apply bg-warm-800 text-warm-200 border-warm-600 hover:bg-warm-700 hover:text-warm-100;
+    @apply bg-neutral-800 text-neutral-200 border-neutral-600 hover:bg-neutral-700 hover:text-neutral-100;
   }
 
   .btn-ghost {
-    @apply btn px-4 py-2 text-warm-600 hover:bg-warm-100 hover:text-warm-900;
+    @apply btn px-4 py-2 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900;
   }
 
   .dark .btn-ghost {
-    @apply text-warm-400 hover:bg-warm-800 hover:text-warm-100;
+    @apply text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100;
   }
 
   .btn-danger {
@@ -188,7 +189,7 @@
   }
 
   .btn-white {
-    @apply btn px-5 py-2.5 bg-white text-haven-700 shadow-lg hover:bg-sage-50;
+    @apply btn px-5 py-2.5 bg-white text-haven-700 shadow-lg hover:bg-haven-50;
   }
 
   .btn-outline-light {
@@ -209,16 +210,16 @@
 
   /* Inputs */
   .input {
-    @apply w-full px-4 py-3 bg-white border border-warm-200 rounded-xl
-           text-warm-800 placeholder:text-warm-400
+    @apply w-full px-4 py-3 bg-white border border-neutral-200 rounded-xl
+           text-neutral-800 placeholder:text-neutral-400
            transition-all duration-200
-           hover:border-warm-300
+           hover:border-neutral-300
            focus:border-haven-600 focus:ring-2 focus:ring-haven-600/20;
   }
 
   .dark .input {
-    @apply bg-warm-800 border-warm-600 text-warm-100 placeholder:text-warm-500
-           hover:border-warm-500 focus:border-haven-400;
+    @apply bg-neutral-800 border-neutral-600 text-neutral-100 placeholder:text-neutral-500
+           hover:border-neutral-500 focus:border-haven-400;
   }
 
   .input-error {
@@ -247,19 +248,19 @@
   }
 
   .badge-neutral {
-    @apply bg-warm-100 text-warm-700 ring-1 ring-inset ring-warm-600/10;
+    @apply bg-neutral-100 text-neutral-700 ring-1 ring-inset ring-neutral-600/10;
   }
 
   .badge-premium {
-    @apply bg-gradient-to-r from-sage-100 to-sage-200 text-sage-700
-           ring-1 ring-inset ring-sage-400/30;
+    @apply bg-gradient-to-r from-haven-100 to-haven-200 text-haven-700
+           ring-1 ring-inset ring-haven-400/30;
   }
 
-  .badge-sage {
-    @apply bg-sage-100 text-sage-700 ring-1 ring-inset ring-sage-500/20;
+  .badge-coral {
+    @apply bg-coral-100 text-coral-600 ring-1 ring-inset ring-coral-500/20;
   }
 
-  .badge-navy {
+  .badge-haven {
     @apply bg-haven-100 text-haven-700 ring-1 ring-inset ring-haven-600/20;
   }
 
@@ -270,7 +271,7 @@
   /* Avatars */
   .avatar {
     @apply relative inline-flex items-center justify-center rounded-full
-           bg-gradient-to-br from-haven-600 to-haven-700 text-white font-semibold
+           bg-gradient-to-br from-haven-500 to-haven-700 text-white font-semibold
            ring-2 ring-white shadow-sm;
   }
 
@@ -286,13 +287,13 @@
   }
 
   .status-online { @apply bg-emerald-500; }
-  .status-offline { @apply bg-warm-400; }
+  .status-offline { @apply bg-neutral-400; }
   .status-busy { @apply bg-red-500; }
   .status-away { @apply bg-amber-500; }
 
   /* Skeleton Loaders */
   .skeleton {
-    @apply bg-gradient-to-r from-warm-100 via-warm-50 to-warm-100
+    @apply bg-gradient-to-r from-neutral-100 via-neutral-50 to-neutral-100
            bg-[length:200%_100%] animate-shimmer rounded-lg;
   }
 
@@ -304,12 +305,12 @@
   /* Nav Items */
   .nav-item {
     @apply flex items-center gap-3 px-4 py-3 rounded-xl font-medium
-           text-warm-600 transition-all duration-200
-           hover:bg-warm-100 hover:text-warm-900;
+           text-neutral-600 transition-all duration-200
+           hover:bg-neutral-100 hover:text-neutral-900;
   }
 
   .dark .nav-item {
-    @apply text-warm-400 hover:bg-warm-800 hover:text-warm-100;
+    @apply text-neutral-400 hover:bg-neutral-800 hover:text-neutral-100;
   }
 
   .nav-item-active {
@@ -326,24 +327,24 @@
   }
 
   .stat-value {
-    @apply text-3xl font-bold text-warm-900 font-serif tabular-nums;
+    @apply text-3xl font-bold text-neutral-900 font-sans font-extrabold tabular-nums;
   }
 
   .dark .stat-value {
-    @apply text-warm-50;
+    @apply text-neutral-50;
   }
 
   .stat-label {
-    @apply text-sm text-warm-500 mt-1;
+    @apply text-sm text-neutral-500 mt-1;
   }
 
   /* Tables */
   .table-container {
-    @apply overflow-x-auto rounded-xl border border-warm-200;
+    @apply overflow-x-auto rounded-xl border border-neutral-200;
   }
 
   .dark .table-container {
-    @apply border-warm-700;
+    @apply border-neutral-700;
   }
 
   .table {
@@ -351,19 +352,19 @@
   }
 
   .table th {
-    @apply px-4 py-3 text-left text-xs font-semibold text-warm-500 uppercase tracking-wider bg-warm-50 border-b border-warm-200;
+    @apply px-4 py-3 text-left text-xs font-semibold text-neutral-500 uppercase tracking-wider bg-neutral-50 border-b border-neutral-200;
   }
 
   .dark .table th {
-    @apply bg-warm-800 text-warm-400 border-warm-700;
+    @apply bg-neutral-800 text-neutral-400 border-neutral-700;
   }
 
   .table td {
-    @apply px-4 py-4 border-b border-warm-100;
+    @apply px-4 py-4 border-b border-neutral-100;
   }
 
   .dark .table td {
-    @apply border-warm-700;
+    @apply border-neutral-700;
   }
 
   .table tr:last-child td {
@@ -371,11 +372,11 @@
   }
 
   .table tr:hover td {
-    @apply bg-warm-50/50;
+    @apply bg-neutral-50/50;
   }
 
   .dark .table tr:hover td {
-    @apply bg-warm-800/50;
+    @apply bg-neutral-800/50;
   }
 
   /* Empty States */
@@ -384,16 +385,16 @@
   }
 
   .empty-state-icon {
-    @apply w-16 h-16 rounded-2xl bg-warm-100 flex items-center justify-center mx-auto mb-4;
+    @apply w-16 h-16 rounded-2xl bg-neutral-100 flex items-center justify-center mx-auto mb-4;
   }
 
   .dark .empty-state-icon {
-    @apply bg-warm-800;
+    @apply bg-neutral-800;
   }
 
   /* Modals */
   .modal-overlay {
-    @apply fixed inset-0 bg-warm-900/40 backdrop-blur-sm z-50
+    @apply fixed inset-0 bg-neutral-900/40 backdrop-blur-sm z-50
            flex items-center justify-center p-4;
   }
 
@@ -403,15 +404,15 @@
   }
 
   .dark .modal {
-    @apply bg-warm-800;
+    @apply bg-neutral-800;
   }
 
   .modal-header {
-    @apply px-6 py-4 border-b border-warm-200;
+    @apply px-6 py-4 border-b border-neutral-200;
   }
 
   .dark .modal-header {
-    @apply border-warm-700;
+    @apply border-neutral-700;
   }
 
   .modal-body {
@@ -419,20 +420,20 @@
   }
 
   .modal-footer {
-    @apply px-6 py-4 border-t border-warm-200 flex items-center justify-end gap-3;
+    @apply px-6 py-4 border-t border-neutral-200 flex items-center justify-end gap-3;
   }
 
   .dark .modal-footer {
-    @apply border-warm-700;
+    @apply border-neutral-700;
   }
 
   /* Label */
   .label {
-    @apply text-sm font-medium text-warm-700;
+    @apply text-sm font-medium text-neutral-700;
   }
 
   .dark .label {
-    @apply text-warm-300;
+    @apply text-neutral-300;
   }
 }
 
@@ -441,9 +442,10 @@
     @apply bg-clip-text text-transparent bg-gradient-to-r from-haven-700 to-haven-600;
   }
 
-  .text-gradient-sage {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-sage-500 to-sage-400;
+  .text-gradient-coral {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-coral-500 to-coral-400;
   }
+
 
   /* Staggered animations */
   .stagger-1 { animation-delay: 50ms; }
@@ -475,31 +477,23 @@
   }
 
   .dark .glass {
-    @apply bg-warm-900/70;
+    @apply bg-neutral-900/70;
   }
 }
 
 /* Typography */
-.font-serif {
-  font-family: 'Playfair Display', Georgia, serif;
+body, h1, h2, h3, h4, h5, h6, p, div, a, button, input, textarea, select, label {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-h1.page-title,
-.page-title {
-  font-family: 'Playfair Display', Georgia, serif;
+h1, h1.page-title, .page-title {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+  font-weight: 800;
 }
 
-body, h2, h3, h4, h5, h6, p, div, a, button, input, textarea, select, label {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
-
-/* Spans inherit from parent - allows font-serif on h1 to cascade to child spans */
+/* Spans inherit from parent */
 span {
   font-family: inherit;
-}
-
-.font-serif {
-  font-family: 'Playfair Display', Georgia, serif !important;
 }
 
 /* Mapbox Popup Styles */

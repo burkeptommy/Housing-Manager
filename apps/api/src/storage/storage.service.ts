@@ -49,6 +49,40 @@ export class StorageService {
   }
 
   /**
+   * Upload a buffer (e.g., email attachment) to Google Cloud Storage
+   */
+  async uploadBuffer(
+    buffer: Buffer,
+    householdId: string,
+    category: string,
+    originalName: string,
+    contentType: string,
+  ): Promise<{ url: string; path: string }> {
+    const fileExtension = originalName.split('.').pop() || 'bin';
+    const fileName = `${uuid()}.${fileExtension}`;
+    const filePath = `households/${householdId}/${category}/${fileName}`;
+
+    const bucket = this.storage.bucket(this.bucketName);
+    const blob = bucket.file(filePath);
+
+    await blob.save(buffer, {
+      metadata: {
+        contentType,
+        metadata: {
+          originalName,
+          householdId,
+          category,
+        },
+      },
+    });
+
+    const url = `https://storage.googleapis.com/${this.bucketName}/${filePath}`;
+    this.logger.log(`Uploaded buffer to ${filePath}`);
+
+    return { url, path: filePath };
+  }
+
+  /**
    * Get a signed URL for temporary access
    */
   async getSignedUrl(

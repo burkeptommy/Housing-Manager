@@ -428,7 +428,7 @@ export default function ManagerScreen() {
           onPress={() => router.push('/(tabs)/maintenance' as any)}
         >
           <View style={styles.quickActionIcon}>
-            <Ionicons name="checkbox-outline" size={20} color={colors.haven.navy[900]} />
+            <Ionicons name="checkbox-outline" size={20} color={colors.haven.purple[900]} />
           </View>
           <Text style={styles.quickActionText}>Checklist</Text>
         </TouchableOpacity>
@@ -437,7 +437,7 @@ export default function ManagerScreen() {
           onPress={() => router.push('/(tabs)/manager/handyman' as any)}
         >
           <View style={styles.quickActionIcon}>
-            <Ionicons name="construct-outline" size={20} color={colors.haven.navy[900]} />
+            <Ionicons name="construct-outline" size={20} color={colors.haven.purple[900]} />
           </View>
           <Text style={styles.quickActionText}>Handyman</Text>
         </TouchableOpacity>
@@ -446,7 +446,7 @@ export default function ManagerScreen() {
           onPress={() => router.push('/(tabs)/manager/vendors' as any)}
         >
           <View style={styles.quickActionIcon}>
-            <Ionicons name="people-outline" size={20} color={colors.haven.navy[900]} />
+            <Ionicons name="people-outline" size={20} color={colors.haven.purple[900]} />
           </View>
           <Text style={styles.quickActionText}>Vendors</Text>
         </TouchableOpacity>
@@ -455,7 +455,7 @@ export default function ManagerScreen() {
           onPress={() => router.push('/(tabs)/approvals' as any)}
         >
           <View style={styles.quickActionIcon}>
-            <Ionicons name="checkmark-circle-outline" size={20} color={colors.haven.navy[900]} />
+            <Ionicons name="checkmark-circle-outline" size={20} color={colors.haven.purple[900]} />
           </View>
           <Text style={styles.quickActionText}>Approvals</Text>
         </TouchableOpacity>
@@ -621,7 +621,7 @@ export default function ManagerScreen() {
               <Ionicons
                 name={getCategoryIcon(item.vendorCategory) as any}
                 size={24}
-                color={colors.haven.champagne[500]}
+                color={colors.haven.purple[500]}
               />
             </View>
             <View style={styles.conversationContent}>
@@ -644,7 +644,7 @@ export default function ManagerScreen() {
         )}
         ListEmptyComponent={
           <View style={styles.emptyMessages}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>No Messages Yet</Text>
             <Text style={styles.emptyText}>
               Start a conversation with your vendors or service providers
@@ -692,7 +692,7 @@ export default function ManagerScreen() {
         >
           <AlfredTabIcon
             size={18}
-            color={activeTab === 'alfred' ? colors.haven.champagne[500] : colors.text.secondary}
+            color={activeTab === 'alfred' ? colors.haven.purple[500] : colors.text.secondary}
           />
           <Text style={[styles.tabText, activeTab === 'alfred' && styles.tabTextActive]}>
             Ask Alfred
@@ -705,7 +705,7 @@ export default function ManagerScreen() {
           <Ionicons
             name="chatbubbles-outline"
             size={18}
-            color={activeTab === 'messages' ? colors.haven.champagne[500] : colors.text.secondary}
+            color={activeTab === 'messages' ? colors.haven.purple[500] : colors.text.secondary}
           />
           <Text style={[styles.tabText, activeTab === 'messages' && styles.tabTextActive]}>
             Messages
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background.secondary,
   },
   headerWrapper: {
-    backgroundColor: colors.haven.navy[950],
+    backgroundColor: colors.haven.purple[950],
   },
   header: {
     height: 56,
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: colors.haven.champagne[500],
+    borderBottomColor: colors.haven.purple[500],
   },
   tabText: {
     fontSize: typography.fontSizes.sm,
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   tabTextActive: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   tabBadge: {
     backgroundColor: colors.status.error,
@@ -813,7 +813,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[1],
@@ -838,14 +838,14 @@ const styles = StyleSheet.create({
   },
   userBubble: {
     alignSelf: 'flex-end',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderBottomRightRadius: borderRadius.sm,
   },
   alfredBubble: {
     alignSelf: 'flex-start',
     backgroundColor: colors.white,
     borderBottomLeftRadius: borderRadius.sm,
-    shadowColor: colors.haven.navy[900],
+    shadowColor: colors.haven.purple[900],
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -859,7 +859,7 @@ const styles = StyleSheet.create({
   alfredName: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     marginLeft: spacing[2],
     flex: 1,
   },
@@ -879,14 +879,14 @@ const styles = StyleSheet.create({
   },
   userTime: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
     marginTop: spacing[1],
     textAlign: 'right',
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.lg,
@@ -909,7 +909,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: colors.haven.champagne[400],
+    backgroundColor: colors.haven.purple[400],
   },
   inputContainer: {
     flexDirection: 'row',
@@ -933,7 +933,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#c4a574',  // Champagne when active - more inviting
+    backgroundColor: '#6200EA',  // Purple when active
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: spacing[2],
@@ -954,16 +954,16 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.full,
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[300],
+    borderColor: colors.haven.purple[300],
   },
   quickReplyButtonPrimary: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   quickReplyText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   quickReplyTextPrimary: {
     color: colors.white,
@@ -984,7 +984,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1048,7 +1048,7 @@ const styles = StyleSheet.create({
   newMessageButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,
@@ -1067,10 +1067,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: colors.haven.navy[900],
+    shadowColor: colors.haven.purple[900],
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,

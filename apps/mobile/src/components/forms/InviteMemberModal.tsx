@@ -271,7 +271,7 @@ export function InviteMemberModal({
           >
             {/* Info Card */}
             <View style={styles.infoCard}>
-              <Ionicons name="mail-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="mail-outline" size={24} color={colors.haven.purple[500]} />
               <Text style={styles.infoText}>
                 Send an invitation email to add someone to your household. They'll receive a link to join.
               </Text>
@@ -336,7 +336,7 @@ export function InviteMemberModal({
                 <Text style={styles.pendingSectionTitle}>Pending Invitations</Text>
 
                 {isLoading ? (
-                  <ActivityIndicator size="small" color={colors.haven.navy[900]} />
+                  <ActivityIndicator size="small" color={colors.haven.purple[900]} />
                 ) : (
                   pendingInvites.map((invite) => (
                     <View key={invite.id} style={styles.pendingCard}>
@@ -352,7 +352,7 @@ export function InviteMemberModal({
                           style={styles.pendingAction}
                           onPress={() => handleResendInvite(invite.id)}
                         >
-                          <Ionicons name="refresh" size={18} color={colors.haven.champagne[500]} />
+                          <Ionicons name="refresh" size={18} color={colors.haven.purple[500]} />
                         </TouchableOpacity>
                         <TouchableOpacity
                           style={styles.pendingAction}
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
   infoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[5],
@@ -421,7 +421,7 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     lineHeight: 20,
   },
   section: {
@@ -455,8 +455,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   roleButtonActive: {
-    backgroundColor: colors.haven.navy[50],
-    borderColor: colors.haven.navy[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   roleButtonText: {
     fontSize: typography.fontSizes.base,
@@ -465,14 +465,14 @@ const styles = StyleSheet.create({
     marginBottom: 2,
   },
   roleButtonTextActive: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   roleDescription: {
     fontSize: typography.fontSizes.xs,
     color: colors.text.tertiary,
   },
   roleDescriptionActive: {
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',
@@ -518,7 +518,7 @@ const styles = StyleSheet.create({
   },
   pendingRole: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   pendingExpiry: {

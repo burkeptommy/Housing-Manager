@@ -8,9 +8,9 @@ export default function AuthLayout() {
         headerStyle: {
           backgroundColor: colors.white,
         },
-        headerTintColor: colors.haven.navy[900],
+        headerTintColor: colors.haven.purple[500],
         headerTitleStyle: {
-          fontWeight: typography.fontWeights.semibold,
+          fontFamily: 'Nunito_600SemiBold',
         },
         headerShadowVisible: false,
         headerBackTitle: '',

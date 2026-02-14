@@ -142,7 +142,7 @@ export default function HandymanPage() {
   if (user?.role !== 'HANDYMAN') {
     return (
       <div className="flex items-center justify-center h-64">
-        <p className="text-warm-600 dark:text-warm-400">This page is only accessible to handymen.</p>
+        <p className="text-neutral-600 dark:text-neutral-400">This page is only accessible to handymen.</p>
       </div>
     );
   }
@@ -175,8 +175,8 @@ export default function HandymanPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-2xl font-bold text-warm-900 dark:text-white">My Jobs</h1>
-        <p className="text-warm-600 dark:text-warm-400">
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">My Jobs</h1>
+        <p className="text-neutral-600 dark:text-neutral-400">
           Welcome back, {dashboard.handymanName}
         </p>
       </div>
@@ -184,15 +184,15 @@ export default function HandymanPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="card">
-          <p className="text-sm text-warm-500 dark:text-warm-400">Pending Tasks</p>
-          <p className="text-3xl font-bold text-warm-900 dark:text-white">{dashboard.stats.pendingTasks}</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">Pending Tasks</p>
+          <p className="text-3xl font-bold text-neutral-900 dark:text-white">{dashboard.stats.pendingTasks}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-warm-500 dark:text-warm-400">Completed This Month</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">Completed This Month</p>
           <p className="text-3xl font-bold text-green-600">{dashboard.stats.completedThisMonth}</p>
         </div>
         <div className="card">
-          <p className="text-sm text-warm-500 dark:text-warm-400">Hours This Month</p>
+          <p className="text-sm text-neutral-500 dark:text-neutral-400">Hours This Month</p>
           <p className="text-3xl font-bold text-haven-700">{dashboard.stats.hoursThisMonth.toFixed(1)}</p>
         </div>
       </div>
@@ -206,14 +206,14 @@ export default function HandymanPage() {
 
       {/* Today's Tasks */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-warm-900 dark:text-white">Today&apos;s Tasks</h2>
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Today&apos;s Tasks</h2>
 
         {dashboard.todaysTasks.length === 0 ? (
           <div className="card text-center py-8">
-            <svg className="w-12 h-12 mx-auto text-warm-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-12 h-12 mx-auto text-neutral-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>
-            <p className="text-warm-600 dark:text-warm-400">No tasks scheduled for today</p>
+            <p className="text-neutral-600 dark:text-neutral-400">No tasks scheduled for today</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -222,17 +222,17 @@ export default function HandymanPage() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-warm-900 dark:text-white">{task.title}</h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[task.status] || 'bg-warm-100 text-warm-600'}`}>
+                      <h3 className="font-semibold text-neutral-900 dark:text-white">{task.title}</h3>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[task.status] || 'bg-neutral-100 text-neutral-600'}`}>
                         {task.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="text-sm text-warm-600 dark:text-warm-400">{task.householdName}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">{task.householdName}</p>
                     {task.address && (
-                      <p className="text-sm text-warm-500 dark:text-warm-400">{task.address}</p>
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400">{task.address}</p>
                     )}
                     {task.scheduledStart && (
-                      <p className="text-sm text-warm-500 dark:text-warm-400 mt-1">
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
                         Scheduled: {formatTime(task.scheduledStart)}
                       </p>
                     )}
@@ -273,11 +273,11 @@ export default function HandymanPage() {
 
       {/* Upcoming Tasks */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-warm-900 dark:text-white">Upcoming Tasks</h2>
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">Upcoming Tasks</h2>
 
         {dashboard.upcomingTasks.length === 0 ? (
           <div className="card text-center py-8">
-            <p className="text-warm-600 dark:text-warm-400">No upcoming tasks in the next 7 days</p>
+            <p className="text-neutral-600 dark:text-neutral-400">No upcoming tasks in the next 7 days</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -286,14 +286,14 @@ export default function HandymanPage() {
                 <div className="flex items-center justify-between">
                   <div>
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-warm-900 dark:text-white">{task.title}</h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[task.status] || 'bg-warm-100 text-warm-600'}`}>
+                      <h3 className="font-semibold text-neutral-900 dark:text-white">{task.title}</h3>
+                      <span className={`px-2 py-0.5 rounded text-xs font-medium ${STATUS_COLORS[task.status] || 'bg-neutral-100 text-neutral-600'}`}>
                         {task.status.replace('_', ' ')}
                       </span>
                     </div>
-                    <p className="text-sm text-warm-600 dark:text-warm-400">{task.householdName}</p>
+                    <p className="text-sm text-neutral-600 dark:text-neutral-400">{task.householdName}</p>
                     {task.scheduledStart && (
-                      <p className="text-sm text-warm-500 dark:text-warm-400 mt-1">
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400 mt-1">
                         {formatDate(task.scheduledStart)} at {formatTime(task.scheduledStart)}
                       </p>
                     )}
@@ -307,11 +307,11 @@ export default function HandymanPage() {
 
       {/* Assigned Households */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold text-warm-900 dark:text-white">My Households</h2>
+        <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">My Households</h2>
 
         {dashboard.assignedHouseholds.length === 0 ? (
           <div className="card text-center py-8">
-            <p className="text-warm-600 dark:text-warm-400">No households assigned yet</p>
+            <p className="text-neutral-600 dark:text-neutral-400">No households assigned yet</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -324,9 +324,9 @@ export default function HandymanPage() {
                     </svg>
                   </div>
                   <div className="flex-1">
-                    <h3 className="font-semibold text-warm-900 dark:text-white">{household.name}</h3>
+                    <h3 className="font-semibold text-neutral-900 dark:text-white">{household.name}</h3>
                     {household.address && (
-                      <p className="text-sm text-warm-500 dark:text-warm-400">{household.address}</p>
+                      <p className="text-sm text-neutral-500 dark:text-neutral-400">{household.address}</p>
                     )}
                     {household.monthlyVisitDay && household.conciergeEnabled && (
                       <p className="text-xs text-haven-700 dark:text-haven-400 mt-1">
@@ -339,7 +339,7 @@ export default function HandymanPage() {
                       Active
                     </span>
                   ) : (
-                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-warm-100 text-warm-600">
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-600">
                       Inactive
                     </span>
                   )}
@@ -353,14 +353,14 @@ export default function HandymanPage() {
       {/* Checkout Modal */}
       {checkoutModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-warm-800 rounded-xl max-w-md w-full">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-md w-full">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-warm-900 dark:text-white mb-4">Complete Task</h2>
-              <p className="text-warm-600 dark:text-warm-400 mb-4">{checkoutModal.title}</p>
+              <h2 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">Complete Task</h2>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-4">{checkoutModal.title}</p>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 dark:text-warm-300 mb-1">
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Hours Worked
                   </label>
                   <input
@@ -369,19 +369,19 @@ export default function HandymanPage() {
                     min="0"
                     value={checkoutData.hoursWorked}
                     onChange={(e) => setCheckoutData({ ...checkoutData, hoursWorked: e.target.value })}
-                    className="w-full px-3 py-2 border border-warm-300 dark:border-warm-600 rounded-lg bg-white dark:bg-warm-700 text-warm-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
                     placeholder="e.g., 1.5"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-warm-700 dark:text-warm-300 mb-1">
+                  <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                     Notes (Optional)
                   </label>
                   <textarea
                     value={checkoutData.notes}
                     onChange={(e) => setCheckoutData({ ...checkoutData, notes: e.target.value })}
-                    className="w-full px-3 py-2 border border-warm-300 dark:border-warm-600 rounded-lg bg-white dark:bg-warm-700 text-warm-900 dark:text-white"
+                    className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
                     rows={3}
                     placeholder="Any notes about the work completed..."
                   />
@@ -394,7 +394,7 @@ export default function HandymanPage() {
                     setCheckoutModal(null);
                     setCheckoutData({ hoursWorked: '', notes: '' });
                   }}
-                  className="flex-1 px-4 py-2 border border-warm-300 dark:border-warm-600 text-warm-700 dark:text-warm-300 rounded-lg hover:bg-warm-50 dark:hover:bg-warm-700 transition-colors"
+                  className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
                 >
                   Cancel
                 </button>
@@ -414,19 +414,19 @@ export default function HandymanPage() {
       {/* Reject Modal */}
       {rejectModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-warm-800 rounded-xl max-w-md w-full">
+          <div className="bg-white dark:bg-neutral-800 rounded-xl max-w-md w-full">
             <div className="p-6">
-              <h2 className="text-xl font-bold text-warm-900 dark:text-white mb-4">Decline Task</h2>
-              <p className="text-warm-600 dark:text-warm-400 mb-4">{rejectModal.title}</p>
+              <h2 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">Decline Task</h2>
+              <p className="text-neutral-600 dark:text-neutral-400 mb-4">{rejectModal.title}</p>
 
               <div>
-                <label className="block text-sm font-medium text-warm-700 dark:text-warm-300 mb-1">
+                <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300 mb-1">
                   Reason for declining
                 </label>
                 <textarea
                   value={rejectReason}
                   onChange={(e) => setRejectReason(e.target.value)}
-                  className="w-full px-3 py-2 border border-warm-300 dark:border-warm-600 rounded-lg bg-white dark:bg-warm-700 text-warm-900 dark:text-white"
+                  className="w-full px-3 py-2 border border-neutral-300 dark:border-neutral-600 rounded-lg bg-white dark:bg-neutral-700 text-neutral-900 dark:text-white"
                   rows={3}
                   placeholder="Please provide a reason..."
                   required
@@ -439,7 +439,7 @@ export default function HandymanPage() {
                     setRejectModal(null);
                     setRejectReason('');
                   }}
-                  className="flex-1 px-4 py-2 border border-warm-300 dark:border-warm-600 text-warm-700 dark:text-warm-300 rounded-lg hover:bg-warm-50 dark:hover:bg-warm-700 transition-colors"
+                  className="flex-1 px-4 py-2 border border-neutral-300 dark:border-neutral-600 text-neutral-700 dark:text-neutral-300 rounded-lg hover:bg-neutral-50 dark:hover:bg-neutral-700 transition-colors"
                 >
                   Cancel
                 </button>

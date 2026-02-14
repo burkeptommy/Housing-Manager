@@ -35,8 +35,8 @@ const STATUS_CONFIG: Record<ProjectIdeaStatus, { name: string; color: string; bg
   },
   ARCHIVED: {
     name: 'Archived',
-    color: 'text-warm-600 dark:text-warm-400',
-    bgColor: 'bg-warm-100 dark:bg-warm-900/20',
+    color: 'text-neutral-600 dark:text-neutral-400',
+    bgColor: 'bg-neutral-100 dark:bg-neutral-900/20',
     icon: '📁',
   },
 };
@@ -194,7 +194,7 @@ export default function ProjectDetailPage() {
   if (!idea) {
     return (
       <div className="text-center py-12">
-        <p className="text-warm-600 dark:text-warm-400">Project not found</p>
+        <p className="text-neutral-600 dark:text-neutral-400">Project not found</p>
         <Link href="/app/projects" className="btn btn-primary mt-4">
           Back to Projects
         </Link>
@@ -227,7 +227,7 @@ export default function ProjectDetailPage() {
       {/* Back button */}
       <Link
         href="/app/projects"
-        className="inline-flex items-center gap-2 text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-white"
+        className="inline-flex items-center gap-2 text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white"
       >
         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -239,7 +239,7 @@ export default function ProjectDetailPage() {
       <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-warm-900 dark:text-white">
+            <h1 className="text-2xl font-bold text-neutral-900 dark:text-white">
               {idea.title}
             </h1>
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${statusConfig.bgColor} ${statusConfig.color}`}>
@@ -247,7 +247,7 @@ export default function ProjectDetailPage() {
               {statusConfig.name}
             </span>
           </div>
-          <p className="text-warm-600 dark:text-warm-400">
+          <p className="text-neutral-600 dark:text-neutral-400">
             {idea.category.replace(/_/g, ' ')}
             {idea.template && ` • ${idea.template.name}`}
           </p>
@@ -287,8 +287,8 @@ export default function ProjectDetailPage() {
       {idea.estimatedCostMin && idea.estimatedCostMax && (
         <div className="p-6 rounded-xl bg-gradient-to-r from-emerald-50 to-purple-50 dark:from-emerald-900/20 dark:to-purple-900/20 border border-emerald-200 dark:border-emerald-800">
           <div className="text-center">
-            <div className="text-sm text-warm-600 dark:text-warm-400 mb-1">Estimated Cost</div>
-            <div className="text-3xl font-bold text-warm-900 dark:text-white">
+            <div className="text-sm text-neutral-600 dark:text-neutral-400 mb-1">Estimated Cost</div>
+            <div className="text-3xl font-bold text-neutral-900 dark:text-white">
               {formatCurrency(idea.estimatedCostMin)} - {formatCurrency(idea.estimatedCostMax)}
             </div>
             {idea.socialProofNote && (
@@ -304,7 +304,7 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Tabs */}
-      <div className="border-b border-warm-200 dark:border-warm-700">
+      <div className="border-b border-neutral-200 dark:border-neutral-700">
         <nav className="flex gap-6">
           {[
             { id: 'overview' as TabType, name: 'Overview' },
@@ -317,12 +317,12 @@ export default function ProjectDetailPage() {
               className={`pb-3 border-b-2 font-medium text-sm transition-colors ${
                 activeTab === tab.id
                   ? 'border-emerald-600 text-emerald-600 dark:text-emerald-400'
-                  : 'border-transparent text-warm-600 dark:text-warm-400 hover:text-warm-900 dark:hover:text-white'
+                  : 'border-transparent text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-white'
               }`}
             >
               {tab.name}
               {tab.count !== undefined && tab.count > 0 && (
-                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-warm-100 dark:bg-warm-800">
+                <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-neutral-100 dark:bg-neutral-800">
                   {tab.count}
                 </span>
               )}
@@ -339,28 +339,28 @@ export default function ProjectDetailPage() {
             {/* Description */}
             {idea.description && (
               <div className="card">
-                <h3 className="font-medium text-warm-900 dark:text-white mb-2">Description</h3>
-                <p className="text-warm-600 dark:text-warm-400">{idea.description}</p>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-2">Description</h3>
+                <p className="text-neutral-600 dark:text-neutral-400">{idea.description}</p>
               </div>
             )}
 
             {/* Specs */}
             {idea.specs && (
               <div className="card">
-                <h3 className="font-medium text-warm-900 dark:text-white mb-4">Project Specs</h3>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-4">Project Specs</h3>
                 <dl className="grid grid-cols-2 gap-4">
                   {(idea.specs as { sqFt?: number; complexity?: string[] }).sqFt && (
                     <div>
-                      <dt className="text-sm text-warm-500 dark:text-warm-400">Size</dt>
-                      <dd className="text-warm-900 dark:text-white font-medium">
+                      <dt className="text-sm text-neutral-500 dark:text-neutral-400">Size</dt>
+                      <dd className="text-neutral-900 dark:text-white font-medium">
                         {(idea.specs as { sqFt: number }).sqFt} sq ft
                       </dd>
                     </div>
                   )}
                   {((idea.specs as { complexity?: string[] })?.complexity?.length ?? 0) > 0 && (
                     <div>
-                      <dt className="text-sm text-warm-500 dark:text-warm-400">Complexity</dt>
-                      <dd className="text-warm-900 dark:text-white">
+                      <dt className="text-sm text-neutral-500 dark:text-neutral-400">Complexity</dt>
+                      <dd className="text-neutral-900 dark:text-white">
                         {(idea.specs as { complexity: string[] }).complexity.length} factor(s)
                       </dd>
                     </div>
@@ -372,18 +372,18 @@ export default function ProjectDetailPage() {
             {/* Vibe Notes */}
             {idea.vibeNotes && (
               <div className="card">
-                <h3 className="font-medium text-warm-900 dark:text-white mb-2">Vibe Notes</h3>
-                <p className="text-warm-600 dark:text-warm-400">{idea.vibeNotes}</p>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-2">Vibe Notes</h3>
+                <p className="text-neutral-600 dark:text-neutral-400">{idea.vibeNotes}</p>
               </div>
             )}
 
             {/* Mood Board */}
             {idea.moodBoardImages && idea.moodBoardImages.length > 0 && (
               <div className="card">
-                <h3 className="font-medium text-warm-900 dark:text-white mb-4">Inspiration Board</h3>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-4">Inspiration Board</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {idea.moodBoardImages.map((url, i) => (
-                    <div key={i} className="aspect-square rounded-lg overflow-hidden bg-warm-100 dark:bg-warm-800">
+                    <div key={i} className="aspect-square rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800">
                       <img src={url} alt={`Inspiration ${i + 1}`} className="w-full h-full object-cover" />
                     </div>
                   ))}
@@ -396,35 +396,35 @@ export default function ProjectDetailPage() {
           <div className="space-y-6">
             {/* Quick Info */}
             <div className="card">
-              <h3 className="font-medium text-warm-900 dark:text-white mb-4">Details</h3>
+              <h3 className="font-medium text-neutral-900 dark:text-white mb-4">Details</h3>
               <dl className="space-y-3">
                 {idea.style && (
                   <div className="flex justify-between">
-                    <dt className="text-warm-500 dark:text-warm-400">Style</dt>
-                    <dd className="text-warm-900 dark:text-white">{STYLE_NAMES[idea.style] || idea.style}</dd>
+                    <dt className="text-neutral-500 dark:text-neutral-400">Style</dt>
+                    <dd className="text-neutral-900 dark:text-white">{STYLE_NAMES[idea.style] || idea.style}</dd>
                   </div>
                 )}
                 {idea.urgency && (
                   <div className="flex justify-between">
-                    <dt className="text-warm-500 dark:text-warm-400">Timeline</dt>
-                    <dd className="text-warm-900 dark:text-white capitalize">{idea.urgency.replace(/_/g, ' ')}</dd>
+                    <dt className="text-neutral-500 dark:text-neutral-400">Timeline</dt>
+                    <dd className="text-neutral-900 dark:text-white capitalize">{idea.urgency.replace(/_/g, ' ')}</dd>
                   </div>
                 )}
                 {idea.targetStartDate && (
                   <div className="flex justify-between">
-                    <dt className="text-warm-500 dark:text-warm-400">Target Start</dt>
-                    <dd className="text-warm-900 dark:text-white">{formatDate(idea.targetStartDate)}</dd>
+                    <dt className="text-neutral-500 dark:text-neutral-400">Target Start</dt>
+                    <dd className="text-neutral-900 dark:text-white">{formatDate(idea.targetStartDate)}</dd>
                   </div>
                 )}
                 {idea.targetCompletionDate && (
                   <div className="flex justify-between">
-                    <dt className="text-warm-500 dark:text-warm-400">Target Completion</dt>
-                    <dd className="text-warm-900 dark:text-white">{formatDate(idea.targetCompletionDate)}</dd>
+                    <dt className="text-neutral-500 dark:text-neutral-400">Target Completion</dt>
+                    <dd className="text-neutral-900 dark:text-white">{formatDate(idea.targetCompletionDate)}</dd>
                   </div>
                 )}
                 <div className="flex justify-between">
-                  <dt className="text-warm-500 dark:text-warm-400">Created</dt>
-                  <dd className="text-warm-900 dark:text-white">{formatDate(idea.createdAt)}</dd>
+                  <dt className="text-neutral-500 dark:text-neutral-400">Created</dt>
+                  <dd className="text-neutral-900 dark:text-white">{formatDate(idea.createdAt)}</dd>
                 </div>
               </dl>
             </div>
@@ -432,7 +432,7 @@ export default function ProjectDetailPage() {
             {/* Quick Actions */}
             {idea.status !== 'ARCHIVED' && idea.status !== 'COMPLETED' && (
               <div className="card">
-                <h3 className="font-medium text-warm-900 dark:text-white mb-4">Quick Actions</h3>
+                <h3 className="font-medium text-neutral-900 dark:text-white mb-4">Quick Actions</h3>
                 <div className="space-y-2">
                   <button
                     onClick={() => setActiveTab('who-to-hire')}
@@ -465,10 +465,10 @@ export default function ProjectDetailPage() {
           {suggestions.length === 0 && (
             <div className="card text-center py-8">
               <div className="text-4xl mb-4">🔍</div>
-              <h3 className="text-lg font-medium text-warm-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
                 Find the right contractor
               </h3>
-              <p className="text-warm-600 dark:text-warm-400 mb-6 max-w-md mx-auto">
+              <p className="text-neutral-600 dark:text-neutral-400 mb-6 max-w-md mx-auto">
                 We&apos;ll search for contractors your neighbors have used for similar projects.
               </p>
               <button
@@ -500,7 +500,7 @@ export default function ProjectDetailPage() {
           {suggestions.length > 0 && (
             <>
               <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-warm-900 dark:text-white">
+                <h3 className="text-lg font-medium text-neutral-900 dark:text-white">
                   Contractor Suggestions ({suggestions.length})
                 </h3>
                 <button
@@ -518,7 +518,7 @@ export default function ProjectDetailPage() {
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                          <h4 className="font-medium text-warm-900 dark:text-white">
+                          <h4 className="font-medium text-neutral-900 dark:text-white">
                             {suggestion.vendor?.companyName || 'Unknown Vendor'}
                           </h4>
                           {suggestion.isSystemSuggestion && (
@@ -539,7 +539,7 @@ export default function ProjectDetailPage() {
                         {suggestion.vendor?.specialty && (
                           <div className="flex flex-wrap gap-1 mb-2">
                             {suggestion.vendor.specialty.map((s, i) => (
-                              <span key={i} className="px-2 py-0.5 rounded text-xs bg-warm-100 dark:bg-warm-800 text-warm-600 dark:text-warm-400">
+                              <span key={i} className="px-2 py-0.5 rounded text-xs bg-neutral-100 dark:bg-neutral-800 text-neutral-600 dark:text-neutral-400">
                                 {s}
                               </span>
                             ))}
@@ -547,7 +547,7 @@ export default function ProjectDetailPage() {
                         )}
 
                         {suggestion.comment && (
-                          <p className="text-warm-600 dark:text-warm-400 mb-2">
+                          <p className="text-neutral-600 dark:text-neutral-400 mb-2">
                             &quot;{suggestion.comment}&quot;
                           </p>
                         )}
@@ -559,7 +559,7 @@ export default function ProjectDetailPage() {
                         )}
 
                         {suggestion.suggestedBy && (
-                          <div className="text-sm text-warm-500 dark:text-warm-400">
+                          <div className="text-sm text-neutral-500 dark:text-neutral-400">
                             Recommended by {suggestion.suggestedBy.displayName}
                           </div>
                         )}
@@ -572,7 +572,7 @@ export default function ProjectDetailPage() {
                           className={`p-2 rounded-lg transition-colors ${
                             suggestion.isHelpful === true
                               ? 'bg-green-100 dark:bg-green-900/30 text-green-600'
-                              : 'hover:bg-warm-100 dark:hover:bg-warm-800 text-warm-400'
+                              : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400'
                           }`}
                           title="Helpful"
                         >
@@ -585,7 +585,7 @@ export default function ProjectDetailPage() {
                           className={`p-2 rounded-lg transition-colors ${
                             suggestion.isHelpful === false
                               ? 'bg-red-100 dark:bg-red-900/30 text-red-600'
-                              : 'hover:bg-warm-100 dark:hover:bg-warm-800 text-warm-400'
+                              : 'hover:bg-neutral-100 dark:hover:bg-neutral-800 text-neutral-400'
                           }`}
                           title="Not helpful"
                         >
@@ -606,10 +606,10 @@ export default function ProjectDetailPage() {
             <div className="flex items-start gap-4">
               <div className="text-3xl">🏘️</div>
               <div className="flex-1">
-                <h4 className="font-medium text-warm-900 dark:text-white mb-1">
+                <h4 className="font-medium text-neutral-900 dark:text-white mb-1">
                   Ask Your Neighbors
                 </h4>
-                <p className="text-warm-600 dark:text-warm-400 text-sm mb-3">
+                <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-3">
                   Post a request to your community and get personal recommendations from neighbors who&apos;ve done similar projects.
                 </p>
                 <button
@@ -629,10 +629,10 @@ export default function ProjectDetailPage() {
           {inspiration.length === 0 ? (
             <div className="card text-center py-12">
               <div className="text-4xl mb-4">🏡</div>
-              <h3 className="text-lg font-medium text-warm-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-neutral-900 dark:text-white mb-2">
                 No neighbor projects found
               </h3>
-              <p className="text-warm-600 dark:text-warm-400 max-w-md mx-auto">
+              <p className="text-neutral-600 dark:text-neutral-400 max-w-md mx-auto">
                 We couldn&apos;t find any similar projects from neighbors in your area yet.
                 Check back later as more projects are shared.
               </p>
@@ -643,20 +643,20 @@ export default function ProjectDetailPage() {
                 <div key={project.id} className="card">
                   <div className="flex items-start gap-4">
                     {project.images && project.images.length > 0 && (
-                      <div className="w-32 h-24 rounded-lg overflow-hidden bg-warm-100 dark:bg-warm-800 flex-shrink-0">
+                      <div className="w-32 h-24 rounded-lg overflow-hidden bg-neutral-100 dark:bg-neutral-800 flex-shrink-0">
                         <img src={project.images[0]} alt={project.title} className="w-full h-full object-cover" />
                       </div>
                     )}
                     <div className="flex-1">
-                      <h4 className="font-medium text-warm-900 dark:text-white mb-1">
+                      <h4 className="font-medium text-neutral-900 dark:text-white mb-1">
                         {project.title}
                       </h4>
                       {project.description && (
-                        <p className="text-warm-600 dark:text-warm-400 text-sm mb-2 line-clamp-2">
+                        <p className="text-neutral-600 dark:text-neutral-400 text-sm mb-2 line-clamp-2">
                           {project.description}
                         </p>
                       )}
-                      <div className="flex flex-wrap gap-3 text-sm text-warm-500 dark:text-warm-400">
+                      <div className="flex flex-wrap gap-3 text-sm text-neutral-500 dark:text-neutral-400">
                         {project.actualCost && (
                           <span>Cost: {formatCurrency(project.actualCost)}</span>
                         )}
@@ -739,12 +739,12 @@ function AskCommunityModal({
       <div className="flex min-h-screen items-center justify-center p-4">
         <div className="fixed inset-0 bg-black/50 transition-opacity" onClick={onClose} />
 
-        <div className="relative w-full max-w-lg bg-white dark:bg-warm-800 rounded-xl shadow-xl">
-          <div className="flex items-center justify-between p-6 border-b border-warm-200 dark:border-warm-700">
-            <h2 className="text-lg font-semibold text-warm-900 dark:text-white">
+        <div className="relative w-full max-w-lg bg-white dark:bg-neutral-800 rounded-xl shadow-xl">
+          <div className="flex items-center justify-between p-6 border-b border-neutral-200 dark:border-neutral-700">
+            <h2 className="text-lg font-semibold text-neutral-900 dark:text-white">
               Ask for Recommendations
             </h2>
-            <button onClick={onClose} className="p-1 text-warm-400 hover:text-warm-500">
+            <button onClick={onClose} className="p-1 text-neutral-400 hover:text-neutral-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>

@@ -37,7 +37,12 @@ interface Staff {
   // Emergency contact
   emergencyContactName?: string;
   emergencyContactPhone?: string;
-  emergencyContactRelationship?: string;
+  // Agency
+  agencyName?: string;
+  agencyContact?: string;
+  agencyPhone?: string;
+  // Responsibilities
+  responsibilities?: string;
 }
 
 const ROLES = [
@@ -78,7 +83,10 @@ export default function EditStaffScreen() {
     payMethod: 'direct_deposit',
     emergencyContactName: '',
     emergencyContactPhone: '',
-    emergencyContactRelationship: '',
+    agencyName: '',
+    agencyContact: '',
+    agencyPhone: '',
+    responsibilities: '',
   });
 
   const fetchStaff = useCallback(async () => {
@@ -94,7 +102,7 @@ export default function EditStaffScreen() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo.id}/staff/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo.id}/member/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -115,9 +123,12 @@ export default function EditStaffScreen() {
           payFrequency: staff.payFrequency || 'biweekly',
           payAmount: staff.payAmount?.toString() || '',
           payMethod: staff.payMethod || 'direct_deposit',
-          emergencyContactName: staff.emergencyContactName || '',
+          emergencyContactName: (staff as any).emergencyContact || staff.emergencyContactName || '',
           emergencyContactPhone: staff.emergencyContactPhone || '',
-          emergencyContactRelationship: staff.emergencyContactRelationship || '',
+          agencyName: staff.agencyName || '',
+          agencyContact: staff.agencyContact || '',
+          agencyPhone: staff.agencyPhone || '',
+          responsibilities: staff.responsibilities || '',
         });
       }
     } catch (err) {
@@ -158,12 +169,15 @@ export default function EditStaffScreen() {
         payFrequency: formData.payFrequency,
         payAmount: formData.payAmount ? parseFloat(formData.payAmount) : null,
         payMethod: formData.payMethod,
-        emergencyContactName: formData.emergencyContactName.trim() || null,
+        emergencyContact: formData.emergencyContactName.trim() || null,
         emergencyContactPhone: formData.emergencyContactPhone.trim() || null,
-        emergencyContactRelationship: formData.emergencyContactRelationship.trim() || null,
+        agencyName: formData.agencyName.trim() || null,
+        agencyContact: formData.agencyContact.trim() || null,
+        agencyPhone: formData.agencyPhone.trim() || null,
+        responsibilities: formData.responsibilities.trim() || null,
       };
 
-      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -172,7 +186,7 @@ export default function EditStaffScreen() {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update staff');
       }
 
@@ -201,7 +215,7 @@ export default function EditStaffScreen() {
               const token = await getIdToken(true);
               if (!token) return;
 
-              await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`, {
+              await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
               });
@@ -348,6 +362,47 @@ export default function EditStaffScreen() {
             )}
           </Card>
 
+          {/* Agency */}
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Staffing Agency</Text>
+
+            <Input
+              label="Agency Name"
+              value={formData.agencyName}
+              onChangeText={(v) => setFormData({ ...formData, agencyName: v })}
+              placeholder="e.g., Care.com, Agency XYZ"
+              autoCapitalize="words"
+            />
+
+            <Input
+              label="Agency Contact"
+              value={formData.agencyContact}
+              onChangeText={(v) => setFormData({ ...formData, agencyContact: v })}
+              placeholder="Contact person at agency"
+              autoCapitalize="words"
+            />
+
+            <Input
+              label="Agency Phone"
+              value={formData.agencyPhone}
+              onChangeText={(v) => setFormData({ ...formData, agencyPhone: v })}
+              placeholder="(555) 123-4567"
+              keyboardType="phone-pad"
+            />
+          </Card>
+
+          {/* Responsibilities */}
+          <Card style={styles.card}>
+            <Text style={styles.cardTitle}>Responsibilities</Text>
+            <Input
+              value={formData.responsibilities}
+              onChangeText={(v) => setFormData({ ...formData, responsibilities: v })}
+              placeholder="Describe key duties and responsibilities..."
+              multiline
+              numberOfLines={4}
+            />
+          </Card>
+
           {/* Compensation */}
           <Card style={styles.card}>
             <Text style={styles.cardTitle}>Compensation</Text>
@@ -398,13 +453,6 @@ export default function EditStaffScreen() {
               keyboardType="phone-pad"
             />
 
-            <Input
-              label="Relationship"
-              value={formData.emergencyContactRelationship}
-              onChangeText={(v) => setFormData({ ...formData, emergencyContactRelationship: v })}
-              placeholder="e.g., Spouse, Parent"
-              autoCapitalize="words"
-            />
           </Card>
 
           {/* Notes */}
@@ -491,7 +539,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,

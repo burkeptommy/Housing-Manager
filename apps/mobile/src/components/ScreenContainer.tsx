@@ -2,7 +2,7 @@ import React from 'react';
 import { View, ScrollView, StyleSheet, ViewStyle, RefreshControl, StatusBar, Platform } from 'react-native';
 import { AppHeader } from './AppHeader';
 
-const NAVY = '#0a1929';
+const PURPLE = '#6200EA';
 const BACKGROUND = '#f9fafb';
 
 interface ScreenContainerProps {
@@ -34,7 +34,7 @@ export function ScreenContainer({
     <View style={styles.container}>
       <StatusBar
         barStyle="light-content"
-        backgroundColor={NAVY}
+        backgroundColor={PURPLE}
         translucent={Platform.OS === 'android'}
       />
       <AppHeader
@@ -68,7 +68,7 @@ export function ScreenContainer({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: NAVY, // Match header for status bar area
+    backgroundColor: PURPLE, // Match header for status bar area
   },
   content: {
     flex: 1,

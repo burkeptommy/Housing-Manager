@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     marginBottom: spacing[4],
   },
   selectAllRow: {
@@ -167,12 +167,12 @@ const styles = StyleSheet.create({
   },
   selectAllText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   selectAllDivider: {
     marginHorizontal: spacing[2],
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
   },
   group: {
     marginBottom: spacing[6],
@@ -180,7 +180,7 @@ const styles = StyleSheet.create({
   groupTitle: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     textTransform: 'uppercase',
     letterSpacing: 0.5,
     marginBottom: spacing[2],
@@ -196,8 +196,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.default,
   },
   calendarRowSelected: {
-    borderColor: colors.haven.champagne[300],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[300],
+    backgroundColor: colors.haven.purple[50],
   },
   colorDot: {
     width: 12,
@@ -208,23 +208,23 @@ const styles = StyleSheet.create({
   calendarName: {
     flex: 1,
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   checkbox: {
     width: 24,
     height: 24,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.haven.navy[300],
+    borderColor: colors.haven.purple[300],
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxSelected: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   saveButton: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     alignItems: 'center',

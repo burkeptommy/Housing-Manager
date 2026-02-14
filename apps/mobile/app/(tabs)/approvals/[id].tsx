@@ -249,9 +249,9 @@ export default function ApprovalDetailScreen() {
       case 'URGENT':
         return colors.status.error;
       case 'HIGH':
-        return colors.haven.champagne[600];
+        return colors.haven.purple[600];
       case 'NORMAL':
-        return colors.haven.navy[600];
+        return colors.haven.purple[600];
       default:
         return colors.text.tertiary;
     }
@@ -415,7 +415,7 @@ export default function ApprovalDetailScreen() {
 
             <View style={styles.vendorHeader}>
               <View style={styles.vendorIcon}>
-                <Ionicons name="business" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="business" size={24} color={colors.haven.purple[500]} />
               </View>
               <Text style={styles.vendorName}>{approval.vendor.companyName}</Text>
             </View>
@@ -424,13 +424,13 @@ export default function ApprovalDetailScreen() {
               <View style={styles.vendorActions}>
                 {approval.vendor.phone && (
                   <TouchableOpacity style={styles.vendorAction} onPress={handleCallVendor}>
-                    <Ionicons name="call" size={20} color={colors.haven.champagne[500]} />
+                    <Ionicons name="call" size={20} color={colors.haven.purple[500]} />
                     <Text style={styles.vendorActionText}>Call</Text>
                   </TouchableOpacity>
                 )}
                 {approval.vendor.email && (
                   <TouchableOpacity style={styles.vendorAction} onPress={handleEmailVendor}>
-                    <Ionicons name="mail" size={20} color={colors.haven.champagne[500]} />
+                    <Ionicons name="mail" size={20} color={colors.haven.purple[500]} />
                     <Text style={styles.vendorActionText}>Email</Text>
                   </TouchableOpacity>
                 )}
@@ -449,7 +449,7 @@ export default function ApprovalDetailScreen() {
                 style={styles.attachmentItem}
                 onPress={() => handleViewAttachment(attachment)}
               >
-                <Ionicons name="document-outline" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="document-outline" size={20} color={colors.haven.purple[500]} />
                 <Text style={styles.attachmentName}>{attachment.filename}</Text>
                 <Ionicons name="open-outline" size={18} color={colors.text.tertiary} />
               </TouchableOpacity>
@@ -511,7 +511,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -629,7 +629,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -650,13 +650,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing[2],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
   },
   vendorActionText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   attachmentItem: {
     flexDirection: 'row',

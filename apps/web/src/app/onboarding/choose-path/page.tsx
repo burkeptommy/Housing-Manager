@@ -47,7 +47,7 @@ export default function ChoosePathPage() {
       <div className="max-w-2xl w-full">
         {/* Header */}
         <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-haven-navy-900 mb-3">
+          <h1 className="text-3xl font-bold text-haven-900 mb-3">
             How would you like to get started?
           </h1>
           <p className="text-gray-600 max-w-md mx-auto">
@@ -64,13 +64,13 @@ export default function ChoosePathPage() {
               className={cn(
                 'w-full p-6 rounded-2xl border-2 text-left transition-all relative',
                 selectedPath === path.id
-                  ? 'border-haven-champagne-500 bg-haven-champagne-50'
+                  ? 'border-haven-500 bg-haven-50'
                   : 'border-gray-200 bg-white hover:border-gray-300'
               )}
             >
               {/* Recommended Badge */}
               {path.recommended && (
-                <div className="absolute -top-3 left-6 bg-haven-champagne-500 text-haven-navy-900 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
+                <div className="absolute -top-3 left-6 bg-haven-500 text-haven-900 text-xs font-semibold px-3 py-1 rounded-full flex items-center gap-1">
                   <Star className="w-3 h-3" />
                   Recommended
                 </div>
@@ -80,7 +80,7 @@ export default function ChoosePathPage() {
                 <div className={cn(
                   'w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0',
                   selectedPath === path.id
-                    ? 'bg-haven-champagne-500 text-haven-navy-900'
+                    ? 'bg-haven-500 text-haven-900'
                     : 'bg-gray-100 text-gray-600'
                 )}>
                   <path.icon className="w-6 h-6" />
@@ -88,7 +88,7 @@ export default function ChoosePathPage() {
 
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold text-haven-navy-900">
+                    <h3 className="text-lg font-semibold text-haven-900">
                       {path.title}
                     </h3>
                   </div>
@@ -104,7 +104,7 @@ export default function ChoosePathPage() {
                 <div className={cn(
                   'w-6 h-6 rounded-full border-2 flex items-center justify-center flex-shrink-0',
                   selectedPath === path.id
-                    ? 'border-haven-champagne-500 bg-haven-champagne-500'
+                    ? 'border-haven-500 bg-haven-500'
                     : 'border-gray-300'
                 )}>
                   {selectedPath === path.id && (
@@ -122,7 +122,7 @@ export default function ChoosePathPage() {
           className={cn(
             'w-full py-4 px-6 rounded-xl font-medium flex items-center justify-center gap-2 transition-all',
             selectedPath
-              ? 'bg-haven-navy-900 hover:bg-haven-navy-800 text-white'
+              ? 'bg-haven-900 hover:bg-haven-800 text-white'
               : 'bg-gray-200 text-gray-400 cursor-not-allowed'
           )}
           onClick={(e) => !selectedPath && e.preventDefault()}

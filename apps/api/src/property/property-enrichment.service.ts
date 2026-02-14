@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { PropertyDetails } from './property.service';
 import {
   getUtilityProviders,
   inferSewerType,
@@ -12,10 +13,8 @@ export class PropertyEnrichmentService {
 
   constructor(private prisma: PrismaService) {}
 
-  async enrichHouseholdFromAttom(householdId: string, attomData: any) {
-    const property = attomData.property?.[0] || attomData;
-
-    // Extract all available ATTOM data
+  async enrichHouseholdFromPropertyData(householdId: string, propertyData: PropertyDetails) {
+    // Extract all available property data
     const enrichedData: any = {
       attomDataFetched: true,
     };
@@ -25,36 +24,30 @@ export class PropertyEnrichmentService {
       where: { householdId },
     });
 
-    // Update HomeProfile with ATTOM data if it exists
+    // Update HomeProfile with property data if it exists
     if (homeProfile) {
       const profileUpdates: any = {};
 
-      if (property.summary?.yearBuilt || property.building?.summary?.yearBuilt) {
-        profileUpdates.yearBuilt =
-          property.summary?.yearBuilt || property.building?.summary?.yearBuilt;
+      if (propertyData.yearBuilt) {
+        profileUpdates.yearBuilt = propertyData.yearBuilt;
       }
-      if (
-        property.building?.size?.livingSize ||
-        property.building?.size?.universalSize
-      ) {
-        profileUpdates.squareFeet =
-          property.building?.size?.livingSize ||
-          property.building?.size?.universalSize;
+      if (propertyData.squareFeet) {
+        profileUpdates.squareFeet = propertyData.squareFeet;
       }
-      if (property.lot?.lotSize1) {
-        profileUpdates.lotSize = property.lot.lotSize1 / 43560; // Convert sq ft to acres
+      if (propertyData.lotSizeAcres) {
+        profileUpdates.lotSize = propertyData.lotSizeAcres;
       }
-      if (property.building?.rooms?.beds) {
-        profileUpdates.bedrooms = property.building.rooms.beds;
+      if (propertyData.bedrooms) {
+        profileUpdates.bedrooms = propertyData.bedrooms;
       }
-      if (property.building?.rooms?.bathsTotal) {
-        profileUpdates.bathrooms = property.building.rooms.bathsTotal;
+      if (propertyData.bathrooms) {
+        profileUpdates.bathrooms = propertyData.bathrooms;
       }
-      if (property.building?.summary?.levels) {
-        profileUpdates.stories = property.building.summary.levels;
+      if (propertyData.stories) {
+        profileUpdates.stories = propertyData.stories;
       }
-      if (property.building?.parking?.garageSpaces) {
-        profileUpdates.garageSpaces = property.building.parking.garageSpaces;
+      if (propertyData.garageSpaces) {
+        profileUpdates.garageSpaces = propertyData.garageSpaces;
       }
 
       if (Object.keys(profileUpdates).length > 0) {
@@ -66,9 +59,7 @@ export class PropertyEnrichmentService {
     }
 
     // Extract heating/cooling info for household
-    const heatingFuel = this.mapHeatingFuel(
-      property.building?.construction?.heatingFuel,
-    );
+    const heatingFuel = this.mapHeatingFuel(propertyData.heatingFuel);
     if (heatingFuel) {
       enrichedData.heatingFuel = heatingFuel;
     }
@@ -85,30 +76,40 @@ export class PropertyEnrichmentService {
         enrichedData.gasProvider = utilities.gas;
       }
 
-      // Infer septic/sewer
-      const lotSize = homeProfile.lotSize;
-      const sewerInference = inferSewerType(
-        lotSize,
-        homeProfile.city,
-        homeProfile.postalCode,
-      );
-      if (sewerInference.confidence >= 0.7) {
-        enrichedData.sewerType = sewerInference.type;
+      // Use property data sewer/water if available, otherwise infer
+      if (propertyData.sewerType) {
+        enrichedData.sewerType = propertyData.sewerType.toLowerCase().includes('septic')
+          ? 'septic' : 'municipal';
+      } else {
+        const lotSize = homeProfile.lotSize;
+        const sewerInference = inferSewerType(
+          lotSize,
+          homeProfile.city,
+          homeProfile.postalCode,
+        );
+        if (sewerInference.confidence >= 0.7) {
+          enrichedData.sewerType = sewerInference.type;
+        }
       }
 
-      // Infer well/municipal water
-      const waterInference = inferWaterSource(
-        lotSize,
-        homeProfile.city,
-        enrichedData.sewerType || 'unknown',
-      );
-      if (waterInference.confidence >= 0.7) {
-        enrichedData.waterSource = waterInference.type;
+      if (propertyData.waterType) {
+        enrichedData.waterSource = propertyData.waterType.toLowerCase().includes('well')
+          ? 'well' : 'municipal';
+      } else {
+        const lotSize = homeProfile.lotSize;
+        const waterInference = inferWaterSource(
+          lotSize,
+          homeProfile.city,
+          enrichedData.sewerType || 'unknown',
+        );
+        if (waterInference.confidence >= 0.7) {
+          enrichedData.waterSource = waterInference.type;
+        }
       }
     }
 
-    // Store raw ATTOM data
-    enrichedData.enrichmentData = attomData;
+    // Store property data as enrichment data
+    enrichedData.enrichmentData = propertyData;
 
     // Update household with enriched data
     await this.prisma.household.update({
@@ -541,7 +542,7 @@ export class PropertyEnrichmentService {
   }
 
   // Helper methods
-  private mapHeatingFuel(fuel: string): string | null {
+  private mapHeatingFuel(fuel: string | null): string | null {
     if (!fuel) return null;
     const f = fuel.toLowerCase();
     if (f.includes('oil')) return 'oil';

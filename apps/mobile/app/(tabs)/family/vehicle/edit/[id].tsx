@@ -18,6 +18,7 @@ import { Card, Button, Input, LoadingSpinner, ImageUpload } from '../../../../..
 import { colors, typography, spacing, borderRadius } from '../../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../../src/lib/api';
 import { getIdToken } from '../../../../../src/lib/firebase';
+import { uploadProfileImage } from '../../../../../src/lib/image-upload';
 
 interface ServiceProvider {
   id?: string;
@@ -36,10 +37,8 @@ interface Vehicle {
   vin?: string;
   insuranceExpiry?: string;
   registrationExpiry?: string;
-  registrationDocUrl?: string;
   notes?: string;
-  imageUrl?: string;
-  serviceProviders?: ServiceProvider[];
+  photoUrl?: string;
 }
 
 export default function EditVehicleScreen() {
@@ -81,7 +80,7 @@ export default function EditVehicleScreen() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/households/${householdInfo.id}/vehicles/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo.id}/vehicle/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -100,9 +99,7 @@ export default function EditVehicleScreen() {
           registrationExpiry: vehicle.registrationExpiry ? new Date(vehicle.registrationExpiry) : null,
           notes: vehicle.notes || '',
         });
-        setVehicleImage(vehicle.imageUrl || null);
-        setRegistrationDoc(vehicle.registrationDocUrl || null);
-        setServiceProviders(vehicle.serviceProviders || []);
+        setVehicleImage(vehicle.photoUrl || null);
       }
     } catch (err) {
       console.error('Fetch vehicle error:', err);
@@ -133,6 +130,17 @@ export default function EditVehicleScreen() {
         return;
       }
 
+      // Upload photo if user picked a new local image
+      let photoUrl = vehicleImage;
+      if (vehicleImage && vehicleImage.startsWith('file://') && id) {
+        try {
+          photoUrl = await uploadProfileImage('vehicle', id, vehicleImage);
+          setVehicleImage(photoUrl);
+        } catch (uploadErr) {
+          console.error('Vehicle photo upload error:', uploadErr);
+        }
+      }
+
       const body = {
         make: formData.make.trim(),
         model: formData.model.trim(),
@@ -142,13 +150,11 @@ export default function EditVehicleScreen() {
         vin: formData.vin.trim() || null,
         insuranceExpiry: formData.insuranceExpiry?.toISOString() || null,
         registrationExpiry: formData.registrationExpiry?.toISOString() || null,
-        registrationDocUrl: registrationDoc,
         notes: formData.notes.trim() || null,
-        imageUrl: vehicleImage,
-        serviceProviders: serviceProviders,
+        photoUrl,
       };
 
-      const response = await fetch(`${API_BASE_URL}/households/${householdInfo?.id}/vehicles/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/vehicles/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -157,7 +163,7 @@ export default function EditVehicleScreen() {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update vehicle');
       }
 
@@ -186,7 +192,7 @@ export default function EditVehicleScreen() {
               const token = await getIdToken(true);
               if (!token) return;
 
-              await fetch(`${API_BASE_URL}/households/${householdInfo?.id}/vehicles/${id}`, {
+              await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/vehicle/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
               });
@@ -301,7 +307,7 @@ export default function EditVehicleScreen() {
               style={styles.dateButton}
               onPress={() => setShowInsurancePicker(true)}
             >
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="shield-checkmark-outline" size={20} color={colors.haven.purple[500]} />
               <View style={styles.dateContent}>
                 <Text style={styles.dateLabel}>Insurance Expiry</Text>
                 <Text style={styles.dateValue}>
@@ -333,7 +339,7 @@ export default function EditVehicleScreen() {
               style={styles.dateButton}
               onPress={() => setShowRegistrationPicker(true)}
             >
-              <Ionicons name="document-text-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="document-text-outline" size={20} color={colors.haven.purple[500]} />
               <View style={styles.dateContent}>
                 <Text style={styles.dateLabel}>Registration Expiry</Text>
                 <Text style={styles.dateValue}>
@@ -389,7 +395,7 @@ export default function EditVehicleScreen() {
                           provider.type === 'body_shop' ? 'color-palette-outline' :
                           'build-outline'}
                     size={20}
-                    color={colors.haven.champagne[500]}
+                    color={colors.haven.purple[500]}
                   />
                 </View>
                 <View style={styles.providerInfo}>
@@ -484,7 +490,7 @@ export default function EditVehicleScreen() {
                 style={styles.addProviderButton}
                 onPress={() => setShowAddProvider(true)}
               >
-                <Ionicons name="add-circle-outline" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle-outline" size={24} color={colors.haven.purple[500]} />
                 <Text style={styles.addProviderText}>Add Service Provider</Text>
               </TouchableOpacity>
             )}
@@ -629,7 +635,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -644,7 +650,7 @@ const styles = StyleSheet.create({
   },
   providerType: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   providerPhone: {
@@ -662,14 +668,14 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[4],
     gap: spacing[2],
     borderWidth: 1,
-    borderColor: colors.haven.champagne[300],
+    borderColor: colors.haven.purple[300],
     borderStyle: 'dashed',
     borderRadius: borderRadius.lg,
     marginTop: spacing[2],
   },
   addProviderText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   addProviderForm: {
@@ -695,7 +701,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,
@@ -722,7 +728,7 @@ const styles = StyleSheet.create({
   confirmAddButton: {
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   confirmAddText: {

@@ -6,7 +6,7 @@ export default function VendorChatLayout() {
     <Stack
       screenOptions={{
         headerShown: true,
-        headerStyle: { backgroundColor: colors.haven.navy[950] },
+        headerStyle: { backgroundColor: colors.haven.purple[500] },
         headerTintColor: colors.white,
         headerBackTitle: 'Back',
       }}

@@ -627,8 +627,8 @@ export class PropertyController {
   }
 
   /**
-   * Generate a smart checklist for a property based on ATTOM data.
-   * If propertyData is not provided, we'll fetch it from ATTOM.
+   * Generate a smart checklist for a property based on property data.
+   * If propertyData is not provided, we'll fetch it via property lookup.
    */
   @Post('checklist/generate')
   async generateChecklist(
@@ -646,7 +646,7 @@ export class PropertyController {
     }
 
     try {
-      // Use provided property data or fetch from ATTOM
+      // Use provided property data or fetch via lookup
       let property: PropertyDetails | null = propertyData || null;
 
       if (!property) {

@@ -27,7 +27,7 @@ interface Household {
 const tierColors: Record<string, string> = {
   ESSENTIALS: 'bg-gray-100 text-gray-700',
   LITE: 'bg-blue-100 text-blue-700',
-  HAVEN: 'bg-haven-champagne-100 text-haven-champagne-700',
+  HAVEN: 'bg-haven-100 text-haven-700',
   'HAVEN+': 'bg-purple-100 text-purple-700',
   ESTATE: 'bg-amber-100 text-amber-700',
 };
@@ -95,7 +95,7 @@ export default function AdminHouseholdsPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or address..."
-              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-champagne-500"
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-haven-500"
             />
           </div>
         </form>
@@ -135,8 +135,8 @@ export default function AdminHouseholdsPage() {
           >
             <div className="flex items-start justify-between mb-3">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-haven-champagne-100 rounded-lg flex items-center justify-center">
-                  <Home className="w-5 h-5 text-haven-champagne-600" />
+                <div className="w-10 h-10 bg-haven-100 rounded-lg flex items-center justify-center">
+                  <Home className="w-5 h-5 text-haven-600" />
                 </div>
                 <div>
                   <h3 className="font-semibold text-gray-900">{h.name}</h3>

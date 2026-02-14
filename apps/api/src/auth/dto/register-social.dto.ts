@@ -20,8 +20,8 @@ class AddressDto {
 }
 
 /**
- * Property details from ATTOM (captured during onboarding)
- * Accepts all fields returned by ATTOM API
+ * Property details captured during onboarding
+ * Accepts all fields returned by property data API
  */
 class PropertyDetailsDto {
   @IsOptional()

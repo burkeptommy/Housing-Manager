@@ -49,7 +49,7 @@ const CATEGORIES = [
 
 const PRIORITIES = [
   { id: 'LOW', label: 'Low', color: colors.status.info },
-  { id: 'NORMAL', label: 'Normal', color: colors.haven.champagne[500] },
+  { id: 'NORMAL', label: 'Normal', color: colors.haven.purple[500] },
   { id: 'HIGH', label: 'High', color: colors.status.warning },
   { id: 'URGENT', label: 'Urgent', color: colors.status.error },
 ];
@@ -157,7 +157,7 @@ export default function EditMaintenanceScreen() {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update task');
       }
 
@@ -225,7 +225,7 @@ export default function EditMaintenanceScreen() {
                   <Ionicons
                     name={cat.icon as any}
                     size={20}
-                    color={formData.category === cat.id ? colors.haven.champagne[500] : colors.text.secondary}
+                    color={formData.category === cat.id ? colors.haven.purple[500] : colors.text.secondary}
                   />
                   <Text
                     style={[
@@ -275,7 +275,7 @@ export default function EditMaintenanceScreen() {
               style={styles.dateButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Ionicons name="calendar-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="calendar-outline" size={20} color={colors.haven.purple[500]} />
               <View style={styles.dateContent}>
                 <Text style={styles.dateLabel}>Due Date</Text>
                 <Text style={styles.dateValue}>
@@ -399,15 +399,15 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   optionItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   optionLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   optionLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   priorityRow: {
@@ -479,15 +479,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   frequencyItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   frequencyLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   frequencyLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   footer: {

@@ -205,9 +205,9 @@ function getAlfredStatusColor(status: string): string {
       return colors.status.success;
     case 'IN_PROGRESS':
     case 'PROCESSING':
-      return colors.haven.champagne[500];
+      return colors.haven.purple[500];
     default:
-      return colors.haven.navy[500];
+      return colors.haven.purple[500];
   }
 }
 
@@ -425,7 +425,7 @@ export default function DashboardScreen() {
 
   return (
     <View style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={colors.haven.navy[950]} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.haven.purple[500]} />
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} />}
@@ -434,7 +434,7 @@ export default function DashboardScreen() {
         {/* Hero Header */}
         <View>
           <LinearGradient
-            colors={[colors.haven.navy[950], colors.haven.navy[900]]}
+            colors={[colors.haven.purple[500], colors.haven.purple[700]]}
             style={[styles.heroGradient, { paddingTop: insets.top + spacing[2] }]}
           >
             {/* Date Row */}
@@ -613,7 +613,7 @@ export default function DashboardScreen() {
                 activeOpacity={0.7}
               >
                 <View style={styles.familyAvatar}>
-                  <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.navy[600]} />
+                  <Ionicons name={getAvatarType(member)} size={24} color={colors.haven.purple[600]} />
                 </View>
                 <Text style={styles.familyName} numberOfLines={1}>{member.firstName}</Text>
                 <Text style={styles.familyRole} numberOfLines={1}>
@@ -628,8 +628,8 @@ export default function DashboardScreen() {
                 onPress={() => router.push(`/(tabs)/family/pet/${pet.id}` as any)}
                 activeOpacity={0.7}
               >
-                <View style={[styles.familyAvatar, { backgroundColor: colors.haven.champagne[100] }]}>
-                  <Ionicons name="paw-outline" size={24} color={colors.haven.champagne[600]} />
+                <View style={[styles.familyAvatar, { backgroundColor: colors.haven.purple[100] }]}>
+                  <Ionicons name="paw-outline" size={24} color={colors.haven.purple[600]} />
                 </View>
                 <Text style={styles.familyName} numberOfLines={1}>{pet.name}</Text>
                 <Text style={styles.familyRole} numberOfLines={1}>{pet.breed || pet.species}</Text>
@@ -642,7 +642,7 @@ export default function DashboardScreen() {
               activeOpacity={0.7}
             >
               <View style={styles.addMemberAvatar}>
-                <Ionicons name="add" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="add" size={24} color={colors.haven.purple[500]} />
               </View>
               <Text style={styles.familyName} numberOfLines={1}>Add</Text>
               <Text style={styles.familyRole} numberOfLines={1}>Member</Text>
@@ -654,13 +654,18 @@ export default function DashboardScreen() {
         <AnimatedCard style={styles.alfredCard} delay={175}>
           <View style={styles.cardHeader}>
             <View style={styles.alfredHeaderLeft}>
-              <Text style={styles.cardTitle}>Alfred Activity</Text>
+              <Ionicons name="mail-outline" size={18} color={colors.haven.purple[700]} />
+              <Text style={styles.cardTitle}>Emails</Text>
               {alfredNeedsInput > 0 && (
                 <Badge label={`${alfredNeedsInput} needs input`} variant="warning" size="sm" />
               )}
             </View>
-            <TouchableOpacity onPress={() => router.push('/(tabs)/settings/alfred-cases' as any)}>
-              <Text style={styles.seeAllLink}>View All</Text>
+            <TouchableOpacity
+              style={styles.viewAllButton}
+              onPress={() => router.push('/(tabs)/settings/alfred-cases' as any)}
+            >
+              <Text style={styles.viewAllButtonText}>View All</Text>
+              <Ionicons name="chevron-forward" size={14} color={colors.haven.purple[700]} />
             </TouchableOpacity>
           </View>
           {alfredCases.length > 0 ? (
@@ -742,7 +747,7 @@ export default function DashboardScreen() {
               </View>
               <View style={styles.managerActions}>
                 <TouchableOpacity style={styles.managerActionBtn}>
-                  <Ionicons name="chatbubble" size={20} color={colors.haven.champagne[500]} />
+                  <Ionicons name="chatbubble" size={20} color={colors.haven.purple[500]} />
                 </TouchableOpacity>
               </View>
             </View>
@@ -754,14 +759,14 @@ export default function DashboardScreen() {
           <Text style={styles.sectionTitle}>Quick Actions</Text>
           <View style={styles.quickActions}>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/manager')}>
-              <View style={[styles.quickIcon, { backgroundColor: colors.haven.champagne[100] }]}>
-                <Ionicons name="chatbubble" size={22} color={colors.haven.champagne[600]} />
+              <View style={[styles.quickIcon, { backgroundColor: colors.haven.purple[100] }]}>
+                <Ionicons name="chatbubble" size={22} color={colors.haven.purple[600]} />
               </View>
               <Text style={styles.quickLabel}>Message</Text>
             </TouchableOpacity>
             <TouchableOpacity style={styles.quickAction} onPress={() => router.push('/(tabs)/approvals')}>
-              <View style={[styles.quickIcon, { backgroundColor: colors.haven.navy[100] }]}>
-                <Ionicons name="checkmark-circle" size={22} color={colors.haven.navy[600]} />
+              <View style={[styles.quickIcon, { backgroundColor: colors.haven.purple[100] }]}>
+                <Ionicons name="checkmark-circle" size={22} color={colors.haven.purple[600]} />
               </View>
               <Text style={styles.quickLabel}>Approvals</Text>
             </TouchableOpacity>
@@ -862,7 +867,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -887,18 +892,18 @@ const styles = StyleSheet.create({
   },
   heroDate: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[200],
+    color: 'rgba(255,255,255,0.7)',
   },
   heroGreeting: {
     fontSize: 28,
-    fontWeight: typography.fontWeights.bold,
+    fontFamily: 'Nunito_700Bold',
     color: colors.white,
     marginBottom: spacing[1],
     letterSpacing: -0.5,  // Tighter for large display text
   },
   heroSubtext: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.champagne[200],
+    color: 'rgba(255,255,255,0.8)',
     marginBottom: spacing[4],
   },
   heroStats: {
@@ -916,7 +921,7 @@ const styles = StyleSheet.create({
   },
   heroStatLabel: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[200],
+    color: 'rgba(255,255,255,0.7)',
     marginBottom: spacing[1],
   },
   heroStatRow: {
@@ -926,7 +931,7 @@ const styles = StyleSheet.create({
   },
   heroStatValue: {
     fontSize: typography.fontSizes.xl,
-    fontWeight: typography.fontWeights.bold,
+    fontFamily: 'Nunito_700Bold',
     color: colors.white,
   },
   healthBadge: {
@@ -937,7 +942,7 @@ const styles = StyleSheet.create({
   },
   healthBadgeText: {
     fontSize: 11,
-    fontWeight: typography.fontWeights.semibold,
+    fontFamily: 'Nunito_600SemiBold',
     color: colors.white,
   },
 
@@ -1064,14 +1069,14 @@ const styles = StyleSheet.create({
   },
   budgetProgress: {
     height: 6,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     borderRadius: 3,
     marginTop: spacing[4],
     overflow: 'hidden',
   },
   budgetProgressFill: {
     height: '100%',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: 3,
   },
 
@@ -1083,7 +1088,7 @@ const styles = StyleSheet.create({
   },
   seeAllLink: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   familyScroll: {
@@ -1098,7 +1103,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
@@ -1107,9 +1112,9 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderWidth: 2,
-    borderColor: colors.haven.champagne[300],
+    borderColor: colors.haven.purple[300],
     borderStyle: 'dashed',
     alignItems: 'center',
     justifyContent: 'center',
@@ -1170,7 +1175,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -1212,7 +1217,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1335,6 +1340,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing[2],
   },
+  viewAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingVertical: spacing[1],
+    paddingHorizontal: spacing[2],
+    backgroundColor: colors.haven.purple[50],
+    borderRadius: borderRadius.md,
+  },
+  viewAllButtonText: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.purple[700],
+  },
   alfredCaseRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1391,7 +1410,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[3],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   alfredSetupButtonText: {

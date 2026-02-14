@@ -1048,7 +1048,7 @@ model Household {
   pets        Pet[]
   homeSystems HomeSystem[]
 
-  // Property Enrichment from ATTOM (stored for reference)
+  // Property Enrichment data (stored for reference)
   enrichmentData Json? @map("enrichment_data")
 
   // Alfred-First Data Capture
@@ -1140,9 +1140,10 @@ model Household {
   emailCases       EmailCase[]
 
   // Budgeting System
-  budget              Budget?
-  budgetTransactions  BudgetTransaction[]
-  systemForecasts     SystemForecast[]
+  budget               Budget?
+  budgetTransactions   BudgetTransaction[]
+  systemForecasts      SystemForecast[]
+  savingsOpportunities SavingsOpportunity[]
 
   @@index([managerId])
   @@index([assignedHandymanId])
@@ -3880,7 +3881,7 @@ model HomeSystemService {
   @@map("home_system_services")
 }
 
-// HomeChecklist - Smart intake checklist generated from ATTOM property data
+// HomeChecklist - Smart intake checklist generated from property data
 // Used by Home Managers to gather comprehensive info during intro calls
 model HomeChecklist {
   id          String @id @default(cuid())
@@ -5622,4 +5623,31 @@ model LocalCostData {
 
   @@unique([zipCode, category])
   @@map("local_cost_data")
+}
+
+model SavingsOpportunity {
+  id            String    @id @default(cuid())
+  householdId   String    @map("household_id")
+  household     Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+
+  type          String    // refinance, rate_optimization, subscription_audit, insurance_bundle
+  category      String    // MORTGAGE, ELECTRIC, INTERNET, etc.
+  title         String
+  description   String?
+
+  currentCost       Float    @map("current_cost")
+  potentialSavings  Float    @map("potential_savings")
+  confidence        String   @default("medium") // high, medium, low
+
+  metadata      Json?     // Extra data (rates, provider suggestions, etc.)
+  actionUrl     String?   @map("action_url")
+  status        String    @default("active") // active, dismissed, applied
+  expiresAt     DateTime? @map("expires_at") // 30-day TTL for cache
+
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  @@index([householdId])
+  @@index([householdId, type])
+  @@map("savings_opportunities")
 }

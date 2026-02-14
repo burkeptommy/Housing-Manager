@@ -1,6 +1,5 @@
 import React from 'react';
 import { View, StyleSheet, ViewStyle, Animated } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, borderRadius } from '../lib/theme';
 import { AlfredLogo } from './AlfredIcon';
@@ -100,7 +99,7 @@ export function AlfredCard({ message, showActions, onChat }: AlfredCardProps) {
         <AlfredAvatar size="md" />
         <View style={styles.cardInfo}>
           <View style={styles.cardNameRow}>
-            <Ionicons name="sparkles" size={14} color={colors.haven.champagne[500]} />
+            <Ionicons name="sparkles" size={14} color={colors.haven.purple[500]} />
           </View>
         </View>
       </View>
@@ -117,6 +116,7 @@ const styles = StyleSheet.create({
   container: {
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: colors.haven.purple[50],
   },
   card: {
     backgroundColor: colors.white,

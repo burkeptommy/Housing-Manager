@@ -611,7 +611,7 @@ export class AlfredQuestionsService {
   }
 
   /**
-   * Initialize data gaps for a new household based on what ATTOM didn't provide
+   * Initialize data gaps for a new household based on what property data didn't provide
    * Called after registration to determine what questions Alfred should ask
    */
   async initializeDataGaps(householdId: string): Promise<string[]> {

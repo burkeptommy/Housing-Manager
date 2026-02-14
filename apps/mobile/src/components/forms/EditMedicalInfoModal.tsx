@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   bloodTypeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   bloodTypeText: {
     fontSize: typography.fontSizes.sm,

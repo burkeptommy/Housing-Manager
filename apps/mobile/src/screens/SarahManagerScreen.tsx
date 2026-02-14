@@ -235,7 +235,7 @@ export function SarahManagerScreen() {
           </View>
           <View style={styles.managerActions}>
             <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
-              <Ionicons name="call" size={20} color={colors.haven.champagne[600]} />
+              <Ionicons name="call" size={20} color={colors.haven.purple[600]} />
               <Text style={styles.actionButtonText}>Call</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -312,7 +312,7 @@ export function SarahManagerScreen() {
                     <Ionicons
                       name="construct-outline"
                       size={20}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.requestInfo}>
@@ -350,7 +350,7 @@ export function SarahManagerScreen() {
                     <Ionicons
                       name={getActivityIcon(activity.type) as any}
                       size={16}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.activityContent}>
@@ -375,7 +375,7 @@ export function SarahManagerScreen() {
               onPress={() => router.push('/(tabs)/manager/new-request' as any)}
             >
               <View style={styles.quickActionIcon}>
-                <Ionicons name="add-circle" size={28} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle" size={28} color={colors.haven.purple[500]} />
               </View>
               <Text style={styles.quickActionText}>New Request</Text>
             </TouchableOpacity>
@@ -384,7 +384,7 @@ export function SarahManagerScreen() {
               onPress={() => router.push('/(tabs)/manager/chat' as any)}
             >
               <View style={styles.quickActionIcon}>
-                <Ionicons name="chatbubbles" size={28} color={colors.haven.champagne[500]} />
+                <Ionicons name="chatbubbles" size={28} color={colors.haven.purple[500]} />
               </View>
               <Text style={styles.quickActionText}>Chat</Text>
             </TouchableOpacity>
@@ -393,7 +393,7 @@ export function SarahManagerScreen() {
               onPress={() => router.push('/(tabs)/manager/requests' as any)}
             >
               <View style={styles.quickActionIcon}>
-                <Ionicons name="list" size={28} color={colors.haven.champagne[500]} />
+                <Ionicons name="list" size={28} color={colors.haven.purple[500]} />
               </View>
               <Text style={styles.quickActionText}>All Requests</Text>
             </TouchableOpacity>
@@ -403,7 +403,7 @@ export function SarahManagerScreen() {
         {/* Empty State */}
         {pendingApprovals.length === 0 && activeRequests.length === 0 && (
           <Card style={styles.emptyCard}>
-            <Ionicons name="checkmark-done-circle" size={48} color={colors.haven.champagne[300]} />
+            <Ionicons name="checkmark-done-circle" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>All caught up!</Text>
             <Text style={styles.emptyText}>
               No pending approvals or active requests. Need something?
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -501,17 +501,17 @@ const styles = StyleSheet.create({
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[200],
+    backgroundColor: colors.haven.purple[50],
   },
   actionButtonPrimary: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   actionButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   actionButtonTextPrimary: {
     color: colors.white,
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   seeAllText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
   approvalCard: {
@@ -557,7 +557,7 @@ const styles = StyleSheet.create({
   approvalAmount: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginTop: spacing[1],
   },
   approvalActions: {
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -674,7 +674,7 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
-    shadowColor: colors.haven.navy[900],
+    shadowColor: colors.haven.purple[900],
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,

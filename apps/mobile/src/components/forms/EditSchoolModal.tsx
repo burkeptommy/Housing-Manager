@@ -104,8 +104,8 @@ export function EditSchoolModal({ visible, onClose, onSave, initialData }: Props
               <Switch
                 value={hasSchool}
                 onValueChange={setHasSchool}
-                trackColor={{ false: colors.gray[200], true: colors.haven.champagne[400] }}
-                thumbColor={hasSchool ? colors.haven.champagne[500] : colors.gray[400]}
+                trackColor={{ false: colors.gray[200], true: colors.haven.purple[400] }}
+                thumbColor={hasSchool ? colors.haven.purple[500] : colors.gray[400]}
               />
             </View>
 

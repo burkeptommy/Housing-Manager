@@ -104,12 +104,12 @@ export default function LoginScreen() {
 
   return (
     <LinearGradient
-      colors={[colors.haven.navy[950], '#0d2137', colors.haven.navy[900]]}
+      colors={[colors.haven.purple[950], '#0d2137', colors.haven.purple[900]]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={styles.gradient}
     >
-      <StatusBar barStyle="light-content" backgroundColor={colors.haven.navy[950]} />
+      <StatusBar barStyle="light-content" backgroundColor={colors.haven.purple[950]} />
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
@@ -169,7 +169,7 @@ export default function LoginScreen() {
                   <Ionicons
                     name={biometricStatus.biometricType === 'facial' ? 'scan' : 'finger-print'}
                     size={22}
-                    color={colors.haven.champagne[500]}
+                    color={colors.haven.purple[500]}
                   />
                   <Text style={styles.biometricButtonText}>
                     {getBiometricName(biometricStatus.biometricType)}
@@ -298,7 +298,7 @@ const styles = StyleSheet.create({
   },
   tagline: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
     letterSpacing: 0.5,
   },
   card: {
@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     textAlign: 'center',
     marginBottom: spacing[1],
   },
@@ -365,18 +365,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[3],
     borderRadius: borderRadius.xl,
     gap: spacing[2],
     height: 52,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   biometricButtonText: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   divider: {
     flexDirection: 'row',
@@ -405,7 +405,7 @@ const styles = StyleSheet.create({
   },
   forgotPasswordText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   signInButton: {
@@ -421,11 +421,11 @@ const styles = StyleSheet.create({
   },
   signUpText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[300],
+    color: colors.haven.purple[300],
   },
   signUpLink: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.champagne[400],
+    color: colors.haven.purple[400],
     fontWeight: typography.fontWeights.semibold,
   },
   devSection: {
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
   },
   devButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[400],
+    color: colors.haven.purple[400],
     fontWeight: typography.fontWeights.medium,
   },
 });

@@ -119,7 +119,7 @@ export default function CompletePage() {
     return (
       <div className="min-h-[calc(100vh-80px)] flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-10 h-10 text-haven-champagne-500 animate-spin mx-auto mb-4" />
+          <Loader2 className="w-10 h-10 text-haven-500 animate-spin mx-auto mb-4" />
           <p className="text-gray-500">Loading...</p>
         </div>
       </div>
@@ -135,7 +135,7 @@ export default function CompletePage() {
           height={windowSize.height}
           recycle={false}
           numberOfPieces={200}
-          colors={['#c4a574', '#102a43', '#faf6ed', '#d4c4a5', '#243b53']}
+          colors={['#6200EA', '#B388FF', '#FF6B6B', '#EDE7F6', '#7C4DFF']}
         />
       )}
 
@@ -143,14 +143,14 @@ export default function CompletePage() {
         {/* Hero */}
         <div className="text-center mb-10">
           <div className="relative inline-block mb-6">
-            <div className="w-24 h-24 bg-gradient-to-br from-haven-champagne-400 to-haven-champagne-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+            <div className="w-24 h-24 bg-gradient-to-br from-haven-400 to-haven-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
               <PartyPopper className="w-12 h-12 text-white" />
             </div>
             <div className="absolute -top-2 -right-2 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center shadow-md">
               <CheckCircle className="w-6 h-6 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-haven-navy-900 mb-3">
+          <h1 className="text-4xl font-bold text-haven-900 mb-3">
             Welcome to Haven, {firstName}!
           </h1>
           <p className="text-xl text-gray-600">
@@ -173,13 +173,13 @@ export default function CompletePage() {
 
         {/* Activation Call Reminder */}
         {data.activationCallAt && (
-          <div className="bg-haven-champagne-50 border border-haven-champagne-200 rounded-2xl p-6 mb-8">
+          <div className="bg-haven-50 border border-haven-200 rounded-2xl p-6 mb-8">
             <div className="flex items-start gap-4">
-              <div className="w-12 h-12 bg-haven-champagne-100 rounded-xl flex items-center justify-center flex-shrink-0">
-                <Calendar className="w-6 h-6 text-haven-champagne-600" />
+              <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                <Calendar className="w-6 h-6 text-haven-600" />
               </div>
               <div>
-                <h3 className="font-semibold text-haven-navy-900">Activation call scheduled!</h3>
+                <h3 className="font-semibold text-haven-900">Activation call scheduled!</h3>
                 <p className="text-sm text-gray-600 mt-1">
                   Check your email for the calendar invite. We&apos;ll review everything and get your Haven Wallet set up.
                 </p>
@@ -191,12 +191,12 @@ export default function CompletePage() {
         {/* Your Home Manager */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
           <div className="flex items-center gap-4 mb-4">
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-haven-champagne-400 to-haven-champagne-600 flex items-center justify-center">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-haven-400 to-haven-600 flex items-center justify-center">
               <User className="w-8 h-8 text-white" />
             </div>
             <div>
               <p className="text-sm text-gray-500">Your Home Manager</p>
-              <h3 className="text-xl font-semibold text-haven-navy-900">Sarah Chen</h3>
+              <h3 className="text-xl font-semibold text-haven-900">Sarah Chen</h3>
             </div>
           </div>
           <p className="text-gray-600 mb-4">
@@ -206,14 +206,14 @@ export default function CompletePage() {
           <div className="flex gap-3">
             <a
               href="sms:+15083338630"
-              className="flex-1 py-3 px-4 bg-haven-navy-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-navy-800 transition-colors"
+              className="flex-1 py-3 px-4 bg-haven-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-800 transition-colors"
             >
               <MessageSquare className="w-4 h-4" />
               Text Sarah
             </a>
             <a
               href="tel:+15083338630"
-              className="flex-1 py-3 px-4 border border-gray-200 text-haven-navy-900 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
+              className="flex-1 py-3 px-4 border border-gray-200 text-haven-900 rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors"
             >
               Call Sarah
             </a>
@@ -222,35 +222,35 @@ export default function CompletePage() {
 
         {/* What's Next */}
         <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-8">
-          <h3 className="font-semibold text-haven-navy-900 mb-4 flex items-center gap-2">
-            <Sparkles className="w-5 h-5 text-haven-champagne-500" />
+          <h3 className="font-semibold text-haven-900 mb-4 flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-haven-500" />
             What happens next
           </h3>
           <div className="space-y-4">
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-haven-navy-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-navy-900">
+              <div className="w-8 h-8 rounded-full bg-haven-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-900">
                 1
               </div>
               <div>
-                <p className="font-medium text-haven-navy-900">Activation call</p>
+                <p className="font-medium text-haven-900">Activation call</p>
                 <p className="text-sm text-gray-500">We&apos;ll finalize your setup and fund your Haven Wallet</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-haven-navy-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-navy-900">
+              <div className="w-8 h-8 rounded-full bg-haven-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-900">
                 2
               </div>
               <div>
-                <p className="font-medium text-haven-navy-900">We take over your bills</p>
+                <p className="font-medium text-haven-900">We take over your bills</p>
                 <p className="text-sm text-gray-500">Sarah will coordinate transferring bill payments to Haven</p>
               </div>
             </div>
             <div className="flex items-start gap-4">
-              <div className="w-8 h-8 rounded-full bg-haven-navy-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-navy-900">
+              <div className="w-8 h-8 rounded-full bg-haven-100 flex items-center justify-center flex-shrink-0 text-sm font-semibold text-haven-900">
                 3
               </div>
               <div>
-                <p className="font-medium text-haven-navy-900">Relax</p>
+                <p className="font-medium text-haven-900">Relax</p>
                 <p className="text-sm text-gray-500">We handle everything — you just live in your home</p>
               </div>
             </div>
@@ -262,7 +262,7 @@ export default function CompletePage() {
           <button
             onClick={handleCompleteOnboarding}
             disabled={isCompleting}
-            className="w-full py-4 px-6 bg-haven-navy-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-navy-800 transition-colors disabled:opacity-50"
+            className="w-full py-4 px-6 bg-haven-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-800 transition-colors disabled:opacity-50"
           >
             {isCompleting ? (
               <>
@@ -280,7 +280,7 @@ export default function CompletePage() {
         ) : (
           <Link
             href="/app"
-            className="w-full py-4 px-6 bg-haven-navy-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-navy-800 transition-colors"
+            className="w-full py-4 px-6 bg-haven-900 text-white rounded-xl font-medium flex items-center justify-center gap-2 hover:bg-haven-800 transition-colors"
           >
             <Home className="w-5 h-5" />
             Go to your dashboard
@@ -291,7 +291,7 @@ export default function CompletePage() {
         {/* Contact */}
         <p className="text-center text-sm text-gray-500 mt-8">
           Questions? Call us anytime at{' '}
-          <a href="tel:508-333-8630" className="text-haven-navy-900 font-medium hover:underline">
+          <a href="tel:508-333-8630" className="text-haven-900 font-medium hover:underline">
             (508) 333-8630
           </a>
         </p>

@@ -18,7 +18,7 @@ try {
   console.log('expo-haptics not available');
 }
 
-type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive';
+type ButtonVariant = 'primary' | 'secondary' | 'outline' | 'ghost' | 'destructive' | 'coral' | 'coralOutline';
 type ButtonSize = 'sm' | 'md' | 'lg';
 
 interface ButtonProps {
@@ -79,7 +79,7 @@ export function Button({
     >
       {loading ? (
         <ActivityIndicator
-          color={variant === 'primary' ? colors.white : colors.haven.navy[900]}
+          color={variant === 'primary' || variant === 'coral' || variant === 'destructive' ? colors.white : colors.haven.purple[900]}
           size="small"
         />
       ) : (
@@ -130,17 +130,17 @@ const styles = StyleSheet.create({
 
   // Variants
   primary: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     ...shadows.sm,
   },
   secondary: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     ...shadows.sm,
   },
   outline: {
     backgroundColor: 'transparent',
     borderWidth: 1.5,
-    borderColor: colors.haven.navy[900],
+    borderColor: colors.haven.purple[900],
   },
   ghost: {
     backgroundColor: 'transparent',
@@ -148,6 +148,15 @@ const styles = StyleSheet.create({
   destructive: {
     backgroundColor: colors.status.error,
     ...shadows.sm,
+  },
+  coral: {
+    backgroundColor: colors.haven.coral[500],
+    ...shadows.sm,
+  },
+  coralOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: colors.haven.coral[500],
   },
 
   // Sizes
@@ -169,7 +178,7 @@ const styles = StyleSheet.create({
 
   // Text base
   text: {
-    fontWeight: typography.fontWeights.semibold,
+    fontFamily: 'Nunito_600SemiBold',
   },
 
   // Text variants
@@ -177,16 +186,22 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   text_secondary: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   text_outline: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   text_ghost: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   text_destructive: {
     color: colors.white,
+  },
+  text_coral: {
+    color: colors.white,
+  },
+  text_coralOutline: {
+    color: colors.haven.coral[600],
   },
 
   // Text sizes

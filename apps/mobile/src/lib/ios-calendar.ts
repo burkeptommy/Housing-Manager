@@ -50,7 +50,7 @@ export async function getDeviceCalendars(): Promise<DeviceCalendar[]> {
   return calendars.map(cal => ({
     id: cal.id,
     name: cal.title,
-    color: cal.color || '#627d98',
+    color: cal.color || '#6200EA',
     source: cal.source.name,
     type: cal.source.type,
     // Filter to show only useful calendars

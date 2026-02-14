@@ -139,7 +139,7 @@ export default function HomeSetupPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-haven-champagne-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-haven-600 mx-auto mb-4" />
           <p className="text-gray-500">Preparing your questionnaire...</p>
         </div>
       </div>
@@ -154,7 +154,7 @@ export default function HomeSetupPage() {
             <CheckCircle className="w-10 h-10 text-emerald-600" />
           </div>
 
-          <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">
+          <h1 className="text-2xl font-bold text-haven-900 mb-2">
             Thank you!
           </h1>
 
@@ -165,7 +165,7 @@ export default function HomeSetupPage() {
 
           <button
             onClick={() => router.push('/app')}
-            className="w-full bg-haven-navy-900 text-white py-3 rounded-xl font-medium hover:bg-haven-navy-800 transition"
+            className="w-full bg-haven-900 text-white py-3 rounded-xl font-medium hover:bg-haven-800 transition"
           >
             Go to Dashboard
           </button>
@@ -182,7 +182,7 @@ export default function HomeSetupPage() {
           <p className="text-gray-500">No questions to answer right now.</p>
           <button
             onClick={() => router.push('/app')}
-            className="mt-4 text-haven-champagne-600 hover:text-haven-champagne-700 font-medium"
+            className="mt-4 text-haven-600 hover:text-haven-700 font-medium"
           >
             Go to Dashboard →
           </button>
@@ -214,7 +214,7 @@ export default function HomeSetupPage() {
         <div className="max-w-lg mx-auto">
           <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-haven-champagne-500 transition-all duration-300"
+              className="h-full bg-haven-500 transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -227,13 +227,13 @@ export default function HomeSetupPage() {
           {/* Question Card */}
           <div className="bg-white rounded-2xl p-8 shadow-lg">
             {currentItem.context && (
-              <div className="flex items-center gap-2 text-sm text-haven-champagne-600 mb-4">
+              <div className="flex items-center gap-2 text-sm text-haven-600 mb-4">
                 <Sparkles className="w-4 h-4" />
                 {currentItem.context}
               </div>
             )}
 
-            <h2 className="text-xl font-bold text-haven-navy-900 mb-6">
+            <h2 className="text-xl font-bold text-haven-900 mb-6">
               {currentItem.question}
             </h2>
 
@@ -244,10 +244,10 @@ export default function HomeSetupPage() {
                   <button
                     key={opt}
                     onClick={() => handleAnswer(opt)}
-                    className="w-full text-left px-4 py-3 border border-gray-200 rounded-xl hover:border-haven-champagne-500 hover:bg-haven-champagne-50 transition flex items-center justify-between group"
+                    className="w-full text-left px-4 py-3 border border-gray-200 rounded-xl hover:border-haven-500 hover:bg-haven-50 transition flex items-center justify-between group"
                   >
                     <span>{opt}</span>
-                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-haven-champagne-500 transition" />
+                    <ArrowRight className="w-4 h-4 text-gray-300 group-hover:text-haven-500 transition" />
                   </button>
                 ))}
               </div>
@@ -262,7 +262,7 @@ export default function HomeSetupPage() {
                       ? 'Company name or "I don\'t have one"'
                       : 'Type your answer...'
                   }
-                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none transition"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none transition"
                   autoFocus
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' && inputValue) {
@@ -273,7 +273,7 @@ export default function HomeSetupPage() {
                 <button
                   onClick={() => inputValue && handleAnswer(inputValue)}
                   disabled={!inputValue}
-                  className="w-full bg-haven-navy-900 text-white py-3 rounded-xl font-medium hover:bg-haven-navy-800 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-haven-900 text-white py-3 rounded-xl font-medium hover:bg-haven-800 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Continue
                   <ArrowRight className="w-4 h-4" />
@@ -306,7 +306,7 @@ export default function HomeSetupPage() {
           {/* Let Manager Handle Button */}
           <button
             onClick={handleLetManagerHandle}
-            className="w-full mt-6 py-3 text-haven-champagne-600 hover:text-haven-champagne-700 text-sm font-medium transition flex items-center justify-center gap-2"
+            className="w-full mt-6 py-3 text-haven-600 hover:text-haven-700 text-sm font-medium transition flex items-center justify-center gap-2"
           >
             <MessageCircle className="w-4 h-4" />
             Let my Home Manager handle the rest

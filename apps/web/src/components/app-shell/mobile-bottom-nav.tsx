@@ -21,7 +21,7 @@ export function MobileBottomNav() {
   return (
     <>
       {/* Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-warm-200 safe-area-pb">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-neutral-200 safe-area-pb">
         <div className="flex items-center justify-around h-16 px-2">
           {navItems.map((item) => {
             const active = isActive(item.href);
@@ -32,7 +32,7 @@ export function MobileBottomNav() {
                 key={item.name}
                 href={item.href}
                 className={`flex flex-col items-center justify-center flex-1 h-full py-1 transition-colors ${
-                  active ? 'text-haven-700' : 'text-warm-400'
+                  active ? 'text-haven-700' : 'text-neutral-400'
                 }`}
               >
                 <div className="relative">
@@ -52,7 +52,7 @@ export function MobileBottomNav() {
           {/* Menu Button */}
           <button
             onClick={() => setDrawerOpen(true)}
-            className="flex flex-col items-center justify-center flex-1 h-full py-1 text-warm-400 transition-colors"
+            className="flex flex-col items-center justify-center flex-1 h-full py-1 text-neutral-400 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

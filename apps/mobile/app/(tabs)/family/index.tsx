@@ -290,7 +290,7 @@ export default function FamilyScreen() {
           onPress={() => setShowInviteModal(true)}
         >
           <View style={styles.inviteIcon}>
-            <Ionicons name="person-add" size={24} color={colors.haven.champagne[500]} />
+            <Ionicons name="person-add" size={24} color={colors.haven.purple[500]} />
           </View>
           <View style={styles.inviteContent}>
             <Text style={styles.inviteTitle}>Invite to Household</Text>
@@ -361,7 +361,7 @@ export default function FamilyScreen() {
                 <TouchableOpacity activeOpacity={0.7} onPress={() => handleVehiclePress(vehicle.id)}>
                   <Card style={styles.vehicleCard}>
                     <View style={styles.vehicleIcon}>
-                      <Ionicons name="car" size={24} color={colors.haven.navy[600]} />
+                      <Ionicons name="car" size={24} color={colors.haven.purple[600]} />
                     </View>
                     <View style={styles.vehicleInfo}>
                       <Text style={styles.vehicleName}>
@@ -384,7 +384,7 @@ export default function FamilyScreen() {
               <Card style={styles.emptyCard}>
                 <Ionicons name="car-outline" size={24} color={colors.text.tertiary} />
                 <Text style={styles.emptyCardText}>Add a vehicle</Text>
-                <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
               </Card>
             </TouchableOpacity>
           )}
@@ -403,7 +403,7 @@ export default function FamilyScreen() {
                 <TouchableOpacity activeOpacity={0.7} onPress={() => handleStaffPress(person.id)}>
                   <Card style={styles.staffCard}>
                     <View style={styles.staffAvatar}>
-                      <Ionicons name="person" size={24} color={colors.haven.champagne[500]} />
+                      <Ionicons name="person" size={24} color={colors.haven.purple[500]} />
                     </View>
                     <View style={styles.staffInfo}>
                       <Text style={styles.staffName}>{person.firstName} {person.lastName}</Text>
@@ -414,7 +414,7 @@ export default function FamilyScreen() {
                     </View>
                     {person.phone && (
                       <TouchableOpacity style={styles.callButton} onPress={(e) => { e.stopPropagation(); handleCall(person.phone!); }}>
-                        <Ionicons name="call" size={20} color={colors.haven.champagne[500]} />
+                        <Ionicons name="call" size={20} color={colors.haven.purple[500]} />
                       </TouchableOpacity>
                     )}
                   </Card>
@@ -426,7 +426,7 @@ export default function FamilyScreen() {
               <Card style={styles.emptyCard}>
                 <Ionicons name="people-outline" size={24} color={colors.text.tertiary} />
                 <Text style={styles.emptyCardText}>Add household staff</Text>
-                <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
               </Card>
             </TouchableOpacity>
           )}
@@ -445,7 +445,7 @@ export default function FamilyScreen() {
                 <TouchableOpacity activeOpacity={0.7} onPress={() => handlePetPress(pet.id)}>
                   <Card style={styles.petCard}>
                     <View style={styles.petIcon}>
-                      <Ionicons name="paw" size={24} color={colors.haven.champagne[500]} />
+                      <Ionicons name="paw" size={24} color={colors.haven.purple[500]} />
                     </View>
                     <View style={styles.petInfo}>
                       <Text style={styles.petName}>{pet.name}</Text>
@@ -466,7 +466,7 @@ export default function FamilyScreen() {
               <Card style={styles.emptyCard}>
                 <Ionicons name="paw-outline" size={24} color={colors.text.tertiary} />
                 <Text style={styles.emptyCardText}>Add a pet</Text>
-                <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
               </Card>
             </TouchableOpacity>
           )}
@@ -484,7 +484,7 @@ export default function FamilyScreen() {
               <Card style={styles.emptyCard}>
                 <Ionicons name="person-add-outline" size={24} color={colors.text.tertiary} />
                 <Text style={styles.emptyCardText}>Add a family member</Text>
-                <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
               </Card>
             </TouchableOpacity>
           </View>
@@ -557,7 +557,7 @@ export default function FamilyScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   scrollContainer: {
     flex: 1,
@@ -595,7 +595,7 @@ const styles = StyleSheet.create({
   inviteCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     padding: spacing[4],
     borderRadius: borderRadius.xl,
     marginBottom: spacing[6],
@@ -604,7 +604,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -619,7 +619,7 @@ const styles = StyleSheet.create({
   },
   inviteSubtitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[200],
+    color: colors.haven.purple[200],
     marginTop: 2,
   },
   memberCard: {
@@ -632,7 +632,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.navy[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
   memberInitials: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   memberInfo: {
     flex: 1,
@@ -657,7 +657,7 @@ const styles = StyleSheet.create({
   },
   memberRole: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   memberDetail: {
@@ -667,17 +667,17 @@ const styles = StyleSheet.create({
   },
   currentUserCard: {
     borderWidth: 1,
-    borderColor: colors.haven.champagne[300],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[300],
+    backgroundColor: colors.haven.purple[50],
   },
   currentUserAvatar: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   currentUserInitials: {
     color: colors.white,
   },
   youBadge: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingHorizontal: spacing[2],
     paddingVertical: 2,
     borderRadius: borderRadius.full,
@@ -697,7 +697,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -730,7 +730,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -745,7 +745,7 @@ const styles = StyleSheet.create({
   },
   staffRole: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: 2,
   },
   staffDetail: {
@@ -766,7 +766,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],

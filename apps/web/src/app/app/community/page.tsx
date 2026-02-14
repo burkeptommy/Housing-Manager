@@ -97,7 +97,7 @@ interface TradeFilter {
 const MAPBOX_TOKEN = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const tradeFilters: TradeFilter[] = [
-  { id: 'all', label: 'All Trades', icon: Home, color: 'bg-warm-100 text-warm-700' },
+  { id: 'all', label: 'All Trades', icon: Home, color: 'bg-neutral-100 text-neutral-700' },
   { id: 'plumber', label: 'Plumbing', icon: Droplets, color: 'bg-blue-100 text-blue-700' },
   { id: 'electrician', label: 'Electrical', icon: Zap, color: 'bg-yellow-100 text-yellow-700' },
   { id: 'hvac', label: 'HVAC', icon: Wind, color: 'bg-cyan-100 text-cyan-700' },
@@ -766,25 +766,25 @@ export default function VendorDiscoveryPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-warm-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+      <div className="bg-white border-b border-neutral-200 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold text-warm-900">Find Contractors</h1>
-              <p className="text-sm text-warm-500">Trusted pros used by your neighbors</p>
+              <h1 className="text-2xl font-bold text-neutral-900">Find Contractors</h1>
+              <p className="text-sm text-neutral-500">Trusted pros used by your neighbors</p>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => setViewMode('map')}
-                className={`p-2 rounded-lg ${viewMode === 'map' ? 'bg-haven-100 text-haven-700' : 'text-warm-400 hover:bg-warm-100'}`}
+                className={`p-2 rounded-lg ${viewMode === 'map' ? 'bg-haven-100 text-haven-700' : 'text-neutral-400 hover:bg-neutral-100'}`}
               >
                 <MapIcon className="w-5 h-5" />
               </button>
               <button
                 onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-haven-100 text-haven-700' : 'text-warm-400 hover:bg-warm-100'}`}
+                className={`p-2 rounded-lg ${viewMode === 'grid' ? 'bg-haven-100 text-haven-700' : 'text-neutral-400 hover:bg-neutral-100'}`}
               >
                 <Grid3X3 className="w-5 h-5" />
               </button>
@@ -793,13 +793,13 @@ export default function VendorDiscoveryPage() {
 
           {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
               type="text"
               placeholder="Search by name or specialty..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-300 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-2.5 border border-neutral-300 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
             />
           </div>
 
@@ -812,7 +812,7 @@ export default function VendorDiscoveryPage() {
                 className={`flex items-center gap-2 px-4 py-2 rounded-full whitespace-nowrap transition-all ${
                   selectedTrade === trade.id
                     ? 'bg-haven-700 text-white'
-                    : 'bg-warm-100 text-warm-600 hover:bg-warm-200'
+                    : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
                 }`}
               >
                 <trade.icon className="w-4 h-4" />
@@ -860,7 +860,7 @@ export default function VendorDiscoveryPage() {
                     <div className={`
                       w-10 h-10 rounded-full flex items-center justify-center cursor-pointer
                       transition-transform hover:scale-110
-                      ${vendor.havenTrusted ? 'bg-haven-700' : 'bg-warm-600'}
+                      ${vendor.havenTrusted ? 'bg-haven-700' : 'bg-neutral-600'}
                       ${selectedVendor?.id === vendor.id ? 'ring-4 ring-haven-300 scale-110' : ''}
                     `}>
                       {vendor.havenTrusted && (
@@ -890,10 +890,10 @@ export default function VendorDiscoveryPage() {
             </div>
 
             {/* Vendor List Sidebar */}
-            <div className="w-full lg:w-96 bg-white border-l border-warm-200 overflow-y-auto">
-              <div className="p-4 border-b border-warm-200">
+            <div className="w-full lg:w-96 bg-white border-l border-neutral-200 overflow-y-auto">
+              <div className="p-4 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-warm-600">
+                  <span className="text-sm font-medium text-neutral-600">
                     {sortedVendors.length} contractors found
                   </span>
                   <select
@@ -908,7 +908,7 @@ export default function VendorDiscoveryPage() {
                   </select>
                 </div>
               </div>
-              <div className="divide-y divide-warm-100">
+              <div className="divide-y divide-neutral-100">
                 {sortedVendors.map(vendor => (
                   <VendorListItem
                     key={vendor.id}
@@ -924,13 +924,13 @@ export default function VendorDiscoveryPage() {
           /* Grid View */
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
-              <span className="text-sm font-medium text-warm-600">
+              <span className="text-sm font-medium text-neutral-600">
                 {sortedVendors.length} contractors found
               </span>
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="text-sm border border-warm-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-haven-600"
+                className="text-sm border border-neutral-300 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-haven-600"
               >
                 <option value="neighbors">Most Used by Neighbors</option>
                 <option value="rating">Highest Rated</option>
@@ -964,7 +964,7 @@ function VendorPopup({ vendor }: { vendor: Vendor }) {
             <VendorAvatarComponent name={vendor.name} size="lg" className="flex-shrink-0" />
             <div className="flex-1 min-w-0">
               {/* Name - allow wrap, no truncate */}
-              <h3 className="font-semibold text-warm-900 text-sm leading-snug">
+              <h3 className="font-semibold text-neutral-900 text-sm leading-snug">
                 {vendor.name}
               </h3>
               {vendor.havenTrusted && (
@@ -979,19 +979,19 @@ function VendorPopup({ vendor }: { vendor: Vendor }) {
           {/* Rating */}
           <div className="mt-3 flex items-center gap-2 text-sm">
             <Star className="w-4 h-4 text-amber-500 fill-current flex-shrink-0" />
-            <span className="font-medium text-warm-900">{vendor.rating}</span>
-            <span className="text-warm-400">•</span>
-            <span className="text-warm-500">{vendor.reviewCount} reviews</span>
+            <span className="font-medium text-neutral-900">{vendor.rating}</span>
+            <span className="text-neutral-400">•</span>
+            <span className="text-neutral-500">{vendor.reviewCount} reviews</span>
           </div>
 
           {/* Stats */}
-          <div className="mt-2 flex items-center gap-4 text-sm text-warm-600">
+          <div className="mt-2 flex items-center gap-4 text-sm text-neutral-600">
             <div className="flex items-center gap-1.5">
-              <Users className="w-4 h-4 text-warm-400 flex-shrink-0" />
+              <Users className="w-4 h-4 text-neutral-400 flex-shrink-0" />
               <span>{vendor.neighborsUsed} neighbors</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <MapPin className="w-4 h-4 text-warm-400 flex-shrink-0" />
+              <MapPin className="w-4 h-4 text-neutral-400 flex-shrink-0" />
               <span>{vendor.distance} mi</span>
             </div>
           </div>
@@ -1004,9 +1004,9 @@ function VendorPopup({ vendor }: { vendor: Vendor }) {
           </button>
           <a
             href={`tel:${vendor.phone}`}
-            className="px-4 py-2.5 border border-warm-200 rounded-lg hover:bg-warm-50 transition-colors flex items-center justify-center flex-shrink-0"
+            className="px-4 py-2.5 border border-neutral-200 rounded-lg hover:bg-neutral-50 transition-colors flex items-center justify-center flex-shrink-0"
           >
-            <Phone className="w-4 h-4 text-warm-600" />
+            <Phone className="w-4 h-4 text-neutral-600" />
           </a>
         </div>
       </div>
@@ -1027,24 +1027,24 @@ function VendorListItem({
     <div
       onClick={onClick}
       className={`p-3 cursor-pointer transition-colors ${
-        isSelected ? 'bg-haven-50' : 'hover:bg-warm-50'
+        isSelected ? 'bg-haven-50' : 'hover:bg-neutral-50'
       }`}
     >
       <div className="flex gap-3">
         <VendorAvatarComponent name={vendor.name} size="lg" className="rounded-lg" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h3 className="font-medium text-warm-900 text-sm truncate">{vendor.name}</h3>
+            <h3 className="font-medium text-neutral-900 text-sm truncate">{vendor.name}</h3>
             {vendor.havenTrusted && (
               <Shield className="w-3.5 h-3.5 text-haven-700 flex-shrink-0" />
             )}
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-warm-500">
+          <div className="flex items-center gap-1.5 text-xs text-neutral-500">
             <Star className="w-3 h-3 text-amber-500 fill-current flex-shrink-0" />
             <span>{vendor.rating}</span>
-            <span className="text-warm-300">•</span>
+            <span className="text-neutral-300">•</span>
             <span>{vendor.priceTier}</span>
-            <span className="text-warm-300">•</span>
+            <span className="text-neutral-300">•</span>
             <span>{vendor.distance} mi</span>
           </div>
           <div className="mt-0.5 flex items-center gap-1 text-xs text-haven-700">
@@ -1059,7 +1059,7 @@ function VendorListItem({
 
 function VendorCard({ vendor }: { vendor: Vendor }) {
   return (
-    <div className="bg-white rounded-xl border border-warm-200 overflow-hidden hover:shadow-lg transition-shadow">
+    <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden hover:shadow-lg transition-shadow">
       {/* Cover Image */}
       <div className="relative h-32 sm:h-40">
         <img
@@ -1084,40 +1084,40 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
         <div className="flex items-start gap-2">
           <VendorAvatarComponent name={vendor.name} size="lg" className="rounded-lg" />
           <div className="flex-1 min-w-0">
-            <h3 className="font-semibold text-warm-900 text-sm truncate">{vendor.name}</h3>
-            <div className="flex items-center gap-1.5 text-xs text-warm-500">
+            <h3 className="font-semibold text-neutral-900 text-sm truncate">{vendor.name}</h3>
+            <div className="flex items-center gap-1.5 text-xs text-neutral-500">
               <Star className="w-3.5 h-3.5 text-amber-500 fill-current flex-shrink-0" />
               <span>{vendor.rating}</span>
-              <span className="text-warm-300">({vendor.reviewCount})</span>
+              <span className="text-neutral-300">({vendor.reviewCount})</span>
             </div>
           </div>
         </div>
 
         {/* Stats */}
         <div className="mt-3 grid grid-cols-3 gap-1.5 text-center">
-          <div className="py-1.5 bg-warm-50 rounded-lg">
-            <div className="text-sm font-semibold text-warm-900">{vendor.neighborsUsed}</div>
-            <div className="text-xs text-warm-500">Neighbors</div>
+          <div className="py-1.5 bg-neutral-50 rounded-lg">
+            <div className="text-sm font-semibold text-neutral-900">{vendor.neighborsUsed}</div>
+            <div className="text-xs text-neutral-500">Neighbors</div>
           </div>
-          <div className="py-1.5 bg-warm-50 rounded-lg">
-            <div className="text-sm font-semibold text-warm-900">{vendor.totalProjects}</div>
-            <div className="text-xs text-warm-500">Projects</div>
+          <div className="py-1.5 bg-neutral-50 rounded-lg">
+            <div className="text-sm font-semibold text-neutral-900">{vendor.totalProjects}</div>
+            <div className="text-xs text-neutral-500">Projects</div>
           </div>
-          <div className="py-1.5 bg-warm-50 rounded-lg">
-            <div className="text-sm font-semibold text-warm-900">{vendor.onTimeRate}%</div>
-            <div className="text-xs text-warm-500">On Time</div>
+          <div className="py-1.5 bg-neutral-50 rounded-lg">
+            <div className="text-sm font-semibold text-neutral-900">{vendor.onTimeRate}%</div>
+            <div className="text-xs text-neutral-500">On Time</div>
           </div>
         </div>
 
         {/* Specialties */}
         <div className="mt-2 flex flex-wrap gap-1">
           {vendor.specialties.slice(0, 2).map(specialty => (
-            <span key={specialty} className="px-2 py-0.5 bg-warm-100 text-warm-600 text-xs rounded-full truncate max-w-[100px]">
+            <span key={specialty} className="px-2 py-0.5 bg-neutral-100 text-neutral-600 text-xs rounded-full truncate max-w-[100px]">
               {specialty}
             </span>
           ))}
           {vendor.specialties.length > 2 && (
-            <span className="px-2 py-0.5 bg-warm-100 text-warm-400 text-xs rounded-full">
+            <span className="px-2 py-0.5 bg-neutral-100 text-neutral-400 text-xs rounded-full">
               +{vendor.specialties.length - 2}
             </span>
           )}
@@ -1128,8 +1128,8 @@ function VendorCard({ vendor }: { vendor: Vendor }) {
           <button className="flex-1 py-2 bg-haven-700 text-white text-xs font-medium rounded-lg hover:bg-haven-800">
             Request Quote
           </button>
-          <button className="px-3 py-2 border border-warm-300 rounded-lg hover:bg-warm-50 flex-shrink-0">
-            <Heart className="w-4 h-4 text-warm-600" />
+          <button className="px-3 py-2 border border-neutral-300 rounded-lg hover:bg-neutral-50 flex-shrink-0">
+            <Heart className="w-4 h-4 text-neutral-600" />
           </button>
         </div>
       </div>

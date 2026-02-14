@@ -187,6 +187,16 @@ Consider seasonal timing appropriate for the region.`;
     let created = 0;
     const now = new Date();
 
+    // Look up the system to get install date and last service date
+    const system = await this.prisma.homeSystem.findUnique({
+      where: { id: systemId },
+      select: { installedDate: true, lastServiceDate: true },
+    });
+
+    // Use last service date or install date as baseline for scheduling
+    // This ensures tasks are calculated from when things were actually last serviced
+    const baselineDate = system?.lastServiceDate || system?.installedDate || now;
+
     for (const task of research.tasks) {
       // Check if task already exists
       const existing = await this.prisma.maintenanceTask.findFirst({
@@ -199,12 +209,19 @@ Consider seasonal timing appropriate for the region.`;
 
       if (existing) continue;
 
-      // Calculate next due date based on frequency and season
-      const nextDueDate = this.calculateNextDueDate(
+      // Calculate next due date based on frequency, season, and when system was last serviced
+      let nextDueDate = this.calculateNextDueDate(
         task.frequency as MaintenanceFrequency,
         task.seasonalTiming as SeasonalTiming,
-        now,
+        baselineDate,
       );
+
+      // If the calculated date is in the past (system overdue), set to soon from now
+      if (nextDueDate < now) {
+        // Overdue - schedule within the next 30 days
+        nextDueDate = new Date(now);
+        nextDueDate.setDate(nextDueDate.getDate() + 14);
+      }
 
       await this.prisma.maintenanceTask.create({
         data: {
@@ -353,20 +370,20 @@ Consider seasonal timing appropriate for the region.`;
     const year = now.getFullYear();
     const month = now.getMonth();
 
-    // Define season start months (approximate)
+    // Define season start months (aligned with maintenance-generator.service.ts)
     const seasonMonths: Record<SeasonalTiming, number> = {
       SPRING: 3, // April
-      SUMMER: 5, // June
-      FALL: 8, // September
-      WINTER: 11, // December
+      SUMMER: 6, // July
+      FALL: 9, // October
+      WINTER: 0, // January
       ANY: month,
     };
 
     const targetMonth = seasonMonths[season];
     let targetYear = year;
 
-    // If we've passed this season, schedule for next year
-    if (month >= targetMonth) {
+    // If we've passed this season's window, schedule for next year
+    if (month >= targetMonth + 2) {
       targetYear++;
     }
 
@@ -449,7 +466,101 @@ Consider seasonal timing appropriate for the region.`;
       research,
     );
 
+    // 5. Generate SystemForecast record for replacement planning
+    await this.generateForecastForSystem(householdId, system, research, input);
+
     return { system, research, tasksCreated };
+  }
+
+  /**
+   * Generate a SystemForecast record for a home system based on research data
+   */
+  private async generateForecastForSystem(
+    householdId: string,
+    system: { id: string; installedDate: Date | null; name: string; type: HomeSystemType },
+    research: ResearchResult,
+    input: SystemInput,
+  ) {
+    try {
+      // Parse lifespan from research (e.g., "15-20 years")
+      let typicalLifespan = 20;
+      let lifespanMin = 15;
+      let lifespanMax = 25;
+
+      if (research.expectedLifespan) {
+        const match = research.expectedLifespan.match(/(\d+)\s*[-–to]+\s*(\d+)/);
+        if (match) {
+          lifespanMin = parseInt(match[1], 10);
+          lifespanMax = parseInt(match[2], 10);
+          typicalLifespan = Math.round((lifespanMin + lifespanMax) / 2);
+        } else {
+          const singleMatch = research.expectedLifespan.match(/(\d+)/);
+          if (singleMatch) {
+            typicalLifespan = parseInt(singleMatch[1], 10);
+            lifespanMin = Math.round(typicalLifespan * 0.75);
+            lifespanMax = Math.round(typicalLifespan * 1.25);
+          }
+        }
+      }
+
+      const currentYear = new Date().getFullYear();
+      const installYear = system.installedDate
+        ? new Date(system.installedDate).getFullYear()
+        : input.installedDate
+          ? new Date(input.installedDate).getFullYear()
+          : currentYear;
+
+      const currentAge = currentYear - installYear;
+      const expectedReplacementYear = installYear + typicalLifespan;
+      const remainingYears = expectedReplacementYear - currentYear;
+
+      let urgency = 'LOW';
+      if (remainingYears <= 0) urgency = 'CRITICAL';
+      else if (remainingYears <= 2) urgency = 'HIGH';
+      else if (remainingYears <= 5) urgency = 'MEDIUM';
+
+      // Check if forecast already exists for this system
+      const existing = await this.prisma.systemForecast.findFirst({
+        where: { householdId, systemId: system.id },
+      });
+
+      const forecastData = {
+        systemType: system.type,
+        systemName: system.name || input.name,
+        installYear,
+        currentAge,
+        typicalLifespan,
+        lifespanMin,
+        lifespanMax,
+        estimatedReplacementCost: research.annualMaintenanceBudget
+          ? research.annualMaintenanceBudget * typicalLifespan * 0.5
+          : undefined,
+        expectedReplacementYear,
+        urgency,
+      };
+
+      if (existing) {
+        await this.prisma.systemForecast.update({
+          where: { id: existing.id },
+          data: forecastData,
+        });
+      } else {
+        await this.prisma.systemForecast.create({
+          data: {
+            householdId,
+            systemId: system.id,
+            ...forecastData,
+          },
+        });
+      }
+
+      this.logger.log(
+        `Generated forecast for ${system.name}: replacement in ~${remainingYears} years (urgency: ${urgency})`,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to generate forecast for ${system.name}:`, error);
+      // Non-fatal - don't break the maintenance program creation
+    }
   }
 
   private inferSystemType(input: SystemInput): HomeSystemType {

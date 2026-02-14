@@ -275,7 +275,7 @@ export default function MessagesScreen() {
         <View style={styles.contactNameRow}>
           <Text style={styles.contactName}>{item.name}</Text>
           {item.isPinned && (
-            <Ionicons name="pin" size={12} color={colors.haven.champagne[500]} />
+            <Ionicons name="pin" size={12} color={colors.haven.purple[500]} />
           )}
         </View>
         <Text style={styles.contactRole}>{item.role}</Text>
@@ -315,7 +315,7 @@ export default function MessagesScreen() {
           <Ionicons
             name="chatbubbles"
             size={18}
-            color={activeTab === 'conversations' ? colors.haven.navy[900] : colors.gray[500]}
+            color={activeTab === 'conversations' ? colors.haven.purple[900] : colors.gray[500]}
           />
           <Text style={[styles.tabText, activeTab === 'conversations' && styles.tabTextActive]}>
             Conversations
@@ -333,7 +333,7 @@ export default function MessagesScreen() {
           <Ionicons
             name="folder-open"
             size={18}
-            color={activeTab === 'projects' ? colors.haven.navy[900] : colors.gray[500]}
+            color={activeTab === 'projects' ? colors.haven.purple[900] : colors.gray[500]}
           />
           <Text style={[styles.tabText, activeTab === 'projects' && styles.tabTextActive]}>
             Projects
@@ -393,7 +393,7 @@ export default function MessagesScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="mail-outline" size={48} color={colors.haven.navy[300]} />
+            <Ionicons name="mail-outline" size={48} color={colors.haven.purple[300]} />
             <Text style={styles.emptyTitle}>No messages</Text>
             <Text style={styles.emptyText}>
               Start a conversation with your home manager, vendors, or community.
@@ -455,7 +455,7 @@ export default function MessagesScreen() {
               <>
                 {/* Team Section */}
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="shield-outline" size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name="shield-outline" size={16} color={colors.haven.purple[500]} />
                   <Text style={styles.sectionTitle}>Your Team</Text>
                 </View>
                 {contacts.filter(c => c.category === 'team').map(contact => (
@@ -473,7 +473,7 @@ export default function MessagesScreen() {
                       <View style={styles.contactNameRow}>
                         <Text style={styles.contactName}>{contact.name}</Text>
                         {contact.isPinned && (
-                          <Ionicons name="pin" size={12} color={colors.haven.champagne[500]} />
+                          <Ionicons name="pin" size={12} color={colors.haven.purple[500]} />
                         )}
                       </View>
                       <Text style={styles.contactRole}>{contact.role}</Text>
@@ -484,7 +484,7 @@ export default function MessagesScreen() {
 
                 {/* Vendors Section */}
                 <View style={styles.sectionHeader}>
-                  <Ionicons name="construct-outline" size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name="construct-outline" size={16} color={colors.haven.purple[500]} />
                   <Text style={styles.sectionTitle}>Vendors</Text>
                 </View>
                 {contacts.filter(c => c.category === 'vendors').map(contact => (
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
   },
   tabActive: {
     backgroundColor: colors.white,
-    shadowColor: colors.haven.navy[900],
+    shadowColor: colors.haven.purple[900],
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
@@ -571,10 +571,10 @@ const styles = StyleSheet.create({
     color: colors.gray[500],
   },
   tabTextActive: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   tabBadge: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: borderRadius.full,
@@ -604,8 +604,8 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   filterPillActive: {
-    backgroundColor: colors.haven.navy[900],
-    borderColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
+    borderColor: colors.haven.purple[900],
   },
   filterPillText: {
     fontSize: typography.fontSizes.sm,
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
   },
   conversationCardUnread: {
     borderLeftWidth: 3,
-    borderLeftColor: colors.haven.champagne[500],
+    borderLeftColor: colors.haven.purple[500],
   },
   conversationHeader: {
     flexDirection: 'row',
@@ -635,13 +635,13 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.navy[400],
+    backgroundColor: colors.haven.purple[400],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
   },
   avatarTeam: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   conversationInfo: {
     flex: 1,
@@ -710,7 +710,7 @@ const styles = StyleSheet.create({
   emptyButton: {
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[6],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   emptyButtonText: {
@@ -725,10 +725,10 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: colors.haven.navy[900],
+    shadowColor: colors.haven.purple[900],
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 8,
@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.haven.navy[400],
+    backgroundColor: colors.haven.purple[400],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],

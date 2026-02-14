@@ -3,8 +3,8 @@ const fs = require('fs');
 const path = require('path');
 
 // Haven brand colors
-const NAVY = { r: 10, g: 25, b: 41, alpha: 1 }; // #0a1929
-const CHAMPAGNE = { r: 196, g: 165, b: 116, alpha: 1 }; // #c4a574
+const PURPLE = { r: 98, g: 0, b: 234, alpha: 1 }; // #6200EA
+const WHITE = { r: 255, g: 255, b: 255, alpha: 1 }; // #ffffff
 
 async function generateIcons() {
   const sourceDir = path.join(__dirname, '../../web/public/images');
@@ -65,7 +65,7 @@ async function generateIcons() {
         width: splashWidth,
         height: splashHeight,
         channels: 4,
-        background: NAVY
+        background: PURPLE
       }
     }).png().toBuffer();
 

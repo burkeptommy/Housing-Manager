@@ -6,7 +6,7 @@ interface HomeHeaderProps {
   children: React.ReactNode;
 }
 
-const NAVY = '#0a1929';
+const PURPLE = '#6200EA';
 
 export function HomeHeader({ children }: HomeHeaderProps) {
   const insets = useSafeAreaInsets();
@@ -20,7 +20,7 @@ export function HomeHeader({ children }: HomeHeaderProps) {
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: NAVY,
+    backgroundColor: PURPLE,
     paddingBottom: 20,
   },
 });

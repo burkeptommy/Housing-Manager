@@ -63,7 +63,7 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: colors.haven.navy[600],  // Navy - professional active state
+        tabBarActiveTintColor: colors.haven.purple[600],  // Navy - professional active state
         tabBarInactiveTintColor: colors.gray[400],
         tabBarStyle: {
           backgroundColor: colors.white,
@@ -73,7 +73,7 @@ export default function TabLayout() {
           paddingBottom: 28,
           paddingTop: 8,
           // Subtle top shadow for depth
-          shadowColor: '#0a1929',
+          shadowColor: '#6200EA',
           shadowOffset: { width: 0, height: -2 },
           shadowOpacity: 0.04,
           shadowRadius: 4,
@@ -81,15 +81,15 @@ export default function TabLayout() {
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600',
+          fontFamily: 'Nunito_600SemiBold',
           letterSpacing: 0.25,
         },
         headerStyle: {
-          backgroundColor: colors.haven.navy[950],
+          backgroundColor: colors.haven.purple[500],
         },
         headerTintColor: colors.white,
         headerTitleStyle: {
-          fontWeight: '600',
+          fontFamily: 'Nunito_600SemiBold',
         },
         headerShadowVisible: false,
       }}
@@ -150,11 +150,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="construct-outline" size={size} color={color} />
           ),
-          headerTitle: 'Maintenance',
-          headerStyle: {
-            backgroundColor: colors.haven.navy[950],
-          },
-          headerTintColor: colors.white,
+          headerShown: false,
         }}
       />
       <Tabs.Screen
@@ -164,11 +160,7 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="menu-outline" size={size} color={color} />
           ),
-          headerTitle: 'More',
-          headerStyle: {
-            backgroundColor: colors.haven.navy[950],
-          },
-          headerTintColor: colors.white,
+          headerShown: false,
         }}
       />
 

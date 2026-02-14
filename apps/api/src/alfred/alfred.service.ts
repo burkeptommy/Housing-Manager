@@ -69,6 +69,28 @@ export class AlfredService {
   }
 
   /**
+   * Get or create the Alfred chat thread for a user
+   */
+  private async getOrCreateThread(userId: string, householdId: string) {
+    let thread = await this.prisma.conciergeThread.findUnique({
+      where: { householdId_userId: { householdId, userId } },
+    });
+
+    if (!thread) {
+      thread = await this.prisma.conciergeThread.create({
+        data: {
+          householdId,
+          userId,
+          title: 'Alfred Chat',
+          isActive: true,
+        },
+      });
+    }
+
+    return thread;
+  }
+
+  /**
    * Main chat endpoint - the heart of Alfred
    */
   async chat(
@@ -77,20 +99,46 @@ export class AlfredService {
     message: string,
     conversationHistory: ConversationMessage[] = [],
   ): Promise<AlfredResponse> {
-    // 1. Load complete household context
+    // 1. Get or create the conversation thread
+    const thread = await this.getOrCreateThread(userId, householdId);
+
+    // 2. Load complete household context
     const context = await this.loadHouseholdContext(householdId);
 
-    // 2. Build the system prompt with all household knowledge
+    // 3. Build the system prompt with all household knowledge
     const systemPrompt = this.buildSystemPrompt(context);
 
-    // 3. Build messages array
+    // 4. Load recent conversation history from DB if none provided
+    let history = conversationHistory;
+    if (history.length === 0) {
+      const dbMessages = await this.prisma.conciergeMessage.findMany({
+        where: { threadId: thread.id },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+      });
+      history = dbMessages.reverse().map((m) => ({
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+      }));
+    }
+
+    // 5. Build messages array
     const messages: Anthropic.MessageParam[] = [
-      ...conversationHistory.map((m) => ({
+      ...history.map((m) => ({
         role: m.role as 'user' | 'assistant',
         content: m.content,
       })),
       { role: 'user', content: message },
     ];
+
+    // Save user message to DB
+    await this.prisma.conciergeMessage.create({
+      data: {
+        threadId: thread.id,
+        role: 'user',
+        content: message,
+      },
+    });
 
     try {
       // 4. Call Claude with tool use enabled
@@ -119,12 +167,16 @@ export class AlfredService {
 
       // 6. If there were tool calls, get Claude's final response
       if (response.stop_reason === 'tool_use') {
+        const toolUseBlocks = response.content.filter(
+          (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+        );
         const toolResults = actions.map((a, i) => ({
           type: 'tool_result' as const,
-          tool_use_id: response.content.find(
-            (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
-          )?.id || `tool_${i}`,
-          content: `Successfully ${a.description}`,
+          tool_use_id: toolUseBlocks[i]?.id || `tool_${i}`,
+          content: a.description.startsWith('Failed to execute')
+            ? `Error: ${a.description}`
+            : `Successfully ${a.description}`,
+          is_error: a.description.startsWith('Failed to execute'),
         }));
 
         const followUp = await this.anthropic.messages.create({
@@ -144,6 +196,22 @@ export class AlfredService {
           }
         }
       }
+
+      // Save assistant response to DB
+      await this.prisma.conciergeMessage.create({
+        data: {
+          threadId: thread.id,
+          role: 'assistant',
+          content: responseText,
+          aiModel: 'claude-sonnet-4-20250514',
+        },
+      });
+
+      // Update thread last message timestamp
+      await this.prisma.conciergeThread.update({
+        where: { id: thread.id },
+        data: { lastMessageAt: new Date() },
+      });
 
       return {
         message: responseText,
@@ -512,17 +580,21 @@ ${proactiveStr}
 
 You can use tools to:
 
-### Bill & Payment Management
-1. **create_bill** - Set up a new recurring bill for automatic payment
-2. **get_upcoming_bills** - Get bills due in the next few days
-3. **get_bill_summary** - Get an overview of all bills and spending
-4. **pay_bill_now** - Immediately pay a specific bill
-5. **pause_bill** / **resume_bill** - Toggle automatic payments
-6. **confirm_detected_bill** - Confirm a bill detected from bank transactions
-7. **get_pending_approvals** - See payments awaiting approval
-8. **approve_payment** - Approve a pending payment
-9. **request_service** - Request Haven team to negotiate, dispute, or research something
-10. **get_haven_card** / **setup_haven_card** - Manage the household virtual card
+### Bill Tracking & Service Requests
+1. **get_upcoming_bills** - Get bills due in the next few days
+2. **get_bill_summary** - Get an overview of all bills and spending
+3. **get_pending_approvals** - See items awaiting approval
+4. **find_savings** - Find savings opportunities (refinancing, rate optimization, subscriptions, insurance bundling)
+5. **request_service** - Request Haven team to negotiate rates, dispute charges, find vendors, schedule service, or research something
+
+IMPORTANT: You do NOT handle payments or autopay. If a user asks about paying a bill, setting up automatic payments, or using a Haven card, let them know that bill payment features are coming soon. For now, you can help them track bills, find better rates, dispute charges, schedule service, and find vendors.
+
+### Savings & Rate Intelligence
+When users ask about saving money, reducing bills, or finding better rates, USE the find_savings tool. It analyzes:
+- **Refinancing**: Loans/mortgages where current rate exceeds market rate
+- **Rate optimization**: Spending categories above local median costs
+- **Subscription audit**: Lists all active subscriptions for review
+- **Insurance bundling**: Identifies multi-provider insurance that could be bundled for savings
 
 ### Home Management
 11. **add_home_system** - Add a new appliance or system (refrigerator, furnace, etc.)
@@ -530,6 +602,7 @@ You can use tools to:
 13. **add_vendor** - Add a new service provider
 14. **schedule_maintenance** - Create a maintenance task/reminder
 15. **research_and_add_system** - Research and add ANY home system with full maintenance program (USE THIS!)
+16. **coordinate_vendor_for_maintenance** - Find and coordinate a vendor for maintenance (USE THIS when user needs service!)
 
 ## PROACTIVE SYSTEM DETECTION - CRITICAL!
 
@@ -584,6 +657,19 @@ When a user mentions ANY of these things, IMMEDIATELY use the research_and_add_s
 The goal is: EVERY system the user mentions should trigger automatic research and task creation.
 Never just acknowledge - always research and create the maintenance program.
 
+## VENDOR COORDINATION - CRITICAL!
+
+When a user needs maintenance or service:
+1. **Always offer to coordinate** - "I can get your [vendor] to handle this"
+2. **Use coordinate_vendor_for_maintenance** when user says things like:
+   - "I need my furnace serviced" -> coordinate HVAC vendor
+   - "Can you get someone to fix..." -> coordinate relevant vendor
+   - "Who handles our pool?" -> look up POOL vendor
+   - "The AC isn't working" -> coordinate HVAC vendor (URGENT)
+   - "We need the gutters cleaned" -> coordinate a vendor
+3. **If no vendor on file** - offer to add one with add_vendor, or say the team will find one
+4. **Match vendors to systems** - link vendors to the systems they maintain
+
 ## IMPORTANT BEHAVIORS
 
 1. **Be specific and helpful** - Reference actual data from the household
@@ -593,6 +679,7 @@ Never just acknowledge - always research and create the maintenance program.
 5. **Zone awareness** - When discussing a zone (kitchen, HVAC, etc.), mention what's missing
 6. **Seasonal awareness** - It's ${season}, mention relevant seasonal maintenance
 7. **Auto-research systems** - When user mentions ANY home system, USE research_and_add_system tool
+8. **Coordinate vendors** - When user needs service, USE coordinate_vendor_for_maintenance tool
 
 ## ZONE CHECKLIST (for reference)
 
@@ -888,6 +975,43 @@ This will create the system AND all recommended maintenance tasks automatically.
           required: ['name', 'systemType'],
         },
       },
+      {
+        name: 'coordinate_vendor_for_maintenance',
+        description: `Find and coordinate a vendor for a home maintenance task.
+Use this when:
+- User needs maintenance done on a home system (e.g., "I need my furnace serviced")
+- A maintenance task is overdue and needs a vendor
+- User wants to schedule service with a specific vendor
+- User asks "who handles my [system]?" or "can you get someone to fix [thing]?"
+This will find vendors that match the system type and create a service request.`,
+        input_schema: {
+          type: 'object' as const,
+          properties: {
+            systemType: {
+              type: 'string',
+              description: 'Type of system needing service (e.g., HVAC, PLUMBING, ELECTRICAL, LANDSCAPING)',
+            },
+            systemId: {
+              type: 'string',
+              description: 'ID of the specific home system (if known)',
+            },
+            description: {
+              type: 'string',
+              description: 'Description of what needs to be done',
+            },
+            priority: {
+              type: 'string',
+              enum: ['LOW', 'MEDIUM', 'HIGH', 'URGENT'],
+              description: 'How urgent is the service needed',
+            },
+            preferredVendorId: {
+              type: 'string',
+              description: 'ID of a preferred vendor (if user specified one)',
+            },
+          },
+          required: ['systemType', 'description'],
+        },
+      },
     ];
   }
 
@@ -1036,13 +1160,92 @@ This will create the system AND all recommended maintenance tasks automatically.
             entityId: result.system.id,
           };
 
+        case 'coordinate_vendor_for_maintenance':
+          // Map system types to vendor categories for matching
+          const vendorCategoryMap: Record<string, string[]> = {
+            'HVAC': ['HVAC', 'HEATING', 'COOLING', 'AIR_CONDITIONING'],
+            'PLUMBING': ['PLUMBING', 'PLUMBER'],
+            'ELECTRICAL': ['ELECTRIC', 'ELECTRICIAN', 'ELECTRICAL'],
+            'LANDSCAPING': ['LAWN_LANDSCAPE', 'LANDSCAPING', 'LAWN'],
+            'POOL': ['POOL_SERVICE', 'POOL'],
+            'PEST': ['PEST_CONTROL', 'PEST'],
+            'CLEANING': ['HOUSE_CLEANING', 'CLEANING'],
+            'ROOFING': ['ROOFING', 'ROOF'],
+            'APPLIANCE': ['APPLIANCE', 'APPLIANCE_REPAIR'],
+            'GENERAL': ['HANDYMAN', 'GENERAL', 'OTHER'],
+          };
+
+          const matchCategories = vendorCategoryMap[params.systemType?.toUpperCase()] || [params.systemType?.toUpperCase(), 'OTHER'];
+
+          // Find matching vendors for this household
+          const matchingVendors = await this.prisma.householdVendor.findMany({
+            where: {
+              householdId,
+              vendor: {
+                OR: matchCategories.map(cat => ({ category: cat })),
+                isActive: true,
+              },
+            },
+            include: {
+              vendor: { select: { id: true, displayName: true, category: true, phone: true, email: true } },
+            },
+          });
+
+          // If user specified a preferred vendor, use that
+          let selectedVendor = params.preferredVendorId
+            ? matchingVendors.find(v => v.vendorId === params.preferredVendorId)
+            : null;
+
+          // Otherwise pick the first matching vendor (could be enhanced with ratings)
+          if (!selectedVendor && matchingVendors.length > 0) {
+            selectedVendor = matchingVendors[0];
+          }
+
+          // Link system to vendor if both exist
+          if (params.systemId && selectedVendor) {
+            await this.prisma.homeSystem.update({
+              where: { id: params.systemId },
+              data: { serviceVendorId: selectedVendor.vendor.id },
+            }).catch(() => { /* System may not exist, that's OK */ });
+          }
+
+          // Create a service request for the vendor coordination
+          const serviceReq = await this.prisma.serviceRequest.create({
+            data: {
+              householdId,
+              createdById: userId,
+              title: `${params.systemType} Service: ${params.description}`,
+              description: `${params.description}${selectedVendor ? `\n\nPreferred vendor: ${selectedVendor.vendor.displayName} (${selectedVendor.vendor.phone || selectedVendor.vendor.email || 'no contact'})` : '\n\nNo matching vendor on file.'}`,
+              status: 'SUBMITTED',
+              priority: (params.priority || 'MEDIUM') as any,
+              quickCategory: 'SCHEDULE',
+            },
+          });
+
+          if (selectedVendor) {
+            return {
+              type: 'COORDINATE_VENDOR',
+              description: `Found ${matchingVendors.length} vendor(s) for ${params.systemType}. Created service request with ${selectedVendor.vendor.displayName} (${selectedVendor.vendor.phone || selectedVendor.vendor.email || 'on file'}). Request #${serviceReq.id.slice(-6)}.${matchingVendors.length > 1 ? ` Other options: ${matchingVendors.slice(1, 3).map(v => v.vendor.displayName).join(', ')}.` : ''}`,
+              entityId: serviceReq.id,
+            };
+          } else {
+            return {
+              type: 'COORDINATE_VENDOR',
+              description: `No ${params.systemType} vendors on file yet. Created service request #${serviceReq.id.slice(-6)} - our team will find a qualified vendor for you. You can also add a vendor with the add_vendor tool.`,
+              entityId: serviceReq.id,
+            };
+          }
+
         default:
           this.logger.warn(`Unknown tool: ${name}`);
           return null;
       }
     } catch (error) {
       this.logger.error(`Error executing tool ${name}:`, error);
-      return null;
+      return {
+        type: name.toUpperCase(),
+        description: `Failed to execute ${name}: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      };
     }
   }
 
@@ -1107,9 +1310,28 @@ This will create the system AND all recommended maintenance tasks automatically.
   }
 
   /**
-   * Get conversation history (placeholder for future implementation)
+   * Get conversation history from database
    */
-  async getConversationHistory(userId: string, limit = 50) {
-    return [];
+  async getConversationHistory(userId: string, householdId: string, limit = 50) {
+    const thread = await this.prisma.conciergeThread.findUnique({
+      where: { householdId_userId: { householdId, userId } },
+    });
+
+    if (!thread) {
+      return [];
+    }
+
+    const messages = await this.prisma.conciergeMessage.findMany({
+      where: { threadId: thread.id },
+      orderBy: { createdAt: 'asc' },
+      take: limit,
+    });
+
+    return messages.map((m) => ({
+      id: m.id,
+      role: m.role === 'assistant' ? 'alfred' : 'user',
+      content: m.content,
+      timestamp: m.createdAt,
+    }));
   }
 }

@@ -18,6 +18,7 @@ import { Card, Button, Input, LoadingSpinner, ImageUpload } from '../../../../..
 import { colors, typography, spacing, borderRadius } from '../../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../../src/lib/api';
 import { getIdToken } from '../../../../../src/lib/firebase';
+import { uploadProfileImage } from '../../../../../src/lib/image-upload';
 
 interface Pet {
   id: string;
@@ -25,26 +26,35 @@ interface Pet {
   type: string;
   breed?: string;
   color?: string;
-  birthDate?: string;
+  birthday?: string;
   weight?: number;
   microchipId?: string;
   notes?: string;
-  imageUrl?: string;
+  photoUrls?: string[];
   // Care fields
   foodBrand?: string;
   foodType?: string;
   feedingSchedule?: string;
-  feedingAmount?: string;
+  dietaryNotes?: string;
   // Vet fields
-  vetName?: string;
-  vetPhone?: string;
-  vetClinic?: string;
+  primaryVetName?: string;
+  vetClinicPhone?: string;
+  vetClinicName?: string;
   // Medical
-  allergies?: string;
-  medications?: string;
+  allergies?: string[];
+  medications?: string[];
 }
 
-const PET_TYPES = ['Dog', 'Cat', 'Bird', 'Fish', 'Rabbit', 'Hamster', 'Reptile', 'Other'];
+const PET_TYPES = [
+  { value: 'DOG', label: 'Dog' },
+  { value: 'CAT', label: 'Cat' },
+  { value: 'BIRD', label: 'Bird' },
+  { value: 'FISH', label: 'Fish' },
+  { value: 'RABBIT', label: 'Rabbit' },
+  { value: 'HAMSTER', label: 'Hamster' },
+  { value: 'REPTILE', label: 'Reptile' },
+  { value: 'OTHER', label: 'Other' },
+];
 
 export default function EditPetScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -57,10 +67,10 @@ export default function EditPetScreen() {
 
   const [formData, setFormData] = useState({
     name: '',
-    type: 'Dog',
+    type: 'DOG',
     breed: '',
     color: '',
-    birthDate: null as Date | null,
+    birthday: null as Date | null,
     weight: '',
     microchipId: '',
     notes: '',
@@ -68,11 +78,11 @@ export default function EditPetScreen() {
     foodBrand: '',
     foodType: '',
     feedingSchedule: '',
-    feedingAmount: '',
+    dietaryNotes: '',
     // Vet fields
-    vetName: '',
-    vetPhone: '',
-    vetClinic: '',
+    primaryVetName: '',
+    vetClinicPhone: '',
+    vetClinicName: '',
     // Medical
     allergies: '',
     medications: '',
@@ -91,7 +101,7 @@ export default function EditPetScreen() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo.id}/pet/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/pets/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -101,24 +111,24 @@ export default function EditPetScreen() {
         const pet: Pet = await response.json();
         setFormData({
           name: pet.name || '',
-          type: pet.type || 'Dog',
+          type: pet.type || 'DOG',
           breed: pet.breed || '',
           color: pet.color || '',
-          birthDate: pet.birthDate ? new Date(pet.birthDate) : null,
+          birthday: pet.birthday ? new Date(pet.birthday) : null,
           weight: pet.weight?.toString() || '',
           microchipId: pet.microchipId || '',
           notes: pet.notes || '',
           foodBrand: pet.foodBrand || '',
           foodType: pet.foodType || '',
           feedingSchedule: pet.feedingSchedule || '',
-          feedingAmount: pet.feedingAmount || '',
-          vetName: pet.vetName || '',
-          vetPhone: pet.vetPhone || '',
-          vetClinic: pet.vetClinic || '',
-          allergies: pet.allergies || '',
-          medications: pet.medications || '',
+          dietaryNotes: pet.dietaryNotes || '',
+          primaryVetName: pet.primaryVetName || '',
+          vetClinicPhone: pet.vetClinicPhone || '',
+          vetClinicName: pet.vetClinicName || '',
+          allergies: Array.isArray(pet.allergies) ? pet.allergies.join(', ') : '',
+          medications: Array.isArray(pet.medications) ? pet.medications.join(', ') : '',
         });
-        setPetImage(pet.imageUrl || null);
+        setPetImage(pet.photoUrls?.[0] || null);
       }
     } catch (err) {
       console.error('Fetch pet error:', err);
@@ -145,28 +155,45 @@ export default function EditPetScreen() {
         return;
       }
 
+      // Upload photo if user picked a new local image
+      if (petImage && petImage.startsWith('file://') && id) {
+        try {
+          const uploadedUrl = await uploadProfileImage('pet', id, petImage);
+          setPetImage(uploadedUrl);
+        } catch (uploadErr) {
+          console.error('Pet photo upload error:', uploadErr);
+        }
+      }
+
+      // Parse comma-separated strings into arrays
+      const allergiesArr = formData.allergies.trim()
+        ? formData.allergies.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+      const medicationsArr = formData.medications.trim()
+        ? formData.medications.split(',').map((s) => s.trim()).filter(Boolean)
+        : [];
+
       const body = {
         name: formData.name.trim(),
         type: formData.type,
         breed: formData.breed.trim() || null,
         color: formData.color.trim() || null,
-        birthDate: formData.birthDate?.toISOString() || null,
+        birthday: formData.birthday?.toISOString() || null,
         weight: formData.weight ? parseFloat(formData.weight) : null,
         microchipId: formData.microchipId.trim() || null,
         notes: formData.notes.trim() || null,
-        imageUrl: petImage,
         foodBrand: formData.foodBrand.trim() || null,
         foodType: formData.foodType.trim() || null,
         feedingSchedule: formData.feedingSchedule.trim() || null,
-        feedingAmount: formData.feedingAmount.trim() || null,
-        vetName: formData.vetName.trim() || null,
-        vetPhone: formData.vetPhone.trim() || null,
-        vetClinic: formData.vetClinic.trim() || null,
-        allergies: formData.allergies.trim() || null,
-        medications: formData.medications.trim() || null,
+        dietaryNotes: formData.dietaryNotes.trim() || null,
+        primaryVetName: formData.primaryVetName.trim() || null,
+        vetClinicPhone: formData.vetClinicPhone.trim() || null,
+        vetClinicName: formData.vetClinicName.trim() || null,
+        allergies: allergiesArr,
+        medications: medicationsArr,
       };
 
-      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/pets/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -175,7 +202,7 @@ export default function EditPetScreen() {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update pet');
       }
 
@@ -204,7 +231,7 @@ export default function EditPetScreen() {
               const token = await getIdToken(true);
               if (!token) return;
 
-              await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/pet/${id}`, {
+              await fetch(`${API_BASE_URL}/family/pets/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
               });
@@ -261,14 +288,14 @@ export default function EditPetScreen() {
             <View style={styles.typeSelector}>
               <Text style={styles.typeLabel}>Type</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {PET_TYPES.map((type) => (
+                {PET_TYPES.map((pt) => (
                   <TouchableOpacity
-                    key={type}
-                    style={[styles.typeChip, formData.type === type && styles.typeChipActive]}
-                    onPress={() => setFormData({ ...formData, type })}
+                    key={pt.value}
+                    style={[styles.typeChip, formData.type === pt.value && styles.typeChipActive]}
+                    onPress={() => setFormData({ ...formData, type: pt.value })}
                   >
-                    <Text style={[styles.typeChipText, formData.type === type && styles.typeChipTextActive]}>
-                      {type}
+                    <Text style={[styles.typeChipText, formData.type === pt.value && styles.typeChipTextActive]}>
+                      {pt.label}
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -314,8 +341,8 @@ export default function EditPetScreen() {
                   <View style={styles.dateContent}>
                     <Text style={styles.dateLabel}>Birthday</Text>
                     <Text style={styles.dateValue}>
-                      {formData.birthDate
-                        ? formData.birthDate.toLocaleDateString('en-US', {
+                      {formData.birthday
+                        ? formData.birthday.toLocaleDateString('en-US', {
                             month: 'short',
                             day: 'numeric',
                             year: 'numeric',
@@ -330,13 +357,13 @@ export default function EditPetScreen() {
 
             {showBirthdayPicker && (
               <DateTimePicker
-                value={formData.birthDate || new Date()}
+                value={formData.birthday || new Date()}
                 mode="date"
                 display="spinner"
                 maximumDate={new Date()}
                 onChange={(_: any, date?: Date) => {
                   setShowBirthdayPicker(Platform.OS === 'ios');
-                  if (date) setFormData({ ...formData, birthDate: date });
+                  if (date) setFormData({ ...formData, birthday: date });
                 }}
               />
             )}
@@ -371,10 +398,10 @@ export default function EditPetScreen() {
             />
 
             <Input
-              label="Feeding Amount"
-              value={formData.feedingAmount}
-              onChangeText={(v) => setFormData({ ...formData, feedingAmount: v })}
-              placeholder="e.g., 2 cups, 1 can"
+              label="Dietary Notes"
+              value={formData.dietaryNotes}
+              onChangeText={(v) => setFormData({ ...formData, dietaryNotes: v })}
+              placeholder="e.g., 2 cups twice daily, grain-free"
             />
 
             <Input
@@ -391,24 +418,24 @@ export default function EditPetScreen() {
 
             <Input
               label="Clinic Name"
-              value={formData.vetClinic}
-              onChangeText={(v) => setFormData({ ...formData, vetClinic: v })}
+              value={formData.vetClinicName}
+              onChangeText={(v) => setFormData({ ...formData, vetClinicName: v })}
               placeholder="e.g., Happy Paws Animal Hospital"
               autoCapitalize="words"
             />
 
             <Input
               label="Vet Name"
-              value={formData.vetName}
-              onChangeText={(v) => setFormData({ ...formData, vetName: v })}
+              value={formData.primaryVetName}
+              onChangeText={(v) => setFormData({ ...formData, primaryVetName: v })}
               placeholder="e.g., Dr. Smith"
               autoCapitalize="words"
             />
 
             <Input
               label="Phone"
-              value={formData.vetPhone}
-              onChangeText={(v) => setFormData({ ...formData, vetPhone: v })}
+              value={formData.vetClinicPhone}
+              onChangeText={(v) => setFormData({ ...formData, vetClinicPhone: v })}
               placeholder="(555) 123-4567"
               keyboardType="phone-pad"
             />
@@ -530,7 +557,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,

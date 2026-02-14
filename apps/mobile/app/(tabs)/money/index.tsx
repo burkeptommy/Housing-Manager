@@ -10,32 +10,62 @@ import {
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { ScreenContainer } from '../../../src/components/ScreenContainer';
+import { useAuth } from '../../../src/contexts/auth-context';
+import { usePlaid } from '../../../src/contexts/plaid-context';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
+import { SparklineChart } from '../../../src/components/charts';
+import { MoneySkeleton } from '../../../src/components/ui/Skeleton';
 
-interface SpendingSummary {
-  monthlyIncome: number | null;
-  totalSpent: number;
-  totalBudget: number;
+interface EnhancedSummary {
+  period: { month: string };
+  spending: {
+    totalSpent: number;
+    totalBudget: number;
+    remaining: number;
+    monthlyIncome: number | null;
+  };
+  comparisons: {
+    monthOverMonth: number;
+    weekOverWeek: number;
+  };
+  pace: {
+    dailyAverage: number;
+    projectedTotal: number;
+    onTrack: boolean;
+    dayOfMonth: number;
+    daysInMonth: number;
+  };
+  weeklyBreakdown: Array<{ week: number; amount: number }>;
   topCategories: Array<{
     categoryId: string;
     name: string;
     color: string;
+    icon: string;
     spent: number;
-    budget: number | null;
+    delta: number;
+    trend: 'up' | 'down' | 'stable';
   }>;
-  upcomingBills: Array<{
+  upcoming: Array<{
     id: string;
     name: string;
     amount: number;
-    dueDate: string;
+    dueDate: string | null;
+    type: 'bill' | 'maintenance';
+    icon: string;
   }>;
-  forecastPreview: {
-    upcomingCount: number;
-    totalCost: number;
-  } | null;
-  insight: string | null;
+  maintenance: {
+    budgeted: number;
+    spent: number;
+    urgentCount: number;
+  };
+  insights: Array<{
+    type: string;
+    title: string;
+    message: string;
+    action?: string;
+  }>;
 }
 
 function formatCurrency(amount: number) {
@@ -47,11 +77,22 @@ function formatCurrency(amount: number) {
   }).format(amount);
 }
 
-const screenWidth = Dimensions.get('window').width;
+function formatDueDate(dateStr: string | null) {
+  if (!dateStr) return 'No date';
+  const d = new Date(dateStr);
+  const now = new Date();
+  const diffDays = Math.ceil((d.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Tomorrow';
+  if (diffDays < 7) return `In ${diffDays} days`;
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 export default function MoneyOverview() {
   const router = useRouter();
-  const [data, setData] = useState<SpendingSummary | null>(null);
+  const { householdInfo } = useAuth();
+  const { connectBank } = usePlaid();
+  const [data, setData] = useState<EnhancedSummary | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -60,7 +101,7 @@ export default function MoneyOverview() {
       const token = await getIdToken(true);
       if (!token) return;
 
-      const res = await fetch(`${API_BASE_URL}/budgeting/spending/summary`, {
+      const res = await fetch(`${API_BASE_URL}/budgeting/spending/enhanced-summary`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
@@ -83,11 +124,9 @@ export default function MoneyOverview() {
     setRefreshing(false);
   }, [fetchData]);
 
-  const currentMonth = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const spentPercent = data && data.totalBudget > 0
-    ? Math.min((data.totalSpent / data.totalBudget) * 100, 100)
+  const spentPercent = data && data.spending.totalBudget > 0
+    ? Math.min((data.spending.totalSpent / data.spending.totalBudget) * 100, 100)
     : 0;
-  const remaining = data ? data.totalBudget - data.totalSpent : 0;
 
   return (
     <ScreenContainer
@@ -97,24 +136,42 @@ export default function MoneyOverview() {
       onRefresh={onRefresh}
     >
       {isLoading ? (
-        <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.haven.sage[500]} />
-        </View>
+        <MoneySkeleton />
       ) : (
         <View style={styles.content}>
-          {/* Hero Summary Card */}
+          {/* Hero Card */}
           <View style={styles.heroCard}>
-            <Text style={styles.heroLabel}>{currentMonth}</Text>
-            <Text style={styles.heroAmount}>
-              {formatCurrency(data?.totalSpent || 0)}
-            </Text>
+            <Text style={styles.heroLabel}>{data?.period.month || 'This Month'}</Text>
+            <View style={styles.heroRow}>
+              <Text style={styles.heroAmount}>
+                {formatCurrency(data?.spending.totalSpent || 0)}
+              </Text>
+              {data && data.comparisons.monthOverMonth !== 0 && (
+                <View style={[
+                  styles.compBadge,
+                  data.comparisons.monthOverMonth > 0 ? styles.compBadgeUp : styles.compBadgeDown,
+                ]}>
+                  <Ionicons
+                    name={data.comparisons.monthOverMonth > 0 ? 'arrow-up' : 'arrow-down'}
+                    size={12}
+                    color={data.comparisons.monthOverMonth > 0 ? colors.status.error : colors.status.success}
+                  />
+                  <Text style={[
+                    styles.compBadgeText,
+                    data.comparisons.monthOverMonth > 0 ? styles.compTextUp : styles.compTextDown,
+                  ]}>
+                    {Math.abs(data.comparisons.monthOverMonth)}%
+                  </Text>
+                </View>
+              )}
+            </View>
             <Text style={styles.heroSubtext}>
-              {data?.totalBudget
-                ? `of ${formatCurrency(data.totalBudget)} budget`
+              {data?.spending.totalBudget
+                ? `of ${formatCurrency(data.spending.totalBudget)} budget`
                 : 'spent this month'}
             </Text>
 
-            {data?.totalBudget ? (
+            {data?.spending.totalBudget ? (
               <View style={styles.progressContainer}>
                 <View style={styles.progressBar}>
                   <View
@@ -122,156 +179,240 @@ export default function MoneyOverview() {
                       styles.progressFill,
                       {
                         width: `${spentPercent}%`,
-                        backgroundColor:
-                          spentPercent > 90
-                            ? colors.status.error
-                            : spentPercent > 75
-                              ? colors.status.warning
-                              : colors.haven.sage[500],
+                        backgroundColor: spentPercent > 90
+                          ? colors.status.error
+                          : spentPercent > 75
+                            ? colors.status.warning
+                            : colors.haven.purple[400],
                       },
                     ]}
                   />
                 </View>
                 <Text style={styles.remainingText}>
-                  {remaining >= 0
-                    ? `${formatCurrency(remaining)} remaining`
-                    : `${formatCurrency(Math.abs(remaining))} over budget`}
+                  {data.spending.remaining >= 0
+                    ? `${formatCurrency(data.spending.remaining)} remaining`
+                    : `${formatCurrency(Math.abs(data.spending.remaining))} over budget`}
                 </Text>
               </View>
             ) : null}
+
+            {/* Spending Pace */}
+            {data?.pace && data.pace.dailyAverage > 0 && (
+              <View style={styles.paceRow}>
+                <Ionicons
+                  name={data.pace.onTrack ? 'checkmark-circle' : 'alert-circle'}
+                  size={14}
+                  color={data.pace.onTrack ? '#4ade80' : '#fbbf24'}
+                />
+                <Text style={styles.paceText}>
+                  {formatCurrency(data.pace.dailyAverage)}/day
+                  {data.spending.totalBudget > 0 && (data.pace.onTrack ? ' — on track' : ' — over pace')}
+                </Text>
+              </View>
+            )}
+
+            {/* Weekly Sparkline */}
+            {data?.weeklyBreakdown && data.weeklyBreakdown.length > 1 && (
+              <View style={styles.sparklineContainer}>
+                <SparklineChart
+                  data={data.weeklyBreakdown.map((w) => w.amount)}
+                  width={Dimensions.get('window').width - spacing[4] * 2 - spacing[6] * 2}
+                  height={50}
+                  color="rgba(255,255,255,0.8)"
+                  fillOpacity={0.2}
+                  strokeWidth={2}
+                />
+              </View>
+            )}
           </View>
 
-          {/* Insight Banner */}
-          {data?.insight && (
-            <View style={styles.insightBanner}>
-              <Ionicons name="bulb-outline" size={18} color={colors.haven.sage[600]} />
-              <Text style={styles.insightText}>{data.insight}</Text>
+          {/* Quick Stats Row */}
+          <View style={styles.statsRow}>
+            <TouchableOpacity
+              style={styles.statPill}
+              onPress={() => router.push('/money/recurring' as any)}
+            >
+              <Ionicons name="repeat-outline" size={14} color={colors.haven.purple[600]} />
+              <Text style={styles.statPillText}>Recurring</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statPill}
+              onPress={() => router.push('/money/budget' as any)}
+            >
+              <Ionicons name="pie-chart-outline" size={14} color={colors.haven.purple[600]} />
+              <Text style={styles.statPillText}>Budget</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.statPill}
+              onPress={() => router.push('/money/forecast' as any)}
+            >
+              <Ionicons name="home-outline" size={14} color={colors.haven.purple[600]} />
+              <Text style={styles.statPillText}>
+                Home{data?.maintenance.urgentCount ? ` (${data.maintenance.urgentCount})` : ''}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Insight Banners */}
+          {data?.insights && data.insights.length > 0 && (
+            <View style={styles.insightsSection}>
+              {data.insights.slice(0, 2).map((insight, i) => (
+                <TouchableOpacity
+                  key={i}
+                  style={[
+                    styles.insightBanner,
+                    insight.type === 'overspend' && styles.insightWarning,
+                    insight.type === 'forecast' && styles.insightAlert,
+                    insight.type === 'setup' && styles.insightInfo,
+                  ]}
+                  onPress={() => {
+                    if (insight.action === 'Review Budget' || insight.action === 'Set Up Budget') {
+                      router.push('/money/budget' as any);
+                    } else if (insight.action === 'View Transactions') {
+                      router.push('/money/transactions' as any);
+                    } else if (insight.action === 'View Forecast') {
+                      router.push('/money/forecast' as any);
+                    }
+                  }}
+                >
+                  <Ionicons
+                    name={
+                      insight.type === 'overspend' ? 'trending-up' :
+                      insight.type === 'pace' ? 'speedometer-outline' :
+                      insight.type === 'forecast' ? 'home-outline' :
+                      'bulb-outline'
+                    }
+                    size={18}
+                    color={
+                      insight.type === 'overspend' ? colors.status.error :
+                      insight.type === 'forecast' ? '#E65100' :
+                      colors.haven.purple[600]
+                    }
+                  />
+                  <View style={styles.insightContent}>
+                    <Text style={styles.insightTitle}>{insight.title}</Text>
+                    <Text style={styles.insightMessage}>{insight.message}</Text>
+                  </View>
+                  {insight.action && (
+                    <Ionicons name="chevron-forward" size={16} color={colors.slate[400]} />
+                  )}
+                </TouchableOpacity>
+              ))}
             </View>
           )}
 
-          {/* Quick Nav Cards */}
-          <View style={styles.navGrid}>
-            <TouchableOpacity
-              style={styles.navCard}
-              onPress={() => router.push('/money/budget' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.navIcon, { backgroundColor: colors.haven.sage[100] }]}>
-                <Ionicons name="pie-chart-outline" size={22} color={colors.haven.sage[600]} />
+          {/* Upcoming Payments */}
+          {data?.upcoming && data.upcoming.length > 0 && (
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Upcoming</Text>
+                <TouchableOpacity onPress={() => router.push('/money/recurring' as any)}>
+                  <Text style={styles.sectionLink}>See All</Text>
+                </TouchableOpacity>
               </View>
-              <Text style={styles.navTitle}>Budget</Text>
-              <Text style={styles.navSubtitle}>Set & track</Text>
-            </TouchableOpacity>
+              {data.upcoming.slice(0, 5).map((item) => (
+                <View key={item.id} style={styles.upcomingRow}>
+                  <View style={[
+                    styles.upcomingIcon,
+                    item.type === 'maintenance' && styles.upcomingIconMaint,
+                  ]}>
+                    <Ionicons
+                      name={(item.icon || 'card-outline') as any}
+                      size={16}
+                      color={item.type === 'maintenance' ? '#E65100' : colors.haven.purple[500]}
+                    />
+                  </View>
+                  <View style={styles.upcomingInfo}>
+                    <Text style={styles.upcomingName} numberOfLines={1}>{item.name}</Text>
+                    <Text style={styles.upcomingDue}>{formatDueDate(item.dueDate)}</Text>
+                  </View>
+                  <Text style={styles.upcomingAmount}>
+                    {item.amount > 0 ? formatCurrency(item.amount) : '—'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
 
-            <TouchableOpacity
-              style={styles.navCard}
-              onPress={() => router.push('/money/transactions' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.navIcon, { backgroundColor: colors.haven.navy[100] }]}>
-                <Ionicons name="list-outline" size={22} color={colors.haven.navy[600]} />
-              </View>
-              <Text style={styles.navTitle}>Transactions</Text>
-              <Text style={styles.navSubtitle}>Recent activity</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navCard}
-              onPress={() => router.push('/money/forecast' as any)}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.navIcon, { backgroundColor: '#FFF3E0' }]}>
-                <Ionicons name="trending-up-outline" size={22} color="#E65100" />
-              </View>
-              <Text style={styles.navTitle}>Forecast</Text>
-              <Text style={styles.navSubtitle}>Home costs</Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Top Spending Categories */}
+          {/* Top Categories */}
           {data?.topCategories && data.topCategories.length > 0 && (
             <View style={styles.section}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>Top Spending</Text>
                 <TouchableOpacity onPress={() => router.push('/money/budget' as any)}>
-                  <Text style={styles.sectionLink}>See All</Text>
+                  <Text style={styles.sectionLink}>Budget</Text>
                 </TouchableOpacity>
               </View>
-              {data.topCategories.slice(0, 4).map((cat) => (
+              {data.topCategories.slice(0, 5).map((cat) => (
                 <View key={cat.categoryId} style={styles.categoryRow}>
                   <View style={[styles.categoryDot, { backgroundColor: cat.color }]} />
-                  <Text style={styles.categoryName} numberOfLines={1}>
-                    {cat.name}
-                  </Text>
-                  <View style={styles.categoryAmounts}>
+                  <Text style={styles.categoryName} numberOfLines={1}>{cat.name}</Text>
+                  <View style={styles.categoryRight}>
                     <Text style={styles.categorySpent}>{formatCurrency(cat.spent)}</Text>
-                    {cat.budget ? (
-                      <Text style={styles.categoryBudget}>
-                        / {formatCurrency(cat.budget)}
-                      </Text>
-                    ) : null}
+                    {cat.delta !== 0 && (
+                      <View style={styles.deltaContainer}>
+                        <Ionicons
+                          name={cat.trend === 'up' ? 'caret-up' : 'caret-down'}
+                          size={10}
+                          color={cat.trend === 'up' ? colors.status.error : colors.status.success}
+                        />
+                        <Text style={[
+                          styles.deltaText,
+                          cat.trend === 'up' ? styles.deltaUp : styles.deltaDown,
+                        ]}>
+                          {Math.abs(cat.delta)}%
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 </View>
               ))}
             </View>
           )}
 
-          {/* Upcoming Bills */}
-          {data?.upcomingBills && data.upcomingBills.length > 0 && (
-            <View style={styles.section}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Upcoming Bills</Text>
-              </View>
-              {data.upcomingBills.map((bill) => (
-                <View key={bill.id} style={styles.billRow}>
-                  <View style={styles.billIcon}>
-                    <Ionicons name="calendar-outline" size={18} color={colors.haven.navy[500]} />
-                  </View>
-                  <View style={styles.billInfo}>
-                    <Text style={styles.billName}>{bill.name}</Text>
-                    <Text style={styles.billDue}>{bill.dueDate}</Text>
-                  </View>
-                  <Text style={styles.billAmount}>{formatCurrency(bill.amount)}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-
-          {/* Home Forecast Preview */}
-          {data?.forecastPreview && (
+          {/* Quick Nav */}
+          <View style={styles.navGrid}>
             <TouchableOpacity
-              style={styles.forecastCard}
-              onPress={() => router.push('/money/forecast' as any)}
-              activeOpacity={0.7}
+              style={styles.navCard}
+              onPress={() => router.push('/money/transactions' as any)}
             >
-              <View style={styles.forecastIcon}>
-                <Ionicons name="home-outline" size={24} color={colors.haven.navy[700]} />
-              </View>
-              <View style={styles.forecastContent}>
-                <Text style={styles.forecastTitle}>Home Forecast</Text>
-                <Text style={styles.forecastSubtext}>
-                  {data.forecastPreview.upcomingCount} system{data.forecastPreview.upcomingCount !== 1 ? 's' : ''} need
-                  attention in the next 5 years
-                </Text>
-                <Text style={styles.forecastCost}>
-                  Est. {formatCurrency(data.forecastPreview.totalCost)}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={20} color={colors.slate[400]} />
+              <Ionicons name="list-outline" size={22} color={colors.haven.purple[600]} />
+              <Text style={styles.navTitle}>Transactions</Text>
             </TouchableOpacity>
-          )}
+            <TouchableOpacity
+              style={styles.navCard}
+              onPress={() => router.push('/money/forecast' as any)}
+            >
+              <Ionicons name="trending-up-outline" size={22} color="#E65100" />
+              <Text style={styles.navTitle}>Forecast</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navCard}
+              onPress={() => router.push('/money/insights' as any)}
+            >
+              <Ionicons name="bulb-outline" size={22} color="#2e7d32" />
+              <Text style={styles.navTitle}>Savings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navCard}
+              onPress={() => router.push('/money/recurring' as any)}
+            >
+              <Ionicons name="repeat-outline" size={22} color="#1565c0" />
+              <Text style={styles.navTitle}>Recurring</Text>
+            </TouchableOpacity>
+          </View>
 
-          {/* Empty state if no data */}
-          {!data?.totalBudget && !data?.topCategories?.length && (
+          {/* Empty state */}
+          {!data?.spending.totalBudget && !data?.topCategories?.length && !data?.upcoming?.length && (
             <View style={styles.emptyState}>
               <Ionicons name="wallet-outline" size={48} color={colors.slate[300]} />
-              <Text style={styles.emptyTitle}>Set Up Your Budget</Text>
+              <Text style={styles.emptyTitle}>Connect Your Bank</Text>
               <Text style={styles.emptySubtext}>
-                Track spending, set goals, and forecast home costs all in one place.
+                Link your bank account to track spending, detect bills, and forecast home costs.
               </Text>
               <TouchableOpacity
                 style={styles.setupButton}
-                onPress={() => router.push('/money/budget' as any)}
+                onPress={() => householdInfo?.id && connectBank(householdInfo.id)}
               >
                 <Text style={styles.setupButtonText}>Get Started</Text>
               </TouchableOpacity>
@@ -295,17 +436,29 @@ const styles = StyleSheet.create({
     paddingTop: spacing[12],
   },
 
-  // Hero Card
+  // Sparkline
+  sparklineContainer: {
+    marginTop: spacing[3],
+    alignItems: 'center',
+    opacity: 0.9,
+  },
+
+  // Hero
   heroCard: {
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
     borderRadius: borderRadius.xl,
     padding: spacing[6],
     marginBottom: spacing[4],
   },
   heroLabel: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.sage[200],
+    color: colors.haven.purple[200],
     marginBottom: spacing[1],
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
   },
   heroAmount: {
     fontSize: 40,
@@ -314,12 +467,30 @@ const styles = StyleSheet.create({
   },
   heroSubtext: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.sage[200],
+    color: colors.haven.purple[200],
     marginTop: spacing[1],
   },
-  progressContainer: {
-    marginTop: spacing[4],
+  compBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+    paddingHorizontal: spacing[2],
+    paddingVertical: 2,
+    borderRadius: borderRadius.full,
   },
+  compBadgeUp: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  compBadgeDown: {
+    backgroundColor: 'rgba(34, 197, 94, 0.2)',
+  },
+  compBadgeText: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.semibold,
+  },
+  compTextUp: { color: '#fca5a5' },
+  compTextDown: { color: '#86efac' },
+  progressContainer: { marginTop: spacing[4] },
   progressBar: {
     height: 8,
     backgroundColor: 'rgba(255,255,255,0.15)',
@@ -332,60 +503,86 @@ const styles = StyleSheet.create({
   },
   remainingText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.sage[200],
+    color: colors.haven.purple[200],
     marginTop: spacing[2],
   },
-
-  // Insight
-  insightBanner: {
+  paceRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[2],
-    backgroundColor: colors.haven.sage[50],
-    borderRadius: borderRadius.lg,
-    padding: spacing[3],
-    marginBottom: spacing[4],
-    borderWidth: 1,
-    borderColor: colors.haven.sage[200],
+    marginTop: spacing[3],
+    paddingTop: spacing[3],
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255,255,255,0.1)',
   },
-  insightText: {
-    flex: 1,
+  paceText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.sage[800],
-    lineHeight: 20,
+    color: colors.haven.purple[200],
   },
 
-  // Nav Grid
-  navGrid: {
+  // Stats Row
+  statsRow: {
     flexDirection: 'row',
-    gap: spacing[3],
-    marginBottom: spacing[6],
+    gap: spacing[2],
+    marginBottom: spacing[4],
   },
-  navCard: {
+  statPill: {
     flex: 1,
-    backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    padding: spacing[4],
-    alignItems: 'center',
-    ...shadows.sm,
-  },
-  navIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: borderRadius.lg,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing[2],
+    gap: spacing[1],
+    backgroundColor: colors.haven.purple[50],
+    paddingVertical: spacing[2],
+    paddingHorizontal: spacing[2],
+    borderRadius: borderRadius.full,
+    borderWidth: 1,
+    borderColor: colors.haven.purple[200],
   },
-  navTitle: {
+  statPillText: {
+    fontSize: typography.fontSizes.xs,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.haven.purple[700],
+  },
+
+  // Insights
+  insightsSection: {
+    gap: spacing[2],
+    marginBottom: spacing[4],
+  },
+  insightBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing[3],
+    backgroundColor: colors.haven.purple[50],
+    borderRadius: borderRadius.lg,
+    padding: spacing[3],
+    borderWidth: 1,
+    borderColor: colors.haven.purple[200],
+  },
+  insightWarning: {
+    backgroundColor: '#FEF2F2',
+    borderColor: '#FECACA',
+  },
+  insightAlert: {
+    backgroundColor: '#FFF3E0',
+    borderColor: '#FFE0B2',
+  },
+  insightInfo: {
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[200],
+  },
+  insightContent: { flex: 1 },
+  insightTitle: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
     color: colors.slate[900],
   },
-  navSubtitle: {
+  insightMessage: {
     fontSize: typography.fontSizes.xs,
-    color: colors.slate[500],
+    color: colors.slate[600],
     marginTop: 2,
+    lineHeight: 16,
   },
 
   // Section
@@ -409,11 +606,46 @@ const styles = StyleSheet.create({
   },
   sectionLink: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.sage[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
   },
 
-  // Category rows
+  // Upcoming
+  upcomingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing[2],
+    gap: spacing[3],
+  },
+  upcomingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: borderRadius.lg,
+    backgroundColor: colors.haven.purple[50],
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  upcomingIconMaint: {
+    backgroundColor: '#FFF3E0',
+  },
+  upcomingInfo: { flex: 1 },
+  upcomingName: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.slate[900],
+  },
+  upcomingDue: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.slate[500],
+    marginTop: 2,
+  },
+  upcomingAmount: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[900],
+  },
+
+  // Categories
   categoryRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -430,95 +662,51 @@ const styles = StyleSheet.create({
     fontSize: typography.fontSizes.sm,
     color: colors.slate[700],
   },
-  categoryAmounts: {
+  categoryRight: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    gap: spacing[2],
   },
   categorySpent: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
     color: colors.slate[900],
   },
-  categoryBudget: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.slate[400],
-    marginLeft: 2,
-  },
-
-  // Bill rows
-  billRow: {
+  deltaContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing[2],
-    gap: spacing[3],
+    gap: 1,
   },
-  billIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.navy[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  billInfo: {
-    flex: 1,
-  },
-  billName: {
-    fontSize: typography.fontSizes.sm,
+  deltaText: {
+    fontSize: 10,
     fontWeight: typography.fontWeights.medium,
-    color: colors.slate[900],
   },
-  billDue: {
-    fontSize: typography.fontSizes.xs,
-    color: colors.slate[500],
-    marginTop: 2,
-  },
-  billAmount: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
+  deltaUp: { color: colors.status.error },
+  deltaDown: { color: colors.status.success },
 
-  // Forecast card
-  forecastCard: {
+  // Nav Grid
+  navGrid: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: spacing[3],
+    marginBottom: spacing[4],
+  },
+  navCard: {
+    width: '47%',
     backgroundColor: colors.white,
     borderRadius: borderRadius.xl,
     padding: spacing[4],
-    marginBottom: spacing[4],
-    gap: spacing[3],
+    alignItems: 'center',
+    gap: spacing[2],
     ...shadows.sm,
   },
-  forecastIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.navy[50],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  forecastContent: {
-    flex: 1,
-  },
-  forecastTitle: {
-    fontSize: typography.fontSizes.base,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.slate[900],
-  },
-  forecastSubtext: {
+  navTitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.slate[500],
-    marginTop: 2,
-  },
-  forecastCost: {
-    fontSize: typography.fontSizes.sm,
-    fontWeight: typography.fontWeights.semibold,
-    color: colors.status.warning,
-    marginTop: 4,
+    fontWeight: typography.fontWeights.medium,
+    color: colors.slate[700],
   },
 
-  // Empty state
+  // Empty
   emptyState: {
     alignItems: 'center',
     paddingVertical: spacing[12],
@@ -537,7 +725,7 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
   setupButton: {
-    backgroundColor: colors.haven.sage[500],
+    backgroundColor: colors.haven.purple[500],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,

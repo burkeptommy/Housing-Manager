@@ -18,9 +18,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   primary: `bg-haven-700 text-white
             shadow-[0_1px_2px_rgba(0,0,0,0.1),0_2px_4px_rgba(0,0,0,0.1)]
             hover:bg-haven-800 hover:shadow-[0_2px_4px_rgba(0,0,0,0.15),0_4px_8px_rgba(0,0,0,0.1)]`,
-  secondary: `bg-white text-warm-700 border border-warm-200 shadow-sm
-              hover:bg-warm-50 hover:border-warm-300 hover:text-warm-900`,
-  ghost: `text-warm-600 hover:bg-warm-100 hover:text-warm-900`,
+  secondary: `bg-white text-neutral-700 border border-neutral-200 shadow-sm
+              hover:bg-neutral-50 hover:border-neutral-300 hover:text-neutral-900`,
+  ghost: `text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900`,
   danger: `bg-gradient-to-b from-red-500 to-red-600 text-white
            shadow-[0_1px_2px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.15)]
            hover:from-red-600 hover:to-red-700`,

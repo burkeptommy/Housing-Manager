@@ -19,8 +19,8 @@ export const FormCheckbox = forwardRef<HTMLInputElement, FormCheckboxProps>(
             className={cn(
               'w-5 h-5 rounded border-2 transition-all',
               'border-gray-300 group-hover:border-gray-400',
-              'peer-checked:bg-haven-navy-900 peer-checked:border-haven-navy-900',
-              'peer-focus:ring-2 peer-focus:ring-haven-champagne-200 peer-focus:ring-offset-2'
+              'peer-checked:bg-haven-900 peer-checked:border-haven-900',
+              'peer-focus:ring-2 peer-focus:ring-haven-200 peer-focus:ring-offset-2'
             )}
           />
           <Check className="absolute top-0.5 left-0.5 w-4 h-4 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />

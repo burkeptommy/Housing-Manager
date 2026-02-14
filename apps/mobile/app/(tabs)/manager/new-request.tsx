@@ -180,7 +180,7 @@ export default function NewRequestScreen() {
                     size={24}
                     color={
                       category === cat.id
-                        ? colors.haven.champagne[500]
+                        ? colors.haven.purple[500]
                         : colors.text.secondary
                     }
                   />
@@ -250,11 +250,11 @@ export default function NewRequestScreen() {
             <Text style={styles.sectionTitle}>Photos (Optional)</Text>
             <View style={styles.attachmentButtons}>
               <TouchableOpacity style={styles.attachmentButton} onPress={takePhoto}>
-                <Ionicons name="camera" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="camera" size={24} color={colors.haven.purple[500]} />
                 <Text style={styles.attachmentButtonText}>Take Photo</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.attachmentButton} onPress={pickImage}>
-                <Ionicons name="images" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="images" size={24} color={colors.haven.purple[500]} />
                 <Text style={styles.attachmentButtonText}>Choose from Library</Text>
               </TouchableOpacity>
             </View>
@@ -262,7 +262,7 @@ export default function NewRequestScreen() {
               <View style={styles.attachmentPreview}>
                 {attachments.map((uri, index) => (
                   <View key={index} style={styles.attachmentItem}>
-                    <Ionicons name="image" size={20} color={colors.haven.champagne[500]} />
+                    <Ionicons name="image" size={20} color={colors.haven.purple[500]} />
                     <Text style={styles.attachmentName}>Photo {index + 1}</Text>
                     <TouchableOpacity onPress={() => removeAttachment(index)}>
                       <Ionicons
@@ -339,8 +339,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   categoryItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   categoryLabel: {
     fontSize: typography.fontSizes.xs,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   categoryLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   priorityList: {
@@ -365,8 +365,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   priorityItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   priorityRadio: {
     width: 20,
@@ -382,7 +382,7 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   priorityContent: {
     flex: 1,
@@ -393,7 +393,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.medium,
   },
   priorityLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   priorityDescription: {
     fontSize: typography.fontSizes.xs,
@@ -423,13 +423,13 @@ const styles = StyleSheet.create({
     padding: spacing[3],
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
     borderStyle: 'dashed',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   attachmentButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   attachmentPreview: {

@@ -21,9 +21,8 @@ import { ImageUpload } from '../ImageUpload';
 interface RegistrationData {
   licensePlate?: string | null;
   vin?: string | null;
-  state?: string | null;
-  expiresAt?: string | null;
-  registrationDocUrl?: string | null;
+  registrationState?: string | null;
+  registrationExpiry?: string | null;
 }
 
 interface Props {
@@ -36,13 +35,11 @@ interface Props {
 export function EditRegistrationModal({ visible, onClose, onSave, initialData }: Props) {
   const [licensePlate, setLicensePlate] = useState(initialData?.licensePlate || '');
   const [vin, setVin] = useState(initialData?.vin || '');
-  const [state, setState] = useState(initialData?.state || '');
+  const [state, setState] = useState(initialData?.registrationState || '');
   const [expiresAt, setExpiresAt] = useState<Date | null>(
-    initialData?.expiresAt ? new Date(initialData.expiresAt) : null
+    initialData?.registrationExpiry ? new Date(initialData.registrationExpiry) : null
   );
-  const [registrationDoc, setRegistrationDoc] = useState<string | null>(
-    initialData?.registrationDocUrl || null
-  );
+  const [registrationDoc, setRegistrationDoc] = useState<string | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -50,9 +47,9 @@ export function EditRegistrationModal({ visible, onClose, onSave, initialData }:
     if (visible) {
       setLicensePlate(initialData?.licensePlate || '');
       setVin(initialData?.vin || '');
-      setState(initialData?.state || '');
-      setExpiresAt(initialData?.expiresAt ? new Date(initialData.expiresAt) : null);
-      setRegistrationDoc(initialData?.registrationDocUrl || null);
+      setState(initialData?.registrationState || '');
+      setExpiresAt(initialData?.registrationExpiry ? new Date(initialData.registrationExpiry) : null);
+      setRegistrationDoc(null);
     }
   }, [visible, initialData]);
 
@@ -62,9 +59,8 @@ export function EditRegistrationModal({ visible, onClose, onSave, initialData }:
       await onSave({
         licensePlate: licensePlate.trim() || null,
         vin: vin.trim() || null,
-        state: state.trim() || null,
-        expiresAt: expiresAt?.toISOString() || null,
-        registrationDocUrl: registrationDoc,
+        registrationState: state.trim() || null,
+        registrationExpiry: expiresAt?.toISOString() || null,
       });
       onClose();
     } catch (err) {

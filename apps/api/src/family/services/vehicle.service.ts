@@ -1,7 +1,7 @@
 import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { CreateVehicleDto, UpdateVehicleDto, CreateVehicleServiceRecordDto } from '../dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, VehicleServiceType } from '@prisma/client';
 
 @Injectable()
 export class VehicleService {
@@ -16,11 +16,19 @@ export class VehicleService {
     return this.prisma.vehicle.create({
       data: {
         householdId,
-        ...dto,
-        purchasePrice: dto.purchasePrice ? new Prisma.Decimal(dto.purchasePrice) : undefined,
-      },
-      include: {
-        preferredVendor: true,
+        name: dto.nickname || `${dto.year} ${dto.make} ${dto.model}`,
+        make: dto.make,
+        model: dto.model,
+        year: dto.year,
+        vehicleType: dto.type,
+        color: dto.color,
+        licensePlate: dto.licensePlate,
+        vin: dto.vin,
+        currentMileage: dto.currentMileage,
+        insuranceProvider: dto.insuranceProvider,
+        insurancePolicyNum: dto.insurancePolicyNum,
+        insuranceExpiry: dto.insuranceExpiry,
+        registrationExpiry: dto.registrationExpiry,
       },
     });
   }
@@ -84,12 +92,25 @@ export class VehicleService {
     return this.prisma.vehicle.update({
       where: { id },
       data: {
-        ...dto,
-        purchasePrice: dto.purchasePrice ? new Prisma.Decimal(dto.purchasePrice) : undefined,
-        lastMileageUpdate: dto.currentMileage ? new Date() : undefined,
-      },
-      include: {
-        preferredVendor: true,
+        ...(dto.nickname !== undefined && { name: dto.nickname }),
+        ...(dto.make !== undefined && { make: dto.make }),
+        ...(dto.model !== undefined && { model: dto.model }),
+        ...(dto.year !== undefined && { year: dto.year }),
+        ...(dto.type !== undefined && { vehicleType: dto.type }),
+        ...(dto.color !== undefined && { color: dto.color }),
+        ...(dto.licensePlate !== undefined && { licensePlate: dto.licensePlate }),
+        ...(dto.vin !== undefined && { vin: dto.vin }),
+        ...(dto.currentMileage !== undefined && { currentMileage: dto.currentMileage }),
+        ...(dto.insuranceProvider !== undefined && { insuranceProvider: dto.insuranceProvider }),
+        ...(dto.insurancePolicyNum !== undefined && { insurancePolicyNum: dto.insurancePolicyNum }),
+        ...(dto.insuranceExpiry !== undefined && { insuranceExpiry: dto.insuranceExpiry }),
+        ...(dto.registrationExpiry !== undefined && { registrationExpiry: dto.registrationExpiry }),
+        ...(dto.lastOilChange !== undefined && { lastOilChange: dto.lastOilChange }),
+        ...(dto.oilChangeMileage !== undefined && { oilChangeMileage: dto.oilChangeMileage }),
+        ...(dto.preferredServiceShop !== undefined && { preferredServiceShop: dto.preferredServiceShop }),
+        ...(dto.photoUrl !== undefined && { photoUrl: dto.photoUrl }),
+        ...(dto.registrationState !== undefined && { registrationState: dto.registrationState }),
+        mileageUpdatedAt: dto.currentMileage ? new Date() : undefined,
       },
     });
   }
@@ -112,11 +133,19 @@ export class VehicleService {
   async addServiceRecord(vehicleId: string, householdId: string, dto: CreateVehicleServiceRecordDto) {
     const vehicle = await this.findOne(vehicleId, householdId);
 
-    const record = await this.prisma.vehicleServiceRecord.create({
+    const record = await this.prisma.vehicleService.create({
       data: {
         vehicleId,
-        ...dto,
+        serviceDate: dto.serviceDate,
+        serviceType: dto.serviceType as VehicleServiceType,
+        description: dto.description,
+        mileageAt: dto.mileageAt,
         cost: dto.cost ? new Prisma.Decimal(dto.cost) : undefined,
+        shopName: dto.shopName,
+        receiptUrl: dto.receiptUrl,
+        nextServiceDate: dto.nextServiceDate,
+        nextServiceMileage: dto.nextServiceMileage,
+        notes: dto.notes,
       },
     });
 
@@ -124,18 +153,13 @@ export class VehicleService {
     const updateData: Prisma.VehicleUpdateInput = {};
 
     if (dto.serviceType.toLowerCase().includes('oil')) {
-      updateData.lastOilChangeDate = dto.serviceDate;
-      updateData.lastOilChangeMileage = dto.mileageAtService;
+      updateData.lastOilChange = dto.serviceDate;
+      updateData.oilChangeMileage = dto.mileageAt;
     }
 
-    if (dto.serviceType.toLowerCase().includes('tire') && dto.serviceType.toLowerCase().includes('rotation')) {
-      updateData.lastTireRotationDate = dto.serviceDate;
-      updateData.lastTireRotationMileage = dto.mileageAtService;
-    }
-
-    if (dto.mileageAtService && (!vehicle.currentMileage || dto.mileageAtService > vehicle.currentMileage)) {
-      updateData.currentMileage = dto.mileageAtService;
-      updateData.lastMileageUpdate = new Date();
+    if (dto.mileageAt && (!vehicle.currentMileage || dto.mileageAt > vehicle.currentMileage)) {
+      updateData.currentMileage = dto.mileageAt;
+      updateData.mileageUpdatedAt = new Date();
     }
 
     if (Object.keys(updateData).length > 0) {
@@ -154,13 +178,8 @@ export class VehicleService {
   async getServiceRecords(vehicleId: string, householdId: string) {
     await this.findOne(vehicleId, householdId);
 
-    return this.prisma.vehicleServiceRecord.findMany({
+    return this.prisma.vehicleService.findMany({
       where: { vehicleId },
-      include: {
-        vendor: {
-          select: { id: true, displayName: true },
-        },
-      },
       orderBy: { serviceDate: 'desc' },
     });
   }
@@ -187,20 +206,22 @@ export class VehicleService {
     const now = new Date();
 
     for (const vehicle of vehicles) {
-      const vehicleName = vehicle.nickname || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
+      const vehicleName = vehicle.name || `${vehicle.year} ${vehicle.make} ${vehicle.model}`;
 
-      // Check oil change
-      if (vehicle.lastOilChangeDate && vehicle.oilChangeIntervalMonths) {
-        const monthsSinceOilChange = (now.getTime() - vehicle.lastOilChangeDate.getTime()) / (1000 * 60 * 60 * 24 * 30);
-        if (monthsSinceOilChange >= vehicle.oilChangeIntervalMonths) {
+      // Check oil change (time-based using last service records)
+      if (vehicle.lastOilChange) {
+        const monthsSinceOilChange = (now.getTime() - vehicle.lastOilChange.getTime()) / (1000 * 60 * 60 * 24 * 30);
+        // Default to 6-month oil change interval if AI schedule hasn't been researched
+        const intervalMonths = 6;
+        if (monthsSinceOilChange >= intervalMonths) {
           alerts.push({
             vehicleId: vehicle.id,
             vehicleName,
             type: 'OIL_CHANGE',
-            message: `Oil change overdue (last: ${vehicle.lastOilChangeDate.toLocaleDateString()})`,
+            message: `Oil change overdue (last: ${vehicle.lastOilChange.toLocaleDateString()})`,
             severity: 'high',
           });
-        } else if (monthsSinceOilChange >= vehicle.oilChangeIntervalMonths - 1) {
+        } else if (monthsSinceOilChange >= intervalMonths - 1) {
           alerts.push({
             vehicleId: vehicle.id,
             vehicleName,
@@ -212,9 +233,11 @@ export class VehicleService {
       }
 
       // Check mileage-based oil change
-      if (vehicle.currentMileage && vehicle.lastOilChangeMileage && vehicle.oilChangeIntervalMiles) {
-        const milesSinceOilChange = vehicle.currentMileage - vehicle.lastOilChangeMileage;
-        if (milesSinceOilChange >= vehicle.oilChangeIntervalMiles) {
+      if (vehicle.currentMileage && vehicle.oilChangeMileage) {
+        const milesSinceOilChange = vehicle.currentMileage - vehicle.oilChangeMileage;
+        // Default to 5000 mile interval
+        const intervalMiles = 5000;
+        if (milesSinceOilChange >= intervalMiles) {
           alerts.push({
             vehicleId: vehicle.id,
             vehicleName,
@@ -226,8 +249,8 @@ export class VehicleService {
       }
 
       // Check registration
-      if (vehicle.registrationExpires) {
-        const daysUntilExpiry = (vehicle.registrationExpires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      if (vehicle.registrationExpiry) {
+        const daysUntilExpiry = (vehicle.registrationExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
         if (daysUntilExpiry <= 0) {
           alerts.push({
             vehicleId: vehicle.id,
@@ -248,8 +271,8 @@ export class VehicleService {
       }
 
       // Check insurance
-      if (vehicle.insuranceExpires) {
-        const daysUntilExpiry = (vehicle.insuranceExpires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+      if (vehicle.insuranceExpiry) {
+        const daysUntilExpiry = (vehicle.insuranceExpiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
         if (daysUntilExpiry <= 0) {
           alerts.push({
             vehicleId: vehicle.id,
@@ -264,28 +287,6 @@ export class VehicleService {
             vehicleName,
             type: 'INSURANCE',
             message: `Insurance expires in ${Math.ceil(daysUntilExpiry)} days`,
-            severity: 'medium',
-          });
-        }
-      }
-
-      // Check inspection
-      if (vehicle.inspectionExpires) {
-        const daysUntilExpiry = (vehicle.inspectionExpires.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
-        if (daysUntilExpiry <= 0) {
-          alerts.push({
-            vehicleId: vehicle.id,
-            vehicleName,
-            type: 'INSPECTION',
-            message: `Inspection expired`,
-            severity: 'high',
-          });
-        } else if (daysUntilExpiry <= 30) {
-          alerts.push({
-            vehicleId: vehicle.id,
-            vehicleName,
-            type: 'INSPECTION',
-            message: `Inspection expires in ${Math.ceil(daysUntilExpiry)} days`,
             severity: 'medium',
           });
         }

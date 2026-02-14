@@ -18,6 +18,7 @@ import { Card, Button, Input, LoadingSpinner, ImageUpload } from '../../../../..
 import { colors, typography, spacing, borderRadius } from '../../../../../src/lib/theme';
 import { API_BASE_URL } from '../../../../../src/lib/api';
 import { getIdToken } from '../../../../../src/lib/firebase';
+import { uploadProfileImage } from '../../../../../src/lib/image-upload';
 
 interface FamilyMember {
   id: string;
@@ -27,7 +28,8 @@ interface FamilyMember {
   phone?: string;
   relationship?: string;
   birthdate?: string;
-  avatarUrl?: string;
+  profilePhotoUrl?: string;
+  photoUrl?: string;
   notes?: string;
   role?: string;
 }
@@ -74,7 +76,7 @@ export default function EditFamilyMemberScreen() {
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/households/${householdInfo.id}/members/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo.id}/member/${id}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -91,7 +93,7 @@ export default function EditFamilyMemberScreen() {
           birthdate: member.birthdate ? new Date(member.birthdate) : null,
           notes: member.notes || '',
         });
-        setAvatar(member.avatarUrl || null);
+        setAvatar(member.profilePhotoUrl || member.photoUrl || null);
       }
     } catch (err) {
       console.error('Fetch member error:', err);
@@ -118,6 +120,17 @@ export default function EditFamilyMemberScreen() {
         return;
       }
 
+      // Upload photo if user picked a new local image
+      let photoUrl = avatar;
+      if (avatar && avatar.startsWith('file://') && id) {
+        try {
+          photoUrl = await uploadProfileImage('family-member', id, avatar);
+          setAvatar(photoUrl);
+        } catch (uploadErr) {
+          console.error('Member photo upload error:', uploadErr);
+        }
+      }
+
       const body = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim(),
@@ -126,10 +139,10 @@ export default function EditFamilyMemberScreen() {
         relationship: formData.relationship,
         birthdate: formData.birthdate?.toISOString() || null,
         notes: formData.notes.trim() || null,
-        avatarUrl: avatar,
+        photoUrl,
       };
 
-      const response = await fetch(`${API_BASE_URL}/households/${householdInfo?.id}/members/${id}`, {
+      const response = await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`, {
         method: 'PATCH',
         headers: {
           Authorization: `Bearer ${token}`,
@@ -138,7 +151,7 @@ export default function EditFamilyMemberScreen() {
         body: JSON.stringify(body),
       });
 
-      if (!response.ok && response.status !== 404) {
+      if (!response.ok) {
         throw new Error('Failed to update member');
       }
 
@@ -167,7 +180,7 @@ export default function EditFamilyMemberScreen() {
               const token = await getIdToken(true);
               if (!token) return;
 
-              await fetch(`${API_BASE_URL}/households/${householdInfo?.id}/members/${id}`, {
+              await fetch(`${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`, {
                 method: 'DELETE',
                 headers: { Authorization: `Bearer ${token}` },
               });
@@ -284,7 +297,7 @@ export default function EditFamilyMemberScreen() {
               style={styles.dateButton}
               onPress={() => setShowDatePicker(true)}
             >
-              <Ionicons name="calendar-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="calendar-outline" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.dateValue}>
                 {formData.birthdate
                   ? formData.birthdate.toLocaleDateString('en-US', {
@@ -390,15 +403,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   relationshipItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   relationshipLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   relationshipLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   dateButton: {

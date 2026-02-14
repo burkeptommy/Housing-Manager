@@ -31,8 +31,8 @@ export function ProgressStepper({ steps, currentStep, completedSteps }: Progress
                 <div
                   className={cn(
                     'w-10 h-10 rounded-full flex items-center justify-center text-sm font-medium transition-all',
-                    isCompleted && 'bg-haven-navy-900 text-white',
-                    isCurrent && !isCompleted && 'bg-haven-champagne-500 text-haven-navy-900 ring-4 ring-haven-champagne-200',
+                    isCompleted && 'bg-haven-900 text-white',
+                    isCurrent && !isCompleted && 'bg-haven-500 text-haven-900 ring-4 ring-haven-200',
                     !isCurrent && !isCompleted && 'bg-gray-200 text-gray-500'
                   )}
                 >
@@ -45,7 +45,7 @@ export function ProgressStepper({ steps, currentStep, completedSteps }: Progress
                 <span
                   className={cn(
                     'mt-2 text-xs font-medium hidden sm:block',
-                    isCurrent ? 'text-haven-navy-900' : 'text-gray-500'
+                    isCurrent ? 'text-haven-900' : 'text-gray-500'
                   )}
                 >
                   {step.label}
@@ -57,7 +57,7 @@ export function ProgressStepper({ steps, currentStep, completedSteps }: Progress
                 <div
                   className={cn(
                     'flex-1 h-1 mx-2',
-                    isPast ? 'bg-haven-navy-900' : 'bg-gray-200'
+                    isPast ? 'bg-haven-900' : 'bg-gray-200'
                   )}
                 />
               )}

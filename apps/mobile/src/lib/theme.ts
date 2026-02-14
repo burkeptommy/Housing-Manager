@@ -1,79 +1,65 @@
 /**
  * Haven Mobile Design System
  *
- * Primary: Navy (#0a1929) - Brand identity, headers, primary actions
- * Accent: Sage Green (#7D8E74) - Natural, grounded, calm
+ * Primary: Deep Purple (#6200EA) - Brand identity, headers, primary actions
+ * Accent: Coral (#FF6B6B) - Alerts, urgent badges, secondary CTAs (use sparingly)
+ * Background: White/Purple-50 - Clean, bright, airy
  *
- * CRITICAL: NO BRIGHT GREEN - Old brand is deprecated
+ * Font: Nunito
  */
 
 // Haven Brand Colors
 export const colors = {
-  // Haven Navy (Primary)
+  // Haven Purple (Primary Brand)
   haven: {
-    navy: {
-      950: '#0a1929',  // Darkest - headers, primary bg
-      900: '#102a43',  // Primary text, buttons
-      800: '#243b53',  // Secondary elements
-      700: '#334e68',  // Hover states
-      600: '#486581',  // Tertiary elements
-      500: '#627d98',  // Muted text
-      400: '#829ab1',  // Borders, disabled
-      300: '#9fb3c8',  // Light borders
-      200: '#bcccdc',  // Subtle backgrounds
-      100: '#d9e2ec',  // Very light backgrounds
-      50: '#f0f4f8',   // Near white
+    purple: {
+      950: '#1A0044',  // Darkest - dark mode bg
+      900: '#2D006B',  // Deep emphasis
+      800: '#3D008F',  // Dark buttons
+      700: '#4A00B4',  // Hover states
+      600: '#5500D4',  // Active states
+      500: '#6200EA',  // PRIMARY BRAND COLOR
+      400: '#7C4DFF',  // Lighter interactive
+      300: '#B388FF',  // Light accent text, badges
+      200: '#D1B3FF',  // Subtle highlights
+      100: '#EDE7F6',  // Card backgrounds, input fills
+      50:  '#F9F5FF',  // Page background, subtle tints
     },
-    // Sage Green accent (replaces champagne)
-    sage: {
-      900: '#3B4536',  // Darkest
-      800: '#4A5544',  // Dark
-      700: '#5A6853',  // Dark accent
-      600: '#6B7A63',  // Medium dark
-      500: '#7D8E74',  // Primary accent - CTAs
-      400: '#8FA37F',  // Hover state
-      300: '#A4B494',  // Light accent
-      200: '#D1DBC9',  // Very light
-      100: '#E8EDE4',  // Subtle backgrounds
-      50: '#F4F6F2',   // Near white
-    },
-    // Legacy alias (maps to sage)
-    champagne: {
-      600: '#6B7A63',  // Dark accent (was #a68a5b)
-      500: '#7D8E74',  // Primary accent (was #c4a574)
-      400: '#8FA37F',  // Hover state (was #d4c4a5)
-      300: '#A4B494',  // Light accent (was #e9dcc4)
-      200: '#D1DBC9',  // Very light (was #f2ebe0)
-      100: '#E8EDE4',  // Subtle backgrounds (was #faf6ed)
-      50: '#F4F6F2',   // Near white (was #fdfbf7)
+    // Coral accent (USE SPARINGLY — alerts, urgent badges, secondary CTAs only)
+    coral: {
+      600: '#E85555',  // Dark coral for text on white (WCAG AA)
+      500: '#FF6B6B',  // Primary coral
+      400: '#FF8A8A',  // Hover state
+      100: '#FFE0E0',  // Light coral bg
+      50:  '#FFF0F0',  // Subtle coral tint
     },
   },
 
   // Neutral grays (for UI elements)
   gray: {
-    950: '#0f0f0f',
-    900: '#171717',
-    800: '#262626',
-    700: '#404040',
+    950: '#0F0F1E',
+    900: '#1A1A2E',
+    800: '#2D2D44',
+    700: '#444466',
     600: '#525252',
-    500: '#737373',
-    400: '#a3a3a3',
-    300: '#d4d4d4',
-    200: '#e5e5e5',
-    100: '#f5f5f5',
-    50: '#fafafa',
+    500: '#6B7280',
+    400: '#9CA3AF',
+    300: '#D1D5DB',
+    200: '#E5E7EB',
+    100: '#F3F4F6',
+    50:  '#F9FAFB',
   },
 
-  // Status colors (use sparingly)
+  // Status colors (semantic — DO NOT change)
   status: {
-    success: '#059669',      // emerald-600 - Confirmations, success states
-    successLight: '#d1fae5', // emerald-100 - Success backgrounds
-    warning: '#d97706',      // amber-600 - Warnings
-    warningLight: '#fef3c7', // amber-100 - Warning backgrounds
-    error: '#dc2626',        // red-600 - Errors
-    errorLight: '#fee2e2',   // red-100 - Error backgrounds
-    info: '#0284c7',         // sky-600 - Information
-    infoLight: '#e0f2fe',    // sky-100 - Info backgrounds
+    success: '#059669',      // emerald-600
+    successLight: '#d1fae5', // emerald-100
+    warning: '#D97706',      // amber-600
+    warningLight: '#fef3c7', // amber-100
+    error: '#DC2626',        // red-600
+    errorLight: '#fee2e2',   // red-100
+    info: '#0284c7',         // sky-600
+    infoLight: '#e0f2fe',    // sky-100
   },
 
   // Basic
@@ -83,54 +69,28 @@ export const colors = {
 
   // Background colors
   background: {
-    primary: '#ffffff',      // Main content
-    secondary: '#f8fafc',    // Cards, sections
-    tertiary: '#f1f5f9',     // Input backgrounds
+    primary: '#FFFFFF',
+    secondary: '#F9F5FF',    // Light purple tint
+    tertiary: '#EDE7F6',     // Purple-100
   },
 
   // Text colors
   text: {
-    primary: '#102a43',      // haven.navy.900
-    secondary: '#627d98',    // haven.navy.500
-    tertiary: '#829ab1',     // haven.navy.400
-    inverse: '#ffffff',      // On dark backgrounds
-    accent: '#7D8E74',       // Sage accent
+    primary: '#1A1A2E',      // gray-900 (dark with purple tint)
+    secondary: '#6B7280',    // gray-500
+    tertiary: '#9CA3AF',     // gray-400
+    inverse: '#FFFFFF',
+    accent: '#6200EA',       // Purple-500
   },
 
   // Border colors
   border: {
-    default: '#e2e8f0',
-    light: '#f1f5f9',
-    dark: '#cbd5e1',
-    focus: '#7D8E74',        // Sage for focus
+    default: '#E5E7EB',
+    light: '#F3F4F6',
+    dark: '#D1D5DB',
+    focus: '#6200EA',        // Purple for focus
   },
 
-  // BACKWARD COMPATIBILITY - Old color aliases (deprecated, use haven.navy/champagne)
-  // These map old blue/green colors to new haven theme
-  primary: {
-    50: '#f0f4f8',   // maps to haven.navy.50
-    100: '#d9e2ec',  // maps to haven.navy.100
-    200: '#bcccdc',  // maps to haven.navy.200
-    300: '#9fb3c8',  // maps to haven.navy.300
-    400: '#829ab1',  // maps to haven.navy.400
-    500: '#627d98',  // maps to haven.navy.500
-    600: '#486581',  // maps to haven.navy.600
-    700: '#334e68',  // maps to haven.navy.700
-    800: '#243b53',  // maps to haven.navy.800
-    900: '#102a43',  // maps to haven.navy.900
-  },
-  accent: {
-    50: '#F4F6F2',   // maps to haven.sage.50
-    100: '#E8EDE4',  // maps to haven.sage.100
-    200: '#D1DBC9',  // maps to haven.sage.200
-    300: '#A4B494',  // maps to haven.sage.300
-    400: '#8FA37F',  // maps to haven.sage.400
-    500: '#7D8E74',  // maps to haven.sage.500
-    600: '#6B7A63',  // maps to haven.sage.600
-    700: '#5A6853',  // maps to haven.sage.700
-    800: '#4A5544',  // maps to haven.sage.800
-    900: '#3B4536',  // maps to haven.sage.900
-  },
   green: {
     50: '#ecfdf5',
     100: '#d1fae5',
@@ -284,6 +244,16 @@ export const colors = {
   },
 };
 
+// Font family names (loaded via @expo-google-fonts/nunito)
+export const fonts = {
+  light: 'Nunito_300Light',
+  regular: 'Nunito_400Regular',
+  medium: 'Nunito_500Medium',
+  semibold: 'Nunito_600SemiBold',
+  bold: 'Nunito_700Bold',
+  extrabold: 'Nunito_800ExtraBold',
+} as const;
+
 // Typography scale
 export const typography = {
   // =========================================================================
@@ -305,11 +275,13 @@ export const typography = {
   // FONT WEIGHTS - Clear hierarchy
   // =========================================================================
   fontWeights: {
+    light: '300' as const,     // Decorative use only
     regular: '400' as const,   // Body text
     normal: '400' as const,    // Alias for regular
     medium: '500' as const,    // Labels, secondary emphasis
-    semibold: '600' as const,  // Headings, buttons
-    bold: '700' as const,      // Strong emphasis
+    semibold: '600' as const,  // Subheadings, buttons, card titles
+    bold: '700' as const,      // Section titles, emphasis
+    extrabold: '800' as const, // Hero text, display headings, screen titles
   },
 
   // =========================================================================

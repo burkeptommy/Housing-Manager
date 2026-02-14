@@ -127,11 +127,11 @@ export default function OnboardingWelcomePage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Side - Branding */}
-      <div className="hidden lg:flex lg:w-1/2 bg-haven-navy-950 text-white flex-col justify-between p-12 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 bg-haven-950 text-white flex-col justify-between p-12 relative overflow-hidden">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-5">
-          <div className="absolute top-0 left-0 w-96 h-96 bg-haven-champagne-500 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
-          <div className="absolute bottom-0 right-0 w-96 h-96 bg-haven-champagne-500 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
+          <div className="absolute top-0 left-0 w-96 h-96 bg-haven-500 rounded-full blur-3xl -translate-x-1/2 -translate-y-1/2" />
+          <div className="absolute bottom-0 right-0 w-96 h-96 bg-haven-500 rounded-full blur-3xl translate-x-1/2 translate-y-1/2" />
         </div>
 
         {/* Logo */}
@@ -150,7 +150,7 @@ export default function OnboardingWelcomePage() {
           <h1 className="text-4xl font-bold leading-tight text-white">
             Your home,
             <br />
-            <span className="text-haven-champagne-400">handled.</span>
+            <span className="text-haven-400">handled.</span>
           </h1>
           <p className="text-lg text-white/70 max-w-md">
             Join thousands of homeowners who&apos;ve reclaimed their time with Haven&apos;s full-service home management.
@@ -159,20 +159,20 @@ export default function OnboardingWelcomePage() {
           {/* Benefits */}
           <div className="space-y-4 pt-4">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-haven-champagne-500/20 flex items-center justify-center">
-                <Check className="w-4 h-4 text-haven-champagne-400" />
+              <div className="w-8 h-8 rounded-full bg-haven-500/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-haven-400" />
               </div>
               <span className="text-white/80">One bill for everything</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-haven-champagne-500/20 flex items-center justify-center">
-                <Check className="w-4 h-4 text-haven-champagne-400" />
+              <div className="w-8 h-8 rounded-full bg-haven-500/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-haven-400" />
               </div>
               <span className="text-white/80">Dedicated Home Manager</span>
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-haven-champagne-500/20 flex items-center justify-center">
-                <Check className="w-4 h-4 text-haven-champagne-400" />
+              <div className="w-8 h-8 rounded-full bg-haven-500/20 flex items-center justify-center">
+                <Check className="w-4 h-4 text-haven-400" />
               </div>
               <span className="text-white/80">Free onboarding & home visit</span>
             </div>
@@ -208,7 +208,7 @@ export default function OnboardingWelcomePage() {
 
           {/* Header */}
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-haven-navy-900">Create your account</h2>
+            <h2 className="text-3xl font-bold text-haven-900">Create your account</h2>
             <p className="text-gray-600 mt-2">Get started with Haven in minutes</p>
           </div>
 
@@ -230,8 +230,8 @@ export default function OnboardingWelcomePage() {
                   type="text"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-champagne-200 ${
-                    errors.firstName ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-champagne-500'
+                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-200 ${
+                    errors.firstName ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-500'
                   }`}
                   placeholder="Bob"
                   disabled={isSubmitting}
@@ -248,8 +248,8 @@ export default function OnboardingWelcomePage() {
                   type="text"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-champagne-200 ${
-                    errors.lastName ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-champagne-500'
+                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-200 ${
+                    errors.lastName ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-500'
                   }`}
                   placeholder="Morrison"
                   disabled={isSubmitting}
@@ -269,8 +269,8 @@ export default function OnboardingWelcomePage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-champagne-200 ${
-                  errors.email ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-champagne-500'
+                className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-200 ${
+                  errors.email ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-500'
                 }`}
                 placeholder="bob@example.com"
                 disabled={isSubmitting}
@@ -289,7 +289,7 @@ export default function OnboardingWelcomePage() {
                 type="tel"
                 value={phone}
                 onChange={handlePhoneChange}
-                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-200 outline-none transition-all"
+                className="w-full px-4 py-3 rounded-xl border border-gray-300 focus:border-haven-500 focus:ring-2 focus:ring-haven-200 outline-none transition-all"
                 placeholder="(203) 555-0100"
                 disabled={isSubmitting}
               />
@@ -305,8 +305,8 @@ export default function OnboardingWelcomePage() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-champagne-200 pr-12 ${
-                    errors.password ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-champagne-500'
+                  className={`w-full px-4 py-3 rounded-xl border transition-all outline-none focus:ring-2 focus:ring-haven-200 pr-12 ${
+                    errors.password ? 'border-red-300 focus:border-red-500' : 'border-gray-300 focus:border-haven-500'
                   }`}
                   placeholder="••••••••"
                   disabled={isSubmitting}
@@ -330,7 +330,7 @@ export default function OnboardingWelcomePage() {
             <button
               type="submit"
               disabled={isSubmitting}
-              className="w-full bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3.5 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+              className="w-full bg-haven-900 hover:bg-haven-800 text-white py-3.5 px-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {isSubmitting ? (
                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
@@ -371,9 +371,9 @@ export default function OnboardingWelcomePage() {
             {/* Terms */}
             <p className="text-xs text-gray-500 text-center mt-4">
               By creating an account, you agree to our{' '}
-              <Link href="/terms" className="text-haven-navy-900 hover:underline">Terms of Service</Link>
+              <Link href="/terms" className="text-haven-900 hover:underline">Terms of Service</Link>
               {' '}and{' '}
-              <Link href="/privacy" className="text-haven-navy-900 hover:underline">Privacy Policy</Link>
+              <Link href="/privacy" className="text-haven-900 hover:underline">Privacy Policy</Link>
             </p>
           </form>
 
@@ -382,7 +382,7 @@ export default function OnboardingWelcomePage() {
             Already have an account?{' '}
             <Link
               href="/login"
-              className="text-haven-navy-900 hover:text-haven-navy-700 font-semibold"
+              className="text-haven-900 hover:text-haven-700 font-semibold"
             >
               Sign in
             </Link>

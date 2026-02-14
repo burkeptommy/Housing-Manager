@@ -28,17 +28,17 @@ interface AddServiceHistoryModalProps {
 }
 
 const SERVICE_TYPES = [
-  { id: 'oil_change', label: 'Oil Change', icon: 'water-outline' },
-  { id: 'tire_rotation', label: 'Tire Rotation', icon: 'ellipse-outline' },
-  { id: 'tire_replacement', label: 'Tire Replacement', icon: 'ellipse' },
-  { id: 'brake_service', label: 'Brake Service', icon: 'disc-outline' },
-  { id: 'inspection', label: 'Inspection', icon: 'clipboard-outline' },
-  { id: 'transmission', label: 'Transmission', icon: 'cog-outline' },
-  { id: 'battery', label: 'Battery', icon: 'battery-charging-outline' },
-  { id: 'air_filter', label: 'Air Filter', icon: 'funnel-outline' },
-  { id: 'coolant', label: 'Coolant Flush', icon: 'thermometer-outline' },
-  { id: 'repair', label: 'Repair', icon: 'build-outline' },
-  { id: 'other', label: 'Other', icon: 'construct-outline' },
+  { id: 'OIL_CHANGE', label: 'Oil Change', icon: 'water-outline' },
+  { id: 'TIRE_ROTATION', label: 'Tire Rotation', icon: 'ellipse-outline' },
+  { id: 'GENERAL_MAINTENANCE', label: 'Tire Replacement', icon: 'ellipse' },
+  { id: 'BRAKE_SERVICE', label: 'Brake Service', icon: 'disc-outline' },
+  { id: 'INSPECTION', label: 'Inspection', icon: 'clipboard-outline' },
+  { id: 'TRANSMISSION_SERVICE', label: 'Transmission', icon: 'cog-outline' },
+  { id: 'BATTERY_REPLACEMENT', label: 'Battery', icon: 'battery-charging-outline' },
+  { id: 'AIR_FILTER', label: 'Air Filter', icon: 'funnel-outline' },
+  { id: 'COOLANT_FLUSH', label: 'Coolant Flush', icon: 'thermometer-outline' },
+  { id: 'REPAIR', label: 'Repair', icon: 'build-outline' },
+  { id: 'OTHER', label: 'Other', icon: 'construct-outline' },
 ];
 
 export function AddServiceHistoryModal({
@@ -48,7 +48,7 @@ export function AddServiceHistoryModal({
   householdId,
   onSuccess,
 }: AddServiceHistoryModalProps) {
-  const [serviceType, setServiceType] = useState('oil_change');
+  const [serviceType, setServiceType] = useState('OIL_CHANGE');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [mileage, setMileage] = useState('');
   const [cost, setCost] = useState('');
@@ -89,7 +89,7 @@ export function AddServiceHistoryModal({
 
       // Create the service record
       const response = await fetch(
-        `${API_BASE_URL}/family/household/${householdId}/vehicle/${vehicleId}/service`,
+        `${API_BASE_URL}/family/vehicles/${vehicleId}/service-records`,
         {
           method: 'POST',
           headers: {
@@ -97,13 +97,13 @@ export function AddServiceHistoryModal({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            type: serviceType,
-            date,
-            mileage: mileage ? parseInt(mileage, 10) : null,
-            cost: cost ? parseFloat(cost) : null,
-            vendor: vendor || null,
+            serviceType,
+            serviceDate: date,
+            mileageAt: mileage ? parseInt(mileage, 10) : undefined,
+            cost: cost ? parseFloat(cost) : undefined,
+            shopName: vendor || undefined,
             description: description || SERVICE_TYPES.find(t => t.id === serviceType)?.label,
-            notes: notes || null,
+            notes: notes || undefined,
           }),
         }
       );
@@ -253,7 +253,7 @@ export function AddServiceHistoryModal({
             {/* Documents */}
             <Text style={styles.label}>Receipts & Documents</Text>
             <TouchableOpacity style={styles.uploadButton} onPress={handlePickDocument}>
-              <Ionicons name="cloud-upload-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="cloud-upload-outline" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.uploadButtonText}>Upload Receipt or Invoice</Text>
             </TouchableOpacity>
             {documents.map((doc, index) => (
@@ -372,7 +372,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[2],
   },
   typeChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   typeChipText: {
     fontSize: typography.fontSizes.sm,
@@ -389,15 +389,15 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     paddingVertical: spacing[3],
     borderWidth: 1,
-    borderColor: colors.haven.champagne[300],
+    borderColor: colors.haven.purple[300],
     borderStyle: 'dashed',
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   uploadButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   documentRow: {
     flexDirection: 'row',

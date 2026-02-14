@@ -231,7 +231,7 @@ export default function MaintenanceBudgetScreen() {
                     <Ionicons
                       name={getCategoryIcon(cat.category) as any}
                       size={20}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <View style={styles.categoryInfo}>
@@ -373,7 +373,7 @@ export default function MaintenanceBudgetScreen() {
             <Ionicons
               name="calculator-outline"
               size={48}
-              color={colors.haven.navy[300]}
+              color={colors.haven.purple[300]}
             />
             <Text style={styles.emptyTitle}>No Budget Data Yet</Text>
             <Text style={styles.emptyText}>
@@ -412,12 +412,12 @@ const styles = StyleSheet.create({
   summaryCard: {
     padding: spacing[5],
     alignItems: 'center',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   summaryTitle: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[200],
+    color: colors.haven.purple[200],
   },
   summaryAmount: {
     fontSize: 40,
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
   },
   summarySubtext: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[300],
+    color: colors.haven.purple[300],
     marginTop: spacing[1],
     textAlign: 'center',
   },
@@ -437,13 +437,13 @@ const styles = StyleSheet.create({
   },
   progressBar: {
     height: 8,
-    backgroundColor: colors.haven.navy[700],
+    backgroundColor: colors.haven.purple[700],
     borderRadius: 4,
     overflow: 'hidden',
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: 4,
   },
   progressLabels: {
@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
   },
   progressLabel: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[300],
+    color: colors.haven.purple[300],
   },
   quickStats: {
     flexDirection: 'row',
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[5],
     paddingTop: spacing[4],
     borderTopWidth: 1,
-    borderTopColor: colors.haven.navy[700],
+    borderTopColor: colors.haven.purple[700],
     width: '100%',
   },
   quickStat: {
@@ -470,7 +470,7 @@ const styles = StyleSheet.create({
   },
   quickStatLabel: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[300],
+    color: colors.haven.purple[300],
   },
   quickStatValue: {
     fontSize: typography.fontSizes.xl,
@@ -481,7 +481,7 @@ const styles = StyleSheet.create({
   quickStatDivider: {
     width: 1,
     height: 40,
-    backgroundColor: colors.haven.navy[700],
+    backgroundColor: colors.haven.purple[700],
   },
   section: {
     marginTop: spacing[6],
@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -532,7 +532,7 @@ const styles = StyleSheet.create({
   },
   categoryUpcoming: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginTop: spacing[0.5],
   },
   systemCard: {
@@ -563,7 +563,7 @@ const styles = StyleSheet.create({
   systemEstimate: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   systemSpent: {
     fontSize: typography.fontSizes.xs,
@@ -591,7 +591,7 @@ const styles = StyleSheet.create({
   upcomingCost: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   chartCard: {
     padding: spacing[4],
@@ -609,14 +609,14 @@ const styles = StyleSheet.create({
   chartBarContainer: {
     width: 16,
     height: 100,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     borderRadius: 8,
     justifyContent: 'flex-end',
     overflow: 'hidden',
   },
   chartBarFill: {
     width: '100%',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: 8,
   },
   chartBarLabel: {
@@ -653,7 +653,7 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,

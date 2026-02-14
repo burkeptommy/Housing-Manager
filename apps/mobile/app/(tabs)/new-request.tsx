@@ -158,7 +158,7 @@ export default function NewRequestScreen() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Category</Text>
               {isFetchingCategories ? (
-                <ActivityIndicator size="small" color={colors.primary[600]} />
+                <ActivityIndicator size="small" color={colors.haven.purple[600]} />
               ) : (
                 <ScrollView
                   horizontal
@@ -320,8 +320,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   categoryChipActive: {
-    borderColor: colors.primary[600],
-    backgroundColor: colors.primary[50],
+    borderColor: colors.haven.purple[600],
+    backgroundColor: colors.haven.purple[50],
   },
   categoryIcon: {
     fontSize: 16,
@@ -332,7 +332,7 @@ const styles = StyleSheet.create({
     color: colors.slate[600],
   },
   categoryTextActive: {
-    color: colors.primary[700],
+    color: colors.haven.purple[700],
     fontWeight: typography.fontWeights.medium,
   },
   priorityRow: {
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.medium,
   },
   submitButton: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     alignItems: 'center',

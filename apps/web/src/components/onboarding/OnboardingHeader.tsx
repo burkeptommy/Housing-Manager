@@ -23,7 +23,7 @@ export function OnboardingHeader() {
           {/* Pricing Link */}
           <button
             onClick={() => setShowTierModal(true)}
-            className="text-sm text-gray-500 hover:text-haven-navy-900 transition-colors font-medium"
+            className="text-sm text-gray-500 hover:text-haven-900 transition-colors font-medium"
           >
             Compare plans
           </button>

@@ -49,7 +49,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-haven-navy-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-haven-900" />
       </div>
     );
   }
@@ -70,19 +70,19 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-haven-navy-950 transform transition-transform lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-haven-950 transform transition-transform lg:translate-x-0 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
-          <div className="flex items-center gap-3 px-6 py-5 border-b border-haven-navy-800">
-            <div className="w-10 h-10 bg-haven-champagne-500 rounded-xl flex items-center justify-center">
-              <Shield className="w-6 h-6 text-haven-navy-950" />
+          <div className="flex items-center gap-3 px-6 py-5 border-b border-haven-800">
+            <div className="w-10 h-10 bg-haven-500 rounded-xl flex items-center justify-center">
+              <Shield className="w-6 h-6 text-haven-950" />
             </div>
             <div>
               <span className="text-white font-bold text-lg">Haven</span>
-              <span className="text-haven-champagne-300 text-sm block">Admin</span>
+              <span className="text-haven-300 text-sm block">Admin</span>
             </div>
             <button
               className="ml-auto lg:hidden text-gray-400 hover:text-white"
@@ -104,8 +104,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   href={item.href}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition ${
                     isActive
-                      ? 'bg-haven-champagne-500 text-haven-navy-950'
-                      : 'text-gray-300 hover:bg-haven-navy-800 hover:text-white'
+                      ? 'bg-haven-500 text-haven-950'
+                      : 'text-gray-300 hover:bg-haven-800 hover:text-white'
                   }`}
                   onClick={() => setSidebarOpen(false)}
                 >
@@ -117,9 +117,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </nav>
 
           {/* User */}
-          <div className="p-4 border-t border-haven-navy-800">
+          <div className="p-4 border-t border-haven-800">
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-10 h-10 bg-haven-navy-700 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-haven-700 rounded-full flex items-center justify-center">
                 <span className="text-white font-medium">
                   {user?.firstName?.[0] || 'A'}
                 </span>

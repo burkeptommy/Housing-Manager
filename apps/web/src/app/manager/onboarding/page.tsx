@@ -123,7 +123,7 @@ export default function OnboardingQueuePage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-8 h-8 animate-spin text-haven-champagne-600 mx-auto mb-4" />
+          <Loader2 className="w-8 h-8 animate-spin text-haven-600 mx-auto mb-4" />
           <p className="text-gray-500">Loading queue...</p>
         </div>
       </div>
@@ -137,7 +137,7 @@ export default function OnboardingQueuePage() {
         <div className="max-w-5xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-xl font-bold text-haven-navy-900">
+              <h1 className="text-xl font-bold text-haven-900">
                 Onboarding Queue
               </h1>
               <p className="text-sm text-gray-500">
@@ -154,7 +154,7 @@ export default function OnboardingQueuePage() {
                   placeholder="Search..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-champagne-500 focus:ring-2 focus:ring-haven-champagne-100 outline-none w-48"
+                  className="pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:border-haven-500 focus:ring-2 focus:ring-haven-100 outline-none w-48"
                 />
               </div>
 
@@ -171,7 +171,7 @@ export default function OnboardingQueuePage() {
                     onClick={() => setFilter(f.key)}
                     className={`px-3 py-1.5 rounded-lg text-sm transition ${
                       filter === f.key
-                        ? 'bg-haven-navy-900 text-white'
+                        ? 'bg-haven-900 text-white'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                     }`}
                   >
@@ -208,11 +208,11 @@ export default function OnboardingQueuePage() {
                   <div className="flex-1">
                     {/* Header Row */}
                     <div className="flex items-center gap-3 mb-2">
-                      <div className="w-10 h-10 bg-haven-champagne-100 rounded-full flex items-center justify-center">
-                        <User className="w-5 h-5 text-haven-champagne-600" />
+                      <div className="w-10 h-10 bg-haven-100 rounded-full flex items-center justify-center">
+                        <User className="w-5 h-5 text-haven-600" />
                       </div>
                       <div>
-                        <div className="font-semibold text-haven-navy-900">
+                        <div className="font-semibold text-haven-900">
                           {item.homeownerName}
                         </div>
                         <div className="text-sm text-gray-500">
@@ -237,7 +237,7 @@ export default function OnboardingQueuePage() {
                         </span>
                       )}
                       {item.selectedTier && (
-                        <span className="px-2 py-0.5 bg-haven-champagne-100 text-haven-champagne-700 rounded">
+                        <span className="px-2 py-0.5 bg-haven-100 text-haven-700 rounded">
                           {item.selectedTier}
                         </span>
                       )}
@@ -257,7 +257,7 @@ export default function OnboardingQueuePage() {
                         </div>
                         <div className="w-full bg-gray-100 rounded-full h-1.5">
                           <div
-                            className="bg-haven-champagne-500 h-1.5 rounded-full transition-all"
+                            className="bg-haven-500 h-1.5 rounded-full transition-all"
                             style={{ width: `${item.progress}%` }}
                           />
                         </div>

@@ -60,7 +60,7 @@ export function ManagerAvatar({ size = 'md', className = '', showBadge = true }:
     >
       {/* Main circle - Champagne gradient */}
       <div
-        className="w-full h-full rounded-full bg-gradient-to-br from-champagne-200 to-champagne-300 flex items-center justify-center overflow-hidden"
+        className="w-full h-full rounded-full bg-gradient-to-br from-haven-200 to-haven-300 flex items-center justify-center overflow-hidden"
       >
         {/* Female human silhouette */}
         <svg
@@ -371,7 +371,7 @@ const initialsVariantClasses: Record<InitialsVariant, string> = {
   amber: 'bg-amber-100 text-amber-600',
   rose: 'bg-rose-100 text-rose-600',
   haven: 'bg-haven-100 text-haven-700',
-  warm: 'bg-warm-100 text-warm-600',
+  warm: 'bg-neutral-100 text-neutral-600',
 };
 
 function getInitialsFromName(name: string): string {

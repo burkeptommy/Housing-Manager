@@ -478,6 +478,73 @@ export class HouseholdVendorsService {
     return message;
   }
 
+  // ========== SEARCH/DIRECTORY ==========
+
+  /**
+   * Search for vendors in the directory (both household-specific and global).
+   * Returns vendors the household already has, plus any global/shared vendors matching.
+   */
+  async searchDirectory(
+    query?: string,
+    category?: VendorCategory,
+    householdId?: string,
+    userId?: string,
+  ) {
+    if (householdId && userId) {
+      await this.verifyHouseholdAccess(householdId, userId);
+    }
+
+    const where: any = {
+      isActive: true,
+    };
+
+    if (category) {
+      where.category = category;
+    }
+
+    if (query) {
+      where.OR = [
+        { displayName: { contains: query, mode: 'insensitive' } },
+        { contactName: { contains: query, mode: 'insensitive' } },
+        { serviceDescription: { contains: query, mode: 'insensitive' } },
+      ];
+    }
+
+    // Search all vendors (both household-specific and global)
+    const vendors = await this.prisma.vendor.findMany({
+      where: {
+        AND: [
+          where,
+          {
+            OR: [
+              // Vendors belonging to this household
+              ...(householdId ? [{ householdId }] : []),
+              // Global/shared vendors (no household)
+              { householdId: null },
+            ],
+          },
+        ],
+      },
+      take: 50,
+      orderBy: { displayName: 'asc' },
+    });
+
+    // Check which are already linked to the household
+    let linkedVendorIds: Set<string> = new Set();
+    if (householdId) {
+      const links = await this.prisma.householdVendor.findMany({
+        where: { householdId },
+        select: { vendorId: true },
+      });
+      linkedVendorIds = new Set(links.map(l => l.vendorId));
+    }
+
+    return vendors.map(v => ({
+      ...this.mapToResponse(v),
+      isLinked: linkedVendorIds.has(v.id),
+    }));
+  }
+
   // ========== HELPER METHODS ==========
 
   private async getOrCreateHouseholdVendor(householdId: string, vendorId: string) {

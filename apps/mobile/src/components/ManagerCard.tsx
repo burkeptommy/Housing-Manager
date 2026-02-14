@@ -66,12 +66,12 @@ export function ManagerCard({ message, showActions = true, onChat, onCall }: Man
           <View style={styles.actions}>
             {onChat && (
               <TouchableOpacity style={styles.actionButton} onPress={onChat} activeOpacity={0.7}>
-                <Ionicons name="chatbubble" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="chatbubble" size={20} color={colors.haven.purple[500]} />
               </TouchableOpacity>
             )}
             {onCall && (
               <TouchableOpacity style={styles.actionButton} onPress={onCall} activeOpacity={0.7}>
-                <Ionicons name="call" size={20} color={colors.haven.champagne[500]} />
+                <Ionicons name="call" size={20} color={colors.haven.purple[500]} />
               </TouchableOpacity>
             )}
           </View>
@@ -160,8 +160,8 @@ export function ContactManagerButton({ variant = 'primary', onPress, showIcon = 
 
   const iconColor = {
     primary: colors.white,
-    secondary: colors.haven.navy[900],
-    outline: colors.haven.champagne[500],
+    secondary: colors.haven.purple[900],
+    outline: colors.haven.purple[500],
   };
 
   return (
@@ -238,9 +238,9 @@ export function ManagerHelpBanner({ context, onDismiss, onChat }: ManagerHelpBan
       {onChat && (
         <TouchableOpacity style={styles.helpBannerAction} onPress={onChat}>
           {isEssentials ? (
-            <AlfredTabIcon size={16} color={colors.haven.champagne[500]} />
+            <AlfredTabIcon size={16} color={colors.haven.purple[500]} />
           ) : (
-            <Ionicons name="chatbubble-outline" size={16} color={colors.haven.champagne[500]} />
+            <Ionicons name="chatbubble-outline" size={16} color={colors.haven.purple[500]} />
           )}
           <Text style={styles.helpBannerActionText}>
             {isEssentials ? 'Ask Alfred' : 'Send Message'}
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   humanAvatar: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -287,11 +287,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   title: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   actions: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   },
   actionButton: {
     padding: spacing[2],
-    backgroundColor: `${colors.haven.champagne[500]}15`,
+    backgroundColor: `${colors.haven.purple[500]}15`,
     borderRadius: borderRadius.lg,
   },
   messageContainer: {
@@ -332,15 +332,15 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
   },
   contactButtonPrimary: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   contactButtonSecondary: {
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
   },
   contactButtonOutline: {
     backgroundColor: 'transparent',
     borderWidth: 1,
-    borderColor: colors.haven.champagne[500],
+    borderColor: colors.haven.purple[500],
   },
   contactButtonText: {
     fontSize: typography.fontSizes.base,
@@ -350,10 +350,10 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   contactButtonTextSecondary: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   contactButtonTextOutline: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
 
   // Help Banner
@@ -362,7 +362,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.xl,
     padding: spacing[4],
     borderLeftWidth: 4,
-    borderLeftColor: colors.haven.champagne[500],
+    borderLeftColor: colors.haven.purple[500],
   },
   helpBannerHeader: {
     flexDirection: 'row',
@@ -402,6 +402,6 @@ const styles = StyleSheet.create({
   helpBannerActionText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
 });

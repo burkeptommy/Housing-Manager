@@ -95,7 +95,7 @@ export function EditPetIdModal({
           <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
             {/* Microchip Section */}
             <View style={styles.sectionHeader}>
-              <Ionicons name="qr-code-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="qr-code-outline" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.sectionTitle}>Microchip</Text>
             </View>
             <Text style={styles.sectionDescription}>
@@ -133,7 +133,7 @@ export function EditPetIdModal({
 
             {/* License Section */}
             <View style={[styles.sectionHeader, { marginTop: spacing[6] }]}>
-              <Ionicons name="card-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="card-outline" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.sectionTitle}>License</Text>
             </View>
             <Text style={styles.sectionDescription}>
@@ -160,7 +160,7 @@ export function EditPetIdModal({
             />
 
             <View style={styles.tipBox}>
-              <Ionicons name="bulb-outline" size={18} color={colors.haven.navy[600]} />
+              <Ionicons name="bulb-outline" size={18} color={colors.haven.purple[600]} />
               <Text style={styles.tipText}>
                 Haven will remind you when your pet's license is about to expire.
               </Text>
@@ -260,14 +260,14 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     gap: spacing[2],
     padding: spacing[3],
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     marginTop: spacing[4],
   },
   tipText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     lineHeight: 20,
   },
   footer: {

@@ -11,7 +11,7 @@ const vehicleStyles = {
   sports: { bg: 'bg-rose-100', icon: 'text-rose-600', accent: 'bg-rose-500' },
   minivan: { bg: 'bg-violet-100', icon: 'text-violet-600', accent: 'bg-violet-500' },
   motorcycle: { bg: 'bg-amber-100', icon: 'text-amber-600', accent: 'bg-amber-500' },
-  default: { bg: 'bg-warm-100', icon: 'text-warm-600', accent: 'bg-warm-500' },
+  default: { bg: 'bg-neutral-100', icon: 'text-neutral-600', accent: 'bg-neutral-500' },
 };
 
 type VehicleType = keyof typeof vehicleStyles;

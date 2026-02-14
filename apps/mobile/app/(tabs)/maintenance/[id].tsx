@@ -312,12 +312,12 @@ export default function MaintenanceDetailScreen() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'PENDING': return colors.haven.champagne[500];
+      case 'PENDING': return colors.haven.purple[500];
       case 'SCHEDULED': return colors.status.info;
       case 'IN_PROGRESS': return colors.status.warning;
       case 'COMPLETED': return colors.status.success;
       case 'SKIPPED': return colors.text.tertiary;
-      default: return colors.haven.champagne[500];
+      default: return colors.haven.purple[500];
     }
   };
 
@@ -348,7 +348,7 @@ export default function MaintenanceDetailScreen() {
     return (
       <ScreenContainer title="Loading...">
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.navy[900]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[900]} />
         </View>
       </ScreenContainer>
     );
@@ -432,7 +432,7 @@ export default function MaintenanceDetailScreen() {
         {task.homeSystem && (
           <Card style={styles.systemCard}>
             <View style={styles.systemHeader}>
-              <Ionicons name="cube-outline" size={20} color={colors.haven.navy[900]} />
+              <Ionicons name="cube-outline" size={20} color={colors.haven.purple[900]} />
               <Text style={styles.systemTitle}>Related System</Text>
             </View>
             <View style={styles.systemInfo}>
@@ -458,7 +458,7 @@ export default function MaintenanceDetailScreen() {
         {task.intervalExplanation && (
           <Card style={styles.whyCard}>
             <View style={styles.whyHeader}>
-              <Ionicons name="bulb-outline" size={20} color={colors.haven.champagne[600]} />
+              <Ionicons name="bulb-outline" size={20} color={colors.haven.purple[600]} />
               <Text style={styles.whyTitle}>Why This Matters</Text>
             </View>
             <Text style={styles.whyText}>{task.intervalExplanation}</Text>
@@ -499,7 +499,7 @@ export default function MaintenanceDetailScreen() {
                     step.completed && styles.checkboxChecked,
                   ]}>
                     {savingStepId === step.id ? (
-                      <ActivityIndicator size="small" color={step.completed ? colors.white : colors.haven.navy[900]} />
+                      <ActivityIndicator size="small" color={step.completed ? colors.white : colors.haven.purple[900]} />
                     ) : step.completed ? (
                       <Ionicons name="checkmark" size={16} color={colors.white} />
                     ) : null}
@@ -538,7 +538,7 @@ export default function MaintenanceDetailScreen() {
                     style={styles.alfredButton}
                     onPress={() => handleHaveAlfredDoIt(step)}
                   >
-                    <Ionicons name="sparkles" size={14} color={colors.haven.champagne[600]} />
+                    <Ionicons name="sparkles" size={14} color={colors.haven.purple[600]} />
                     <Text style={styles.alfredButtonText}>Have Alfred Do It</Text>
                   </TouchableOpacity>
                 )}
@@ -551,7 +551,7 @@ export default function MaintenanceDetailScreen() {
         {task.frequency && (
           <Card style={styles.scheduleCard}>
             <View style={styles.scheduleHeader}>
-              <Ionicons name="calendar" size={24} color={colors.haven.navy[900]} />
+              <Ionicons name="calendar" size={24} color={colors.haven.purple[900]} />
               <Text style={styles.scheduleTitle}>Maintenance Schedule</Text>
             </View>
             <View style={styles.scheduleInfo}>
@@ -579,13 +579,13 @@ export default function MaintenanceDetailScreen() {
         {task.assignedVendor && (
           <Card style={styles.vendorCard}>
             <View style={styles.vendorHeader}>
-              <Ionicons name="business-outline" size={20} color={colors.haven.navy[900]} />
+              <Ionicons name="business-outline" size={20} color={colors.haven.purple[900]} />
               <Text style={styles.vendorTitle}>Assigned Vendor</Text>
             </View>
             <Text style={styles.vendorName}>{task.assignedVendor.displayName}</Text>
             {task.assignedVendor.phone && (
               <TouchableOpacity style={styles.vendorContact}>
-                <Ionicons name="call-outline" size={16} color={colors.haven.champagne[500]} />
+                <Ionicons name="call-outline" size={16} color={colors.haven.purple[500]} />
                 <Text style={styles.vendorPhone}>{task.assignedVendor.phone}</Text>
               </TouchableOpacity>
             )}
@@ -596,9 +596,9 @@ export default function MaintenanceDetailScreen() {
         <View style={styles.actionSection}>
           <Text style={styles.actionTitle}>Need Help?</Text>
 
-          <TouchableOpacity style={styles.actionButton} onPress={handleHireVendor}>
-            <View style={styles.actionIconContainer}>
-              <Ionicons name="briefcase-outline" size={24} color={colors.haven.navy[900]} />
+          <TouchableOpacity style={[styles.actionButton, styles.actionButtonCoral]} onPress={handleHireVendor}>
+            <View style={[styles.actionIconContainer, styles.actionIconCoral]}>
+              <Ionicons name="briefcase-outline" size={24} color={colors.haven.coral[500]} />
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionButtonTitle}>Hire a Vendor</Text>
@@ -606,7 +606,7 @@ export default function MaintenanceDetailScreen() {
                 Alfred will find a trusted professional
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.tertiary} />
+            <Ionicons name="chevron-forward" size={20} color={colors.haven.coral[400]} />
           </TouchableOpacity>
 
           <TouchableOpacity style={[styles.actionButton, styles.actionButtonPrimary]} onPress={handleAskAlfred}>
@@ -621,7 +621,7 @@ export default function MaintenanceDetailScreen() {
                 He'll take care of everything
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.haven.champagne[200]} />
+            <Ionicons name="chevron-forward" size={20} color={colors.haven.purple[200]} />
           </TouchableOpacity>
         </View>
 
@@ -651,7 +651,7 @@ export default function MaintenanceDetailScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   container: {
     flex: 1,
@@ -694,7 +694,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -785,9 +785,9 @@ const styles = StyleSheet.create({
   whyCard: {
     padding: spacing[4],
     marginBottom: spacing[4],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderLeftWidth: 4,
-    borderLeftColor: colors.haven.champagne[500],
+    borderLeftColor: colors.haven.purple[500],
   },
   whyHeader: {
     flexDirection: 'row',
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
   whyTitle: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -825,7 +825,7 @@ const styles = StyleSheet.create({
   progressCount: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   progressBar: {
     height: 8,
@@ -835,7 +835,7 @@ const styles = StyleSheet.create({
   },
   progressFill: {
     height: '100%',
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderRadius: borderRadius.full,
   },
   checklistCard: {
@@ -872,8 +872,8 @@ const styles = StyleSheet.create({
     marginRight: spacing[3],
   },
   checkboxChecked: {
-    backgroundColor: colors.haven.navy[900],
-    borderColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
+    borderColor: colors.haven.purple[900],
   },
   checklistItemContent: {
     flex: 1,
@@ -919,15 +919,15 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   alfredButtonText: {
     fontSize: typography.fontSizes.xs,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   scheduleCard: {
     padding: spacing[4],
@@ -990,7 +990,7 @@ const styles = StyleSheet.create({
   },
   vendorPhone: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   actionSection: {
     marginBottom: spacing[4],
@@ -1015,7 +1015,15 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   actionButtonPrimary: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
+  },
+  actionButtonCoral: {
+    borderWidth: 1,
+    borderColor: colors.haven.coral[100],
+    backgroundColor: colors.haven.coral[50],
+  },
+  actionIconCoral: {
+    backgroundColor: colors.haven.coral[100],
   },
   actionIconContainer: {
     width: 48,
@@ -1027,7 +1035,7 @@ const styles = StyleSheet.create({
     marginRight: spacing[3],
   },
   actionIconPrimary: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   actionContent: {
     flex: 1,
@@ -1046,7 +1054,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   actionButtonSubtitlePrimary: {
-    color: colors.haven.champagne[200],
+    color: colors.haven.purple[200],
   },
   completeButton: {
     flexDirection: 'row',
@@ -1054,7 +1062,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: spacing[2],
     paddingVertical: spacing[4],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.xl,
   },
   completeButtonReady: {

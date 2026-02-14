@@ -95,14 +95,14 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
     >
       <Icon className={`w-5 h-5 flex-shrink-0 mt-0.5 ${iconColor}`} />
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-warm-900">{toast.title}</p>
+        <p className="text-sm font-medium text-neutral-900">{toast.title}</p>
         {toast.description && (
-          <p className="text-sm text-warm-600 mt-0.5">{toast.description}</p>
+          <p className="text-sm text-neutral-600 mt-0.5">{toast.description}</p>
         )}
       </div>
       <button
         onClick={onClose}
-        className="p-1 rounded-lg text-warm-400 hover:text-warm-600 hover:bg-white/50 transition-colors"
+        className="p-1 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-white/50 transition-colors"
       >
         <X className="w-4 h-4" />
       </button>

@@ -217,7 +217,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             Address
           </h3>
           {isEnriching && (
-            <div className="flex items-center gap-2 text-xs text-haven-champagne-600">
+            <div className="flex items-center gap-2 text-xs text-haven-600">
               <Loader2 className="w-3 h-3 animate-spin" />
               <span>Looking up property details...</span>
             </div>
@@ -302,14 +302,14 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             <label htmlFor="yearBuilt" className="label block mb-1.5 flex items-center gap-1">
               Year built (optional)
               {enrichedFields.has('yearBuilt') && (
-                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+                <Sparkles className="w-3 h-3 text-haven-500" />
               )}
             </label>
             <input
               {...register('yearBuilt')}
               id="yearBuilt"
               type="number"
-              className={`input ${enrichedFields.has('yearBuilt') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
+              className={`input ${enrichedFields.has('yearBuilt') ? 'border-haven-300 bg-haven-50' : ''}`}
               placeholder="1990"
             />
             {errors.yearBuilt && (
@@ -330,14 +330,14 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             <label htmlFor="squareFeet" className="label block mb-1.5 flex items-center gap-1">
               Square feet
               {enrichedFields.has('squareFeet') && (
-                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+                <Sparkles className="w-3 h-3 text-haven-500" />
               )}
             </label>
             <input
               {...register('squareFeet')}
               id="squareFeet"
               type="number"
-              className={`input ${enrichedFields.has('squareFeet') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
+              className={`input ${enrichedFields.has('squareFeet') ? 'border-haven-300 bg-haven-50' : ''}`}
               placeholder="2000"
             />
           </div>
@@ -345,14 +345,14 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             <label htmlFor="bedrooms" className="label block mb-1.5 flex items-center gap-1">
               Bedrooms
               {enrichedFields.has('bedrooms') && (
-                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+                <Sparkles className="w-3 h-3 text-haven-500" />
               )}
             </label>
             <input
               {...register('bedrooms')}
               id="bedrooms"
               type="number"
-              className={`input ${enrichedFields.has('bedrooms') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
+              className={`input ${enrichedFields.has('bedrooms') ? 'border-haven-300 bg-haven-50' : ''}`}
               placeholder="3"
             />
           </div>
@@ -360,7 +360,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
             <label htmlFor="bathrooms" className="label block mb-1.5 flex items-center gap-1">
               Bathrooms
               {enrichedFields.has('bathrooms') && (
-                <Sparkles className="w-3 h-3 text-haven-champagne-500" />
+                <Sparkles className="w-3 h-3 text-haven-500" />
               )}
             </label>
             <input
@@ -368,7 +368,7 @@ export function StepHomeBasics({ onSubmit, defaultValues, isSubmitting }: StepHo
               id="bathrooms"
               type="number"
               step="0.5"
-              className={`input ${enrichedFields.has('bathrooms') ? 'border-haven-champagne-300 bg-haven-champagne-50' : ''}`}
+              className={`input ${enrichedFields.has('bathrooms') ? 'border-haven-300 bg-haven-50' : ''}`}
               placeholder="2"
             />
           </div>

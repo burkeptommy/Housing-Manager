@@ -154,7 +154,7 @@ export class UploadsController {
   async uploadProfileImage(
     @Body()
     body: {
-      entityType: 'family-member' | 'pet' | 'household';
+      entityType: 'family-member' | 'pet' | 'household' | 'user' | 'vehicle';
       entityId: string;
       image: string; // base64
       mimeType: string;
@@ -178,7 +178,7 @@ export class UploadsController {
   async removeProfileImage(
     @Body()
     body: {
-      entityType: 'family-member' | 'pet' | 'household';
+      entityType: 'family-member' | 'pet' | 'household' | 'user' | 'vehicle';
       entityId: string;
     },
     @Req() req: any,

@@ -367,7 +367,7 @@ export default function AddVendorScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   container: {
     flex: 1,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
   saveButton: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   saveButtonDisabled: {
     opacity: 0.5,
@@ -413,8 +413,8 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   categoryChipActive: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   categoryChipText: {
     fontSize: typography.fontSizes.sm,
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[4],
     borderRadius: borderRadius.lg,
     gap: spacing[2],

@@ -53,7 +53,7 @@ export function Input({
           <Ionicons
             name={leftIcon}
             size={20}
-            color={colors.haven.navy[400]}
+            color={colors.haven.purple[400]}
             style={styles.leftIcon}
           />
         )}
@@ -64,7 +64,7 @@ export function Input({
             leftIcon && styles.inputWithLeftIcon,
             (rightIcon || showPasswordToggle) && styles.inputWithRightIcon,
           ]}
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
           secureTextEntry={actualSecureEntry}
@@ -79,14 +79,14 @@ export function Input({
             <Ionicons
               name={isPasswordVisible ? 'eye-off-outline' : 'eye-outline'}
               size={20}
-              color={colors.haven.navy[400]}
+              color={colors.haven.purple[400]}
             />
           </TouchableOpacity>
         )}
 
         {rightIcon && onRightIconPress && (
           <TouchableOpacity onPress={onRightIconPress} style={styles.rightIconContainer}>
-            <Ionicons name={rightIcon} size={20} color={colors.haven.navy[400]} />
+            <Ionicons name={rightIcon} size={20} color={colors.haven.purple[400]} />
           </TouchableOpacity>
         )}
       </View>
@@ -117,7 +117,7 @@ const styles = StyleSheet.create({
     minHeight: 48,
   },
   inputFocused: {
-    borderColor: colors.haven.champagne[500],
+    borderColor: colors.haven.purple[500],
     borderWidth: 2,
     backgroundColor: colors.white,
   },

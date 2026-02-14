@@ -185,7 +185,7 @@ export default function SettingsScreen() {
               }}
             >
               <Text style={styles.manageButtonText}>Manage Subscription</Text>
-              <Ionicons name="chevron-forward" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="chevron-forward" size={20} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           </Card>
         </View>
@@ -215,7 +215,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   onValueChange={handleNotificationToggle}
-                  trackColor={{ false: colors.gray[300], true: colors.haven.champagne[500] }}
+                  trackColor={{ false: colors.gray[300], true: colors.haven.purple[500] }}
                 />
               }
             />
@@ -243,7 +243,7 @@ export default function SettingsScreen() {
                   <Switch
                     value={biometricEnabled}
                     onValueChange={handleBiometricToggle}
-                    trackColor={{ false: colors.gray[300], true: colors.haven.champagne[500] }}
+                    trackColor={{ false: colors.gray[300], true: colors.haven.purple[500] }}
                   />
                 }
               />
@@ -362,7 +362,7 @@ function SettingRow({
         <Ionicons
           name={icon as any}
           size={22}
-          color={iconColor || colors.haven.champagne[500]}
+          color={iconColor || colors.haven.purple[500]}
         />
       </View>
       <View style={styles.settingContent}>
@@ -379,7 +379,7 @@ function SettingRow({
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   scrollContainer: {
     flex: 1,
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
   manageButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   settingsCard: {
     overflow: 'hidden',
@@ -450,7 +450,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],

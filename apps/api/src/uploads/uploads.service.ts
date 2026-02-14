@@ -235,7 +235,7 @@ export class UploadsService {
    * Upload a profile image for an entity (family member, pet, or household)
    */
   async uploadProfileImage(
-    entityType: 'family-member' | 'pet' | 'household',
+    entityType: 'family-member' | 'pet' | 'household' | 'user' | 'vehicle',
     entityId: string,
     base64Image: string,
     mimeType: string,
@@ -258,10 +258,16 @@ export class UploadsService {
 
     // Update the entity with the new image URL
     switch (entityType) {
+      case 'user':
+        await this.prisma.user.update({
+          where: { id: entityId },
+          data: { avatarUrl: imageUrl },
+        });
+        break;
       case 'family-member':
         await this.prisma.familyMember.update({
           where: { id: entityId },
-          data: { profilePhotoUrl: imageUrl },
+          data: { photoUrl: imageUrl },
         });
         break;
       case 'pet':
@@ -274,6 +280,12 @@ export class UploadsService {
         await this.prisma.pet.update({
           where: { id: entityId },
           data: { photoUrls: [imageUrl, ...existingPhotos.slice(0, 9)] }, // Keep max 10 photos
+        });
+        break;
+      case 'vehicle':
+        await this.prisma.vehicle.update({
+          where: { id: entityId },
+          data: { photoUrl: imageUrl },
         });
         break;
       case 'household':
@@ -291,16 +303,22 @@ export class UploadsService {
    * Remove a profile image from an entity
    */
   async removeProfileImage(
-    entityType: 'family-member' | 'pet' | 'household',
+    entityType: 'family-member' | 'pet' | 'household' | 'user' | 'vehicle',
     entityId: string,
     userId: string,
   ): Promise<{ success: boolean }> {
     // Update the entity to remove the image URL
     switch (entityType) {
+      case 'user':
+        await this.prisma.user.update({
+          where: { id: entityId },
+          data: { avatarUrl: null },
+        });
+        break;
       case 'family-member':
         await this.prisma.familyMember.update({
           where: { id: entityId },
-          data: { profilePhotoUrl: null },
+          data: { photoUrl: null },
         });
         break;
       case 'pet':
@@ -315,6 +333,12 @@ export class UploadsService {
             data: { photoUrls: pet.photoUrls.slice(1) }, // Remove first photo
           });
         }
+        break;
+      case 'vehicle':
+        await this.prisma.vehicle.update({
+          where: { id: entityId },
+          data: { photoUrl: null },
+        });
         break;
       case 'household':
         await this.prisma.household.update({

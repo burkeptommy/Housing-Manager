@@ -23,7 +23,7 @@ import type { WorkOrder, WorkOrderStatus, MaintenanceTask, HouseholdVendor, Crea
 const STATUS_COLORS: Record<WorkOrderStatus, string> = {
   DRAFT: colors.slate[400],
   REQUESTED: colors.info,
-  SCHEDULED: colors.accent[500],
+  SCHEDULED: colors.haven.purple[400],
   IN_PROGRESS: colors.warning,
   COMPLETED: colors.success,
   CANCELLED: colors.error,
@@ -95,7 +95,7 @@ export default function WorkOrdersScreen() {
       <>
         <Stack.Screen options={{ title: 'Work Orders' }} />
         <SafeAreaView style={styles.loadingContainer} edges={['bottom']}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[600]} />
         </SafeAreaView>
       </>
     );
@@ -111,7 +111,7 @@ export default function WorkOrdersScreen() {
             <RefreshControl
               refreshing={refreshing}
               onRefresh={onRefresh}
-              tintColor={colors.primary[600]}
+              tintColor={colors.haven.purple[600]}
             />
           }
         >
@@ -331,7 +331,7 @@ function CreateWorkOrderModal({
             <Text style={styles.modalTitle}>Request Vendor Visit</Text>
             <TouchableOpacity onPress={handleSubmit} disabled={isSubmitting}>
               {isSubmitting ? (
-                <ActivityIndicator size="small" color={colors.primary[600]} />
+                <ActivityIndicator size="small" color={colors.haven.purple[600]} />
               ) : (
                 <Text style={styles.modalSubmit}>Submit</Text>
               )}
@@ -612,7 +612,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   createButton: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     paddingHorizontal: spacing[4],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.lg,
@@ -640,7 +640,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   emptyButton: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     paddingHorizontal: spacing[5],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
   modalSubmit: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.primary[600],
+    color: colors.haven.purple[600],
   },
   modalContent: {
     flex: 1,
@@ -776,8 +776,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   chipActive: {
-    borderColor: colors.primary[600],
-    backgroundColor: colors.primary[50],
+    borderColor: colors.haven.purple[600],
+    backgroundColor: colors.haven.purple[50],
   },
   chipText: {
     fontSize: typography.fontSizes.sm,
@@ -785,7 +785,7 @@ const styles = StyleSheet.create({
     maxWidth: 150,
   },
   chipTextActive: {
-    color: colors.primary[700],
+    color: colors.haven.purple[700],
     fontWeight: typography.fontWeights.medium,
   },
   // Detail Modal

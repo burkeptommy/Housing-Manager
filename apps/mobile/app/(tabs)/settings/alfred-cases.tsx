@@ -137,11 +137,11 @@ export default function AlfredCasesScreen() {
         onPress={() => router.push(`/(tabs)/settings/alfred-case/${item.id}` as any)}
       >
         <View style={styles.caseHeader}>
-          <View style={[styles.iconContainer, { backgroundColor: `${colors.haven.champagne[500]}15` }]}>
+          <View style={[styles.iconContainer, { backgroundColor: `${colors.haven.purple[500]}15` }]}>
             <Ionicons
               name={getCategoryIcon(item.detectedIntent) as any}
               size={24}
-              color={colors.haven.champagne[500]}
+              color={colors.haven.purple[500]}
             />
           </View>
           <View style={styles.caseInfo}>
@@ -208,7 +208,7 @@ export default function AlfredCasesScreen() {
           onBackPress={() => router.navigate('/(tabs)/settings/alfred-email' as any)}
         />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </View>
     );
@@ -239,7 +239,7 @@ export default function AlfredCasesScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={onRefresh}
-            tintColor={colors.haven.champagne[500]}
+            tintColor={colors.haven.purple[500]}
           />
         }
         ListEmptyComponent={
@@ -259,7 +259,7 @@ export default function AlfredCasesScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   loadingContainer: {
     flex: 1,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.gray[200],
   },
   filterChipActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   filterChipText: {
     fontSize: typography.fontSizes.sm,

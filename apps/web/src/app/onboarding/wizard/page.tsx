@@ -236,14 +236,14 @@ export default function OnboardingWizard() {
   const currentStepIndex = steps.indexOf(step);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-haven-navy-950 to-haven-navy-900 flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-haven-950 to-haven-900 flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
 
         {/* Step 1: Challenge */}
         {step === 'challenge' && (
           <div className="bg-white rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">
+              <h1 className="text-2xl font-bold text-haven-900 mb-2">
                 What&apos;s your biggest challenge as a homeowner?
               </h1>
               <p className="text-gray-500">
@@ -258,20 +258,20 @@ export default function OnboardingWizard() {
                   onClick={() => handleChallengeSelect(challenge.id)}
                   className={`w-full p-4 rounded-xl border-2 text-left transition-all duration-200 ${
                     selectedChallenge === challenge.id
-                      ? 'border-haven-champagne-500 bg-haven-champagne-50'
-                      : 'border-gray-200 hover:border-haven-champagne-300 hover:bg-gray-50'
+                      ? 'border-haven-500 bg-haven-50'
+                      : 'border-gray-200 hover:border-haven-300 hover:bg-gray-50'
                   }`}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
                       selectedChallenge === challenge.id
-                        ? 'bg-haven-champagne-500 text-white'
+                        ? 'bg-haven-500 text-white'
                         : 'bg-gray-100 text-gray-600'
                     }`}>
                       {challenge.icon}
                     </div>
                     <div>
-                      <h3 className="font-semibold text-haven-navy-900">
+                      <h3 className="font-semibold text-haven-900">
                         {challenge.title}
                       </h3>
                       <p className="text-sm text-gray-500 mt-0.5">
@@ -289,10 +289,10 @@ export default function OnboardingWizard() {
         {step === 'address' && (
           <div className="bg-white rounded-2xl p-8 shadow-2xl">
             <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Home className="w-8 h-8 text-haven-champagne-600" />
+              <div className="w-16 h-16 bg-haven-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                <Home className="w-8 h-8 text-haven-600" />
               </div>
-              <h1 className="text-2xl font-bold text-haven-navy-900">
+              <h1 className="text-2xl font-bold text-haven-900">
                 Let&apos;s find your home
               </h1>
               <p className="text-gray-500 mt-2">
@@ -306,7 +306,7 @@ export default function OnboardingWizard() {
             />
 
             {isEnriching && (
-              <div className="mt-6 flex items-center justify-center gap-3 text-haven-navy-600">
+              <div className="mt-6 flex items-center justify-center gap-3 text-haven-600">
                 <Loader2 className="w-5 h-5 animate-spin" />
                 <span>Finding your home details...</span>
               </div>
@@ -318,7 +318,7 @@ export default function OnboardingWizard() {
 
             <button
               onClick={() => setStep('challenge')}
-              className="w-full mt-6 text-gray-500 py-2 text-sm hover:text-haven-navy-900 transition"
+              className="w-full mt-6 text-gray-500 py-2 text-sm hover:text-haven-900 transition"
             >
               ← Back
             </button>
@@ -332,7 +332,7 @@ export default function OnboardingWizard() {
               <div className="w-16 h-16 bg-emerald-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <Sparkles className="w-8 h-8 text-emerald-600" />
               </div>
-              <h1 className="text-2xl font-bold text-haven-navy-900">
+              <h1 className="text-2xl font-bold text-haven-900">
                 {propertyData.enrichment ? 'We found your home!' : 'Confirm your address'}
               </h1>
               <p className="text-gray-500 mt-2">
@@ -348,7 +348,7 @@ export default function OnboardingWizard() {
               <div className="flex items-start gap-3">
                 <Building2 className="w-5 h-5 text-gray-400 mt-0.5" />
                 <div>
-                  <p className="font-medium text-haven-navy-900">
+                  <p className="font-medium text-haven-900">
                     {propertyData.street}
                   </p>
                   <p className="text-gray-500 text-sm">
@@ -364,25 +364,25 @@ export default function OnboardingWizard() {
                 {propertyData.bedrooms && (
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Bedrooms</p>
-                    <p className="text-lg font-semibold text-haven-navy-900">{propertyData.bedrooms}</p>
+                    <p className="text-lg font-semibold text-haven-900">{propertyData.bedrooms}</p>
                   </div>
                 )}
                 {propertyData.bathrooms && (
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Bathrooms</p>
-                    <p className="text-lg font-semibold text-haven-navy-900">{propertyData.bathrooms}</p>
+                    <p className="text-lg font-semibold text-haven-900">{propertyData.bathrooms}</p>
                   </div>
                 )}
                 {propertyData.squareFeet && (
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Square Feet</p>
-                    <p className="text-lg font-semibold text-haven-navy-900">{parseInt(propertyData.squareFeet).toLocaleString()}</p>
+                    <p className="text-lg font-semibold text-haven-900">{parseInt(propertyData.squareFeet).toLocaleString()}</p>
                   </div>
                 )}
                 {propertyData.yearBuilt && (
                   <div className="bg-gray-50 rounded-xl p-3">
                     <p className="text-xs text-gray-500 uppercase tracking-wide">Year Built</p>
-                    <p className="text-lg font-semibold text-haven-navy-900">{propertyData.yearBuilt}</p>
+                    <p className="text-lg font-semibold text-haven-900">{propertyData.yearBuilt}</p>
                   </div>
                 )}
               </div>
@@ -394,7 +394,7 @@ export default function OnboardingWizard() {
                 {propertyData.propertyType && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Property Type</span>
-                    <span className="font-medium text-haven-navy-900">
+                    <span className="font-medium text-haven-900">
                       {PROPERTY_TYPE_LABELS[propertyData.propertyType] || propertyData.propertyType}
                     </span>
                   </div>
@@ -402,13 +402,13 @@ export default function OnboardingWizard() {
                 {propertyData.enrichment.heatingType && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Heating</span>
-                    <span className="font-medium text-haven-navy-900">{propertyData.enrichment.heatingType}</span>
+                    <span className="font-medium text-haven-900">{propertyData.enrichment.heatingType}</span>
                   </div>
                 )}
                 {propertyData.enrichment.coolingType && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Cooling</span>
-                    <span className="font-medium text-haven-navy-900">{propertyData.enrichment.coolingType}</span>
+                    <span className="font-medium text-haven-900">{propertyData.enrichment.coolingType}</span>
                   </div>
                 )}
                 {propertyData.enrichment.hasPool && (
@@ -420,7 +420,7 @@ export default function OnboardingWizard() {
                 {propertyData.enrichment.fireplaceCount && propertyData.enrichment.fireplaceCount > 0 && (
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Fireplaces</span>
-                    <span className="font-medium text-haven-navy-900">{propertyData.enrichment.fireplaceCount}</span>
+                    <span className="font-medium text-haven-900">{propertyData.enrichment.fireplaceCount}</span>
                   </div>
                 )}
               </div>
@@ -436,7 +436,7 @@ export default function OnboardingWizard() {
             <button
               onClick={handleConfirm}
               disabled={isSaving}
-              className="w-full bg-haven-navy-900 text-white py-3 rounded-xl font-medium hover:bg-haven-navy-800 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full bg-haven-900 text-white py-3 rounded-xl font-medium hover:bg-haven-800 transition flex items-center justify-center gap-2 disabled:opacity-50"
             >
               {isSaving ? (
                 <>
@@ -453,7 +453,7 @@ export default function OnboardingWizard() {
 
             <button
               onClick={() => setStep('address')}
-              className="w-full mt-3 text-gray-500 py-2 text-sm hover:text-haven-navy-900 transition"
+              className="w-full mt-3 text-gray-500 py-2 text-sm hover:text-haven-900 transition"
             >
               ← Change address
             </button>
@@ -467,7 +467,7 @@ export default function OnboardingWizard() {
               <CheckCircle className="w-10 h-10 text-emerald-600" />
             </div>
 
-            <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">
+            <h1 className="text-2xl font-bold text-haven-900 mb-2">
               Welcome to Haven, {userName}!
             </h1>
 
@@ -480,11 +480,11 @@ export default function OnboardingWizard() {
             {propertyData.street && (
               <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
                 <div className="flex items-start gap-3">
-                  <div className="w-10 h-10 bg-haven-champagne-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <Home className="w-5 h-5 text-haven-champagne-600" />
+                  <div className="w-10 h-10 bg-haven-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                    <Home className="w-5 h-5 text-haven-600" />
                   </div>
                   <div>
-                    <p className="font-medium text-haven-navy-900">{propertyData.street}</p>
+                    <p className="font-medium text-haven-900">{propertyData.street}</p>
                     <p className="text-sm text-gray-500">
                       {propertyData.city}, {propertyData.state} {propertyData.zipCode}
                     </p>
@@ -500,21 +500,21 @@ export default function OnboardingWizard() {
             )}
 
             {/* Next Steps */}
-            <div className="bg-haven-champagne-50 rounded-xl p-5 mb-6 text-left">
-              <h3 className="font-semibold text-haven-navy-900 mb-3">
+            <div className="bg-haven-50 rounded-xl p-5 mb-6 text-left">
+              <h3 className="font-semibold text-haven-900 mb-3">
                 What happens next?
               </h3>
               <ul className="space-y-3 text-sm text-gray-600">
                 <li className="flex items-start gap-3">
-                  <Phone className="w-5 h-5 text-haven-champagne-600 mt-0.5 flex-shrink-0" />
+                  <Phone className="w-5 h-5 text-haven-600 mt-0.5 flex-shrink-0" />
                   <span>Schedule a 30-minute intro call with your Home Manager</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Calendar className="w-5 h-5 text-haven-champagne-600 mt-0.5 flex-shrink-0" />
+                  <Calendar className="w-5 h-5 text-haven-600 mt-0.5 flex-shrink-0" />
                   <span>They&apos;ll learn about your home systems, vendors, and needs</span>
                 </li>
                 <li className="flex items-start gap-3">
-                  <Sparkles className="w-5 h-5 text-haven-champagne-600 mt-0.5 flex-shrink-0" />
+                  <Sparkles className="w-5 h-5 text-haven-600 mt-0.5 flex-shrink-0" />
                   <span>Receive your personalized home profile within 48 hours</span>
                 </li>
               </ul>
@@ -522,7 +522,7 @@ export default function OnboardingWizard() {
 
             <button
               onClick={handleScheduleCall}
-              className="w-full bg-haven-navy-900 text-white py-3 rounded-xl font-medium hover:bg-haven-navy-800 transition flex items-center justify-center gap-2"
+              className="w-full bg-haven-900 text-white py-3 rounded-xl font-medium hover:bg-haven-800 transition flex items-center justify-center gap-2"
             >
               <Calendar className="w-5 h-5" />
               Schedule Your Intro Call
@@ -530,7 +530,7 @@ export default function OnboardingWizard() {
 
             <button
               onClick={handleComplete}
-              className="w-full mt-3 text-gray-500 py-2 text-sm hover:text-haven-navy-900 transition"
+              className="w-full mt-3 text-gray-500 py-2 text-sm hover:text-haven-900 transition"
             >
               Skip for now → Explore dashboard
             </button>

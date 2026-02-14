@@ -79,7 +79,7 @@ export default function HandymanScreen() {
         {/* Pricing Info */}
         <Card style={styles.pricingCard}>
           <View style={styles.pricingHeader}>
-            <Ionicons name="construct" size={24} color={colors.haven.champagne[500]} />
+            <Ionicons name="construct" size={24} color={colors.haven.purple[500]} />
             <View style={styles.pricingInfo}>
               <Text style={styles.pricingTitle}>On-Demand Handyman</Text>
               <Text style={styles.pricingDescription}>
@@ -120,7 +120,7 @@ export default function HandymanScreen() {
                   <Ionicons
                     name={service.icon}
                     size={24}
-                    color={isSelected ? colors.white : colors.haven.champagne[500]}
+                    color={isSelected ? colors.white : colors.haven.purple[500]}
                   />
                 </View>
                 <View style={styles.serviceInfo}>
@@ -310,19 +310,19 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   serviceCardSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   serviceIcon: {
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
   serviceIconSelected: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   serviceInfo: {
     flex: 1,
@@ -358,8 +358,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   checkboxSelected: {
-    backgroundColor: colors.haven.champagne[500],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
+    borderColor: colors.haven.purple[500],
   },
   timeSlots: {
     flexDirection: 'row',
@@ -375,8 +375,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   timeSlotSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   timeSlotLabel: {
     fontSize: typography.fontSizes.sm,
@@ -384,7 +384,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   timeSlotLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   timeSlotTime: {
     fontSize: typography.fontSizes.xs,
@@ -392,7 +392,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[1],
   },
   timeSlotTimeSelected: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   howItWorksCard: {
     padding: spacing[4],
@@ -412,7 +412,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -420,7 +420,7 @@ const styles = StyleSheet.create({
   stepNumberText: {
     fontSize: typography.fontSizes.xs,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   stepText: {
     flex: 1,
@@ -445,7 +445,7 @@ const styles = StyleSheet.create({
   footerPrice: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   footerIncluded: {
     fontSize: typography.fontSizes.sm,

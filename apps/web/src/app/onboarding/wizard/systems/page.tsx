@@ -390,29 +390,29 @@ export default function SystemsPage() {
 
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Settings className="w-7 h-7 text-haven-champagne-600" />
+        <div className="w-14 h-14 bg-haven-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Settings className="w-7 h-7 text-haven-600" />
         </div>
-        <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">Home systems & appliances</h1>
+        <h1 className="text-2xl font-bold text-haven-900 mb-2">Home systems & appliances</h1>
         <p className="text-gray-600">
           Tell us about your home systems and major appliances so we can track maintenance.
         </p>
       </div>
 
       {/* Schedule Home Visit CTA */}
-      <div className="bg-haven-champagne-50 border border-haven-champagne-200 rounded-2xl p-6 mb-6">
+      <div className="bg-haven-50 border border-haven-200 rounded-2xl p-6 mb-6">
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 bg-haven-champagne-100 rounded-xl flex items-center justify-center flex-shrink-0">
-            <Home className="w-6 h-6 text-haven-champagne-600" />
+          <div className="w-12 h-12 bg-haven-100 rounded-xl flex items-center justify-center flex-shrink-0">
+            <Home className="w-6 h-6 text-haven-600" />
           </div>
           <div className="flex-1">
-            <h3 className="font-semibold text-haven-navy-900">Want us to document everything?</h3>
+            <h3 className="font-semibold text-haven-900">Want us to document everything?</h3>
             <p className="text-sm text-gray-600 mt-1">
               Schedule a free home visit and our handyman will photograph and catalog all your systems.
             </p>
             <Link
               href="/onboarding/schedule?type=visit"
-              className="inline-flex items-center gap-1 text-sm font-medium text-haven-champagne-700 hover:text-haven-champagne-800 mt-3"
+              className="inline-flex items-center gap-1 text-sm font-medium text-haven-700 hover:text-haven-800 mt-3"
             >
               Schedule home visit →
             </Link>
@@ -452,9 +452,9 @@ export default function SystemsPage() {
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-haven-navy-900">Home Systems</h3>
+            <h3 className="font-semibold text-haven-900">Home Systems</h3>
             {data.systems.length > 0 && (
-              <span className="bg-haven-champagne-100 text-haven-champagne-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              <span className="bg-haven-100 text-haven-700 text-xs font-medium px-2 py-0.5 rounded-full">
                 {data.systems.length}
               </span>
             )}
@@ -480,7 +480,7 @@ export default function SystemsPage() {
                     {getSystemIcon(catInfo.icon)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-haven-navy-900">{catInfo.label}</p>
+                    <p className="font-medium text-haven-900">{catInfo.label}</p>
                     <p className="text-sm text-gray-500">
                       {system.brand && system.model ? `${system.brand} ${system.model}` : catInfo.description}
                     </p>
@@ -488,7 +488,7 @@ export default function SystemsPage() {
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEditSystemModal(system)}
-                      className="p-2 text-gray-400 hover:text-haven-navy-900 hover:bg-white rounded-lg"
+                      className="p-2 text-gray-400 hover:text-haven-900 hover:bg-white rounded-lg"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -535,9 +535,9 @@ export default function SystemsPage() {
           className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
         >
           <div className="flex items-center gap-3">
-            <h3 className="font-semibold text-haven-navy-900">Major Appliances</h3>
+            <h3 className="font-semibold text-haven-900">Major Appliances</h3>
             {data.appliances.length > 0 && (
-              <span className="bg-haven-champagne-100 text-haven-champagne-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              <span className="bg-haven-100 text-haven-700 text-xs font-medium px-2 py-0.5 rounded-full">
                 {data.appliances.length}
               </span>
             )}
@@ -563,7 +563,7 @@ export default function SystemsPage() {
                     {getApplianceIcon(catInfo.icon)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-haven-navy-900">{catInfo.label}</p>
+                    <p className="font-medium text-haven-900">{catInfo.label}</p>
                     <p className="text-sm text-gray-500">
                       {appliance.brand && appliance.model ? `${appliance.brand} ${appliance.model}` : 'No details added'}
                     </p>
@@ -571,7 +571,7 @@ export default function SystemsPage() {
                   <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={() => openEditApplianceModal(appliance)}
-                      className="p-2 text-gray-400 hover:text-haven-navy-900 hover:bg-white rounded-lg"
+                      className="p-2 text-gray-400 hover:text-haven-900 hover:bg-white rounded-lg"
                     >
                       <Pencil className="w-4 h-4" />
                     </button>
@@ -615,14 +615,14 @@ export default function SystemsPage() {
       <div className="flex justify-between mt-8">
         <Link
           href="/onboarding/wizard/bills"
-          className="text-gray-600 hover:text-haven-navy-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
+          className="text-gray-600 hover:text-haven-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <button
           onClick={handleContinue}
-          className="bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
+          className="bg-haven-900 hover:bg-haven-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
         >
           Continue
           <ArrowRight className="w-4 h-4" />
@@ -635,7 +635,7 @@ export default function SystemsPage() {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-haven-navy-900">
+              <h2 className="text-lg font-semibold text-haven-900">
                 {editingSystem || editingAppliance ? 'Edit' : 'Add'} {itemType === 'system' ? 'System' : 'Appliance'}
               </h2>
               <button
@@ -664,11 +664,11 @@ export default function SystemsPage() {
                       <button
                         key={key}
                         onClick={() => setSelectedSystemCategory(key as SystemCategory)}
-                        className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-haven-champagne-500 hover:bg-haven-champagne-50 text-left transition-colors"
+                        className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-haven-500 hover:bg-haven-50 text-left transition-colors"
                       >
                         <span className="text-gray-500">{getSystemIcon(cat.icon)}</span>
                         <div>
-                          <span className="text-sm font-medium text-haven-navy-900 block">{cat.label}</span>
+                          <span className="text-sm font-medium text-haven-900 block">{cat.label}</span>
                           <span className="text-xs text-gray-500">{cat.description}</span>
                         </div>
                       </button>
@@ -688,10 +688,10 @@ export default function SystemsPage() {
                       <button
                         key={key}
                         onClick={() => setSelectedApplianceCategory(key as ApplianceCategory)}
-                        className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-haven-champagne-500 hover:bg-haven-champagne-50 text-left transition-colors"
+                        className="flex items-center gap-2 p-3 rounded-xl border border-gray-200 hover:border-haven-500 hover:bg-haven-50 text-left transition-colors"
                       >
                         <span className="text-gray-500">{getApplianceIcon(cat.icon)}</span>
-                        <span className="text-sm font-medium text-haven-navy-900">{cat.label}</span>
+                        <span className="text-sm font-medium text-haven-900">{cat.label}</span>
                       </button>
                     ))}
                   </div>
@@ -702,14 +702,14 @@ export default function SystemsPage() {
               {((itemType === 'system' && selectedSystemCategory) || (itemType === 'appliance' && selectedApplianceCategory)) && (
                 <>
                   {/* Selected Category Indicator */}
-                  <div className="flex items-center gap-3 p-3 bg-haven-champagne-50 rounded-xl">
-                    <div className="w-10 h-10 bg-haven-champagne-100 rounded-lg flex items-center justify-center text-haven-champagne-600">
+                  <div className="flex items-center gap-3 p-3 bg-haven-50 rounded-xl">
+                    <div className="w-10 h-10 bg-haven-100 rounded-lg flex items-center justify-center text-haven-600">
                       {itemType === 'system' && selectedSystemCategory
                         ? getSystemIcon(SYSTEM_CATEGORIES[selectedSystemCategory].icon)
                         : selectedApplianceCategory && getApplianceIcon(APPLIANCE_CATEGORIES[selectedApplianceCategory].icon)}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-haven-navy-900">
+                      <p className="font-medium text-haven-900">
                         {itemType === 'system' && selectedSystemCategory
                           ? SYSTEM_CATEGORIES[selectedSystemCategory].label
                           : selectedApplianceCategory && APPLIANCE_CATEGORIES[selectedApplianceCategory].label}
@@ -721,7 +721,7 @@ export default function SystemsPage() {
                           setSelectedSystemCategory(null);
                           setSelectedApplianceCategory(null);
                         }}
-                        className="text-sm text-haven-champagne-600 hover:text-haven-champagne-700"
+                        className="text-sm text-haven-600 hover:text-haven-700"
                       >
                         Change
                       </button>
@@ -850,7 +850,7 @@ export default function SystemsPage() {
                 </button>
                 <button
                   onClick={itemType === 'system' ? handleSaveSystem : handleSaveAppliance}
-                  className="flex-1 py-3 px-4 bg-haven-navy-900 text-white rounded-xl font-medium hover:bg-haven-navy-800 transition-colors"
+                  className="flex-1 py-3 px-4 bg-haven-900 text-white rounded-xl font-medium hover:bg-haven-800 transition-colors"
                 >
                   {editingSystem || editingAppliance ? 'Save Changes' : `Add ${itemType === 'system' ? 'System' : 'Appliance'}`}
                 </button>

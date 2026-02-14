@@ -380,8 +380,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   typeButtonActive: {
-    backgroundColor: colors.haven.navy[50],
-    borderColor: colors.haven.navy[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   typeButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -389,7 +389,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   typeButtonTextActive: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',

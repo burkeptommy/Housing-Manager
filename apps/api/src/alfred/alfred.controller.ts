@@ -46,6 +46,19 @@ export class AlfredController {
     );
   }
 
+  @Get('history')
+  async getHistory(@CurrentUser() user: AuthPayload) {
+    const userId = user.userId;
+    const householdId = user.householdId;
+
+    if (!householdId) {
+      return { messages: [] };
+    }
+
+    const messages = await this.alfredService.getConversationHistory(userId, householdId);
+    return { messages };
+  }
+
   @Get('suggestions')
   async getSuggestions(@CurrentUser() user: AuthPayload) {
     const householdId = user.householdId;

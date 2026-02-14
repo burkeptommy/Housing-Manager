@@ -30,10 +30,10 @@ export const FormSelect = forwardRef<HTMLSelectElement, FormSelectProps>(
             ref={ref}
             className={cn(
               'w-full px-4 py-3 rounded-xl border transition-all outline-none appearance-none bg-white',
-              'focus:ring-2 focus:ring-haven-champagne-200',
+              'focus:ring-2 focus:ring-haven-200',
               error
                 ? 'border-red-300 focus:border-red-500'
-                : 'border-gray-300 focus:border-haven-champagne-500',
+                : 'border-gray-300 focus:border-haven-500',
               className
             )}
             {...props}

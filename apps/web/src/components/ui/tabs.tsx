@@ -27,7 +27,7 @@ export function Tabs({ defaultTab, children, className = '' }: TabsProps) {
 
 export function TabList({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex gap-1 p-1 bg-warm-100 rounded-xl ${className}`}>
+    <div className={`flex gap-1 p-1 bg-neutral-100 rounded-xl ${className}`}>
       {children}
     </div>
   );
@@ -53,8 +53,8 @@ export function Tab({
       onClick={() => setActiveTab(id)}
       className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-all duration-200
                   ${isActive
-                    ? 'bg-white text-warm-900 shadow-sm'
-                    : 'text-warm-600 hover:text-warm-900'}`}
+                    ? 'bg-white text-neutral-900 shadow-sm'
+                    : 'text-neutral-600 hover:text-neutral-900'}`}
     >
       {icon}
       {children}
@@ -82,7 +82,7 @@ export function TabPanel({
 // Underline variant for navigation-style tabs
 export function TabListUnderline({ children, className = '' }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`flex gap-6 border-b border-warm-200 ${className}`}>
+    <div className={`flex gap-6 border-b border-neutral-200 ${className}`}>
       {children}
     </div>
   );
@@ -107,14 +107,14 @@ export function TabUnderline({
     <button
       onClick={() => setActiveTab(id)}
       className={`relative pb-3 text-sm font-medium transition-colors
-                  ${isActive ? 'text-haven-700' : 'text-warm-500 hover:text-warm-700'}`}
+                  ${isActive ? 'text-haven-700' : 'text-neutral-500 hover:text-neutral-700'}`}
     >
       <span className="flex items-center gap-2">
         {children}
         {count !== undefined && (
           <span
             className={`px-2 py-0.5 text-xs rounded-full
-                       ${isActive ? 'bg-haven-100 text-haven-700' : 'bg-warm-100 text-warm-600'}`}
+                       ${isActive ? 'bg-haven-100 text-haven-700' : 'bg-neutral-100 text-neutral-600'}`}
           >
             {count}
           </span>

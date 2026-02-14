@@ -29,8 +29,8 @@ export function ListItem({
   title,
   subtitle,
   leftIcon,
-  leftIconColor = colors.haven.champagne[500],
-  leftIconBgColor = colors.haven.champagne[50],
+  leftIconColor = colors.haven.purple[500],
+  leftIconBgColor = colors.haven.purple[50],
   rightElement,
   showChevron = true,
   badge,
@@ -49,7 +49,7 @@ export function ListItem({
       case 'error':
         return { backgroundColor: colors.status.error };
       default:
-        return { backgroundColor: colors.haven.champagne[500] };
+        return { backgroundColor: colors.haven.purple[500] };
     }
   };
 

@@ -203,8 +203,8 @@ export function EditMembershipModal({
               <Switch
                 value={autoRenew}
                 onValueChange={setAutoRenew}
-                trackColor={{ false: colors.gray[200], true: colors.haven.champagne[400] }}
-                thumbColor={autoRenew ? colors.haven.champagne[500] : colors.gray[400]}
+                trackColor={{ false: colors.gray[200], true: colors.haven.purple[400] }}
+                thumbColor={autoRenew ? colors.haven.purple[500] : colors.gray[400]}
               />
             </View>
 
@@ -303,15 +303,15 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
   },
   typeItemSelected: {
-    borderColor: colors.haven.champagne[500],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[500],
+    backgroundColor: colors.haven.purple[50],
   },
   typeLabel: {
     fontSize: typography.fontSizes.sm,
     color: colors.text.secondary,
   },
   typeLabelSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   toggleRow: {

@@ -44,9 +44,23 @@ export class HomeHealthService {
         ]);
 
       // === MAINTENANCE FACTORS ===
-      const overdueTasks = maintenanceTasks.filter((t) => t.status === 'OVERDUE');
+      const now = new Date();
+      // Tasks are overdue if explicitly marked OR if PENDING/SCHEDULED with a past due date
+      const overdueTasks = maintenanceTasks.filter(
+        (t) =>
+          t.status === 'OVERDUE' ||
+          ((t.status === 'PENDING' || t.status === 'SCHEDULED') &&
+            t.dueDate &&
+            new Date(t.dueDate) < now),
+      );
+      // Tasks are upcoming if explicitly marked OR if PENDING/SCHEDULED with a future due date
       const upcomingTasks = maintenanceTasks.filter(
-        (t) => t.status === 'UPCOMING' || t.status === 'SCHEDULED' || t.status === 'DUE_SOON',
+        (t) =>
+          t.status === 'UPCOMING' ||
+          t.status === 'DUE_SOON' ||
+          ((t.status === 'PENDING' || t.status === 'SCHEDULED') &&
+            t.dueDate &&
+            new Date(t.dueDate) >= now),
       );
       const completedTasks = maintenanceTasks.filter((t) => t.status === 'COMPLETED');
 

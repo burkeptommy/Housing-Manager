@@ -5,6 +5,7 @@ import { AuthPayload } from '../firebase';
 import { BudgetingService } from './budgeting.service';
 import { ForecastService } from './forecast.service';
 import { InsightsService } from './insights.service';
+import { SavingsIntelligenceService } from './savings-intelligence.service';
 
 @Controller('budgeting')
 @UseGuards(FirebaseAuthGuard)
@@ -13,6 +14,7 @@ export class BudgetingController {
     private readonly budgetingService: BudgetingService,
     private readonly forecastService: ForecastService,
     private readonly insightsService: InsightsService,
+    private readonly savingsService: SavingsIntelligenceService,
   ) {}
 
   // === BUDGET SETUP ===
@@ -37,6 +39,30 @@ export class BudgetingController {
     @Body() body: { budgetedAmount: number },
   ) {
     return this.budgetingService.updateCategoryBudget(user, categoryId, body.budgetedAmount);
+  }
+
+  // === ENHANCED SUMMARY ===
+
+  @Get('spending/enhanced-summary')
+  async getEnhancedSummary(
+    @CurrentUser() user: AuthPayload,
+    @Query('month') month?: string,
+  ) {
+    return this.budgetingService.getEnhancedSummary(user, month);
+  }
+
+  // === RECURRING PAYMENTS ===
+
+  @Get('recurring')
+  async getRecurringPayments(@CurrentUser() user: AuthPayload) {
+    return this.budgetingService.getRecurringPayments(user);
+  }
+
+  // === BUDGET SUGGESTIONS ===
+
+  @Get('budget/suggestions')
+  async getBudgetSuggestions(@CurrentUser() user: AuthPayload) {
+    return this.budgetingService.getBudgetSuggestions(user);
   }
 
   // === SPENDING ANALYSIS ===
@@ -146,6 +172,23 @@ export class BudgetingController {
     @Param('id') id: string,
   ) {
     return this.forecastService.requestAlfredResearch(user, id);
+  }
+
+  // === SAVINGS INTELLIGENCE ===
+
+  @Get('refinancing-opportunities')
+  async getRefinancingOpportunities(@CurrentUser() user: AuthPayload) {
+    return this.savingsService.getRefinancingOpportunities(user);
+  }
+
+  @Get('rate-optimizations')
+  async getRateOptimizations(@CurrentUser() user: AuthPayload) {
+    return this.savingsService.getRateOptimizations(user);
+  }
+
+  @Get('savings-summary')
+  async getSavingsSummary(@CurrentUser() user: AuthPayload) {
+    return this.savingsService.getSavingsSummary(user);
   }
 
   // === INSIGHTS ===

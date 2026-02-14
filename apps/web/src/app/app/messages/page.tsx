@@ -368,15 +368,15 @@ export default function MessagesPage() {
   if (selectedConversation) {
     const messages = getConversationHistory(selectedConversation.id);
     return (
-      <div className="min-h-screen bg-warm-50 flex flex-col">
+      <div className="min-h-screen bg-neutral-50 flex flex-col">
         {/* Conversation Header */}
-        <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+        <div className="bg-white border-b border-neutral-200 sticky top-0 z-20">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
             <button
               onClick={() => setSelectedConversation(null)}
-              className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-warm-600" />
+              <ChevronLeft className="w-5 h-5 text-neutral-600" />
             </button>
             <div className="flex-1 flex items-center gap-3">
               {selectedConversation.id === 'sarah-chen' && <ManagerAvatar size="md" />}
@@ -386,12 +386,12 @@ export default function MessagesPage() {
                 <VendorAvatar name={selectedConversation.name} size="md" />
               )}
               <div>
-                <h2 className="font-semibold text-warm-900">{selectedConversation.name}</h2>
-                <p className="text-xs text-warm-500">{selectedConversation.role}</p>
+                <h2 className="font-semibold text-neutral-900">{selectedConversation.name}</h2>
+                <p className="text-xs text-neutral-500">{selectedConversation.role}</p>
               </div>
             </div>
-            <button className="p-2 hover:bg-warm-100 rounded-lg transition-colors">
-              <Phone className="w-5 h-5 text-warm-600" />
+            <button className="p-2 hover:bg-neutral-100 rounded-lg transition-colors">
+              <Phone className="w-5 h-5 text-neutral-600" />
             </button>
           </div>
         </div>
@@ -403,10 +403,10 @@ export default function MessagesPage() {
               <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
                 msg.sender === 'user'
                   ? 'bg-haven-700 text-white'
-                  : 'bg-white border border-warm-200 text-warm-900'
+                  : 'bg-white border border-neutral-200 text-neutral-900'
               }`}>
                 <p className="text-sm">{msg.text}</p>
-                <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-haven-200' : 'text-warm-400'}`}>
+                <p className={`text-xs mt-1 ${msg.sender === 'user' ? 'text-haven-200' : 'text-neutral-400'}`}>
                   {msg.time}
                 </p>
               </div>
@@ -415,14 +415,14 @@ export default function MessagesPage() {
         </div>
 
         {/* Message Input */}
-        <div className="bg-white border-t border-warm-200 p-4 safe-area-pb">
+        <div className="bg-white border-t border-neutral-200 p-4 safe-area-pb">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             <input
               type="text"
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+              className="flex-1 px-4 py-2.5 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
             />
             <button className="p-3 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
               <Send className="w-5 h-5" />
@@ -436,19 +436,19 @@ export default function MessagesPage() {
   // Show project detail view
   if (selectedProject) {
     return (
-      <div className="min-h-screen bg-warm-50 flex flex-col">
+      <div className="min-h-screen bg-neutral-50 flex flex-col">
         {/* Project Header */}
-        <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+        <div className="bg-white border-b border-neutral-200 sticky top-0 z-20">
           <div className="max-w-4xl mx-auto px-4 py-3 flex items-center gap-3">
             <button
               onClick={() => setSelectedProject(null)}
-              className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+              className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
             >
-              <ChevronLeft className="w-5 h-5 text-warm-600" />
+              <ChevronLeft className="w-5 h-5 text-neutral-600" />
             </button>
             <div className="flex-1">
-              <h2 className="font-semibold text-warm-900">{selectedProject.title}</h2>
-              <p className="text-xs text-warm-500">{selectedProject.category} • {selectedProject.vendor}</p>
+              <h2 className="font-semibold text-neutral-900">{selectedProject.title}</h2>
+              <p className="text-xs text-neutral-500">{selectedProject.category} • {selectedProject.vendor}</p>
             </div>
           </div>
         </div>
@@ -456,22 +456,22 @@ export default function MessagesPage() {
         {/* Project Messages */}
         <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4 max-w-4xl mx-auto w-full">
           <div className="flex justify-start">
-            <div className="max-w-[80%] rounded-2xl px-4 py-2.5 bg-white border border-warm-200 text-warm-900">
+            <div className="max-w-[80%] rounded-2xl px-4 py-2.5 bg-white border border-neutral-200 text-neutral-900">
               <p className="text-sm">{selectedProject.lastMessage}</p>
-              <p className="text-xs mt-1 text-warm-400">{selectedProject.lastMessageTime}</p>
+              <p className="text-xs mt-1 text-neutral-400">{selectedProject.lastMessageTime}</p>
             </div>
           </div>
         </div>
 
         {/* Message Input */}
-        <div className="bg-white border-t border-warm-200 p-4 safe-area-pb">
+        <div className="bg-white border-t border-neutral-200 p-4 safe-area-pb">
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             <input
               type="text"
               value={messageInput}
               onChange={(e) => setMessageInput(e.target.value)}
               placeholder="Type a message..."
-              className="flex-1 px-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+              className="flex-1 px-4 py-2.5 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent"
             />
             <button className="p-3 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
               <Send className="w-5 h-5" />
@@ -483,12 +483,12 @@ export default function MessagesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-warm-50">
+    <div className="min-h-screen bg-neutral-50">
       {/* Header */}
-      <div className="bg-white border-b border-warm-200 sticky top-0 z-20">
+      <div className="bg-white border-b border-neutral-200 sticky top-0 z-20">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between mb-4">
-            <h1 className="text-2xl font-bold text-warm-900">Messages</h1>
+            <h1 className="text-2xl font-bold text-neutral-900">Messages</h1>
             <button
               onClick={() => setShowNewMessageModal(true)}
               className="p-2 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors"
@@ -499,24 +499,24 @@ export default function MessagesPage() {
 
           {/* Search */}
           <div className="relative mb-4">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
             <input
               type="text"
               placeholder="Search messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-2.5 border border-warm-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent bg-warm-50"
+              className="w-full pl-10 pr-4 py-2.5 border border-neutral-200 rounded-xl focus:ring-2 focus:ring-haven-600 focus:border-transparent bg-neutral-50"
             />
           </div>
 
           {/* Tabs */}
-          <div className="flex gap-1 p-1 bg-warm-100 rounded-xl">
+          <div className="flex gap-1 p-1 bg-neutral-100 rounded-xl">
             <button
               onClick={() => setActiveTab('conversations')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'conversations'
-                  ? 'bg-white text-warm-900 shadow-sm'
-                  : 'text-warm-600 hover:text-warm-900'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <MessageSquare className="w-4 h-4" />
@@ -526,8 +526,8 @@ export default function MessagesPage() {
               onClick={() => setActiveTab('projects')}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
                 activeTab === 'projects'
-                  ? 'bg-white text-warm-900 shadow-sm'
-                  : 'text-warm-600 hover:text-warm-900'
+                  ? 'bg-white text-neutral-900 shadow-sm'
+                  : 'text-neutral-600 hover:text-neutral-900'
               }`}
             >
               <FolderOpen className="w-4 h-4" />
@@ -553,7 +553,7 @@ export default function MessagesPage() {
                 className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                   selectedCategory === 'all'
                     ? 'bg-haven-700 text-white'
-                    : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
+                    : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
                 }`}
               >
                 All
@@ -567,7 +567,7 @@ export default function MessagesPage() {
                     className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                       selectedCategory === key
                         ? 'bg-haven-700 text-white'
-                        : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
+                        : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
                     }`}
                   >
                     <Icon className="w-4 h-4" />
@@ -582,7 +582,7 @@ export default function MessagesPage() {
               <div className="px-4 mb-2">
                 <div className="flex items-center gap-2 py-2">
                   <Pin className="w-4 h-4 text-haven-700" />
-                  <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">
+                  <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
                     Pinned
                   </span>
                 </div>
@@ -606,7 +606,7 @@ export default function MessagesPage() {
                 <div key={category} className="px-4 mb-2">
                   <div className="flex items-center gap-2 py-2 mt-2">
                     <Icon className={`w-4 h-4 ${config.color}`} />
-                    <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">
+                    <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">
                       {config.label}
                     </span>
                   </div>
@@ -631,7 +631,7 @@ export default function MessagesPage() {
                   className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
                     projectFilter === filter
                       ? 'bg-haven-700 text-white'
-                      : 'bg-white text-warm-600 border border-warm-200 hover:bg-warm-50'
+                      : 'bg-white text-neutral-600 border border-neutral-200 hover:bg-neutral-50'
                   }`}
                 >
                   {filter === 'all' ? 'All Projects' : filter.charAt(0).toUpperCase() + filter.slice(1)}
@@ -646,7 +646,7 @@ export default function MessagesPage() {
               ))}
 
               {filteredProjects.length === 0 && (
-                <div className="text-center py-12 text-warm-500">
+                <div className="text-center py-12 text-neutral-500">
                   No projects found
                 </div>
               )}
@@ -664,17 +664,17 @@ export default function MessagesPage() {
               setNewMessageRecipient(null);
             }} />
             <div className="relative bg-white rounded-xl shadow-xl w-full max-w-md max-h-[80vh] overflow-hidden">
-              <div className="p-4 border-b border-warm-200">
+              <div className="p-4 border-b border-neutral-200">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold text-warm-900">New Message</h3>
+                  <h3 className="text-lg font-semibold text-neutral-900">New Message</h3>
                   <button
                     onClick={() => {
                       setShowNewMessageModal(false);
                       setNewMessageRecipient(null);
                     }}
-                    className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+                    className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
                   >
-                    <X className="w-5 h-5 text-warm-400" />
+                    <X className="w-5 h-5 text-neutral-400" />
                   </button>
                 </div>
               </div>
@@ -682,13 +682,13 @@ export default function MessagesPage() {
               {!newMessageRecipient ? (
                 <>
                   {/* Search */}
-                  <div className="p-4 border-b border-warm-100">
+                  <div className="p-4 border-b border-neutral-100">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400" />
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                       <input
                         type="text"
                         placeholder="Search contacts..."
-                        className="w-full pl-9 pr-4 py-2 border border-warm-200 rounded-lg text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+                        className="w-full pl-9 pr-4 py-2 border border-neutral-200 rounded-lg text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
                       />
                     </div>
                   </div>
@@ -696,14 +696,14 @@ export default function MessagesPage() {
                   {/* Contact List */}
                   <div className="max-h-[400px] overflow-y-auto">
                     {/* Your Team */}
-                    <div className="px-4 py-2 bg-warm-50">
-                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Your Team</span>
+                    <div className="px-4 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Your Team</span>
                     </div>
                     {contacts.filter(c => c.category === 'team').map(contact => (
                       <button
                         key={contact.id}
                         onClick={() => setNewMessageRecipient(contact)}
-                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 hover:bg-neutral-50 transition-colors text-left"
                       >
                         {contact.id === 'sarah-chen' ? (
                           <ManagerAvatar size="md" />
@@ -715,44 +715,44 @@ export default function MessagesPage() {
                           <InitialsAvatar name={contact.name} size="md" />
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
-                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                          <p className="font-medium text-neutral-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-neutral-500 truncate">{contact.role}</p>
                         </div>
                       </button>
                     ))}
 
                     {/* Vendors */}
-                    <div className="px-4 py-2 bg-warm-50">
-                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Vendors</span>
+                    <div className="px-4 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Vendors</span>
                     </div>
                     {contacts.filter(c => c.category === 'vendors').map(contact => (
                       <button
                         key={contact.id}
                         onClick={() => setNewMessageRecipient(contact)}
-                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 hover:bg-neutral-50 transition-colors text-left"
                       >
                         <VendorAvatar name={contact.name} size="md" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
-                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                          <p className="font-medium text-neutral-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-neutral-500 truncate">{contact.role}</p>
                         </div>
                       </button>
                     ))}
 
                     {/* Community */}
-                    <div className="px-4 py-2 bg-warm-50">
-                      <span className="text-xs font-semibold text-warm-500 uppercase tracking-wide">Community</span>
+                    <div className="px-4 py-2 bg-neutral-50">
+                      <span className="text-xs font-semibold text-neutral-500 uppercase tracking-wide">Community</span>
                     </div>
                     {contacts.filter(c => c.category === 'community').map(contact => (
                       <button
                         key={contact.id}
                         onClick={() => setNewMessageRecipient(contact)}
-                        className="w-full flex items-center gap-3 p-3 hover:bg-warm-50 transition-colors text-left"
+                        className="w-full flex items-center gap-3 p-3 hover:bg-neutral-50 transition-colors text-left"
                       >
                         <InitialsAvatar name={contact.name} size="md" />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-warm-900 text-sm">{contact.name}</p>
-                          <p className="text-xs text-warm-500 truncate">{contact.role}</p>
+                          <p className="font-medium text-neutral-900 text-sm">{contact.name}</p>
+                          <p className="text-xs text-neutral-500 truncate">{contact.role}</p>
                         </div>
                       </button>
                     ))}
@@ -762,32 +762,32 @@ export default function MessagesPage() {
                 /* Message Compose View */
                 <div className="flex flex-col h-[400px]">
                   {/* Recipient Header */}
-                  <div className="p-3 border-b border-warm-100 flex items-center gap-3">
+                  <div className="p-3 border-b border-neutral-100 flex items-center gap-3">
                     <button
                       onClick={() => setNewMessageRecipient(null)}
-                      className="p-1 hover:bg-warm-100 rounded"
+                      className="p-1 hover:bg-neutral-100 rounded"
                     >
-                      <ChevronLeft className="w-5 h-5 text-warm-400" />
+                      <ChevronLeft className="w-5 h-5 text-neutral-400" />
                     </button>
                     <InitialsAvatar name={newMessageRecipient.name} size="sm" />
                     <div>
-                      <p className="font-medium text-warm-900 text-sm">{newMessageRecipient.name}</p>
-                      <p className="text-xs text-warm-500">{newMessageRecipient.role}</p>
+                      <p className="font-medium text-neutral-900 text-sm">{newMessageRecipient.name}</p>
+                      <p className="text-xs text-neutral-500">{newMessageRecipient.role}</p>
                     </div>
                   </div>
 
                   {/* Message Area */}
-                  <div className="flex-1 p-4 bg-warm-50">
-                    <p className="text-sm text-warm-400 text-center mt-8">Start a conversation with {newMessageRecipient.name.split(' ')[0]}</p>
+                  <div className="flex-1 p-4 bg-neutral-50">
+                    <p className="text-sm text-neutral-400 text-center mt-8">Start a conversation with {newMessageRecipient.name.split(' ')[0]}</p>
                   </div>
 
                   {/* Input */}
-                  <div className="p-3 border-t border-warm-200 bg-white">
+                  <div className="p-3 border-t border-neutral-200 bg-white">
                     <div className="flex gap-2">
                       <input
                         type="text"
                         placeholder="Type a message..."
-                        className="flex-1 px-4 py-2 border border-warm-200 rounded-xl text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
+                        className="flex-1 px-4 py-2 border border-neutral-200 rounded-xl text-sm focus:ring-2 focus:ring-haven-600 focus:border-transparent"
                         autoFocus
                       />
                       <button className="px-4 py-2 bg-haven-700 text-white rounded-xl hover:bg-haven-800 transition-colors">
@@ -832,7 +832,7 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick?: () => vo
   };
 
   return (
-    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-warm-50 cursor-pointer transition-colors active:bg-warm-100">
+    <div onClick={onClick} className="flex items-center gap-3 p-3 bg-white rounded-xl hover:bg-neutral-50 cursor-pointer transition-colors active:bg-neutral-100">
       {/* Avatar with online indicator */}
       <div className="relative">
         {renderAvatar()}
@@ -844,18 +844,18 @@ function ContactRow({ contact, onClick }: { contact: Contact; onClick?: () => vo
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
-          <h3 className="font-medium text-warm-900 truncate">{contact.name}</h3>
+          <h3 className="font-medium text-neutral-900 truncate">{contact.name}</h3>
           {contact.isPinned && (
             <Pin className="w-3 h-3 text-haven-700 flex-shrink-0" />
           )}
         </div>
-        <p className="text-xs text-warm-500 truncate">{contact.role}</p>
-        <p className="text-sm text-warm-600 truncate mt-0.5">{contact.lastMessage}</p>
+        <p className="text-xs text-neutral-500 truncate">{contact.role}</p>
+        <p className="text-sm text-neutral-600 truncate mt-0.5">{contact.lastMessage}</p>
       </div>
 
       {/* Meta */}
       <div className="flex flex-col items-end gap-1">
-        <span className="text-xs text-warm-400">{contact.lastMessageTime}</span>
+        <span className="text-xs text-neutral-400">{contact.lastMessageTime}</span>
         {contact.unreadCount > 0 && (
           <span className="px-2 py-0.5 bg-haven-700 text-white text-xs font-medium rounded-full">
             {contact.unreadCount}
@@ -870,26 +870,26 @@ function ProjectRow({ project, onClick }: { project: ProjectConversation; onClic
   const statusColors = {
     active: 'bg-green-100 text-green-700',
     pending: 'bg-amber-100 text-amber-700',
-    resolved: 'bg-warm-100 text-warm-600',
+    resolved: 'bg-neutral-100 text-neutral-600',
   };
 
   return (
-    <div onClick={onClick} className="bg-white rounded-xl p-4 hover:shadow-md cursor-pointer transition-all border border-warm-100 active:bg-warm-50">
+    <div onClick={onClick} className="bg-white rounded-xl p-4 hover:shadow-md cursor-pointer transition-all border border-neutral-100 active:bg-neutral-50">
       <div className="flex items-start justify-between mb-3">
         <div>
           <div className="flex items-center gap-2">
-            <h3 className="font-semibold text-warm-900">{project.title}</h3>
+            <h3 className="font-semibold text-neutral-900">{project.title}</h3>
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${statusColors[project.status]}`}>
               {project.status}
             </span>
           </div>
           <div className="flex items-center gap-2 mt-1">
-            <Hash className="w-3 h-3 text-warm-400" />
-            <span className="text-sm text-warm-500">{project.category}</span>
+            <Hash className="w-3 h-3 text-neutral-400" />
+            <span className="text-sm text-neutral-500">{project.category}</span>
             {project.vendor && (
               <>
-                <span className="text-warm-300">•</span>
-                <span className="text-sm text-warm-500">{project.vendor}</span>
+                <span className="text-neutral-300">•</span>
+                <span className="text-sm text-neutral-500">{project.vendor}</span>
               </>
             )}
           </div>
@@ -918,15 +918,15 @@ function ProjectRow({ project, onClick }: { project: ProjectConversation; onClic
             </div>
           ))}
         </div>
-        <span className="text-xs text-warm-500">
+        <span className="text-xs text-neutral-500">
           {project.participants.map(p => p.name).join(', ')}
         </span>
       </div>
 
       {/* Last message */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-warm-600 truncate flex-1">{project.lastMessage}</p>
-        <span className="text-xs text-warm-400 ml-2 flex-shrink-0">{project.lastMessageTime}</span>
+        <p className="text-sm text-neutral-600 truncate flex-1">{project.lastMessage}</p>
+        <span className="text-xs text-neutral-400 ml-2 flex-shrink-0">{project.lastMessageTime}</span>
       </div>
     </div>
   );

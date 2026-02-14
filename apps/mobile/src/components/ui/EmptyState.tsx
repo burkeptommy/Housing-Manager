@@ -18,7 +18,7 @@ interface EmptyStateProps {
 
 export function EmptyState({
   icon = 'document-outline',
-  iconColor = colors.haven.navy[300],
+  iconColor = colors.haven.purple[300],
   title,
   description,
   actionLabel,
@@ -142,7 +142,7 @@ export function NoBillsEmptyState({ onAction, onSecondaryAction }: { onAction?: 
   return (
     <EmptyState
       icon="card-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No bills detected yet"
       description="Connect your bank to auto-detect bills, or add them manually to track your home expenses."
       actionLabel="Connect Bank"
@@ -158,7 +158,7 @@ export function NoFamilyEmptyState({ onAction }: { onAction?: () => void }) {
   return (
     <EmptyState
       icon="people-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="Add your household"
       description="Keep track of family members, their activities, medical info, and emergency contacts all in one place."
       actionLabel="Add Family Member"
@@ -172,7 +172,7 @@ export function NoVendorsEmptyState({ onAction }: { onAction?: () => void }) {
   return (
     <EmptyState
       icon="business-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No vendors added"
       description="Add your service providers like plumbers, electricians, and landscapers for quick access when you need them."
       actionLabel="Add Vendor"
@@ -186,7 +186,7 @@ export function NoSystemsEmptyState({ onAction }: { onAction?: () => void }) {
   return (
     <EmptyState
       icon="construct-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No home systems documented"
       description="Add your HVAC, plumbing, and other systems to get maintenance reminders and track service history."
       actionLabel="Add System"
@@ -200,7 +200,7 @@ export function NoPetsEmptyState({ onAction }: { onAction?: () => void }) {
   return (
     <EmptyState
       icon="paw-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No pets added"
       description="Track your furry friends' vet visits, medications, and care instructions."
       actionLabel="Add Pet"
@@ -214,7 +214,7 @@ export function NoVehiclesEmptyState({ onAction }: { onAction?: () => void }) {
   return (
     <EmptyState
       icon="car-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No vehicles added"
       description="Track maintenance, registration, and insurance for your vehicles."
       actionLabel="Add Vehicle"
@@ -228,7 +228,7 @@ export function NoActivitiesEmptyState({ onAction }: { onAction?: () => void }) 
   return (
     <EmptyState
       icon="calendar-outline"
-      iconColor={colors.haven.champagne[500]}
+      iconColor={colors.haven.purple[500]}
       title="No activities added"
       description="Track sports, lessons, and other activities for your family members."
       actionLabel="Add Activity"
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },

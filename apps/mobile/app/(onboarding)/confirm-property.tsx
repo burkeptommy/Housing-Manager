@@ -53,7 +53,7 @@ export default function ConfirmPropertyScreen() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch property details from ATTOM via API
+  // Fetch property details via API
   useEffect(() => {
     fetchPropertyDetails();
   }, []);
@@ -82,7 +82,7 @@ export default function ConfirmPropertyScreen() {
       }
     } catch (err) {
       console.error('Property lookup error:', err);
-      // Not a fatal error - we can proceed without ATTOM data
+      // Not a fatal error - we can proceed without property data
     } finally {
       setIsLoading(false);
     }
@@ -107,7 +107,7 @@ export default function ConfirmPropertyScreen() {
           firstName: firstName || pendingSocialAuth.firstName,
           lastName: lastName || pendingSocialAuth.lastName,
           address: addressData,
-          propertyDetails, // Pass ATTOM data to backend
+          propertyDetails, // Pass property data to backend
         });
 
         if (result.success) {
@@ -148,7 +148,7 @@ export default function ConfirmPropertyScreen() {
   }) => (
     <View style={styles.propertyRow}>
       <View style={styles.propertyIcon}>
-        <Ionicons name={icon as any} size={20} color={colors.haven.champagne[500]} />
+        <Ionicons name={icon as any} size={20} color={colors.haven.purple[500]} />
       </View>
       <Text style={styles.propertyLabel}>{label}</Text>
       <Text style={styles.propertyValue}>{value || '—'}</Text>
@@ -173,7 +173,7 @@ export default function ConfirmPropertyScreen() {
 
         {/* Address Card */}
         <View style={styles.addressCard}>
-          <Ionicons name="home" size={24} color={colors.haven.champagne[500]} />
+          <Ionicons name="home" size={24} color={colors.haven.purple[500]} />
           <View style={styles.addressText}>
             <Text style={styles.addressStreet}>{street}</Text>
             <Text style={styles.addressCity}>{city}, {state} {zipCode}</Text>
@@ -187,13 +187,13 @@ export default function ConfirmPropertyScreen() {
         <View style={styles.card}>
           {isLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+              <ActivityIndicator size="large" color={colors.haven.purple[500]} />
               <Text style={styles.loadingText}>Looking up property details...</Text>
             </View>
           ) : propertyDetails ? (
             <>
               <View style={styles.autoFilledBadge}>
-                <Ionicons name="sparkles" size={14} color={colors.haven.champagne[600]} />
+                <Ionicons name="sparkles" size={14} color={colors.haven.purple[600]} />
                 <Text style={styles.autoFilledText}>Auto-filled from public records</Text>
               </View>
 
@@ -256,7 +256,7 @@ export default function ConfirmPropertyScreen() {
             </>
           ) : (
             <View style={styles.noDataContainer}>
-              <Ionicons name="information-circle-outline" size={32} color={colors.haven.navy[400]} />
+              <Ionicons name="information-circle-outline" size={32} color={colors.haven.purple[400]} />
               <Text style={styles.noDataText}>
                 We couldn't find detailed records for this property.
                 Don't worry—Alfred will help you fill in the details!
@@ -320,7 +320,7 @@ export default function ConfirmPropertyScreen() {
 
         {/* Back Button */}
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={20} color={colors.haven.navy[600]} />
+          <Ionicons name="arrow-back" size={20} color={colors.haven.purple[600]} />
           <Text style={styles.backButtonText}>Change Address</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -331,7 +331,7 @@ export default function ConfirmPropertyScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
   },
   scrollContent: {
     flexGrow: 1,
@@ -350,12 +350,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[2],
   },
   subtitle: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     textAlign: 'center',
     lineHeight: 22,
   },
@@ -374,16 +374,16 @@ const styles = StyleSheet.create({
   addressStreet: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   addressCity: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: 2,
   },
   editLink: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   card: {
@@ -399,12 +399,12 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: spacing[3],
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
   },
   autoFilledBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     paddingHorizontal: spacing[3],
     paddingVertical: spacing[2],
     borderRadius: borderRadius.full,
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
   },
   autoFilledText: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   propertyGrid: {
@@ -425,7 +425,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing[2],
     borderBottomWidth: 1,
-    borderBottomColor: colors.haven.navy[100],
+    borderBottomColor: colors.haven.purple[100],
   },
   propertyIcon: {
     width: 32,
@@ -433,12 +433,12 @@ const styles = StyleSheet.create({
   propertyLabel: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
   },
   propertyValue: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   noDataContainer: {
     alignItems: 'center',
@@ -447,12 +447,12 @@ const styles = StyleSheet.create({
   noDataText: {
     marginTop: spacing[3],
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     textAlign: 'center',
     lineHeight: 20,
   },
   nextStepsCard: {
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     padding: spacing[5],
     marginBottom: spacing[6],
@@ -460,7 +460,7 @@ const styles = StyleSheet.create({
   nextStepsTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[4],
   },
   nextStep: {
@@ -473,7 +473,7 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   stepText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     lineHeight: 20,
   },
   errorContainer: {
@@ -503,7 +503,7 @@ const styles = StyleSheet.create({
     color: colors.status.error,
   },
   button: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     flexDirection: 'row',
@@ -528,6 +528,6 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
   },
 });

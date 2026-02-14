@@ -17,7 +17,7 @@ const variantClasses: Record<BadgeVariant, string> = {
   warning: 'bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20',
   error: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20',
   info: 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-600/20',
-  neutral: 'bg-warm-100 text-warm-700 ring-1 ring-inset ring-warm-600/10',
+  neutral: 'bg-neutral-100 text-neutral-700 ring-1 ring-inset ring-neutral-600/10',
   premium: 'bg-gradient-to-r from-gold-50 to-gold-100 text-gold-800 ring-1 ring-inset ring-gold-400/30',
 };
 

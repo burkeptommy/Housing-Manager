@@ -164,9 +164,9 @@ const ZONE_ICONS: Record<ZoneType, keyof typeof Ionicons.glyphMap> = {
 };
 
 const ZONE_COLORS: Record<ZoneType, string> = {
-  KITCHEN: colors.haven.champagne[500],
-  LIVING_ROOM: colors.haven.navy[500],
-  DINING_ROOM: colors.haven.champagne[600],
+  KITCHEN: colors.haven.purple[500],
+  LIVING_ROOM: colors.haven.purple[500],
+  DINING_ROOM: colors.haven.purple[600],
   BEDROOM: colors.indigo[500],
   BATHROOM: colors.blue[500],
   GARAGE: colors.gray[600],
@@ -372,7 +372,7 @@ export default function YourHomeScreen() {
     );
   }
 
-  const totalAssets = data.zones.reduce((sum, zone) => sum + zone.assetCount, 0);
+  const totalAssets = (data.zones || []).reduce((sum, zone) => sum + (zone.assetCount || 0), 0);
 
   return (
     <ScreenContainer
@@ -395,25 +395,25 @@ export default function YourHomeScreen() {
 
           {/* Property Stats */}
           <View style={styles.propertyStats}>
-            {data.property.details.bedrooms && (
+            {data.property.details?.bedrooms && (
               <View style={styles.statBadge}>
                 <Ionicons name="bed-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.statText}>{data.property.details.bedrooms} bed</Text>
               </View>
             )}
-            {data.property.details.bathrooms && (
+            {data.property.details?.bathrooms && (
               <View style={styles.statBadge}>
                 <Ionicons name="water-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.statText}>{data.property.details.bathrooms} bath</Text>
               </View>
             )}
-            {data.property.details.squareFeet && (
+            {data.property.details?.squareFeet && (
               <View style={styles.statBadge}>
                 <Ionicons name="resize-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.statText}>{data.property.details.squareFeet.toLocaleString()} sqft</Text>
               </View>
             )}
-            {data.property.details.yearBuilt && (
+            {data.property.details?.yearBuilt && (
               <View style={styles.statBadge}>
                 <Ionicons name="calendar-outline" size={14} color={colors.text.secondary} />
                 <Text style={styles.statText}>Built {data.property.details.yearBuilt}</Text>
@@ -483,7 +483,7 @@ export default function YourHomeScreen() {
               style={styles.emptyUtilityCard}
               onPress={() => router.push('/(tabs)/manager/vendors/add' as any)}
             >
-              <Ionicons name="flash-outline" size={32} color={colors.haven.champagne[500]} />
+              <Ionicons name="flash-outline" size={32} color={colors.haven.purple[500]} />
               <Text style={styles.emptyUtilityText}>Add your utility providers</Text>
               <Text style={styles.emptyUtilitySubtext}>Electric, gas, water, internet...</Text>
             </TouchableOpacity>
@@ -527,13 +527,13 @@ export default function YourHomeScreen() {
               onPress={() => setShowAddAssetModal(true)}
             >
               <View style={styles.emptySystemsIcon}>
-                <Ionicons name="hardware-chip-outline" size={28} color={colors.haven.champagne[500]} />
+                <Ionicons name="hardware-chip-outline" size={28} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.emptySystemsContent}>
                 <Text style={styles.emptySystemsTitle}>Add your home systems</Text>
                 <Text style={styles.emptySystemsSubtitle}>HVAC, water heater, appliances...</Text>
               </View>
-              <Ionicons name="add-circle-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="add-circle-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           )}
         </View>
@@ -599,7 +599,7 @@ export default function YourHomeScreen() {
           />
 
           {/* Recent Assets Preview */}
-          {data.zones.flatMap(z => z.assets).slice(0, 5).length === 0 ? (
+          {(data.zones || []).flatMap(z => z.assets || []).slice(0, 5).length === 0 ? (
             <TouchableOpacity
               style={styles.emptyCard}
               onPress={() => setShowAddAssetModal(true)}
@@ -609,7 +609,7 @@ export default function YourHomeScreen() {
             </TouchableOpacity>
           ) : (
             <AnimatedCard style={styles.assetsCard}>
-              {data.zones.flatMap(z => z.assets.map(a => ({ ...a, zoneName: z.name }))).slice(0, 5).map((asset, index) => (
+              {(data.zones || []).flatMap(z => (z.assets || []).map(a => ({ ...a, zoneName: z.name }))).slice(0, 5).map((asset, index) => (
                 <TouchableOpacity
                   key={asset.id}
                   style={[
@@ -634,7 +634,7 @@ export default function YourHomeScreen() {
                   onPress={() => router.push('/(tabs)/home/assets' as any)}
                 >
                   <Text style={styles.viewAllText}>View all {totalAssets} items</Text>
-                  <Ionicons name="arrow-forward" size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name="arrow-forward" size={16} color={colors.haven.purple[500]} />
                 </TouchableOpacity>
               )}
             </AnimatedCard>
@@ -702,7 +702,7 @@ export default function YourHomeScreen() {
           >
             <View style={styles.vendorsRow}>
               <View style={styles.vendorIconCircle}>
-                <Ionicons name="people" size={24} color={colors.haven.champagne[500]} />
+                <Ionicons name="people" size={24} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.vendorsContent}>
                 <Text style={styles.vendorsTitle}>Vendor CRM</Text>
@@ -721,7 +721,7 @@ export default function YourHomeScreen() {
           onPress={() => askAlfredForHelp('my property')}
         >
           <View style={styles.alfredIconContainer}>
-            <AlfredTabIcon size={28} color={colors.haven.navy[900]} />
+            <AlfredTabIcon size={28} color={colors.haven.purple[900]} />
           </View>
           <View style={styles.alfredContent}>
             <Text style={styles.alfredTitle}>Ask Alfred</Text>
@@ -731,7 +731,7 @@ export default function YourHomeScreen() {
                 : 'Your AI home manager is ready to help'}
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={colors.haven.navy[400]} />
+          <Ionicons name="chevron-forward" size={20} color={colors.haven.purple[400]} />
         </TouchableOpacity>
       </ScrollView>
 
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -881,11 +881,11 @@ const styles = StyleSheet.create({
   emptySystemsCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.xl,
     padding: spacing[4],
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
     borderStyle: 'dashed',
   },
   emptySystemsIcon: {
@@ -1027,7 +1027,7 @@ const styles = StyleSheet.create({
   viewAllText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
 
   // Utilities
@@ -1062,9 +1062,9 @@ const styles = StyleSheet.create({
     padding: spacing[6],
     borderStyle: 'dashed',
     borderWidth: 1,
-    borderColor: colors.haven.champagne[300],
+    borderColor: colors.haven.purple[300],
     borderRadius: borderRadius.xl,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   emptyUtilityText: {
     fontSize: typography.fontSizes.base,
@@ -1094,7 +1094,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1115,20 +1115,20 @@ const styles = StyleSheet.create({
   alfredCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     marginHorizontal: spacing[4],
     marginTop: spacing[5],
     marginBottom: spacing[4],
     padding: spacing[4],
     borderRadius: borderRadius.xl,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   alfredIconContainer: {
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1139,7 +1139,7 @@ const styles = StyleSheet.create({
   alfredTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   alfredSubtitle: {
     fontSize: typography.fontSizes.xs,

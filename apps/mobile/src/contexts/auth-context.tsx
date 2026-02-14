@@ -42,6 +42,7 @@ interface UserInfo {
   displayName: string | null;
   firstName: string | null;
   lastName: string | null;
+  phone: string | null;
   avatarUrl: string | null;
   role: string;
   emailVerified: boolean;
@@ -86,7 +87,7 @@ interface RegisterSimpleInput {
   };
 }
 
-// Property details from ATTOM (for onboarding)
+// Property details from property lookup (for onboarding)
 interface PropertyDetails {
   bedrooms: number | null;
   bathrooms: number | null;
@@ -264,7 +265,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             email: meData.user.email,
             firstName: meData.user.firstName || '',
             lastName: meData.user.lastName || '',
-            phone: null,
+            phone: meData.user.phone || null,
             avatarUrl: meData.user.avatarUrl,
             role: meData.user.role as User['role'],
             isActive: true,
@@ -374,7 +375,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         email: meData.user.email,
         firstName: meData.user.firstName || '',
         lastName: meData.user.lastName || '',
-        phone: null,
+        phone: meData.user.phone || null,
         avatarUrl: meData.user.avatarUrl,
         role: meData.user.role as User['role'],
         isActive: true,
@@ -515,10 +516,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         await SecureStore.setItemAsync(STORED_EMAIL_KEY, input.email);
         await SecureStore.setItemAsync(STORED_PASSWORD_KEY, input.password);
 
-        // 5. Refresh user data to get household info
-        await refreshMe();
-        await refreshHouseholds();
-
+        // 5. Don't refresh state here — let the completion screen handle it
+        // This allows the user to see the celebration screen before being
+        // redirected to the main app by the navigation guard
         return { success: true };
       } catch (error: any) {
         console.error('Simple registration error:', error);
@@ -680,7 +680,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           firstName: input.firstName,
           lastName: input.lastName,
           address: input.address,
-          propertyDetails: input.propertyDetails, // Include ATTOM data
+          propertyDetails: input.propertyDetails, // Include property data
         }),
       });
 

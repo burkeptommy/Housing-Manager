@@ -481,8 +481,8 @@ const getCategoryColor = (category: BillCategory) => {
     case 'childcare': return { bg: 'bg-rose-100', text: 'text-rose-700', icon: 'text-rose-600', border: 'border-rose-200' };
     case 'pet_care': return { bg: 'bg-orange-100', text: 'text-orange-700', icon: 'text-orange-600', border: 'border-orange-200' };
     case 'maintenance': return { bg: 'bg-blue-100', text: 'text-blue-700', icon: 'text-blue-600', border: 'border-blue-200' };
-    case 'membership': return { bg: 'bg-warm-100', text: 'text-warm-700', icon: 'text-warm-600', border: 'border-warm-200' };
-    default: return { bg: 'bg-warm-100', text: 'text-warm-700', icon: 'text-warm-600', border: 'border-warm-200' };
+    case 'membership': return { bg: 'bg-neutral-100', text: 'text-neutral-700', icon: 'text-neutral-600', border: 'border-neutral-200' };
+    default: return { bg: 'bg-neutral-100', text: 'text-neutral-700', icon: 'text-neutral-600', border: 'border-neutral-200' };
   }
 };
 
@@ -513,7 +513,7 @@ const getStatusBadge = (status: PaymentStatus, dueDate?: Date) => {
     case 'overdue':
       return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded-full"><AlertCircle className="w-3 h-3" /> Overdue</span>;
     default:
-      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-warm-100 text-warm-700 text-xs font-medium rounded-full">Pending</span>;
+      return <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-neutral-100 text-neutral-700 text-xs font-medium rounded-full">Pending</span>;
   }
 };
 
@@ -567,7 +567,7 @@ function AuthorizationCard({
   return (
     <div
       className={`bg-white rounded-xl border-2 p-5 transition-all hover:shadow-lg ${
-        request.urgency === 'high' ? 'border-red-300 bg-red-50/30' : 'border-warm-200'
+        request.urgency === 'high' ? 'border-red-300 bg-red-50/30' : 'border-neutral-200'
       }`}
     >
       {request.urgency === 'high' && (
@@ -583,12 +583,12 @@ function AuthorizationCard({
             <CategoryIcon className={`w-5 h-5 ${categoryColor.icon}`} />
           </div>
           <div>
-            <div className="font-semibold text-warm-900">{request.vendor}</div>
-            <div className="text-sm text-warm-500">{request.description}</div>
+            <div className="font-semibold text-neutral-900">{request.vendor}</div>
+            <div className="text-sm text-neutral-500">{request.description}</div>
           </div>
         </div>
         <div className="text-right">
-          <div className="text-xl font-bold text-warm-900">{formatCurrency(request.amount)}</div>
+          <div className="text-xl font-bold text-neutral-900">{formatCurrency(request.amount)}</div>
         </div>
       </div>
 
@@ -599,7 +599,7 @@ function AuthorizationCard({
           </div>
           <div>
             <div className="text-xs font-medium text-emerald-700 mb-1">Note from {request.managerName}, your Home Manager</div>
-            <div className="text-sm text-warm-700">{request.managerNote}</div>
+            <div className="text-sm text-neutral-700">{request.managerNote}</div>
           </div>
         </div>
       </div>
@@ -614,7 +614,7 @@ function AuthorizationCard({
         </button>
         <button
           onClick={() => onDecline(request.id)}
-          className="flex items-center justify-center gap-2 px-4 py-2.5 border border-warm-300 text-warm-700 rounded-lg font-medium hover:bg-warm-50 transition-colors"
+          className="flex items-center justify-center gap-2 px-4 py-2.5 border border-neutral-300 text-neutral-700 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
         >
           <X className="w-4 h-4" />
           Decline
@@ -636,12 +636,12 @@ function MortgageCard({ mortgage }: { mortgage: MortgageDetails }) {
               <Home className="w-6 h-6 text-indigo-700" />
             </div>
             <div>
-              <h3 className="font-semibold text-warm-900">Mortgage & Housing</h3>
-              <p className="text-sm text-warm-600">{mortgage.lender}</p>
+              <h3 className="font-semibold text-neutral-900">Mortgage & Housing</h3>
+              <p className="text-sm text-neutral-600">{mortgage.lender}</p>
             </div>
           </div>
           <div className="text-right">
-            <div className="text-2xl font-bold text-warm-900">{formatCurrency(mortgage.monthlyPayment)}</div>
+            <div className="text-2xl font-bold text-neutral-900">{formatCurrency(mortgage.monthlyPayment)}</div>
             <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-100 text-emerald-700 text-xs font-medium rounded-full">
               <CheckCircle2 className="w-3 h-3" /> Paid {formatDate(mortgage.lastPaidDate)}
             </span>
@@ -650,23 +650,23 @@ function MortgageCard({ mortgage }: { mortgage: MortgageDetails }) {
       </div>
 
       <div className="p-5 space-y-3">
-        <div className="flex items-center justify-between py-2 border-b border-warm-100">
-          <span className="text-sm text-warm-600">Principal & Interest</span>
-          <span className="font-medium text-warm-900">{formatCurrency(mortgage.principalAndInterest)}</span>
+        <div className="flex items-center justify-between py-2 border-b border-neutral-100">
+          <span className="text-sm text-neutral-600">Principal & Interest</span>
+          <span className="font-medium text-neutral-900">{formatCurrency(mortgage.principalAndInterest)}</span>
         </div>
-        <div className="flex items-center justify-between py-2 border-b border-warm-100">
-          <span className="text-sm text-warm-600">Property Tax (Escrow)</span>
-          <span className="font-medium text-warm-900">{formatCurrency(mortgage.escrowAmount)}</span>
+        <div className="flex items-center justify-between py-2 border-b border-neutral-100">
+          <span className="text-sm text-neutral-600">Property Tax (Escrow)</span>
+          <span className="font-medium text-neutral-900">{formatCurrency(mortgage.escrowAmount)}</span>
         </div>
         <div className="flex items-center justify-between py-2">
-          <span className="text-sm text-warm-600">Next Payment</span>
+          <span className="text-sm text-neutral-600">Next Payment</span>
           <span className="text-sm font-medium text-blue-600">{formatDate(mortgage.nextDueDate)} - Scheduled</span>
         </div>
       </div>
 
       <button
         onClick={() => setShowDetails(!showDetails)}
-        className="w-full flex items-center justify-center gap-2 py-3 border-t border-warm-100 text-sm font-medium text-warm-600 hover:bg-warm-50 transition-colors"
+        className="w-full flex items-center justify-center gap-2 py-3 border-t border-neutral-100 text-sm font-medium text-neutral-600 hover:bg-neutral-50 transition-colors"
       >
         {showDetails ? (
           <>
@@ -682,23 +682,23 @@ function MortgageCard({ mortgage }: { mortgage: MortgageDetails }) {
       </button>
 
       {showDetails && (
-        <div className="p-5 bg-warm-50 border-t border-warm-100 space-y-3">
+        <div className="p-5 bg-neutral-50 border-t border-neutral-100 space-y-3">
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <p className="text-xs text-warm-500">Loan Balance</p>
-              <p className="font-semibold text-warm-900">{formatCurrency(mortgage.loanBalance)}</p>
+              <p className="text-xs text-neutral-500">Loan Balance</p>
+              <p className="font-semibold text-neutral-900">{formatCurrency(mortgage.loanBalance)}</p>
             </div>
             <div>
-              <p className="text-xs text-warm-500">Interest Rate</p>
-              <p className="font-semibold text-warm-900">{mortgage.interestRate}%</p>
+              <p className="text-xs text-neutral-500">Interest Rate</p>
+              <p className="font-semibold text-neutral-900">{mortgage.interestRate}%</p>
             </div>
             <div>
-              <p className="text-xs text-warm-500">Account Number</p>
-              <p className="font-semibold text-warm-900">{mortgage.accountNumber}</p>
+              <p className="text-xs text-neutral-500">Account Number</p>
+              <p className="font-semibold text-neutral-900">{mortgage.accountNumber}</p>
             </div>
             <div>
-              <p className="text-xs text-warm-500">Estimated Payoff</p>
-              <p className="font-semibold text-warm-900">{mortgage.payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
+              <p className="text-xs text-neutral-500">Estimated Payoff</p>
+              <p className="font-semibold text-neutral-900">{mortgage.payoffDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}</p>
             </div>
           </div>
         </div>
@@ -724,10 +724,10 @@ function BillCategoryGroup({
   const hasDueSoon = bills.some(b => b.status === 'due_soon' || b.status === 'overdue');
 
   return (
-    <div className={`bg-white rounded-xl border ${hasDueSoon ? 'border-amber-300' : 'border-warm-200'} overflow-hidden`}>
+    <div className={`bg-white rounded-xl border ${hasDueSoon ? 'border-amber-300' : 'border-neutral-200'} overflow-hidden`}>
       <button
         onClick={onToggle}
-        className="w-full flex items-center justify-between p-4 hover:bg-warm-50 transition-colors"
+        className="w-full flex items-center justify-between p-4 hover:bg-neutral-50 transition-colors"
       >
         <div className="flex items-center gap-3">
           <div className={`p-2 rounded-lg ${categoryColor.bg}`}>
@@ -735,41 +735,41 @@ function BillCategoryGroup({
           </div>
           <div className="text-left">
             <div className="flex items-center gap-2">
-              <span className="font-medium text-warm-900">{getCategoryLabel(category)}</span>
+              <span className="font-medium text-neutral-900">{getCategoryLabel(category)}</span>
               {hasDueSoon && <AlertTriangle className="w-4 h-4 text-amber-500" />}
             </div>
-            <div className="text-sm text-warm-500">{bills.length} {bills.length === 1 ? 'item' : 'items'}</div>
+            <div className="text-sm text-neutral-500">{bills.length} {bills.length === 1 ? 'item' : 'items'}</div>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="font-semibold text-warm-900">{formatCurrency(total)}</span>
-          <ChevronDown className={`w-5 h-5 text-warm-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+          <span className="font-semibold text-neutral-900">{formatCurrency(total)}</span>
+          <ChevronDown className={`w-5 h-5 text-neutral-400 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
         </div>
       </button>
 
       {isExpanded && (
         <div className="px-4 pb-4">
-          <div className="border-t border-warm-100 pt-3 space-y-2">
+          <div className="border-t border-neutral-100 pt-3 space-y-2">
             {bills.map((bill) => (
               <div
                 key={bill.id}
                 className={`flex items-center justify-between p-3 rounded-lg ${
-                  bill.status === 'due_soon' ? 'bg-amber-50 border border-amber-200' : 'bg-warm-50'
+                  bill.status === 'due_soon' ? 'bg-amber-50 border border-amber-200' : 'bg-neutral-50'
                 }`}
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-warm-900">{bill.vendor}</span>
+                    <span className="font-medium text-neutral-900">{bill.vendor}</span>
                     {bill.isRecurring && bill.frequency && (
-                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-warm-200 text-warm-600 rounded">
+                      <span className="px-1.5 py-0.5 text-[10px] font-medium bg-neutral-200 text-neutral-600 rounded">
                         {bill.frequency}
                       </span>
                     )}
                   </div>
-                  <div className="text-sm text-warm-500">{bill.description}</div>
+                  <div className="text-sm text-neutral-500">{bill.description}</div>
                 </div>
                 <div className="text-right">
-                  <div className="font-medium text-warm-900">{formatCurrency(bill.amount)}</div>
+                  <div className="font-medium text-neutral-900">{formatCurrency(bill.amount)}</div>
                   <div className="mt-1">
                     {bill.status === 'paid' && bill.paidDate ? (
                       <span className="text-xs text-emerald-600">Paid {formatDate(bill.paidDate)}</span>
@@ -860,42 +860,42 @@ function ManualBillModal({
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl w-full max-w-md shadow-xl">
-        <div className="flex items-center justify-between p-5 border-b border-warm-200">
+        <div className="flex items-center justify-between p-5 border-b border-neutral-200">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-emerald-100 rounded-lg">
               <Plus className="w-5 h-5 text-emerald-600" />
             </div>
-            <h2 className="text-lg font-bold text-warm-900">Add Bill Manually</h2>
+            <h2 className="text-lg font-bold text-neutral-900">Add Bill Manually</h2>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+            className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
           >
-            <X className="w-5 h-5 text-warm-500" />
+            <X className="w-5 h-5 text-neutral-500" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
           {/* Bill Name */}
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">Bill Name</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Bill Name</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Netflix, AT&T, Pool Service"
-              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
               required
             />
           </div>
 
           {/* Category */}
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">Category</label>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">Category</label>
             <select
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
             >
               {BILL_CATEGORIES.map((cat) => (
                 <option key={cat.value} value={cat.value}>{cat.label}</option>
@@ -906,9 +906,9 @@ function ManualBillModal({
           {/* Amount and Frequency Row */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Amount</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Amount</label>
               <div className="relative">
-                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-warm-400" />
+                <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400" />
                 <input
                   type="number"
                   value={amount}
@@ -916,17 +916,17 @@ function ManualBillModal({
                   placeholder="0.00"
                   step="0.01"
                   min="0"
-                  className="w-full pl-9 pr-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                  className="w-full pl-9 pr-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   required
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-warm-700 mb-1">Frequency</label>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Frequency</label>
               <select
                 value={frequency}
                 onChange={(e) => setFrequency(e.target.value)}
-                className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
+                className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent bg-white"
               >
                 {FREQUENCY_OPTIONS.map((freq) => (
                   <option key={freq.value} value={freq.value}>{freq.label}</option>
@@ -937,8 +937,8 @@ function ManualBillModal({
 
           {/* Due Day */}
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
-              Due Day of Month <span className="text-warm-400 font-normal">(optional)</span>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Due Day of Month <span className="text-neutral-400 font-normal">(optional)</span>
             </label>
             <input
               type="number"
@@ -947,21 +947,21 @@ function ManualBillModal({
               placeholder="e.g., 15"
               min="1"
               max="31"
-              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
             />
           </div>
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-warm-700 mb-1">
-              Notes <span className="text-warm-400 font-normal">(optional)</span>
+            <label className="block text-sm font-medium text-neutral-700 mb-1">
+              Notes <span className="text-neutral-400 font-normal">(optional)</span>
             </label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Account number, login info, etc."
               rows={2}
-              className="w-full px-3 py-2 border border-warm-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
+              className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:ring-2 focus:ring-emerald-600 focus:border-transparent resize-none"
             />
           </div>
 
@@ -970,7 +970,7 @@ function ManualBillModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2.5 border border-warm-300 text-warm-700 rounded-lg font-medium hover:bg-warm-50 transition-colors"
+              className="flex-1 px-4 py-2.5 border border-neutral-300 text-neutral-700 rounded-lg font-medium hover:bg-neutral-50 transition-colors"
             >
               Cancel
             </button>
@@ -1000,19 +1000,19 @@ function BillSuggestionsCard({
 }) {
   if (suggestions.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+      <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 bg-amber-100 rounded-lg">
             <Lightbulb className="w-5 h-5 text-amber-600" />
           </div>
-          <h3 className="font-semibold text-warm-900">Anything We&apos;re Missing?</h3>
+          <h3 className="font-semibold text-neutral-900">Anything We&apos;re Missing?</h3>
         </div>
-        <p className="text-sm text-warm-600 mb-4">
+        <p className="text-sm text-neutral-600 mb-4">
           Looks like we&apos;ve captured all your bills! If there&apos;s something we missed, add it manually.
         </p>
         <button
           onClick={onAddManually}
-          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-neutral-300 rounded-lg text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
           <span className="text-sm font-medium">Add Bill Manually</span>
@@ -1022,15 +1022,15 @@ function BillSuggestionsCard({
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-warm-200 shadow-sm overflow-hidden">
-      <div className="p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-warm-200">
+    <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm overflow-hidden">
+      <div className="p-5 bg-gradient-to-r from-amber-50 to-orange-50 border-b border-neutral-200">
         <div className="flex items-center gap-3">
           <div className="p-2 bg-amber-100 rounded-lg">
             <Lightbulb className="w-5 h-5 text-amber-600" />
           </div>
           <div>
-            <h3 className="font-semibold text-warm-900">Anything We&apos;re Missing?</h3>
-            <p className="text-sm text-warm-600">Based on your home profile, you might have these bills</p>
+            <h3 className="font-semibold text-neutral-900">Anything We&apos;re Missing?</h3>
+            <p className="text-sm text-neutral-600">Based on your home profile, you might have these bills</p>
           </div>
         </div>
       </div>
@@ -1039,31 +1039,31 @@ function BillSuggestionsCard({
         {suggestions.map((suggestion) => (
           <div
             key={suggestion.id}
-            className="p-4 bg-warm-50 rounded-xl border border-warm-100"
+            className="p-4 bg-neutral-50 rounded-xl border border-neutral-100"
           >
             <div className="flex items-start justify-between mb-2">
               <div>
-                <div className="font-medium text-warm-900">{suggestion.label}</div>
-                <div className="text-sm text-warm-500">{suggestion.description}</div>
+                <div className="font-medium text-neutral-900">{suggestion.label}</div>
+                <div className="text-sm text-neutral-500">{suggestion.description}</div>
               </div>
               {suggestion.estimatedAmount && (
                 <div className="text-right">
-                  <div className="text-sm font-medium text-warm-700">
+                  <div className="text-sm font-medium text-neutral-700">
                     {formatCurrency(suggestion.estimatedAmount.min)} - {formatCurrency(suggestion.estimatedAmount.max)}
                   </div>
-                  <div className="text-xs text-warm-400">/{suggestion.frequency.toLowerCase()}</div>
+                  <div className="text-xs text-neutral-400">/{suggestion.frequency.toLowerCase()}</div>
                 </div>
               )}
             </div>
             <div className="flex items-center justify-between mt-3">
-              <span className="text-xs text-warm-400 flex items-center gap-1">
+              <span className="text-xs text-neutral-400 flex items-center gap-1">
                 <Info className="w-3 h-3" />
                 {suggestion.reason}
               </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => onDismissSuggestion(suggestion.id)}
-                  className="px-3 py-1.5 text-xs font-medium text-warm-500 hover:text-warm-700 transition-colors"
+                  className="px-3 py-1.5 text-xs font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
                 >
                   Dismiss
                 </button>
@@ -1080,7 +1080,7 @@ function BillSuggestionsCard({
 
         <button
           onClick={onAddManually}
-          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors mt-2"
+          className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-neutral-300 rounded-lg text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors mt-2"
         >
           <Plus className="w-4 h-4" />
           <span className="text-sm font-medium">Add Different Bill</span>
@@ -1228,7 +1228,7 @@ export default function BillingPage() {
   const ytdTotal = statementBreakdown.total * 11;
 
   return (
-    <div className="min-h-screen bg-warm-50 pb-24 lg:pb-8">
+    <div className="min-h-screen bg-neutral-50 pb-24 lg:pb-8">
       <ConfettiEffect show={showConfetti} />
 
       {/* Toast Notification */}
@@ -1240,7 +1240,7 @@ export default function BillingPage() {
                 ? 'bg-emerald-600 text-white'
                 : toast.type === 'error'
                   ? 'bg-red-600 text-white'
-                  : 'bg-warm-800 text-white'
+                  : 'bg-neutral-800 text-white'
             }`}
           >
             {toast.type === 'success' && <CheckCircle2 className="w-5 h-5" />}
@@ -1252,7 +1252,7 @@ export default function BillingPage() {
       )}
 
       {/* Hero Statement Section */}
-      <div className="bg-gradient-to-br from-warm-900 via-warm-800 to-warm-900 text-white">
+      <div className="bg-gradient-to-br from-neutral-900 via-neutral-800 to-neutral-900 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12">
           <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-8">
             {/* Left: Statement Info */}
@@ -1264,7 +1264,7 @@ export default function BillingPage() {
               <h1 className="text-4xl lg:text-5xl font-bold mb-2 text-white">
                 {formatCurrency(statementBreakdown.total)}
               </h1>
-              <p className="text-warm-400 mb-6">
+              <p className="text-neutral-400 mb-6">
                 Due {formatFullDate(nextPaymentDate)} • {daysUntilDue} days
               </p>
 
@@ -1272,56 +1272,56 @@ export default function BillingPage() {
               <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
                 <div className="space-y-2.5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
-                      <Receipt className="w-4 h-4 text-warm-500" />
+                    <span className="text-neutral-300 flex items-center gap-2">
+                      <Receipt className="w-4 h-4 text-neutral-500" />
                       Haven Membership
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.membership)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <Home className="w-4 h-4 text-indigo-400" />
                       Mortgage & Housing
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.mortgage)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <Zap className="w-4 h-4 text-amber-400" />
                       Utilities
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.utilities)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
                       Insurance
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.insurance)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <Sparkles className="w-4 h-4 text-purple-400" />
                       Household Services
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.householdServices)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <GraduationCap className="w-4 h-4 text-pink-400" />
                       Kids & Activities
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.kidsActivities)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <PawPrint className="w-4 h-4 text-orange-400" />
                       Pet Care
                     </span>
                     <span className="font-medium">{formatCurrency(statementBreakdown.petCare)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="text-warm-300 flex items-center gap-2">
+                    <span className="text-neutral-300 flex items-center gap-2">
                       <Wrench className="w-4 h-4 text-blue-400" />
                       Maintenance & Repairs
                     </span>
@@ -1337,14 +1337,14 @@ export default function BillingPage() {
               <div className="flex flex-wrap gap-3">
                 <button
                   onClick={() => setShowStatementModal(true)}
-                  className="flex items-center gap-2 px-5 py-2.5 bg-white text-warm-900 rounded-lg font-medium hover:bg-warm-100 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-white text-neutral-900 rounded-lg font-medium hover:bg-neutral-100 transition-colors"
                 >
                   <FileText className="w-4 h-4" />
                   View Full Statement
                 </button>
                 <button
                   onClick={() => showToast('Downloading PDF statement...', 'info')}
-                  className="flex items-center gap-2 px-5 py-2.5 border border-warm-600 text-white rounded-lg font-medium hover:bg-warm-800 transition-colors"
+                  className="flex items-center gap-2 px-5 py-2.5 border border-neutral-600 text-white rounded-lg font-medium hover:bg-neutral-800 transition-colors"
                 >
                   <Download className="w-4 h-4" />
                   Download PDF
@@ -1360,16 +1360,16 @@ export default function BillingPage() {
                 </div>
                 <div>
                   <div className="font-semibold">Auto-Pay Enabled</div>
-                  <div className="text-sm text-warm-400">Scheduled for {formatDate(nextPaymentDate)}</div>
+                  <div className="text-sm text-neutral-400">Scheduled for {formatDate(nextPaymentDate)}</div>
                 </div>
               </div>
 
-              <div className="p-3 bg-warm-800/50 rounded-lg mb-4">
+              <div className="p-3 bg-neutral-800/50 rounded-lg mb-4">
                 <div className="flex items-center gap-3">
-                  <Building2 className="w-5 h-5 text-warm-400" />
+                  <Building2 className="w-5 h-5 text-neutral-400" />
                   <div className="flex-1">
                     <div className="text-sm font-medium">Chase Checking</div>
-                    <div className="text-xs text-warm-400">•••• 9876</div>
+                    <div className="text-xs text-neutral-400">•••• 9876</div>
                   </div>
                   <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded">
                     Default
@@ -1377,7 +1377,7 @@ export default function BillingPage() {
                 </div>
               </div>
 
-              <p className="text-xs text-warm-400">
+              <p className="text-xs text-neutral-400">
                 Haven pays all your bills throughout the month, then charges you once on the 1st. No action needed.
               </p>
             </div>
@@ -1395,7 +1395,7 @@ export default function BillingPage() {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <AlertCircle className="w-5 h-5 text-amber-500" />
-                    <h2 className="text-lg font-semibold text-warm-900">Sarah Needs Your Approval</h2>
+                    <h2 className="text-lg font-semibold text-neutral-900">Sarah Needs Your Approval</h2>
                     <span className="px-2 py-0.5 bg-amber-100 text-amber-700 text-xs font-semibold rounded-full">
                       {authRequests.length}
                     </span>
@@ -1405,7 +1405,7 @@ export default function BillingPage() {
                       setTempThreshold(trustThreshold);
                       setShowThresholdModal(true);
                     }}
-                    className="text-sm text-warm-500 hover:text-warm-700 font-medium flex items-center gap-1"
+                    className="text-sm text-neutral-500 hover:text-neutral-700 font-medium flex items-center gap-1"
                   >
                     <Settings className="w-4 h-4" />
                     Auto-approve under {formatCurrency(trustThreshold)}
@@ -1427,7 +1427,7 @@ export default function BillingPage() {
 
             {/* Mortgage Section */}
             <div>
-              <h2 className="text-lg font-semibold text-warm-900 mb-4">This Month&apos;s Bills</h2>
+              <h2 className="text-lg font-semibold text-neutral-900 mb-4">This Month&apos;s Bills</h2>
               <MortgageCard mortgage={mortgage} />
             </div>
 
@@ -1458,21 +1458,21 @@ export default function BillingPage() {
             />
 
             {/* Annual Summary */}
-            <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-purple-100 rounded-lg">
                   <TrendingUp className="w-5 h-5 text-purple-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-warm-900">{currentYear} Summary</h3>
-                  <p className="text-sm text-warm-500">Year-to-date spending</p>
+                  <h3 className="font-semibold text-neutral-900">{currentYear} Summary</h3>
+                  <p className="text-sm text-neutral-500">Year-to-date spending</p>
                 </div>
               </div>
 
-              <div className="p-4 bg-warm-50 rounded-lg mb-4">
+              <div className="p-4 bg-neutral-50 rounded-lg mb-4">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-warm-900">{formatCurrency(ytdTotal)}</div>
-                  <div className="text-sm text-warm-500 mt-1">Total paid by Haven this year</div>
+                  <div className="text-3xl font-bold text-neutral-900">{formatCurrency(ytdTotal)}</div>
+                  <div className="text-sm text-neutral-500 mt-1">Total paid by Haven this year</div>
                 </div>
               </div>
 
@@ -1486,19 +1486,19 @@ export default function BillingPage() {
             </div>
 
             {/* Bill Accounts */}
-            <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-warm-900">Bill Accounts</h3>
-                <span className="text-xs text-warm-500">12 linked</span>
+                <h3 className="font-semibold text-neutral-900">Bill Accounts</h3>
+                <span className="text-xs text-neutral-500">12 linked</span>
               </div>
 
-              <p className="text-sm text-warm-600 mb-4">
+              <p className="text-sm text-neutral-600 mb-4">
                 Haven pays these bills on your behalf and includes them in your monthly statement.
               </p>
 
               <button
                 onClick={() => showToast('Opening bill account management...', 'info')}
-                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-warm-300 rounded-lg text-warm-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
+                className="w-full flex items-center justify-center gap-2 py-2.5 border-2 border-dashed border-neutral-300 rounded-lg text-neutral-600 hover:border-emerald-500 hover:text-emerald-600 transition-colors"
               >
                 <Settings className="w-4 h-4" />
                 <span className="text-sm font-medium">Manage Accounts</span>
@@ -1506,50 +1506,50 @@ export default function BillingPage() {
             </div>
 
             {/* Payment Method */}
-            <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6">
               <div className="flex items-center justify-between mb-4">
-                <h3 className="font-semibold text-warm-900">Payment Method</h3>
+                <h3 className="font-semibold text-neutral-900">Payment Method</h3>
                 <button className="text-sm text-emerald-600 font-medium">Change</button>
               </div>
 
-              <div className="p-4 bg-warm-50 rounded-lg flex items-center gap-4">
+              <div className="p-4 bg-neutral-50 rounded-lg flex items-center gap-4">
                 <div className="p-2 bg-blue-100 rounded-lg">
                   <Building2 className="w-5 h-5 text-blue-600" />
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium text-warm-900">Chase Checking</div>
-                  <div className="text-sm text-warm-500">•••• 9876</div>
+                  <div className="font-medium text-neutral-900">Chase Checking</div>
+                  <div className="text-sm text-neutral-500">•••• 9876</div>
                 </div>
                 <BadgeCheck className="w-5 h-5 text-emerald-500" />
               </div>
             </div>
 
             {/* Tax Documents */}
-            <div className="bg-white rounded-2xl border border-warm-200 shadow-sm p-6">
+            <div className="bg-white rounded-2xl border border-neutral-200 shadow-sm p-6">
               <div className="flex items-center gap-3 mb-4">
-                <div className="p-2 bg-warm-100 rounded-lg">
-                  <FileText className="w-5 h-5 text-warm-600" />
+                <div className="p-2 bg-neutral-100 rounded-lg">
+                  <FileText className="w-5 h-5 text-neutral-600" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-warm-900">Tax Documents</h3>
-                  <p className="text-sm text-warm-500">Download for your records</p>
+                  <h3 className="font-semibold text-neutral-900">Tax Documents</h3>
+                  <p className="text-sm text-neutral-500">Download for your records</p>
                 </div>
               </div>
 
               <div className="space-y-2">
                 <button
                   onClick={() => showToast('Downloading 2024 tax summary...', 'info')}
-                  className="w-full flex items-center justify-between p-3 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors"
+                  className="w-full flex items-center justify-between p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
-                  <span className="text-sm font-medium text-warm-700">2024 Tax Summary</span>
-                  <Download className="w-4 h-4 text-warm-400" />
+                  <span className="text-sm font-medium text-neutral-700">2024 Tax Summary</span>
+                  <Download className="w-4 h-4 text-neutral-400" />
                 </button>
                 <button
                   onClick={() => showToast('Downloading property tax records...', 'info')}
-                  className="w-full flex items-center justify-between p-3 bg-warm-50 rounded-lg hover:bg-warm-100 transition-colors"
+                  className="w-full flex items-center justify-between p-3 bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors"
                 >
-                  <span className="text-sm font-medium text-warm-700">Property Tax Records</span>
-                  <Download className="w-4 h-4 text-warm-400" />
+                  <span className="text-sm font-medium text-neutral-700">Property Tax Records</span>
+                  <Download className="w-4 h-4 text-neutral-400" />
                 </button>
               </div>
             </div>
@@ -1582,15 +1582,15 @@ export default function BillingPage() {
       {showStatementModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[85vh] overflow-hidden shadow-xl">
-            <div className="flex items-center justify-between p-6 border-b border-warm-200 bg-warm-50">
+            <div className="flex items-center justify-between p-6 border-b border-neutral-200 bg-neutral-50">
               <div>
-                <h2 className="text-xl font-bold text-warm-900">Your {currentMonth} Statement</h2>
-                <p className="text-sm text-warm-500">Due {formatFullDate(nextPaymentDate)}</p>
+                <h2 className="text-xl font-bold text-neutral-900">Your {currentMonth} Statement</h2>
+                <p className="text-sm text-neutral-500">Due {formatFullDate(nextPaymentDate)}</p>
               </div>
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => showToast('Downloading PDF...', 'info')}
-                  className="px-3 py-2 text-sm font-medium text-warm-700 hover:bg-white rounded-lg transition-colors flex items-center gap-2"
+                  className="px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-white rounded-lg transition-colors flex items-center gap-2"
                 >
                   <Download className="w-4 h-4" />
                   PDF
@@ -1599,7 +1599,7 @@ export default function BillingPage() {
                   onClick={() => setShowStatementModal(false)}
                   className="p-2 hover:bg-white rounded-lg transition-colors"
                 >
-                  <X className="w-5 h-5 text-warm-500" />
+                  <X className="w-5 h-5 text-neutral-500" />
                 </button>
               </div>
             </div>
@@ -1616,15 +1616,15 @@ export default function BillingPage() {
                   if (category === 'membership') {
                     return (
                       <div key={category} className="mb-6">
-                        <h3 className="text-sm font-semibold text-warm-500 uppercase tracking-wider mb-3">Membership</h3>
-                        <div className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
+                        <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider mb-3">Membership</h3>
+                        <div className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-warm-200 rounded-lg">
-                              <Receipt className="w-4 h-4 text-warm-600" />
+                            <div className="p-2 bg-neutral-200 rounded-lg">
+                              <Receipt className="w-4 h-4 text-neutral-600" />
                             </div>
-                            <span className="font-medium text-warm-900">Haven Home Management</span>
+                            <span className="font-medium text-neutral-900">Haven Home Management</span>
                           </div>
-                          <span className="font-semibold text-warm-900">{formatCurrency(HAVEN_MEMBERSHIP_FEE)}</span>
+                          <span className="font-semibold text-neutral-900">{formatCurrency(HAVEN_MEMBERSHIP_FEE)}</span>
                         </div>
                       </div>
                     );
@@ -1633,27 +1633,27 @@ export default function BillingPage() {
                   return (
                     <div key={category} className="mb-6">
                       <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-sm font-semibold text-warm-500 uppercase tracking-wider">
+                        <h3 className="text-sm font-semibold text-neutral-500 uppercase tracking-wider">
                           {getCategoryLabel(category)}
                         </h3>
-                        <span className="text-sm font-medium text-warm-700">{formatCurrency(categoryTotal)}</span>
+                        <span className="text-sm font-medium text-neutral-700">{formatCurrency(categoryTotal)}</span>
                       </div>
                       <div className="space-y-2">
                         {categoryBills.map((bill) => (
-                          <div key={bill.id} className="flex items-center justify-between p-3 bg-warm-50 rounded-lg">
+                          <div key={bill.id} className="flex items-center justify-between p-3 bg-neutral-50 rounded-lg">
                             <div className="flex items-center gap-3">
                               <div className={`p-2 rounded-lg ${categoryColor.bg}`}>
                                 <CategoryIcon className={`w-4 h-4 ${categoryColor.icon}`} />
                               </div>
                               <div>
-                                <div className="font-medium text-warm-900">{bill.vendor}</div>
-                                <div className="text-sm text-warm-500">{bill.description}</div>
+                                <div className="font-medium text-neutral-900">{bill.vendor}</div>
+                                <div className="text-sm text-neutral-500">{bill.description}</div>
                               </div>
                             </div>
                             <div className="text-right">
-                              <div className="font-medium text-warm-900">{formatCurrency(bill.amount)}</div>
+                              <div className="font-medium text-neutral-900">{formatCurrency(bill.amount)}</div>
                               {bill.paidDate && (
-                                <div className="text-xs text-warm-400">{formatDate(bill.paidDate)}</div>
+                                <div className="text-xs text-neutral-400">{formatDate(bill.paidDate)}</div>
                               )}
                             </div>
                           </div>
@@ -1664,12 +1664,12 @@ export default function BillingPage() {
                 })}
             </div>
 
-            <div className="p-6 border-t border-warm-200 bg-warm-900 text-white rounded-b-2xl">
+            <div className="p-6 border-t border-neutral-200 bg-neutral-900 text-white rounded-b-2xl">
               <div className="flex items-center justify-between">
                 <span className="font-semibold">Total Due</span>
                 <span className="text-3xl font-bold">{formatCurrency(statementBreakdown.total)}</span>
               </div>
-              <p className="text-sm text-warm-400 mt-2">Auto-pay scheduled for {formatFullDate(nextPaymentDate)}</p>
+              <p className="text-sm text-neutral-400 mt-2">Auto-pay scheduled for {formatFullDate(nextPaymentDate)}</p>
             </div>
           </div>
         </div>
@@ -1680,29 +1680,29 @@ export default function BillingPage() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-xl">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-bold text-warm-900">Auto-Approval Threshold</h2>
+              <h2 className="text-xl font-bold text-neutral-900">Auto-Approval Threshold</h2>
               <button
                 onClick={() => setShowThresholdModal(false)}
-                className="p-2 hover:bg-warm-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-neutral-100 rounded-lg transition-colors"
               >
-                <X className="w-5 h-5 text-warm-500" />
+                <X className="w-5 h-5 text-neutral-500" />
               </button>
             </div>
 
             <div className="space-y-4">
-              <p className="text-warm-600">
+              <p className="text-neutral-600">
                 Sarah can automatically approve routine expenses under this amount without asking you first.
               </p>
 
-              <div className="p-4 bg-warm-50 rounded-xl">
-                <label className="block text-sm font-medium text-warm-700 mb-2">Threshold Amount</label>
+              <div className="p-4 bg-neutral-50 rounded-xl">
+                <label className="block text-sm font-medium text-neutral-700 mb-2">Threshold Amount</label>
                 <div className="relative">
-                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-warm-400" />
+                  <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-neutral-400" />
                   <input
                     type="number"
                     value={tempThreshold}
                     onChange={(e) => setTempThreshold(Number(e.target.value))}
-                    className="w-full pl-10 pr-4 py-3 border border-warm-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
+                    className="w-full pl-10 pr-4 py-3 border border-neutral-300 rounded-lg text-lg font-semibold focus:ring-2 focus:ring-emerald-600 focus:border-transparent"
                   />
                 </div>
               </div>
@@ -1715,7 +1715,7 @@ export default function BillingPage() {
                     className={`flex-1 py-2 text-sm font-medium rounded-lg transition-colors ${
                       tempThreshold === amount
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-warm-100 text-warm-700 hover:bg-warm-200'
+                        : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
                     }`}
                   >
                     ${amount}
@@ -1744,7 +1744,7 @@ export default function BillingPage() {
       {showHowItWorksModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl w-full max-w-md max-h-[85vh] overflow-hidden shadow-xl">
-            <div className="flex items-center justify-between p-5 border-b border-warm-200 bg-gradient-to-r from-emerald-600 to-emerald-700">
+            <div className="flex items-center justify-between p-5 border-b border-neutral-200 bg-gradient-to-r from-emerald-600 to-emerald-700">
               <h2 className="text-lg font-bold text-white">How Haven Billing Works</h2>
               <button
                 onClick={() => setShowHowItWorksModal(false)}
@@ -1760,8 +1760,8 @@ export default function BillingPage() {
                   <span className="text-sm font-bold text-emerald-700">1</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-warm-900 mb-1">We Pay Your Bills</h4>
-                  <p className="text-sm text-warm-600">Haven pays all your household bills on your behalf - mortgage, utilities, insurance, services, kids activities, everything.</p>
+                  <h4 className="font-semibold text-neutral-900 mb-1">We Pay Your Bills</h4>
+                  <p className="text-sm text-neutral-600">Haven pays all your household bills on your behalf - mortgage, utilities, insurance, services, kids activities, everything.</p>
                 </div>
               </div>
 
@@ -1771,8 +1771,8 @@ export default function BillingPage() {
                   <span className="text-sm font-bold text-emerald-700">2</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-warm-900 mb-1">One Monthly Statement</h4>
-                  <p className="text-sm text-warm-600">At the end of each month, you receive a single itemized statement showing everything we paid.</p>
+                  <h4 className="font-semibold text-neutral-900 mb-1">One Monthly Statement</h4>
+                  <p className="text-sm text-neutral-600">At the end of each month, you receive a single itemized statement showing everything we paid.</p>
                 </div>
               </div>
 
@@ -1782,28 +1782,28 @@ export default function BillingPage() {
                   <span className="text-sm font-bold text-emerald-700">3</span>
                 </div>
                 <div>
-                  <h4 className="font-semibold text-warm-900 mb-1">You Pay Haven</h4>
-                  <p className="text-sm text-warm-600">Make one payment to Haven that covers all your household expenses. No more juggling 15+ different bills.</p>
+                  <h4 className="font-semibold text-neutral-900 mb-1">You Pay Haven</h4>
+                  <p className="text-sm text-neutral-600">Make one payment to Haven that covers all your household expenses. No more juggling 15+ different bills.</p>
                 </div>
               </div>
 
               {/* Benefits */}
-              <div className="bg-warm-50 rounded-xl p-4 mt-4">
-                <h4 className="font-semibold text-warm-900 mb-3">Why This Works</h4>
+              <div className="bg-neutral-50 rounded-xl p-4 mt-4">
+                <h4 className="font-semibold text-neutral-900 mb-3">Why This Works</h4>
                 <ul className="space-y-2">
-                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                  <li className="flex items-start gap-2 text-sm text-neutral-600">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                     <span>Never miss a payment or late fee again</span>
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                  <li className="flex items-start gap-2 text-sm text-neutral-600">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                     <span>See all household spending in one place</span>
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                  <li className="flex items-start gap-2 text-sm text-neutral-600">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                     <span>Set approval thresholds for larger expenses</span>
                   </li>
-                  <li className="flex items-start gap-2 text-sm text-warm-600">
+                  <li className="flex items-start gap-2 text-sm text-neutral-600">
                     <CheckCircle2 className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
                     <span>Bank-level security for all transactions</span>
                   </li>

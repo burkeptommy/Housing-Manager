@@ -79,7 +79,7 @@ export function ConciergeFab() {
     <>
       {/* Chat Popover */}
       {isOpen && (
-        <div className="fixed bottom-36 lg:bottom-24 right-4 lg:right-6 w-[calc(100vw-2rem)] sm:w-[380px] h-[500px] lg:h-[560px] bg-white rounded-2xl shadow-2xl shadow-warm-900/20 border border-warm-200 flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
+        <div className="fixed bottom-36 lg:bottom-24 right-4 lg:right-6 w-[calc(100vw-2rem)] sm:w-[380px] h-[500px] lg:h-[560px] bg-white rounded-2xl shadow-2xl shadow-neutral-900/20 border border-neutral-200 flex flex-col z-50 overflow-hidden animate-in slide-in-from-bottom-4 duration-200">
           {/* Header - Navy gradient */}
           <div className="bg-gradient-to-r from-haven-700 to-haven-800 px-4 py-4">
             <div className="flex items-center justify-between">
@@ -118,7 +118,7 @@ export function ConciergeFab() {
           </div>
 
           {/* Messages - Warm background */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-warm-50">
+          <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-neutral-50">
             {messages.map((message) => (
               <div
                 key={message.id}
@@ -129,10 +129,10 @@ export function ConciergeFab() {
                   <div className="flex items-start gap-2 max-w-[85%]">
                     <ConciergeAvatar size="sm" showPulse={false} />
                     <div>
-                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-warm-100">
-                        <p className="text-warm-800 text-sm leading-relaxed">{message.content}</p>
+                      <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-neutral-100">
+                        <p className="text-neutral-800 text-sm leading-relaxed">{message.content}</p>
                       </div>
-                      <p className="text-xs text-warm-400 mt-1 ml-2">
+                      <p className="text-xs text-neutral-400 mt-1 ml-2">
                         {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </p>
                     </div>
@@ -145,7 +145,7 @@ export function ConciergeFab() {
                     <div className="bg-haven-700 text-white rounded-2xl rounded-tr-sm px-4 py-3">
                       <p className="text-sm leading-relaxed">{message.content}</p>
                     </div>
-                    <p className="text-xs text-warm-400 mt-1 mr-2 text-right">
+                    <p className="text-xs text-neutral-400 mt-1 mr-2 text-right">
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
@@ -156,15 +156,15 @@ export function ConciergeFab() {
           </div>
 
           {/* Quick Actions - Champagne pills */}
-          <div className="px-4 py-2 bg-white border-t border-warm-100">
+          <div className="px-4 py-2 bg-white border-t border-neutral-100">
             <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
               {quickActions.map((action, idx) => (
                 <button
                   key={idx}
                   onClick={action.action}
                   className="flex-shrink-0 px-3 py-1.5 text-xs font-medium
-                             bg-champagne-100 text-champagne-700
-                             hover:bg-champagne-200
+                             bg-haven-100 text-haven-700
+                             hover:bg-haven-200
                              rounded-full transition-colors"
                 >
                   {action.label}
@@ -174,9 +174,9 @@ export function ConciergeFab() {
           </div>
 
           {/* Input Area */}
-          <div className="p-4 border-t border-warm-100 bg-white">
+          <div className="p-4 border-t border-neutral-100 bg-white">
             <div className="flex items-center gap-2">
-              <button className="p-2 text-warm-400 hover:text-warm-600 hover:bg-warm-100 rounded-lg transition-colors">
+              <button className="p-2 text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors">
                 <Paperclip className="w-5 h-5" />
               </button>
               <input
@@ -186,9 +186,9 @@ export function ConciergeFab() {
                 onChange={(e) => setInputValue(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Type a message..."
-                className="flex-1 px-4 py-2.5 bg-warm-50 border border-warm-200
+                className="flex-1 px-4 py-2.5 bg-neutral-50 border border-neutral-200
                            rounded-xl text-sm
-                           placeholder:text-warm-400
+                           placeholder:text-neutral-400
                            focus:outline-none focus:border-haven-500 focus:ring-2 focus:ring-haven-500/20
                            transition-all"
               />
@@ -207,12 +207,12 @@ export function ConciergeFab() {
         </div>
       )}
 
-      {/* FAB Button - Navy with champagne notification dot */}
+      {/* FAB Button - Purple with notification dot */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={`fixed bottom-20 lg:bottom-6 right-4 lg:right-6 z-50 transition-all duration-200 ${
           isOpen
-            ? 'w-14 h-14 rounded-full bg-warm-800 hover:bg-warm-700 shadow-lg'
+            ? 'w-14 h-14 rounded-full bg-neutral-800 hover:bg-neutral-700 shadow-lg'
             : 'flex items-center gap-2 px-5 py-3 bg-haven-700 hover:bg-haven-800 rounded-full shadow-lg shadow-haven-900/20 hover:shadow-xl hover:shadow-haven-900/25'
         }`}
         aria-label={isOpen ? 'Close chat' : 'Open chat'}
@@ -224,7 +224,7 @@ export function ConciergeFab() {
             <MessageCircle className="w-5 h-5 text-white" />
             <span className="text-white font-medium">Chat</span>
             {/* Notification dot */}
-            <span className="absolute -top-1 -right-1 w-3 h-3 bg-champagne-400 rounded-full ring-2 ring-white" />
+            <span className="absolute -top-1 -right-1 w-3 h-3 bg-haven-400 rounded-full ring-2 ring-white" />
           </>
         )}
       </button>

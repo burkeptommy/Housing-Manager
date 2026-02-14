@@ -245,7 +245,7 @@ export default function HomeManualScreen() {
       {/* Property Header */}
       <View style={styles.propertyHeader}>
         <View style={styles.propertyIcon}>
-          <Ionicons name="home" size={32} color={colors.haven.champagne[500]} />
+          <Ionicons name="home" size={32} color={colors.haven.purple[500]} />
         </View>
         <Text style={styles.propertyAddress}>
           {homeProfile?.street || 'Your Home'}
@@ -300,7 +300,7 @@ export default function HomeManualScreen() {
                     <Ionicons
                       name={getSystemIcon(system.type) as any}
                       size={24}
-                      color={colors.haven.champagne[500]}
+                      color={colors.haven.purple[500]}
                     />
                   </View>
                   <Text style={styles.systemCardName} numberOfLines={1}>{system.name}</Text>
@@ -368,7 +368,7 @@ export default function HomeManualScreen() {
                 <Ionicons
                   name={getSystemIcon(item.type) as any}
                   size={24}
-                  color={colors.haven.champagne[500]}
+                  color={colors.haven.purple[500]}
                 />
               </View>
               <View style={styles.systemListInfo}>
@@ -415,7 +415,7 @@ export default function HomeManualScreen() {
       contentContainerStyle={styles.listContent}
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
-          <Ionicons name="document-outline" size={48} color={colors.haven.navy[300]} />
+          <Ionicons name="document-outline" size={48} color={colors.haven.purple[300]} />
           <Text style={styles.emptyTitle}>No Documents Yet</Text>
           <Text style={styles.emptyText}>
             Upload manuals, warranties, and receipts to keep everything organized
@@ -435,7 +435,7 @@ export default function HomeManualScreen() {
             <Ionicons
               name={item.type === 'PDF' ? 'document-text-outline' : 'image-outline'}
               size={24}
-              color={colors.haven.champagne[500]}
+              color={colors.haven.purple[500]}
             />
           </View>
           <View style={styles.documentInfo}>
@@ -464,7 +464,7 @@ export default function HomeManualScreen() {
       contentContainerStyle={styles.listContent}
       ListEmptyComponent={
         <View style={styles.emptyContainer}>
-          <Ionicons name="time-outline" size={48} color={colors.haven.navy[300]} />
+          <Ionicons name="time-outline" size={48} color={colors.haven.purple[300]} />
           <Text style={styles.emptyTitle}>No Maintenance History</Text>
           <Text style={styles.emptyText}>
             Completed maintenance tasks will appear here for your records
@@ -559,7 +559,7 @@ function DetailRow({ label, value }: { label: string; value?: string }) {
 function UtilityRow({ icon, label, value }: { icon: string; label: string; value?: string }) {
   return (
     <View style={styles.utilityRow}>
-      <Ionicons name={icon as any} size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name={icon as any} size={20} color={colors.haven.purple[500]} />
       <Text style={styles.utilityLabel}>{label}</Text>
       <Text style={styles.utilityValue}>{value || 'Not set'}</Text>
     </View>
@@ -580,7 +580,7 @@ function DateRow({ label, value }: { label: string; value?: string }) {
 function EmptySystemsCard({ onAddPress }: { onAddPress: () => void }) {
   return (
     <Card style={styles.emptySystemsCard}>
-      <Ionicons name="construct-outline" size={32} color={colors.haven.navy[300]} />
+      <Ionicons name="construct-outline" size={32} color={colors.haven.purple[300]} />
       <Text style={styles.emptySystemsText}>No systems added yet</Text>
       <TouchableOpacity style={styles.emptySystemsButton} onPress={onAddPress}>
         <Text style={styles.emptySystemsButtonText}>Add Your First System</Text>
@@ -592,7 +592,7 @@ function EmptySystemsCard({ onAddPress }: { onAddPress: () => void }) {
 function EmptySystemsState() {
   return (
     <View style={styles.emptyContainer}>
-      <Ionicons name="construct-outline" size={48} color={colors.haven.navy[300]} />
+      <Ionicons name="construct-outline" size={48} color={colors.haven.purple[300]} />
       <Text style={styles.emptyTitle}>No Systems Added Yet</Text>
       <Text style={styles.emptyText}>
         Track your home systems to get maintenance reminders and keep everything organized
@@ -625,7 +625,7 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabButtonActive: {
-    borderBottomColor: colors.haven.champagne[500],
+    borderBottomColor: colors.haven.purple[500],
   },
   tabButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -633,7 +633,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   tabButtonTextActive: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   tabContent: {
     flex: 1,
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[3],
@@ -680,7 +680,7 @@ const styles = StyleSheet.create({
   },
   sectionAction: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   detailsCard: {
@@ -740,7 +740,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[2],
@@ -767,7 +767,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   emptySystemsButton: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[4],
     borderRadius: borderRadius.md,
@@ -792,7 +792,7 @@ const styles = StyleSheet.create({
   },
   addSystemText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   systemListCard: {
@@ -807,7 +807,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -845,7 +845,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -915,7 +915,7 @@ const styles = StyleSheet.create({
   emptyButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[5],
     borderRadius: borderRadius.lg,

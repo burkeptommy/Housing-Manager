@@ -158,7 +158,7 @@ export default function BankConnectionPage() {
         <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
           <Building2 className="w-7 h-7 text-indigo-600" />
         </div>
-        <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">Connect your bank</h1>
+        <h1 className="text-2xl font-bold text-haven-900 mb-2">Connect your bank</h1>
         <p className="text-gray-600">
           We'll automatically detect your recurring bills so you don't have to enter them
           manually.
@@ -205,7 +205,7 @@ export default function BankConnectionPage() {
 
       {/* Info */}
       <div className="bg-gray-50 rounded-xl p-4 mb-8">
-        <h3 className="font-medium text-haven-navy-900 mb-2">Why connect your bank?</h3>
+        <h3 className="font-medium text-haven-900 mb-2">Why connect your bank?</h3>
         <ul className="space-y-2 text-sm text-gray-600">
           <li className="flex items-start gap-2">
             <CheckCircle className="w-4 h-4 text-green-500 mt-0.5 flex-shrink-0" />
@@ -226,14 +226,14 @@ export default function BankConnectionPage() {
       <div className="flex justify-between">
         <Link
           href="/onboarding/wizard/bills"
-          className="text-gray-600 hover:text-haven-navy-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
+          className="text-gray-600 hover:text-haven-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <button
           onClick={handleContinue}
-          className="bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
+          className="bg-haven-900 hover:bg-haven-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
         >
           {connectedBanks > 0 ? 'Continue' : 'Skip for now'}
           <ArrowRight className="w-4 h-4" />

@@ -220,7 +220,7 @@ export default function VendorChatScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['bottom']}>
+    <SafeAreaView style={styles.container} edges={[]}>
       <Stack.Screen
         options={{
           title: vendorInfo?.displayName || 'Chat',
@@ -370,7 +370,7 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
   },
   messageBubbleOwn: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderBottomRightRadius: 4,
   },
   messageBubbleOther: {
@@ -380,7 +380,7 @@ const styles = StyleSheet.create({
   senderName: {
     fontSize: typography.fontSizes.xs,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     marginBottom: 2,
   },
   messageText: {
@@ -427,7 +427,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     alignItems: 'center',
     justifyContent: 'center',
   },

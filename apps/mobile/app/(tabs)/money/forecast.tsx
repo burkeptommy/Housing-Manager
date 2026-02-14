@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -13,6 +14,7 @@ import { ScreenContainer } from '../../../src/components/ScreenContainer';
 import { colors, spacing, typography, borderRadius, shadows } from '../../../src/lib/theme';
 import { API_BASE_URL } from '../../../src/lib/api';
 import { getIdToken } from '../../../src/lib/firebase';
+import { BarChart } from '../../../src/components/charts';
 
 interface SystemForecast {
   id: string;
@@ -66,7 +68,7 @@ function getUrgencyColor(urgency: string | null) {
     case 'MEDIUM':
       return '#FB8C00';
     case 'LOW':
-      return colors.haven.sage[500];
+      return colors.haven.purple[500];
     default:
       return colors.slate[400];
   }
@@ -111,8 +113,14 @@ export default function ForecastScreen() {
         }).catch(() => null),
       ]);
 
-      if (forecastRes?.ok) setData(await forecastRes.json());
-      if (timelineRes?.ok) setTimeline(await timelineRes.json());
+      if (forecastRes?.ok) {
+        const forecastJson = await forecastRes.json();
+        if (forecastJson?.forecasts) setData(forecastJson);
+      }
+      if (timelineRes?.ok) {
+        const timelineJson = await timelineRes.json();
+        setTimeline(Array.isArray(timelineJson) ? timelineJson : []);
+      }
     } catch (err) {
       console.error('Forecast fetch error:', err);
       setFetchError(true);
@@ -176,11 +184,11 @@ export default function ForecastScreen() {
     >
       {isLoading ? (
         <View style={styles.loading}>
-          <ActivityIndicator size="large" color={colors.haven.sage[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       ) : fetchError || (!data && timeline.length === 0) ? (
         <View style={styles.noBankContainer}>
-          <Ionicons name="analytics-outline" size={64} color={colors.haven.navy[300]} />
+          <Ionicons name="analytics-outline" size={64} color={colors.haven.purple[300]} />
           <Text style={styles.noBankTitle}>Home Forecasts</Text>
           <Text style={styles.noBankText}>
             Connect your bank to unlock intelligent home forecasting.
@@ -310,7 +318,7 @@ export default function ForecastScreen() {
                     </View>
 
                     {/* Lifespan bar */}
-                    {system.typicalLifespan && system.estimatedAge != null && (
+                    {system.typicalLifespan != null && system.typicalLifespan > 0 && system.estimatedAge != null && (
                       <View style={styles.lifespanBar}>
                         <View
                           style={[
@@ -331,7 +339,7 @@ export default function ForecastScreen() {
                       style={styles.researchButton}
                       onPress={() => requestResearch(system.id, system.systemName)}
                     >
-                      <Ionicons name="search-outline" size={16} color={colors.haven.navy[600]} />
+                      <Ionicons name="search-outline" size={16} color={colors.haven.purple[600]} />
                       <Text style={styles.researchButtonText}>Ask Alfred to Research</Text>
                     </TouchableOpacity>
                   </View>
@@ -351,16 +359,36 @@ export default function ForecastScreen() {
           {/* Timeline View */}
           {activeTab === 'timeline' && (
             <>
+              {/* Timeline Bar Chart */}
+              {timeline.length > 1 && (
+                <View style={styles.timelineChart}>
+                  <Text style={styles.timelineChartTitle}>Projected Costs by Year</Text>
+                  <BarChart
+                    data={timeline.slice(0, 10).map((y) => ({
+                      label: String(y.year).slice(-2),
+                      value: y.totalCost || 0,
+                      color: y.items?.some((i) => i.urgency === 'CRITICAL')
+                        ? colors.status.error
+                        : y.items?.some((i) => i.urgency === 'HIGH')
+                          ? colors.status.warning
+                          : colors.haven.purple[500],
+                    }))}
+                    width={Dimensions.get('window').width - spacing[4] * 2 - spacing[4] * 2}
+                    height={120}
+                    showLabels={true}
+                  />
+                </View>
+              )}
               {timeline.length > 0 ? (
                 timeline.map((year) => (
                   <View key={year.year} style={styles.timelineYear}>
                     <View style={styles.timelineHeader}>
                       <Text style={styles.timelineYearText}>{year.year}</Text>
                       <Text style={styles.timelineCost}>
-                        {formatCurrency(year.totalCost)}
+                        {formatCurrency(year.totalCost || 0)}
                       </Text>
                     </View>
-                    {year.items.map((item, idx) => (
+                    {(year.items || []).map((item, idx) => (
                       <View key={idx} style={styles.timelineItem}>
                         <View
                           style={[
@@ -407,7 +435,7 @@ const styles = StyleSheet.create({
 
   // Summary
   summaryCard: {
-    backgroundColor: colors.haven.navy[800],
+    backgroundColor: colors.haven.purple[800],
     borderRadius: borderRadius.xl,
     padding: spacing[5],
     marginBottom: spacing[4],
@@ -432,7 +460,7 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.sage[200],
+    color: colors.haven.purple[200],
     marginTop: 4,
   },
 
@@ -548,7 +576,24 @@ const styles = StyleSheet.create({
   researchButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
+  },
+
+  // Timeline Chart
+  timelineChart: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    padding: spacing[4],
+    marginBottom: spacing[4],
+    alignItems: 'center',
+    ...shadows.sm,
+  },
+  timelineChartTitle: {
+    fontSize: typography.fontSizes.sm,
+    fontWeight: typography.fontWeights.semibold,
+    color: colors.slate[700],
+    marginBottom: spacing[3],
+    alignSelf: 'flex-start',
   },
 
   // Timeline
@@ -570,7 +615,7 @@ const styles = StyleSheet.create({
   timelineCost: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   timelineItem: {
     flexDirection: 'row',
@@ -622,7 +667,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing[2],
-    backgroundColor: colors.haven.sage[600],
+    backgroundColor: colors.haven.purple[600],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.xl,

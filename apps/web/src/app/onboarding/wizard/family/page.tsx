@@ -362,9 +362,9 @@ export default function FamilyPage() {
         >
           <div className="flex items-center gap-3">
             {icon}
-            <h3 className="font-semibold text-haven-navy-900">{title}</h3>
+            <h3 className="font-semibold text-haven-900">{title}</h3>
             {items.length > 0 && (
-              <span className="bg-haven-champagne-100 text-haven-champagne-700 text-xs font-medium px-2 py-0.5 rounded-full">
+              <span className="bg-haven-100 text-haven-700 text-xs font-medium px-2 py-0.5 rounded-full">
                 {items.length}
               </span>
             )}
@@ -381,13 +381,13 @@ export default function FamilyPage() {
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-xl group">
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-haven-navy-900">{item.name}</p>
+                  <p className="font-medium text-haven-900">{item.name}</p>
                   <p className="text-sm text-gray-500">{item.subtitle}</p>
                 </div>
                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
                     onClick={() => onEdit(item.id)}
-                    className="p-2 text-gray-400 hover:text-haven-navy-900 hover:bg-white rounded-lg"
+                    className="p-2 text-gray-400 hover:text-haven-900 hover:bg-white rounded-lg"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
@@ -403,7 +403,7 @@ export default function FamilyPage() {
 
             <button
               onClick={onAdd}
-              className="w-full py-3 px-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-haven-champagne-500 hover:text-haven-champagne-600 transition-colors flex items-center justify-center gap-2"
+              className="w-full py-3 px-4 border-2 border-dashed border-gray-200 rounded-xl text-gray-500 hover:border-haven-500 hover:text-haven-600 transition-colors flex items-center justify-center gap-2"
             >
               <Plus className="w-4 h-4" />
               Add {title.toLowerCase().replace(/s$/, '')}
@@ -444,10 +444,10 @@ export default function FamilyPage() {
 
       {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-14 h-14 bg-haven-champagne-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-          <Users className="w-7 h-7 text-haven-champagne-600" />
+        <div className="w-14 h-14 bg-haven-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Users className="w-7 h-7 text-haven-600" />
         </div>
-        <h1 className="text-2xl font-bold text-haven-navy-900 mb-2">Family & household</h1>
+        <h1 className="text-2xl font-bold text-haven-900 mb-2">Family & household</h1>
         <p className="text-gray-600">
           Tell us about your family, vehicles, pets, and household staff.
         </p>
@@ -458,7 +458,7 @@ export default function FamilyPage() {
         {renderSection(
           'members',
           'Family Members',
-          <User className="w-5 h-5 text-haven-champagne-600" />,
+          <User className="w-5 h-5 text-haven-600" />,
           memberItems,
           openAddMemberModal,
           (id) => {
@@ -473,7 +473,7 @@ export default function FamilyPage() {
         {renderSection(
           'vehicles',
           'Vehicles',
-          <Car className="w-5 h-5 text-haven-champagne-600" />,
+          <Car className="w-5 h-5 text-haven-600" />,
           vehicleItems,
           openAddVehicleModal,
           (id) => {
@@ -488,7 +488,7 @@ export default function FamilyPage() {
         {renderSection(
           'pets',
           'Pets',
-          <PawPrint className="w-5 h-5 text-haven-champagne-600" />,
+          <PawPrint className="w-5 h-5 text-haven-600" />,
           petItems,
           openAddPetModal,
           (id) => {
@@ -503,7 +503,7 @@ export default function FamilyPage() {
         {renderSection(
           'staff',
           'Household Staff',
-          <Briefcase className="w-5 h-5 text-haven-champagne-600" />,
+          <Briefcase className="w-5 h-5 text-haven-600" />,
           staffItems,
           openAddStaffModal,
           (id) => {
@@ -520,14 +520,14 @@ export default function FamilyPage() {
       <div className="flex justify-between mt-8">
         <Link
           href="/onboarding/wizard/systems"
-          className="text-gray-600 hover:text-haven-navy-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
+          className="text-gray-600 hover:text-haven-900 py-3 px-4 font-medium flex items-center gap-2 transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back
         </Link>
         <button
           onClick={handleContinue}
-          className="bg-haven-navy-900 hover:bg-haven-navy-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
+          className="bg-haven-900 hover:bg-haven-800 text-white py-3 px-6 rounded-xl font-medium flex items-center gap-2 transition-colors"
         >
           Continue
           <ArrowRight className="w-4 h-4" />
@@ -540,7 +540,7 @@ export default function FamilyPage() {
           <div className="bg-white rounded-t-2xl sm:rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-lg font-semibold text-haven-navy-900">
+              <h2 className="text-lg font-semibold text-haven-900">
                 {editingMember || editingVehicle || editingPet || editingStaff ? 'Edit' : 'Add'}{' '}
                 {modalType === 'member' && 'Family Member'}
                 {modalType === 'vehicle' && 'Vehicle'}
@@ -807,7 +807,7 @@ export default function FamilyPage() {
                   else if (modalType === 'pet') handleSavePet();
                   else if (modalType === 'staff') handleSaveStaff();
                 }}
-                className="flex-1 py-3 px-4 bg-haven-navy-900 text-white rounded-xl font-medium hover:bg-haven-navy-800 transition-colors"
+                className="flex-1 py-3 px-4 bg-haven-900 text-white rounded-xl font-medium hover:bg-haven-800 transition-colors"
               >
                 {editingMember || editingVehicle || editingPet || editingStaff ? 'Save Changes' : 'Add'}
               </button>

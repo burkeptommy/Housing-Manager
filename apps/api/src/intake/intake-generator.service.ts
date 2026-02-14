@@ -109,7 +109,7 @@ export interface IntakeItem {
   category: IntakeCategory;
   label: string;
   question: string;
-  context?: string; // Additional info from ATTOM or previous answers
+  context?: string; // Additional info from property data or previous answers
   inputType: InputType;
   options?: string[];
   required: boolean;

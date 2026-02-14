@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   button: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
     borderRadius: borderRadius.lg,

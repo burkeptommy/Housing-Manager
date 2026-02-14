@@ -323,13 +323,13 @@ export default function ZoneDetailPage() {
       <div className="grid grid-cols-2 gap-3">
         <Link href="/app/requests">
           <Card hover className="text-center py-4">
-            <Wrench className="w-6 h-6 mx-auto mb-2 text-haven-champagne-600" />
+            <Wrench className="w-6 h-6 mx-auto mb-2 text-haven-600" />
             <p className="text-sm font-medium text-gray-700">Request Service</p>
           </Card>
         </Link>
         <Link href="/app/maintenance">
           <Card hover className="text-center py-4">
-            <Calendar className="w-6 h-6 mx-auto mb-2 text-haven-champagne-600" />
+            <Calendar className="w-6 h-6 mx-auto mb-2 text-haven-600" />
             <p className="text-sm font-medium text-gray-700">Schedule Maintenance</p>
           </Card>
         </Link>

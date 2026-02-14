@@ -19,14 +19,59 @@ import { useAuth } from '../../src/contexts/auth-context';
 import { colors, spacing, typography, borderRadius } from '../../src/lib/theme';
 import { GoogleSignInButtonIfAvailable } from '../../src/components/GoogleSignInButton';
 
-// US States for picker
+// US States + DC for picker (alphabetical by abbreviation)
 const US_STATES = [
+  { value: 'AL', label: 'Alabama' },
+  { value: 'AK', label: 'Alaska' },
+  { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' },
+  { value: 'CA', label: 'California' },
+  { value: 'CO', label: 'Colorado' },
   { value: 'CT', label: 'Connecticut' },
-  { value: 'NY', label: 'New York' },
-  { value: 'NJ', label: 'New Jersey' },
+  { value: 'DE', label: 'Delaware' },
+  { value: 'DC', label: 'District of Columbia' },
+  { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' },
+  { value: 'HI', label: 'Hawaii' },
+  { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' },
+  { value: 'IN', label: 'Indiana' },
+  { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' },
+  { value: 'KY', label: 'Kentucky' },
+  { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' },
+  { value: 'MD', label: 'Maryland' },
   { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' },
+  { value: 'MN', label: 'Minnesota' },
+  { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' },
+  { value: 'MT', label: 'Montana' },
+  { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' },
+  { value: 'NH', label: 'New Hampshire' },
+  { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' },
+  { value: 'NY', label: 'New York' },
+  { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' },
+  { value: 'OH', label: 'Ohio' },
+  { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' },
   { value: 'PA', label: 'Pennsylvania' },
-  // Add more states as needed
+  { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' },
+  { value: 'SD', label: 'South Dakota' },
+  { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' },
+  { value: 'UT', label: 'Utah' },
+  { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' },
+  { value: 'WA', label: 'Washington' },
+  { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' },
+  { value: 'WY', label: 'Wyoming' },
 ];
 
 export default function RegisterScreen() {
@@ -153,8 +198,10 @@ export default function RegisterScreen() {
 
     if (!result.success) {
       Alert.alert('Registration Failed', result.error || 'Unable to create account');
+    } else {
+      // Navigate to the completion/celebration screen
+      router.replace('/(onboarding)/complete');
     }
-    // If successful, auth-context will handle navigation to main app
     setIsLoading(false);
   };
 
@@ -263,7 +310,7 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             placeholder="First"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -278,7 +325,7 @@ export default function RegisterScreen() {
             ref={lastNameRef}
             style={styles.input}
             placeholder="Last"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -295,7 +342,7 @@ export default function RegisterScreen() {
           ref={emailRef}
           style={styles.input}
           placeholder="Enter your email"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={email}
           onChangeText={setEmail}
           autoCapitalize="none"
@@ -312,7 +359,7 @@ export default function RegisterScreen() {
           ref={passwordRef}
           style={styles.input}
           placeholder="Create a password (min 8 chars)"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={password}
           onChangeText={setPassword}
           secureTextEntry
@@ -328,7 +375,7 @@ export default function RegisterScreen() {
           ref={confirmPasswordRef}
           style={styles.input}
           placeholder="Confirm your password"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={confirmPassword}
           onChangeText={setConfirmPassword}
           secureTextEntry
@@ -354,7 +401,7 @@ export default function RegisterScreen() {
         style={styles.backButton}
         onPress={() => setStep('account')}
       >
-        <Ionicons name="arrow-back" size={20} color={colors.haven.navy[600]} />
+        <Ionicons name="arrow-back" size={20} color={colors.haven.purple[600]} />
         <Text style={styles.backButtonText}>Back</Text>
       </TouchableOpacity>
 
@@ -368,7 +415,7 @@ export default function RegisterScreen() {
         <TextInput
           style={styles.input}
           placeholder="123 Main Street"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={addressLine1}
           onChangeText={setAddressLine1}
           autoCapitalize="words"
@@ -384,7 +431,7 @@ export default function RegisterScreen() {
           ref={addressLine2Ref}
           style={styles.input}
           placeholder="Apt 4B"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={addressLine2}
           onChangeText={setAddressLine2}
           autoCapitalize="words"
@@ -400,7 +447,7 @@ export default function RegisterScreen() {
             ref={cityRef}
             style={styles.input}
             placeholder="City"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={city}
             onChangeText={setCity}
             autoCapitalize="words"
@@ -418,14 +465,14 @@ export default function RegisterScreen() {
             <Ionicons
               name={showStatePicker ? "chevron-up" : "chevron-down"}
               size={16}
-              color={colors.haven.navy[600]}
+              color={colors.haven.purple[600]}
             />
           </TouchableOpacity>
         </View>
       </View>
 
       {showStatePicker && (
-        <View style={styles.stateList}>
+        <ScrollView style={styles.stateList} nestedScrollEnabled>
           {US_STATES.map((s) => (
             <TouchableOpacity
               key={s.value}
@@ -448,7 +495,7 @@ export default function RegisterScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <View style={styles.inputContainer}>
@@ -457,7 +504,7 @@ export default function RegisterScreen() {
           ref={zipRef}
           style={styles.input}
           placeholder="06810"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={zipCode}
           onChangeText={setZipCode}
           keyboardType="number-pad"
@@ -491,7 +538,7 @@ export default function RegisterScreen() {
         style={styles.backButton}
         onPress={handleCancelSocialRegistration}
       >
-        <Ionicons name="arrow-back" size={20} color={colors.haven.navy[600]} />
+        <Ionicons name="arrow-back" size={20} color={colors.haven.purple[600]} />
         <Text style={styles.backButtonText}>Cancel</Text>
       </TouchableOpacity>
 
@@ -507,7 +554,7 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             placeholder="First"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={firstName}
             onChangeText={setFirstName}
             autoCapitalize="words"
@@ -518,7 +565,7 @@ export default function RegisterScreen() {
           <TextInput
             style={styles.input}
             placeholder="Last"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={lastName}
             onChangeText={setLastName}
             autoCapitalize="words"
@@ -531,7 +578,7 @@ export default function RegisterScreen() {
         <TextInput
           style={styles.input}
           placeholder="123 Main Street"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={addressLine1}
           onChangeText={setAddressLine1}
           autoCapitalize="words"
@@ -547,7 +594,7 @@ export default function RegisterScreen() {
           ref={addressLine2Ref}
           style={styles.input}
           placeholder="Apt 4B"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={addressLine2}
           onChangeText={setAddressLine2}
           autoCapitalize="words"
@@ -563,7 +610,7 @@ export default function RegisterScreen() {
             ref={cityRef}
             style={styles.input}
             placeholder="City"
-            placeholderTextColor={colors.haven.navy[400]}
+            placeholderTextColor={colors.haven.purple[400]}
             value={city}
             onChangeText={setCity}
             autoCapitalize="words"
@@ -581,14 +628,14 @@ export default function RegisterScreen() {
             <Ionicons
               name={showStatePicker ? "chevron-up" : "chevron-down"}
               size={16}
-              color={colors.haven.navy[600]}
+              color={colors.haven.purple[600]}
             />
           </TouchableOpacity>
         </View>
       </View>
 
       {showStatePicker && (
-        <View style={styles.stateList}>
+        <ScrollView style={styles.stateList} nestedScrollEnabled>
           {US_STATES.map((s) => (
             <TouchableOpacity
               key={s.value}
@@ -611,7 +658,7 @@ export default function RegisterScreen() {
               </Text>
             </TouchableOpacity>
           ))}
-        </View>
+        </ScrollView>
       )}
 
       <View style={styles.inputContainer}>
@@ -620,7 +667,7 @@ export default function RegisterScreen() {
           ref={zipRef}
           style={styles.input}
           placeholder="06810"
-          placeholderTextColor={colors.haven.navy[400]}
+          placeholderTextColor={colors.haven.purple[400]}
           value={zipCode}
           onChangeText={setZipCode}
           keyboardType="number-pad"
@@ -739,7 +786,7 @@ export default function RegisterScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
   },
   keyboardView: {
     flex: 1,
@@ -764,11 +811,11 @@ const styles = StyleSheet.create({
   title: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   subtitle: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginTop: spacing[1],
   },
   progressContainer: {
@@ -780,15 +827,15 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: colors.haven.navy[200],
+    backgroundColor: colors.haven.purple[200],
   },
   progressDotActive: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
   },
   progressLine: {
     width: 40,
     height: 2,
-    backgroundColor: colors.haven.navy[200],
+    backgroundColor: colors.haven.purple[200],
     marginHorizontal: spacing[2],
   },
   form: {
@@ -808,18 +855,18 @@ const styles = StyleSheet.create({
   },
   backButtonText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     marginLeft: spacing[1],
   },
   stepTitle: {
     fontSize: typography.fontSizes.lg,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[1],
   },
   stepSubtitle: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     marginBottom: spacing[4],
   },
   row: {
@@ -835,22 +882,22 @@ const styles = StyleSheet.create({
   label: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
     marginBottom: spacing[2],
   },
   input: {
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   statePicker: {
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     flexDirection: 'row',
@@ -859,34 +906,35 @@ const styles = StyleSheet.create({
   },
   statePickerText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   stateList: {
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[4],
     marginTop: -spacing[2],
+    maxHeight: 240,
   },
   stateOption: {
     padding: spacing[3],
     borderBottomWidth: 1,
-    borderBottomColor: colors.haven.navy[100],
+    borderBottomColor: colors.haven.purple[100],
   },
   stateOptionSelected: {
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
   },
   stateOptionText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   stateOptionTextSelected: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontWeight: typography.fontWeights.medium,
   },
   button: {
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     flexDirection: 'row',
@@ -909,11 +957,11 @@ const styles = StyleSheet.create({
     marginTop: spacing[6],
   },
   footerText: {
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     fontSize: typography.fontSizes.sm,
   },
   linkText: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
   },
@@ -923,7 +971,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing[4],
   },
   socialButton: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     flexDirection: 'row',
@@ -934,7 +982,7 @@ const styles = StyleSheet.create({
   googleButton: {
     backgroundColor: colors.white,
     borderWidth: 1,
-    borderColor: colors.haven.navy[200],
+    borderColor: colors.haven.purple[200],
   },
   socialButtonText: {
     color: colors.white,
@@ -942,7 +990,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.semibold,
   },
   googleButtonText: {
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
   },
   divider: {
     flexDirection: 'row',
@@ -952,12 +1000,12 @@ const styles = StyleSheet.create({
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: colors.haven.navy[200],
+    backgroundColor: colors.haven.purple[200],
   },
   dividerText: {
     marginHorizontal: spacing[4],
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
   },
   googleButtonStyle: {
     marginBottom: 0, // Override default margin since socialButtons uses gap

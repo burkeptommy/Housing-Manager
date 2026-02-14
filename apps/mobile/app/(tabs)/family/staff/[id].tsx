@@ -21,6 +21,9 @@ import { EditStaffContactModal } from '../../../../src/components/forms/EditStaf
 import { EditEmergencyContactModal } from '../../../../src/components/forms/EditEmergencyContactModal';
 import { EditCompensationModal } from '../../../../src/components/forms/EditCompensationModal';
 import { EditBenefitsModal } from '../../../../src/components/forms/EditBenefitsModal';
+import { EditReimbursementsModal } from '../../../../src/components/forms/EditReimbursementsModal';
+import { EditDocumentsModal } from '../../../../src/components/forms/EditDocumentsModal';
+import { EditEmploymentModal } from '../../../../src/components/forms/EditEmploymentModal';
 
 // =============================================================================
 // TYPES
@@ -167,7 +170,7 @@ interface EmptyPromptProps {
 function EmptyPrompt({ text, onPress }: EmptyPromptProps) {
   return (
     <TouchableOpacity style={helperStyles.emptyPrompt} onPress={onPress} disabled={!onPress}>
-      <Ionicons name="add-circle-outline" size={20} color={colors.haven.champagne[500]} />
+      <Ionicons name="add-circle-outline" size={20} color={colors.haven.purple[500]} />
       <Text style={helperStyles.emptyPromptText}>{text}</Text>
     </TouchableOpacity>
   );
@@ -224,7 +227,7 @@ const helperStyles = StyleSheet.create({
   sectionAction: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   infoRow: {
     flexDirection: 'row',
@@ -246,7 +249,7 @@ const helperStyles = StyleSheet.create({
     color: colors.text.primary,
   },
   linkText: {
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   emptyPrompt: {
     flexDirection: 'row',
@@ -256,7 +259,7 @@ const helperStyles = StyleSheet.create({
   },
   emptyPromptText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   checklistRow: {
     flexDirection: 'row',
@@ -311,6 +314,9 @@ export default function StaffDetailScreen() {
   const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [showCompensationModal, setShowCompensationModal] = useState(false);
   const [showBenefitsModal, setShowBenefitsModal] = useState(false);
+  const [showReimbursementsModal, setShowReimbursementsModal] = useState(false);
+  const [showDocumentsModal, setShowDocumentsModal] = useState(false);
+  const [showEmploymentModal, setShowEmploymentModal] = useState(false);
 
   const fetchStaff = useCallback(async () => {
     if (!id || !householdInfo?.id) return;
@@ -324,7 +330,7 @@ export default function StaffDetailScreen() {
       }
 
       const response = await fetch(
-        `${API_BASE_URL}/family/household/${householdInfo.id}/staff/${id}`,
+        `${API_BASE_URL}/family/household/${householdInfo.id}/member/${id}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -389,7 +395,7 @@ export default function StaffDetailScreen() {
               }
 
               const response = await fetch(
-                `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+                `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
                 {
                   method: 'DELETE',
                   headers: {
@@ -430,7 +436,7 @@ export default function StaffDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -455,7 +461,7 @@ export default function StaffDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -463,9 +469,8 @@ export default function StaffDetailScreen() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          emergencyContactName: data.emergencyContact,
+          emergencyContact: data.emergencyContact,
           emergencyContactPhone: data.emergencyContactPhone,
-          emergencyContactRelationship: data.emergencyContactRelationship,
         }),
       }
     );
@@ -485,7 +490,7 @@ export default function StaffDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -512,7 +517,87 @@ export default function StaffDetailScreen() {
     if (!token) throw new Error('Authentication expired');
 
     const response = await fetch(
-      `${API_BASE_URL}/family/household/${householdInfo?.id}/staff/${id}`,
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save reimbursements
+  const handleSaveReimbursements = async (data: {
+    mileageReimbursement?: boolean;
+    gasReimbursement?: boolean;
+    mealsReimbursement?: boolean;
+    phoneAllowance?: boolean;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save documents
+  const handleSaveDocuments = async (data: {
+    hasW9?: boolean;
+    hasI9?: boolean;
+    backgroundCheckDate?: string | null;
+    cprCertifiedUntil?: string | null;
+    firstAidCertifiedUntil?: string | null;
+    driversLicenseExpiry?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
+      {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      }
+    );
+
+    if (!response.ok) throw new Error('Failed to save');
+    await fetchStaff();
+  };
+
+  // Save employment details (agency + responsibilities)
+  const handleSaveEmployment = async (data: {
+    agencyName?: string | null;
+    agencyContact?: string | null;
+    agencyPhone?: string | null;
+    responsibilities?: string | null;
+  }) => {
+    const token = await getIdToken(true);
+    if (!token) throw new Error('Authentication expired');
+
+    const response = await fetch(
+      `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
         method: 'PATCH',
         headers: {
@@ -610,7 +695,7 @@ export default function StaffDetailScreen() {
           title: 'Staff Member',
           headerRight: () => (
             <TouchableOpacity onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}>
-              <Ionicons name="create-outline" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="create-outline" size={24} color={colors.haven.purple[500]} />
             </TouchableOpacity>
           ),
         }}
@@ -647,7 +732,7 @@ export default function StaffDetailScreen() {
             {staff.phone && (
               <TouchableOpacity style={styles.actionButton} onPress={handleCall}>
                 <View style={styles.actionIcon}>
-                  <Ionicons name="call" size={24} color={colors.haven.champagne[500]} />
+                  <Ionicons name="call" size={24} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.actionButtonText}>Call</Text>
               </TouchableOpacity>
@@ -655,7 +740,7 @@ export default function StaffDetailScreen() {
             {staff.phone && (
               <TouchableOpacity style={styles.actionButton} onPress={handleMessage}>
                 <View style={styles.actionIcon}>
-                  <Ionicons name="chatbubble" size={24} color={colors.haven.champagne[500]} />
+                  <Ionicons name="chatbubble" size={24} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.actionButtonText}>Message</Text>
               </TouchableOpacity>
@@ -663,7 +748,7 @@ export default function StaffDetailScreen() {
             {staff.email && (
               <TouchableOpacity style={styles.actionButton} onPress={handleEmail}>
                 <View style={styles.actionIcon}>
-                  <Ionicons name="mail" size={24} color={colors.haven.champagne[500]} />
+                  <Ionicons name="mail" size={24} color={colors.haven.purple[500]} />
                 </View>
                 <Text style={styles.actionButtonText}>Email</Text>
               </TouchableOpacity>
@@ -704,11 +789,11 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="SCHEDULE & EMPLOYMENT"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+            onAction={() => setShowEmploymentModal(true)}
           />
           {(staff.workSchedule || staff.employment?.schedule) && (
             <View style={styles.scheduleCard}>
-              <Ionicons name="calendar-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="calendar-outline" size={20} color={colors.haven.purple[500]} />
               <View style={styles.scheduleContent}>
                 <Text style={styles.scheduleLabel}>Work Schedule</Text>
                 <Text style={styles.scheduleText}>
@@ -737,7 +822,7 @@ export default function StaffDetailScreen() {
                   style={styles.agencyCallButton}
                   onPress={() => Linking.openURL(`tel:${staff.employment?.agencyPhone}`)}
                 >
-                  <Ionicons name="call-outline" size={20} color={colors.haven.champagne[500]} />
+                  <Ionicons name="call-outline" size={20} color={colors.haven.purple[500]} />
                 </TouchableOpacity>
               )}
             </View>
@@ -863,7 +948,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="REIMBURSEMENTS"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+            onAction={() => setShowReimbursementsModal(true)}
           />
           {hasReimbursementsData ? (
             <>
@@ -923,7 +1008,7 @@ export default function StaffDetailScreen() {
           ) : (
             <EmptyPrompt
               text="Add reimbursement policy"
-              onPress={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+              onPress={() => setShowReimbursementsModal(true)}
             />
           )}
         </Card>
@@ -933,7 +1018,7 @@ export default function StaffDetailScreen() {
           <SectionHeader
             title="DOCUMENTS & CERTIFICATIONS"
             action="Edit"
-            onAction={() => router.push(`/(tabs)/family/staff/edit/${id}` as any)}
+            onAction={() => setShowDocumentsModal(true)}
           />
           <ChecklistRow
             label="W-9 on file"
@@ -1068,6 +1153,44 @@ export default function StaffDetailScreen() {
           hasHolidayPay: staff.compensation?.benefits?.holidayPay,
         }}
       />
+
+      <EditReimbursementsModal
+        visible={showReimbursementsModal}
+        onClose={() => setShowReimbursementsModal(false)}
+        onSave={handleSaveReimbursements}
+        initialData={{
+          mileageReimbursement: staff.compensation?.reimbursements?.mileage,
+          gasReimbursement: staff.compensation?.reimbursements?.gas,
+          mealsReimbursement: staff.compensation?.reimbursements?.meals,
+          phoneAllowance: staff.compensation?.reimbursements?.phone,
+        }}
+      />
+
+      <EditDocumentsModal
+        visible={showDocumentsModal}
+        onClose={() => setShowDocumentsModal(false)}
+        onSave={handleSaveDocuments}
+        initialData={{
+          hasW9: staff.documents?.w9OnFile,
+          hasI9: staff.documents?.i9OnFile,
+          backgroundCheckDate: staff.documents?.backgroundCheckDate,
+          cprCertifiedUntil: staff.documents?.cprExpires,
+          firstAidCertifiedUntil: staff.documents?.firstAidCertified ? undefined : undefined,
+          driversLicenseExpiry: staff.documents?.driversLicenseExpires,
+        }}
+      />
+
+      <EditEmploymentModal
+        visible={showEmploymentModal}
+        onClose={() => setShowEmploymentModal(false)}
+        onSave={handleSaveEmployment}
+        initialData={{
+          agencyName: staff.employment?.agency,
+          agencyContact: staff.employment?.agencyContact,
+          agencyPhone: staff.employment?.agencyPhone,
+          responsibilities: staff.employment?.responsibilities?.join('\n'),
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -1103,7 +1226,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -1121,7 +1244,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: spacing[3],
@@ -1129,7 +1252,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: typography.fontSizes['2xl'],
     fontWeight: typography.fontWeights.bold,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   fullName: {
     fontSize: typography.fontSizes.xl,
@@ -1156,7 +1279,7 @@ const styles = StyleSheet.create({
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1175,7 +1298,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[3],
@@ -1249,7 +1372,7 @@ const styles = StyleSheet.create({
   },
   // Pay Card
   payCard: {
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginBottom: spacing[3],

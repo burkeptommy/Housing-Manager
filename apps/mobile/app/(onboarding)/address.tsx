@@ -115,7 +115,7 @@ export default function AddressScreen() {
             <Ionicons
               name="sparkles"
               size={20}
-              color={colors.haven.champagne[500]}
+              color={colors.haven.purple[500]}
             />
             <Text style={styles.infoText}>
               We'll look up your property details like bedrooms, bathrooms,
@@ -145,7 +145,7 @@ export default function AddressScreen() {
 
         {/* Privacy Note */}
         <View style={styles.privacyContainer}>
-          <Ionicons name="lock-closed" size={12} color={colors.haven.navy[400]} />
+          <Ionicons name="lock-closed" size={12} color={colors.haven.purple[400]} />
           <Text style={styles.privacyNote}>
             Your information is secure and never shared.
           </Text>
@@ -158,7 +158,7 @@ export default function AddressScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.haven.navy[50],
+    backgroundColor: colors.haven.purple[50],
   },
   scrollContent: {
     flexGrow: 1,
@@ -178,12 +178,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 28,
     fontWeight: '700',
-    color: colors.haven.navy[900],
+    color: colors.haven.purple[900],
     marginBottom: spacing[2],
   },
   subtitle: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.navy[500],
+    color: colors.haven.purple[500],
     textAlign: 'center',
     lineHeight: 24,
     paddingHorizontal: spacing[4],
@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   infoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     padding: spacing[4],
     borderRadius: borderRadius.lg,
     marginTop: spacing[4],
@@ -224,11 +224,11 @@ const styles = StyleSheet.create({
   infoText: {
     flex: 1,
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.navy[600],
+    color: colors.haven.purple[600],
     lineHeight: 20,
   },
   button: {
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     flexDirection: 'row',
@@ -254,6 +254,6 @@ const styles = StyleSheet.create({
   },
   privacyNote: {
     fontSize: typography.fontSizes.xs,
-    color: colors.haven.navy[400],
+    color: colors.haven.purple[400],
   },
 });

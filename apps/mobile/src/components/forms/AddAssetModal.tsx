@@ -16,6 +16,7 @@ import { colors, typography, spacing, borderRadius } from '../../lib/theme';
 import { API_BASE_URL } from '../../lib/api';
 import { getIdToken } from '../../lib/firebase';
 import { Button } from '../ui/Button';
+import { ImageUpload } from '../ImageUpload';
 
 // =============================================================================
 // TYPES
@@ -88,6 +89,7 @@ export function AddAssetModal({
   const [serialNumber, setSerialNumber] = useState('');
   const [condition, setCondition] = useState('Good');
   const [notes, setNotes] = useState('');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
 
   // Update form when defaults change (e.g., from suggestion)
   React.useEffect(() => {
@@ -104,6 +106,7 @@ export function AddAssetModal({
     setSerialNumber('');
     setCondition('Good');
     setNotes('');
+    setPhotoUri(null);
     setError(null);
   };
 
@@ -145,6 +148,7 @@ export function AddAssetModal({
             serialNumber: serialNumber.trim() || undefined,
             condition,
             notes: notes.trim() || undefined,
+            photos: photoUri ? [photoUri] : undefined,
           }),
         }
       );
@@ -189,6 +193,20 @@ export function AddAssetModal({
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
           >
+            {/* Photo */}
+            <View style={styles.photoSection}>
+              <ImageUpload
+                onImageSelected={(uri) => setPhotoUri(uri || null)}
+                currentImage={photoUri}
+                placeholder="Take a photo"
+                shape="rectangle"
+                size="large"
+              />
+              <Text style={styles.photoHint}>
+                Take a photo of the item or its label to help identify it
+              </Text>
+            </View>
+
             {/* Item Name */}
             <View style={styles.section}>
               <Text style={styles.label}>Item Name *</Text>
@@ -217,7 +235,7 @@ export function AddAssetModal({
                     <Ionicons
                       name={cat.icon}
                       size={16}
-                      color={category === cat.value ? colors.haven.champagne[600] : colors.text.tertiary}
+                      color={category === cat.value ? colors.haven.purple[600] : colors.text.tertiary}
                     />
                     <Text
                       style={[
@@ -414,6 +432,16 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     paddingBottom: spacing[8],
   },
+  photoSection: {
+    alignItems: 'center',
+    marginBottom: spacing[4],
+    gap: spacing[2],
+  },
+  photoHint: {
+    fontSize: typography.fontSizes.xs,
+    color: colors.text.tertiary,
+    textAlign: 'center',
+  },
   section: {
     marginBottom: spacing[4],
   },
@@ -466,8 +494,8 @@ const styles = StyleSheet.create({
     gap: spacing[1],
   },
   typeButtonActive: {
-    backgroundColor: colors.haven.champagne[50],
-    borderColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   typeButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -475,7 +503,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   typeButtonTextActive: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   zoneButtons: {
     flexDirection: 'row',
@@ -491,8 +519,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   zoneButtonActive: {
-    backgroundColor: colors.haven.navy[50],
-    borderColor: colors.haven.navy[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   zoneButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -500,7 +528,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   zoneButtonTextActive: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   conditionButtons: {
     flexDirection: 'row',
@@ -516,8 +544,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border.light,
   },
   conditionButtonActive: {
-    backgroundColor: colors.haven.navy[50],
-    borderColor: colors.haven.navy[500],
+    backgroundColor: colors.haven.purple[50],
+    borderColor: colors.haven.purple[500],
   },
   conditionButtonText: {
     fontSize: typography.fontSizes.sm,
@@ -525,7 +553,7 @@ const styles = StyleSheet.create({
     color: colors.text.secondary,
   },
   conditionButtonTextActive: {
-    color: colors.haven.navy[700],
+    color: colors.haven.purple[700],
   },
   errorContainer: {
     backgroundColor: colors.status.error + '20',

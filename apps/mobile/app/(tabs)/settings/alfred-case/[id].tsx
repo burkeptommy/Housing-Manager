@@ -201,7 +201,7 @@ export default function AlfredCaseDetailScreen() {
           <Ionicons
             name={`${icon}-outline` as any}
             size={18}
-            color={isError ? colors.status.error : colors.haven.champagne[500]}
+            color={isError ? colors.status.error : colors.haven.purple[500]}
           />
         </View>
         <View style={styles.activityContent}>
@@ -221,7 +221,7 @@ export default function AlfredCaseDetailScreen() {
       <View style={styles.fullContainer}>
         <AppHeader title="Case Details" showBack onBackPress={() => router.navigate('/(tabs)/settings/alfred-cases' as any)} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.haven.champagne[500]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[500]} />
         </View>
       </View>
     );
@@ -260,7 +260,7 @@ export default function AlfredCaseDetailScreen() {
 
           {caseDetail.summary && (
             <View style={styles.summaryBox}>
-              <Ionicons name="sparkles" size={16} color={colors.haven.champagne[500]} />
+              <Ionicons name="sparkles" size={16} color={colors.haven.purple[500]} />
               <Text style={styles.summaryText}>{caseDetail.summary}</Text>
             </View>
           )}
@@ -279,7 +279,7 @@ export default function AlfredCaseDetailScreen() {
         {needsInput && (
           <Card style={styles.questionCard}>
             <View style={styles.questionHeader}>
-              <Ionicons name="help-circle" size={24} color={colors.haven.champagne[500]} />
+              <Ionicons name="help-circle" size={24} color={colors.haven.purple[500]} />
               <Text style={styles.questionTitle}>Alfred needs your input</Text>
             </View>
             <Text style={styles.questionText}>{caseDetail.pendingQuestion}</Text>
@@ -359,7 +359,7 @@ export default function AlfredCaseDetailScreen() {
 const styles = StyleSheet.create({
   fullContainer: {
     flex: 1,
-    backgroundColor: colors.haven.navy[900],
+    backgroundColor: colors.haven.purple[900],
   },
   loadingContainer: {
     flex: 1,
@@ -404,7 +404,7 @@ const styles = StyleSheet.create({
   summaryBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    backgroundColor: `${colors.haven.champagne[500]}10`,
+    backgroundColor: `${colors.haven.purple[500]}10`,
     padding: spacing[3],
     borderRadius: borderRadius.md,
     marginTop: spacing[3],
@@ -429,7 +429,7 @@ const styles = StyleSheet.create({
   },
   intentValue: {
     fontSize: typography.fontSizes.sm,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
     fontWeight: typography.fontWeights.medium,
     textTransform: 'capitalize',
   },
@@ -437,7 +437,7 @@ const styles = StyleSheet.create({
     padding: spacing[4],
     marginBottom: spacing[3],
     borderWidth: 2,
-    borderColor: colors.haven.champagne[500],
+    borderColor: colors.haven.purple[500],
   },
   questionHeader: {
     flexDirection: 'row',
@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
   questionTitle: {
     fontSize: typography.fontSizes.base,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
   questionText: {
     fontSize: typography.fontSizes.base,
@@ -460,16 +460,16 @@ const styles = StyleSheet.create({
     gap: spacing[2],
   },
   optionButton: {
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     paddingVertical: spacing[3],
     paddingHorizontal: spacing[4],
     borderRadius: borderRadius.md,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   optionText: {
     fontSize: typography.fontSizes.base,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
     textAlign: 'center',
     fontWeight: typography.fontWeights.medium,
   },
@@ -491,7 +491,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: borderRadius.md,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: borderRadius.full,
-    backgroundColor: `${colors.haven.champagne[500]}15`,
+    backgroundColor: `${colors.haven.purple[500]}15`,
     justifyContent: 'center',
     alignItems: 'center',
   },

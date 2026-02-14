@@ -148,7 +148,7 @@ export default function ChecklistDetailScreen() {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <Stack.Screen options={{ title: 'Not Found' }} />
         <View style={styles.notFound}>
-          <Ionicons name="alert-circle" size={48} color={colors.haven.navy[300]} />
+          <Ionicons name="alert-circle" size={48} color={colors.haven.purple[300]} />
           <Text style={styles.notFoundText}>Checklist item not found</Text>
           <Button
             title="Go Back"
@@ -205,7 +205,7 @@ export default function ChecklistDetailScreen() {
                 </>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle-outline" size={20} color={colors.haven.champagne[500]} />
+                  <Ionicons name="checkmark-circle-outline" size={20} color={colors.haven.purple[500]} />
                   <Text style={styles.completeButtonText}>Mark Complete</Text>
                 </>
               )}
@@ -274,7 +274,7 @@ export default function ChecklistDetailScreen() {
                         item.diyDifficulty === 'easy'
                           ? colors.status.success
                           : item.diyDifficulty === 'medium'
-                          ? colors.haven.champagne[500]
+                          ? colors.haven.purple[500]
                           : item.diyDifficulty === 'hard'
                           ? colors.status.warning
                           : colors.status.error,
@@ -291,7 +291,7 @@ export default function ChecklistDetailScreen() {
         {item.tips && item.tips.length > 0 && (
           <Card style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="bulb-outline" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="bulb-outline" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.sectionTitle}>Pro Tips</Text>
             </View>
             {item.tips.map((tip, index) => (
@@ -317,7 +317,7 @@ export default function ChecklistDetailScreen() {
         {/* When to Do It */}
         <Card style={styles.section}>
           <View style={styles.sectionHeader}>
-            <Ionicons name="calendar-outline" size={20} color={colors.haven.navy[500]} />
+            <Ionicons name="calendar-outline" size={20} color={colors.haven.purple[500]} />
             <Text style={styles.sectionTitle}>When to Do This</Text>
           </View>
           <View style={styles.monthsGrid}>
@@ -359,8 +359,8 @@ export default function ChecklistDetailScreen() {
               style={styles.actionCard}
               onPress={handleBookHandyman}
             >
-              <View style={[styles.actionIcon, { backgroundColor: colors.haven.champagne[50] }]}>
-                <Ionicons name="hammer" size={24} color={colors.haven.champagne[500]} />
+              <View style={[styles.actionIcon, { backgroundColor: colors.haven.purple[50] }]}>
+                <Ionicons name="hammer" size={24} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.actionContent}>
                 <Text style={styles.actionTitle}>Book Handyman</Text>
@@ -377,8 +377,8 @@ export default function ChecklistDetailScreen() {
               style={styles.actionCard}
               onPress={handleFindVendor}
             >
-              <View style={[styles.actionIcon, { backgroundColor: colors.haven.navy[50] }]}>
-                <Ionicons name="business" size={24} color={colors.haven.navy[500]} />
+              <View style={[styles.actionIcon, { backgroundColor: colors.haven.purple[50] }]}>
+                <Ionicons name="business" size={24} color={colors.haven.purple[500]} />
               </View>
               <View style={styles.actionContent}>
                 <Text style={styles.actionTitle}>Find a Vendor</Text>
@@ -394,8 +394,8 @@ export default function ChecklistDetailScreen() {
             style={styles.actionCard}
             onPress={handleAskAlfred}
           >
-            <View style={[styles.actionIcon, { backgroundColor: colors.haven.champagne[50] }]}>
-              <Ionicons name="sparkles" size={24} color={colors.haven.champagne[500]} />
+            <View style={[styles.actionIcon, { backgroundColor: colors.haven.purple[50] }]}>
+              <Ionicons name="sparkles" size={24} color={colors.haven.purple[500]} />
             </View>
             <View style={styles.actionContent}>
               <Text style={styles.actionTitle}>Ask Alfred</Text>
@@ -474,8 +474,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing[3],
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
-    backgroundColor: colors.haven.champagne[50],
+    borderColor: colors.haven.purple[200],
+    backgroundColor: colors.haven.purple[50],
     gap: spacing[1],
   },
   completeButtonDone: {
@@ -485,7 +485,7 @@ const styles = StyleSheet.create({
   completeButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   completeButtonTextDone: {
     color: colors.white,
@@ -586,7 +586,7 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     marginTop: 8,
     marginRight: spacing[3],
   },
@@ -622,11 +622,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthBadgeActive: {
-    backgroundColor: colors.haven.champagne[100],
+    backgroundColor: colors.haven.purple[100],
   },
   monthBadgeCurrent: {
     borderWidth: 2,
-    borderColor: colors.haven.champagne[500],
+    borderColor: colors.haven.purple[500],
   },
   monthText: {
     fontSize: typography.fontSizes.xs,
@@ -634,7 +634,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.fontWeights.medium,
   },
   monthTextActive: {
-    color: colors.haven.champagne[600],
+    color: colors.haven.purple[600],
   },
   actionsSection: {
     marginBottom: spacing[4],

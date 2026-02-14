@@ -187,7 +187,7 @@ const STATUS_LABELS: Record<TransactionStatus, string> = {
 const STATUS_COLORS: Record<TransactionStatus, string> = {
   PENDING: colors.warning,
   PAID_TO_VENDOR: colors.info,
-  BILLED_TO_CLIENT: colors.primary[600],
+  BILLED_TO_CLIENT: colors.haven.purple[600],
   SETTLED: colors.success,
   CANCELLED: colors.slate[400],
 };
@@ -282,7 +282,7 @@ export default function WalletScreen() {
     return (
       <ScreenContainer title="Wallet" onBackPress={() => router.navigate('/more')}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary[600]} />
+          <ActivityIndicator size="large" color={colors.haven.purple[600]} />
         </View>
       </ScreenContainer>
     );
@@ -529,7 +529,7 @@ const styles = StyleSheet.create({
   },
   // Balance Card
   balanceCard: {
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     borderRadius: borderRadius.xl,
     padding: spacing[6],
     marginBottom: spacing[4],
@@ -537,7 +537,7 @@ const styles = StyleSheet.create({
   },
   balanceLabel: {
     fontSize: typography.fontSizes.sm,
-    color: colors.primary[100],
+    color: colors.haven.purple[100],
     marginBottom: spacing[2],
   },
   balanceAmount: {
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   },
   balanceSubtext: {
     fontSize: typography.fontSizes.xs,
-    color: colors.primary[200],
+    color: colors.haven.purple[200],
     textAlign: 'center',
   },
   // Stats Row
@@ -602,7 +602,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: borderRadius.lg,
-    backgroundColor: colors.primary[100],
+    backgroundColor: colors.haven.purple[100],
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing[3],
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primary[600],
+    backgroundColor: colors.haven.purple[600],
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -642,7 +642,7 @@ const styles = StyleSheet.create({
   changeButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.primary[600],
+    color: colors.haven.purple[600],
   },
   addBankButton: {
     flexDirection: 'row',
@@ -767,21 +767,21 @@ const styles = StyleSheet.create({
   },
   // Info Card
   infoCard: {
-    backgroundColor: colors.primary[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.lg,
     padding: spacing[4],
     borderWidth: 1,
-    borderColor: colors.primary[200],
+    borderColor: colors.haven.purple[200],
   },
   infoTitle: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.semibold,
-    color: colors.primary[700],
+    color: colors.haven.purple[700],
     marginBottom: spacing[2],
   },
   infoText: {
     fontSize: typography.fontSizes.sm,
-    color: colors.primary[600],
+    color: colors.haven.purple[600],
     lineHeight: 20,
   },
   // Alert Banner

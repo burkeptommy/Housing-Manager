@@ -2,7 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
 import { colors, typography, spacing, borderRadius } from '../../lib/theme';
 
-type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'champagne';
+type BadgeVariant = 'default' | 'success' | 'warning' | 'error' | 'info' | 'accent' | 'coral';
 
 interface BadgeProps {
   label: string;
@@ -43,8 +43,11 @@ const styles = StyleSheet.create({
   info: {
     backgroundColor: colors.status.infoLight,
   },
-  champagne: {
-    backgroundColor: colors.haven.champagne[100],
+  accent: {
+    backgroundColor: colors.haven.purple[100],
+  },
+  coral: {
+    backgroundColor: colors.haven.coral[100],
   },
 
   // Sizes
@@ -59,7 +62,7 @@ const styles = StyleSheet.create({
 
   // Text base
   text: {
-    fontWeight: typography.fontWeights.medium,
+    fontFamily: 'Nunito_500Medium',
   },
 
   // Text variants
@@ -78,8 +81,11 @@ const styles = StyleSheet.create({
   text_info: {
     color: colors.status.info,
   },
-  text_champagne: {
-    color: colors.haven.champagne[600],
+  text_accent: {
+    color: colors.haven.purple[600],
+  },
+  text_coral: {
+    color: colors.haven.coral[600],
   },
 
   // Text sizes - minimum 11px for badges (xs is now 13px)

@@ -80,9 +80,9 @@ const ZONE_ICONS: Record<ZoneType, keyof typeof Ionicons.glyphMap> = {
 };
 
 const ZONE_COLORS: Record<ZoneType, string> = {
-  KITCHEN: colors.haven.champagne[500],
-  LIVING_ROOM: colors.haven.navy[500],
-  DINING_ROOM: colors.haven.champagne[600],
+  KITCHEN: colors.haven.purple[500],
+  LIVING_ROOM: colors.haven.purple[500],
+  DINING_ROOM: colors.haven.purple[600],
   BEDROOM: colors.indigo[500],
   BATHROOM: colors.blue[500],
   GARAGE: colors.gray[600],
@@ -156,7 +156,7 @@ function getCategoryLabel(category: AssetCategory): string {
 function getConditionColor(condition: string | null): string {
   switch (condition) {
     case 'Excellent': return colors.status.success;
-    case 'Good': return colors.haven.navy[500];
+    case 'Good': return colors.haven.purple[500];
     case 'Fair': return colors.status.warning;
     case 'Needs Service': return colors.status.error;
     default: return colors.gray[400];
@@ -426,7 +426,7 @@ export default function ZoneDetailScreen() {
               style={styles.addButton}
               onPress={() => setShowAddAssetModal(true)}
             >
-              <Ionicons name="add" size={20} color={colors.haven.champagne[500]} />
+              <Ionicons name="add" size={20} color={colors.haven.purple[500]} />
               <Text style={styles.addButtonText}>Add</Text>
             </TouchableOpacity>
           </View>
@@ -492,9 +492,9 @@ export default function ZoneDetailScreen() {
                   style={styles.suggestionChip}
                   onPress={() => handleSuggestionPress(suggestion)}
                 >
-                  <Ionicons name={suggestion.icon} size={16} color={colors.haven.champagne[500]} />
+                  <Ionicons name={suggestion.icon} size={16} color={colors.haven.purple[500]} />
                   <Text style={styles.suggestionText}>{suggestion.name}</Text>
-                  <Ionicons name="add" size={14} color={colors.haven.champagne[500]} />
+                  <Ionicons name="add" size={14} color={colors.haven.purple[500]} />
                 </TouchableOpacity>
               ))}
             </View>
@@ -564,7 +564,7 @@ const styles = StyleSheet.create({
     marginTop: spacing[4],
     paddingHorizontal: spacing[6],
     paddingVertical: spacing[3],
-    backgroundColor: colors.haven.champagne[500],
+    backgroundColor: colors.haven.purple[500],
     borderRadius: borderRadius.lg,
   },
   retryText: {
@@ -678,7 +678,7 @@ const styles = StyleSheet.create({
   addButtonText: {
     fontSize: typography.fontSizes.sm,
     fontWeight: typography.fontWeights.medium,
-    color: colors.haven.champagne[500],
+    color: colors.haven.purple[500],
   },
 
   // Empty
@@ -783,10 +783,10 @@ const styles = StyleSheet.create({
     gap: spacing[2],
     paddingVertical: spacing[2],
     paddingHorizontal: spacing[3],
-    backgroundColor: colors.haven.champagne[50],
+    backgroundColor: colors.haven.purple[50],
     borderRadius: borderRadius.full,
     borderWidth: 1,
-    borderColor: colors.haven.champagne[200],
+    borderColor: colors.haven.purple[200],
   },
   suggestionText: {
     fontSize: typography.fontSizes.sm,
