@@ -210,6 +210,57 @@ export class CreateFamilyMemberDto {
 
   @IsOptional()
   @IsString()
+  bloodType?: string;
+
+  @IsOptional()
+  @IsString()
+  medicalNotes?: string;
+
+  // Medical Providers
+  @IsOptional()
+  @IsString()
+  primaryDoctorName?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryDoctorPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  primaryDoctorAddress?: string;
+
+  @IsOptional()
+  @IsString()
+  dentistName?: string;
+
+  @IsOptional()
+  @IsString()
+  dentistPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  dentistAddress?: string;
+
+  // Work info (adults)
+  @IsOptional()
+  @IsString()
+  occupation?: string;
+
+  @IsOptional()
+  @IsString()
+  employer?: string;
+
+  @IsOptional()
+  @IsString()
+  workPhone?: string;
+
+  @IsOptional()
+  @IsString()
+  workAddress?: string;
+
+  // Emergency
+  @IsOptional()
+  @IsString()
   emergencyContact?: string;
 
   @IsOptional()

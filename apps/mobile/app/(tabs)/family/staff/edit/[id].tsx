@@ -122,7 +122,7 @@ export default function EditStaffScreen() {
           notes: staff.notes || '',
           payFrequency: staff.payFrequency || 'biweekly',
           payAmount: staff.payAmount?.toString() || '',
-          payMethod: staff.payMethod || 'direct_deposit',
+          payMethod: (staff as any).paymentMethod || staff.payMethod || 'direct_deposit',
           emergencyContactName: (staff as any).emergencyContact || staff.emergencyContactName || '',
           emergencyContactPhone: staff.emergencyContactPhone || '',
           agencyName: staff.agencyName || '',
@@ -159,16 +159,15 @@ export default function EditStaffScreen() {
       const body = {
         firstName: formData.firstName.trim(),
         lastName: formData.lastName.trim() || null,
-        role: formData.role,
+        relationship: formData.role, // Store role as relationship (DTO field)
         phone: formData.phone.trim() || null,
         email: formData.email.trim() || null,
-        address: formData.address.trim() || null,
         workSchedule: formData.workSchedule.trim() || null,
         startDate: formData.startDate?.toISOString() || null,
         notes: formData.notes.trim() || null,
         payFrequency: formData.payFrequency,
         payAmount: formData.payAmount ? parseFloat(formData.payAmount) : null,
-        payMethod: formData.payMethod,
+        paymentMethod: formData.payMethod, // DTO field is paymentMethod, not payMethod
         emergencyContact: formData.emergencyContactName.trim() || null,
         emergencyContactPhone: formData.emergencyContactPhone.trim() || null,
         agencyName: formData.agencyName.trim() || null,

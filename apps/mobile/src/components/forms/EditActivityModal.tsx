@@ -40,9 +40,11 @@ export interface ActivityData {
   type: string;
   location?: string | null;
   instructor?: string | null;
+  coachName?: string | null; // API field name for instructor
   schedule?: string | null;
   cost?: number | null;
   paymentFrequency?: string | null;
+  costFrequency?: string | null; // API field name for paymentFrequency
   notes?: string | null;
 }
 
@@ -78,10 +80,10 @@ export function EditActivityModal({
       setName(initialData?.name || '');
       setType(initialData?.type || 'sports');
       setLocation(initialData?.location || '');
-      setInstructor(initialData?.instructor || '');
+      setInstructor(initialData?.instructor || initialData?.coachName || '');
       setSchedule(initialData?.schedule || '');
       setCost(initialData?.cost?.toString() || '');
-      setPaymentFrequency(initialData?.paymentFrequency || 'monthly');
+      setPaymentFrequency(initialData?.paymentFrequency || initialData?.costFrequency || 'monthly');
       setNotes(initialData?.notes || '');
     }
   }, [visible, initialData]);

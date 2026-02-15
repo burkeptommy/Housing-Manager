@@ -333,6 +333,9 @@ export default function MemberDetailScreen() {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
+    // Only send fields that exist in the Prisma schema / DTO
+    const { emergencyContactRelationship: _rel, ...validData } = data;
+
     const response = await fetch(
       `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
@@ -341,7 +344,7 @@ export default function MemberDetailScreen() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(validData),
       }
     );
 
@@ -359,6 +362,9 @@ export default function MemberDetailScreen() {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
+    // Only send fields that exist in the Prisma schema / DTO
+    const { insuranceProvider: _ip, insuranceMemberId: _im, ...validData } = data;
+
     const response = await fetch(
       `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
@@ -367,7 +373,7 @@ export default function MemberDetailScreen() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(validData),
       }
     );
 
@@ -387,6 +393,21 @@ export default function MemberDetailScreen() {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
+    // Map mobile field names to Prisma schema fields
+    // Schema has schoolPickup/schoolDropoff, not pickupTime/dropoffTime/busNumber/schoolPhone
+    const validData: Record<string, unknown> = {
+      school: data.school,
+      schoolGrade: data.schoolGrade,
+      teacher: data.teacher,
+    };
+    // Map pickup/dropoff to schema fields
+    if (data.pickupTime !== undefined || data.busNumber !== undefined) {
+      validData.schoolPickup = [data.busNumber, data.pickupTime].filter(Boolean).join(' - ') || null;
+    }
+    if (data.dropoffTime !== undefined) {
+      validData.schoolDropoff = data.dropoffTime;
+    }
+
     const response = await fetch(
       `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
@@ -395,7 +416,7 @@ export default function MemberDetailScreen() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(validData),
       }
     );
 
@@ -411,13 +432,22 @@ export default function MemberDetailScreen() {
       ? `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/activity/${data.id}`
       : `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/activity`;
 
+    // Map mobile field names to DTO/Prisma field names
+    const { instructor, paymentFrequency, id: activityId, ...rest } = data;
+    const apiData: Record<string, unknown> = {
+      ...rest,
+      familyMemberId: id, // Required by CreateActivityDto
+      ...(instructor !== undefined && { coachName: instructor }), // instructor → coachName
+      ...(paymentFrequency !== undefined && { costFrequency: paymentFrequency }), // paymentFrequency → costFrequency
+    };
+
     const response = await fetch(endpoint, {
-      method: data.id ? 'PATCH' : 'POST',
+      method: activityId ? 'PATCH' : 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(apiData),
     });
 
     if (!response.ok) throw new Error('Failed to save');
@@ -451,6 +481,9 @@ export default function MemberDetailScreen() {
     const token = await getIdToken(true);
     if (!token) throw new Error('Authentication expired');
 
+    // workEmail not in Prisma schema - strip it
+    const { workEmail: _we, ...validData } = data;
+
     const response = await fetch(
       `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}`,
       {
@@ -459,7 +492,7 @@ export default function MemberDetailScreen() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(data),
+        body: JSON.stringify(validData),
       }
     );
 
@@ -475,13 +508,22 @@ export default function MemberDetailScreen() {
       ? `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/membership/${data.id}`
       : `${API_BASE_URL}/family/household/${householdInfo?.id}/member/${id}/membership`;
 
+    // Map mobile fields to API fields (membership stored as kidActivity)
+    const apiData = {
+      name: data.name,
+      type: data.type,
+      memberNumber: data.memberNumber,
+      cost: data.monthlyFee, // monthlyFee maps to kidActivity.cost
+      notes: data.notes,
+    };
+
     const response = await fetch(endpoint, {
       method: data.id ? 'PATCH' : 'POST',
       headers: {
         Authorization: `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(data),
+      body: JSON.stringify(apiData),
     });
 
     if (!response.ok) throw new Error('Failed to save');
