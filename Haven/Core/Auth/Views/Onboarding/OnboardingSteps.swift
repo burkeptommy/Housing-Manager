@@ -125,6 +125,7 @@ struct OnboardingPrimaryMemberStep: View {
             }
             .padding(.horizontal, HavenTheme.padding)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -176,6 +177,7 @@ struct OnboardingSpouseStep: View {
             .padding(.horizontal, HavenTheme.padding)
             .animation(.easeInOut, value: addSpouse)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
@@ -245,6 +247,7 @@ struct OnboardingFamilyStep: View {
             }
             .padding(.horizontal, HavenTheme.padding)
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 }
 
