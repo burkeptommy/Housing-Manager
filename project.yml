@@ -29,7 +29,6 @@ targets:
           - "Resources/SplashScreen.storyboard"
     resources:
       - path: Haven/Resources/Assets.xcassets
-      - path: Haven/Resources/SplashScreen.storyboard
     dependencies:
       - package: Supabase
         product: Supabase
