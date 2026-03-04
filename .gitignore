@@ -1,59 +1,31 @@
-# Dependencies
-node_modules
-.pnpm-store
+# Xcode
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
 
-# Build outputs
-dist
-build
-.next
-out
-.expo
-*.tsbuildinfo
+# Build
+build/
+.build/
 
-# IDE
-.idea
-.vscode
+# macOS
+.DS_Store
 *.swp
-*.swo
-.DS_Store
+*~
 
-# Environment files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
+# CocoaPods (if used later)
+Pods/
 
-# Testing
-coverage
-.nyc_output
+# Swift Package Manager
+.swiftpm/
+Package.resolved
 
-# Logs
-logs
-*.log
-npm-debug.log*
-pnpm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Misc
-*.pem
-.turbo
-.cache
-
-# Expo
-*.jks
+# Secrets
+*.env
+*.env.local
 *.p8
 *.p12
 *.key
 *.mobileprovision
-*.orig.*
-web-build/
-
-# NestJS
-# NOTE: The following folders are not to be included in source control.
-# See NestJS .gitignore template
+*.pem

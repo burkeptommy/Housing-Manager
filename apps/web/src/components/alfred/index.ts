@@ -1,1 +1,0 @@
-export { AlfredChat } from './AlfredChat';

@@ -1,8 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 50" width="200" height="50">
-  <!-- Roof peak icon -->
-  <g transform="translate(25, 26)" fill="#0a1929">
-    <path d="M 0 -14 L -18 4 L -14 4 L 0 -9 L 14 4 L 18 4 Z"/>
-  </g>
-  <!-- HAVEN text -->
-  <text x="52" y="32" font-family="system-ui, -apple-system, 'Segoe UI', sans-serif" font-size="20" font-weight="600" letter-spacing="2" fill="#0a1929">HAVEN</text>
-</svg>

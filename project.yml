@@ -1,0 +1,49 @@
+name: Haven
+options:
+  bundleIdPrefix: com.havenhome
+  deploymentTarget:
+    iOS: "17.0"
+  xcodeVersion: "16.0"
+  generateEmptyDirectories: true
+  groupSortPosition: top
+
+settings:
+  base:
+    DEVELOPMENT_TEAM: RW9CWCAWGQ
+    SWIFT_VERSION: "5.0"
+
+packages:
+  Supabase:
+    url: https://github.com/supabase/supabase-swift
+    from: "2.0.0"
+
+targets:
+  Haven:
+    type: application
+    platform: iOS
+    sources:
+      - path: Haven
+        excludes:
+          - "Config/Info.plist"
+          - "Config/Haven.entitlements"
+          - "Resources/SplashScreen.storyboard"
+    resources:
+      - path: Haven/Resources/Assets.xcassets
+      - path: Haven/Resources/SplashScreen.storyboard
+    dependencies:
+      - package: Supabase
+        product: Supabase
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.havenhome.app
+        INFOPLIST_FILE: Haven/Config/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Haven/Config/Haven.entitlements
+        MARKETING_VERSION: "1.0.0"
+        CURRENT_PROJECT_VERSION: "73"
+        CODE_SIGN_STYLE: Automatic
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: false
+        TARGETED_DEVICE_FAMILY: "1,2"
+    entitlements:
+      path: Haven/Config/Haven.entitlements
