@@ -32,6 +32,26 @@ final class DatabaseService {
             .value
     }
 
+    /// Insert a household with a known ID (for onboarding).
+    /// Avoids the `.select()` call which fails because the user's household_id
+    /// hasn't been set yet (RLS SELECT policy can't match).
+    func insertHousehold(id: UUID, name: String, subscriptionTier: String = "standard") async throws {
+        struct HouseholdInsertWithId: Codable {
+            let id: UUID
+            let name: String
+            let subscriptionTier: String
+
+            enum CodingKeys: String, CodingKey {
+                case id, name
+                case subscriptionTier = "subscription_tier"
+            }
+        }
+
+        try await from("households")
+            .insert(HouseholdInsertWithId(id: id, name: name, subscriptionTier: subscriptionTier))
+            .execute()
+    }
+
     func updateHousehold(id: UUID, _ updates: HouseholdUpdate) async throws -> HouseholdRow {
         try await from("households")
             .update(updates)

@@ -80,17 +80,21 @@ final class OnboardingViewModel: ObservableObject {
         defer { isLoading = false }
 
         do {
-            // 1. Create household
-            let household = try await DatabaseService.shared.createHousehold(
-                HouseholdInsert(name: householdName.trimmingCharacters(in: .whitespaces), subscriptionTier: "standard")
+            // 1. Create household with a client-generated UUID.
+            //    We use insertHousehold (no .select()) because the RLS SELECT policy
+            //    requires the user's household_id to be set, which hasn't happened yet.
+            let householdId = UUID()
+            try await DatabaseService.shared.insertHousehold(
+                id: householdId,
+                name: householdName.trimmingCharacters(in: .whitespaces)
             )
 
-            // 2. Link user to household
-            try await authService.completeOnboarding(householdId: household.id)
+            // 2. Link user to household (sets user.household_id so RLS passes for later inserts)
+            try await authService.completeOnboarding(householdId: householdId)
 
             // 3. Add primary family member
             _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
-                householdId: household.id,
+                householdId: householdId,
                 firstName: primaryFirstName.trimmingCharacters(in: .whitespaces),
                 lastName: primaryLastName.trimmingCharacters(in: .whitespaces),
                 relationship: "Primary Client",
@@ -101,7 +105,7 @@ final class OnboardingViewModel: ObservableObject {
             // 4. Add spouse if provided
             if addSpouse && !spouseFirstName.trimmingCharacters(in: .whitespaces).isEmpty {
                 _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
-                    householdId: household.id,
+                    householdId: householdId,
                     firstName: spouseFirstName.trimmingCharacters(in: .whitespaces),
                     lastName: spouseLastName.trimmingCharacters(in: .whitespaces),
                     relationship: "Spouse/Partner",
@@ -112,14 +116,15 @@ final class OnboardingViewModel: ObservableObject {
             // 5. Add additional family members
             for member in additionalMembers where !member.firstName.trimmingCharacters(in: .whitespaces).isEmpty {
                 _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
-                    householdId: household.id,
+                    householdId: householdId,
                     firstName: member.firstName.trimmingCharacters(in: .whitespaces),
                     lastName: member.lastName.trimmingCharacters(in: .whitespaces),
                     relationship: member.relationship
                 ))
             }
         } catch {
-            errorMessage = "Setup failed. Please try again."
+            print("[Onboarding] Setup failed: \(error)")
+            errorMessage = "Setup failed: \(error.localizedDescription)"
         }
     }
 }

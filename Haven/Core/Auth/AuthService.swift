@@ -78,7 +78,9 @@ final class AuthService: ObservableObject {
 
     /// Complete onboarding by linking the user to a household.
     func completeOnboarding(householdId: UUID) async throws {
-        guard let userId = currentUserId else { return }
+        guard let userId = currentUserId else {
+            throw NSError(domain: "AuthService", code: 0, userInfo: [NSLocalizedDescriptionKey: "No authenticated user found."])
+        }
         _ = try await DatabaseService.shared.updateUser(id: userId, UserUpdate(householdId: householdId))
         needsOnboarding = false
     }
