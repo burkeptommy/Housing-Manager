@@ -90,7 +90,7 @@ final class DocumentDetailViewModel: ObservableObject {
         isDeleting = true
         do {
             // Delete file from storage
-            try? await HavenSupabase.storage
+            _ = try? await HavenSupabase.storage
                 .from("documents")
                 .remove(paths: [doc.filePath])
 

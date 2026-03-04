@@ -9,8 +9,8 @@ enum HavenSupabase {
         supabaseKey: AppConfig.Supabase.anonKey
     )
 
-    static var db: PostgrestClient {
-        client.database
+    static func from(_ table: String) -> PostgrestQueryBuilder {
+        client.from(table)
     }
 
     static var auth: AuthClient {

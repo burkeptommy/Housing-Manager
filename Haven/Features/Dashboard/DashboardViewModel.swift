@@ -57,10 +57,10 @@ final class DashboardViewModel: ObservableObject {
     }
 
     private func fetchAll() async {
-        async let scoresTask = loadCompletionScores()
-        async let expirationsTask = loadExpirations()
-        async let maintenanceTask = loadOverdueMaintenance()
-        async let recentTask = loadRecentDocuments()
+        async let scoresTask: Void = loadCompletionScores()
+        async let expirationsTask: Void = loadExpirations()
+        async let maintenanceTask: Void = loadOverdueMaintenance()
+        async let recentTask: Void = loadRecentDocuments()
         _ = await (scoresTask, expirationsTask, maintenanceTask, recentTask)
     }
 

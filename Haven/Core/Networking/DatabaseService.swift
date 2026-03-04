@@ -5,14 +5,17 @@ import Supabase
 /// All methods use the Supabase PostgREST client with automatic RLS enforcement.
 final class DatabaseService {
     static let shared = DatabaseService()
-    private let db = HavenSupabase.db
 
     private init() {}
+
+    private func from(_ table: String) -> PostgrestQueryBuilder {
+        HavenSupabase.from(table)
+    }
 
     // MARK: - Households
 
     func fetchHousehold(id: UUID) async throws -> HouseholdRow {
-        try await db.from("households")
+        try await from("households")
             .select()
             .eq("id", value: id.uuidString)
             .single()
@@ -21,7 +24,7 @@ final class DatabaseService {
     }
 
     func createHousehold(_ household: HouseholdInsert) async throws -> HouseholdRow {
-        try await db.from("households")
+        try await from("households")
             .insert(household)
             .select()
             .single()
@@ -30,7 +33,7 @@ final class DatabaseService {
     }
 
     func updateHousehold(id: UUID, _ updates: HouseholdUpdate) async throws -> HouseholdRow {
-        try await db.from("households")
+        try await from("households")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -43,7 +46,7 @@ final class DatabaseService {
 
     func fetchCurrentUser() async throws -> UserRow {
         let userId = try await HavenSupabase.auth.session.user.id
-        return try await db.from("users")
+        return try await from("users")
             .select()
             .eq("id", value: userId.uuidString)
             .single()
@@ -52,7 +55,7 @@ final class DatabaseService {
     }
 
     func createUser(_ user: UserInsert) async throws -> UserRow {
-        try await db.from("users")
+        try await from("users")
             .insert(user)
             .select()
             .single()
@@ -61,7 +64,7 @@ final class DatabaseService {
     }
 
     func updateUser(id: UUID, _ updates: UserUpdate) async throws -> UserRow {
-        try await db.from("users")
+        try await from("users")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -73,7 +76,7 @@ final class DatabaseService {
     // MARK: - Family Members
 
     func fetchFamilyMembers() async throws -> [FamilyMemberRow] {
-        try await db.from("family_members")
+        try await from("family_members")
             .select()
             .order("first_name")
             .execute()
@@ -81,7 +84,7 @@ final class DatabaseService {
     }
 
     func createFamilyMember(_ member: FamilyMemberInsert) async throws -> FamilyMemberRow {
-        try await db.from("family_members")
+        try await from("family_members")
             .insert(member)
             .select()
             .single()
@@ -90,7 +93,7 @@ final class DatabaseService {
     }
 
     func updateFamilyMember(id: UUID, _ updates: FamilyMemberUpdate) async throws -> FamilyMemberRow {
-        try await db.from("family_members")
+        try await from("family_members")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -100,7 +103,7 @@ final class DatabaseService {
     }
 
     func deleteFamilyMember(id: UUID) async throws {
-        try await db.from("family_members")
+        try await from("family_members")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -109,14 +112,14 @@ final class DatabaseService {
     // MARK: - Documents
 
     func fetchDocuments(category: String? = nil, status: String? = nil) async throws -> [DocumentRow] {
-        var query = db.from("documents").select()
+        var query = from("documents").select()
         if let category { query = query.eq("category", value: category) }
         if let status { query = query.eq("status", value: status) }
         return try await query.order("uploaded_at", ascending: false).execute().value
     }
 
     func fetchDocument(id: UUID) async throws -> DocumentRow {
-        try await db.from("documents")
+        try await from("documents")
             .select()
             .eq("id", value: id.uuidString)
             .single()
@@ -125,7 +128,7 @@ final class DatabaseService {
     }
 
     func createDocument(_ doc: DocumentInsert) async throws -> DocumentRow {
-        try await db.from("documents")
+        try await from("documents")
             .insert(doc)
             .select()
             .single()
@@ -134,7 +137,7 @@ final class DatabaseService {
     }
 
     func updateDocument(id: UUID, _ updates: DocumentUpdate) async throws -> DocumentRow {
-        try await db.from("documents")
+        try await from("documents")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -144,7 +147,7 @@ final class DatabaseService {
     }
 
     func deleteDocument(id: UUID) async throws {
-        try await db.from("documents")
+        try await from("documents")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -153,7 +156,7 @@ final class DatabaseService {
     // MARK: - Document Family Members
 
     func fetchDocumentFamilyMembers(documentId: UUID) async throws -> [DocumentFamilyMemberRow] {
-        try await db.from("document_family_members")
+        try await from("document_family_members")
             .select()
             .eq("document_id", value: documentId.uuidString)
             .execute()
@@ -162,13 +165,13 @@ final class DatabaseService {
 
     func linkDocumentToFamilyMember(documentId: UUID, familyMemberId: UUID) async throws {
         let insert = DocumentFamilyMemberInsert(documentId: documentId, familyMemberId: familyMemberId)
-        try await db.from("document_family_members")
+        try await from("document_family_members")
             .insert(insert)
             .execute()
     }
 
     func unlinkDocumentFromFamilyMember(documentId: UUID, familyMemberId: UUID) async throws {
-        try await db.from("document_family_members")
+        try await from("document_family_members")
             .delete()
             .eq("document_id", value: documentId.uuidString)
             .eq("family_member_id", value: familyMemberId.uuidString)
@@ -176,14 +179,14 @@ final class DatabaseService {
     }
 
     func fetchFamilyMembersForDocument(documentId: UUID) async throws -> [FamilyMemberRow] {
-        let junctions: [DocumentFamilyMemberRow] = try await db.from("document_family_members")
+        let junctions: [DocumentFamilyMemberRow] = try await from("document_family_members")
             .select()
             .eq("document_id", value: documentId.uuidString)
             .execute()
             .value
         guard !junctions.isEmpty else { return [] }
         let ids = junctions.map { $0.familyMemberId.uuidString }
-        return try await db.from("family_members")
+        return try await from("family_members")
             .select()
             .in("id", values: ids)
             .execute()
@@ -209,7 +212,7 @@ final class DatabaseService {
     // MARK: - Properties
 
     func fetchProperties() async throws -> [PropertyRow] {
-        try await db.from("properties")
+        try await from("properties")
             .select()
             .order("name")
             .execute()
@@ -217,7 +220,7 @@ final class DatabaseService {
     }
 
     func fetchProperty(id: UUID) async throws -> PropertyRow {
-        try await db.from("properties")
+        try await from("properties")
             .select()
             .eq("id", value: id.uuidString)
             .single()
@@ -226,7 +229,7 @@ final class DatabaseService {
     }
 
     func createProperty(_ property: PropertyInsert) async throws -> PropertyRow {
-        try await db.from("properties")
+        try await from("properties")
             .insert(property)
             .select()
             .single()
@@ -235,7 +238,7 @@ final class DatabaseService {
     }
 
     func updateProperty(id: UUID, _ updates: PropertyUpdate) async throws -> PropertyRow {
-        try await db.from("properties")
+        try await from("properties")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -245,7 +248,7 @@ final class DatabaseService {
     }
 
     func deleteProperty(id: UUID) async throws {
-        try await db.from("properties")
+        try await from("properties")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -254,7 +257,7 @@ final class DatabaseService {
     // MARK: - Home Systems
 
     func fetchHomeSystems(propertyId: UUID) async throws -> [HomeSystemRow] {
-        try await db.from("home_systems")
+        try await from("home_systems")
             .select()
             .eq("property_id", value: propertyId.uuidString)
             .order("name")
@@ -263,7 +266,7 @@ final class DatabaseService {
     }
 
     func createHomeSystem(_ system: HomeSystemInsert) async throws -> HomeSystemRow {
-        try await db.from("home_systems")
+        try await from("home_systems")
             .insert(system)
             .select()
             .single()
@@ -272,7 +275,7 @@ final class DatabaseService {
     }
 
     func updateHomeSystem(id: UUID, _ updates: HomeSystemUpdate) async throws -> HomeSystemRow {
-        try await db.from("home_systems")
+        try await from("home_systems")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -282,7 +285,7 @@ final class DatabaseService {
     }
 
     func deleteHomeSystem(id: UUID) async throws {
-        try await db.from("home_systems")
+        try await from("home_systems")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -291,13 +294,13 @@ final class DatabaseService {
     // MARK: - Warranties
 
     func fetchWarranties(systemId: UUID? = nil) async throws -> [WarrantyRow] {
-        var query = db.from("warranties").select()
+        var query = from("warranties").select()
         if let systemId { query = query.eq("system_id", value: systemId.uuidString) }
         return try await query.order("end_date").execute().value
     }
 
     func createWarranty(_ warranty: WarrantyInsert) async throws -> WarrantyRow {
-        try await db.from("warranties")
+        try await from("warranties")
             .insert(warranty)
             .select()
             .single()
@@ -306,7 +309,7 @@ final class DatabaseService {
     }
 
     func updateWarranty(id: UUID, _ updates: WarrantyUpdate) async throws -> WarrantyRow {
-        try await db.from("warranties")
+        try await from("warranties")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -316,7 +319,7 @@ final class DatabaseService {
     }
 
     func deleteWarranty(id: UUID) async throws {
-        try await db.from("warranties")
+        try await from("warranties")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -325,7 +328,7 @@ final class DatabaseService {
     // MARK: - Contractors
 
     func fetchContractors() async throws -> [ContractorRow] {
-        try await db.from("contractors")
+        try await from("contractors")
             .select()
             .order("company_name")
             .execute()
@@ -333,7 +336,7 @@ final class DatabaseService {
     }
 
     func createContractor(_ contractor: ContractorInsert) async throws -> ContractorRow {
-        try await db.from("contractors")
+        try await from("contractors")
             .insert(contractor)
             .select()
             .single()
@@ -342,7 +345,7 @@ final class DatabaseService {
     }
 
     func updateContractor(id: UUID, _ updates: ContractorUpdate) async throws -> ContractorRow {
-        try await db.from("contractors")
+        try await from("contractors")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -352,7 +355,7 @@ final class DatabaseService {
     }
 
     func deleteContractor(id: UUID) async throws {
-        try await db.from("contractors")
+        try await from("contractors")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -361,13 +364,13 @@ final class DatabaseService {
     // MARK: - Maintenance Tasks
 
     func fetchMaintenanceTasks(propertyId: UUID? = nil) async throws -> [MaintenanceTaskDBRow] {
-        var query = db.from("maintenance_tasks").select()
+        var query = from("maintenance_tasks").select()
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
         return try await query.order("next_due_date").execute().value
     }
 
     func createMaintenanceTask(_ task: MaintenanceTaskInsert) async throws -> MaintenanceTaskDBRow {
-        try await db.from("maintenance_tasks")
+        try await from("maintenance_tasks")
             .insert(task)
             .select()
             .single()
@@ -376,7 +379,7 @@ final class DatabaseService {
     }
 
     func updateMaintenanceTask(id: UUID, _ updates: MaintenanceTaskUpdate) async throws -> MaintenanceTaskDBRow {
-        try await db.from("maintenance_tasks")
+        try await from("maintenance_tasks")
             .update(updates)
             .eq("id", value: id.uuidString)
             .select()
@@ -386,7 +389,7 @@ final class DatabaseService {
     }
 
     func deleteMaintenanceTask(id: UUID) async throws {
-        try await db.from("maintenance_tasks")
+        try await from("maintenance_tasks")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -395,14 +398,14 @@ final class DatabaseService {
     // MARK: - Service Records
 
     func fetchServiceRecords(systemId: UUID? = nil, propertyId: UUID? = nil) async throws -> [ServiceRecordRow] {
-        var query = db.from("service_records").select()
+        var query = from("service_records").select()
         if let systemId { query = query.eq("system_id", value: systemId.uuidString) }
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
         return try await query.order("service_date", ascending: false).execute().value
     }
 
     func createServiceRecord(_ record: ServiceRecordInsert) async throws -> ServiceRecordRow {
-        try await db.from("service_records")
+        try await from("service_records")
             .insert(record)
             .select()
             .single()
@@ -411,7 +414,7 @@ final class DatabaseService {
     }
 
     func deleteServiceRecord(id: UUID) async throws {
-        try await db.from("service_records")
+        try await from("service_records")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()
@@ -420,7 +423,7 @@ final class DatabaseService {
     // MARK: - Chat Messages
 
     func fetchChatMessages(limit: Int = 50) async throws -> [ChatMessageRow] {
-        try await db.from("chat_messages")
+        try await from("chat_messages")
             .select()
             .order("created_at", ascending: false)
             .limit(limit)
@@ -429,7 +432,7 @@ final class DatabaseService {
     }
 
     func createChatMessage(_ message: ChatMessageInsert) async throws -> ChatMessageRow {
-        try await db.from("chat_messages")
+        try await from("chat_messages")
             .insert(message)
             .select()
             .single()
@@ -440,7 +443,7 @@ final class DatabaseService {
     // MARK: - Completion Scores
 
     func fetchCompletionScores() async throws -> [CompletionScoreRow] {
-        try await db.from("completion_scores")
+        try await from("completion_scores")
             .select()
             .order("category")
             .execute()
@@ -448,7 +451,7 @@ final class DatabaseService {
     }
 
     func upsertCompletionScore(_ score: CompletionScoreInsert) async throws -> CompletionScoreRow {
-        try await db.from("completion_scores")
+        try await from("completion_scores")
             .upsert(score)
             .select()
             .single()
