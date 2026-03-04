@@ -11,6 +11,7 @@ final class AuthViewModel: ObservableObject {
     @Published var showSignUp = false
     @Published var showForgotPassword = false
     @Published var resetEmailSent = false
+    @Published var confirmationEmailSent = false
 
     func signIn(authService: AuthService) async {
         guard validate(forSignUp: false) else { return }
@@ -35,6 +36,10 @@ final class AuthViewModel: ObservableObject {
                 password: password,
                 fullName: fullName.trimmingCharacters(in: .whitespaces)
             )
+            // If email confirmation is required, authService sets pendingConfirmation
+            if authService.pendingConfirmation {
+                confirmationEmailSent = true
+            }
         } catch {
             errorMessage = friendlyError(error)
         }
@@ -90,10 +95,16 @@ final class AuthViewModel: ObservableObject {
             return "Invalid email or password."
         }
         if desc.contains("already registered") || desc.contains("already been registered") {
-            return "An account with this email already exists."
+            return "An account with this email already exists. Try signing in."
+        }
+        if desc.contains("email not confirmed") {
+            return "Please check your email and confirm your account first."
         }
         if desc.contains("network") || desc.contains("offline") {
             return "Network error. Please check your connection."
+        }
+        if desc.contains("rate limit") || desc.contains("too many") {
+            return "Too many attempts. Please wait a moment and try again."
         }
         return "Something went wrong. Please try again."
     }

@@ -7,8 +7,10 @@ final class AuthService: ObservableObject {
     @Published var currentUserId: UUID?
     @Published var isAuthenticated = false
     @Published var needsOnboarding = false
+    @Published var pendingConfirmation = false
 
     private var authStateTask: Task<Void, Never>?
+    private var pendingFullName: String?
 
     /// Start listening for auth state changes. Call once on app launch.
     func startListening() {
@@ -18,13 +20,16 @@ final class AuthService: ObservableObject {
                 case .initialSession, .signedIn:
                     currentUserId = session?.user.id
                     isAuthenticated = session != nil
+                    pendingConfirmation = false
                     if session != nil {
+                        await ensureUserRecord(session: session)
                         await checkOnboardingStatus()
                     }
                 case .signedOut:
                     currentUserId = nil
                     isAuthenticated = false
                     needsOnboarding = false
+                    pendingConfirmation = false
                 default:
                     break
                 }
@@ -39,16 +44,25 @@ final class AuthService: ObservableObject {
     func signUp(email: String, password: String, fullName: String?) async throws {
         let result = try await HavenSupabase.auth.signUp(email: email, password: password)
 
-        let userId = result.user.id
-        let userInsert = UserInsert(
-            id: userId,
-            householdId: nil,
-            email: email,
-            fullName: fullName,
-            role: "member"
-        )
-        _ = try await DatabaseService.shared.createUser(userInsert)
-        needsOnboarding = true
+        // Check if the user has a session (email confirmation disabled)
+        // or if they need to confirm their email first
+        if result.session != nil {
+            // No email confirmation required — create user record immediately
+            let userId = result.user.id
+            let userInsert = UserInsert(
+                id: userId,
+                householdId: nil,
+                email: email,
+                fullName: fullName,
+                role: "member"
+            )
+            _ = try await DatabaseService.shared.createUser(userInsert)
+            needsOnboarding = true
+        } else {
+            // Email confirmation required — store name for later, show confirmation UI
+            pendingFullName = fullName
+            pendingConfirmation = true
+        }
     }
 
     func signOut() {
@@ -121,6 +135,32 @@ final class AuthService: ObservableObject {
     }
 
     // MARK: - Private
+
+    /// Ensure a user record exists in the users table.
+    /// Called on sign-in — handles the case where the user confirmed their email
+    /// and is signing in for the first time (user record wasn't created during sign-up).
+    private func ensureUserRecord(session: Session?) async {
+        guard let session else { return }
+        let userId = session.user.id
+        let email = session.user.email ?? ""
+
+        do {
+            // Try to fetch — if it exists, we're good
+            _ = try await DatabaseService.shared.fetchCurrentUser()
+        } catch {
+            // User record doesn't exist yet — create it
+            let fullName = pendingFullName ?? session.user.userMetadata["full_name"]?.value as? String
+            let userInsert = UserInsert(
+                id: userId,
+                householdId: nil,
+                email: email,
+                fullName: fullName,
+                role: "member"
+            )
+            _ = try? await DatabaseService.shared.createUser(userInsert)
+            pendingFullName = nil
+        }
+    }
 
     private func checkOnboardingStatus() async {
         do {
