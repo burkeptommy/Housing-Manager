@@ -11,16 +11,17 @@ struct ErrorView: View {
 
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.havenCritical)
+                .foregroundStyle(HavenColors.critical)
                 .accessibilityHidden(true)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Something Went Wrong")
                     .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.textPrimary)
 
                 Text(message)
-                    .font(HavenTypography.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, HavenTheme.spacing32)
             }
@@ -48,4 +49,5 @@ struct ErrorView: View {
 
 #Preview {
     ErrorView(message: "Unable to load your documents. Check your connection and try again.", retryAction: {})
+        .background(HavenColors.background)
 }

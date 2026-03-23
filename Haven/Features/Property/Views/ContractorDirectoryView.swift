@@ -10,27 +10,52 @@ struct ContractorDirectoryView: View {
                 ProgressView("Loading contractors...")
             } else if viewModel.contractors.isEmpty {
                 ContentUnavailableView {
-                    Label("No Contractors", systemImage: "person.crop.rectangle.badge.plus")
+                    Label("Your Contact Network", systemImage: "person.crop.rectangle.badge.plus")
                 } description: {
-                    Text("Add contractors to track your service providers.")
+                    Text("Add contractors, attorneys, financial advisors, insurance agents, and other contacts.")
                 } actions: {
-                    Button("Add Contractor") {
+                    Button("Add a Contact") {
                         showAddContractor = true
                     }
                     .buttonStyle(.borderedProminent)
+                    .tint(HavenColors.navy)
                 }
             } else {
                 contractorList
             }
         }
-        .navigationTitle("Contractors")
+        .navigationTitle("Home & Estate Contacts")
         .searchable(text: $viewModel.searchText, prompt: "Search contractors...")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showAddContractor = true
-                } label: {
-                    Image(systemName: "plus")
+                HStack(spacing: 12) {
+                    Menu {
+                        Picker("Sort", selection: $viewModel.sortBy) {
+                            ForEach(ContractorViewModel.SortOption.allCases, id: \.self) { option in
+                                Text(option.rawValue).tag(option)
+                            }
+                        }
+
+                        if !viewModel.availableSpecialties.isEmpty {
+                            Divider()
+                            Picker("Specialty", selection: $viewModel.filterSpecialty) {
+                                Text("All Specialties").tag(nil as String?)
+                                ForEach(viewModel.availableSpecialties, id: \.self) { s in
+                                    Text(s).tag(s as String?)
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "line.3.horizontal.decrease.circle")
+                            .foregroundStyle(HavenColors.navy)
+                    }
+
+                    Button {
+                        showAddContractor = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(HavenColors.navy)
+                    }
                 }
             }
         }
@@ -43,7 +68,7 @@ struct ContractorDirectoryView: View {
             }
         }
         .sheet(isPresented: $showAddContractor) {
-            AddContractorView(onComplete: {
+            AddVendorSheet(onComplete: {
                 Task { await viewModel.loadContractors() }
             })
         }
@@ -63,7 +88,7 @@ struct ContractorDirectoryView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(HavenColors.background)
     }
 
     private func contractorCard(_ contractor: ContractorRow) -> some View {
@@ -71,20 +96,21 @@ struct ContractorDirectoryView: View {
             HStack(spacing: 12) {
                 Image(systemName: "person.crop.circle.fill")
                     .font(.title2)
-                    .foregroundStyle(Color.havenAccent)
+                    .foregroundStyle(HavenColors.navy)
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(contractor.companyName)
-                        .font(.subheadline.weight(.medium))
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
                     if let contact = contractor.contactName {
                         Text(contact)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     if let specialties = contractor.specialties, !specialties.isEmpty {
                         Text(specialties.joined(separator: ", "))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -97,22 +123,32 @@ struct ContractorDirectoryView: View {
                             ForEach(1...5, id: \.self) { star in
                                 Image(systemName: star <= rating ? "star.fill" : "star")
                                     .font(.caption2)
-                                    .foregroundStyle(star <= rating ? .yellow : .secondary)
+                                    .foregroundStyle(star <= rating ? HavenColors.warning : HavenColors.textTertiary)
                             }
                         }
                     }
 
+                    let spent = viewModel.totalSpent(for: contractor.id)
+                    if spent > 0 {
+                        Text("$\(spent, specifier: "%.0f") spent")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
                     HStack(spacing: 8) {
-                        Link(destination: URL(string: "tel:\(contractor.phone)")!) {
-                            Image(systemName: "phone.fill")
-                                .font(.caption)
-                                .foregroundStyle(Color.havenAccent)
+                        if let url = sanitizedPhoneURL(contractor.phone) {
+                            Link(destination: url) {
+                                Image(systemName: "phone.fill")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
                         }
-                        if let email = contractor.email {
-                            Link(destination: URL(string: "mailto:\(email)")!) {
+                        if let email = contractor.email,
+                           let url = sanitizedEmailURL(email) {
+                            Link(destination: url) {
                                 Image(systemName: "envelope.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(Color.havenAccent)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.navy700)
                             }
                         }
                     }
@@ -134,7 +170,8 @@ struct ContractorDetailView: View {
                 HavenCard {
                     VStack(alignment: .leading, spacing: 12) {
                         Text(contractor.companyName)
-                            .font(.title2.bold())
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.textPrimary)
                         if let contact = contractor.contactName {
                             infoRow("Contact", value: contact)
                         }
@@ -151,9 +188,10 @@ struct ContractorDetailView: View {
                         if contractor.insuranceVerified == true {
                             HStack {
                                 Image(systemName: "checkmark.seal.fill")
-                                    .foregroundStyle(.green)
+                                    .foregroundStyle(HavenColors.success)
                                 Text("Insurance Verified")
-                                    .font(.subheadline)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
                             }
                         }
                     }
@@ -161,46 +199,52 @@ struct ContractorDetailView: View {
 
                 // Quick actions
                 HStack(spacing: 12) {
-                    Link(destination: URL(string: "tel:\(contractor.phone)")!) {
-                        Label("Call", systemImage: "phone.fill")
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.green.opacity(0.12))
-                            .foregroundStyle(.green)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    if let url = sanitizedPhoneURL(contractor.phone) {
+                        Link(destination: url) {
+                            Label("Call", systemImage: "phone.fill")
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(HavenColors.success.opacity(0.12))
+                                .foregroundStyle(HavenColors.success)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
                     }
-                    if let email = contractor.email {
-                        Link(destination: URL(string: "mailto:\(email)")!) {
+                    if let email = contractor.email,
+                       let url = sanitizedEmailURL(email) {
+                        Link(destination: url) {
                             Label("Email", systemImage: "envelope.fill")
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .background(Color.blue.opacity(0.12))
-                                .foregroundStyle(.blue)
+                                .background(HavenColors.info.opacity(0.12))
+                                .foregroundStyle(HavenColors.info)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                     }
                 }
-                .font(.subheadline.weight(.medium))
+                .font(HavenTypography.uiLabel)
 
                 // Service history
                 if !serviceRecords.isEmpty {
                     HavenCard {
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Service History")
-                                .font(.headline)
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
                             ForEach(serviceRecords) { record in
                                 HStack {
                                     VStack(alignment: .leading, spacing: 2) {
                                         Text(record.description)
-                                            .font(.subheadline)
+                                            .font(HavenTypography.bodySmall)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                         Text(record.serviceDate)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundStyle(HavenColors.textSecondary)
                                     }
                                     Spacer()
                                     if let cost = record.cost {
                                         Text("$\(cost, specifier: "%.0f")")
-                                            .font(.caption.bold())
+                                            .font(HavenTypography.uiLabel)
+                                            .foregroundStyle(HavenColors.textPrimary)
                                     }
                                 }
                             }
@@ -210,7 +254,7 @@ struct ContractorDetailView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(HavenColors.background)
         .navigationTitle(contractor.companyName)
         .navigationBarTitleDisplayMode(.inline)
         .task {
@@ -222,11 +266,12 @@ struct ContractorDetailView: View {
     private func infoRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
             Spacer()
             Text(value)
-                .font(.subheadline)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
 }
@@ -243,16 +288,34 @@ struct AddContractorView: View {
     @State private var email = ""
     @State private var address = ""
     @State private var licenseNumber = ""
+    @State private var contactType = "Contractor / Service Provider"
     @State private var selectedSpecialties: Set<String> = []
     @State private var notes = ""
     @State private var isSaving = false
     @State private var error: String?
 
+    private let contactTypes = [
+        "Contractor / Service Provider",
+        "Attorney",
+        "Financial Advisor / CPA",
+        "Insurance Agent",
+        "Property Manager",
+        "Other"
+    ]
+
     var body: some View {
         NavigationStack {
             Form {
-                Section("Company Info") {
-                    TextField("Company Name", text: $companyName)
+                Section("Contact Type") {
+                    Picker("Type", selection: $contactType) {
+                        ForEach(contactTypes, id: \.self) { type in
+                            Text(type).tag(type)
+                        }
+                    }
+                }
+
+                Section(contactType == "Contractor / Service Provider" ? "Company Info" : "Contact Info") {
+                    TextField(contactType == "Contractor / Service Provider" ? "Company Name" : "Name / Firm", text: $companyName)
                     TextField("Contact Name", text: $contactName)
                     TextField("Phone", text: $phone)
                         .keyboardType(.phonePad)
@@ -265,22 +328,24 @@ struct AddContractorView: View {
                     TextField("Address", text: $address)
                 }
 
-                Section("Specialties") {
-                    ForEach(SystemCategory.allCases, id: \.self) { cat in
-                        Button {
-                            if selectedSpecialties.contains(cat.rawValue) {
-                                selectedSpecialties.remove(cat.rawValue)
-                            } else {
-                                selectedSpecialties.insert(cat.rawValue)
-                            }
-                        } label: {
-                            HStack {
-                                Text(cat.rawValue)
-                                    .foregroundStyle(.primary)
-                                Spacer()
+                if contactType == "Contractor / Service Provider" {
+                    Section("Specialties") {
+                        ForEach(SystemCategory.allCases, id: \.self) { cat in
+                            Button {
                                 if selectedSpecialties.contains(cat.rawValue) {
-                                    Image(systemName: "checkmark")
-                                        .foregroundStyle(Color.havenAccent)
+                                    selectedSpecialties.remove(cat.rawValue)
+                                } else {
+                                    selectedSpecialties.insert(cat.rawValue)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(cat.rawValue)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer()
+                                    if selectedSpecialties.contains(cat.rawValue) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(HavenColors.navy)
+                                    }
                                 }
                             }
                         }
@@ -293,11 +358,15 @@ struct AddContractorView: View {
 
                 if let error {
                     Section {
-                        Text(error).foregroundStyle(.red).font(.caption)
+                        Text(error)
+                            .foregroundStyle(HavenColors.critical)
+                            .font(HavenTypography.caption)
                     }
                 }
             }
-            .navigationTitle("Add Contractor")
+            .scrollContentBackground(.hidden)
+            .background(HavenColors.cream)
+            .navigationTitle("Add Contact")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -308,6 +377,7 @@ struct AddContractorView: View {
                         .disabled(companyName.isEmpty || phone.isEmpty || isSaving)
                 }
             }
+            .tint(HavenColors.navy)
         }
     }
 
@@ -321,13 +391,18 @@ struct AddContractorView: View {
                 isSaving = false
                 return
             }
+            var allSpecialties = Array(selectedSpecialties)
+            if contactType != "Contractor / Service Provider" {
+                allSpecialties.insert(contactType, at: 0)
+            }
+
             let insert = ContractorInsert(
                 householdId: householdId,
                 companyName: companyName,
                 phone: phone,
                 contactName: contactName.isEmpty ? nil : contactName,
                 email: email.isEmpty ? nil : email,
-                specialties: selectedSpecialties.isEmpty ? nil : Array(selectedSpecialties),
+                specialties: allSpecialties.isEmpty ? nil : allSpecialties,
                 address: address.isEmpty ? nil : address,
                 licenseNumber: licenseNumber.isEmpty ? nil : licenseNumber
             )
@@ -339,6 +414,17 @@ struct AddContractorView: View {
         }
         isSaving = false
     }
+}
+
+// MARK: - URL Helpers
+
+private func sanitizedPhoneURL(_ phone: String) -> URL? {
+    let cleaned = phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+    return URL(string: "tel:\(cleaned)")
+}
+
+private func sanitizedEmailURL(_ email: String) -> URL? {
+    URL(string: "mailto:\(email.trimmingCharacters(in: .whitespaces))")
 }
 
 #Preview {

@@ -15,6 +15,14 @@ struct HavenTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
+            // Label above field — SF Pro 10pt, ALL CAPS, letter-spacing 1.5
+            if isActive {
+                Text(title.uppercased())
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(labelColor)
+            }
+
             fieldContainer
             errorLabel
         }
@@ -28,13 +36,17 @@ struct HavenTextField: View {
             inputContent
         }
         .padding(.horizontal, HavenTheme.spacing12)
-        .frame(minHeight: HavenTheme.minTouchTarget)
-        .background(HavenColors.surface)
+        .padding(.vertical, 14)
+        .background(HavenColors.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         .overlay {
             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                 .strokeBorder(borderColor, lineWidth: borderWidth)
         }
+        .shadow(
+            color: isFocused && !hasError ? HavenColors.navy500.opacity(0.1) : .clear,
+            radius: 4
+        )
     }
 
     @ViewBuilder
@@ -48,20 +60,16 @@ struct HavenTextField: View {
     }
 
     private var inputContent: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            if isActive {
-                Text(title)
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(labelColor)
-            }
-
+        Group {
             if isSecure {
                 SecureField(isActive ? "" : title, text: $text)
                     .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .focused($isFocused)
             } else {
                 TextField(isActive ? "" : title, text: $text)
                     .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .focused($isFocused)
                     .keyboardType(keyboardType)
             }
@@ -77,24 +85,24 @@ struct HavenTextField: View {
                 Text(errorMessage)
                     .font(HavenTypography.caption)
             }
-            .foregroundStyle(Color.havenCritical)
+            .foregroundStyle(HavenColors.critical)
         }
     }
 
     private var iconColor: Color {
-        hasError ? Color.havenCritical : (isFocused ? Color.havenAccent : Color.secondary)
+        hasError ? HavenColors.critical : (isFocused ? HavenColors.navy700 : HavenColors.textTertiary)
     }
 
     private var labelColor: Color {
-        hasError ? Color.havenCritical : (isFocused ? Color.havenAccent : Color.secondary)
+        hasError ? HavenColors.critical : (isFocused ? HavenColors.navy700 : HavenColors.textTertiary)
     }
 
     private var borderColor: Color {
-        hasError ? Color.havenCritical : (isFocused ? Color.havenAccent : Color(.separator))
+        hasError ? HavenColors.critical : (isFocused ? HavenColors.navy500 : HavenColors.beige200)
     }
 
     private var borderWidth: CGFloat {
-        (isFocused || hasError) ? 1.5 : 0.5
+        (isFocused || hasError) ? 1 : 1
     }
 }
 
@@ -105,5 +113,5 @@ struct HavenTextField: View {
         HavenTextField(title: "Account Number", text: .constant("1234"), icon: "creditcard", errorMessage: "Must be 4 digits")
     }
     .padding()
-    .background(Color(.systemGroupedBackground))
+    .background(HavenColors.background)
 }

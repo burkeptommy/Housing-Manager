@@ -1,10 +1,29 @@
 import SwiftUI
 
+enum PropertyDetailTab: String, CaseIterable {
+    case overview = "Overview"
+    case maintenance = "Maintenance"
+    case contacts = "Contacts"
+}
+
 struct PropertyDetailView: View {
     let propertyID: UUID
     @StateObject private var viewModel = PropertyDetailViewModel()
+    @State private var activeTab: PropertyDetailTab = .maintenance
     @State private var showAddSystem = false
+    @State private var showEditProperty = false
     @State private var showDeleteConfirmation = false
+    @State private var showDocumentUpload = false
+    @State private var showFullSchedule = false
+    @State private var showAlfredChat = false
+    @State private var selectedTaskForReminder: MaintenanceTaskDBRow?
+    @State private var showReminderPicker = false
+    @State private var showVendorAssignment = false
+    @State private var selectedTaskForVendor: MaintenanceTaskDBRow?
+    @State private var taskForDateEdit: MaintenanceTaskDBRow?
+    @State private var taskForLastServiced: MaintenanceTaskDBRow?
+    @State private var editedTaskDueDate = Date()
+    @State private var lastServicedTaskDate = Date()
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -23,9 +42,14 @@ struct PropertyDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        showEditProperty = true
+                    } label: {
+                        Label("Edit Property", systemImage: "pencil")
+                    }
+                    Button {
                         showAddSystem = true
                     } label: {
-                        Label("Add System", systemImage: "gearshape.badge.plus")
+                        Label("Add System", systemImage: "plus.circle.fill")
                     }
                     Divider()
                     Button(role: .destructive) {
@@ -35,6 +59,7 @@ struct PropertyDetailView: View {
                     }
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(HavenColors.navy)
                 }
             }
         }
@@ -44,16 +69,148 @@ struct PropertyDetailView: View {
         .refreshable {
             await viewModel.loadProperty(id: propertyID)
         }
+        .sheet(isPresented: $showEditProperty) {
+            if let property = viewModel.property {
+                EditPropertyView(property: property) { _ in
+                    Task { await viewModel.loadProperty(id: propertyID) }
+                }
+            }
+        }
+        .sheet(isPresented: $showDocumentUpload) {
+            DocumentUploadView(preselectedPropertyId: propertyID) {
+                Task { await viewModel.loadProperty(id: propertyID) }
+            }
+        }
         .sheet(isPresented: $showAddSystem) {
             AddSystemView(propertyID: propertyID, onComplete: {
                 Task { await viewModel.loadProperty(id: propertyID) }
             })
         }
+        .sheet(isPresented: $showAlfredChat) {
+            NavigationStack {
+                ChatView(contextType: "property", contextId: propertyID)
+            }
+        }
+        .sheet(isPresented: $showReminderPicker) {
+            reminderSheet
+        }
+        .sheet(item: $taskForDateEdit) { task in
+            NavigationStack {
+                VStack(spacing: 16) {
+                    Text("When is \(task.title) actually due?")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+
+                    DatePicker("Due Date", selection: $editedTaskDueDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(HavenColors.navy)
+
+                    Spacer()
+                }
+                .padding()
+                .navigationTitle("Edit Due Date")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { taskForDateEdit = nil }
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            Task {
+                                let f = DateFormatter()
+                                f.dateFormat = "yyyy-MM-dd"
+                                _ = try? await DatabaseService.shared.updateMaintenanceTask(
+                                    id: task.id,
+                                    MaintenanceTaskUpdate(nextDueDate: f.string(from: editedTaskDueDate))
+                                )
+                                Task { await NotificationScheduler.shared.rescheduleAll() }
+                                Haptics.success()
+                                taskForDateEdit = nil
+                                await viewModel.loadProperty(id: propertyID)
+                            }
+                        }
+                        .foregroundStyle(HavenColors.navy)
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+        .sheet(item: $taskForLastServiced) { task in
+            NavigationStack {
+                VStack(spacing: 16) {
+                    Text("When did you last do \(task.title)?")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+
+                    Text("Haven will recalculate the next due date based on the task frequency (\(task.frequency)).")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .multilineTextAlignment(.center)
+
+                    DatePicker("Date Completed", selection: $lastServicedTaskDate, in: ...Date(), displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(HavenColors.navy)
+
+                    Spacer()
+                }
+                .padding()
+                .navigationTitle("Log Past Service")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { taskForLastServiced = nil }
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        Button("Save") {
+                            Task {
+                                let f = DateFormatter()
+                                f.dateFormat = "yyyy-MM-dd"
+                                let completedStr = f.string(from: lastServicedTaskDate)
+                                let nextDate = MaintenanceTaskDetailSheet.calculateNextDue(frequency: task.frequency, from: lastServicedTaskDate)
+                                let nextDueStr = f.string(from: nextDate)
+
+                                _ = try? await DatabaseService.shared.updateMaintenanceTask(
+                                    id: task.id,
+                                    MaintenanceTaskUpdate(lastCompletedDate: completedStr, nextDueDate: nextDueStr)
+                                )
+                                if let systemId = task.systemId {
+                                    _ = try? await DatabaseService.shared.updateHomeSystem(
+                                        id: systemId,
+                                        HomeSystemUpdate(lastServiceDate: completedStr, nextServiceDue: nextDueStr)
+                                    )
+                                }
+                                Task { await NotificationScheduler.shared.rescheduleAll() }
+                                Haptics.success()
+                                taskForLastServiced = nil
+                                await viewModel.loadProperty(id: propertyID)
+                            }
+                        }
+                        .foregroundStyle(HavenColors.navy)
+                        .fontWeight(.semibold)
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .navigationDestination(isPresented: $showFullSchedule) {
+            MaintenanceScheduleView(filterPropertyId: propertyID)
+        }
         .confirmationDialog("Delete Property?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task {
-                    try? await DatabaseService.shared.deleteProperty(id: propertyID)
-                    dismiss()
+                    do {
+                        try await DatabaseService.shared.deleteProperty(id: propertyID)
+                        Haptics.success()
+                        dismiss()
+                    } catch {
+                        viewModel.error = "Failed to delete property: \(error.localizedDescription)"
+                        Haptics.error()
+                    }
                 }
             }
         } message: {
@@ -61,44 +218,48 @@ struct PropertyDetailView: View {
         }
     }
 
+    // MARK: - Main Content
+
     private func propertyContent(_ property: PropertyRow) -> some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
-                // Property header
                 propertyHeader(property)
+                quickActionsRow
 
-                // Overdue maintenance alerts
-                if !viewModel.overdueTasks.isEmpty {
-                    overdueSection
+                Picker("Section", selection: $activeTab) {
+                    ForEach(PropertyDetailTab.allCases, id: \.self) { tab in
+                        Text(tab.rawValue).tag(tab)
+                    }
                 }
+                .pickerStyle(.segmented)
+                .padding(.horizontal, 4)
 
-                // Systems
-                systemsSection
+                switch activeTab {
+                case .overview:
+                    propertyDocumentsSection
+                    propertyMaintenanceCard
+                    if !viewModel.activeWarranties.isEmpty { warrantiesSection }
 
-                // Upcoming maintenance
-                if !viewModel.maintenanceTasks.isEmpty {
-                    maintenanceSection
-                }
+                case .maintenance:
+                    if !viewModel.currentSeasonTasks.isEmpty || !viewModel.nextSeasonTasks.isEmpty {
+                        seasonalOverviewCard
+                    }
+                    if !viewModel.overdueTasks.isEmpty { overdueSection }
+                    systemsSection
+                    if !viewModel.upcomingTasks.isEmpty { upcomingMaintenanceSection }
+                    if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
 
-                // Active warranties
-                if !viewModel.activeWarranties.isEmpty {
-                    warrantiesSection
-                }
-
-                // Linked documents
-                if !viewModel.linkedDocuments.isEmpty {
-                    documentsSection
-                }
-
-                // Service history
-                if !viewModel.serviceRecords.isEmpty {
-                    serviceHistorySection
+                case .contacts:
+                    vendorsSection
+                    if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
                 }
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(HavenColors.background)
     }
+
+    // MARK: - Header
 
     private func propertyHeader(_ property: PropertyRow) -> some View {
         HavenCard {
@@ -106,29 +267,30 @@ struct PropertyDetailView: View {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
                         Text(property.name)
-                            .font(.title2.bold())
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.textPrimary)
                         Text(property.propertyType)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     Spacer()
                     Image(systemName: "house.fill")
                         .font(.title)
-                        .foregroundStyle(Color.havenAccent)
+                        .foregroundStyle(HavenColors.navy)
                 }
 
                 if let street = property.street {
                     HStack(spacing: 6) {
                         Image(systemName: "mappin")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
                         Text(street)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                         if let city = property.city, let state = property.state {
                             Text("\(city), \(state) \(property.zipCode ?? "")")
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
                     }
                 }
@@ -151,105 +313,683 @@ struct PropertyDetailView: View {
     private func propertyDetail(label: String, value: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.subheadline.bold())
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textPrimary)
             Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textSecondary)
         }
     }
 
-    private var overdueSection: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .foregroundStyle(.red)
-                    Text("Overdue Maintenance")
-                        .font(.headline)
-                    Spacer()
-                    Text("\(viewModel.overdueTasks.count)")
-                        .font(.caption.bold())
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 2)
-                        .background(Color.red.opacity(0.12))
-                        .foregroundStyle(.red)
-                        .clipShape(Capsule())
-                }
+    // MARK: - Quick Actions
 
-                ForEach(viewModel.overdueTasks) { task in
+    private var quickActionsRow: some View {
+        HStack(spacing: 12) {
+            quickActionButton(icon: "bubble.left.fill", label: "Chat") {
+                showAlfredChat = true
+            }
+            quickActionButton(icon: "clock.fill", label: "Service History") {
+                showFullSchedule = true
+            }
+            quickActionButton(icon: "plus.circle.fill", label: "Add System") {
+                showAddSystem = true
+            }
+        }
+    }
+
+    private func quickActionButton(icon: String, label: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.body)
+                    .foregroundStyle(HavenColors.navy700)
+                Text(label)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(HavenColors.cream)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Maintenance Summary
+
+    private var propertyMaintenanceCard: some View {
+        NavigationLink {
+            MaintenanceScheduleView(filterPropertyId: propertyID)
+        } label: {
+            HavenCard {
+                VStack(alignment: .leading, spacing: 10) {
                     HStack {
-                        Circle().fill(.red).frame(width: 8, height: 8)
-                        Text(task.title)
-                            .font(.subheadline)
+                        Image(systemName: "wrench.and.screwdriver.fill")
+                            .foregroundStyle(HavenColors.navy700)
+                        Text("HOME MAINTENANCE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
                         Spacer()
-                        Button("Complete") {
-                            Task { await viewModel.completeMaintenanceTask(task) }
+                        Image(systemName: "chevron.right")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    HStack(spacing: 16) {
+                        maintenanceStat(
+                            count: viewModel.overdueTasks.count,
+                            label: "Overdue",
+                            color: HavenColors.critical
+                        )
+                        maintenanceStat(
+                            count: viewModel.dueThisMonthTasks.count,
+                            label: "This Month",
+                            color: HavenColors.warning
+                        )
+                        maintenanceStat(
+                            count: viewModel.upcomingTasks.count,
+                            label: "Upcoming",
+                            color: HavenColors.success
+                        )
+                    }
+
+                    if let next = viewModel.upcomingTasks.first {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.right.circle")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("Next: \(next.title)")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Spacer()
+                            Text(next.nextDueDate.havenDateShort)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
                         }
-                        .font(.caption)
-                        .buttonStyle(.bordered)
+                    }
+
+                    if viewModel.maintenanceTasks.isEmpty {
+                        Text("Add home systems to start tracking maintenance.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
             }
         }
+        .buttonStyle(.plain)
     }
+
+    private func maintenanceStat(count: Int, label: String, color: Color) -> some View {
+        VStack(spacing: 4) {
+            Text("\(max(0, count))")
+                .font(HavenTypography.title2)
+                .foregroundStyle(count > 0 ? color : HavenColors.textTertiary)
+            Text(label)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textSecondary)
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Seasonal Overview
+
+    private var seasonalOverviewCard: some View {
+        NavigationLink {
+            SeasonalTasksDetailView(
+                season: viewModel.currentSeason,
+                tasks: viewModel.currentSeasonTasks,
+                completedCount: viewModel.currentSeasonCompletedCount,
+                nextSeason: viewModel.nextSeason,
+                nextSeasonTasks: viewModel.nextSeasonTasks,
+                systemNameLookup: { viewModel.systemName(for: $0) }
+            )
+        } label: {
+            HavenCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Image(systemName: seasonIcon(viewModel.currentSeason))
+                            .foregroundStyle(HavenColors.navy700)
+                        Text("Seasonal Overview")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    // Current season
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text(viewModel.currentSeason)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Spacer()
+                            Text("\(viewModel.currentSeasonCompletedCount) of \(viewModel.currentSeasonTasks.count) done")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+
+                        if !viewModel.currentSeasonTasks.isEmpty {
+                            ProgressView(
+                                value: Double(viewModel.currentSeasonCompletedCount),
+                                total: Double(viewModel.currentSeasonTasks.count)
+                            )
+                            .tint(seasonalProgressColor)
+                        }
+                    }
+
+                    // Next season preview
+                    if !viewModel.nextSeasonTasks.isEmpty {
+                        HStack(spacing: 6) {
+                            Image(systemName: seasonIcon(viewModel.nextSeason))
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("Coming up in \(viewModel.nextSeason): \(viewModel.nextSeasonTasks.count) tasks")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var seasonalProgressColor: Color {
+        let total = viewModel.currentSeasonTasks.count
+        let done = viewModel.currentSeasonCompletedCount
+        if total == 0 { return HavenColors.success }
+        let ratio = Double(done) / Double(total)
+        if ratio >= 0.8 { return HavenColors.success }
+        if ratio >= 0.5 { return HavenColors.warning }
+        return HavenColors.critical
+    }
+
+    private func seasonIcon(_ season: String) -> String {
+        switch season {
+        case "Spring": return "leaf.fill"
+        case "Summer": return "sun.max.fill"
+        case "Fall": return "wind"
+        case "Winter": return "snowflake"
+        default: return "calendar"
+        }
+    }
+
+    // MARK: - Overdue
+
+    private var overdueSection: some View {
+        NavigationLink {
+            OverdueTasksDetailView(
+                tasks: viewModel.overdueTasks,
+                systemNameLookup: { viewModel.systemName(for: $0) },
+                propertyAddress: viewModel.property?.street ?? "my property"
+            )
+        } label: {
+            HavenCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(HavenColors.critical)
+                        Text("Overdue Maintenance")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Text("\(viewModel.overdueTasks.count)")
+                            .font(HavenTypography.uiLabelSmall)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(HavenColors.critical.opacity(0.12))
+                            .foregroundStyle(HavenColors.critical)
+                            .clipShape(Capsule())
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    ForEach(viewModel.overdueTasks.prefix(3)) { task in
+                        HStack {
+                            Circle().fill(HavenColors.critical).frame(width: 8, height: 8)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(task.title)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                if let systemName = viewModel.systemName(for: task.systemId) {
+                                    Text(systemName)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+
+                    if viewModel.overdueTasks.count > 3 {
+                        Text("+ \(viewModel.overdueTasks.count - 3) more")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Systems
 
     private var systemsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Home Systems")
-                    .font(.headline)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
                 Spacer()
                 Button {
+                    Haptics.light()
                     showAddSystem = true
                 } label: {
-                    Image(systemName: "plus.circle.fill")
-                        .foregroundStyle(Color.havenAccent)
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(HavenColors.navy700)
+                            .imageScale(.medium)
+                        Text("Add")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(Capsule())
                 }
             }
 
             if viewModel.systems.isEmpty {
                 HavenCard {
-                    VStack(spacing: 8) {
+                    VStack(spacing: 10) {
                         Image(systemName: "gearshape.2")
                             .font(.title2)
-                            .foregroundStyle(.secondary)
-                        Text("No systems added yet")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("What systems does your home have?")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("Add your HVAC, plumbing, electrical and more — Haven will track maintenance for you.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .multilineTextAlignment(.center)
+
+                        Button {
+                            Haptics.light()
+                            showAddSystem = true
+                        } label: {
+                            Text("Add a Home System")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy800)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                        .buttonStyle(.plain)
                     }
                     .frame(maxWidth: .infinity)
-                    .padding(.vertical, 12)
+                    .padding(.vertical, 8)
                 }
             } else {
-                ForEach(viewModel.systemsByCategory, id: \.0) { category, systems in
+                let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+                LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(viewModel.systems) { system in
+                        NavigationLink {
+                            SystemDetailRowView(system: system)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 6) {
+                                HStack(spacing: 6) {
+                                    Circle()
+                                        .fill(systemStatusColor(system.status))
+                                        .frame(width: 8, height: 8)
+                                    Text(system.name)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                        .lineLimit(1)
+                                }
+                                if let mfr = system.manufacturer {
+                                    Text(mfr)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                        .lineLimit(1)
+                                }
+                                if let nextDue = system.nextServiceDue {
+                                    Text("Due: \(nextDue)")
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(12)
+                            .background(HavenColors.creamLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .stroke(HavenColors.beige300, lineWidth: 0.5)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Upcoming Maintenance (Next 30 Days)
+
+    private var upcomingMaintenanceSection: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "calendar.badge.clock")
+                        .foregroundStyle(HavenColors.warning)
+                    Text("Upcoming Maintenance")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    Text("Next 30 days")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+
+                ForEach(viewModel.upcomingTasks.prefix(5)) { task in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(task.title)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            HStack(spacing: 8) {
+                                Text("Due: \(task.nextDueDate.havenDateShort)")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                if let systemName = viewModel.systemName(for: task.systemId) {
+                                    Text(systemName)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                        }
+                        Spacer()
+                        taskActionMenu(task)
+                    }
+                }
+
+                if viewModel.upcomingTasks.count > 5 {
+                    Button {
+                        showFullSchedule = true
+                    } label: {
+                        Text("View All (\(viewModel.upcomingTasks.count))")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Warranties
+
+    private var warrantiesSection: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "shield.fill")
+                        .foregroundStyle(HavenColors.info)
+                    Text("Active Warranties")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+
+                ForEach(viewModel.activeWarranties) { warranty in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(warranty.provider)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("Expires: \(warranty.endDate)")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        Spacer()
+                        if let phone = warranty.claimPhone,
+                           let url = sanitizedPhoneURL(phone) {
+                            Link(destination: url) {
+                                Image(systemName: "phone.fill")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Property Documents (moved higher in layout)
+
+    private var propertyDocumentsSection: some View {
+        NavigationLink {
+            PropertyDocumentsView(propertyId: propertyID, propertyName: viewModel.property?.name ?? "Property")
+        } label: {
+            HavenCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Image(systemName: "doc.fill")
+                            .foregroundStyle(HavenColors.navy700)
+                        Text("Property Documents")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+
+                        Text("\(viewModel.linkedDocuments.count)")
+                            .font(.system(size: 12, weight: .semibold, design: .rounded))
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 2)
+                            .background(HavenColors.beige200)
+                            .clipShape(Capsule())
+
+                        Image(systemName: "chevron.right")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    if viewModel.linkedDocuments.isEmpty {
+                        Text("Upload deeds, insurance, blueprints, quotes, and more")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    } else {
+                        // Show first 3 docs as preview
+                        ForEach(viewModel.linkedDocuments.prefix(3)) { doc in
+                            HStack(spacing: 10) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(Color.havenSuccess)
+                                    .font(.caption)
+                                Text(doc.title)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .lineLimit(1)
+                                Spacer()
+                                Text(doc.category)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                        }
+
+                        if viewModel.linkedDocuments.count > 3 {
+                            Text("+ \(viewModel.linkedDocuments.count - 3) more")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.navy700)
+                        }
+                    }
+
+                    // Missing doc prompts
+                    let missingCount = viewModel.missingPropertyDocTypes.count
+                    if missingCount > 0 {
+                        HStack(spacing: 4) {
+                            Image(systemName: "lightbulb.fill")
+                                .font(.caption2)
+                                .foregroundStyle(HavenColors.warning)
+                            Text("\(missingCount) suggested document\(missingCount == 1 ? "" : "s") to upload")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Vendors
+
+    private var vendorsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("Home & Estate Contacts")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                NavigationLink {
+                    ContractorDirectoryView()
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 16))
+                            .foregroundStyle(HavenColors.navy700)
+                            .imageScale(.medium)
+                        Text("Add")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+            }
+
+            if viewModel.assignedContractors.isEmpty {
+                HavenCard {
+                    VStack(spacing: 10) {
+                        Image(systemName: "person.2")
+                            .font(.title2)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("Add your trusted contractors and service providers here.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: 12) {
+                            NavigationLink {
+                                ContractorDirectoryView()
+                            } label: {
+                                Text("Add a Vendor")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.navy800)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .background(HavenColors.navy.opacity(0.08))
+                                    .clipShape(Capsule())
+                            }
+
+                            Button {
+                                Haptics.light()
+                                showAlfredChat = true
+                            } label: {
+                                Text("Ask Alfred to Find One")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.navy700)
+                                    .padding(.horizontal, 16)
+                                    .padding(.vertical, 8)
+                                    .overlay(Capsule().stroke(HavenColors.navy.opacity(0.2), lineWidth: 1))
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+            } else {
+                ForEach(viewModel.assignedContractors, id: \.0.id) { contractor, systemNames in
                     HavenCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text(category)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.secondary)
-
-                            ForEach(systems) { system in
-                                NavigationLink {
-                                    SystemDetailRowView(system: system)
-                                } label: {
-                                    HStack(spacing: 10) {
-                                        Circle()
-                                            .fill(systemStatusColor(system.status))
-                                            .frame(width: 10, height: 10)
-                                        VStack(alignment: .leading) {
-                                            Text(system.name)
-                                                .font(.subheadline.weight(.medium))
-                                                .foregroundStyle(.primary)
-                                            if let mfr = system.manufacturer {
-                                                Text(mfr)
-                                                    .font(.caption)
-                                                    .foregroundStyle(.secondary)
-                                            }
-                                        }
-                                        Spacer()
-                                        Image(systemName: "chevron.right")
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(contractor.companyName)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    if let contact = contractor.contactName {
+                                        Text(contact)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                }
+                                Spacer()
+                                if let rating = contractor.rating {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "star.fill")
                                             .font(.caption2)
-                                            .foregroundStyle(.tertiary)
+                                            .foregroundStyle(HavenColors.warning)
+                                        Text("\(rating)")
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                }
+                            }
+
+                            // Specialties
+                            if let specialties = contractor.specialties, !specialties.isEmpty {
+                                HStack(spacing: 6) {
+                                    ForEach(specialties.prefix(3), id: \.self) { specialty in
+                                        Text(specialty)
+                                            .font(.system(size: 10, weight: .medium))
+                                            .foregroundStyle(HavenColors.navy700)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(HavenColors.navy.opacity(0.08))
+                                            .clipShape(Capsule())
+                                    }
+                                }
+                            }
+
+                            // Assigned systems
+                            if !systemNames.isEmpty {
+                                Text("Assigned to: \(systemNames.joined(separator: ", "))")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+
+                            // Quick actions
+                            HStack(spacing: 16) {
+                                if let url = sanitizedPhoneURL(contractor.phone) {
+                                    Link(destination: url) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "phone.fill")
+                                                .font(.caption2)
+                                            Text("Call")
+                                                .font(HavenTypography.uiCaption)
+                                        }
+                                        .foregroundStyle(HavenColors.navy700)
+                                    }
+                                }
+
+                                if let email = contractor.email,
+                                   let url = sanitizedEmailURL(email) {
+                                    Link(destination: url) {
+                                        HStack(spacing: 4) {
+                                            Image(systemName: "envelope.fill")
+                                                .font(.caption2)
+                                            Text("Email")
+                                                .font(HavenTypography.uiCaption)
+                                        }
+                                        .foregroundStyle(HavenColors.navy700)
                                     }
                                 }
                             }
@@ -260,143 +1000,195 @@ struct PropertyDetailView: View {
         }
     }
 
-    private var maintenanceSection: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "wrench.and.screwdriver.fill")
-                        .foregroundStyle(.orange)
-                    Text("Upcoming Maintenance")
-                        .font(.headline)
-                }
-
-                ForEach(viewModel.maintenanceTasks.prefix(5)) { task in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(task.title)
-                                .font(.subheadline)
-                            Text("Due: \(task.nextDueDate)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        Button("Done") {
-                            Task { await viewModel.completeMaintenanceTask(task) }
-                        }
-                        .font(.caption2)
-                        .buttonStyle(.bordered)
-                    }
-                }
-
-                if viewModel.maintenanceTasks.count > 5 {
-                    NavigationLink("View All (\(viewModel.maintenanceTasks.count))") {
-                        MaintenanceScheduleView()
-                    }
-                    .font(.caption)
-                }
-            }
-        }
-    }
-
-    private var warrantiesSection: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "shield.fill")
-                        .foregroundStyle(.blue)
-                    Text("Active Warranties")
-                        .font(.headline)
-                }
-
-                ForEach(viewModel.activeWarranties) { warranty in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(warranty.provider)
-                                .font(.subheadline.weight(.medium))
-                            Text("Expires: \(warranty.endDate)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if let phone = warranty.claimPhone {
-                            Link(destination: URL(string: "tel:\(phone)")!) {
-                                Image(systemName: "phone.fill")
-                                    .font(.caption)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private var documentsSection: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "doc.fill")
-                        .foregroundStyle(Color.havenAccent)
-                    Text("Linked Documents")
-                        .font(.headline)
-                }
-
-                ForEach(viewModel.linkedDocuments) { doc in
-                    NavigationLink {
-                        DocumentDetailView(documentID: doc.id)
-                    } label: {
-                        HStack {
-                            Text(doc.title)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                            Spacer()
-                            Text(doc.category)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-        }
-    }
+    // MARK: - Service History
 
     private var serviceHistorySection: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "clock.fill")
-                        .foregroundStyle(.secondary)
-                    Text("Service History")
-                        .font(.headline)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Text("Recent Service History")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    if viewModel.totalServiceCost > 0 {
+                        Text("$\(viewModel.totalServiceCost, specifier: "%.0f") total")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
                 }
 
                 ForEach(viewModel.serviceRecords.prefix(5)) { record in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(record.description)
-                                .font(.subheadline)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Text(record.serviceDate)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
                         Spacer()
                         if let cost = record.cost {
                             Text("$\(cost, specifier: "%.0f")")
-                                .font(.caption.weight(.semibold))
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
                         }
+                    }
+                }
+
+                if viewModel.serviceRecords.count > 5 {
+                    NavigationLink {
+                        ServiceHistoryView()
+                    } label: {
+                        Text("View All (\(viewModel.serviceRecords.count))")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
                     }
                 }
             }
         }
     }
 
+    // MARK: - Task Action Menu
+
+    private func taskActionMenu(_ task: MaintenanceTaskDBRow) -> some View {
+        Menu {
+            Button {
+                Task { await viewModel.completeMaintenanceTask(task) }
+            } label: {
+                Label("Mark Complete", systemImage: "checkmark.circle")
+            }
+
+            if let vendorName = viewModel.vendorName(for: task.systemId),
+               let vendorPhone = viewModel.vendorPhone(for: task.systemId) {
+                Button {
+                    if let url = sanitizedPhoneURL(vendorPhone) {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    Label("Call \(vendorName)", systemImage: "phone")
+                }
+
+                if let vendorEmail = viewModel.vendorEmail(for: task.systemId) {
+                    Button {
+                        if let url = sanitizedEmailURL(vendorEmail) {
+                            UIApplication.shared.open(url)
+                        }
+                    } label: {
+                        Label("Email \(vendorName)", systemImage: "envelope")
+                    }
+                }
+            }
+
+            if viewModel.vendorName(for: task.systemId) == nil {
+                NavigationLink {
+                    ContractorDirectoryView()
+                } label: {
+                    Label("Assign a Vendor", systemImage: "person.badge.plus")
+                }
+            }
+
+            Button {
+                let f = DateFormatter()
+                f.dateFormat = "yyyy-MM-dd"
+                editedTaskDueDate = f.date(from: task.nextDueDate) ?? Date()
+                taskForDateEdit = task
+            } label: {
+                Label("Edit Due Date", systemImage: "calendar.badge.clock")
+            }
+
+            Button {
+                taskForLastServiced = task
+            } label: {
+                Label("I Already Did This", systemImage: "checkmark.circle.badge.questionmark")
+            }
+
+            Button {
+                selectedTaskForReminder = task
+                showReminderPicker = true
+            } label: {
+                Label("Set Reminder", systemImage: "bell")
+            }
+
+            Button {
+                showAlfredChat = true
+            } label: {
+                Label("Ask Alfred for Help", systemImage: "bubble.left")
+            }
+
+            Divider()
+
+            Menu("Snooze") {
+                Button("1 Week") { Task { await viewModel.snoozeTask(task, days: 7) } }
+                Button("2 Weeks") { Task { await viewModel.snoozeTask(task, days: 14) } }
+                Button("1 Month") { Task { await viewModel.snoozeTask(task, days: 30) } }
+            }
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .font(.body)
+                .foregroundStyle(HavenColors.navy700)
+        }
+    }
+
+    // MARK: - Reminder Sheet
+
+    private var reminderSheet: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                Text("When should we remind you?")
+                    .font(HavenTypography.headline)
+
+                ForEach(["Tomorrow", "In 3 Days", "Next Week", "Next Month"], id: \.self) { option in
+                    Button {
+                        Task {
+                            await viewModel.setReminder(for: selectedTaskForReminder, option: option)
+                        }
+                        showReminderPicker = false
+                    } label: {
+                        Text(option)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(HavenColors.creamLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding()
+            .presentationDetents([.height(300)])
+            .navigationTitle("Set Reminder")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showReminderPicker = false }
+                }
+            }
+        }
+    }
+
+    // MARK: - Helpers
+
     private func systemStatusColor(_ status: String?) -> Color {
         switch status?.lowercased() {
-        case "good": return .green
-        case "needs maintenance": return .orange
-        case "needs repair", "needs replacement": return .red
-        case "under warranty": return .blue
-        case "out of service": return .gray
-        default: return .green
+        case "good": return HavenColors.success
+        case "needs maintenance": return HavenColors.warning
+        case "needs repair", "needs replacement": return HavenColors.critical
+        case "under warranty": return HavenColors.info
+        case "out of service": return HavenColors.textTertiary
+        default: return HavenColors.success
         }
+    }
+
+    private func sanitizedPhoneURL(_ phone: String) -> URL? {
+        let cleaned = phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+        return URL(string: "tel:\(cleaned)")
+    }
+
+    private func sanitizedEmailURL(_ email: String) -> URL? {
+        URL(string: "mailto:\(email.trimmingCharacters(in: .whitespaces))")
     }
 }

@@ -3,6 +3,7 @@ import SwiftUI
 struct LoginView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AuthViewModel()
+    @StateObject private var appleSignIn = AppleSignInCoordinator()
     @State private var showBiometricPrompt = false
 
     var body: some View {
@@ -13,14 +14,23 @@ struct LoginView: View {
 
                     // Logo & branding
                     VStack(spacing: 8) {
-                        Image(systemName: "shield.checkered")
-                            .font(.system(size: 56))
-                            .foregroundStyle(Color.havenAccent)
+                        Text("H")
+                            .font(Font.custom("Georgia", size: 88))
+                            .foregroundStyle(HavenColors.navy800)
+                            .frame(width: 100, height: 100)
+                            .background(
+                                RoundedRectangle(cornerRadius: 22)
+                                    .fill(HavenColors.creamLight)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 22)
+                                            .stroke(HavenColors.beige300, lineWidth: 1)
+                                    )
+                            )
                         Text("Haven")
-                            .font(.largeTitle.bold())
-                        Text("Your family's estate, organized.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.largeTitle)
+                        Text("Your home and everything that protects it.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
 
                     // Form
@@ -36,8 +46,8 @@ struct LoginView: View {
 
                         if let error = viewModel.errorMessage {
                             Text(error)
-                                .font(.caption)
-                                .foregroundStyle(.red)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.critical)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
@@ -49,14 +59,55 @@ struct LoginView: View {
                         }
                         .disabled(viewModel.isLoading)
 
+                        // Divider
+                        HStack {
+                            Rectangle().fill(HavenColors.beige300).frame(height: 1)
+                            Text("or")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Rectangle().fill(HavenColors.beige300).frame(height: 1)
+                        }
+
+                        // Sign In with Apple
+                        Button {
+                            Haptics.light()
+                            appleSignIn.onCredential = { credential in
+                                Task {
+                                    do {
+                                        try await appState.authService.signInWithApple(credential: credential)
+                                    } catch {
+                                        viewModel.errorMessage = "Apple sign-in failed. Please try again."
+                                        print("[Apple Sign In] Error: \(error)")
+                                    }
+                                }
+                            }
+                            appleSignIn.onError = { error in
+                                viewModel.errorMessage = "Apple sign-in failed: \(error.localizedDescription)"
+                            }
+                            appleSignIn.startSignInFlow()
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "apple.logo")
+                                    .font(.system(size: 18, weight: .medium))
+                                Text("Continue with Apple")
+                                    .font(.system(size: 16, weight: .medium))
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(Color.black)
+                            .foregroundStyle(.white)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+
                         // Biometric shortcut
                         if AuthService.isBiometricAvailable && appState.authService.isBiometricEnabled {
                             Button {
                                 Task { await biometricSignIn() }
                             } label: {
                                 Label("Sign in with \(AuthService.biometricName)", systemImage: AuthService.biometricIcon)
-                                    .font(.subheadline.weight(.medium))
+                                    .font(HavenTypography.uiLabel)
                             }
+                            .foregroundStyle(HavenColors.navy)
                         }
                     }
 
@@ -65,17 +116,19 @@ struct LoginView: View {
                         Button("Forgot Password?") {
                             viewModel.showForgotPassword = true
                         }
-                        .font(.subheadline)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.navy)
 
                         HStack(spacing: 4) {
                             Text("Don't have an account?")
-                                .foregroundStyle(.secondary)
+                                .foregroundStyle(HavenColors.textSecondary)
                             Button("Sign Up") {
                                 viewModel.showSignUp = true
                             }
                             .fontWeight(.semibold)
+                            .foregroundStyle(HavenColors.navy)
                         }
-                        .font(.subheadline)
+                        .font(HavenTypography.bodySmall)
                     }
 
                     Spacer(minLength: 20)
@@ -86,16 +139,41 @@ struct LoginView: View {
                 SignUpView()
                     .environmentObject(appState)
             }
-            .alert("Reset Password", isPresented: $viewModel.showForgotPassword) {
-                TextField("Email", text: $viewModel.email)
-                    .textContentType(.emailAddress)
-                    .keyboardType(.emailAddress)
-                Button("Send Reset Link") {
-                    Task { await viewModel.resetPassword(authService: appState.authService) }
+            .sheet(isPresented: $viewModel.showForgotPassword) {
+                NavigationStack {
+                    VStack(spacing: 24) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "key.fill")
+                                .font(.system(size: 48))
+                                .foregroundStyle(HavenColors.navy)
+                            Text("Reset Password")
+                                .font(HavenTypography.title2)
+                            Text("Enter your email and we'll send you a reset link.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(.top, 24)
+
+                        HavenTextField(title: "Email", text: $viewModel.email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+
+                        HavenButton(title: "Send Reset Link") {
+                            Task { await viewModel.resetPassword(authService: appState.authService) }
+                        }
+                    }
+                    .padding()
+                    .presentationDetents([.height(360)])
+                    .navigationTitle("Reset Password")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            Button("Cancel") { viewModel.showForgotPassword = false }
+                        }
+                    }
                 }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("Enter your email and we'll send you a password reset link.")
             }
             .alert("Check Your Email", isPresented: $viewModel.resetEmailSent) {
                 Button("OK", role: .cancel) {}

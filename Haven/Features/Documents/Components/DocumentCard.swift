@@ -22,13 +22,25 @@ struct DocumentCard: View {
 
     var body: some View {
         HStack(spacing: HavenTheme.spacing12) {
-            Image(systemName: categoryIcon)
-                .font(.title3)
-                .foregroundStyle(Color.havenAccent)
-                .frame(width: 40, height: 40)
-                .background(Color.havenAccent.opacity(0.1))
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
-                .accessibilityHidden(true)
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: categoryIcon)
+                    .font(.title3)
+                    .foregroundStyle(HavenColors.navy)
+                    .frame(width: 40, height: 40)
+                    .background(HavenColors.navy.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+
+                if document.vaultLocked == true {
+                    Image(systemName: "lock.shield.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.havenWarning)
+                        .padding(2)
+                        .background(HavenColors.surface)
+                        .clipShape(Circle())
+                        .offset(x: 4, y: 4)
+                }
+            }
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
                 Text(document.title)
@@ -39,12 +51,12 @@ struct DocumentCard: View {
                 HStack(spacing: HavenTheme.spacing8) {
                     Text(document.category)
                         .font(HavenTypography.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(HavenColors.textSecondary)
 
                     if let institution = document.issuingInstitution, !institution.isEmpty {
                         Text("\u{2022} \(institution)")
                             .font(HavenTypography.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                             .lineLimit(1)
                     }
                 }
@@ -72,6 +84,6 @@ struct DocumentCard: View {
         }
         .padding(.vertical, HavenTheme.spacing4)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(document.title), \(document.category), \(document.status)")
+        .accessibilityLabel("\(document.title), \(document.category), \(document.status)\(document.vaultLocked == true ? ", vault locked" : "")")
     }
 }

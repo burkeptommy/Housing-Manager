@@ -5,12 +5,12 @@ struct SystemStatusIndicator: View {
 
     private var statusColor: Color {
         switch (status ?? "good").lowercased() {
-        case "good": return Color.havenSuccess
-        case "needs maintenance": return Color.havenWarning
-        case "needs repair", "needs replacement": return Color.havenCritical
-        case "under warranty": return Color.havenInfo
-        case "out of service": return .gray
-        default: return Color.havenSuccess
+        case "good": return HavenColors.success
+        case "needs maintenance": return HavenColors.warning
+        case "needs repair", "needs replacement": return HavenColors.critical
+        case "under warranty": return HavenColors.info
+        case "out of service": return HavenColors.textTertiary
+        default: return HavenColors.success
         }
     }
 
@@ -22,9 +22,9 @@ struct SystemStatusIndicator: View {
         HStack(spacing: HavenTheme.spacing4) {
             Circle()
                 .fill(statusColor)
-                .frame(width: 10, height: 10)
+                .frame(width: 8, height: 8)
             Text(statusLabel)
-                .font(HavenTypography.caption)
+                .font(HavenTypography.uiLabelSmall)
                 .foregroundStyle(statusColor)
         }
         .accessibilityElement(children: .combine)

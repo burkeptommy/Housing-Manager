@@ -11,33 +11,33 @@ struct BiometricAuthView: View {
 
             Image(systemName: "lock.shield.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(Color.havenAccent)
+                .foregroundStyle(HavenColors.navy)
 
             VStack(spacing: 8) {
                 Text("Haven is Locked")
-                    .font(.title2.bold())
+                    .font(HavenTypography.title2)
                 Text("Authenticate to continue")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
             }
 
             Button {
                 Task { await authenticate() }
             } label: {
                 Label("Unlock with \(AuthService.biometricName)", systemImage: AuthService.biometricIcon)
-                    .font(.headline)
+                    .font(HavenTypography.uiButton)
                     .padding()
                     .frame(maxWidth: .infinity)
-                    .background(Color.havenAccent)
-                    .foregroundStyle(.white)
+                    .background(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textOnNavy)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.cornerRadius))
             }
             .padding(.horizontal, HavenTheme.padding)
 
             if authFailed {
                 Text("Authentication failed. Try again.")
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.critical)
             }
 
             Spacer()
@@ -45,8 +45,8 @@ struct BiometricAuthView: View {
             Button("Sign Out") {
                 appState.authService.signOut()
             }
-            .font(.subheadline)
-            .foregroundStyle(.secondary)
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textSecondary)
             .padding(.bottom, 32)
         }
         .task {

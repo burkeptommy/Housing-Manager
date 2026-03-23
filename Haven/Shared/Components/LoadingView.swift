@@ -6,12 +6,18 @@ struct LoadingView: View {
 
     var body: some View {
         VStack(spacing: HavenTheme.spacing16) {
+            Text("H")
+                .font(Font.custom("Georgia", size: 56))
+                .foregroundStyle(HavenColors.navy800)
+
             ProgressView()
-                .controlSize(.large)
+                .controlSize(.regular)
+                .tint(HavenColors.navy)
+
             if !message.isEmpty {
                 Text(message)
-                    .font(HavenTypography.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -30,9 +36,7 @@ struct SkeletonCard: View {
     var body: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                // Title placeholder
                 SkeletonRect(width: 180, height: 16)
-
                 ForEach(0..<lineCount, id: \.self) { i in
                     SkeletonRect(
                         width: i == lineCount - 1 ? 120 : .infinity,
@@ -52,7 +56,6 @@ struct SkeletonRow: View {
         HStack(spacing: HavenTheme.spacing12) {
             SkeletonRect(width: 44, height: 44)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-
             VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
                 SkeletonRect(width: 140, height: 14)
                 SkeletonRect(width: 80, height: 10)
@@ -87,13 +90,14 @@ struct SkeletonScorecard: View {
 }
 
 /// A rounded rectangle placeholder for skeleton loading.
+/// Uses beige shimmer gradient: beige200 → beige100 → beige200
 struct SkeletonRect: View {
     var width: CGFloat? = nil
     var height: CGFloat = 16
 
     var body: some View {
         RoundedRectangle(cornerRadius: 4)
-            .fill(Color(.systemGray5))
+            .fill(HavenColors.beige200)
             .frame(maxWidth: width == .infinity ? .infinity : nil)
             .frame(width: width == .infinity ? nil : width, height: height)
     }

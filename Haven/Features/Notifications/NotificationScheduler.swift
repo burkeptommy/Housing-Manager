@@ -66,35 +66,48 @@ final class NotificationScheduler {
                 }
             }
 
-            // Maintenance tasks
+            // Maintenance tasks — frequency-based reminder schedule
             if prefs.maintenanceDue {
                 let tasks = try await db.fetchMaintenanceTasks()
+                let properties = try await db.fetchProperties()
+                let propNames = Dictionary(uniqueKeysWithValues: properties.map { ($0.id, $0.name) })
+
                 for task in tasks {
                     let formatter = DateFormatter()
                     formatter.dateFormat = "yyyy-MM-dd"
                     guard let dueDate = formatter.date(from: task.nextDueDate) else { continue }
+                    let propertyName = propNames[task.propertyId] ?? "Your Property"
 
-                    // Due date notification
                     if dueDate > .now {
-                        scheduleNotification(
-                            id: "maint-due-\(task.id)",
-                            title: "Maintenance Due",
-                            body: task.title,
-                            date: dueDate,
-                            category: "maintenance_due"
-                        )
+                        // Schedule reminders based on frequency
+                        let reminderDays = reminderDaysBefore(frequency: task.frequency)
+                        for daysBefore in reminderDays {
+                            guard let alertDate = Calendar.current.date(byAdding: .day, value: -daysBefore, to: dueDate),
+                                  alertDate > .now else { continue }
 
-                        // 7-day warning
-                        if let weekBefore = Calendar.current.date(byAdding: .day, value: -7, to: dueDate),
-                           weekBefore > .now {
+                            let daysText = daysBefore == 0 ? "today" :
+                                           daysBefore == 1 ? "tomorrow" : "in \(daysBefore) days"
+
                             scheduleNotification(
-                                id: "maint-warn-\(task.id)",
-                                title: "Maintenance Due Soon",
-                                body: "\(task.title) is due in 7 days",
-                                date: weekBefore,
+                                id: "maint-\(task.id)-\(daysBefore)",
+                                title: "Maintenance Due — \(propertyName)",
+                                body: "\(task.title) is due \(daysText).\(task.isDiy == true ? " This is a DIY task." : "")",
+                                date: alertDate,
                                 category: "maintenance_due"
                             )
                         }
+
+                        // Day-of notification at 9am
+                        var dayOfComponents = Calendar.current.dateComponents([.year, .month, .day], from: dueDate)
+                        dayOfComponents.hour = 9
+                        dayOfComponents.minute = 0
+                        scheduleNotification(
+                            id: "maint-dayof-\(task.id)",
+                            title: "Maintenance Due — \(propertyName)",
+                            body: "\(task.title) is due today.",
+                            dateComponents: dayOfComponents,
+                            category: "maintenance_due"
+                        )
                     }
 
                     // Overdue notification (if overdue, notify tomorrow at 9am)
@@ -106,8 +119,8 @@ final class NotificationScheduler {
 
                         scheduleNotification(
                             id: "maint-overdue-\(task.id)",
-                            title: "Overdue Maintenance",
-                            body: "\(task.title) is overdue",
+                            title: "Overdue — \(propertyName)",
+                            body: "\(task.title) is overdue. Mark complete or reschedule.",
                             dateComponents: tomorrow,
                             category: "maintenance_overdue"
                         )
@@ -120,8 +133,103 @@ final class NotificationScheduler {
                 scheduleMorningDigest()
             }
 
+            // Seasonal reminders
+            if prefs.maintenanceDue {
+                scheduleSeasonalReminders()
+            }
+
         } catch {
             // silently handle — notifications are best-effort
+        }
+    }
+
+    /// Schedule notifications for a single newly-created maintenance task
+    func scheduleForTask(_ task: MaintenanceTaskDBRow, propertyName: String) {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let dueDate = formatter.date(from: task.nextDueDate), dueDate > .now else { return }
+
+        let reminderDays = reminderDaysBefore(frequency: task.frequency)
+        for daysBefore in reminderDays {
+            guard let alertDate = Calendar.current.date(byAdding: .day, value: -daysBefore, to: dueDate),
+                  alertDate > .now else { continue }
+
+            let daysText = daysBefore == 0 ? "today" :
+                           daysBefore == 1 ? "tomorrow" : "in \(daysBefore) days"
+
+            scheduleNotification(
+                id: "maint-\(task.id)-\(daysBefore)",
+                title: "Maintenance Due — \(propertyName)",
+                body: "\(task.title) is due \(daysText).",
+                date: alertDate,
+                category: "maintenance_due"
+            )
+        }
+    }
+
+    // MARK: - Reminder Schedule by Frequency
+
+    private func reminderDaysBefore(frequency: String) -> [Int] {
+        switch frequency.lowercased() {
+        case "monthly":
+            return [3]
+        case "quarterly":
+            return [7]
+        case "semi-annually":
+            return [14]
+        case "annually":
+            return [30, 7]
+        case "every 2 years", "every 3 years", "every 5 years", "every 10 years":
+            return [30, 7]
+        case "seasonal":
+            return [14, 7]
+        default:
+            return [7]
+        }
+    }
+
+    // MARK: - Seasonal Reminders
+
+    private func scheduleSeasonalReminders() {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: .now)
+
+        let seasons: [(name: String, month: Int, day: Int, message: String)] = [
+            ("Spring", 3, 15, "Spring maintenance season is here! Time to prep your home."),
+            ("Summer", 6, 15, "Summer maintenance check — keep your home running cool."),
+            ("Fall", 9, 15, "Time to prepare for winter. Check your fall maintenance tasks."),
+            ("Winter", 12, 15, "Winter maintenance check — protect your home from the cold."),
+        ]
+
+        for season in seasons {
+            var components = DateComponents()
+            components.year = year
+            components.month = season.month
+            components.day = season.day
+            components.hour = 9
+            components.minute = 0
+
+            guard let date = cal.date(from: components), date > .now else {
+                // Try next year
+                components.year = year + 1
+                guard let nextDate = cal.date(from: components), nextDate > .now else { continue }
+                scheduleNotification(
+                    id: "seasonal-\(season.name.lowercased())-\(year + 1)",
+                    title: "\(season.name) Home Maintenance",
+                    body: season.message,
+                    dateComponents: components,
+                    category: "seasonal_reminder"
+                )
+                continue
+            }
+
+            scheduleNotification(
+                id: "seasonal-\(season.name.lowercased())-\(year)",
+                title: "\(season.name) Home Maintenance",
+                body: season.message,
+                dateComponents: components,
+                category: "seasonal_reminder"
+            )
         }
     }
 

@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Branded empty state with icon, title, description, and optional CTA button.
-/// Each section should provide a unique message and action.
+/// Branded empty state — warm and helpful, never blank.
+/// Relevant SF Symbol + Georgia title + description + primary CTA.
 struct EmptyStateView: View {
     let title: String
     let message: String
@@ -14,18 +14,19 @@ struct EmptyStateView: View {
             Spacer()
 
             Image(systemName: icon)
-                .font(.system(size: 56))
-                .foregroundStyle(Color.havenAccent.opacity(0.6))
+                .font(.system(size: 48))
+                .foregroundStyle(HavenColors.textTertiary)
                 .accessibilityHidden(true)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text(title)
                     .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
 
                 Text(message)
-                    .font(HavenTypography.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, HavenTheme.spacing32)
             }
@@ -45,7 +46,7 @@ struct EmptyStateView: View {
     private var actionIcon: String? {
         switch icon {
         case "doc.badge.plus": return "plus"
-        case "house.badge.plus": return "plus"
+        case "building.2": return "plus"
         default: return nil
         }
     }
@@ -53,10 +54,11 @@ struct EmptyStateView: View {
 
 #Preview {
     EmptyStateView(
-        title: "No Documents Yet",
+        title: "Your vault is ready",
         message: "Upload your first document to start building your estate vault.",
-        icon: "doc.badge.plus",
+        icon: "doc.text.magnifyingglass",
         actionTitle: "Upload Document",
         action: {}
     )
+    .background(HavenColors.background)
 }

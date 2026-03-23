@@ -1,0 +1,333 @@
+import Foundation
+
+struct MaintenanceTemplate: Identifiable {
+    let id = UUID()
+    let systemCategory: String
+    let title: String
+    let description: String
+    let frequency: String
+    let priority: String
+    let estimatedCostRange: String
+    let isDIY: Bool
+    let seasonalTiming: String?
+    let professionalRequired: Bool
+    let notes: String?
+    /// Tags that mark this template as requiring a specific subtype.
+    /// e.g. ["lawn"] means only for natural lawns, ["ducted"] means only for ducted HVAC, ["tank"] for tank water heaters.
+    var requiredSubtypes: Set<String> = []
+    /// Whether this task is essential (created during setup) vs recommended (available to add later).
+    var isEssential: Bool = true
+
+    /// DateComponents interval for calculating next due date from frequency string.
+    var interval: DateComponents {
+        switch frequency.lowercased() {
+        case "weekly":
+            return DateComponents(weekOfYear: 1)
+        case "monthly":
+            return DateComponents(month: 1)
+        case "every 2 months":
+            return DateComponents(month: 2)
+        case "quarterly":
+            return DateComponents(month: 3)
+        case "every 4 months":
+            return DateComponents(month: 4)
+        case "semi-annually", "twice yearly":
+            return DateComponents(month: 6)
+        case "annually", "annually (spring)", "annually (fall)":
+            return DateComponents(year: 1)
+        case "every 2 years":
+            return DateComponents(year: 2)
+        case "every 2-3 years":
+            return DateComponents(year: 2)
+        case "every 3 years":
+            return DateComponents(year: 3)
+        case "every 3-5 years":
+            return DateComponents(year: 3)
+        case "every 5 years":
+            return DateComponents(year: 5)
+        case "every 5-7 years":
+            return DateComponents(year: 5)
+        case "every 10 years":
+            return DateComponents(year: 10)
+        case "every 10-15 years":
+            return DateComponents(year: 10)
+        default:
+            return DateComponents(year: 1) // Default to annual
+        }
+    }
+}
+
+// MARK: - Template Library
+
+enum MaintenanceTemplates {
+
+    /// Returns only essential templates for setup. Non-essential tasks are available to add later.
+    static func essentialTemplates(for category: String, activeSubtypes: Set<String> = []) -> [MaintenanceTemplate] {
+        templates(for: category, activeSubtypes: activeSubtypes).filter(\.isEssential)
+    }
+
+    /// Returns templates matching a system category string (case-insensitive partial match).
+    /// `activeSubtypes` is the set of subtypes the user's home has (e.g. ["lawn", "ducted", "tank", "sump_pump"]).
+    /// Templates whose `requiredSubtypes` are not a subset of `activeSubtypes` are excluded.
+    static func templates(for category: String, activeSubtypes: Set<String> = []) -> [MaintenanceTemplate] {
+        let lower = category.lowercased()
+        let matched = allTemplates.first { sectionName, _ in
+            sectionName.lowercased() == lower
+            || lower.contains(sectionName.lowercased())
+            || sectionName.lowercased().contains(lower)
+        }?.1 ?? []
+        if activeSubtypes.isEmpty {
+            return matched
+        }
+        return matched.filter { $0.requiredSubtypes.isEmpty || $0.requiredSubtypes.isSubset(of: activeSubtypes) }
+    }
+
+    // MARK: - Master Template Database
+
+    static let allTemplates: [(String, [MaintenanceTemplate])] = [
+
+        // ──────────────────────────────────────────────
+        // ROOF & EXTERIOR
+        // ──────────────────────────────────────────────
+        ("Roofing", [
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Professional roof inspection", description: "Hire a roofing professional to inspect for damage, wear, and potential leaks.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Check for damaged shingles", description: "Visual ground-level inspection for missing, curled, or cracked shingles.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Also check after major storms"),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Clean gutters and downspouts", description: "Remove debris from gutters and ensure downspouts drain away from foundation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Spring and fall"),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Inspect flashing around chimney/vents", description: "Check flashing around chimneys, vents, and skylights for gaps or deterioration.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Check attic for leaks after heavy rain", description: "Inspect attic for water stains, mold, or daylight coming through roof.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Check after any major storm", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Roofing", title: "Trim tree branches away from roof", description: "Cut back branches within 10 feet of the roof to prevent damage.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$200–$600", isDIY: false, seasonalTiming: "Fall", professionalRequired: false, notes: "May need arborist for large trees", isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // SIDING / EXTERIOR
+        // ──────────────────────────────────────────────
+        ("Siding/Exterior", [
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Power wash exterior siding", description: "Clean siding to remove dirt, mildew, and algae buildup.", frequency: "Annually", priority: "Low", estimatedCostRange: "$200–$400", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Inspect/repair caulking around windows and doors", description: "Check exterior caulking for cracks or gaps and re-caulk as needed.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$50 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: "Critical for energy efficiency", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Check and repair deck/patio", description: "Inspect deck boards, railings, and stairs for rot, loose fasteners, or damage.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$200", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Seal or stain every 2-3 years", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Siding/Exterior", title: "Inspect/repair driveway cracks", description: "Fill cracks in concrete or asphalt driveway to prevent water infiltration.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0–$100 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Seal coat asphalt every 2-3 years", isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // HVAC
+        // ──────────────────────────────────────────────
+        ("HVAC", [
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Replace air filters", description: "Replace or clean HVAC air filters for optimal airflow and indoor air quality.", frequency: "Monthly", priority: "High", estimatedCostRange: "$10–$40", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Every 1-3 months depending on filter type"),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Professional HVAC tune-up (cooling)", description: "Professional inspection and service of air conditioning system before summer.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Schedule before summer heat", requiredSubtypes: ["has_ac"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Professional HVAC tune-up (heating)", description: "Professional inspection and service of heating system before winter.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Schedule before cold weather", requiredSubtypes: ["has_furnace"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Clean air vents and returns", description: "Remove vent covers and vacuum dust from supply and return vents.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Check thermostat calibration", description: "Verify thermostat reads accurate temperature and programs are correct.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect ductwork for leaks", description: "Professional inspection of ductwork for air leaks that reduce efficiency.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, requiredSubtypes: ["ducted"], isEssential: false),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Clean condensate drain line", description: "Flush AC condensate drain with vinegar to prevent clogs and water damage.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Especially important in humid climates", requiredSubtypes: ["has_ac"], isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // PLUMBING
+        // ──────────────────────────────────────────────
+        ("Plumbing", [
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Check for leaks under sinks", description: "Inspect under all sinks for drips, moisture, or water damage.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Test water pressure", description: "Use a gauge to test water pressure; ideal is 40-60 PSI.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "High pressure can damage fixtures", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Check toilets for running/leaks", description: "Listen for running toilets and check around base for moisture.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "A running toilet can waste 200+ gallons/day"),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Clean faucet aerators", description: "Remove and soak aerators in vinegar to clear mineral buildup.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Inspect washing machine supply hoses", description: "Check hoses for bulges, cracks, or kinks. Replace every 5 years.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Burst hoses are a top insurance claim"),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Test sump pump", description: "Pour water into sump pit to verify pump activates and drains properly.", frequency: "Quarterly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Critical before spring rains", requiredSubtypes: ["sump_pump"], isEssential: false),
+            MaintenanceTemplate(systemCategory: "Plumbing", title: "Professional drain cleaning", description: "Professional clearing of main drains to prevent backups.", frequency: "Every 2 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // WATER HEATER
+        // ──────────────────────────────────────────────
+        ("Water Heater", [
+            MaintenanceTemplate(systemCategory: "Water Heater", title: "Flush water heater", description: "Drain and flush sediment from the tank to maintain heating efficiency.", frequency: "Annually", priority: "High", estimatedCostRange: "$0–$200", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "DIY possible but professional recommended for older units", requiredSubtypes: ["tank"]),
+            MaintenanceTemplate(systemCategory: "Water Heater", title: "Inspect anode rod", description: "Check and replace sacrificial anode rod to prevent tank corrosion.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$20–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Replace if more than 50% depleted", requiredSubtypes: ["tank"], isEssential: false),
+            MaintenanceTemplate(systemCategory: "Water Heater", title: "Test T&P relief valve", description: "Test temperature and pressure relief valve for proper operation.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Safety critical — valve should release water when lifted"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // SEPTIC SYSTEM
+        // ──────────────────────────────────────────────
+        ("Septic System", [
+            MaintenanceTemplate(systemCategory: "Septic System", title: "Septic tank pumping", description: "Professional pumping of septic tank to remove accumulated solids.", frequency: "Every 3-5 years", priority: "High", estimatedCostRange: "$300–$600", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Frequency depends on household size and tank size"),
+            MaintenanceTemplate(systemCategory: "Septic System", title: "Inspect septic baffles", description: "Have baffles inspected during pumping to ensure they're intact.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "Included with pumping", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Done during pumping"),
+            MaintenanceTemplate(systemCategory: "Septic System", title: "Check drain field for wet spots", description: "Walk the drain field looking for soggy areas, odors, or unusually green grass.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Wet spots may indicate system failure"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // WELL SYSTEM
+        // ──────────────────────────────────────────────
+        ("Well System", [
+            MaintenanceTemplate(systemCategory: "Well System", title: "Test water quality", description: "Lab test for bacteria, nitrates, pH, and other contaminants.", frequency: "Annually", priority: "High", estimatedCostRange: "$50–$200", isDIY: false, seasonalTiming: "Spring", professionalRequired: false, notes: "Test more frequently if you notice taste/odor changes"),
+            MaintenanceTemplate(systemCategory: "Well System", title: "Inspect well cap and casing", description: "Check well cap is secure and casing is intact above ground.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Well System", title: "Check pressure tank", description: "Verify pressure tank air charge and check for waterlogging.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Well System", title: "Professional well inspection", description: "Comprehensive inspection of well pump, casing, and water flow.", frequency: "Every 3-5 years", priority: "High", estimatedCostRange: "$300–$500", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // ELECTRICAL
+        // ──────────────────────────────────────────────
+        ("Electrical", [
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Test GFCI outlets", description: "Press test/reset buttons on all GFCI outlets to verify protection. Modern GFCI outlets have self-test features, but an annual manual check is good practice.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Modern GFCI outlets self-test — this is your annual manual confirmation", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Verify smoke detectors", description: "Press test button on each smoke detector to confirm it's working. Most modern detectors self-test, but an annual manual check ensures nothing has been disconnected or failed silently.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Modern detectors self-test — this is your annual manual confirmation"),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detector batteries", description: "Replace batteries in all smoke detectors. Test after replacing.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$10–$20 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Change at daylight saving time"),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Replace smoke detectors", description: "Smoke detectors expire after 10 years. Check manufacture date and replace.", frequency: "Every 10 years", priority: "High", estimatedCostRange: "$15–$40 each", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Verify carbon monoxide detectors", description: "Press test button on each CO detector to confirm it's working. Most modern units self-test, but an annual manual check ensures nothing has failed.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: "Modern detectors self-test — this is your annual manual confirmation"),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Inspect electrical panel", description: "Professional inspection of main breaker panel for wear or overheating.", frequency: "Every 3 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Electrical", title: "Check outdoor lighting", description: "Test all exterior and security lights, replace burned-out bulbs.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // FIRE PROTECTION (Smoke/CO — also used for fireplace)
+        // ──────────────────────────────────────────────
+        ("Fire Protection", [
+            MaintenanceTemplate(systemCategory: "Fire Protection", title: "Verify smoke detectors", description: "Press test button on each smoke detector to confirm it's working. Most modern detectors self-test, but an annual manual check ensures nothing has been disconnected or failed silently.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Modern detectors self-test — this is your annual manual confirmation"),
+            MaintenanceTemplate(systemCategory: "Fire Protection", title: "Replace smoke detector batteries", description: "Replace batteries in all smoke and CO detectors.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$10–$20 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Change at daylight saving time"),
+            MaintenanceTemplate(systemCategory: "Fire Protection", title: "Check fire extinguishers", description: "Verify gauge is in green zone, check expiration date, ensure accessible.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Professional recharge every 6 years"),
+            MaintenanceTemplate(systemCategory: "Fire Protection", title: "Professional chimney sweep", description: "Professional cleaning and inspection of chimney and flue.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Before first use each season", requiredSubtypes: ["fireplace"], isEssential: false),
+            MaintenanceTemplate(systemCategory: "Fire Protection", title: "Inspect firebox and damper", description: "Check firebox for cracks and verify damper opens/closes properly.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: "Before first use each season", requiredSubtypes: ["fireplace"], isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // WINDOWS & DOORS
+        // ──────────────────────────────────────────────
+        ("Windows", [
+            MaintenanceTemplate(systemCategory: "Windows", title: "Inspect weatherstripping", description: "Check weatherstripping on all windows for wear, gaps, or damage.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: "Replace worn strips for $20–$50"),
+            MaintenanceTemplate(systemCategory: "Windows", title: "Check window locks and operation", description: "Test all window locks, hinges, and opening mechanisms.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Windows", title: "Clean window tracks and weep holes", description: "Vacuum tracks and clear weep holes to ensure proper drainage.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Windows", title: "Re-caulk exterior windows", description: "Remove old caulk and apply fresh exterior-grade caulk around windows.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$0–$50 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false),
+        ]),
+
+        ("Doors", [
+            MaintenanceTemplate(systemCategory: "Doors", title: "Lubricate door hinges and locks", description: "Apply lubricant to all door hinges, locks, and deadbolts.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Doors", title: "Inspect weatherstripping on exterior doors", description: "Check door sweeps and weatherstripping for gaps that allow drafts.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Doors", title: "Check door alignment and operation", description: "Verify doors open, close, and latch properly. Adjust hinges if needed.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // GARAGE DOOR
+        // ──────────────────────────────────────────────
+        ("Garage Door", [
+            MaintenanceTemplate(systemCategory: "Garage Door", title: "Test garage door auto-reverse", description: "Place an object in the door path to verify the auto-reverse safety feature works. Modern openers have sensors that handle this automatically, but an annual manual test confirms everything is aligned and responsive.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Modern openers self-monitor — this is your annual safety confirmation"),
+            MaintenanceTemplate(systemCategory: "Garage Door", title: "Lubricate garage door tracks and hardware", description: "Apply garage door lubricant to tracks, rollers, hinges, and springs.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Do NOT lubricate with WD-40; use silicone spray"),
+            MaintenanceTemplate(systemCategory: "Garage Door", title: "Professional garage door tune-up", description: "Professional inspection of springs, cables, rollers, and opener.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Never attempt spring repair yourself"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // LANDSCAPING
+        // ──────────────────────────────────────────────
+        ("Landscaping", [
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Fertilize lawn", description: "Apply seasonal fertilizer appropriate for grass type and season.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$50–$150", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Spring, early summer, fall applications", requiredSubtypes: ["lawn"]),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Aerate lawn", description: "Core aeration to reduce soil compaction and improve root growth.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$100–$200", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, requiredSubtypes: ["lawn"], isEssential: false),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Mulch garden beds", description: "Add 2-3 inches of fresh mulch to garden beds to retain moisture and suppress weeds.", frequency: "Annually", priority: "Low", estimatedCostRange: "$200–$500", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Prune shrubs and hedges", description: "Trim overgrown shrubs and hedges for health and appearance.", frequency: "Semi-annually", priority: "Low", estimatedCostRange: "$0–$200", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Spring and fall"),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Grade check — drainage away from foundation", description: "Ensure soil slopes away from foundation to prevent water intrusion.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Critical for foundation health"),
+            MaintenanceTemplate(systemCategory: "Landscaping", title: "Inspect retaining walls", description: "Check retaining walls for leaning, bulging, or cracking.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // IRRIGATION
+        // ──────────────────────────────────────────────
+        ("Irrigation", [
+            MaintenanceTemplate(systemCategory: "Irrigation", title: "Winterize irrigation system", description: "Professional blow-out of irrigation lines to prevent freeze damage.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Must be done before first freeze"),
+            MaintenanceTemplate(systemCategory: "Irrigation", title: "Spring startup irrigation", description: "Gradually pressurize system, check for leaks, and adjust heads.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Irrigation", title: "Check irrigation heads and adjust", description: "Walk each zone checking for broken, clogged, or misaligned heads.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "During irrigation season only"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // POOL / SPA
+        // ──────────────────────────────────────────────
+        ("Pool/Spa", [
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Test and balance water chemistry", description: "Test and adjust pH, chlorine, alkalinity, and calcium hardness.", frequency: "Weekly", priority: "High", estimatedCostRange: "$20–$50/month", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "During swimming season"),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean pool filter", description: "Backwash or clean pool filter cartridge to maintain proper filtration.", frequency: "Monthly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "During swimming season"),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool opening", description: "Remove cover, start up equipment, balance chemicals, and inspect.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool closing/winterization", description: "Chemical treatment, lower water level, blow out lines, install cover.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Inspect pool equipment", description: "Check pump, heater, filter, and automation for proper operation.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$100", isDIY: false, seasonalTiming: "Spring", professionalRequired: false, notes: "During opening"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // APPLIANCES
+        // ──────────────────────────────────────────────
+        ("Appliance", [
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Clean dishwasher filter and spray arms", description: "Remove and clean dishwasher filter and check spray arms for clogs.", frequency: "Monthly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Clean washing machine", description: "Run cleaning cycle with machine cleaner or vinegar to prevent mold and odor.", frequency: "Monthly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Deep clean dryer vent duct", description: "Professional cleaning of full dryer vent duct to prevent fire hazard.", frequency: "Annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Lint buildup is a top cause of house fires"),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Clean range hood filter", description: "Remove and clean/replace range hood grease filter.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Clean refrigerator coils", description: "Vacuum dust from condenser coils behind or under the refrigerator.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Improves efficiency and extends life"),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Inspect refrigerator door seals", description: "Check door gaskets for cracks or gaps. Clean with mild soap.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Dollar bill test: close door on bill, should hold tight", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Appliance", title: "Check and clean garbage disposal", description: "Clean disposal with ice cubes and lemon, check for leaks underneath.", frequency: "Monthly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, requiredSubtypes: ["garbage_disposal"], isEssential: false),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // PEST CONTROL
+        // ──────────────────────────────────────────────
+        ("Pest Control", [
+            MaintenanceTemplate(systemCategory: "Pest Control", title: "Inspect foundation for entry points", description: "Walk perimeter checking for gaps, cracks, or holes where pests can enter.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Spring and fall", isEssential: false),
+            MaintenanceTemplate(systemCategory: "Pest Control", title: "Professional termite inspection", description: "Annual professional inspection for termite and wood-destroying insect activity.", frequency: "Annually", priority: "High", estimatedCostRange: "$75–$150", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Required for many home warranties"),
+            MaintenanceTemplate(systemCategory: "Pest Control", title: "Seal gaps around pipes and utility entries", description: "Use caulk or steel wool to seal gaps around pipes, wires, and vents.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$20 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, isEssential: false),
+            MaintenanceTemplate(systemCategory: "Pest Control", title: "Professional pest treatment", description: "Quarterly or as-needed professional pest control treatment.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$100–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // GENERATOR
+        // ──────────────────────────────────────────────
+        ("Generator", [
+            MaintenanceTemplate(systemCategory: "Generator", title: "Verify generator test cycle", description: "Confirm your generator is running its automatic weekly exercise cycle. Most standby generators auto-exercise — just verify it ran by checking the hour meter or app.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Most standby generators auto-exercise weekly — this is your periodic check that it's working"),
+            MaintenanceTemplate(systemCategory: "Generator", title: "Check generator oil level", description: "Verify oil level is within the proper range on dipstick.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Check more frequently during heavy use"),
+            MaintenanceTemplate(systemCategory: "Generator", title: "Change generator oil", description: "Drain and replace oil per manufacturer schedule.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$20–$150", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Every 200 hours or annually"),
+            MaintenanceTemplate(systemCategory: "Generator", title: "Replace spark plugs", description: "Replace spark plugs per manufacturer recommendations.", frequency: "Annually", priority: "Low", estimatedCostRange: "$10–$30 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Generator", title: "Professional generator service", description: "Full professional service including all fluids, filters, and electrical check.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Before winter storm season"),
+            MaintenanceTemplate(systemCategory: "Generator", title: "Test automatic transfer switch", description: "Professional test of transfer switch operation.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$100–$200", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // SECURITY SYSTEM
+        // ──────────────────────────────────────────────
+        ("Security System", [
+            MaintenanceTemplate(systemCategory: "Security System", title: "Verify alarm system", description: "Walk-test each sensor to confirm it registers with the panel. Monitoring services like ADT run regular automated checks, but an annual manual walk-test catches sensors that may have shifted or lost signal.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Monitored systems self-test — this is your annual manual confirmation"),
+            MaintenanceTemplate(systemCategory: "Security System", title: "Replace sensor batteries", description: "Replace batteries in door/window sensors and motion detectors.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$20–$50 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Security System", title: "Clean camera lenses", description: "Wipe camera lenses clean and verify camera angles and recording.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Security System", title: "Update alarm codes", description: "Change alarm codes and review authorized user list.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Also change when personnel changes"),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // SOLAR PANELS
+        // ──────────────────────────────────────────────
+        ("Solar", [
+            MaintenanceTemplate(systemCategory: "Solar", title: "Visual inspection from ground", description: "Look for debris, damage, bird nests, or shading issues on panels.", frequency: "Quarterly", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Professional panel cleaning", description: "Professional cleaning to remove dirt, pollen, and bird droppings.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: "Can significantly improve output"),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Monitor output for performance drop", description: "Check inverter app or meter for unexpected drops in power production.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Professional inspection", description: "Comprehensive inspection of panels, wiring, inverter, and mounting.", frequency: "Every 3-5 years", priority: "Medium", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil),
+            MaintenanceTemplate(systemCategory: "Solar", title: "Check inverter operation", description: "Verify inverter shows green/normal status and no error codes.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // CRAWL SPACE / BASEMENT
+        // ──────────────────────────────────────────────
+        ("Crawl Space", [
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Inspect for moisture or water intrusion", description: "Check for standing water, damp walls, or moisture on surfaces.", frequency: "Quarterly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Check vapor barrier condition", description: "Inspect plastic vapor barrier for tears, displacement, or gaps.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Inspect for mold or mildew", description: "Visual inspection for mold growth on joists, insulation, and walls.", frequency: "Semi-annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Professional remediation if found"),
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Check foundation for cracks", description: "Inspect foundation walls for new or expanding cracks.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "Mark and monitor cracks over time"),
+            MaintenanceTemplate(systemCategory: "Crawl Space", title: "Test dehumidifier operation", description: "Verify dehumidifier is working and draining properly.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil),
+        ]),
+
+        // ──────────────────────────────────────────────
+        // WATER TREATMENT
+        // ──────────────────────────────────────────────
+        ("Water Treatment", [
+            MaintenanceTemplate(systemCategory: "Water Treatment", title: "Replace water softener salt", description: "Check and refill salt in water softener brine tank.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$10–$20 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Water Treatment", title: "Clean water softener brine tank", description: "Drain, clean, and refill the brine tank to prevent salt bridging.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil),
+            MaintenanceTemplate(systemCategory: "Water Treatment", title: "Replace whole-house water filter", description: "Replace filter cartridge per manufacturer schedule.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$20–$80 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Frequency varies by filter type and water quality"),
+            MaintenanceTemplate(systemCategory: "Water Treatment", title: "Test water after filter replacement", description: "Test water quality to verify filter is working properly.", frequency: "Annually", priority: "Low", estimatedCostRange: "$50–$100", isDIY: false, seasonalTiming: nil, professionalRequired: false, notes: nil),
+        ]),
+    ]
+
+    /// All system categories that have templates available.
+    static var availableCategories: [String] {
+        allTemplates.map(\.0)
+    }
+
+    /// Total count of all maintenance templates across all categories.
+    static var totalTemplateCount: Int {
+        allTemplates.reduce(0) { $0 + $1.1.count }
+    }
+}

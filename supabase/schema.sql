@@ -59,6 +59,23 @@ CREATE TABLE properties (
     year_built INT,
     ownership_entity TEXT,
     notes TEXT,
+    attributes JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Service Contracts (recurring services: pest control, landscaping, pool, cleaning)
+CREATE TABLE service_contracts (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    property_id UUID REFERENCES properties(id) ON DELETE CASCADE NOT NULL,
+    household_id UUID REFERENCES households(id) NOT NULL,
+    service_type TEXT NOT NULL,
+    provider_name TEXT,
+    contractor_id UUID REFERENCES contractors(id) ON DELETE SET NULL,
+    frequency TEXT,
+    details JSONB DEFAULT '{}',
+    annual_cost DECIMAL,
+    start_date DATE,
+    notes TEXT,
     created_at TIMESTAMPTZ DEFAULT now()
 );
 
@@ -84,7 +101,11 @@ CREATE TABLE documents (
     property_id UUID REFERENCES properties(id),
     uploaded_at TIMESTAMPTZ DEFAULT now(),
     last_reviewed_at TIMESTAMPTZ,
-    metadata JSONB DEFAULT '{}'
+    metadata JSONB DEFAULT '{}',
+    vault_locked BOOLEAN DEFAULT false,
+    vault_lock_iv TEXT,
+    content_hash TEXT,
+    file_size BIGINT
 );
 
 -- Document-FamilyMember junction
@@ -182,12 +203,40 @@ CREATE TABLE service_records (
 CREATE TABLE chat_messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     household_id UUID REFERENCES households(id) NOT NULL,
-    user_id UUID REFERENCES users(id) NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE NOT NULL,
     role TEXT NOT NULL,                   -- 'user' or 'assistant'
     content TEXT NOT NULL,
     context_type TEXT,                    -- 'general', 'document', 'property', 'maintenance'
     context_id UUID,
     created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Access Log (immutable, append-only audit trail)
+CREATE TABLE access_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    household_id UUID REFERENCES households(id) NOT NULL,
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,  -- NULL for system/AI actions
+    action TEXT NOT NULL,
+    resource_type TEXT NOT NULL,                  -- 'document', 'property', 'system', 'chat'
+    resource_id UUID,
+    resource_name TEXT,
+    actor_type TEXT NOT NULL DEFAULT 'user',      -- 'user', 'system', 'ai_analysis', 'admin'
+    ip_address TEXT,
+    device_info TEXT,
+    metadata JSONB DEFAULT '{}',
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Document Content (extracted text for AI queries)
+CREATE TABLE document_content (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE NOT NULL,
+    household_id UUID REFERENCES households(id) NOT NULL,
+    extracted_text TEXT NOT NULL,
+    extraction_method TEXT DEFAULT 'ocr',
+    extracted_at TIMESTAMPTZ DEFAULT now(),
+    last_ai_analysis_at TIMESTAMPTZ,
+    ai_model_version TEXT
 );
 
 -- Completion Scorecard
@@ -224,6 +273,10 @@ CREATE INDEX idx_service_records_household ON service_records(household_id);
 CREATE INDEX idx_service_records_system ON service_records(system_id);
 CREATE INDEX idx_chat_messages_household ON chat_messages(household_id, user_id);
 CREATE INDEX idx_chat_messages_created ON chat_messages(household_id, created_at DESC);
+CREATE INDEX idx_access_log_household_created ON access_log(household_id, created_at DESC);
+CREATE INDEX idx_access_log_resource ON access_log(resource_type, resource_id);
+CREATE INDEX idx_document_content_household ON document_content(household_id);
+CREATE INDEX idx_document_content_document ON document_content(document_id);
 CREATE INDEX idx_completion_scores_household ON completion_scores(household_id);
 
 -- ============================================================================
@@ -243,25 +296,40 @@ ALTER TABLE maintenance_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE service_records ENABLE ROW LEVEL SECURITY;
 ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE completion_scores ENABLE ROW LEVEL SECURITY;
+ALTER TABLE access_log ENABLE ROW LEVEL SECURITY;
+ALTER TABLE document_content ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- RLS HELPER FUNCTION
+-- ============================================================================
+
+-- SECURITY DEFINER function that bypasses RLS to look up the current user's
+-- household_id.  This avoids infinite recursion when used in policies on the
+-- users table itself, and is more efficient than a repeated sub-query.
+CREATE OR REPLACE FUNCTION public.get_my_household_id()
+RETURNS UUID
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT household_id FROM public.users WHERE id = auth.uid()
+$$;
 
 -- ============================================================================
 -- RLS POLICIES
 -- ============================================================================
-
--- Helper: get the current user's household_id
--- Used in all policies below via subquery:
---   (SELECT household_id FROM users WHERE id = auth.uid())
 
 -- ----------------------------------------------------------------------------
 -- households
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view own household"
     ON households FOR SELECT
-    USING (id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (id = public.get_my_household_id());
 
 CREATE POLICY "Users can update own household"
     ON households FOR UPDATE
-    USING (id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (id = public.get_my_household_id());
 
 -- Allow insert during onboarding (user creates household before user row exists)
 CREATE POLICY "Authenticated users can create households"
@@ -277,7 +345,7 @@ CREATE POLICY "Users can view own profile"
 
 CREATE POLICY "Users can view household members"
     ON users FOR SELECT
-    USING (household_id = (SELECT household_id FROM users u WHERE u.id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert own profile"
     ON users FOR INSERT
@@ -292,38 +360,38 @@ CREATE POLICY "Users can update own profile"
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household family members"
     ON family_members FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household family members"
     ON family_members FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household family members"
     ON family_members FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household family members"
     ON family_members FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- documents
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household documents"
     ON documents FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household documents"
     ON documents FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household documents"
     ON documents FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household documents"
     ON documents FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- document_family_members (junction table — access via document's household)
@@ -331,19 +399,19 @@ CREATE POLICY "Users can delete household documents"
 CREATE POLICY "Users can view document-member links"
     ON document_family_members FOR SELECT
     USING (document_id IN (
-        SELECT id FROM documents WHERE household_id = (SELECT household_id FROM users WHERE id = auth.uid())
+        SELECT id FROM documents WHERE household_id = public.get_my_household_id()
     ));
 
 CREATE POLICY "Users can insert document-member links"
     ON document_family_members FOR INSERT
     WITH CHECK (document_id IN (
-        SELECT id FROM documents WHERE household_id = (SELECT household_id FROM users WHERE id = auth.uid())
+        SELECT id FROM documents WHERE household_id = public.get_my_household_id()
     ));
 
 CREATE POLICY "Users can delete document-member links"
     ON document_family_members FOR DELETE
     USING (document_id IN (
-        SELECT id FROM documents WHERE household_id = (SELECT household_id FROM users WHERE id = auth.uid())
+        SELECT id FROM documents WHERE household_id = public.get_my_household_id()
     ));
 
 -- ----------------------------------------------------------------------------
@@ -351,114 +419,132 @@ CREATE POLICY "Users can delete document-member links"
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household properties"
     ON properties FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household properties"
     ON properties FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household properties"
     ON properties FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household properties"
     ON properties FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
+
+ALTER TABLE service_contracts ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view household service contracts"
+    ON service_contracts FOR SELECT
+    USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Users can insert household service contracts"
+    ON service_contracts FOR INSERT
+    WITH CHECK (household_id = public.get_my_household_id());
+
+CREATE POLICY "Users can update household service contracts"
+    ON service_contracts FOR UPDATE
+    USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Users can delete household service contracts"
+    ON service_contracts FOR DELETE
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- home_systems
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household systems"
     ON home_systems FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household systems"
     ON home_systems FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household systems"
     ON home_systems FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household systems"
     ON home_systems FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- warranties
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household warranties"
     ON warranties FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household warranties"
     ON warranties FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household warranties"
     ON warranties FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household warranties"
     ON warranties FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- contractors
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household contractors"
     ON contractors FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household contractors"
     ON contractors FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household contractors"
     ON contractors FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household contractors"
     ON contractors FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- maintenance_tasks
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household maintenance tasks"
     ON maintenance_tasks FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household maintenance tasks"
     ON maintenance_tasks FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household maintenance tasks"
     ON maintenance_tasks FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household maintenance tasks"
     ON maintenance_tasks FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- service_records
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household service records"
     ON service_records FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household service records"
     ON service_records FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household service records"
     ON service_records FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can delete household service records"
     ON service_records FOR DELETE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 -- ----------------------------------------------------------------------------
 -- chat_messages
@@ -466,14 +552,14 @@ CREATE POLICY "Users can delete household service records"
 CREATE POLICY "Users can view own chat messages"
     ON chat_messages FOR SELECT
     USING (
-        household_id = (SELECT household_id FROM users WHERE id = auth.uid())
+        household_id = public.get_my_household_id()
         AND user_id = auth.uid()
     );
 
 CREATE POLICY "Users can insert own chat messages"
     ON chat_messages FOR INSERT
     WITH CHECK (
-        household_id = (SELECT household_id FROM users WHERE id = auth.uid())
+        household_id = public.get_my_household_id()
         AND user_id = auth.uid()
     );
 
@@ -482,12 +568,38 @@ CREATE POLICY "Users can insert own chat messages"
 -- ----------------------------------------------------------------------------
 CREATE POLICY "Users can view household completion scores"
     ON completion_scores FOR SELECT
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can insert household completion scores"
     ON completion_scores FOR INSERT
-    WITH CHECK (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    WITH CHECK (household_id = public.get_my_household_id());
 
 CREATE POLICY "Users can update household completion scores"
     ON completion_scores FOR UPDATE
-    USING (household_id = (SELECT household_id FROM users WHERE id = auth.uid()));
+    USING (household_id = public.get_my_household_id());
+
+-- ----------------------------------------------------------------------------
+-- access_log (immutable — SELECT and INSERT only, no UPDATE or DELETE)
+-- ----------------------------------------------------------------------------
+CREATE POLICY "Users can view own household access logs"
+    ON access_log FOR SELECT
+    USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Edge functions can insert access logs"
+    ON access_log FOR INSERT
+    WITH CHECK (true);
+
+-- ----------------------------------------------------------------------------
+-- document_content
+-- ----------------------------------------------------------------------------
+CREATE POLICY "Household members can view own content"
+    ON document_content FOR SELECT
+    USING (household_id = public.get_my_household_id());
+
+CREATE POLICY "Edge functions can insert document content"
+    ON document_content FOR INSERT
+    WITH CHECK (true);
+
+CREATE POLICY "Edge functions can update document content"
+    ON document_content FOR UPDATE
+    USING (true);

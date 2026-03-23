@@ -2,6 +2,7 @@ import SwiftUI
 
 struct MaintenanceTaskRow: View {
     let task: MaintenanceTaskDBRow
+    var assignedUserName: String? = nil
 
     private var isOverdue: Bool {
         let formatter = DateFormatter()
@@ -13,15 +14,28 @@ struct MaintenanceTaskRow: View {
     var body: some View {
         HStack(spacing: HavenTheme.spacing12) {
             Image(systemName: isOverdue ? "exclamationmark.circle.fill" : "circle")
-                .foregroundStyle(isOverdue ? Color.havenCritical : .secondary)
+                .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textSecondary)
                 .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(task.title)
-                    .font(HavenTypography.subheadline)
-                Text("Due: \(task.nextDueDate)")
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textPrimary)
+                HStack(spacing: 4) {
+                    Text("Due: \(task.nextDueDate.havenDateShort)")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                    if let name = assignedUserName {
+                        Text("·")
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Image(systemName: "person.fill")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.navy)
+                        Text(name)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                }
             }
 
             Spacer()
@@ -37,6 +51,6 @@ struct MaintenanceTaskRow: View {
             }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(task.title), due \(task.nextDueDate)\(isOverdue ? ", overdue" : "")")
+        .accessibilityLabel("\(task.title), due \(task.nextDueDate.havenDateShort)\(isOverdue ? ", overdue" : "")\(assignedUserName.map { ", assigned to \($0)" } ?? "")")
     }
 }

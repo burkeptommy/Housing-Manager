@@ -23,10 +23,14 @@ struct MaintenanceTask: Identifiable, Codable {
 
 enum MaintenanceFrequency: String, Codable, CaseIterable {
     case monthly = "Monthly"
+    case everyTwoMonths = "Every 2 Months"
     case quarterly = "Quarterly"
+    case everyFourMonths = "Every 4 Months"
     case semiAnnually = "Semi-Annually"
     case annually = "Annually"
     case biAnnually = "Every 2 Years"
+    case everyThreeYears = "Every 3 Years"
+    case everyFiveYears = "Every 5 Years"
     case asNeeded = "As Needed"
     case seasonal = "Seasonal"
 }

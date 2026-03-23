@@ -3,40 +3,80 @@ import SwiftUI
 struct PropertyListView: View {
     @StateObject private var viewModel = PropertyListViewModel()
     @State private var showAddProperty = false
+    @State private var navigationPath = NavigationPath()
 
     var body: some View {
-        NavigationStack {
-            Group {
+        NavigationStack(path: $navigationPath) {
+            ScrollView {
+                screenTitle("Properties")
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.top, HavenTheme.spacing4)
+
                 if viewModel.isLoading && viewModel.properties.isEmpty {
-                    ScrollView {
-                        VStack(spacing: HavenTheme.spacing12) {
-                            SkeletonCard(lineCount: 2)
-                            SkeletonCard(lineCount: 2)
-                            SkeletonCard(lineCount: 2)
-                        }
-                        .padding()
+                    VStack(spacing: HavenTheme.spacing12) {
+                        SkeletonCard(lineCount: 2)
+                        SkeletonCard(lineCount: 2)
+                        SkeletonCard(lineCount: 2)
                     }
-                    .background(HavenColors.background)
+                    .padding()
                 } else if viewModel.properties.isEmpty {
-                    EmptyStateView(
-                        title: "No Properties",
-                        message: "Add your first property to start tracking home systems and maintenance.",
-                        icon: "house.badge.plus",
-                        actionTitle: "Add Property",
-                        action: { showAddProperty = true }
-                    )
+                    VStack(spacing: 20) {
+                        Spacer().frame(height: 60)
+                        Image(systemName: "house.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("Your Home Awaits")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("Add your property and Haven will help you track systems, maintenance, and more.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
+                        Button {
+                            showAddProperty = true
+                        } label: {
+                            Text("Add Property")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                                .background(HavenColors.navy800)
+                                .clipShape(Capsule())
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                 } else {
-                    propertyList
+                    LazyVStack(spacing: HavenTheme.spacing12) {
+                        ForEach(viewModel.properties) { property in
+                            NavigationLink {
+                                PropertyDetailView(propertyID: property.id)
+                            } label: {
+                                PropertyCardRow(property: property)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.top, HavenTheme.spacing8)
+                    .padding(.bottom, HavenTheme.spacing32)
                 }
             }
+            .background(HavenColors.background)
             .navigationTitle("Properties")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Color.clear.frame(height: 0)
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Haptics.light()
                         showAddProperty = true
                     } label: {
                         Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy800)
                     }
                     .accessibilityLabel("Add new property")
                 }
@@ -45,10 +85,8 @@ struct PropertyListView: View {
                 Haptics.light()
                 await viewModel.loadProperties()
             }
-            .task {
-                if viewModel.properties.isEmpty {
-                    await viewModel.loadProperties()
-                }
+            .onAppear {
+                Task { await viewModel.loadProperties() }
             }
             .sheet(isPresented: $showAddProperty) {
                 AddPropertyView(onComplete: {
@@ -56,27 +94,14 @@ struct PropertyListView: View {
                     Task { await viewModel.loadProperties() }
                 })
             }
+            .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in
+                if let tab = notification.userInfo?["tab"] as? Int, tab == 1 {
+                    navigationPath = NavigationPath()
+                }
+            }
         }
     }
 
-    private var propertyList: some View {
-        ScrollView {
-            LazyVStack(spacing: HavenTheme.spacing12) {
-                ForEach(viewModel.properties) { property in
-                    NavigationLink {
-                        PropertyDetailView(propertyID: property.id)
-                    } label: {
-                        PropertyCardRow(property: property)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(.horizontal, HavenTheme.spacing16)
-            .padding(.top, HavenTheme.spacing8)
-            .padding(.bottom, HavenTheme.spacing32)
-        }
-        .background(HavenColors.background)
-    }
 }
 
 struct PropertyCardRow: View {
@@ -97,31 +122,32 @@ struct PropertyCardRow: View {
             HStack(spacing: HavenTheme.spacing16) {
                 Image(systemName: propertyIcon)
                     .font(.title2)
-                    .foregroundStyle(Color.havenAccent)
+                    .foregroundStyle(HavenColors.navy)
                     .frame(width: 48, height: 48)
-                    .background(Color.havenAccent.opacity(0.1))
+                    .background(HavenColors.navy.opacity(0.1))
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                     .accessibilityHidden(true)
 
                 VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
                     Text(property.name)
                         .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
                     if let street = property.street {
                         Text(street)
                             .font(HavenTypography.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     if let city = property.city, let state = property.state {
                         Text("\(city), \(state)")
                             .font(HavenTypography.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(.tertiary)
+                    .foregroundStyle(HavenColors.textTertiary)
                     .accessibilityHidden(true)
             }
         }

@@ -19,15 +19,15 @@ struct CategoryProgress: View {
                     Text("\(documentCount)")
                         .font(HavenTypography.caption)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.havenAccent)
+                        .foregroundStyle(HavenColors.navy)
                 }
                 Text("\(Int(progress * 100))%")
                     .font(HavenTypography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .monospacedDigit()
             }
             ProgressView(value: progress)
-                .tint(progress >= 1.0 ? Color.havenSuccess : Color.havenAccent)
+                .tint(progress >= 1.0 ? Color.havenSuccess : HavenColors.navy)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(category.rawValue), \(documentCount) documents, \(Int(progress * 100)) percent complete")

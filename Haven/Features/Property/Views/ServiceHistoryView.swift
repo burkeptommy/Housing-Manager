@@ -12,9 +12,9 @@ struct ServiceHistoryView: View {
                 ProgressView("Loading records...")
             } else if records.isEmpty {
                 ContentUnavailableView {
-                    Label("No Service Records", systemImage: "clock")
+                    Label("Service History", systemImage: "clock")
                 } description: {
-                    Text("Service records will appear here as maintenance is completed.")
+                    Text("A record of all work done on your home will appear here as maintenance is completed.")
                 }
             } else {
                 recordsList
@@ -36,11 +36,13 @@ struct ServiceHistoryView: View {
                                 Image(systemName: serviceIcon(record.serviceType))
                                     .foregroundStyle(serviceColor(record.serviceType))
                                 Text(record.description)
-                                    .font(.subheadline.weight(.medium))
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.textPrimary)
                                 Spacer()
                                 if let cost = record.cost {
                                     Text("$\(cost, specifier: "%.0f")")
-                                        .font(.subheadline.weight(.bold))
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
 
@@ -48,13 +50,13 @@ struct ServiceHistoryView: View {
                                 Label(record.serviceDate, systemImage: "calendar")
                                 Label(record.serviceType.capitalized, systemImage: "wrench")
                             }
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
 
                             if let notes = record.notes, !notes.isEmpty {
                                 Text(notes)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
                             }
                         }
                     }
@@ -62,7 +64,7 @@ struct ServiceHistoryView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(HavenColors.background)
     }
 
     private func serviceIcon(_ type: String) -> String {
@@ -79,10 +81,10 @@ struct ServiceHistoryView: View {
 
     private func serviceColor(_ type: String) -> Color {
         switch type.lowercased() {
-        case "emergency": return .red
-        case "repair": return .orange
-        case "replacement": return .purple
-        default: return .blue
+        case "emergency": return HavenColors.critical
+        case "repair": return HavenColors.warning
+        case "replacement": return HavenColors.navy700
+        default: return HavenColors.info
         }
     }
 

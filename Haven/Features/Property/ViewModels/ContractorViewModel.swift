@@ -7,22 +7,61 @@ final class ContractorViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var error: String?
     @Published var searchText = ""
+    @Published var filterSpecialty: String?
+    @Published var sortBy: SortOption = .name
+
+    enum SortOption: String, CaseIterable {
+        case name = "Name"
+        case rating = "Rating"
+    }
 
     private let db = DatabaseService.shared
 
     var filteredContractors: [ContractorRow] {
-        guard !searchText.isEmpty else { return contractors }
-        return contractors.filter {
-            $0.companyName.localizedCaseInsensitiveContains(searchText) ||
-            ($0.contactName ?? "").localizedCaseInsensitiveContains(searchText) ||
-            ($0.specialties ?? []).joined(separator: " ").localizedCaseInsensitiveContains(searchText)
+        var result = contractors
+
+        if !searchText.isEmpty {
+            result = result.filter {
+                $0.companyName.localizedCaseInsensitiveContains(searchText) ||
+                ($0.contactName ?? "").localizedCaseInsensitiveContains(searchText) ||
+                ($0.specialties ?? []).joined(separator: " ").localizedCaseInsensitiveContains(searchText)
+            }
         }
+
+        if let specialty = filterSpecialty {
+            result = result.filter {
+                $0.specialties?.contains(specialty) ?? false
+            }
+        }
+
+        switch sortBy {
+        case .name:
+            result.sort { $0.companyName < $1.companyName }
+        case .rating:
+            result.sort { ($0.rating ?? 0) > ($1.rating ?? 0) }
+        }
+
+        return result
+    }
+
+    var availableSpecialties: [String] {
+        Array(Set(contractors.flatMap { $0.specialties ?? [] })).sorted()
+    }
+
+    func totalSpent(for contractorId: UUID) -> Double {
+        serviceRecords.filter { $0.contractorId == contractorId }
+            .compactMap(\.cost)
+            .reduce(0, +)
     }
 
     func loadContractors() async {
         isLoading = true
         do {
-            contractors = try await db.fetchContractors()
+            async let contractorsResult = db.fetchContractors()
+            async let recordsResult = db.fetchServiceRecords()
+            let (c, r) = try await (contractorsResult, recordsResult)
+            contractors = c
+            serviceRecords = r
         } catch {
             self.error = error.localizedDescription
         }

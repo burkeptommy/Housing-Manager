@@ -33,14 +33,14 @@ struct FamilyReferenceBinder: View {
 
             Image(systemName: "book.closed.fill")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.havenAccent)
+                .foregroundStyle(HavenColors.navy)
 
             VStack(spacing: 8) {
                 Text("Family Reference Binder")
-                    .font(.title2.bold())
+                    .font(HavenTypography.title2)
                 Text("Generate a comprehensive PDF of your estate and property portfolio, organized by section for easy reference.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 32)
             }
@@ -66,19 +66,19 @@ struct FamilyReferenceBinder: View {
                     Image(systemName: "doc.richtext")
                     Text("Generate PDF")
                 }
-                .font(.headline)
+                .font(HavenTypography.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 14)
-                .background(Color.havenAccent)
-                .foregroundStyle(.white)
+                .background(HavenColors.navy)
+                .foregroundStyle(HavenColors.textOnNavy)
                 .clipShape(RoundedRectangle(cornerRadius: 12))
             }
             .padding(.horizontal, 24)
 
             if let error = viewModel.error {
                 Text(error)
-                    .font(.caption)
-                    .foregroundStyle(.red)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.critical)
             }
 
             Spacer()
@@ -88,10 +88,10 @@ struct FamilyReferenceBinder: View {
     private func binderSection(icon: String, text: String) -> some View {
         HStack(spacing: 10) {
             Image(systemName: icon)
-                .foregroundStyle(Color.havenAccent)
+                .foregroundStyle(HavenColors.navy)
                 .frame(width: 20)
             Text(text)
-                .font(.subheadline)
+                .font(HavenTypography.bodySmall)
         }
     }
 
@@ -101,10 +101,10 @@ struct FamilyReferenceBinder: View {
             ProgressView()
                 .scaleEffect(1.5)
             Text("Generating your binder...")
-                .font(.headline)
+                .font(HavenTypography.headline)
             Text("Compiling \(viewModel.statusText)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
             Spacer()
         }
     }
@@ -123,8 +123,8 @@ struct FamilyReferenceBinder: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color.havenAccent)
-                    .foregroundStyle(.white)
+                    .background(HavenColors.navy)
+                    .foregroundStyle(HavenColors.textOnNavy)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
 
@@ -137,12 +137,12 @@ struct FamilyReferenceBinder: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 14)
-                    .background(Color(.systemGray5))
-                    .foregroundStyle(.primary)
+                    .background(HavenColors.inputBackground)
+                    .foregroundStyle(HavenColors.textPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
-            .font(.subheadline.weight(.medium))
+            .font(HavenTypography.uiLabel)
             .padding()
         }
     }

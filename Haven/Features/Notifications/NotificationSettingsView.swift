@@ -17,20 +17,23 @@ struct NotificationSettingsView: View {
                     } label: {
                         HStack {
                             Image(systemName: "bell.badge.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(HavenColors.warning)
                             Text("Enable Notifications")
+                                .font(HavenTypography.body)
                         }
                     }
                 } else if notifService.isAuthorized {
                     Toggle("Notifications Enabled", isOn: $prefs.isEnabled)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.isEnabled) { _, _ in saveAndReschedule() }
                 } else {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
-                            .foregroundStyle(.orange)
+                            .foregroundStyle(HavenColors.warning)
                         Text("Notifications are disabled in Settings. Please enable them to receive reminders.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
             }
@@ -38,36 +41,63 @@ struct NotificationSettingsView: View {
             if prefs.isEnabled && notifService.isAuthorized {
                 Section {
                     Toggle("Document Expirations", isOn: $prefs.documentExpirations)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.documentExpirations) { _, _ in saveAndReschedule() }
                     Toggle("Insurance Renewals", isOn: $prefs.insuranceRenewals)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.insuranceRenewals) { _, _ in saveAndReschedule() }
                 } header: {
-                    Text("Document Reminders")
+                    Text("DOCUMENT REMINDERS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
                 } footer: {
                     Text("Get notified 90, 60, 30, and 7 days before expiration.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
 
                 Section {
                     Toggle("Maintenance Due Dates", isOn: $prefs.maintenanceDue)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.maintenanceDue) { _, _ in saveAndReschedule() }
                     Toggle("Overdue Items", isOn: $prefs.overdueItems)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.overdueItems) { _, _ in saveAndReschedule() }
                     Toggle("Warranty Expirations", isOn: $prefs.warrantyExpirations)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.warrantyExpirations) { _, _ in saveAndReschedule() }
                 } header: {
-                    Text("Property Reminders")
+                    Text("PROPERTY REMINDERS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
 
                 Section {
                     Toggle("Morning Digest (8:00 AM)", isOn: $prefs.morningDigest)
+                        .font(HavenTypography.body)
+                        .tint(HavenColors.navy800)
                         .onChange(of: prefs.morningDigest) { _, _ in saveAndReschedule() }
                 } header: {
-                    Text("Digest")
+                    Text("DIGEST")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
                 } footer: {
                     Text("A daily summary of what needs your attention.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
             }
         }
+        .scrollContentBackground(.hidden)
+        .background(HavenColors.cream)
         .navigationTitle("Notifications")
     }
 

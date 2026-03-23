@@ -18,6 +18,9 @@ struct AddPropertyView: View {
     @State private var notes = ""
     @State private var isSaving = false
     @State private var error: String?
+    @State private var showSystemSetup = false
+    @State private var savedPropertyId: UUID?
+    @State private var savedHouseholdId: UUID?
 
     private let propertyTypes = ["Primary Residence", "Vacation Home", "Rental Property", "Commercial", "Land"]
 
@@ -34,12 +37,13 @@ struct AddPropertyView: View {
                 }
 
                 Section("Address") {
-                    TextField("Street", text: $street)
-                    TextField("Unit/Apt (optional)", text: $unit)
-                    TextField("City", text: $city)
-                    TextField("State", text: $state)
-                    TextField("ZIP Code", text: $zipCode)
-                        .keyboardType(.numberPad)
+                    AddressAutocompleteField(
+                        street: $street,
+                        unit: $unit,
+                        city: $city,
+                        state: $state,
+                        zipCode: $zipCode
+                    )
                 }
 
                 Section("Details (Optional)") {
@@ -60,11 +64,13 @@ struct AddPropertyView: View {
                 if let error {
                     Section {
                         Text(error)
-                            .foregroundStyle(.red)
-                            .font(.caption)
+                            .foregroundStyle(HavenColors.critical)
+                            .font(HavenTypography.caption)
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(HavenColors.cream)
             .navigationTitle("Add Property")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -72,16 +78,35 @@ struct AddPropertyView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Save") {
-                        Task { await save() }
+                    if isSaving {
+                        ProgressView()
+                            .tint(HavenColors.navy)
+                    } else {
+                        Button("Save") {
+                            Task { await save() }
+                        }
+                        .disabled(name.isEmpty)
                     }
-                    .disabled(name.isEmpty || isSaving)
+                }
+            }
+            .tint(HavenColors.navy)
+            .fullScreenCover(isPresented: $showSystemSetup) {
+                if let propId = savedPropertyId, let hhId = savedHouseholdId {
+                    HomeSystemsSetupView(
+                        propertyId: propId,
+                        householdId: hhId,
+                        propertyType: propertyType
+                    ) {
+                        onComplete?()
+                        dismiss()
+                    }
                 }
             }
         }
     }
 
     private func save() async {
+        guard !isSaving else { return }
         isSaving = true
         error = nil
         do {
@@ -108,11 +133,18 @@ struct AddPropertyView: View {
                 notes: notes.isEmpty ? nil : notes
             )
 
-            _ = try await DatabaseService.shared.createProperty(insert)
-            onComplete?()
-            dismiss()
+            let property = try await DatabaseService.shared.createProperty(insert)
+
+            Haptics.success()
+            savedPropertyId = property.id
+            savedHouseholdId = householdId
+
+            // Brief visual confirmation before transitioning
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            showSystemSetup = true
         } catch {
             self.error = error.localizedDescription
+            Haptics.error()
         }
         isSaving = false
     }

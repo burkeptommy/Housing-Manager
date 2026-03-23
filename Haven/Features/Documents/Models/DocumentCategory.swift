@@ -75,12 +75,57 @@ enum DocumentCategory: String, CaseIterable, Codable {
     case citizenshipDocuments = "Citizenship/Immigration"
     case deathCertificate = "Death Certificate"
 
+    // Home Projects
+    case projectPlan = "Project Plan"
+    case contractorQuote = "Contractor Quote"
+    case projectInvoice = "Project Invoice"
+    case beforeAfterPhotos = "Before/After Photos"
+    case permit = "Permit"
+    case inspectionReport = "Inspection Report"
+    case completionCertificate = "Completion Certificate"
+
+    // Home Records
+    case blueprintFloorPlan = "Blueprint/Floor Plan"
+    case propertyLayout = "Property Layout"
+    case applianceManual = "Appliance Manual"
+    case warrantyCard = "Warranty Card"
+    case homeInventory = "Home Inventory"
+    case utilityAccount = "Utility Account"
+    case vendorContract = "Vendor Contract"
+
+    // Home Financials
+    case homeBillInvoice = "Home Bill/Invoice"
+    case propertyTaxBill = "Property Tax Bill"
+    case utilityBill = "Utility Bill"
+    case repairEstimate = "Repair Estimate"
+    case renovationBudget = "Renovation Budget"
+
     // Professional & Business
     case employmentAgreement = "Employment Agreement"
     case nonCompete = "Non-Compete/NDA"
     case partnershipAgreement = "Partnership Agreement"
     case buySellagreement = "Buy-Sell Agreement"
     case successionPlan = "Succession Plan"
+
+    // Other
+    case otherPersonalDocuments = "Other Personal Documents"
+
+    /// Whether this category should typically have only one document per household.
+    var isSingleton: Bool {
+        switch self {
+        // Estate Planning (one per type)
+        case .will, .trust, .powerOfAttorney, .healthcareDirective, .guardianshipDesignation, .letterOfIntent:
+            return true
+        // Personal ID (one per type)
+        case .passport, .birthCertificate, .marriageCertificate, .socialSecurityCard, .deathCertificate:
+            return true
+        // Business (one per type)
+        case .employmentAgreement, .successionPlan:
+            return true
+        default:
+            return false
+        }
+    }
 
     var sectionGroup: String {
         switch self {
@@ -102,14 +147,22 @@ enum DocumentCategory: String, CaseIterable, Codable {
             return "Digital Assets"
         case .passport, .birthCertificate, .marriageCertificate, .divorcedDecree, .socialSecurityCard, .citizenshipDocuments, .deathCertificate:
             return "Personal Identification"
+        case .projectPlan, .contractorQuote, .projectInvoice, .beforeAfterPhotos, .permit, .inspectionReport, .completionCertificate:
+            return "Home Projects"
+        case .blueprintFloorPlan, .propertyLayout, .applianceManual, .warrantyCard, .homeInventory, .utilityAccount, .vendorContract:
+            return "Home Records"
+        case .homeBillInvoice, .propertyTaxBill, .utilityBill, .repairEstimate, .renovationBudget:
+            return "Home Financials"
         case .employmentAgreement, .nonCompete, .partnershipAgreement, .buySellagreement, .successionPlan:
             return "Professional & Business"
+        case .otherPersonalDocuments:
+            return "Other"
         }
     }
 
     static var groupedCategories: [(String, [DocumentCategory])] {
         let groups = Dictionary(grouping: allCases) { $0.sectionGroup }
-        let order = ["Estate Planning", "Entity Documents", "Real Estate", "Insurance", "Financial Accounts", "Tax Records", "Personal Property", "Digital Assets", "Personal Identification", "Professional & Business"]
+        let order = ["Estate Planning", "Entity Documents", "Real Estate", "Home Projects", "Home Records", "Home Financials", "Insurance", "Financial Accounts", "Tax Records", "Personal Property", "Digital Assets", "Personal Identification", "Professional & Business", "Other"]
         return order.compactMap { key in
             guard let values = groups[key] else { return nil }
             return (key, values)

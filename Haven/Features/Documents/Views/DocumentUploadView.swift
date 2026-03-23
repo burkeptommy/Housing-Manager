@@ -4,32 +4,31 @@ import UniformTypeIdentifiers
 
 struct DocumentUploadView: View {
     var preselectedCategory: DocumentCategory?
+    var preselectedPropertyId: UUID?
     var onComplete: (() -> Void)?
 
     @StateObject private var viewModel = DocumentUploadViewModel()
     @Environment(\.dismiss) private var dismiss
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var selectedPhotoItems: [PhotosPickerItem] = []
     @State private var showFileImporter = false
+    @State private var showCategoryPicker = false
+    @State private var showErrorAlert = false
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                // Step indicator
-                stepIndicator
-
-                // Step content
-                TabView(selection: $viewModel.currentStep) {
-                    sourceStep.tag(0)
-                    categoryStep.tag(1)
-                    detailsStep.tag(2)
-                    peopleStep.tag(3)
-                    reviewStep.tag(4)
+            Group {
+                if viewModel.isBatchMode && !viewModel.isUploading {
+                    batchResultsView
+                } else if viewModel.isUploading && viewModel.isBatchMode {
+                    batchUploadingView
+                } else if viewModel.isUploading {
+                    uploadingView
+                } else if let result = viewModel.analysisResult {
+                    resultsView(result)
+                } else {
+                    sourceSelectionView
                 }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut, value: viewModel.currentStep)
-
-                // Navigation buttons
-                navigationButtons
             }
             .navigationTitle("Upload Document")
             .navigationBarTitleDisplayMode(.inline)
@@ -43,77 +42,128 @@ struct DocumentUploadView: View {
                 if let cat = preselectedCategory {
                     viewModel.setCategory(cat)
                 }
+                if let propId = preselectedPropertyId {
+                    viewModel.selectedPropertyId = propId
+                }
             }
             .sheet(isPresented: $viewModel.showScanner) {
                 DocumentScannerView { images in
                     viewModel.handleScannedImages(images)
+                    startAutoUpload()
                 }
             }
             .photosPicker(
                 isPresented: $viewModel.showPhotoPicker,
-                selection: $selectedPhotoItem,
+                selection: $selectedPhotoItems,
+                maxSelectionCount: 20,
                 matching: .images
             )
             .fileImporter(
                 isPresented: $showFileImporter,
                 allowedContentTypes: [.pdf, .image, .jpeg, .png],
-                allowsMultipleSelection: false
+                allowsMultipleSelection: true
             ) { result in
                 handleFileImport(result)
             }
-            .onChange(of: selectedPhotoItem) { _, item in
-                handlePhotoSelection(item)
-            }
-            .alert("Error", isPresented: .constant(viewModel.error != nil)) {
-                Button("OK") { viewModel.error = nil }
-            } message: {
-                Text(viewModel.error ?? "")
-            }
-            .alert("Critical Issue Detected", isPresented: $viewModel.showCriticalFlagAlert) {
-                Button("View Details", role: .cancel) {}
-            } message: {
-                if let flags = viewModel.analysisResult?.criticalFlags, let first = flags.first {
-                    Text(first.message)
+            .onChange(of: selectedPhotoItems) { _, items in
+                guard !items.isEmpty else { return }
+
+                if items.count == 1, let item = items.first {
+                    // Single photo — use existing flow
+                    handlePhotoSelection(item)
                 } else {
-                    Text("AI analysis found a critical issue with this document.")
+                    // Multiple photos — background upload
+                    Task {
+                        var files: [PendingUploadFile] = []
+                        for item in items {
+                            if let data = try? await item.loadTransferable(type: Data.self) {
+                                let preview = UIImage(data: data)
+                                files.append(PendingUploadFile(
+                                    data: data,
+                                    fileName: "photo_\(UUID().uuidString).jpg",
+                                    contentType: "image/jpeg",
+                                    previewImage: preview
+                                ))
+                            }
+                        }
+                        if !files.isEmpty {
+                            DocumentUploadManager.shared.enqueueFiles(files, propertyId: viewModel.selectedPropertyId)
+                            Haptics.success()
+                            onComplete?()
+                            dismiss()
+                        }
+                    }
+                }
+                selectedPhotoItems = []
+            }
+            .onChange(of: viewModel.error) { _, newValue in
+                showErrorAlert = newValue != nil
+            }
+            .alert("Upload Issue", isPresented: $showErrorAlert) {
+                Button("Try Again") {
+                    viewModel.error = nil
+                    viewModel.isUploading = false
+                }
+                Button("Dismiss", role: .cancel) {
+                    viewModel.error = nil
+                }
+            } message: {
+                Text(viewModel.error ?? "An unexpected error occurred.")
+            }
+            .sheet(isPresented: $viewModel.showPartyReview) {
+                partyReviewSheet
+            }
+            .sheet(isPresented: $showCategoryPicker) {
+                CategoryPickerSheet(selectedCategory: $viewModel.category) { newCategory in
+                    Task { await viewModel.updateCategory(newCategory) }
+                }
+            }
+            .alert("Duplicate Document", isPresented: $viewModel.showDuplicateAlert) {
+                Button("Replace", role: .destructive) {
+                    Task { await viewModel.replaceDuplicate() }
+                }
+                Button("Keep Both", role: .cancel) {
+                    viewModel.keepBoth()
+                }
+            } message: {
+                if let existing = viewModel.duplicateExistingDoc {
+                    Text("You already have a \"\(existing.category)\" document (\(existing.title)). Replace it or keep both?")
                 }
             }
         }
-    }
-
-    // MARK: - Step Indicator
-
-    private var stepIndicator: some View {
-        HStack(spacing: 4) {
-            ForEach(0..<viewModel.stepTitles.count, id: \.self) { index in
-                VStack(spacing: 4) {
-                    Capsule()
-                        .fill(index <= viewModel.currentStep ? Color.havenAccent : Color.secondary.opacity(0.3))
-                        .frame(height: 3)
-                    Text(viewModel.stepTitles[index])
-                        .font(.caption2)
-                        .foregroundStyle(index <= viewModel.currentStep ? .primary : .secondary)
-                }
-            }
+        .alert("Not a Critical Document", isPresented: $viewModel.showOtherDocumentNotice) {
+            Button("OK") {}
+        } message: {
+            Text("This doesn't appear to be a critical home or estate document. We've stored it under \"Other Personal Documents\" for safekeeping.")
         }
-        .padding(.horizontal)
-        .padding(.top, 8)
+        .alert("Are You Sure?", isPresented: $viewModel.showIrrelevantWarning) {
+            Button("Upload Anyway") {
+                Task { await viewModel.confirmUploadAnyway() }
+            }
+            Button("Cancel", role: .cancel) {
+                viewModel.cancelIrrelevantUpload()
+            }
+        } message: {
+            Text(viewModel.irrelevantWarningMessage + "\n\nWould you like to upload it anyway?")
+        }
     }
 
-    // MARK: - Step 0: Source Selection
+    // MARK: - Source Selection (only step the user sees)
 
-    private var sourceStep: some View {
+    private var sourceSelectionView: some View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
                     Image(systemName: "doc.badge.plus")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.havenAccent)
-                    Text("Choose a Source")
-                        .font(.title2.bold())
-                    Text("Select how you'd like to add your document")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(HavenColors.navy)
+                    Text("Upload a Document")
+                        .font(HavenTypography.title)
+                    Text("Just pick your file — Alfred will automatically categorize it, extract dates, identify people, and fill everything in for you.")
+                        .font(HavenTypography.subheadline)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
                 }
                 .padding(.top, 32)
 
@@ -122,43 +172,33 @@ struct DocumentUploadView: View {
                         icon: "doc.viewfinder",
                         title: "Scan Document",
                         subtitle: "Use your camera to scan pages",
-                        color: .blue
+                        color: HavenColors.navy
                     ) {
+                        Haptics.light()
                         viewModel.showScanner = true
                     }
 
                     sourceButton(
                         icon: "photo.on.rectangle",
                         title: "Photo Library",
-                        subtitle: "Choose from your photo library",
-                        color: .green
+                        subtitle: "Choose one or more photos",
+                        color: HavenColors.navy700
                     ) {
+                        Haptics.light()
                         viewModel.showPhotoPicker = true
                     }
 
                     sourceButton(
                         icon: "folder",
                         title: "Browse Files",
-                        subtitle: "Select a PDF or image file",
-                        color: .orange
+                        subtitle: "Select one or multiple PDFs and images",
+                        color: HavenColors.navy600
                     ) {
+                        Haptics.light()
                         showFileImporter = true
                     }
                 }
                 .padding(.horizontal)
-
-                if viewModel.selectedData != nil {
-                    HStack(spacing: 8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                        Text("File selected: \(viewModel.selectedFileName)")
-                            .font(.subheadline)
-                    }
-                    .padding()
-                    .background(Color.green.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                    .padding(.horizontal)
-                }
             }
         }
     }
@@ -175,339 +215,506 @@ struct DocumentUploadView: View {
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(title)
-                        .font(.headline)
-                        .foregroundStyle(.primary)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Text(subtitle)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
 
                 Spacer()
 
                 Image(systemName: "chevron.right")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HavenColors.textTertiary)
             }
             .padding()
-            .background(Color(.systemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.05), radius: 4, y: 2)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .havenShadow()
         }
         .buttonStyle(.plain)
     }
 
-    // MARK: - Step 1: Category
+    // MARK: - Uploading View
 
-    private var categoryStep: some View {
-        List {
-            ForEach(DocumentCategory.groupedCategories, id: \.0) { group, categories in
-                Section(group) {
-                    ForEach(categories, id: \.self) { cat in
-                        Button {
-                            viewModel.setCategory(cat)
-                        } label: {
-                            HStack {
-                                Text(cat.rawValue)
-                                    .foregroundStyle(.primary)
-                                Spacer()
-                                if viewModel.category == cat {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color.havenAccent)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-    }
+    private var uploadingView: some View {
+        VStack(spacing: 24) {
+            Spacer()
 
-    // MARK: - Step 2: Details
-
-    private var detailsStep: some View {
-        Form {
-            Section("Document Title") {
-                TextField("Title", text: $viewModel.title)
-            }
-
-            Section("Issuing Information") {
-                TextField("Issuing Institution (optional)", text: $viewModel.issuingInstitution)
-                SecureField("Account # last 4 (optional)", text: $viewModel.accountNumberLast4)
-                    .keyboardType(.numberPad)
-            }
-
-            Section("Dates") {
-                Toggle("Has Effective Date", isOn: $viewModel.hasEffective)
-                if viewModel.hasEffective {
-                    DatePicker("Effective Date", selection: Binding(
-                        get: { viewModel.effectiveDate ?? .now },
-                        set: { viewModel.effectiveDate = $0 }
-                    ), displayedComponents: .date)
-                }
-
-                Toggle("Has Expiration Date", isOn: $viewModel.hasExpiration)
-                if viewModel.hasExpiration {
-                    DatePicker("Expiration Date", selection: Binding(
-                        get: { viewModel.expirationDate ?? .now },
-                        set: { viewModel.expirationDate = $0 }
-                    ), displayedComponents: .date)
-                }
-
-                Toggle("Has Renewal Date", isOn: $viewModel.hasRenewal)
-                if viewModel.hasRenewal {
-                    DatePicker("Renewal Date", selection: Binding(
-                        get: { viewModel.renewalDate ?? .now },
-                        set: { viewModel.renewalDate = $0 }
-                    ), displayedComponents: .date)
-                }
-            }
-
-            Section("Notes") {
-                TextEditor(text: $viewModel.notes)
-                    .frame(minHeight: 60)
-            }
-        }
-    }
-
-    // MARK: - Step 3: People & Property
-
-    private var peopleStep: some View {
-        List {
-            Section("Assign Family Members") {
-                if viewModel.familyMembers.isEmpty {
-                    Text("No family members found")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.familyMembers) { member in
-                        Button {
-                            if viewModel.selectedFamilyMemberIds.contains(member.id) {
-                                viewModel.selectedFamilyMemberIds.remove(member.id)
-                            } else {
-                                viewModel.selectedFamilyMemberIds.insert(member.id)
-                            }
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text("\(member.firstName) \(member.lastName)")
-                                        .foregroundStyle(.primary)
-                                    Text(member.relationship)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                if viewModel.selectedFamilyMemberIds.contains(member.id) {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color.havenAccent)
-                                } else {
-                                    Image(systemName: "circle")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            Section("Link to Property (Optional)") {
-                if viewModel.properties.isEmpty {
-                    Text("No properties found")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(viewModel.properties) { property in
-                        Button {
-                            if viewModel.selectedPropertyId == property.id {
-                                viewModel.selectedPropertyId = nil
-                            } else {
-                                viewModel.selectedPropertyId = property.id
-                            }
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    Text(property.name)
-                                        .foregroundStyle(.primary)
-                                    if let street = property.street {
-                                        Text(street)
-                                            .font(.caption)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                Spacer()
-                                if viewModel.selectedPropertyId == property.id {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(Color.havenAccent)
-                                } else {
-                                    Image(systemName: "circle")
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        .listStyle(.insetGrouped)
-    }
-
-    // MARK: - Step 4: Review & Upload
-
-    private var reviewStep: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                if viewModel.isUploading {
-                    uploadProgressView
-                } else {
-                    reviewContent
-                }
-            }
-            .padding()
-        }
-    }
-
-    private var reviewContent: some View {
-        VStack(spacing: 16) {
             // Preview thumbnail
             if let image = viewModel.previewImage {
                 Image(uiImage: image)
                     .resizable()
                     .scaledToFit()
-                    .frame(maxHeight: 150)
+                    .frame(maxHeight: 120)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .shadow(radius: 4)
             }
 
-            HavenCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text("Review")
-                        .font(.headline)
+            VStack(spacing: 12) {
+                ProgressView(value: viewModel.uploadProgress)
+                    .progressViewStyle(.linear)
+                    .tint(HavenColors.navy)
+                    .padding(.horizontal, 40)
 
-                    reviewRow("Title", value: viewModel.title)
-                    reviewRow("Category", value: viewModel.category.rawValue)
-                    reviewRow("File", value: viewModel.selectedFileName)
+                Text(uploadStatusText)
+                    .font(HavenTypography.subheadline)
+                    .fontWeight(.medium)
 
-                    if !viewModel.issuingInstitution.isEmpty {
-                        reviewRow("Institution", value: viewModel.issuingInstitution)
-                    }
-                    if viewModel.hasExpiration, let date = viewModel.expirationDate {
-                        reviewRow("Expires", value: date.formatted(date: .abbreviated, time: .omitted))
-                    }
-                    if !viewModel.selectedFamilyMemberIds.isEmpty {
-                        let names = viewModel.familyMembers
-                            .filter { viewModel.selectedFamilyMemberIds.contains($0.id) }
-                            .map { "\($0.firstName) \($0.lastName)" }
-                            .joined(separator: ", ")
-                        reviewRow("Members", value: names)
-                    }
-                    if let propId = viewModel.selectedPropertyId,
-                       let prop = viewModel.properties.first(where: { $0.id == propId }) {
-                        reviewRow("Property", value: prop.name)
-                    }
-                }
+                Text("Alfred is analyzing your document and extracting all important information automatically.")
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 40)
             }
-        }
-    }
 
-    private var uploadProgressView: some View {
-        VStack(spacing: 16) {
-            ProgressView(value: viewModel.uploadProgress)
-                .progressViewStyle(.linear)
-                .tint(Color.havenAccent)
-
-            Text(uploadStatusText)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            Spacer()
         }
-        .padding(.top, 32)
     }
 
     private var uploadStatusText: String {
         switch viewModel.uploadProgress {
-        case 0..<0.3: return "Encrypting document..."
-        case 0.3..<0.6: return "Uploading encrypted file..."
-        case 0.6..<0.8: return "Creating record..."
-        case 0.8..<0.9: return "Linking family members..."
-        case 0.9..<1.0: return "Running AI analysis..."
+        case 0..<0.3: return "Uploading file..."
+        case 0.3..<0.5: return "Creating record..."
+        case 0.5..<0.8: return "AI is reading your document..."
+        case 0.8..<0.95: return "Extracting dates, people & metadata..."
+        case 0.95..<1.0: return "Linking family members & properties..."
         default: return "Complete!"
         }
     }
 
-    private func reviewRow(_ label: String, value: String) -> some View {
+    // MARK: - Results View
+
+    private func resultsView(_ analysis: DocumentAnalysisResult) -> some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Success header
+                VStack(spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(Color.havenSuccess)
+                    Text("Document Processed!")
+                        .font(HavenTypography.title)
+                    Text("Alfred analyzed your document and filled in everything automatically.")
+                        .font(HavenTypography.subheadline)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
+                }
+                .padding(.top, 16)
+
+                // Card 1: Summary
+                HavenCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Label("Summary", systemImage: "sparkles")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy)
+
+                        resultRow("Title", value: viewModel.title)
+
+                        HStack {
+                            Text("Category")
+                                .font(HavenTypography.subheadline)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Spacer()
+                            Button {
+                                showCategoryPicker = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Text(viewModel.category.rawValue)
+                                        .font(HavenTypography.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                        .lineLimit(1)
+                                    Text("Change")
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.navy)
+                                }
+                            }
+                        }
+
+                        if !analysis.summary.isEmpty {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Summary")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                Text(analysis.summary)
+                                    .font(HavenTypography.subheadline)
+                            }
+                        }
+                    }
+                }
+
+                // Card 2: Details (dates, parties, links)
+                if !analysis.keyDates.isEmpty || !analysis.keyParties.isEmpty || !viewModel.autoLinkedMemberNames.isEmpty || viewModel.autoLinkedPropertyName != nil {
+                    HavenCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Details", systemImage: "doc.text.magnifyingglass")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.navy)
+
+                            if !analysis.keyDates.isEmpty {
+                                ForEach(analysis.keyDates) { date in
+                                    resultRow(date.label, value: date.date)
+                                }
+                            }
+
+                            if !analysis.keyParties.isEmpty {
+                                if !analysis.keyDates.isEmpty { Divider() }
+                                Text("People Identified")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                                ForEach(analysis.keyParties) { party in
+                                    HStack {
+                                        Image(systemName: "person.fill")
+                                            .font(.system(size: 12))
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                        Text(party.name)
+                                            .font(HavenTypography.subheadline)
+                                        Text("(\(party.role))")
+                                            .font(HavenTypography.caption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                }
+                            }
+
+                            if !viewModel.autoLinkedMemberNames.isEmpty {
+                                Divider()
+                                HStack(spacing: 4) {
+                                    Image(systemName: "link")
+                                        .font(.caption)
+                                        .foregroundStyle(HavenColors.navy)
+                                    Text("Auto-linked: \(viewModel.autoLinkedMemberNames.joined(separator: ", "))")
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.navy)
+                                }
+                            }
+
+                            if let propName = viewModel.autoLinkedPropertyName {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "house.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(HavenColors.navy)
+                                    Text("Linked to: \(propName)")
+                                        .font(HavenTypography.caption)
+                                        .foregroundStyle(HavenColors.navy)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Card 3: Action Items (only if flags exist)
+                if !analysis.flags.isEmpty {
+                    HavenCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label("Action Items", systemImage: "exclamationmark.triangle")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(Color.havenWarning)
+
+                            ForEach(analysis.flags) { flag in
+                                HStack(alignment: .top, spacing: 8) {
+                                    Circle()
+                                        .fill(flagColor(flag.severity))
+                                        .frame(width: 8, height: 8)
+                                        .padding(.top, 5)
+                                    Text(flag.message)
+                                        .font(HavenTypography.subheadline)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Action buttons
+                HStack(spacing: 12) {
+                    if let docId = viewModel.uploadedDocumentId {
+                        NavigationLink {
+                            DocumentDetailView(documentID: docId)
+                        } label: {
+                            Text("View Document")
+                                .font(HavenTypography.uiButton)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(HavenColors.navy)
+                                .foregroundStyle(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                    }
+
+                    Button {
+                        Haptics.success()
+                        onComplete?()
+                        dismiss()
+                    } label: {
+                        Text("Done")
+                            .font(HavenTypography.uiButton)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                            .background(HavenColors.creamLight)
+                            .foregroundStyle(HavenColors.navy800)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                                    .stroke(HavenColors.beige300, lineWidth: 1)
+                            )
+                    }
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+            .padding()
+        }
+    }
+
+    // MARK: - Batch Uploading View
+
+    private var batchUploadingView: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Image(systemName: "doc.on.doc")
+                .font(.system(size: 48))
+                .foregroundStyle(HavenColors.navy)
+
+            VStack(spacing: 12) {
+                ProgressView(value: viewModel.batchProgress)
+                    .progressViewStyle(.linear)
+                    .tint(HavenColors.navy)
+                    .padding(.horizontal, 40)
+
+                Text("Processing document \(viewModel.currentBatchIndex + 1) of \(viewModel.uploadItems.count)")
+                    .font(HavenTypography.subheadline)
+                    .fontWeight(.medium)
+
+                if viewModel.currentBatchIndex < viewModel.uploadItems.count {
+                    Text(viewModel.uploadItems[viewModel.currentBatchIndex].fileName)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Batch Results View
+
+    private var batchResultsView: some View {
+        ScrollView {
+            VStack(spacing: 16) {
+                // Success header
+                VStack(spacing: 8) {
+                    let successCount = viewModel.uploadItems.filter({ $0.error == nil && $0.isComplete }).count
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 48))
+                        .foregroundStyle(Color.havenSuccess)
+                    Text("\(successCount) Documents Processed")
+                        .font(HavenTypography.title)
+                    if viewModel.uploadItems.contains(where: { $0.error != nil }) {
+                        let errorCount = viewModel.uploadItems.filter({ $0.error != nil }).count
+                        Text("\(errorCount) failed")
+                            .font(HavenTypography.subheadline)
+                            .foregroundStyle(HavenColors.critical)
+                    }
+                }
+                .padding(.top, 16)
+
+                // Document list
+                ForEach(viewModel.uploadItems) { item in
+                    batchItemRow(item)
+                }
+
+                HavenButton(title: "Done") {
+                    Haptics.success()
+                    onComplete?()
+                    dismiss()
+                }
+                .padding(.horizontal)
+                .padding(.top, 8)
+            }
+            .padding()
+        }
+    }
+
+    private func batchItemRow(_ item: UploadItem) -> some View {
+        HavenCard {
+            HStack(spacing: 12) {
+                if let preview = item.previewImage {
+                    Image(uiImage: preview)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 44, height: 44)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                } else {
+                    Image(systemName: "doc.fill")
+                        .font(.title3)
+                        .foregroundStyle(HavenColors.navy)
+                        .frame(width: 44, height: 44)
+                }
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title.isEmpty ? item.fileName : item.title)
+                        .font(HavenTypography.subheadline)
+                        .fontWeight(.medium)
+                        .lineLimit(1)
+
+                    if let error = item.error {
+                        Text(error)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.critical)
+                            .lineLimit(2)
+                    } else if let cat = item.matchedCategory {
+                        Text(cat.rawValue)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Spacer()
+
+                if item.error != nil {
+                    Image(systemName: "exclamationmark.circle.fill")
+                        .foregroundStyle(HavenColors.critical)
+                } else if item.isComplete {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(Color.havenSuccess)
+                }
+            }
+        }
+    }
+
+    private func resultRow(_ label: String, value: String) -> some View {
         HStack {
             Text(label)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+                .font(HavenTypography.subheadline)
+                .foregroundStyle(HavenColors.textSecondary)
             Spacer()
             Text(value)
-                .font(.subheadline)
-                .lineLimit(1)
+                .font(HavenTypography.subheadline)
+                .fontWeight(.medium)
+                .foregroundStyle(HavenColors.textPrimary)
+                .lineLimit(2)
+                .multilineTextAlignment(.trailing)
         }
     }
 
-    // MARK: - Navigation
-
-    private var navigationButtons: some View {
-        HStack(spacing: 12) {
-            if viewModel.currentStep > 0 {
-                Button {
-                    withAnimation { viewModel.currentStep -= 1 }
-                } label: {
-                    Text("Back")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(Color(.systemGray5))
-                        .foregroundStyle(.primary)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-
-            if viewModel.currentStep < viewModel.stepTitles.count - 1 {
-                Button {
-                    withAnimation { viewModel.currentStep += 1 }
-                } label: {
-                    Text("Next")
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 14)
-                        .background(canAdvance ? Color.havenAccent : Color.gray)
-                        .foregroundStyle(.white)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(!canAdvance)
-            } else {
-                Button {
-                    Task {
-                        do {
-                            try await viewModel.upload()
-                            onComplete?()
-                            dismiss()
-                        } catch {
-                            // Error handled by viewModel
-                        }
-                    }
-                } label: {
-                    HStack {
-                        if viewModel.isUploading {
-                            ProgressView()
-                                .tint(.white)
-                        }
-                        Text(viewModel.isUploading ? "Uploading..." : "Upload")
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 14)
-                    .background(viewModel.isValid ? Color.havenAccent : Color.gray)
-                    .foregroundStyle(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(!viewModel.isValid || viewModel.isUploading)
-            }
+    private func flagColor(_ severity: String) -> Color {
+        switch severity {
+        case "critical": return Color.havenCritical
+        case "warning": return Color.havenWarning
+        default: return HavenColors.navy
         }
-        .padding()
     }
 
-    private var canAdvance: Bool {
-        switch viewModel.currentStep {
-        case 0: return viewModel.selectedData != nil
-        case 1: return true
-        case 2: return !viewModel.title.isEmpty
-        case 3: return true
-        default: return true
+    // MARK: - Party Review Sheet
+
+    private var partyReviewSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("People Identified")
+                            .font(HavenTypography.title2)
+                        Text("Alfred found these people in your document. Would you like to add any of them as trusted contacts?")
+                            .font(HavenTypography.subheadline)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    .padding(.top, 8)
+
+                    ForEach(viewModel.unlinkedParties) { party in
+                        HavenCard {
+                            HStack(spacing: 12) {
+                                Image(systemName: "person.circle")
+                                    .font(.title2)
+                                    .foregroundStyle(HavenColors.textSecondary)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(party.name)
+                                        .font(HavenTypography.subheadline)
+                                        .fontWeight(.medium)
+                                    Text(party.role.capitalized)
+                                        .font(HavenTypography.caption)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 2)
+                                        .background(HavenColors.navy.opacity(0.12))
+                                        .foregroundStyle(HavenColors.navy)
+                                        .clipShape(Capsule())
+                                }
+
+                                Spacer()
+
+                                Button {
+                                    Task {
+                                        await addPartyAsTrustedContact(party)
+                                    }
+                                } label: {
+                                    Text("Add Contact")
+                                        .font(HavenTypography.uiLabelMedium)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
+                                        .background(HavenColors.navy)
+                                        .foregroundStyle(HavenColors.textOnNavy)
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    }
+                }
+                .padding()
+            }
+            .background(HavenColors.background)
+            .navigationTitle("Review People")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Done") {
+                        viewModel.showPartyReview = false
+                    }
+                }
+            }
+        }
+    }
+
+    private func addPartyAsTrustedContact(_ party: DocumentPartyRow) async {
+        let db = DatabaseService.shared
+        do {
+            let user = try await db.fetchCurrentUser()
+            guard let householdId = user.householdId else { return }
+
+            let contact = try await db.createTrustedContact(TrustedContactInsert(
+                householdId: householdId,
+                name: party.name,
+                email: "",
+                role: party.role
+            ))
+
+            try await db.updateDocumentParty(id: party.id, DocumentPartyUpdate(
+                trustedContactId: contact.id
+            ))
+
+            if let docId = viewModel.uploadedDocumentId {
+                try await db.grantDocumentAccess(contactId: contact.id, documentId: docId)
+            }
+
+            viewModel.unlinkedParties.removeAll { $0.id == party.id }
+            Haptics.success()
+
+            if viewModel.unlinkedParties.isEmpty {
+                viewModel.showPartyReview = false
+            }
+        } catch {
+            viewModel.error = error.localizedDescription
+        }
+    }
+
+    // MARK: - Auto Upload
+
+    private func startAutoUpload() {
+        guard viewModel.selectedData != nil else { return }
+        Task {
+            await viewModel.preScreenAndUpload()
         }
     }
 
@@ -518,6 +725,7 @@ struct DocumentUploadView: View {
         Task {
             if let data = try? await item.loadTransferable(type: Data.self) {
                 viewModel.handlePhotoSelection(data, fileName: "photo_\(Date().timeIntervalSince1970).jpg")
+                startAutoUpload()
             }
         }
     }
@@ -525,15 +733,54 @@ struct DocumentUploadView: View {
     private func handleFileImport(_ result: Result<[URL], Error>) {
         switch result {
         case .success(let urls):
-            guard let url = urls.first else { return }
-            guard url.startAccessingSecurityScopedResource() else { return }
-            defer { url.stopAccessingSecurityScopedResource() }
-            if let data = try? Data(contentsOf: url) {
-                let contentType = url.pathExtension == "pdf" ? "application/pdf" : "image/jpeg"
-                viewModel.handleFileSelection(data, fileName: url.lastPathComponent, contentType: contentType)
+            guard !urls.isEmpty else { return }
+
+            if urls.count == 1, let url = urls.first {
+                // Single file — use existing flow
+                guard url.startAccessingSecurityScopedResource() else { return }
+                defer { url.stopAccessingSecurityScopedResource() }
+                if let data = try? Data(contentsOf: url) {
+                    let contentType = url.pathExtension.lowercased() == "pdf" ? "application/pdf" : "image/jpeg"
+                    viewModel.handleFileSelection(data, fileName: url.lastPathComponent, contentType: contentType)
+                    startAutoUpload()
+                }
+            } else {
+                // MULTIPLE files — hand off to background manager and dismiss
+                var files: [PendingUploadFile] = []
+                for url in urls {
+                    guard url.startAccessingSecurityScopedResource() else { continue }
+                    defer { url.stopAccessingSecurityScopedResource() }
+                    if let data = try? Data(contentsOf: url) {
+                        let contentType = url.pathExtension.lowercased() == "pdf" ? "application/pdf" : "image/jpeg"
+                        var preview: UIImage?
+                        if contentType.hasPrefix("image/") {
+                            preview = UIImage(data: data)
+                        }
+                        files.append(PendingUploadFile(
+                            data: data,
+                            fileName: url.lastPathComponent,
+                            contentType: contentType,
+                            previewImage: preview
+                        ))
+                    }
+                }
+
+                if !files.isEmpty {
+                    // Hand off to background manager
+                    DocumentUploadManager.shared.enqueueFiles(
+                        files,
+                        propertyId: viewModel.selectedPropertyId
+                    )
+
+                    Haptics.success()
+
+                    // Dismiss the upload sheet — processing continues in background
+                    onComplete?()
+                    dismiss()
+                }
             }
         case .failure(let error):
-            viewModel.error = error.localizedDescription
+            viewModel.error = DocumentUploadViewModel.userFriendlyError(error)
         }
     }
 }

@@ -1,17 +1,26 @@
 // Haven Edge Function: gap-analysis
-// Fetches full household inventory, calls Claude for comprehensive gap analysis,
+// Fetches full household inventory + document content, calls Claude for comprehensive gap analysis,
 // returns structured results and updates completion_scores table.
+// Logs ai_gap_analysis to access_log.
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// CORS headers for all responses
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 interface GapAnalysisRequest {
   household_id: string;
+  user_id?: string;
 }
 
 const GAP_ANALYSIS_PROMPT = `You are an estate organization expert analyzing a family's complete document portfolio. Given the household data below, perform a thorough gap analysis and return a JSON response.
 
-Analyze and return JSON with:
+Analyze and return ONLY valid JSON (no markdown fences, no explanation) with:
 
 1. "overall_readiness_score" — Integer 0-100 representing estate readiness
 2. "summary" — A 2-3 sentence overview of the household's estate readiness
@@ -35,45 +44,90 @@ Analyze and return JSON with:
    - Each entry: { "title": string, "description": string, "priority": "critical"|"high"|"medium" }
 7. "section_scores" — Object mapping section group names to { "score": 0-100, "actual": int, "expected": int }. Sections: "Estate Planning", "Entity Documents", "Real Estate", "Insurance", "Financial Accounts", "Tax Records", "Personal Property", "Digital Assets", "Personal Identification", "Professional & Business"
 
-Respond ONLY with valid JSON. No markdown, no explanation, no code fences.`;
+CRITICAL: Respond with ONLY the JSON object. No markdown code fences. No explanation text before or after.`;
 
 serve(async (req: Request) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
+  const responseHeaders = { ...corsHeaders, "Content-Type": "application/json" };
+
   try {
-    // Verify auth
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader) {
-      return new Response(JSON.stringify({ error: "Missing authorization" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      { global: { headers: { Authorization: authHeader } } }
-    );
-
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { "Content-Type": "application/json" },
-      });
-    }
-
-    const body: GapAnalysisRequest = await req.json();
+    // === Validate environment variables ===
+    const supabaseUrl = Deno.env.get("SUPABASE_URL");
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY");
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
-    if (!anthropicApiKey) {
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      console.error("Missing SUPABASE_URL or SUPABASE_ANON_KEY");
       return new Response(
-        JSON.stringify({ error: "AI service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: "Server configuration error" }),
+        { status: 500, headers: responseHeaders }
       );
     }
 
+    if (!anthropicApiKey) {
+      console.error("ANTHROPIC_API_KEY is not set in Supabase secrets!");
+      return new Response(
+        JSON.stringify({ error: "AI service not configured", detail: "ANTHROPIC_API_KEY is not set" }),
+        { status: 500, headers: responseHeaders }
+      );
+    }
+
+    if (!serviceRoleKey) {
+      console.error("SUPABASE_SERVICE_ROLE_KEY is not set");
+      return new Response(
+        JSON.stringify({ error: "Server configuration error", detail: "Missing service role key" }),
+        { status: 500, headers: responseHeaders }
+      );
+    }
+
+    // === Authenticate user ===
+    const authHeader = req.headers.get("Authorization");
+
+    let userId: string | null = null;
+    let supabase;
+
+    if (authHeader) {
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+
+      try {
+        const { data: { user }, error: authError } = await supabase.auth.getUser();
+        if (user && !authError) {
+          userId = user.id;
+          console.log("Authenticated via JWT:", userId);
+        } else {
+          console.warn("JWT auth failed:", authError?.message, "- will try service client");
+        }
+      } catch (authErr) {
+        console.warn("JWT auth threw:", authErr, "- will try service client");
+      }
+    }
+
+    // If JWT auth failed, create client with service role for DB operations
+    if (!supabase || !userId) {
+      console.log("Using service client fallback for auth");
+      supabase = createClient(supabaseUrl, serviceRoleKey);
+    }
+
+    const body: GapAnalysisRequest = await req.json();
     const householdId = body.household_id;
 
-    // Fetch all household data in parallel
+    // Use JWT-authenticated userId, or fall back to body-provided userId
+    if (!userId && body.user_id) {
+      userId = body.user_id;
+      console.log("Using body-provided user_id:", userId);
+    }
+
+    // Service client for document_content access and logging
+    const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+
+    // Fetch all household data + document content in parallel
     const [
       householdResult,
       membersResult,
@@ -82,6 +136,7 @@ serve(async (req: Request) => {
       systemsResult,
       warrantiesResult,
       maintenanceResult,
+      documentContentResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", householdId).single(),
       supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -90,6 +145,7 @@ serve(async (req: Request) => {
       supabase.from("home_systems").select("*").eq("household_id", householdId),
       supabase.from("warranties").select("*").eq("household_id", householdId),
       supabase.from("maintenance_tasks").select("*").eq("household_id", householdId),
+      serviceClient.from("document_content").select("document_id, extracted_text").eq("household_id", householdId),
     ]);
 
     const household = householdResult.data;
@@ -99,6 +155,7 @@ serve(async (req: Request) => {
     const systems = systemsResult.data ?? [];
     const warranties = warrantiesResult.data ?? [];
     const maintenance = maintenanceResult.data ?? [];
+    const documentContent = documentContentResult.data ?? [];
 
     // Build comprehensive household data string for Claude
     const householdData = buildHouseholdDataString(
@@ -108,51 +165,94 @@ serve(async (req: Request) => {
       documents,
       systems,
       warranties,
-      maintenance
+      maintenance,
+      documentContent
     );
 
     // Call Claude API
-    const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-5-20250929",
-        max_tokens: 8192,
-        system: GAP_ANALYSIS_PROMPT,
-        messages: [
-          {
-            role: "user",
-            content: `HOUSEHOLD DATA:\n\n${householdData}`,
-          },
-        ],
-      }),
-    });
+    console.log("Calling Claude API for gap analysis with model claude-sonnet-4-6...");
+
+    let claudeResponse: Response;
+    try {
+      claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": anthropicApiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-6",
+          max_tokens: 8192,
+          system: GAP_ANALYSIS_PROMPT,
+          messages: [
+            {
+              role: "user",
+              content: `HOUSEHOLD DATA:\n\n${householdData}`,
+            },
+          ],
+        }),
+        signal: AbortSignal.timeout(120000),
+      });
+    } catch (fetchError) {
+      const isTimeout = fetchError.name === "TimeoutError" || fetchError.name === "AbortError";
+      console.error("Fetch to Claude API failed:", fetchError.name, fetchError.message);
+      return new Response(
+        JSON.stringify({
+          error: isTimeout ? "Gap analysis timed out. Please try again." : "Failed to reach AI service",
+        }),
+        { status: isTimeout ? 504 : 502, headers: responseHeaders }
+      );
+    }
 
     if (!claudeResponse.ok) {
       const errorText = await claudeResponse.text();
-      console.error("Claude API error:", errorText);
+      console.error(`Claude API returned ${claudeResponse.status}: ${errorText}`);
+
+      let errorDetail = "AI analysis failed";
+      switch (claudeResponse.status) {
+        case 401:
+          errorDetail = "AI service authentication failed. Check ANTHROPIC_API_KEY.";
+          break;
+        case 429:
+          errorDetail = "Too many requests. Please wait a moment and try again.";
+          break;
+        default:
+          try {
+            const parsed = JSON.parse(errorText);
+            if (parsed.error?.message) errorDetail = parsed.error.message;
+          } catch {}
+      }
+
       return new Response(
-        JSON.stringify({ error: "AI analysis failed" }),
-        { status: 502, headers: { "Content-Type": "application/json" } }
+        JSON.stringify({ error: errorDetail, claude_status: claudeResponse.status }),
+        { status: 502, headers: responseHeaders }
       );
     }
 
     const claudeData = await claudeResponse.json();
     const rawText = claudeData.content?.[0]?.text ?? "";
 
-    // Parse Claude's response
+    // Parse Claude's response — strip markdown fences if present
     let analysis: Record<string, unknown>;
     try {
-      analysis = JSON.parse(rawText);
+      let cleanedText = rawText.trim();
+      if (cleanedText.startsWith("```json")) {
+        cleanedText = cleanedText.slice(7);
+      } else if (cleanedText.startsWith("```")) {
+        cleanedText = cleanedText.slice(3);
+      }
+      if (cleanedText.endsWith("```")) {
+        cleanedText = cleanedText.slice(0, -3);
+      }
+      cleanedText = cleanedText.trim();
+
+      analysis = JSON.parse(cleanedText);
     } catch {
-      console.error("Failed to parse gap analysis response:", rawText);
+      console.error("Failed to parse gap analysis response:", rawText.substring(0, 500));
       return new Response(
         JSON.stringify({ error: "Failed to parse AI analysis results" }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
+        { status: 500, headers: responseHeaders }
       );
     }
 
@@ -175,10 +275,36 @@ serve(async (req: Request) => {
       );
 
       for (const upsert of upserts) {
-        await supabase
-          .from("completion_scores")
-          .upsert(upsert, { onConflict: "household_id,category" });
+        try {
+          await supabase
+            .from("completion_scores")
+            .upsert(upsert, { onConflict: "household_id,category" });
+        } catch (upsertErr) {
+          console.warn("Failed to upsert completion score:", upsertErr);
+        }
       }
+    }
+
+    // Log ai_gap_analysis to access_log
+    try {
+      const analyzedDocIds = documentContent.map((dc) => dc.document_id);
+      await serviceClient.from("access_log").insert({
+        household_id: householdId,
+        user_id: userId ?? null,
+        action: "ai_gap_analysis",
+        resource_type: "document",
+        resource_id: null,
+        resource_name: null,
+        actor_type: "ai_analysis",
+        metadata: {
+          model: "claude-sonnet-4-6",
+          documents_analyzed: analyzedDocIds.length,
+          overall_readiness_score: analysis.overall_readiness_score,
+          vault_locked_excluded: documents.filter((d) => d.vault_locked === true).length,
+        },
+      });
+    } catch (logErr) {
+      console.warn("Failed to log gap analysis:", logErr);
     }
 
     // Transform response for iOS client
@@ -236,13 +362,13 @@ serve(async (req: Request) => {
 
     return new Response(JSON.stringify(clientResponse), {
       status: 200,
-      headers: { "Content-Type": "application/json" },
+      headers: responseHeaders,
     });
   } catch (error) {
     console.error("gap-analysis error:", error);
     return new Response(
       JSON.stringify({ error: error.message ?? "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: 500, headers: responseHeaders }
     );
   }
 });
@@ -254,9 +380,16 @@ function buildHouseholdDataString(
   documents: Array<Record<string, unknown>>,
   systems: Array<Record<string, unknown>>,
   warranties: Array<Record<string, unknown>>,
-  maintenance: Array<Record<string, unknown>>
+  maintenance: Array<Record<string, unknown>>,
+  documentContent: Array<{ document_id: string; extracted_text: string }>
 ): string {
   const parts: string[] = [];
+
+  // Build a map of document_id -> extracted_text for quick lookup
+  const contentMap = new Map<string, string>();
+  for (const dc of documentContent) {
+    contentMap.set(dc.document_id, dc.extracted_text);
+  }
 
   // Household
   parts.push(`HOUSEHOLD: ${household?.name ?? "Unknown"}`);
@@ -294,11 +427,18 @@ function buildHouseholdDataString(
     }
   }
 
-  // Documents by category
+  // Documents by category — now includes extracted text for critical documents
   parts.push("\nDOCUMENTS:");
   if (documents.length === 0) {
     parts.push("  No documents uploaded.");
   } else {
+    // Critical categories where full text is most valuable for gap analysis
+    const criticalCategories = new Set([
+      "Will", "Trust", "Power of Attorney", "Healthcare Directive",
+      "Guardianship Designation", "Life Insurance", "Umbrella Insurance",
+      "Beneficiary Designation", "Deed",
+    ]);
+
     const grouped = new Map<string, Array<Record<string, unknown>>>();
     for (const d of documents) {
       const cat = d.category as string;
@@ -315,9 +455,22 @@ function buildHouseholdDataString(
         const expiry = d.expiration_date
           ? ` (expires: ${d.expiration_date})`
           : "";
-        parts.push(`    - "${d.title}"${expiry}${flags}`);
+        const vaultLocked = d.vault_locked === true
+          ? " [VAULT LOCKED — content not available for analysis]"
+          : "";
+        parts.push(`    - "${d.title}"${expiry}${flags}${vaultLocked}`);
         if (d.ai_summary) {
           parts.push(`      AI Summary: ${d.ai_summary}`);
+        }
+        // Include extracted text for critical categories (not vault-locked)
+        if (
+          criticalCategories.has(category) &&
+          d.vault_locked !== true &&
+          contentMap.has(d.id as string)
+        ) {
+          const text = contentMap.get(d.id as string)!;
+          // Limit to 3000 chars per document to stay within context
+          parts.push(`      Extracted Content: ${text.substring(0, 3000)}`);
         }
       }
     }

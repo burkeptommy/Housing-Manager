@@ -38,16 +38,22 @@ struct DocumentCategoryView: View {
                         HStack {
                             Text("\(documents.count) document\(documents.count == 1 ? "" : "s")")
                             Spacer()
-                            Text(category.sectionGroup)
-                                .foregroundStyle(.secondary)
+                            Text(category.sectionGroup.uppercased())
+                                .foregroundStyle(HavenColors.textTertiary)
                         }
-                        .font(.caption)
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(HavenColors.cream)
             }
         }
         .navigationTitle(category.rawValue)
+        .onAppear {
+            Task { await vaultViewModel.loadData() }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button {

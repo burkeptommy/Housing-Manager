@@ -28,6 +28,7 @@ enum AppConfig {
     enum Google {
         static let webClientID = "421884826038-j17pdc6q3loa7kr13evbiaraq0d8cnef.apps.googleusercontent.com"
         static let iOSClientID = "421884826038-oi6sdgqco1g7umpogf1g2b754tpg80q8.apps.googleusercontent.com"
+        static let placesAPIKey = "AIzaSyDeJGjktaIHmcybrOV4LZyBHiRS0G_BUaA"
     }
 
     // MARK: - Apple Developer (public identifiers)

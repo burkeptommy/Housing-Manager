@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Elevated card container with consistent padding, corner radius, and shadow.
-/// Used as the standard container for all list items, detail sections, and dashboard cards.
+/// Elevated card container with consistent padding, corner radius, border, and shadow.
+/// Light: white background with beige200 border. Dark: darkElevated with darkBorder.
 struct HavenCard<Content: View>: View {
     var padding: CGFloat = HavenTheme.spacing16
     @ViewBuilder let content: () -> Content
@@ -14,6 +14,10 @@ struct HavenCard<Content: View>: View {
         .padding(padding)
         .background(HavenColors.surface)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .overlay {
+            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                .strokeBorder(HavenColors.border, lineWidth: 1)
+        }
         .havenShadow()
     }
 }
@@ -23,13 +27,15 @@ struct HavenCard<Content: View>: View {
         HavenCard {
             Text("Standard Card")
                 .font(HavenTypography.headline)
+                .foregroundStyle(HavenColors.textPrimary)
             Text("With consistent theming and shadow")
-                .font(HavenTypography.callout)
-                .foregroundStyle(.secondary)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textSecondary)
         }
         HavenCard(padding: HavenTheme.spacing12) {
             Text("Compact Card")
-                .font(HavenTypography.subheadline)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
         }
     }
     .padding()

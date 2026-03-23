@@ -29,14 +29,14 @@ struct MissingDocumentsView: View {
                     Section {
                         HStack(spacing: 12) {
                             Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(HavenColors.warning)
                                 .font(.title2)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text("\(missingCategories.count) categories without documents")
-                                    .font(.headline)
+                                    .font(HavenTypography.headline)
                                 Text("Upload documents to improve your estate readiness score.")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
                             }
                         }
                         .padding(.vertical, 4)
@@ -47,15 +47,15 @@ struct MissingDocumentsView: View {
                             ForEach(categories, id: \.self) { cat in
                                 HStack {
                                     Image(systemName: "circle")
-                                        .foregroundStyle(.red.opacity(0.6))
+                                        .foregroundStyle(HavenColors.critical.opacity(0.6))
                                     Text(cat.rawValue)
-                                        .font(.subheadline)
+                                        .font(HavenTypography.bodySmall)
                                     Spacer()
                                     Button {
                                         onUpload?(cat)
                                     } label: {
                                         Image(systemName: "plus.circle.fill")
-                                            .foregroundStyle(Color.havenAccent)
+                                            .foregroundStyle(HavenColors.navy)
                                     }
                                 }
                             }
@@ -63,6 +63,8 @@ struct MissingDocumentsView: View {
                     }
                 }
                 .listStyle(.insetGrouped)
+                .scrollContentBackground(.hidden)
+                .background(HavenColors.cream)
             }
         }
         .navigationTitle("Missing Documents")

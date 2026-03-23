@@ -2,41 +2,69 @@ import SwiftUI
 
 struct ChatBubble: View {
     let message: ChatMessage
+    var showAvatar: Bool = true
 
     private var isUser: Bool { message.role == .user }
 
+    /// Asymmetric corner radii per spec:
+    /// User  — 14 TL, 14 TR, 4 BR, 14 BL
+    /// AI    — 14 TL, 14 TR, 14 BR, 4 BL
+    private var bubbleShape: UnevenRoundedRectangle {
+        if isUser {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 14,
+                bottomLeadingRadius: 14,
+                bottomTrailingRadius: 4,
+                topTrailingRadius: 14
+            )
+        } else {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 14,
+                bottomLeadingRadius: 4,
+                bottomTrailingRadius: 14,
+                topTrailingRadius: 14
+            )
+        }
+    }
+
     var body: some View {
         HStack(alignment: .top, spacing: HavenTheme.spacing8) {
-            if isUser { Spacer(minLength: 48) }
+            if isUser { Spacer(minLength: UIScreen.main.bounds.width * 0.20) }
 
-            if !isUser {
-                Image(systemName: "sparkles")
-                    .font(.caption)
-                    .foregroundStyle(.white)
-                    .frame(width: 28, height: 28)
-                    .background(Color.havenAccent)
-                    .clipShape(Circle())
+            if !isUser && showAvatar {
+                AlfredChatAvatar()
                     .accessibilityHidden(true)
+            } else if !isUser {
+                Spacer().frame(width: 28)
             }
 
             VStack(alignment: isUser ? .trailing : .leading, spacing: HavenTheme.spacing4) {
                 Text(markdownContent)
-                    .font(HavenTypography.subheadline)
-                    .foregroundStyle(isUser ? .white : .primary)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(isUser ? HavenColors.textOnNavy : HavenColors.textPrimary)
                     .textSelection(.enabled)
 
                 Text(message.timestamp, style: .time)
-                    .font(HavenTypography.caption2)
-                    .foregroundStyle(isUser ? .white.opacity(0.7) : .secondary)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(isUser ? HavenColors.beige300 : HavenColors.textTertiary)
             }
             .padding(HavenTheme.spacing12)
-            .background(isUser ? Color.havenAccent : Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .frame(maxWidth: UIScreen.main.bounds.width * (isUser ? 0.80 : 0.85), alignment: isUser ? .trailing : .leading)
+            .background {
+                if isUser {
+                    bubbleShape.fill(HavenColors.navy)
+                } else {
+                    bubbleShape
+                        .fill(HavenColors.creamLight)
+                        .overlay(bubbleShape.stroke(HavenColors.beige300, lineWidth: 1))
+                }
+            }
+            .clipShape(bubbleShape)
 
-            if !isUser { Spacer(minLength: 48) }
+            if !isUser { Spacer(minLength: UIScreen.main.bounds.width * 0.15) }
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(isUser ? "You" : "Haven AI"): \(message.content)")
+        .accessibilityLabel("\(isUser ? "You" : "Alfred"): \(message.content)")
     }
 
     private var markdownContent: AttributedString {

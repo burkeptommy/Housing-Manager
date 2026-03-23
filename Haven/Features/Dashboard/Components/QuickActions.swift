@@ -1,53 +1,70 @@
 import SwiftUI
 
 struct QuickActions: View {
+    var onUploadDocument: () -> Void = {}
+    var onAddProperty: () -> Void = {}
+    var onAskAI: () -> Void = {}
+    var onViewOverdue: () -> Void = {}
+    var onViewMaintenance: () -> Void = {}
+    var overdueCount: Int = 0
+    var hasProperty: Bool = false
+
     var body: some View {
         HStack(spacing: HavenTheme.spacing12) {
+            // Upload document
             quickActionButton(
-                "Upload\nDocument",
+                "Upload",
                 icon: "doc.badge.plus",
-                color: .havenAccent
+                action: onUploadDocument
             )
-            quickActionButton(
-                "Add\nProperty",
-                icon: "house.badge.plus",
-                color: .havenSuccess
-            )
-            quickActionButton(
-                "Ask\nHaven AI",
-                icon: "sparkles",
-                color: .havenWarning
-            )
+
+            // Contextual: overdue, maintenance, or add home
+            if overdueCount > 0 {
+                quickActionButton(
+                    "Overdue (\(overdueCount))",
+                    icon: "exclamationmark.triangle.fill",
+                    action: onViewOverdue
+                )
+            } else if !hasProperty {
+                quickActionButton(
+                    "Add Home",
+                    icon: "house.fill",
+                    action: onAddProperty
+                )
+            } else {
+                quickActionButton(
+                    "Maintenance",
+                    icon: "wrench.fill",
+                    action: onViewMaintenance
+                )
+            }
         }
     }
 
-    private func quickActionButton(_ title: String, icon: String, color: Color) -> some View {
+    private func quickActionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
+            action()
         } label: {
-            VStack(spacing: HavenTheme.spacing8) {
+            VStack(spacing: HavenTheme.spacing4) {
                 Image(systemName: icon)
-                    .font(.title2)
-                    .foregroundStyle(color)
-                    .frame(width: HavenTheme.minTouchTarget, height: HavenTheme.minTouchTarget)
-                    .background(color.opacity(0.1))
-                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .font(.system(size: 18))
+                    .foregroundStyle(HavenColors.navy700)
 
                 Text(title)
-                    .font(HavenTypography.caption2)
-                    .fontWeight(.medium)
-                    .multilineTextAlignment(.center)
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.textPrimary)
             }
             .frame(maxWidth: .infinity)
-            .padding(.vertical, HavenTheme.spacing12)
-            .background(HavenColors.surface)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-            .havenShadow()
+            .frame(height: 48)
+            .background(HavenColors.creamLight)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.beige300, lineWidth: 1)
+            }
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(title.replacingOccurrences(of: "\n", with: " "))
+        .buttonStyle(HavenButtonPressStyle())
+        .accessibilityLabel(title)
     }
 }

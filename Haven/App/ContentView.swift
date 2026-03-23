@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @EnvironmentObject var appState: AppState
+    @AppStorage("hasSeenIntro") private var hasSeenIntro = false
 
     var body: some View {
         Group {
@@ -13,6 +14,12 @@ struct ContentView: View {
             } else if appState.sessionManager.isLocked {
                 BiometricAuthView()
                     .environmentObject(appState)
+            } else if appState.needsOnboarding && !hasSeenIntro {
+                IntroExplainerView(onContinue: {
+                    withAnimation(.easeInOut(duration: 0.4)) {
+                        hasSeenIntro = true
+                    }
+                })
             } else if appState.needsOnboarding {
                 OnboardingView()
                     .environmentObject(appState)
@@ -24,6 +31,7 @@ struct ContentView: View {
         .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: appState.sessionManager.isLocked)
         .animation(.easeInOut(duration: 0.3), value: appState.needsOnboarding)
+        .animation(.easeInOut(duration: 0.3), value: hasSeenIntro)
     }
 }
 

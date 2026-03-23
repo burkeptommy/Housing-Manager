@@ -28,9 +28,9 @@ struct WarrantyTrackerView: View {
                 ProgressView("Loading warranties...")
             } else if warranties.isEmpty {
                 ContentUnavailableView {
-                    Label("No Warranties", systemImage: "shield")
+                    Label("Warranty Tracker", systemImage: "shield")
                 } description: {
-                    Text("Warranties will appear here when you add them to home systems.")
+                    Text("Add warranties to your home systems and Haven will remind you before they expire.")
                 }
             } else {
                 warrantyList
@@ -47,8 +47,10 @@ struct WarrantyTrackerView: View {
             LazyVStack(spacing: 16) {
                 if !activeWarranties.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Active")
-                            .font(.headline)
+                        Text("ACTIVE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .tracking(1.5)
                         ForEach(activeWarranties) { warranty in
                             warrantyCard(warranty, isActive: true)
                         }
@@ -57,9 +59,10 @@ struct WarrantyTrackerView: View {
 
                 if !expiredWarranties.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Expired")
-                            .font(.headline)
-                            .foregroundStyle(.secondary)
+                        Text("EXPIRED")
+                            .font(HavenTypography.uiSectionHeader)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .tracking(1.5)
                         ForEach(expiredWarranties) { warranty in
                             warrantyCard(warranty, isActive: false)
                         }
@@ -68,7 +71,7 @@ struct WarrantyTrackerView: View {
             }
             .padding()
         }
-        .background(Color(.systemGroupedBackground))
+        .background(HavenColors.background)
     }
 
     private func warrantyCard(_ warranty: WarrantyRow, isActive: Bool) -> some View {
@@ -76,39 +79,44 @@ struct WarrantyTrackerView: View {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: isActive ? "shield.fill" : "shield.slash")
-                        .foregroundStyle(isActive ? .blue : .secondary)
+                        .foregroundStyle(isActive ? HavenColors.info : HavenColors.textSecondary)
                     Text(warranty.provider)
-                        .font(.subheadline.weight(.medium))
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
                     Spacer()
                     Text(warranty.warrantyType.capitalized)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
 
                 HStack {
                     Text("\(warranty.startDate) — \(warranty.endDate)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
 
                 if let coverage = warranty.coverageDetails, !coverage.isEmpty {
                     Text(coverage)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
 
                 if let phone = warranty.claimPhone {
-                    Link(destination: URL(string: "tel:\(phone)")!) {
-                        Label("Call to Claim: \(phone)", systemImage: "phone.fill")
-                            .font(.caption.weight(.medium))
+                    let cleaned = phone.components(separatedBy: CharacterSet.decimalDigits.inverted).joined()
+                    if let url = URL(string: "tel:\(cleaned)") {
+                        Link(destination: url) {
+                            Label("Call to Claim: \(phone)", systemImage: "phone.fill")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.navy700)
+                        }
                     }
                 }
 
                 if let policyNum = warranty.policyNumber {
                     HStack {
                         Text("Policy: \(policyNum)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
             }

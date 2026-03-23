@@ -31,16 +31,16 @@ struct GapAnalysisView: View {
 
             Image(systemName: "chart.bar.doc.horizontal")
                 .font(.system(size: 56))
-                .foregroundStyle(Color.havenAccent)
+                .foregroundStyle(HavenColors.navy)
                 .accessibilityHidden(true)
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("AI Gap Analysis")
                     .font(HavenTypography.title2)
                     .fontWeight(.bold)
-                Text("Haven AI will analyze your document vault to identify:")
+                Text("Alfred will analyze your document vault to identify:")
                     .font(HavenTypography.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
             }
 
@@ -71,7 +71,7 @@ struct GapAnalysisView: View {
     private func gapFeatureRow(icon: String, text: String) -> some View {
         HStack(spacing: HavenTheme.spacing12) {
             Image(systemName: icon)
-                .foregroundStyle(Color.havenAccent)
+                .foregroundStyle(HavenColors.navy)
                 .frame(width: 24)
             Text(text)
                 .font(HavenTypography.subheadline)
@@ -85,9 +85,9 @@ struct GapAnalysisView: View {
                 .scaleEffect(1.5)
             Text("Analyzing your document vault...")
                 .font(HavenTypography.headline)
-            Text("Haven AI is reviewing your entire portfolio against best practices for estate readiness.")
+            Text("Alfred is reviewing your entire portfolio against best practices for estate readiness.")
                 .font(HavenTypography.subheadline)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, HavenTheme.spacing32)
             Spacer()
@@ -105,13 +105,13 @@ struct GapAnalysisView: View {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                         HStack {
                             Image(systemName: "sparkles")
-                                .foregroundStyle(Color.havenAccent)
+                                .foregroundStyle(HavenColors.navy)
                             Text("Analysis Complete")
                                 .font(HavenTypography.headline)
                         }
                         Text(result.summary)
                             .font(HavenTypography.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
 
@@ -157,7 +157,7 @@ struct GapAnalysisView: View {
                     .font(HavenTypography.subheadline)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, HavenTheme.spacing12)
-                    .background(Color(.systemGray5))
+                    .background(HavenColors.inputBackground)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
                 }
             }
@@ -171,12 +171,12 @@ struct GapAnalysisView: View {
             VStack(spacing: HavenTheme.spacing12) {
                 Text("Estate Readiness")
                     .font(HavenTypography.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(HavenColors.textSecondary)
                     .fontWeight(.semibold)
 
                 ZStack {
                     Circle()
-                        .stroke(Color(.systemGray5), lineWidth: 12)
+                        .stroke(HavenColors.beige200, lineWidth: 12)
                     Circle()
                         .trim(from: 0, to: Double(result.overallReadinessScore) / 100.0)
                         .stroke(
@@ -191,7 +191,7 @@ struct GapAnalysisView: View {
                             .fontWeight(.bold)
                         Text("/ 100")
                             .font(HavenTypography.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
                 .frame(width: 120, height: 120)
@@ -246,7 +246,7 @@ struct GapAnalysisView: View {
                             .fontWeight(.medium)
                         Text(item.description)
                             .font(HavenTypography.caption)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                     .padding(.vertical, HavenTheme.spacing4)
                 }

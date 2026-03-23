@@ -1,92 +1,38 @@
 import SwiftUI
 
-// MARK: - Step 1: Welcome
+// MARK: - Phone Formatting Helper
 
-struct OnboardingWelcomeStep: View {
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
+private func formatPhoneNumber(_ input: String) -> String {
+    let digits = input.filter { $0.isNumber }
+    let limited = String(digits.prefix(10))
 
-            Image(systemName: "shield.checkered")
-                .font(.system(size: 72))
-                .foregroundStyle(Color.havenAccent)
-
-            VStack(spacing: 12) {
-                Text("Welcome to Haven")
-                    .font(.title.bold())
-
-                Text("The smart way to organize your family's estate documents and manage your properties.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 24)
-            }
-
-            VStack(alignment: .leading, spacing: 16) {
-                featureRow(icon: "doc.text.fill", title: "Document Vault", description: "Securely store and organize estate documents")
-                featureRow(icon: "house.fill", title: "Property Management", description: "Track systems, maintenance, and warranties")
-                featureRow(icon: "brain.head.profile.fill", title: "AI Assistant", description: "Get personalized guidance and gap analysis")
-            }
-            .padding(.horizontal, 8)
-            .padding(.top, 8)
-
-            Spacer()
-        }
-        .padding(.horizontal, HavenTheme.padding)
-    }
-
-    private func featureRow(icon: String, title: String, description: String) -> some View {
-        HStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundStyle(Color.havenAccent)
-                .frame(width: 36, height: 36)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title).font(.subheadline.weight(.semibold))
-                Text(description).font(.caption).foregroundStyle(.secondary)
-            }
-        }
+    switch limited.count {
+    case 0:
+        return ""
+    case 1...3:
+        return "(\(limited)"
+    case 4...6:
+        let area = limited.prefix(3)
+        let middle = limited.dropFirst(3)
+        return "(\(area)) \(middle)"
+    case 7...10:
+        let area = limited.prefix(3)
+        let middle = limited.dropFirst(3).prefix(3)
+        let last = limited.dropFirst(6)
+        return "(\(area)) \(middle)-\(last)"
+    default:
+        return limited
     }
 }
 
-// MARK: - Step 2: Household Name
+// MARK: - Step 1: About You (Primary Member)
 
-struct OnboardingHouseholdStep: View {
-    @Binding var householdName: String
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "house.and.flag.fill")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.havenAccent)
-
-            VStack(spacing: 8) {
-                Text("Name Your Household")
-                    .font(.title2.bold())
-                Text("This helps organize everything under one roof.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            HavenTextField(title: "Household Name (e.g. \"The Burke Family\")", text: $householdName)
-                .textInputAutocapitalization(.words)
-
-            Spacer()
-        }
-        .padding(.horizontal, HavenTheme.padding)
-    }
-}
-
-// MARK: - Step 3: Primary Member
-
-struct OnboardingPrimaryMemberStep: View {
+struct OnboardingCombinedInfoStep: View {
     @Binding var firstName: String
     @Binding var lastName: String
     @Binding var email: String
     @Binding var phone: String
+    @Binding var gender: String
 
     var body: some View {
         ScrollView {
@@ -94,14 +40,15 @@ struct OnboardingPrimaryMemberStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.havenAccent)
-                    Text("Your Information")
-                        .font(.title2.bold())
-                    Text("As the primary household member.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(HavenColors.navy)
+                    Text("About You")
+                        .font(HavenTypography.title2)
+                    Text("Tell us a bit about yourself so Haven can personalize your experience.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
                 }
-                .padding(.top, 32)
+                .padding(.top, 24)
 
                 VStack(spacing: 16) {
                     HStack(spacing: 12) {
@@ -113,14 +60,46 @@ struct OnboardingPrimaryMemberStep: View {
                             .textInputAutocapitalization(.words)
                     }
 
-                    HavenTextField(title: "Email (optional)", text: $email)
-                        .textContentType(.emailAddress)
-                        .keyboardType(.emailAddress)
-                        .textInputAutocapitalization(.never)
+                    if !email.isEmpty {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Email")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(email)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(HavenColors.success)
+                                .font(.caption)
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(HavenColors.creamLight)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    } else {
+                        HavenTextField(title: "Email (optional)", text: $email)
+                            .textContentType(.emailAddress)
+                            .keyboardType(.emailAddress)
+                            .textInputAutocapitalization(.never)
+                    }
 
-                    HavenTextField(title: "Phone (optional)", text: $phone)
-                        .textContentType(.telephoneNumber)
-                        .keyboardType(.phonePad)
+                    HavenTextField(title: "Phone (optional)", text: Binding(
+                        get: { phone },
+                        set: { phone = formatPhoneNumber($0) }
+                    ))
+                    .textContentType(.telephoneNumber)
+                    .keyboardType(.phonePad)
+
+                    Picker("Gender", selection: $gender) {
+                        Text("Male").tag("male")
+                        Text("Female").tag("female")
+                        Text("Other").tag("other")
+                        Text("Prefer Not to Say").tag("prefer_not_to_say")
+                    }
+                    .pickerStyle(.segmented)
                 }
             }
             .padding(.horizontal, HavenTheme.padding)
@@ -129,13 +108,17 @@ struct OnboardingPrimaryMemberStep: View {
     }
 }
 
-// MARK: - Step 4: Spouse/Partner
+// MARK: - Step 2: Spouse/Partner
 
 struct OnboardingSpouseStep: View {
     @Binding var addSpouse: Bool
     @Binding var firstName: String
     @Binding var lastName: String
     @Binding var email: String
+    @Binding var gender: String
+    var spouseHasExistingAccount: Bool = false
+    var isCheckingSpouseEmail: Bool = false
+    var onEmailChanged: ((String) -> Void)?
 
     var body: some View {
         ScrollView {
@@ -143,19 +126,35 @@ struct OnboardingSpouseStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.2.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.havenAccent)
+                        .foregroundStyle(HavenColors.navy)
                     Text("Spouse or Partner")
-                        .font(.title2.bold())
+                        .font(HavenTypography.title2)
                     Text("Add them now, or skip and add later.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 .padding(.top, 32)
 
-                Toggle("Add Spouse/Partner", isOn: $addSpouse)
-                    .tint(Color.havenAccent)
+                if !addSpouse {
+                    VStack(spacing: 12) {
+                        Button {
+                            withAnimation { addSpouse = true }
+                        } label: {
+                            Text("Yes, add my spouse or partner")
+                                .font(HavenTypography.uiLabel)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 14)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .foregroundStyle(HavenColors.navy800)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
 
-                if addSpouse {
+                        Text("You can always add them later from Settings.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                } else {
                     VStack(spacing: 16) {
                         HStack(spacing: 12) {
                             HavenTextField(title: "First Name", text: $firstName)
@@ -165,11 +164,55 @@ struct OnboardingSpouseStep: View {
                                 .textContentType(.familyName)
                                 .textInputAutocapitalization(.words)
                         }
-
                         HavenTextField(title: "Email (optional)", text: $email)
                             .textContentType(.emailAddress)
                             .keyboardType(.emailAddress)
                             .textInputAutocapitalization(.never)
+                            .onChange(of: email) { _, newValue in
+                                onEmailChanged?(newValue)
+                            }
+
+                        if isCheckingSpouseEmail {
+                            HStack(spacing: 8) {
+                                ProgressView().controlSize(.small)
+                                Text("Checking...")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        } else if spouseHasExistingAccount {
+                            HStack(spacing: 8) {
+                                Image(systemName: "person.badge.checkmark")
+                                    .foregroundStyle(HavenColors.success)
+                                    .font(.caption)
+                                Text("This person already has a Haven account. They'll be invited to join your household.")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.success)
+                            }
+                            .padding(12)
+                            .background(HavenColors.success.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+
+                        Picker("Gender", selection: $gender) {
+                            Text("Male").tag("male")
+                            Text("Female").tag("female")
+                            Text("Other").tag("other")
+                            Text("Prefer Not to Say").tag("prefer_not_to_say")
+                        }
+                        .pickerStyle(.segmented)
+
+                        Button {
+                            withAnimation {
+                                addSpouse = false
+                                firstName = ""
+                                lastName = ""
+                                email = ""
+                            }
+                        } label: {
+                            Text("Remove")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
                     }
                     .transition(.opacity.combined(with: .move(edge: .top)))
                 }
@@ -181,7 +224,7 @@ struct OnboardingSpouseStep: View {
     }
 }
 
-// MARK: - Step 5: Additional Family Members
+// MARK: - Step 3: Additional Family Members
 
 struct OnboardingFamilyStep: View {
     @Binding var members: [AdditionalMember]
@@ -194,12 +237,12 @@ struct OnboardingFamilyStep: View {
                 VStack(spacing: 8) {
                     Image(systemName: "person.3.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.havenAccent)
+                        .foregroundStyle(HavenColors.navy)
                     Text("Family Members")
-                        .font(.title2.bold())
-                    Text("Add children, parents, or others. You can always add more later.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.title2)
+                    Text("Add people named in your estate documents — children, parents, guardians, or trustees. Haven will match them when you upload documents.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
                 .padding(.top, 32)
@@ -208,13 +251,13 @@ struct OnboardingFamilyStep: View {
                     VStack(spacing: 12) {
                         HStack {
                             Text("Family Member")
-                                .font(.subheadline.weight(.medium))
+                                .font(HavenTypography.uiLabel)
                             Spacer()
                             Button {
                                 members.removeAll { $0.id == member.id }
                             } label: {
                                 Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
+                                    .foregroundStyle(HavenColors.textTertiary)
                             }
                         }
 
@@ -234,7 +277,7 @@ struct OnboardingFamilyStep: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(HavenColors.inputBackground)
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.cornerRadius))
                 }
 
@@ -242,7 +285,7 @@ struct OnboardingFamilyStep: View {
                     members.append(AdditionalMember())
                 } label: {
                     Label("Add Family Member", systemImage: "plus.circle.fill")
-                        .font(.subheadline.weight(.medium))
+                        .font(HavenTypography.uiLabel)
                 }
             }
             .padding(.horizontal, HavenTheme.padding)
@@ -251,43 +294,98 @@ struct OnboardingFamilyStep: View {
     }
 }
 
-// MARK: - Step 6: Module Explanation
+// MARK: - Step 4: Features Overview
+
+struct OnboardingFeaturesStep: View {
+    var body: some View {
+        VStack(spacing: 24) {
+            Spacer()
+
+            Text("H")
+                .font(Font.custom("Georgia", size: 88))
+                .foregroundStyle(HavenColors.navy800)
+                .frame(width: 100, height: 100)
+                .background(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(HavenColors.creamLight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 22)
+                                .stroke(HavenColors.beige300, lineWidth: 1)
+                        )
+                )
+
+            VStack(spacing: 12) {
+                Text("Welcome to Haven")
+                    .font(HavenTypography.title)
+
+                Text("The smart way to manage your home and protect what matters most.")
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                featureRow(icon: "house.fill", title: "Home Management", description: "Track systems, maintenance, vendors, and costs")
+                featureRow(icon: "doc.text.fill", title: "Document Vault", description: "Securely organize estate and property documents")
+                featureRow(icon: "sparkles", title: "Alfred AI", description: "Personalized guidance, scenarios, and gap analysis")
+            }
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+
+            Spacer()
+        }
+        .padding(.horizontal, HavenTheme.padding)
+    }
+
+    private func featureRow(icon: String, title: String, description: String) -> some View {
+        HStack(alignment: .top, spacing: 16) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(HavenColors.navy)
+                .frame(width: 36, height: 36)
+                .padding(.top, 2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.subheadline.weight(.semibold))
+                Text(description).font(HavenTypography.caption).foregroundStyle(HavenColors.textSecondary)
+            }
+        }
+    }
+}
+
+// MARK: - Step 5: All Set
 
 struct OnboardingModulesStep: View {
     var body: some View {
         ScrollView {
-            VStack(spacing: 32) {
+            VStack(spacing: 28) {
                 VStack(spacing: 8) {
                     Image(systemName: "checkmark.seal.fill")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.havenAccent)
+                        .foregroundStyle(HavenColors.navy)
                     Text("You're All Set!")
-                        .font(.title2.bold())
-                    Text("Here's what Haven can do for you.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.title2)
+                    Text("Here's what you can start doing right away.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
                 .padding(.top, 32)
-
-                moduleCard(
-                    icon: "doc.text.fill",
-                    title: "Document Vault",
-                    items: [
-                        "Upload and organize estate documents by category",
-                        "AI-powered analysis identifies gaps and issues",
-                        "Track expirations and get renewal reminders",
-                        "Generate a Family Reference Binder"
-                    ]
-                )
 
                 moduleCard(
                     icon: "house.fill",
                     title: "Property & Home Systems",
                     items: [
-                        "Track all your properties and their systems",
-                        "Automated maintenance schedules with reminders",
-                        "Warranty tracker with expiration alerts",
-                        "Contractor directory with service history"
+                        "Track properties, systems, and maintenance schedules",
+                        "Warranty tracking and contractor directory"
+                    ]
+                )
+
+                moduleCard(
+                    icon: "doc.text.fill",
+                    title: "Document Vault",
+                    items: [
+                        "Upload and organize estate documents with AI analysis",
+                        "Expiration reminders and Family Reference Binder"
                     ]
                 )
             }
@@ -297,28 +395,30 @@ struct OnboardingModulesStep: View {
 
     private func moduleCard(icon: String, title: String, items: [String]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Image(systemName: icon)
                     .font(.title3)
-                    .foregroundStyle(Color.havenAccent)
+                    .foregroundStyle(HavenColors.navy)
                 Text(title)
-                    .font(.headline)
+                    .font(HavenTypography.headline)
             }
             ForEach(items, id: \.self) { item in
                 HStack(alignment: .top, spacing: 8) {
                     Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
-                        .foregroundStyle(.green)
-                        .padding(.top, 2)
+                        .font(HavenTypography.uiLabelSmall)
+                        .fontWeight(.bold)
+                        .foregroundStyle(HavenColors.success)
+                        .frame(width: 14, height: 14)
+                        .padding(.top, 3)
                     Text(item)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
             }
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemGray6))
+        .background(HavenColors.inputBackground)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.cardCornerRadius))
     }
 }
