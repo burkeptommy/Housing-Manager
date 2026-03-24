@@ -244,6 +244,7 @@ struct NewArrivalChecklistView: View {
         .background(HavenColors.background)
         .navigationTitle("New Arrival Checklist")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("NewArrivalChecklistView")
     }
 
     // MARK: - Hero Header
@@ -435,6 +436,7 @@ struct NewArrivalChecklistView: View {
         } else {
             ids.insert(item.id)
         }
+        Analytics.track(.newArrivalChecklistItemToggled, ["item_id": item.id, "completed": !completedIds.contains(item.id)])
         completedItemIds = ids.joined(separator: ",")
     }
 }

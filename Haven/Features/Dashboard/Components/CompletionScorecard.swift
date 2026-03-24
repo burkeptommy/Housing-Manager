@@ -84,6 +84,9 @@ struct CompletionScorecard: View {
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         .accessibilityElement()
         .accessibilityLabel("\(level.name), \(Int(vaultViewModel.levelProgress * 100)) percent to next level")
+        .simultaneousGesture(TapGesture().onEnded {
+            Analytics.track(.dashboardReadinessTapped, ["level": level.name, "progress": Int(vaultViewModel.levelProgress * 100)])
+        })
         .onAppear {
             guard !hasAppeared else { return }
             hasAppeared = true

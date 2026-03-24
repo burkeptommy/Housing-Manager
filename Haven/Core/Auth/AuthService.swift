@@ -33,6 +33,9 @@ final class AuthService: ObservableObject {
                         pendingConfirmation = false
                         await ensureUserRecord(session: refreshed)
                         await checkOnboardingStatus()
+                        // Identify user for analytics on session restore
+                        let user = try? await DatabaseService.shared.fetchCurrentUser()
+                        Analytics.identify(userId: refreshed.user.id, householdId: user?.householdId)
                     } catch {
                         print("[Auth] Session restore failed (user likely deleted): \(error)")
                         await forceLocalSignOut()
@@ -42,12 +45,17 @@ final class AuthService: ObservableObject {
                     currentUserId = session?.user.id
                     isAuthenticated = session != nil
                     pendingConfirmation = false
-                    if session != nil {
+                    if let session {
                         await ensureUserRecord(session: session)
                         await checkOnboardingStatus()
+                        // Identify user for analytics
+                        let user = try? await DatabaseService.shared.fetchCurrentUser()
+                        Analytics.identify(userId: session.user.id, householdId: user?.householdId)
                     }
 
                 case .signedOut:
+                    Analytics.track(.authSignedOut)
+                    Analytics.reset()
                     clearAuthState()
 
                 default:
@@ -58,10 +66,12 @@ final class AuthService: ObservableObject {
     }
 
     func signIn(email: String, password: String) async throws {
+        Analytics.track(.authLoginEmail)
         try await HavenSupabase.auth.signIn(email: email, password: password)
     }
 
     func signUp(email: String, password: String, fullName: String?) async throws {
+        Analytics.track(.authSignupStarted)
         let result = try await HavenSupabase.auth.signUp(email: email, password: password)
 
         // Check if the user has a session (email confirmation disabled)
@@ -89,6 +99,7 @@ final class AuthService: ObservableObject {
 
     /// Handle Sign In with Apple credential and authenticate with Supabase
     func signInWithApple(credential: ASAuthorizationAppleIDCredential) async throws {
+        Analytics.track(.authLoginApple)
         guard let identityToken = credential.identityToken,
               let idTokenString = String(data: identityToken, encoding: .utf8) else {
             throw NSError(domain: "AuthService", code: -1,
@@ -131,6 +142,7 @@ final class AuthService: ObservableObject {
     }
 
     func resetPassword(email: String) async throws {
+        Analytics.track(.authPasswordResetRequested)
         try await HavenSupabase.auth.resetPasswordForEmail(email)
     }
 

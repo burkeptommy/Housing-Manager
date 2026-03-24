@@ -90,9 +90,11 @@ struct MaintenanceTaskDetailSheet: View {
                     .foregroundStyle(HavenColors.navy)
             }
         }
+        .trackScreen("MaintenanceTaskDetailSheet", properties: ["task_id": task.id.uuidString, "task_title": task.title])
         .sheet(isPresented: $showCompleteForm) {
             NavigationStack {
                 MarkCompleteForm(task: task, onComplete: {
+                    Analytics.track(.maintenanceTaskCompleted, ["task_id": task.id.uuidString, "task_title": task.title])
                     onTaskCompleted?()
                     dismiss()
                 })
@@ -167,6 +169,7 @@ struct MaintenanceTaskDetailSheet: View {
 
     private func toggleReminder(daysBefore: Int, isEnabled: Bool) {
         guard let dueDate = dateFormatter.date(from: task.nextDueDate) else { return }
+        Analytics.track(.maintenanceTaskReminderSet, ["task_id": task.id.uuidString, "days_before": daysBefore, "enabled": isEnabled])
 
         let center = UNUserNotificationCenter.current()
         let notificationId = "task-reminder-\(task.id.uuidString)-\(daysBefore)d"
@@ -369,6 +372,7 @@ struct MaintenanceTaskDetailSheet: View {
                                     id: task.id,
                                     MaintenanceTaskUpdate(nextDueDate: formatter.string(from: editedDueDate))
                                 )
+                                Analytics.track(.maintenanceTaskDueDateEdited, ["task_id": task.id.uuidString])
                                 Task { await NotificationScheduler.shared.rescheduleAll() }
                                 Haptics.success()
                                 showEditDueDate = false
@@ -535,6 +539,7 @@ struct MaintenanceTaskDetailSheet: View {
                     nextDueDate: formatter.string(from: nextDate)
                 )
             )
+            Analytics.track(.maintenanceTaskFrequencyEdited, ["task_id": task.id.uuidString, "new_frequency": editedFrequency])
             Task { await NotificationScheduler.shared.rescheduleAll() }
             Haptics.success()
             showEditFrequency = false
@@ -766,6 +771,7 @@ struct MaintenanceTaskDetailSheet: View {
     private func updateAssignment(userId: UUID?) async {
         do {
             _ = try await db.clearMaintenanceTaskAssignment(id: task.id, userId: userId)
+            Analytics.track(.maintenanceTaskAssigned, ["task_id": task.id.uuidString, "assigned_user_id": userId?.uuidString ?? "unassigned"])
         } catch {
             print("[TaskDetail] Failed to update assignment: \(error)")
             Haptics.error()
@@ -778,6 +784,7 @@ struct MaintenanceTaskDetailSheet: View {
         VStack(spacing: HavenTheme.spacing12) {
             Button {
                 Haptics.light()
+                Analytics.track(.maintenanceTaskCompleted, ["task_id": task.id.uuidString, "source": "button"])
                 showCompleteForm = true
             } label: {
                 HStack {
@@ -794,6 +801,7 @@ struct MaintenanceTaskDetailSheet: View {
 
             Button {
                 Haptics.light()
+                Analytics.track(.maintenanceTaskSnoozed, ["task_id": task.id.uuidString])
                 showSnooze = true
             } label: {
                 HStack {
@@ -814,6 +822,7 @@ struct MaintenanceTaskDetailSheet: View {
 
             Button {
                 Haptics.light()
+                Analytics.track(.maintenanceTaskDeleted, ["task_id": task.id.uuidString])
                 onDeleteTask?()
                 dismiss()
             } label: {

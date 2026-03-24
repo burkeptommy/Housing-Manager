@@ -135,6 +135,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, HavenTheme.padding)
             }
+            .trackScreen("LoginView")
             .navigationDestination(isPresented: $viewModel.showSignUp) {
                 SignUpView()
                     .environmentObject(appState)
@@ -184,6 +185,7 @@ struct LoginView: View {
     }
 
     private func biometricSignIn() async {
+        Analytics.track(.authLoginBiometric)
         let success = await AuthService.authenticateWithBiometrics()
         if !success {
             viewModel.errorMessage = "Biometric authentication failed."

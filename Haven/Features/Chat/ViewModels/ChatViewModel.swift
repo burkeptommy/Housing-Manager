@@ -55,6 +55,7 @@ final class ChatViewModel: ObservableObject {
 
         let userMsg = ChatMessage(role: .user, content: text)
         messages.append(userMsg)
+        Analytics.track(.chatMessageSent, ["has_context": contextType != nil])
         Haptics.light()
 
         isTyping = true
@@ -87,6 +88,7 @@ final class ChatViewModel: ObservableObject {
 
             let assistantMsg = ChatMessage(role: .assistant, content: responseText)
             messages.append(assistantMsg)
+            Analytics.track(.chatMessageReceived)
             Haptics.success()
 
         } catch {

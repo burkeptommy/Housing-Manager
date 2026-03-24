@@ -81,6 +81,7 @@ struct DuplicateDocumentsView: View {
         }
         .navigationTitle("Duplicate Documents")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("DuplicateDocumentsView")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 if resolving {
@@ -93,6 +94,7 @@ struct DuplicateDocumentsView: View {
     }
 
     private func removeAllDuplicates() async {
+        Analytics.track(.documentDuplicateResolved, ["resolution": "remove_all", "group_count": duplicateService.duplicateGroups.count])
         resolving = true
         // For each group, keep the first (newest — sorted by uploaded_at desc) and delete the rest
         for group in duplicateService.duplicateGroups {
@@ -113,6 +115,7 @@ struct DuplicateDocumentsView: View {
     }
 
     private func resolveGroup(keep keepId: UUID, group: [DocumentRow]) async {
+        Analytics.track(.documentDuplicateResolved, ["resolution": "keep_one", "group_size": group.count])
         resolving = true
         let deleteIds = group.filter { $0.id != keepId }.map(\.id)
         do {

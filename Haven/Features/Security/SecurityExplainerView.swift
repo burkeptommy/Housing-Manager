@@ -66,6 +66,7 @@ struct SecurityExplainerView: View {
             .padding(.bottom, 16)
         }
         .background(HavenColors.cream)
+        .trackScreen("SecurityExplainerView")
     }
 }
 

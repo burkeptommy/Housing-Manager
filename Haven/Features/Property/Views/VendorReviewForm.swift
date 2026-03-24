@@ -153,6 +153,7 @@ struct VendorReviewForm: View {
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("VendorReviewForm")
             .sheet(isPresented: $showSystemAssignment) {
                 SystemAssignmentSheet(
                     systems: systems,
@@ -214,6 +215,7 @@ struct VendorReviewForm: View {
 
             let contractor = try await DatabaseService.shared.createContractor(insert)
             savedContractorId = contractor.id
+            Analytics.track(.contractorCreated, ["contractor_id": contractor.id.uuidString, "source": vendor.source == .manual ? "manual" : vendor.source == .contacts ? "contacts" : "website"])
             Haptics.success()
 
             // Load systems for assignment

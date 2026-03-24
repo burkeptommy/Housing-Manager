@@ -1347,6 +1347,329 @@ struct ServiceContractUpdate: Codable {
     }
 }
 
+// MARK: - Property Projects
+
+struct PropertyProjectRow: Codable, Identifiable, Hashable {
+    static func == (lhs: PropertyProjectRow, rhs: PropertyProjectRow) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    let id: UUID
+    let householdId: UUID
+    let propertyId: UUID
+    let name: String
+    let description: String?
+    let category: String
+    let status: String
+    let projectType: String
+    let priority: String?
+    let estimatedBudget: Double?
+    let actualSpend: Double?
+    let aiEstimatedDiyCost: Double?
+    let aiEstimatedProCost: Double?
+    let targetStartDate: String?
+    let targetEndDate: String?
+    let actualStartDate: String?
+    let actualEndDate: String?
+    let aiResearch: ProjectAIResearch?
+    let aiResearchUpdatedAt: Date?
+    let notes: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+    let createdBy: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, description, category, status, priority, notes
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case projectType = "project_type"
+        case estimatedBudget = "estimated_budget"
+        case actualSpend = "actual_spend"
+        case aiEstimatedDiyCost = "ai_estimated_diy_cost"
+        case aiEstimatedProCost = "ai_estimated_pro_cost"
+        case targetStartDate = "target_start_date"
+        case targetEndDate = "target_end_date"
+        case actualStartDate = "actual_start_date"
+        case actualEndDate = "actual_end_date"
+        case aiResearch = "ai_research"
+        case aiResearchUpdatedAt = "ai_research_updated_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case createdBy = "created_by"
+    }
+}
+
+struct PropertyProjectInsert: Codable {
+    let householdId: UUID
+    let propertyId: UUID
+    let name: String
+    var description: String?
+    let category: String
+    var status: String = "planning"
+    var projectType: String = "diy"
+    var priority: String? = "medium"
+    var estimatedBudget: Double?
+    var targetStartDate: String?
+    var targetEndDate: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, description, category, status, priority, notes
+        case householdId = "household_id"
+        case propertyId = "property_id"
+        case projectType = "project_type"
+        case estimatedBudget = "estimated_budget"
+        case targetStartDate = "target_start_date"
+        case targetEndDate = "target_end_date"
+    }
+}
+
+struct PropertyProjectUpdate: Codable {
+    var name: String?
+    var description: String?
+    var category: String?
+    var status: String?
+    var projectType: String?
+    var priority: String?
+    var estimatedBudget: Double?
+    var actualSpend: Double?
+    var aiEstimatedDiyCost: Double?
+    var aiEstimatedProCost: Double?
+    var targetStartDate: String?
+    var targetEndDate: String?
+    var actualStartDate: String?
+    var actualEndDate: String?
+    var aiResearch: ProjectAIResearch?
+    var aiResearchUpdatedAt: Date?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, description, category, status, priority, notes
+        case projectType = "project_type"
+        case estimatedBudget = "estimated_budget"
+        case actualSpend = "actual_spend"
+        case aiEstimatedDiyCost = "ai_estimated_diy_cost"
+        case aiEstimatedProCost = "ai_estimated_pro_cost"
+        case targetStartDate = "target_start_date"
+        case targetEndDate = "target_end_date"
+        case actualStartDate = "actual_start_date"
+        case actualEndDate = "actual_end_date"
+        case aiResearch = "ai_research"
+        case aiResearchUpdatedAt = "ai_research_updated_at"
+    }
+}
+
+// MARK: - Project Line Items
+
+struct ProjectLineItemRow: Codable, Identifiable {
+    let id: UUID
+    let projectId: UUID
+    let householdId: UUID
+    let name: String
+    let category: String?
+    let quantity: Double?
+    let unit: String?
+    let estimatedUnitPrice: Double?
+    let actualUnitPrice: Double?
+    let suggestedStore: String?
+    let suggestedUrl: String?
+    let isPurchased: Bool
+    let isAiSuggested: Bool
+    let isOwned: Bool?
+    let notes: String?
+    let sortOrder: Int?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, category, quantity, unit, notes
+        case projectId = "project_id"
+        case householdId = "household_id"
+        case estimatedUnitPrice = "estimated_unit_price"
+        case actualUnitPrice = "actual_unit_price"
+        case suggestedStore = "suggested_store"
+        case suggestedUrl = "suggested_url"
+        case isPurchased = "is_purchased"
+        case isAiSuggested = "is_ai_suggested"
+        case isOwned = "is_owned"
+        case sortOrder = "sort_order"
+        case createdAt = "created_at"
+    }
+}
+
+struct ProjectLineItemInsert: Codable {
+    let projectId: UUID
+    let householdId: UUID
+    let name: String
+    var category: String?
+    var quantity: Double? = 1
+    var unit: String?
+    var estimatedUnitPrice: Double?
+    var actualUnitPrice: Double?
+    var suggestedStore: String?
+    var suggestedUrl: String?
+    var isPurchased: Bool = false
+    var isAiSuggested: Bool = false
+    var notes: String?
+    var sortOrder: Int? = 0
+
+    enum CodingKeys: String, CodingKey {
+        case name, category, quantity, unit, notes
+        case projectId = "project_id"
+        case householdId = "household_id"
+        case estimatedUnitPrice = "estimated_unit_price"
+        case actualUnitPrice = "actual_unit_price"
+        case suggestedStore = "suggested_store"
+        case suggestedUrl = "suggested_url"
+        case isPurchased = "is_purchased"
+        case isAiSuggested = "is_ai_suggested"
+        case sortOrder = "sort_order"
+    }
+}
+
+struct ProjectLineItemUpdate: Codable {
+    var name: String?
+    var category: String?
+    var quantity: Double?
+    var unit: String?
+    var estimatedUnitPrice: Double?
+    var actualUnitPrice: Double?
+    var suggestedStore: String?
+    var isPurchased: Bool?
+    var isOwned: Bool?
+    var notes: String?
+    var sortOrder: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case name, category, quantity, unit, notes
+        case estimatedUnitPrice = "estimated_unit_price"
+        case actualUnitPrice = "actual_unit_price"
+        case suggestedStore = "suggested_store"
+        case isPurchased = "is_purchased"
+        case isOwned = "is_owned"
+        case sortOrder = "sort_order"
+    }
+}
+
+// MARK: - AI Research Response (decoded from JSONB)
+
+struct ProjectAIResearch: Codable {
+    let projectSummary: String?
+    let typicalItems: [ResearchLineItem]?
+    let estimatedDiyCost: CostEstimate?
+    let estimatedProCost: CostEstimate?
+    let tipsAndWarnings: [String]?
+    let suggestedVideoTopics: [String]?
+    let permitNotes: String?
+    let difficultyLevel: String?
+    let estimatedTimeframe: FlexibleTimeframe?
+
+    enum CodingKeys: String, CodingKey {
+        case projectSummary = "projectSummary"
+        case typicalItems = "typicalItems"
+        case estimatedDiyCost = "estimatedDiyCost"
+        case estimatedProCost = "estimatedProCost"
+        case tipsAndWarnings = "tipsAndWarnings"
+        case suggestedVideoTopics = "suggestedVideoTopics"
+        case permitNotes = "permitNotes"
+        case difficultyLevel = "difficultyLevel"
+        case estimatedTimeframe = "estimatedTimeframe"
+    }
+}
+
+struct ResearchLineItem: Codable {
+    let name: String
+    let category: String?
+    // Edge Function may return "estimatedQuantity" or "quantity"
+    let estimatedQuantity: Double?
+    let quantity: Double?
+    let unit: String?
+    // Edge Function may return "estimatedUnitPrice" or "price"
+    let estimatedUnitPrice: Double?
+    let price: Double?
+    let notes: String?
+    // Edge Function may return "typicalStore" or "store"
+    let typicalStore: String?
+    let store: String?
+
+    /// Resolved quantity from whichever field is present
+    var resolvedQuantity: Double { estimatedQuantity ?? quantity ?? 1 }
+    /// Resolved unit price from whichever field is present
+    var resolvedPrice: Double? { estimatedUnitPrice ?? price }
+    /// Resolved store from whichever field is present
+    var resolvedStore: String? { typicalStore ?? store }
+}
+
+struct CostEstimate: Codable {
+    // Edge Function may return "lowRange"/"highRange" or "low"/"high"
+    let lowRange: Double?
+    let highRange: Double?
+    let low: Double?
+    let high: Double?
+    let breakdown: [CostBreakdownItem]?
+    let notes: String?
+
+    /// Resolved low value from whichever field is present
+    var resolvedLow: Double { lowRange ?? low ?? 0 }
+    /// Resolved high value from whichever field is present
+    var resolvedHigh: Double { highRange ?? high ?? 0 }
+}
+
+/// Handles estimatedTimeframe which can be a string or an object {diy, professional}.
+enum FlexibleTimeframe: Codable {
+    case string(String)
+    case object(diy: String?, professional: String?)
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let s = try? container.decode(String.self) {
+            self = .string(s)
+            return
+        }
+        // Try as object
+        struct TimeframeObj: Decodable {
+            let diy: String?
+            let professional: String?
+        }
+        if let obj = try? container.decode(TimeframeObj.self) {
+            self = .object(diy: obj.diy, professional: obj.professional)
+            return
+        }
+        self = .string("Unknown")
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .string(let s): try container.encode(s)
+        case .object(let diy, let pro):
+            try container.encode(["diy": diy ?? "", "professional": pro ?? ""])
+        }
+    }
+
+    var displayString: String {
+        switch self {
+        case .string(let s): return s
+        case .object(let diy, let pro):
+            let parts = [diy.map { "DIY: \($0)" }, pro.map { "Pro: \($0)" }].compactMap { $0 }
+            return parts.joined(separator: " / ")
+        }
+    }
+}
+
+struct CostBreakdownItem: Codable {
+    let category: String?
+    // Amount can be a number or a string like "$400-$800"
+    let amount: FlexibleValue?
+    let description: String?
+
+    var displayAmount: String {
+        switch amount {
+        case .string(let s): return s
+        case .double(let d): return "$\(Int(d))"
+        case .int(let i): return "$\(i)"
+        default: return ""
+        }
+    }
+}
+
 // MARK: - Merge Preview Models
 
 struct MergeDuplicate<T: Codable>: Codable {

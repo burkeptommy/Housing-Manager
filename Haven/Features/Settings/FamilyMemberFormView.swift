@@ -289,6 +289,7 @@ struct FamilyMemberFormView: View {
             }
         }
         .tint(HavenColors.navy)
+        .trackScreen(isEditing ? "FamilyMemberEditView" : "FamilyMemberAddView")
         .sheet(isPresented: $showInviteSheet) {
             InviteToHavenSheet(familyMember: existingMember, prefillEmail: email)
         }
@@ -418,6 +419,7 @@ struct FamilyMemberFormView: View {
                 ))
             }
             Haptics.success()
+            Analytics.track(isEditing ? .familyMemberEdited : .familyMemberCreated, ["relationship": relationship])
             await onSave?()
 
             if showInviteAfterSave && existingUserDetected {
@@ -469,6 +471,7 @@ struct FamilyMemberFormView: View {
         guard let memberId = existingMember?.id else { return }
         do {
             try await DatabaseService.shared.deleteFamilyMember(id: memberId)
+            Analytics.track(.familyMemberDeleted)
             Haptics.success()
             await onSave?()
             dismiss()

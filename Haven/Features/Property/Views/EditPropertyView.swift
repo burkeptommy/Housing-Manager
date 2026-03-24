@@ -92,10 +92,11 @@ struct EditPropertyView: View {
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }
-                        .disabled(name.isEmpty || isSaving)
+                        .disabled(name.isEmpty || street.isEmpty || city.isEmpty || state.isEmpty || isSaving)
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("EditPropertyView", properties: ["property_id": property.id.uuidString])
         }
     }
 
@@ -118,6 +119,7 @@ struct EditPropertyView: View {
                 notes: notes.isEmpty ? nil : notes
             )
             let updated = try await DatabaseService.shared.updateProperty(id: property.id, update)
+            Analytics.track(.propertyEdited, ["property_id": property.id.uuidString])
             onSave?(updated)
             dismiss()
         } catch {

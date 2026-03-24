@@ -246,7 +246,9 @@ ${
           body: JSON.stringify({
             model: "claude-sonnet-4-6",
             max_tokens: 8192,
-            system: `You are a financial and estate planning scenario simulator. You MUST return ONLY valid JSON — no markdown code fences, no backticks, no explanation outside the JSON object. Start your response with { and end with }.${
+            system: `You are a financial and estate planning scenario simulator. You MUST return ONLY valid JSON — no markdown code fences, no backticks, no explanation outside the JSON object. Start your response with { and end with }.
+
+IMPORTANT: In the "summary" field of your JSON response, always begin with: "This analysis is for educational and informational purposes only and does not constitute legal, financial, or tax advice. Please consult qualified professionals before making decisions based on these results."${
               !hasAnyData
                 ? " The user has not uploaded any documents or added household data yet. Provide helpful GENERAL advice about this topic, clearly noting that you don't have their specific data. Explain the general benefits, considerations, and steps they should take. Recommend they upload relevant documents to get personalized analysis."
                 : ""

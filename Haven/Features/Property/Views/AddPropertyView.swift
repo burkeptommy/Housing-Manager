@@ -85,11 +85,12 @@ struct AddPropertyView: View {
                         Button("Save") {
                             Task { await save() }
                         }
-                        .disabled(name.isEmpty)
+                        .disabled(name.isEmpty || street.isEmpty || city.isEmpty || state.isEmpty)
                     }
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("AddPropertyView")
             .fullScreenCover(isPresented: $showSystemSetup) {
                 if let propId = savedPropertyId, let hhId = savedHouseholdId {
                     HomeSystemsSetupView(
@@ -136,6 +137,7 @@ struct AddPropertyView: View {
             let property = try await DatabaseService.shared.createProperty(insert)
 
             Haptics.success()
+            Analytics.track(.propertyCreated, ["property_type": propertyType, "property_id": property.id.uuidString])
             savedPropertyId = property.id
             savedHouseholdId = householdId
 

@@ -64,6 +64,7 @@ struct SeasonalTasksDetailView: View {
         .background(HavenColors.background)
         .navigationTitle("\(season) Tasks")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("SeasonalTasksDetailView", properties: ["season": season])
     }
 
     private var progress: Double {

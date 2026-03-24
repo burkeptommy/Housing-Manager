@@ -46,6 +46,7 @@ struct MainTabView: View {
                     Haptics.medium()
                     hasUsedScenarioStudio = true
                     showScenarioStudio = true
+                    Analytics.track(.scenarioStudioOpened, ["source": "floating_button"])
                 } label: {
                     HStack(spacing: 8) {
                         Image(systemName: "sparkles")
@@ -70,8 +71,11 @@ struct MainTabView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .onChange(of: selectedTab) { _, _ in
+        .onChange(of: selectedTab) { _, newTab in
             Haptics.selection()
+            let tabNames = ["Dashboard", "Property", "Life", "Alfred"]
+            let name = newTab < tabNames.count ? tabNames[newTab] : "Unknown"
+            Analytics.track(.tabSelected, ["tab": name, "tab_index": newTab])
         }
         .onReceive(NotificationCenter.default.publisher(for: .switchToTab)) { notification in
             if let tab = notification.userInfo?["tab"] as? Int {

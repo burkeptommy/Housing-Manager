@@ -30,6 +30,7 @@ struct HouseholdAccessView: View {
         .background(HavenColors.background)
         .navigationTitle("Household & Access")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("HouseholdAccessView")
         .task { await loadData() }
     }
 

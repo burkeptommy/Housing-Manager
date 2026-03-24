@@ -103,6 +103,7 @@ struct EditDocumentDetailsView: View {
             .background(HavenColors.cream)
             .navigationTitle("Edit Details")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("EditDocumentDetailsView")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -116,6 +117,7 @@ struct EditDocumentDetailsView: View {
     }
 
     private func save() async {
+        Analytics.track(.documentEdited, ["document_id": document.id.uuidString, "source": "edit_details_save"])
         isSaving = true
         error = nil
         let dateFormatter = DateFormatter()

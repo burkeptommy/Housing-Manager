@@ -72,6 +72,7 @@ struct WebsiteImportView: View {
             }
             .navigationTitle("Website Import")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("WebsiteImportView")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
@@ -125,8 +126,10 @@ struct WebsiteImportView: View {
                     })
                 }
 
+                Analytics.track(.contractorWebsiteImport, ["url": normalizedUrl, "success": true])
                 onResult(result)
             } else {
+                Analytics.track(.contractorWebsiteImport, ["url": normalizedUrl, "success": false])
                 error = "Couldn't extract info from that website. Try entering details manually."
             }
         } catch {

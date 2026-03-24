@@ -52,6 +52,7 @@ struct MissingDocumentsView: View {
                                         .font(HavenTypography.bodySmall)
                                     Spacer()
                                     Button {
+                                        Analytics.track(.documentUploadStarted, ["source": "missing_documents", "category": cat.rawValue])
                                         onUpload?(cat)
                                     } label: {
                                         Image(systemName: "plus.circle.fill")
@@ -69,6 +70,7 @@ struct MissingDocumentsView: View {
         }
         .navigationTitle("Missing Documents")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("MissingDocumentsView")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }

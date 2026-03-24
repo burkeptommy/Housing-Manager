@@ -38,6 +38,8 @@ struct RecommendationEngine {
         expiringCount: Int,
         estateReadiness: Double,
         hasRemindersEnabled: Bool,
+        overBudgetProjectCount: Int = 0,
+        approachingDeadlineProjectCount: Int = 0,
         dismissedIds: Set<String>
     ) -> [Recommendation] {
         var recs: [Recommendation] = []
@@ -102,6 +104,30 @@ struct RecommendationEngine {
                 icon: "wrench.and.screwdriver.fill",
                 iconColor: HavenColors.critical,
                 priority: 12,
+                action: .navigate(tab: 1)
+            ))
+        }
+
+        if overBudgetProjectCount > 0 {
+            recs.append(Recommendation(
+                id: "over_budget_projects",
+                title: "\(overBudgetProjectCount) project\(overBudgetProjectCount == 1 ? " is" : "s are") over budget",
+                subtitle: "Review your spending to stay on track",
+                icon: "exclamationmark.triangle.fill",
+                iconColor: HavenColors.critical,
+                priority: 18,
+                action: .navigate(tab: 1)
+            ))
+        }
+
+        if approachingDeadlineProjectCount > 0 {
+            recs.append(Recommendation(
+                id: "approaching_deadline_projects",
+                title: "\(approachingDeadlineProjectCount) project\(approachingDeadlineProjectCount == 1 ? "" : "s") approaching deadline",
+                subtitle: "Check your timeline and remaining tasks",
+                icon: "calendar.badge.exclamationmark",
+                iconColor: HavenColors.warning,
+                priority: 22,
                 action: .navigate(tab: 1)
             ))
         }

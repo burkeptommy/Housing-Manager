@@ -110,6 +110,7 @@ struct ApplianceSetupSheet: View {
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("ApplianceSetup")
             .onAppear { setupAppliances() }
         }
     }
@@ -155,6 +156,7 @@ struct ApplianceSetupSheet: View {
             _ = try? await DatabaseService.shared.createHomeSystem(insert)
         }
 
+        Analytics.track(.applianceSetupCompleted, ["count": toCreate.count, "appliances": toCreate.map(\.name).joined(separator: ",")])
         Haptics.success()
         onComplete?()
         dismiss()

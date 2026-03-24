@@ -251,6 +251,22 @@ CREATE TABLE completion_scores (
     UNIQUE(household_id, category)
 );
 
+-- Analytics Events (product analytics — all user interactions)
+CREATE TABLE analytics_events (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    household_id UUID,
+    event_name TEXT NOT NULL,
+    screen_name TEXT,
+    properties JSONB DEFAULT '{}',
+    device_model TEXT,
+    os_version TEXT,
+    app_version TEXT,
+    build_number TEXT,
+    session_id TEXT,
+    created_at TIMESTAMPTZ DEFAULT now()
+);
+
 -- ============================================================================
 -- INDEXES (performance on household_id lookups)
 -- ============================================================================
@@ -278,6 +294,12 @@ CREATE INDEX idx_access_log_resource ON access_log(resource_type, resource_id);
 CREATE INDEX idx_document_content_household ON document_content(household_id);
 CREATE INDEX idx_document_content_document ON document_content(document_id);
 CREATE INDEX idx_completion_scores_household ON completion_scores(household_id);
+CREATE INDEX idx_analytics_events_user ON analytics_events(user_id, created_at DESC);
+CREATE INDEX idx_analytics_events_household ON analytics_events(household_id, created_at DESC);
+CREATE INDEX idx_analytics_events_name ON analytics_events(event_name, created_at DESC);
+CREATE INDEX idx_analytics_events_screen ON analytics_events(screen_name, created_at DESC);
+CREATE INDEX idx_analytics_events_session ON analytics_events(session_id);
+CREATE INDEX idx_analytics_events_created ON analytics_events(created_at DESC);
 
 -- ============================================================================
 -- ROW LEVEL SECURITY
@@ -298,6 +320,7 @@ ALTER TABLE chat_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE completion_scores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE access_log ENABLE ROW LEVEL SECURITY;
 ALTER TABLE document_content ENABLE ROW LEVEL SECURITY;
+ALTER TABLE analytics_events ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- RLS HELPER FUNCTION
@@ -603,3 +626,14 @@ CREATE POLICY "Edge functions can insert document content"
 CREATE POLICY "Edge functions can update document content"
     ON document_content FOR UPDATE
     USING (true);
+
+-- ----------------------------------------------------------------------------
+-- analytics_events (INSERT only for clients, SELECT for service role)
+-- ----------------------------------------------------------------------------
+CREATE POLICY "Users can insert own analytics events"
+    ON analytics_events FOR INSERT
+    WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Service role can read all analytics"
+    ON analytics_events FOR SELECT
+    USING (auth.jwt() ->> 'role' = 'service_role');

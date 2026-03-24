@@ -39,6 +39,7 @@ struct FamilyMembersView: View {
                     }
                 }
             }
+            .trackScreen("FamilyMembersView")
             .onAppear { Task { await loadData() } }
             .sheet(isPresented: $showAddMember) {
                 NavigationStack {

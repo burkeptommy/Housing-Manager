@@ -1078,4 +1078,92 @@ final class DatabaseService {
             .eq("id", value: id.uuidString)
             .execute()
     }
+
+    // MARK: - Property Projects
+
+    func fetchProjects(propertyId: UUID) async throws -> [PropertyProjectRow] {
+        try await from("property_projects")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func fetchAllProjects() async throws -> [PropertyProjectRow] {
+        try await from("property_projects")
+            .select()
+            .order("updated_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func createProject(_ project: PropertyProjectInsert) async throws -> PropertyProjectRow {
+        try await from("property_projects")
+            .insert(project)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateProject(id: UUID, _ updates: PropertyProjectUpdate) async throws -> PropertyProjectRow {
+        try await from("property_projects")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func deleteProject(id: UUID) async throws {
+        try await from("property_projects")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Project Line Items
+
+    func fetchLineItems(projectId: UUID) async throws -> [ProjectLineItemRow] {
+        try await from("project_line_items")
+            .select()
+            .eq("project_id", value: projectId.uuidString)
+            .order("sort_order")
+            .execute()
+            .value
+    }
+
+    func createLineItem(_ item: ProjectLineItemInsert) async throws -> ProjectLineItemRow {
+        try await from("project_line_items")
+            .insert(item)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func createLineItems(_ items: [ProjectLineItemInsert]) async throws {
+        try await from("project_line_items")
+            .insert(items)
+            .execute()
+    }
+
+    func updateLineItem(id: UUID, _ updates: ProjectLineItemUpdate) async throws -> ProjectLineItemRow {
+        try await from("project_line_items")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func deleteLineItem(id: UUID) async throws {
+        try await from("project_line_items")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
 }

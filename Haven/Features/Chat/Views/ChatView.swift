@@ -25,6 +25,7 @@ struct ChatView: View {
             VStack(spacing: 0) {
                 alfredTab
             }
+            .trackScreen("ChatView")
             .navigationTitle("Alfred")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -32,6 +33,7 @@ struct ChatView: View {
                     Menu {
                         Button {
                             Haptics.medium()
+                            Analytics.track(.chatCleared)
                             Task {
                                 await viewModel.clearChat()
                                 contextName = nil
@@ -177,6 +179,7 @@ struct ChatView: View {
                         ForEach(suggestedChips, id: \.self) { chip in
                             Button {
                                 Haptics.light()
+                                Analytics.track(.chatSuggestedPromptTapped, ["prompt": chip])
                                 Task { await viewModel.sendSuggestedPrompt(chip) }
                             } label: {
                                 Text(chip)
@@ -352,18 +355,21 @@ struct ChatView: View {
                 Menu {
                     Button {
                         Haptics.light()
+                        Analytics.track(.chatAttachmentAdded, ["source": "scanner"])
                         showScanner = true
                     } label: {
                         Label("Scan Document", systemImage: "doc.text.viewfinder")
                     }
                     Button {
                         Haptics.light()
+                        Analytics.track(.chatAttachmentAdded, ["source": "photo_library"])
                         showPhotoPicker = true
                     } label: {
                         Label("Photo Library", systemImage: "photo.on.rectangle")
                     }
                     Button {
                         Haptics.light()
+                        Analytics.track(.chatAttachmentAdded, ["source": "file_picker"])
                         showFilePicker = true
                     } label: {
                         Label("Choose File", systemImage: "folder")

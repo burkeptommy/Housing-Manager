@@ -93,6 +93,7 @@ final class DocumentDetailViewModel: ObservableObject {
 
     func requestAIAnalysis() async {
         guard let doc = document else { return }
+        Analytics.track(.documentAIAnalysisRequested, ["document_id": doc.id.uuidString, "source": "detail_view"])
         isAnalyzing = true
         do {
             let user = try await db.fetchCurrentUser()
@@ -131,6 +132,7 @@ final class DocumentDetailViewModel: ObservableObject {
                 householdId: householdId
             )
             analysisResult = result
+            Analytics.track(.documentAIAnalysisCompleted, ["document_id": doc.id.uuidString, "has_critical_flags": result.hasCriticalFlags])
             if result.hasCriticalFlags {
                 showCriticalFlagAlert = true
             }
@@ -164,6 +166,7 @@ final class DocumentDetailViewModel: ObservableObject {
 
     func deleteDocument() async -> Bool {
         guard let doc = document else { return false }
+        Analytics.track(.documentDeleted, ["document_id": doc.id.uuidString, "category": doc.category])
         isDeleting = true
         do {
             // Delete file from storage
@@ -193,6 +196,7 @@ final class DocumentDetailViewModel: ObservableObject {
 
     func markReviewed() async {
         guard let doc = document else { return }
+        Analytics.track(.documentMarkedReviewed, ["document_id": doc.id.uuidString])
         do {
             document = try await db.updateDocument(
                 id: doc.id,
@@ -296,6 +300,7 @@ final class DocumentDetailViewModel: ObservableObject {
 
     func toggleVaultLock() async {
         guard let doc = document else { return }
+        Analytics.track(.documentVaultLockToggled, ["document_id": doc.id.uuidString, "new_state": doc.vaultLocked == true ? "unlocked" : "locked"])
         isTogglingVaultLock = true
 
         do {
@@ -402,9 +407,11 @@ final class DocumentDetailViewModel: ObservableObject {
         let isShared = trustedContactsWithAccess.contains { $0.id == contactId }
         do {
             if isShared {
+                Analytics.track(.documentAccessRevoked, ["document_id": doc.id.uuidString, "contact_id": contactId.uuidString])
                 try await db.revokeDocumentAccess(contactId: contactId, documentId: doc.id)
                 trustedContactsWithAccess.removeAll { $0.id == contactId }
             } else {
+                Analytics.track(.documentSharedWithContact, ["document_id": doc.id.uuidString, "contact_id": contactId.uuidString])
                 try await db.grantDocumentAccess(contactId: contactId, documentId: doc.id)
                 if let contact = allTrustedContacts.first(where: { $0.id == contactId }) {
                     trustedContactsWithAccess.append(contact)

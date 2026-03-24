@@ -26,6 +26,7 @@
 		B1C2D3E4F5A6B7C8D9E0F1A4 /* ServiceContractSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E2A4 /* ServiceContractSheet.swift */; };
 		0E71FADFFA9696BBA2485BDC /* Font+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E819F4A1BD46D5CE48E9E1A /* Font+Haven.swift */; };
 		0EDD47FCE25451C4627CA4AA /* ScenarioDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1B8119785871802AF221E00 /* ScenarioDefinitions.swift */; };
+		D7E8F9A0B1C2D3E4F5061728 /* ScenarioDisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4F5A6B7C8D9E0F1A2B3C4D5 /* ScenarioDisclaimerView.swift */; };
 		0EEC7C97D14C2A7C4EB1B95C /* ChatBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8FC428382466D4854DE31A /* ChatBubble.swift */; };
 		0EEC7C98D14C2A7C4EB1B95D /* ChatDocumentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F8FC429382466D4854DE31B /* ChatDocumentCard.swift */; };
 		11E1363EB1C640B6C1A2CCE6 /* ScenarioLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 013974A131EC33DB20C08CEE /* ScenarioLoadingView.swift */; };
@@ -42,6 +43,7 @@
 		31A0E1F2C3B4D5E6F7890ABC /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31A0E1F2C3B4D5E6F7890ABD /* IntroExplainerView.swift */; };
 		32EAB44D462EDADAF339A759 /* ScenarioStudioViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A093309B88F4255CDA4007D9 /* ScenarioStudioViewModel.swift */; };
 		SCENRUN001BUILDFILE00001 /* ScenarioRunnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCENRUN001FILEREF00001 /* ScenarioRunnerService.swift */; };
+		ANALYT001BUILDFILE00001 /* AnalyticsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = ANALYT001FILEREF00001 /* AnalyticsService.swift */; };
 		3534ED295F8A950D56F1C2F7 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 8FC4B4D10494E8767E9A0642 /* Assets.xcassets */; };
 		355888DCD1168D6EB16EA195 /* Color+Haven.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2218FB82A32E8E479EB1078E /* Color+Haven.swift */; };
 		393F6ED81F144330EAEA13E1 /* DocumentVaultViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CCD19CB328DFD094D0C1DEF /* DocumentVaultViewModel.swift */; };
@@ -174,10 +176,18 @@
 		F52507EB3AA830122241C680 /* HavenButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */; };
 		F66A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift */; };
 		FEEAF0C71107387A5BCCD8DA /* HavenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCD278A06338019D17B809C /* HavenTheme.swift */; };
+		CD747E62AC4C033CF27E632B /* PropertyProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F696424E97E6A38E13D7F80C /* PropertyProjectsView.swift */; };
+		09AC0052B3FC6E6A78BC8D94 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */; };
+		1792CBDFC18CC63A1A79C1D8 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */; };
+		677840DC4B5E9480C17D8B92 /* EditLineItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E02CA16C2CF788621F3866 /* EditLineItemView.swift */; };
+		85FA7718FBD50912F4C696FF /* ProjectsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FBB06D60A12902AE54892E9 /* ProjectsViewModel.swift */; };
+		36CD76C541EED3DBDAFC50EA /* ProjectTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F4D32D60C3662D57FA6C10 /* ProjectTypes.swift */; };
+		C3D4E5F6A7B8C9D0E1F20314 /* ProjectResearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
 		013974A131EC33DB20C08CEE /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4B5C /* ScenarioDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDisclaimerView.swift; sourceTree = "<group>"; };
 		01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceScheduleView.swift; sourceTree = "<group>"; };
 		03D64EAE4435181BE7303600 /* HomeSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSystem.swift; sourceTree = "<group>"; };
 		065CD0193255DF7812606891 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
@@ -262,6 +272,8 @@
 		A03C5495A9EBA23FE8FAB5AD /* DocumentCategory.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCategory.swift; sourceTree = "<group>"; };
 		A093309B88F4255CDA4007D9 /* ScenarioStudioViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioViewModel.swift; sourceTree = "<group>"; };
 		SCENRUN001FILEREF00001 /* ScenarioRunnerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioRunnerService.swift; sourceTree = "<group>"; };
+		ANALYT001FILEREF00001 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
+		E4F5A6B7C8D9E0F1A2B3C4D5 /* ScenarioDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDisclaimerView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* EditPropertyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPropertyView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F4 /* DuplicateDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetectionService.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F6A7B8C9D0E1F6 /* DuplicateDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDocumentsView.swift; sourceTree = "<group>"; };
@@ -344,6 +356,13 @@
 		FDDD425AF92101F7B1B5793E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorViewModel.swift; sourceTree = "<group>"; };
 		FF6A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressAutocompleteField.swift; sourceTree = "<group>"; };
+		F696424E97E6A38E13D7F80C /* PropertyProjectsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyProjectsView.swift; sourceTree = "<group>"; };
+		D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProjectView.swift; sourceTree = "<group>"; };
+		44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
+		05E02CA16C2CF788621F3866 /* EditLineItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLineItemView.swift; sourceTree = "<group>"; };
+		8FBB06D60A12902AE54892E9 /* ProjectsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsViewModel.swift; sourceTree = "<group>"; };
+		52F4D32D60C3662D57FA6C10 /* ProjectTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTypes.swift; sourceTree = "<group>"; };
+		F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectResearchService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -427,6 +446,7 @@
 				A093309B88F4255CDA4007D9 /* ScenarioStudioViewModel.swift */,
 				BDB529E1D8E04597D51D669D /* ScenarioInputView.swift */,
 				013974A131EC33DB20C08CEE /* ScenarioLoadingView.swift */,
+				E4F5A6B7C8D9E0F1A2B3C4D5 /* ScenarioDisclaimerView.swift */,
 			);
 			path = Scenarios;
 			sourceTree = "<group>";
@@ -436,6 +456,7 @@
 			children = (
 				483098FC70EB489F89E2222E /* DefaultSystemsService.swift */,
 				B0C1D2E3F4A5B6C7D8E9F0A1 /* MaintenanceTemplates.swift */,
+				F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -578,6 +599,7 @@
 				F691E9DF04B09ED99D53FEA6 /* MaintenanceViewModel.swift */,
 				8E68BAC14F9D97FFE5C7B429 /* PropertyDetailViewModel.swift */,
 				ADB9AB1A050BE0EC660905BA /* PropertyListViewModel.swift */,
+				8FBB06D60A12902AE54892E9 /* ProjectsViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -676,6 +698,7 @@
 				A1B2C3D4E5F6A7B8C9D0E1F4 /* DuplicateDetectionService.swift */,
 				EE5F6A7B8C9D0E1F2A3B4C5D /* GooglePlacesService.swift */,
 				SCENRUN001FILEREF00001 /* ScenarioRunnerService.swift */,
+				ANALYT001FILEREF00001 /* AnalyticsService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -725,6 +748,10 @@
 				96C942808EB50DCF9A399128 /* VendorReviewForm.swift */,
 				D5E6F7A8B9C0D1E2F3A4B5C6 /* SeasonalTasksDetailView.swift */,
 				E7F8A9B0C1D2E3F4A5B6C7D9 /* OverdueTasksDetailView.swift */,
+				F696424E97E6A38E13D7F80C /* PropertyProjectsView.swift */,
+				D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */,
+				44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */,
+				05E02CA16C2CF788621F3866 /* EditLineItemView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -809,6 +836,7 @@
 				ABB0AD3DDD56272B9730CDBA /* Property.swift */,
 				ED26FF74B1C1FC72D3F0E6D0 /* ServiceRecord.swift */,
 				BCED3F91C128394EBFF7BB27 /* Warranty.swift */,
+				52F4D32D60C3662D57FA6C10 /* ProjectTypes.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -1093,12 +1121,21 @@
 				D345B388C4AC30F662DE79E3 /* ScenarioResultView.swift in Sources */,
 				32EAB44D462EDADAF339A759 /* ScenarioStudioViewModel.swift in Sources */,
 				SCENRUN001BUILDFILE00001 /* ScenarioRunnerService.swift in Sources */,
+				ANALYT001BUILDFILE00001 /* AnalyticsService.swift in Sources */,
 				AA34CBD6B3CD64D3807B274A /* ScenarioInputView.swift in Sources */,
 				11E1363EB1C640B6C1A2CCE6 /* ScenarioLoadingView.swift in Sources */,
+				D7E8F9A0B1C2D3E4F5061728 /* ScenarioDisclaimerView.swift in Sources */,
 				B1A2C3D4E5F6789012345602 /* FamilyAvatarView.swift in Sources */,
 				B1A2C3D4E5F6789012345604 /* FamilyMembersView.swift in Sources */,
 				152F97CC67274C27BB83106B /* HouseholdAccessView.swift in Sources */,
 				B1A2C3D4E5F6789012345606 /* FamilyMemberFormView.swift in Sources */,
+				CD747E62AC4C033CF27E632B /* PropertyProjectsView.swift in Sources */,
+				09AC0052B3FC6E6A78BC8D94 /* NewProjectView.swift in Sources */,
+				1792CBDFC18CC63A1A79C1D8 /* ProjectDetailView.swift in Sources */,
+				677840DC4B5E9480C17D8B92 /* EditLineItemView.swift in Sources */,
+				85FA7718FBD50912F4C696FF /* ProjectsViewModel.swift in Sources */,
+				36CD76C541EED3DBDAFC50EA /* ProjectTypes.swift in Sources */,
+				C3D4E5F6A7B8C9D0E1F20314 /* ProjectResearchService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

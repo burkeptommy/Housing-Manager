@@ -11,6 +11,7 @@ struct SubscriptionView: View {
         }
         .padding()
         .navigationTitle("Subscription")
+        .trackScreen("SubscriptionView")
     }
 }
 

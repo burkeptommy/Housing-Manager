@@ -11,6 +11,8 @@ struct ScenarioStudioView: View {
     @State private var showSubmittedBanner = false
     @State private var customQuery = ""
     @State private var activeTab: ScenarioTab = .explore
+    @AppStorage("hasAcknowledgedScenarioDisclaimer") private var hasAcknowledgedDisclaimer = false
+    @State private var showDisclaimer = false
 
     enum ScenarioTab: String, CaseIterable {
         case explore = "Explore"
@@ -138,9 +140,20 @@ struct ScenarioStudioView: View {
                     )
                 }
             }
+            .trackScreen("ScenarioStudioView")
+            .sheet(isPresented: $showDisclaimer) {
+                ScenarioDisclaimerView {
+                    hasAcknowledgedDisclaimer = true
+                    showDisclaimer = false
+                }
+            }
             .task {
+                Analytics.track(.scenarioStudioOpened)
                 await viewModel.loadHousehold()
                 await viewModel.loadRecentScenarios()
+                if !hasAcknowledgedDisclaimer {
+                    showDisclaimer = true
+                }
                 // Handle initial query from contextual trigger
                 if let query = initialQuery, !query.isEmpty {
                     customQuery = query
@@ -257,6 +270,7 @@ struct ScenarioStudioView: View {
                     ForEach(viewModel.inspirationChips, id: \.self) { chip in
                         Button {
                             Haptics.medium()
+                            Analytics.track(.scenarioSubmitted, ["type": "inspiration_chip", "query": String(chip.prefix(100))])
                             customQuery = chip
                             selectedScenario = nil
                             viewModel.runCustomScenario(query: chip)
@@ -341,10 +355,12 @@ struct ScenarioStudioView: View {
             ForEach(category.scenarios) { scenario in
                 Button {
                     Haptics.light()
+                    Analytics.track(.scenarioPresetSelected, ["scenario_id": scenario.id])
                     selectedScenario = scenario
                     if scenario.requiresParams {
                         showInput = true
                     } else {
+                        Analytics.track(.scenarioSubmitted, ["type": "preset", "scenario_id": scenario.id])
                         viewModel.runScenario(id: scenario.id)
                         showSubmittedBanner(andDismiss: true)
                     }
@@ -561,6 +577,7 @@ struct ScenarioStudioView: View {
 
     private func submitCustomQuery() {
         Haptics.medium()
+        Analytics.track(.scenarioSubmitted, ["type": "custom", "query": String(customQuery.prefix(100))])
         selectedScenario = nil
         viewModel.runCustomScenario(query: customQuery)
         showSubmittedBanner(andDismiss: true)

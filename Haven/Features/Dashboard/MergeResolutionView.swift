@@ -68,6 +68,7 @@ struct MergeResolutionView: View {
                 .padding()
             }
             .background(HavenColors.cream)
+            .trackScreen("MergeResolution")
             .navigationTitle("Combine Households")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -331,6 +332,7 @@ struct MergeResolutionView: View {
     // MARK: - Execute Merge
 
     private func executeMerge() async {
+        Analytics.track(.householdMergeStarted, ["merge_request_id": mergeRequestId, "has_conflicts": hasConflicts])
         isMerging = true
         error = nil
 
@@ -372,6 +374,7 @@ struct MergeResolutionView: View {
 
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let success = json["success"] as? Bool, success {
+                Analytics.track(.householdMergeCompleted, ["merge_request_id": mergeRequestId])
                 Haptics.success()
                 withAnimation { mergeComplete = true }
             } else {

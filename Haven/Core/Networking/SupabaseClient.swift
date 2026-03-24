@@ -226,6 +226,40 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "simulate-scenario", body: body, timeoutSeconds: 180)
     }
 
+    // MARK: - Research Project
+
+    struct ResearchProjectRequest: Encodable {
+        let projectName: String
+        let category: String
+        let description: String?
+        let propertyLocation: String?
+        let projectId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case category, description
+            case projectName = "project_name"
+            case propertyLocation = "property_location"
+            case projectId = "project_id"
+        }
+    }
+
+    static func researchProject(
+        projectName: String,
+        category: String,
+        description: String? = nil,
+        propertyLocation: String? = nil,
+        projectId: String? = nil
+    ) async throws -> Data {
+        let body = ResearchProjectRequest(
+            projectName: projectName,
+            category: category,
+            description: description,
+            propertyLocation: propertyLocation,
+            projectId: projectId
+        )
+        return try await callEdgeFunction(name: "research-project", body: body, timeoutSeconds: 120)
+    }
+
     // MARK: - View Document (Zero-Access Model)
 
     struct ViewDocumentRequest: Encodable {

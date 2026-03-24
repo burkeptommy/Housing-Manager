@@ -73,6 +73,7 @@ struct MaintenanceScheduleView: View {
             }
         }
         .animation(.easeInOut, value: viewModel.completionToast?.id)
+        .trackScreen("MaintenanceScheduleView")
         .task {
             if viewModel.tasks.isEmpty {
                 await viewModel.loadTasks()
@@ -232,6 +233,9 @@ struct MaintenanceScheduleView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .onChange(of: viewMode) { _, newMode in
+                    Analytics.track(.maintenanceFilterChanged, ["filter_type": "view_mode", "value": newMode.rawValue])
+                }
 
                 // Summary bar
                 summaryBar
@@ -515,6 +519,7 @@ struct MaintenanceScheduleView: View {
         let showPropertyLabel = viewModel.properties.count > 1
 
         return Button {
+            Analytics.track(.maintenanceTaskViewed, ["task_id": task.id.uuidString, "task_title": task.title])
             selectedTask = task
         } label: {
             HavenCard {

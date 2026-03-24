@@ -44,6 +44,7 @@ struct QuickActions: View {
     private func quickActionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
         Button {
             Haptics.light()
+            Analytics.track(.dashboardQuickAction, ["action": title])
             action()
         } label: {
             VStack(spacing: HavenTheme.spacing4) {

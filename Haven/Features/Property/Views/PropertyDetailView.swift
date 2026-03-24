@@ -1,9 +1,28 @@
 import SwiftUI
 
 enum PropertyDetailTab: String, CaseIterable {
-    case overview = "Overview"
-    case maintenance = "Maintenance"
-    case contacts = "Contacts"
+    case overview
+    case maintenance
+    case projects
+    case contacts
+
+    var title: String {
+        switch self {
+        case .overview: return "Overview"
+        case .maintenance: return "Maintenance"
+        case .projects: return "Projects"
+        case .contacts: return "Contacts"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .overview: return "house.fill"
+        case .maintenance: return "calendar.badge.clock"
+        case .projects: return "hammer.fill"
+        case .contacts: return "person.2.fill"
+        }
+    }
 }
 
 struct PropertyDetailView: View {
@@ -42,17 +61,20 @@ struct PropertyDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        Analytics.track(.propertyEdited, ["property_id": propertyID.uuidString, "source": "menu"])
                         showEditProperty = true
                     } label: {
                         Label("Edit Property", systemImage: "pencil")
                     }
                     Button {
+                        Analytics.track(.systemCreated, ["property_id": propertyID.uuidString, "source": "menu"])
                         showAddSystem = true
                     } label: {
                         Label("Add System", systemImage: "plus.circle.fill")
                     }
                     Divider()
                     Button(role: .destructive) {
+                        Analytics.track(.propertyDeleted, ["property_id": propertyID.uuidString])
                         showDeleteConfirmation = true
                     } label: {
                         Label("Delete Property", systemImage: "trash")
@@ -63,10 +85,12 @@ struct PropertyDetailView: View {
                 }
             }
         }
+        .trackScreen("PropertyDetailView", properties: ["property_id": propertyID.uuidString])
         .task {
             await viewModel.loadProperty(id: propertyID)
         }
         .refreshable {
+            Analytics.track(.propertyRefreshed, ["property_id": propertyID.uuidString])
             await viewModel.loadProperty(id: propertyID)
         }
         .sheet(isPresented: $showEditProperty) {
@@ -224,20 +248,42 @@ struct PropertyDetailView: View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 16) {
                 propertyHeader(property)
-                quickActionsRow
 
-                Picker("Section", selection: $activeTab) {
+                HStack(spacing: 0) {
                     ForEach(PropertyDetailTab.allCases, id: \.self) { tab in
-                        Text(tab.rawValue).tag(tab)
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                activeTab = tab
+                            }
+                            Analytics.track(.propertyTabSelected, ["tab": tab.title, "property_id": propertyID.uuidString])
+                        } label: {
+                            VStack(spacing: 4) {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: 16))
+                                    .symbolRenderingMode(.hierarchical)
+                                Text(tab.title)
+                                    .font(HavenTypography.uiCaption)
+                            }
+                            .foregroundStyle(activeTab == tab ? HavenColors.navy800 : HavenColors.textTertiary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(
+                                activeTab == tab
+                                    ? HavenColors.navy.opacity(0.08)
+                                    : Color.clear
+                            )
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
-                .pickerStyle(.segmented)
                 .padding(.horizontal, 4)
 
                 switch activeTab {
                 case .overview:
                     propertyDocumentsSection
                     propertyMaintenanceCard
+                    if !viewModel.serviceRecords.isEmpty { recentServiceHistoryCard }
                     if !viewModel.activeWarranties.isEmpty { warrantiesSection }
 
                 case .maintenance:
@@ -248,6 +294,9 @@ struct PropertyDetailView: View {
                     systemsSection
                     if !viewModel.upcomingTasks.isEmpty { upcomingMaintenanceSection }
                     if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
+
+                case .projects:
+                    PropertyProjectsView(propertyID: propertyID, householdId: viewModel.property?.householdId)
 
                 case .contacts:
                     vendorsSection
@@ -306,6 +355,33 @@ struct PropertyDetailView: View {
                         propertyDetail(label: "Entity", value: entity)
                     }
                 }
+
+                // Ask Alfred — contextual chat
+                Button {
+                    showAlfredChat = true
+                } label: {
+                    HStack(spacing: 6) {
+                        ZStack {
+                            Circle()
+                                .fill(HavenColors.navy800)
+                                .frame(width: 20, height: 20)
+                            Text("A")
+                                .font(.system(size: 11, weight: .bold, design: .serif))
+                                .foregroundStyle(HavenColors.creamLight)
+                        }
+                        Text("Ask Alfred about this property")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .padding(HavenTheme.spacing8)
+                    .background(HavenColors.navy.opacity(0.04))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -1001,6 +1077,52 @@ struct PropertyDetailView: View {
     }
 
     // MARK: - Service History
+
+    /// Compact service history for the Overview tab — last 3 records.
+    private var recentServiceHistoryCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Image(systemName: "clock.fill")
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Text("Recent Service")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                }
+
+                ForEach(viewModel.serviceRecords.prefix(3)) { record in
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(record.description)
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textPrimary)
+                                .lineLimit(1)
+                            Text(record.serviceDate)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        Spacer()
+                        if let cost = record.cost {
+                            Text("$\(cost, specifier: "%.0f")")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+                }
+
+                if viewModel.serviceRecords.count > 3 {
+                    NavigationLink {
+                        ServiceHistoryView()
+                    } label: {
+                        Text("View All (\(viewModel.serviceRecords.count))")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                }
+            }
+        }
+    }
 
     private var serviceHistorySection: some View {
         HavenCard {

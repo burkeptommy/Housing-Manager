@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// Address input with Google Places autocomplete suggestions.
-/// On selection, auto-fills structured address bindings (street, city, state, zip).
+/// Shows a single search field. On selection, auto-fills and reveals
+/// structured address fields (street, city, state, zip) for confirmation.
 struct AddressAutocompleteField: View {
     @Binding var street: String
     @Binding var unit: String
@@ -15,12 +16,30 @@ struct AddressAutocompleteField: View {
     @State private var searchTask: Task<Void, Never>?
     @State private var hasSelectedPlace = false
     @State private var errorMessage: String?
+    @State private var isEditing = false
 
     private let placesService = GooglePlacesService.shared
 
+    /// Whether address details should be visible (selected from autocomplete or pre-filled).
+    private var showDetails: Bool {
+        !street.isEmpty
+    }
+
     var body: some View {
-        // Search field
-        TextField("Start typing an address...", text: $searchText)
+        if showDetails && !isEditing {
+            // Confirmed address — show summary with edit option
+            confirmedAddressView
+        } else {
+            // Search mode
+            searchView
+        }
+    }
+
+    // MARK: - Search Mode
+
+    @ViewBuilder
+    private var searchView: some View {
+        TextField("Search for your address...", text: $searchText)
             .textContentType(.fullStreetAddress)
             .autocorrectionDisabled()
             .onChange(of: searchText) { _, newValue in
@@ -31,7 +50,6 @@ struct AddressAutocompleteField: View {
                 debounceSearch(newValue)
             }
 
-        // Suggestions list — rendered as regular Form rows
         if !suggestions.isEmpty {
             ForEach(suggestions) { suggestion in
                 Button {
@@ -66,15 +84,78 @@ struct AddressAutocompleteField: View {
                 .foregroundStyle(.orange)
         }
 
-        // Filled address fields (editable)
-        if !street.isEmpty {
-            TextField("Street", text: $street)
-            TextField("Unit/Apt (optional)", text: $unit)
-            TextField("City", text: $city)
-            TextField("State", text: $state)
-            TextField("ZIP Code", text: $zipCode)
-                .keyboardType(.numberPad)
+        // Show detail fields while editing (after autocomplete fills them)
+        if showDetails && isEditing {
+            addressDetailFields
+            doneEditingButton
         }
+    }
+
+    // MARK: - Confirmed Address View
+
+    private var confirmedAddressView: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(street)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if !unit.isEmpty {
+                        Text(unit)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Text(cityStateZip)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Button {
+                    isEditing = true
+                    searchText = street
+                } label: {
+                    Text("Change")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Detail Fields (editable after autocomplete)
+
+    @ViewBuilder
+    private var addressDetailFields: some View {
+        TextField("Street", text: $street)
+            .textContentType(.streetAddressLine1)
+        TextField("Unit/Apt (optional)", text: $unit)
+            .textContentType(.streetAddressLine2)
+        TextField("City", text: $city)
+            .textContentType(.addressCity)
+        TextField("State", text: $state)
+            .textContentType(.addressState)
+        TextField("ZIP Code", text: $zipCode)
+            .textContentType(.postalCode)
+            .keyboardType(.numberPad)
+    }
+
+    private var doneEditingButton: some View {
+        Button {
+            isEditing = false
+            suggestions = []
+        } label: {
+            Text("Confirm Address")
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.navy800)
+        }
+        .disabled(street.isEmpty || city.isEmpty || state.isEmpty)
+    }
+
+    // MARK: - Helpers
+
+    private var cityStateZip: String {
+        [city, state, zipCode].filter { !$0.isEmpty }.joined(separator: ", ")
     }
 
     private func debounceSearch(_ query: String) {
@@ -89,7 +170,7 @@ struct AddressAutocompleteField: View {
 
         isSearching = true
         searchTask = Task {
-            try? await Task.sleep(nanoseconds: 300_000_000) // 300ms debounce
+            try? await Task.sleep(nanoseconds: 300_000_000)
             guard !Task.isCancelled else { return }
 
             do {
@@ -124,11 +205,13 @@ struct AddressAutocompleteField: View {
                 city = address.city
                 state = address.state
                 zipCode = address.zipCode
+                // Keep editing mode so user can see/tweak the filled fields
+                isEditing = true
             } catch {
-                // Fall back to just setting the main text as street
                 hasSelectedPlace = true
                 searchText = suggestion.mainText
                 street = suggestion.mainText
+                isEditing = true
                 print("[GooglePlaces] placeDetails error: \(error)")
             }
         }

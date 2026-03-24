@@ -34,6 +34,7 @@ final class ScenarioStudioViewModel: ObservableObject {
             .compactMap { $0 }
             .receive(on: DispatchQueue.main)
             .sink { [weak self] err in
+                Analytics.track(.scenarioFailed, ["error": String(err.prefix(200))])
                 self?.error = err
             }
             .store(in: &cancellables)

@@ -55,6 +55,7 @@ struct TrustedContactsView: View {
                 }
             }
         }
+        .trackScreen("TrustedContactsView")
         .task {
             await viewModel.loadContacts()
         }

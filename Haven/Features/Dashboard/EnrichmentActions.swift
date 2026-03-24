@@ -10,6 +10,8 @@ enum EnrichmentActions {
         householdId: UUID,
         homeSystems: [HomeSystemRow]
     ) async {
+        Analytics.track(.enrichmentCardCompleted, ["question_id": questionId, "answer": answer])
+
         switch questionId {
 
         case "roof_material":

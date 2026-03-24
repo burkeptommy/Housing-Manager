@@ -275,6 +275,7 @@ async function buildSystemPrompt(
     warrantiesResult,
     systemsResult,
     serviceContractsResult,
+    projectsResult,
   ] = await Promise.all([
     supabase.from("households").select("*").eq("id", householdId).single(),
     supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -284,6 +285,7 @@ async function buildSystemPrompt(
     supabase.from("warranties").select("*").eq("household_id", householdId),
     supabase.from("home_systems").select("*").eq("household_id", householdId),
     supabase.from("service_contracts").select("*").eq("household_id", householdId),
+    supabase.from("property_projects").select("*").eq("household_id", householdId),
   ]);
 
   const household = householdResult.data;
@@ -294,6 +296,7 @@ async function buildSystemPrompt(
   const warranties = warrantiesResult.data ?? [];
   const systems = systemsResult.data ?? [];
   const serviceContracts = (serviceContractsResult.data ?? []) as Record<string, unknown>[];
+  const projects = projectsResult.data ?? [];
 
   // Fetch document content for context-specific or keyword-matched documents
   let documentContentSection = "";
@@ -460,6 +463,20 @@ async function buildSystemPrompt(
     })
     .join("\n");
 
+  // Build active projects section
+  const activeProjects = projects.filter(
+    (p: any) => p.status === "planning" || p.status === "in_progress"
+  );
+  const projectsList = activeProjects.length > 0
+    ? activeProjects.map((p: any) => {
+        const budget = p.estimated_budget ? `$${Math.round(p.estimated_budget)}` : "not set";
+        const spent = `$${Math.round(p.actual_spend || 0)}`;
+        const over = (p.actual_spend || 0) > (p.estimated_budget || Infinity);
+        const property = properties.find((prop: any) => prop.id === p.property_id);
+        return `- ${p.name} (${p.category}, ${property?.name ?? "Unknown property"}): ${p.status}, Budget: ${budget}, Spent: ${spent}${over ? " ⚠️ OVER BUDGET" : ""}`;
+      }).join("\n")
+    : "No active projects";
+
   // Build context-specific prefix
   let contextPrefix = "";
   if (body.context_type === "document" && body.context_id) {
@@ -497,6 +514,9 @@ ${flagsList}
 
 PROPERTY STATUS:
 ${propertyStatus || "No properties added yet."}
+
+ACTIVE HOME PROJECTS:
+${projectsList}
 ${contextPrefix}${documentContentSection}
 YOUR ROLE:
 - Help families understand their document coverage and estate readiness

@@ -37,7 +37,9 @@ struct DocumentUploadView: View {
                     Button("Cancel") { dismiss() }
                 }
             }
+            .trackScreen("DocumentUploadView")
             .task {
+                Analytics.track(.documentUploadStarted, ["has_preselected_category": preselectedCategory != nil])
                 await viewModel.loadReferenceData()
                 if let cat = preselectedCategory {
                     viewModel.setCategory(cat)
@@ -115,14 +117,17 @@ struct DocumentUploadView: View {
             }
             .sheet(isPresented: $showCategoryPicker) {
                 CategoryPickerSheet(selectedCategory: $viewModel.category) { newCategory in
+                    Analytics.track(.documentCategorySelected, ["category": newCategory.rawValue, "source": "upload_results"])
                     Task { await viewModel.updateCategory(newCategory) }
                 }
             }
             .alert("Duplicate Document", isPresented: $viewModel.showDuplicateAlert) {
                 Button("Replace", role: .destructive) {
+                    Analytics.track(.documentDuplicateResolved, ["resolution": "replace"])
                     Task { await viewModel.replaceDuplicate() }
                 }
                 Button("Keep Both", role: .cancel) {
+                    Analytics.track(.documentDuplicateResolved, ["resolution": "keep_both"])
                     viewModel.keepBoth()
                 }
             } message: {
@@ -175,6 +180,7 @@ struct DocumentUploadView: View {
                         color: HavenColors.navy
                     ) {
                         Haptics.light()
+                        Analytics.track(.documentUploadSourceSelected, ["source": "scanner"])
                         viewModel.showScanner = true
                     }
 
@@ -185,6 +191,7 @@ struct DocumentUploadView: View {
                         color: HavenColors.navy700
                     ) {
                         Haptics.light()
+                        Analytics.track(.documentUploadSourceSelected, ["source": "photo_library"])
                         viewModel.showPhotoPicker = true
                     }
 
@@ -195,6 +202,7 @@ struct DocumentUploadView: View {
                         color: HavenColors.navy600
                     ) {
                         Haptics.light()
+                        Analytics.track(.documentUploadSourceSelected, ["source": "file_browser"])
                         showFileImporter = true
                     }
                 }

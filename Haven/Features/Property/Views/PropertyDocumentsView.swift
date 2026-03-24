@@ -49,6 +49,7 @@ struct PropertyDocumentsView: View {
             }
         }
         .searchable(text: $searchText, prompt: "Search documents...")
+        .trackScreen("PropertyDocumentsView", properties: ["property_id": propertyId.uuidString])
         .task { await loadDocuments() }
         .refreshable { await loadDocuments() }
         .sheet(isPresented: $showUpload) {

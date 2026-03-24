@@ -36,6 +36,7 @@ struct ReadinessDetailView: View {
             .padding(.vertical, HavenTheme.spacing16)
         }
         .background(HavenColors.background)
+        .trackScreen("ReadinessDetail")
         .navigationTitle("Your Progress")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showUpload) {

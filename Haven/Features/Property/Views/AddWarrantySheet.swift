@@ -85,6 +85,7 @@ struct AddWarrantySheet: View {
             }
         }
         .tint(HavenColors.navy)
+        .trackScreen("AddWarrantySheet")
     }
 
     private func save() async {
@@ -119,6 +120,7 @@ struct AddWarrantySheet: View {
             _ = try await DatabaseService.shared.createWarranty(insert)
 
             Haptics.success()
+            Analytics.track(.warrantyCreated, ["system_id": systemId.uuidString, "warranty_type": warrantyType])
             onComplete?()
             dismiss()
         } catch {

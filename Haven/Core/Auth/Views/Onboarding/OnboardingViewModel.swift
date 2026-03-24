@@ -122,6 +122,7 @@ final class OnboardingViewModel: ObservableObject {
 
     func nextStep() {
         guard let next = OnboardingStep(rawValue: currentStep.rawValue + 1) else { return }
+        Analytics.track(.onboardingStepCompleted, ["step": currentStep.rawValue])
         errorMessage = nil
         currentStep = next
     }
@@ -269,6 +270,7 @@ final class OnboardingViewModel: ObservableObject {
             }
 
             setupProgress = "All done!"
+            Analytics.track(.onboardingCompleted, ["member_count": additionalMembers.count, "has_spouse": addSpouse])
         } catch {
             print("[Onboarding] Setup failed: \(error)")
             errorMessage = "Setup failed: \(error.localizedDescription)"

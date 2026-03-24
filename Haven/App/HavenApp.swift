@@ -26,6 +26,7 @@ struct HavenApp: App {
                     performSecurityChecks()
                     // Request notification permission for background upload alerts
                     _ = await NotificationService.shared.requestPermission()
+                    Analytics.track(.appLaunched)
                 }
                 .alert("Security Warning", isPresented: $showJailbreakAlert) {
                     Button("I Understand", role: .cancel) {}

@@ -124,6 +124,7 @@ struct TrustedContactFormView: View {
                 .fontWeight(.semibold)
             }
         }
+        .trackScreen(editingContact != nil ? "TrustedContactEditView" : "TrustedContactAddView")
         .onAppear {
             if let contact = editingContact {
                 name = contact.name
@@ -185,6 +186,7 @@ struct TrustedContactFormView: View {
                 notes: notes.isEmpty ? nil : notes
             ))
         }
+        Analytics.track(editingContact != nil ? .trustedContactEdited : .trustedContactCreated, ["role": role])
         isSaving = false
         dismiss()
     }

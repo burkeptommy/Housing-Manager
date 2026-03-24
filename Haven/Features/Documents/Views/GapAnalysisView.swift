@@ -18,6 +18,7 @@ struct GapAnalysisView: View {
         }
         .navigationTitle("Gap Analysis")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("GapAnalysisView")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }
@@ -258,6 +259,7 @@ struct GapAnalysisView: View {
 
     private func runAnalysis() async {
         Haptics.medium()
+        Analytics.track(.gapAnalysisRequested, ["source": "gap_analysis_view"])
         isAnalyzing = true
         error = nil
         do {
@@ -271,6 +273,12 @@ struct GapAnalysisView: View {
             let data = try await HavenSupabase.gapAnalysis(householdId: householdId.uuidString)
             let result = try JSONDecoder().decode(GapAnalysisResult.self, from: data)
             analysisResult = result
+            Analytics.track(.gapAnalysisCompleted, [
+                "readiness_score": result.overallReadinessScore,
+                "critical_gaps": result.criticalGaps.count,
+                "warnings": result.warnings.count,
+                "recommendations": result.recommendations.count
+            ])
             Haptics.success()
         } catch {
             self.error = error.localizedDescription

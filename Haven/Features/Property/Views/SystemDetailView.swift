@@ -39,6 +39,7 @@ struct SystemDetailRowView: View {
         .background(HavenColors.background)
         .navigationTitle(system.name)
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("SystemDetailView", properties: ["system_id": system.id.uuidString, "category": system.category])
         .task {
             await loadDetails()
         }
@@ -70,6 +71,7 @@ struct SystemDetailRowView: View {
         .sheet(isPresented: $showAddWarranty) {
             NavigationStack {
                 AddWarrantySheet(systemId: system.id, householdId: nil, onComplete: {
+                    Analytics.track(.warrantyCreated, ["system_id": system.id.uuidString, "source": "system_detail"])
                     Task { await loadDetails() }
                 })
             }
@@ -736,6 +738,7 @@ struct SystemDetailRowView: View {
                 HomeSystemUpdate(preferredContractorId: contractor.id)
             )
             preferredContractor = contractor
+            Analytics.track(.systemContractorAssigned, ["system_id": system.id.uuidString, "contractor_id": contractor.id.uuidString])
             Haptics.success()
         } catch {
             // silently handle

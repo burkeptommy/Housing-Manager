@@ -13,7 +13,9 @@ struct OnboardingView: View {
                 normalOnboardingView
             }
         }
+        .trackScreen("OnboardingView")
         .task {
+            Analytics.track(.onboardingStarted)
             await viewModel.prefillFromAuth()
             await viewModel.checkForInvitation()
         }
@@ -137,6 +139,7 @@ struct OnboardingView: View {
                 if viewModel.currentStep == .spouse || viewModel.currentStep == .family
                     || viewModel.currentStep == .features || viewModel.currentStep == .allSet {
                     Button("Skip") {
+                        Analytics.track(.onboardingSkipped, ["step": viewModel.currentStep.rawValue])
                         if viewModel.isLastStep {
                             Task { await viewModel.complete(authService: appState.authService) }
                         } else {

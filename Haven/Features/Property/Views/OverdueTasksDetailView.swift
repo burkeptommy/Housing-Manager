@@ -101,5 +101,6 @@ struct OverdueTasksDetailView: View {
         .background(HavenColors.background)
         .navigationTitle("Overdue Tasks")
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("OverdueTasksDetailView", properties: ["task_count": tasks.count])
     }
 }

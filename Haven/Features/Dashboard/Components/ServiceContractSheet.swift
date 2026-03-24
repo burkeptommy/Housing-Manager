@@ -116,6 +116,7 @@ struct ServiceContractSheet: View {
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("ServiceContractSetup")
         }
         .presentationDetents([.medium, .large])
     }
@@ -179,6 +180,7 @@ struct ServiceContractSheet: View {
 
         do {
             _ = try await DatabaseService.shared.createServiceContract(insert)
+            Analytics.track(.serviceContractCreated, ["service_type": serviceType, "frequency": frequency, "has_provider": !providerName.isEmpty])
             Haptics.success()
             onComplete?()
             dismiss()

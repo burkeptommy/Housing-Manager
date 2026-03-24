@@ -26,6 +26,7 @@ struct OverdueMaintenanceCard: View {
                 ForEach(tasks.prefix(5)) { task in
                     Button {
                         Haptics.light()
+                        Analytics.track(.dashboardMaintenanceCardTapped, ["task_title": task.title, "task_id": task.id.uuidString])
                         selectedTask = task
                     } label: {
                         HStack(spacing: HavenTheme.spacing12) {

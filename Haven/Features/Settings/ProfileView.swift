@@ -98,6 +98,7 @@ struct ProfileView: View {
                 }
             }
         }
+        .trackScreen("ProfileView")
         .task { await loadProfile() }
     }
 
@@ -120,6 +121,7 @@ struct ProfileView: View {
                 id: userId,
                 UserUpdate(fullName: trimmed.isEmpty ? nil : trimmed)
             )
+            Analytics.track(.profileEdited)
             isEditing = false
         } catch {
             self.error = error.localizedDescription

@@ -131,6 +131,7 @@ struct AddSystemView: View {
                 }
             }
             .tint(HavenColors.navy)
+            .trackScreen("AddSystemView", properties: ["property_id": propertyID.uuidString])
         }
     }
 
@@ -206,6 +207,7 @@ struct AddSystemView: View {
             }
 
             Haptics.success()
+            Analytics.track(.systemCreated, ["category": category, "system_id": system.id.uuidString, "has_warranty": addWarranty])
             onComplete?()
             dismiss()
         } catch {

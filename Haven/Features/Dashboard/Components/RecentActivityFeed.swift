@@ -31,6 +31,7 @@ struct RecentActivityFeed: View {
                         if let onUpload {
                             Button {
                                 Haptics.light()
+                                Analytics.track(.dashboardQuickAction, ["action": "upload_from_recent_activity"])
                                 onUpload()
                             } label: {
                                 HStack(spacing: 6) {

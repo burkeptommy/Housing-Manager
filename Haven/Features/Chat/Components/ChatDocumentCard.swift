@@ -67,6 +67,9 @@ struct ChatDocumentCard: View {
                         .font(HavenTypography.uiLabel)
                         .foregroundStyle(HavenColors.navy)
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.chatDocumentCardTapped, ["document_id": result.documentId.uuidString, "category": result.category])
+                })
             }
             .padding(HavenTheme.spacing12)
             .frame(maxWidth: .infinity, alignment: .leading)

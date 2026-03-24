@@ -124,6 +124,7 @@ struct SettingsView: View {
                     }
                     .tint(HavenColors.navy800)
                     .onChange(of: biometricEnabled) { _, newValue in
+                        Analytics.track(.biometricToggled, ["enabled": newValue])
                         appState.authService.isBiometricEnabled = newValue
                     }
                 }
@@ -240,6 +241,7 @@ struct SettingsView: View {
                     .foregroundStyle(HavenColors.navy)
             }
         }
+        .trackScreen("SettingsView")
         .onAppear {
             biometricEnabled = appState.authService.isBiometricEnabled
         }

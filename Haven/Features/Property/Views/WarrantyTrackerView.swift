@@ -37,6 +37,7 @@ struct WarrantyTrackerView: View {
             }
         }
         .navigationTitle("Warranties")
+        .trackScreen("WarrantyTrackerView")
         .task {
             await loadWarranties()
         }

@@ -38,6 +38,7 @@ struct ContractorPickerSheet: View {
                     List {
                         ForEach(filteredContractors) { contractor in
                             Button {
+                                Analytics.track(.systemContractorAssigned, ["contractor_id": contractor.id.uuidString, "system_category": systemCategory])
                                 onSelect(contractor)
                                 dismiss()
                             } label: {
@@ -50,6 +51,7 @@ struct ContractorPickerSheet: View {
             }
             .navigationTitle("Select Contractor")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("ContractorPickerSheet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

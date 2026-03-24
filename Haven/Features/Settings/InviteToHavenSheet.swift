@@ -270,6 +270,7 @@ struct InviteToHavenSheet: View {
 
             _ = try await db.createInvitation(insert)
             inviteCode = code
+            Analytics.track(.householdInviteSent)
             Haptics.success()
             onInviteSent?()
         } catch {

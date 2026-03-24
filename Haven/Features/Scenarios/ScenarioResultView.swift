@@ -10,6 +10,21 @@ struct ScenarioResultView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
+                // Educational disclaimer banner
+                HStack(spacing: 8) {
+                    Image(systemName: "info.circle.fill")
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .font(.caption)
+                    Text("For educational purposes only. Consult a qualified professional before acting on these results.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(HavenColors.cream)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                .padding(.horizontal, HavenTheme.pageMargin)
+
                 // Personalization indicator
                 personalizationBar
 
@@ -99,6 +114,10 @@ struct ScenarioResultView: View {
             .padding(.bottom, HavenTheme.spacing32)
         }
         .background(HavenColors.background)
+        .trackScreen("ScenarioResultView")
+        .onAppear {
+            Analytics.track(.scenarioCompleted, ["severity": result.severity, "title": String(result.title.prefix(100))])
+        }
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(true)
         .toolbar {
@@ -113,6 +132,9 @@ struct ScenarioResultView: View {
                         .font(.system(size: 16, weight: .semibold))
                         .foregroundStyle(HavenColors.navy800)
                 }
+                .simultaneousGesture(TapGesture().onEnded {
+                    Analytics.track(.scenarioShared, ["title": String(result.title.prefix(100))])
+                })
             }
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") {

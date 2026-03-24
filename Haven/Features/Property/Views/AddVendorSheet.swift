@@ -45,6 +45,7 @@ struct AddVendorSheet: View {
                             color: HavenColors.success
                         ) {
                             Haptics.light()
+                            Analytics.track(.contractorContactPickerUsed)
                             showContactPicker = true
                         }
 
@@ -56,6 +57,7 @@ struct AddVendorSheet: View {
                             color: HavenColors.info
                         ) {
                             Haptics.light()
+                            Analytics.track(.contractorWebsiteImport, ["source": "add_vendor_sheet"])
                             showWebsiteImport = true
                         }
 
@@ -67,6 +69,7 @@ struct AddVendorSheet: View {
                             color: HavenColors.navy700
                         ) {
                             Haptics.light()
+                            Analytics.track(.contractorCreated, ["source": "manual"])
                             importedVendor = ImportedVendorData() // Reset
                             showManualForm = true
                         }
@@ -77,6 +80,7 @@ struct AddVendorSheet: View {
             .background(HavenColors.background)
             .navigationTitle("Add Vendor")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("AddVendorSheet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

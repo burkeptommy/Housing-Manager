@@ -19,6 +19,7 @@ struct FamilyReferenceBinder: View {
             }
             .navigationTitle("Family Binder")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("FamilyReferenceBinder")
             .sheet(isPresented: $showShareSheet) {
                 if let url = pdfURL {
                     ShareSheet(items: [url])
@@ -115,6 +116,7 @@ struct FamilyReferenceBinder: View {
 
             HStack(spacing: 16) {
                 Button {
+                    Analytics.track(.familyBinderExported)
                     showShareSheet = true
                 } label: {
                     HStack {
@@ -148,6 +150,7 @@ struct FamilyReferenceBinder: View {
     }
 
     private func generatePDF() async {
+        Analytics.track(.familyBinderViewed)
         await viewModel.loadAllData()
         if let url = viewModel.generatePDF() {
             pdfURL = url

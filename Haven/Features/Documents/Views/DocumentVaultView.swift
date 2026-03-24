@@ -51,10 +51,10 @@ struct DocumentVaultView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
                         Menu("By Status") {
-                            Button("Active") { viewModel.filterStatus = "active" }
-                            Button("Expired") { viewModel.filterStatus = "expired" }
-                            Button("Expiring Soon") { viewModel.filterStatus = "expiringSoon" }
-                            Button("Needs Review") { viewModel.filterStatus = "needsReview" }
+                            Button("Active") { Analytics.track(.documentFilterChanged, ["filter": "active"]); viewModel.filterStatus = "active" }
+                            Button("Expired") { Analytics.track(.documentFilterChanged, ["filter": "expired"]); viewModel.filterStatus = "expired" }
+                            Button("Expiring Soon") { Analytics.track(.documentFilterChanged, ["filter": "expiringSoon"]); viewModel.filterStatus = "expiringSoon" }
+                            Button("Needs Review") { Analytics.track(.documentFilterChanged, ["filter": "needsReview"]); viewModel.filterStatus = "needsReview" }
                         }
 
                         if !viewModel.familyMembers.isEmpty {
@@ -71,13 +71,14 @@ struct DocumentVaultView: View {
 
                         Button {
                             Haptics.light()
+                            Analytics.track(.missingDocumentsViewed)
                             showMissing = true
                         } label: {
                             Label("Missing Documents", systemImage: "exclamationmark.triangle")
                         }
                         Button {
                             Haptics.light()
-                            showGapAnalysis = true
+                            Analytics.track(.gapAnalysisRequested, ["source": "vault_menu"])
                         } label: {
                             Label("Gap Analysis", systemImage: "chart.bar.doc.horizontal")
                         }
@@ -105,6 +106,7 @@ struct DocumentVaultView: View {
                     Menu {
                         Button {
                             Haptics.light()
+                            Analytics.track(.documentUploadStarted, ["source": "toolbar_menu"])
                             uploadCategory = nil
                             showUpload = true
                         } label: {
@@ -125,9 +127,16 @@ struct DocumentVaultView: View {
                     .accessibilityLabel("Document actions")
                 }
             }
+            .trackScreen("DocumentVaultView")
             .searchable(text: $viewModel.searchText, prompt: "Search documents...")
+            .onChange(of: viewModel.searchText) { _, newValue in
+                if !newValue.isEmpty {
+                    Analytics.track(.documentSearched, ["query_length": newValue.count])
+                }
+            }
             .refreshable {
                 Haptics.light()
+                Analytics.track(.documentRefreshed)
                 await viewModel.loadData()
             }
             .task {
@@ -176,6 +185,9 @@ struct DocumentVaultView: View {
                 }
             }
             .onChange(of: selectedMemberId) { _, newValue in
+                if let memberId = newValue {
+                    Analytics.track(.documentFilterChanged, ["filter": "family_member", "member_id": memberId.uuidString])
+                }
                 viewModel.filterFamilyMemberId = newValue
             }
         }
@@ -976,6 +988,7 @@ struct DocumentVaultView: View {
 
     private var duplicatesFoundBanner: some View {
         Button {
+            Analytics.track(.duplicateDocumentsViewed, ["duplicate_count": viewModel.duplicateService.totalDuplicateCount])
             showDuplicates = true
         } label: {
             HavenCard {

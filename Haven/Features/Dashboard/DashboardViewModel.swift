@@ -67,6 +67,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var hasRunGapAnalysis = false
     @Published var hasRunScenario = false
     @Published var hasRemindersEnabled = false
+    @Published var overBudgetProjectCount = 0
+    @Published var approachingDeadlineProjectCount = 0
     @Published var dismissedRecommendationIds: Set<String> = []
 
     // Expecting members
@@ -99,6 +101,8 @@ final class DashboardViewModel: ObservableObject {
             expiringCount: upcomingExpirations.count,
             estateReadiness: overallReadiness,
             hasRemindersEnabled: hasRemindersEnabled,
+            overBudgetProjectCount: overBudgetProjectCount,
+            approachingDeadlineProjectCount: approachingDeadlineProjectCount,
             dismissedIds: dismissedRecommendationIds
         )
     }
@@ -153,6 +157,7 @@ final class DashboardViewModel: ObservableObject {
         isLoading = true
         defer { isLoading = false }
         await fetchAll()
+        Analytics.track(.dashboardRefreshed, ["type": "initial_load", "overdue_count": overdueMaintenanceTasks.count, "document_count": documentCount])
     }
 
     func refresh() async {
@@ -344,6 +349,22 @@ final class DashboardViewModel: ObservableObject {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         hasRemindersEnabled = !pending.isEmpty
+
+        // Project budget & deadline tracking
+        let projects = try? await DatabaseService.shared.fetchAllProjects()
+        let activeProjects = projects?.filter { $0.status == "planning" || $0.status == "in_progress" } ?? []
+        overBudgetProjectCount = activeProjects.filter { p in
+            guard let budget = p.estimatedBudget, let spend = p.actualSpend else { return false }
+            return spend > budget
+        }.count
+        approachingDeadlineProjectCount = activeProjects.filter { p in
+            guard let endDate = p.targetEndDate else { return false }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            guard let date = formatter.date(from: endDate) else { return false }
+            let daysLeft = Calendar.current.dateComponents([.day], from: .now, to: date).day ?? 99
+            return daysLeft <= 7 && daysLeft >= 0
+        }.count
     }
 
     private func loadEnrichmentData() async {

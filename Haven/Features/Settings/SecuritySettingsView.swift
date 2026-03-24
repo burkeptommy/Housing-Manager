@@ -25,6 +25,7 @@ struct SecuritySettingsView: View {
                     }
                     .tint(HavenColors.navy800)
                     .onChange(of: biometricEnabled) { _, newValue in
+                        Analytics.track(.biometricToggled, ["enabled": newValue])
                         appState.authService.isBiometricEnabled = newValue
                     }
                 }
@@ -60,6 +61,7 @@ struct SecuritySettingsView: View {
 
             Section {
                 Button("Change Password") {
+                    Analytics.track(.passwordChanged)
                     showChangePassword = true
                 }
                 .font(HavenTypography.body)
@@ -74,6 +76,7 @@ struct SecuritySettingsView: View {
         .scrollContentBackground(.hidden)
         .background(HavenColors.cream)
         .navigationTitle("Security")
+        .trackScreen("SecuritySettingsView")
         .onAppear {
             biometricEnabled = appState.authService.isBiometricEnabled
             selectedTimeout = Int(appState.sessionManager.lockTimeout)

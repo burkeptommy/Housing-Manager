@@ -44,6 +44,7 @@ struct TrustedContactDetailView: View {
                 }
             }
         }
+        .trackScreen("TrustedContactDetailView")
         .task {
             sharedDocuments = await viewModel.fetchSharedDocuments(contactId: contact.id)
         }
@@ -211,6 +212,7 @@ struct TrustedContactDetailView: View {
                             Spacer()
                             Button {
                                 Task {
+                                    Analytics.track(.trustedContactDocumentAccess, ["action": "revoked", "contact_id": contact.id.uuidString])
                                     await viewModel.revokeDocumentAccess(contactId: contact.id, documentId: doc.id)
                                     sharedDocuments.removeAll { $0.id == doc.id }
                                 }

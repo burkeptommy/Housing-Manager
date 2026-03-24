@@ -18,6 +18,7 @@ struct SignUpView: View {
             .padding(.horizontal, HavenTheme.spacing24)
         }
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("SignUpView")
     }
 
     // MARK: - Sign Up Form

@@ -11,7 +11,9 @@ struct NotificationSettingsView: View {
                 if !notifService.isAuthorized && !hasRequestedPermission {
                     Button {
                         Task {
-                            _ = await notifService.requestPermission()
+                            Analytics.track(.notificationPermissionRequested)
+                            let granted = await notifService.requestPermission()
+                            Analytics.track(.notificationPermissionResult, ["granted": granted])
                             hasRequestedPermission = true
                         }
                     } label: {
@@ -99,9 +101,11 @@ struct NotificationSettingsView: View {
         .scrollContentBackground(.hidden)
         .background(HavenColors.cream)
         .navigationTitle("Notifications")
+        .trackScreen("NotificationSettingsView")
     }
 
     private func saveAndReschedule() {
+        Analytics.track(.notificationSettingChanged)
         prefs.save()
         Task {
             await NotificationScheduler.shared.rescheduleAll()

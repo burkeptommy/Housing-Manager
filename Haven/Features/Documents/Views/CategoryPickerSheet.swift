@@ -24,6 +24,7 @@ struct CategoryPickerSheet: View {
                     Section(group) {
                         ForEach(categories, id: \.self) { cat in
                             Button {
+                                Analytics.track(.documentCategorySelected, ["category": cat.rawValue])
                                 selectedCategory = cat
                                 onSelect?(cat)
                                 dismiss()
@@ -46,6 +47,7 @@ struct CategoryPickerSheet: View {
             .searchable(text: $searchText, prompt: "Search categories")
             .navigationTitle("Select Category")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("CategoryPickerSheet")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }

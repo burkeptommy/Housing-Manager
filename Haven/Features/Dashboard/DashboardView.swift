@@ -127,6 +127,7 @@ struct DashboardView: View {
                 ToolbarItem(placement: .topBarLeading) {
                     Button {
                         Haptics.light()
+                        Analytics.track(.dashboardSecurityTapped)
                         navigationPath.append("security")
                     } label: {
                         Image(systemName: "lock.shield.fill")
@@ -138,6 +139,7 @@ struct DashboardView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Haptics.light()
+                        Analytics.track(.settingsViewed)
                         showSettings = true
                     } label: {
                         Image(systemName: "gearshape.fill")
@@ -200,8 +202,10 @@ struct DashboardView: View {
             .fullScreenCover(isPresented: $showScenarioStudio) {
                 ScenarioStudioView()
             }
+            .trackScreen("Dashboard")
             .refreshable {
                 Haptics.light()
+                Analytics.track(.dashboardRefreshed)
                 await viewModel.refresh()
             }
             .task {
@@ -391,6 +395,7 @@ struct DashboardView: View {
     private var whatIfCard: some View {
         Button {
             Haptics.light()
+            Analytics.track(.scenarioStudioOpened, ["source": "dashboard_what_if_card"])
             showScenarioStudio = true
         } label: {
             HavenCard {
@@ -482,6 +487,7 @@ struct DashboardView: View {
     private func gettingStartedRow(step: Int, title: String, subtitle: String, icon: String, done: Bool, action: @escaping () -> Void) -> some View {
         Button(action: {
             Haptics.light()
+            Analytics.track(.dashboardGettingStartedItemTapped, ["step": step, "title": title])
             action()
         }) {
             HStack(spacing: 12) {
@@ -621,6 +627,7 @@ struct DashboardView: View {
                 ForEach(Array(viewModel.recommendations.enumerated()), id: \.element.id) { index, rec in
                     Button {
                         Haptics.light()
+                        Analytics.track(.dashboardRecommendationTapped, ["recommendation_id": rec.id, "title": rec.title])
                         handleRecommendationAction(rec.action)
                     } label: {
                         HStack(spacing: HavenTheme.spacing12) {
@@ -644,6 +651,7 @@ struct DashboardView: View {
 
                             Button {
                                 Haptics.light()
+                                Analytics.track(.dashboardRecommendationDismissed, ["recommendation_id": rec.id])
                                 withAnimation { viewModel.dismissRecommendation(rec.id) }
                             } label: {
                                 Image(systemName: "xmark")
@@ -698,10 +706,12 @@ struct DashboardView: View {
                             viewModel.dismissEnrichmentCard(question.id)
                         },
                         onServiceSetup: { serviceType in
+                            Analytics.track(.dashboardEnrichmentCardTapped, ["card_id": question.id, "action": "service_setup", "service_type": serviceType])
                             serviceContractType = serviceType
                             showServiceContractSheet = true
                         },
                         onApplianceSetup: {
+                            Analytics.track(.dashboardEnrichmentCardTapped, ["card_id": question.id, "action": "appliance_setup"])
                             showApplianceSetup = true
                         }
                     )
@@ -711,6 +721,7 @@ struct DashboardView: View {
     }
 
     private func handleEnrichmentAnswer(questionId: String, answer: String, attributeKey: String?) {
+        Analytics.track(.dashboardEnrichmentCardSubmitted, ["question_id": questionId, "answer": answer])
         guard let propertyId = viewModel.primaryPropertyId else { return }
         let key = attributeKey ?? questionId
 
@@ -852,6 +863,7 @@ struct DashboardView: View {
 
     private var securityBadge: some View {
         Button {
+            Analytics.track(.dashboardSecurityTapped, ["source": "trust_badge"])
             navigationPath.append("security")
         } label: {
             HStack(spacing: HavenTheme.spacing8) {

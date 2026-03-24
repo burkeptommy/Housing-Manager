@@ -49,22 +49,26 @@ struct DocumentDetailView: View {
                 if viewModel.document != nil {
                     Menu {
                         Button {
+                            Analytics.track(.documentEdited, ["document_id": documentID.uuidString, "source": "toolbar_menu"])
                             showEditDetails = true
                         } label: {
                             Label("Edit Details", systemImage: "pencil")
                         }
                         Button {
+                            Analytics.track(.documentMarkedReviewed, ["document_id": documentID.uuidString])
                             Task { await viewModel.markReviewed() }
                         } label: {
                             Label("Mark Reviewed", systemImage: "checkmark.circle")
                         }
                         Button {
+                            Analytics.track(.documentAIAnalysisRequested, ["document_id": documentID.uuidString, "source": "toolbar_menu"])
                             Task { await viewModel.requestAIAnalysis() }
                         } label: {
                             Label("Run AI Analysis", systemImage: "sparkles")
                         }
 
                         Button {
+                            Analytics.track(.documentVaultLockToggled, ["document_id": documentID.uuidString, "current_state": viewModel.document?.vaultLocked == true ? "locked" : "unlocked"])
                             showVaultLockConfirmation = true
                         } label: {
                             if viewModel.document?.vaultLocked == true {
@@ -87,12 +91,15 @@ struct DocumentDetailView: View {
                 }
             }
         }
+        .trackScreen("DocumentDetailView")
         .task {
+            Analytics.track(.documentViewed, ["document_id": documentID.uuidString])
             await viewModel.loadDocument(id: documentID)
             await viewModel.loadAllTrustedContacts()
         }
         .confirmationDialog("Delete Document?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
+                Analytics.track(.documentDeleted, ["document_id": documentID.uuidString])
                 Task {
                     if await viewModel.deleteDocument() {
                         dismiss()
@@ -1044,6 +1051,11 @@ struct DocumentDetailView: View {
                             Toggle("", isOn: Binding(
                                 get: { isShared },
                                 set: { _ in
+                                    if isShared {
+                                        Analytics.track(.documentAccessRevoked, ["document_id": documentID.uuidString, "contact_id": contact.id.uuidString])
+                                    } else {
+                                        Analytics.track(.documentSharedWithContact, ["document_id": documentID.uuidString, "contact_id": contact.id.uuidString])
+                                    }
                                     Task { await viewModel.toggleDocumentSharing(contactId: contact.id) }
                                 }
                             ))

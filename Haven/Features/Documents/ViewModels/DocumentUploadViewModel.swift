@@ -289,6 +289,7 @@ final class DocumentUploadViewModel: ObservableObject {
 
             // Check for existing duplicate by content hash
             if let existingDup = await DuplicateDetectionService.shared.checkForDuplicate(hash: contentHash) {
+                Analytics.track(.documentDuplicateDetected, ["existing_category": existingDup.category])
                 pendingCategory = existingDup.category
                 duplicateExistingDoc = existingDup
                 showDuplicateAlert = true
@@ -498,6 +499,18 @@ final class DocumentUploadViewModel: ObservableObject {
             }
 
             uploadProgress = 1.0
+            Analytics.track(.documentUploadCompleted, [
+                "category": categoryValue,
+                "has_duplicate": showDuplicateAlert,
+                "auto_linked_members": autoLinkedMemberNames.count,
+                "auto_linked_property": autoLinkedPropertyName != nil
+            ])
+            Analytics.track(.documentAIAnalysisCompleted, [
+                "category": categoryValue,
+                "parties_found": analysis.keyParties.count,
+                "dates_found": analysis.keyDates.count,
+                "has_critical_flags": analysis.hasCriticalFlags
+            ])
             Haptics.success()
 
             // Log access events
@@ -525,6 +538,7 @@ final class DocumentUploadViewModel: ObservableObject {
             // Rollback: clean up orphaned file + DB record if AI analysis failed
             await cleanupFailedUpload(documentId: uploadedDocumentId, filePath: uploadedFilePath)
 
+            Analytics.track(.documentUploadFailed, ["error": Self.userFriendlyError(error)])
             self.error = Self.userFriendlyError(error)
             uploadedDocumentId = nil
             isUploading = false

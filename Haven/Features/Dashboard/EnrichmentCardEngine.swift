@@ -218,10 +218,16 @@ struct EnrichmentEngine {
             ))
         }
 
-        return questions
+        let result = questions
             .filter { !dismissedIds.contains($0.id) }
             .sorted { $0.priority < $1.priority }
             .prefix(2)
             .map { $0 }
+
+        if !result.isEmpty {
+            Analytics.track(.enrichmentCardViewed, ["card_count": result.count, "card_ids": result.map(\.id).joined(separator: ",")])
+        }
+
+        return result
     }
 }

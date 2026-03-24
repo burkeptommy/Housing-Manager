@@ -25,7 +25,13 @@ struct ContractorDirectoryView: View {
             }
         }
         .navigationTitle("Home & Estate Contacts")
+        .trackScreen("ContractorDirectoryView")
         .searchable(text: $viewModel.searchText, prompt: "Search contractors...")
+        .onChange(of: viewModel.searchText) { _, newValue in
+            if !newValue.isEmpty {
+                Analytics.track(.contractorSearched, ["query": newValue])
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 HStack(spacing: 12) {
@@ -84,6 +90,9 @@ struct ContractorDirectoryView: View {
                         contractorCard(contractor)
                     }
                     .buttonStyle(.plain)
+                    .simultaneousGesture(TapGesture().onEnded {
+                        Analytics.track(.contractorViewed, ["contractor_id": contractor.id.uuidString])
+                    })
                 }
             }
             .padding()
@@ -166,6 +175,7 @@ struct ContractorDetailView: View {
 
     var body: some View {
         ScrollView {
+
             LazyVStack(alignment: .leading, spacing: 16) {
                 HavenCard {
                     VStack(alignment: .leading, spacing: 12) {
@@ -257,6 +267,7 @@ struct ContractorDetailView: View {
         .background(HavenColors.background)
         .navigationTitle(contractor.companyName)
         .navigationBarTitleDisplayMode(.inline)
+        .trackScreen("ContractorDetailView", properties: ["contractor_id": contractor.id.uuidString])
         .task {
             let allRecords = (try? await DatabaseService.shared.fetchServiceRecords()) ?? []
             serviceRecords = allRecords.filter { $0.contractorId == contractor.id }
@@ -407,6 +418,7 @@ struct AddContractorView: View {
                 licenseNumber: licenseNumber.isEmpty ? nil : licenseNumber
             )
             _ = try await DatabaseService.shared.createContractor(insert)
+            Analytics.track(.contractorCreated, ["company_name": companyName, "contact_type": contactType])
             onComplete?()
             dismiss()
         } catch {

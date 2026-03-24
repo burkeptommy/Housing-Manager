@@ -55,6 +55,9 @@ struct PropertyListView: View {
                                 PropertyCardRow(property: property)
                             }
                             .buttonStyle(.plain)
+                            .simultaneousGesture(TapGesture().onEnded {
+                                Analytics.track(.propertyViewed, ["property_id": property.id.uuidString])
+                            })
                         }
                     }
                     .padding(.horizontal, HavenTheme.spacing16)
@@ -72,6 +75,7 @@ struct PropertyListView: View {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         Haptics.light()
+                        Analytics.track(.propertyCreated, ["source": "toolbar_plus"])
                         showAddProperty = true
                     } label: {
                         Image(systemName: "plus")
@@ -83,8 +87,10 @@ struct PropertyListView: View {
             }
             .refreshable {
                 Haptics.light()
+                Analytics.track(.propertyRefreshed)
                 await viewModel.loadProperties()
             }
+            .trackScreen("PropertyListView")
             .onAppear {
                 Task { await viewModel.loadProperties() }
             }

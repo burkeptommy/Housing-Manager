@@ -21,6 +21,7 @@ struct ServiceHistoryView: View {
             }
         }
         .navigationTitle("Service History")
+        .trackScreen("ServiceHistoryView")
         .task {
             await loadRecords()
         }

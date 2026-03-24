@@ -49,12 +49,14 @@ struct BiometricAuthView: View {
             .foregroundStyle(HavenColors.textSecondary)
             .padding(.bottom, 32)
         }
+        .trackScreen("BiometricAuthView")
         .task {
             await authenticate()
         }
     }
 
     private func authenticate() async {
+        Analytics.track(.authLoginBiometric)
         let success = await appState.sessionManager.unlock()
         authFailed = !success
     }

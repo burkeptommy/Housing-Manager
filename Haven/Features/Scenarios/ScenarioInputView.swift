@@ -41,6 +41,7 @@ struct ScenarioInputView: View {
                 // Run button
                 Button {
                     Haptics.medium()
+                    Analytics.track(.scenarioSubmitted, ["type": "preset_with_params", "scenario_id": scenario.id])
                     onSubmit(paramValues)
                 } label: {
                     Text("Run Scenario")
@@ -65,6 +66,7 @@ struct ScenarioInputView: View {
                     .foregroundStyle(HavenColors.navy800)
             }
         }
+        .trackScreen("ScenarioInputView")
         .onAppear {
             // Set defaults
             if let fields = scenario.paramFields {

@@ -72,6 +72,7 @@ struct IntroExplainerView: View {
             .padding(.bottom, 40)
         }
         .background(HavenColors.cream)
+        .trackScreen("IntroExplainerView")
     }
 
     // MARK: - Page 1: Property Management

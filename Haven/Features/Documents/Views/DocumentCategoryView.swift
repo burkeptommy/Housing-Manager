@@ -51,7 +51,9 @@ struct DocumentCategoryView: View {
             }
         }
         .navigationTitle(category.rawValue)
+        .trackScreen("DocumentCategoryView")
         .onAppear {
+            Analytics.track(.documentVaultViewed, ["category": category.rawValue])
             Task { await vaultViewModel.loadData() }
         }
         .toolbar {

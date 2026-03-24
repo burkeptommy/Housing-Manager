@@ -23,6 +23,9 @@ struct EnrichmentCardView: View {
     @ViewBuilder
     private var cardContent: some View {
         HavenCard {
+            Color.clear.frame(height: 0).onAppear {
+                Analytics.track(.enrichmentCardViewed, ["card_id": question.id, "title": question.title])
+            }
             VStack(alignment: .leading, spacing: 12) {
                 // Header row
                 HStack(alignment: .top, spacing: 10) {
@@ -80,6 +83,7 @@ struct EnrichmentCardView: View {
             ForEach(options) { option in
                 Button {
                     Haptics.light()
+                    Analytics.track(.dashboardEnrichmentCardSubmitted, ["card_id": question.id, "answer": option.id])
                     selectedId = option.id
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
                         answered = true

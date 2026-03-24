@@ -25,6 +25,7 @@ struct SecurityDashboardView: View {
         .background(HavenColors.background)
         .navigationTitle("Security")
         .navigationBarTitleDisplayMode(.large)
+        .trackScreen("SecurityDashboardView")
         .task { await viewModel.load() }
     }
 

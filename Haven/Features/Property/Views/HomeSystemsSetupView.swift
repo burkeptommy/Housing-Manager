@@ -82,6 +82,7 @@ struct HomeSystemsSetupView: View {
             }
             .navigationTitle("Set Up Home Systems")
             .navigationBarTitleDisplayMode(.inline)
+            .trackScreen("HomeSystemsSetupView")
             .toolbar {
                 if currentStep != .completion {
                     ToolbarItem(placement: .cancellationAction) {
@@ -507,6 +508,7 @@ struct HomeSystemsSetupView: View {
         }
 
         let selected = selections.filter(\.isSelected)
+        Analytics.track(.homeSystemsSetupStarted, ["system_count": selected.count, "property_id": propertyId.uuidString])
         savingTotal = selected.count
         savingProgress = 0
         savingCurrentName = selected.first?.name ?? ""
@@ -577,6 +579,7 @@ struct HomeSystemsSetupView: View {
         createdTasks = allCreatedTasks
         systemsAlreadyCreated = count > 0
         isSaving = false
+        Analytics.track(.homeSystemsSetupCompleted, ["systems_created": count, "tasks_created": allCreatedTasks.count])
         Haptics.success()
 
         // Show task review step if we have tasks, otherwise go to completion
