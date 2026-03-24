@@ -280,7 +280,7 @@ async function buildSystemPrompt(
     supabase.from("households").select("*").eq("id", householdId).single(),
     supabase.from("family_members").select("*").eq("household_id", householdId),
     supabase.from("properties").select("*").eq("household_id", householdId),
-    supabase.from("documents").select("*").eq("household_id", householdId),
+    supabase.from("documents").select("*").eq("household_id", householdId).is("deleted_at", null),
     supabase.from("maintenance_tasks").select("*").eq("household_id", householdId),
     supabase.from("warranties").select("*").eq("household_id", householdId),
     supabase.from("home_systems").select("*").eq("household_id", householdId),
@@ -303,17 +303,20 @@ async function buildSystemPrompt(
 
   if (body.context_type === "document" && body.context_id) {
     // User is viewing a specific document — fetch its full extracted text
-    const { data: content } = await serviceClient
-      .from("document_content")
-      .select("extracted_text, document_id")
-      .eq("document_id", body.context_id)
-      .single();
+    // Only include if document is not soft-deleted
+    const doc = documents.find((d: Record<string, unknown>) => d.id === body.context_id);
+    if (doc) {
+      const { data: content } = await serviceClient
+        .from("document_content")
+        .select("extracted_text, document_id")
+        .eq("document_id", body.context_id)
+        .single();
 
-    if (content?.extracted_text) {
-      const doc = documents.find((d: Record<string, unknown>) => d.id === body.context_id);
-      const title = (doc?.title as string) ?? "Unknown Document";
-      documentContentSection = `\nDOCUMENT CONTENT (user is currently viewing "${title}"):\n${content.extracted_text.substring(0, 8000)}\n`;
-      referencedDocumentIds.push(content.document_id);
+      if (content?.extracted_text) {
+        const title = (doc?.title as string) ?? "Unknown Document";
+        documentContentSection = `\nDOCUMENT CONTENT (user is currently viewing "${title}"):\n${content.extracted_text.substring(0, 8000)}\n`;
+        referencedDocumentIds.push(content.document_id);
+      }
     }
   } else {
     // Search for relevant documents based on the user's message

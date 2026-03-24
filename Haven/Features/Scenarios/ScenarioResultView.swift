@@ -115,6 +115,7 @@ struct ScenarioResultView: View {
         }
         .background(HavenColors.background)
         .trackScreen("ScenarioResultView")
+        .screenshotProtected()
         .onAppear {
             Analytics.track(.scenarioCompleted, ["severity": result.severity, "title": String(result.title.prefix(100))])
         }

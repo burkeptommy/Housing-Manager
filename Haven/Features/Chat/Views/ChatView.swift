@@ -26,6 +26,7 @@ struct ChatView: View {
                 alfredTab
             }
             .trackScreen("ChatView")
+            .screenshotProtected()
             .navigationTitle("Alfred")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

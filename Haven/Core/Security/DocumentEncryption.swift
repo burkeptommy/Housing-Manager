@@ -38,10 +38,17 @@ final class DocumentEncryption {
     }
 
     /// Decrypt document data after downloading from Supabase Storage.
-    func decrypt(data: Data, householdId: UUID) throws -> Data {
-        let encryptionKey = key(for: householdId)
-        let sealedBox = try AES.GCM.SealedBox(combined: data)
-        return try AES.GCM.open(sealedBox, using: encryptionKey)
+    /// Backwards compatible: if decryption fails, assumes the file is a
+    /// legacy unencrypted upload and returns the data as-is.
+    func decrypt(data: Data, householdId: UUID) -> Data {
+        do {
+            let encryptionKey = key(for: householdId)
+            let sealedBox = try AES.GCM.SealedBox(combined: data)
+            return try AES.GCM.open(sealedBox, using: encryptionKey)
+        } catch {
+            // Legacy unencrypted file — return as-is
+            return data
+        }
     }
 
     enum EncryptionError: LocalizedError {

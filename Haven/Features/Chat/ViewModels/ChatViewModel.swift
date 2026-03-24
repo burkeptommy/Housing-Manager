@@ -173,11 +173,12 @@ final class ChatViewModel: ObservableObject {
         messages.append(userMsg)
 
         do {
-            // Step 1: Upload file to storage
+            // Step 1: Encrypt and upload file to storage
+            let encryptedChatData = try DocumentEncryption.shared.encrypt(data: data, householdId: householdId)
             let filePath = try await db.uploadDocumentFile(
                 householdId: householdId,
                 fileName: fileName,
-                data: data,
+                data: encryptedChatData,
                 contentType: contentType
             )
 

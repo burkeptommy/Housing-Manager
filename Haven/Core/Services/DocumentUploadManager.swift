@@ -119,11 +119,12 @@ final class DocumentUploadManager: ObservableObject {
         queue[index].status = "Uploading..."
 
         do {
-            // Step 1: Upload file to storage
+            // Step 1: Encrypt and upload file to storage
+            let encryptedData = try DocumentEncryption.shared.encrypt(data: item.data, householdId: householdId)
             let filePath = try await db.uploadDocumentFile(
                 householdId: householdId,
                 fileName: item.fileName,
-                data: item.data,
+                data: encryptedData,
                 contentType: item.contentType
             )
 

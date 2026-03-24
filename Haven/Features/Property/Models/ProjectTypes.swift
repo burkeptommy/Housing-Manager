@@ -132,3 +132,35 @@ enum ItemUnit: String, CaseIterable {
     case each, sqFt = "sq ft", linearFt = "linear ft"
     case gallon, quart, hour, bundle, box, bag, roll, sheet, set
 }
+
+// MARK: - Necessity Group (for line item sectioning)
+
+enum NecessityGroup: String, CaseIterable {
+    case required
+    case optional
+    case likelyOwned = "likely_owned"
+
+    var displayName: String {
+        switch self {
+        case .required: return "REQUIRED"
+        case .optional: return "OPTIONAL"
+        case .likelyOwned: return "YOU MAY ALREADY HAVE"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .required: return "checkmark.circle.fill"
+        case .optional: return "sparkles"
+        case .likelyOwned: return "house.circle.fill"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .required: return HavenColors.textPrimary
+        case .optional: return HavenColors.info
+        case .likelyOwned: return HavenColors.textTertiary
+        }
+    }
+}

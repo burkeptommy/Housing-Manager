@@ -191,6 +191,15 @@ struct PropertyProjectsView: View {
                                 Text(approach.displayName)
                             }
                         }
+                        Spacer()
+
+                        // Projected cost
+                        let cost = project.estimatedTotal ?? project.aiEstimatedDiyCost
+                        if let cost, cost > 0 {
+                            Text("~$\(Int(cost))")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy)
+                        }
                     }
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)

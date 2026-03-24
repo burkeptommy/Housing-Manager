@@ -141,6 +141,20 @@ final class AuthService: ObservableObject {
         }
     }
 
+    /// Permanently delete the user's account and all data.
+    func deleteAccount() async throws {
+        Analytics.track(.authSignedOut, ["reason": "account_deleted"])
+        _ = try await HavenSupabase.deleteAccount()
+        // Clear all local data
+        SecureStorageService.shared.deleteAll()
+        Analytics.reset()
+        // Sign out locally
+        try? await HavenSupabase.auth.signOut(scope: .local)
+        currentUserId = nil
+        isAuthenticated = false
+        needsOnboarding = false
+    }
+
     func resetPassword(email: String) async throws {
         Analytics.track(.authPasswordResetRequested)
         try await HavenSupabase.auth.resetPasswordForEmail(email)
@@ -206,13 +220,15 @@ final class AuthService: ObservableObject {
 
     static func authenticateWithBiometrics() async -> Bool {
         let context = LAContext()
-        context.localizedCancelTitle = "Use Password"
-        guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil) else {
+        context.localizedCancelTitle = "Cancel"
+        // Use .deviceOwnerAuthentication which falls back to device passcode
+        // if biometrics fail or aren't enrolled
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: nil) else {
             return false
         }
         do {
             return try await context.evaluatePolicy(
-                .deviceOwnerAuthenticationWithBiometrics,
+                .deviceOwnerAuthentication,
                 localizedReason: "Unlock Haven"
             )
         } catch {

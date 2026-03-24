@@ -19,6 +19,7 @@ struct GapAnalysisView: View {
         .navigationTitle("Gap Analysis")
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("GapAnalysisView")
+        .screenshotProtected()
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }

@@ -59,15 +59,18 @@ final class DocumentDetailViewModel: ObservableObject {
 
         isLoadingFile = true
         do {
+            let householdId = document?.householdId
             if document?.vaultLocked == true {
                 let url = try await db.getDocumentSignedURL(path: filePath)
                 let (encryptedData, _) = try await URLSession.shared.data(from: url)
-                decryptedFileData = try VaultLockService.shared.decrypt(data: encryptedData)
+                // Decrypt document encryption layer first, then vault lock layer
+                let docDecrypted = householdId.map { DocumentEncryption.shared.decrypt(data: encryptedData, householdId: $0) } ?? encryptedData
+                decryptedFileData = try VaultLockService.shared.decrypt(data: docDecrypted)
             } else {
-                // Try signed URL directly (faster than edge function)
                 let url = try await db.getDocumentSignedURL(path: filePath)
                 let (data, _) = try await URLSession.shared.data(from: url)
-                decryptedFileData = data
+                // Decrypt document encryption (backwards compat: returns as-is for legacy unencrypted files)
+                decryptedFileData = householdId.map { DocumentEncryption.shared.decrypt(data: data, householdId: $0) } ?? data
             }
 
             // Write to temp file so QuickLook can preview it

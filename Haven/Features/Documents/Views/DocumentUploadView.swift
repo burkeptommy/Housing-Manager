@@ -38,6 +38,7 @@ struct DocumentUploadView: View {
                 }
             }
             .trackScreen("DocumentUploadView")
+            .screenshotProtected()
             .task {
                 Analytics.track(.documentUploadStarted, ["has_preselected_category": preselectedCategory != nil])
                 await viewModel.loadReferenceData()

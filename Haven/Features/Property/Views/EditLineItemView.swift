@@ -17,6 +17,7 @@ struct EditLineItemView: View {
     @State private var store: String
     @State private var isPurchased: Bool
     @State private var isOwned: Bool
+    @State private var necessity: String
     @State private var notes: String
     @State private var isSaving = false
     @State private var error: String?
@@ -37,6 +38,7 @@ struct EditLineItemView: View {
         _store = State(initialValue: item?.suggestedStore ?? "")
         _isPurchased = State(initialValue: item?.isPurchased ?? false)
         _isOwned = State(initialValue: item?.isOwned ?? false)
+        _necessity = State(initialValue: item?.necessity ?? "required")
         _notes = State(initialValue: item?.notes ?? "")
     }
 
@@ -93,6 +95,11 @@ struct EditLineItemView: View {
 
                 Section("Details") {
                     TextField("Store", text: $store)
+                    Picker("Necessity", selection: $necessity) {
+                        Text("Required").tag("required")
+                        Text("Optional").tag("optional")
+                        Text("Likely Owned").tag("likely_owned")
+                    }
                     Toggle("Purchased", isOn: $isPurchased)
                         .tint(HavenColors.success)
                     Toggle("I Already Own This", isOn: $isOwned)
@@ -150,6 +157,7 @@ struct EditLineItemView: View {
                     suggestedStore: store.isEmpty ? nil : store,
                     isPurchased: isPurchased,
                     isOwned: isOwned,
+                    necessity: necessity,
                     notes: notes.isEmpty ? nil : notes
                 )
                 try await viewModel.updateLineItem(id: item.id, updates)
@@ -164,6 +172,7 @@ struct EditLineItemView: View {
                     estimatedUnitPrice: Double(estimatedPriceText),
                     suggestedStore: store.isEmpty ? nil : store,
                     isPurchased: isPurchased,
+                    necessity: necessity,
                     notes: notes.isEmpty ? nil : notes
                 )
                 try await viewModel.addLineItem(insert)

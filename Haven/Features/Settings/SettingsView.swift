@@ -5,6 +5,10 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var biometricEnabled = false
     @State private var showSignOutConfirmation = false
+    @State private var showDeleteAccountStep1 = false
+    @State private var showDeleteAccountStep2 = false
+    @State private var deleteConfirmText = ""
+    @State private var isDeletingAccount = false
     @State private var userName = ""
     @State private var userEmail = ""
     @State private var householdName = ""
@@ -229,6 +233,21 @@ struct SettingsView: View {
                         .foregroundStyle(HavenColors.critical)
                         .frame(maxWidth: .infinity)
                 }
+
+                Button(role: .destructive) {
+                    showDeleteAccountStep1 = true
+                } label: {
+                    if isDeletingAccount {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Label("Delete My Account", systemImage: "trash.fill")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.critical)
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .disabled(isDeletingAccount)
             }
         }
         .scrollContentBackground(.hidden)
@@ -266,6 +285,38 @@ struct SettingsView: View {
             }
         } message: {
             Text("You'll need to sign in again to access your data.")
+        }
+        .confirmationDialog("Delete Your Account?", isPresented: $showDeleteAccountStep1) {
+            Button("Continue", role: .destructive) {
+                showDeleteAccountStep2 = true
+            }
+        } message: {
+            Text("This will permanently delete your account and ALL your data — documents, properties, projects, chat history, and everything else. This cannot be undone.")
+        }
+        .alert("Type DELETE to confirm", isPresented: $showDeleteAccountStep2) {
+            TextField("Type DELETE", text: $deleteConfirmText)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.characters)
+            Button("Delete Everything", role: .destructive) {
+                guard deleteConfirmText == "DELETE" else { return }
+                isDeletingAccount = true
+                Task {
+                    do {
+                        try await appState.authService.deleteAccount()
+                        Haptics.success()
+                        dismiss()
+                    } catch {
+                        isDeletingAccount = false
+                        Haptics.error()
+                    }
+                    deleteConfirmText = ""
+                }
+            }
+            Button("Cancel", role: .cancel) {
+                deleteConfirmText = ""
+            }
+        } message: {
+            Text("Type DELETE to permanently delete your account. This action cannot be undone.")
         }
     }
 }

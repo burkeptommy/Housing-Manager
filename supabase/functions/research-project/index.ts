@@ -18,6 +18,7 @@ interface ResearchRequest {
   description?: string;
   property_location?: string;
   project_id?: string;
+  user_toolkit?: string[];
 }
 
 serve(async (req: Request) => {
@@ -42,7 +43,7 @@ serve(async (req: Request) => {
 
     // --- PARSE REQUEST ---
     const body: ResearchRequest = await req.json();
-    const { project_name, category, description, property_location, project_id } = body;
+    const { project_name, category, description, property_location, project_id, user_toolkit } = body;
 
     if (!project_name) {
       return new Response(
@@ -67,6 +68,11 @@ serve(async (req: Request) => {
       ? `The property is located in ${property_location}. Factor in regional pricing, local permit requirements, and any climate or code considerations specific to this area.`
       : "No specific property location was provided. Use national average pricing for the United States.";
 
+    // --- BUILD TOOLKIT CONTEXT ---
+    const toolkitContext = user_toolkit && user_toolkit.length > 0
+      ? `\n\nIMPORTANT: The user already owns these tools: ${user_toolkit.join(", ")}. Do NOT include any of these in typicalItems. The user does not need to buy them again.`
+      : "";
+
     // --- BUILD PROMPTS ---
     const systemPrompt = `You are a home improvement cost estimator and project research assistant for Haven, a home management app. You MUST return ONLY valid JSON — no markdown code fences, no backticks, no explanation outside the JSON object. Start your response with { and end with }.
 
@@ -79,7 +85,7 @@ Your job is to provide realistic, detailed cost estimates for home improvement p
 5. Pro costs should reflect real contractor pricing including labor, overhead, markup, and profit margin — not just labor + materials.
 6. DIY costs should include tool rentals or purchases that a typical homeowner wouldn't already own.
 7. For the items list, use specific product names and real unit prices where possible rather than vague categories.
-8. Timeframes should reflect realistic DIY pace (weekends only) vs. professional pace.`;
+8. Timeframes should reflect realistic DIY pace (weekends only) vs. professional pace.${toolkitContext}`;
 
     const userPrompt = `Research the following home improvement project and provide a detailed cost estimate.
 
@@ -96,6 +102,8 @@ Return JSON with this EXACT structure:
     {
       "name": "Specific product/material name",
       "category": "materials" | "tools" | "hardware" | "rental" | "permits" | "disposal" | "safety",
+      "necessity": "required" | "optional" | "likely_owned",
+      "multiProjectUseful": false,
       "quantity": 1,
       "unit": "each" | "sq ft" | "linear ft" | "gallon" | "bag" | "box" | "bundle" | "day" | "flat fee",
       "price": 29.99,
@@ -131,6 +139,14 @@ Return JSON with this EXACT structure:
   "estimatedTimeframe": {
     "diy": "e.g., 2-3 weekends",
     "professional": "e.g., 2-4 days"
+  },
+  "dealRating": "good_value" | "fair" | "premium",
+  "dealRatingReason": "Brief explanation of whether typical costs for this project represent good value for what you get",
+  "homeValueImpact": {
+    "score": 72,
+    "label": "High ROI" | "Moderate ROI" | "Low ROI" | "Lifestyle Only",
+    "typicalRoi": "70-80%",
+    "explanation": "Brief explanation of how this project typically affects home resale value and marketability"
   }
 }
 
@@ -139,6 +155,10 @@ IMPORTANT:
 - Prices in typicalItems should be per-unit prices. The quantity field handles multiples.
 - The low/high cost ranges should reflect the realistic spread for a typical-sized version of this project (e.g., average room size, average home size).
 - Include at least 3-5 tips/warnings that are specific to THIS project, not generic advice.
+- For necessity: "required" = must buy for the project to succeed. "optional" = improves outcome but not essential (e.g., nicer tape, knee pads, premium finishes). "likely_owned" = common household tools the user probably already has (screwdriver, tape measure, utility knife, drill, level, etc.).
+- For multiProjectUseful: set to true for tools and items that are broadly useful beyond this specific project (e.g., a stud finder, cordless drill, or oscillating multi-tool). Set to false for project-specific materials and consumables.
+- For homeValueImpact score (0-100): Kitchen/bathroom remodels score 70-85, curb appeal 60-75, maintenance/repair 40-60, purely cosmetic/lifestyle 10-30. Base this on real estate industry data about typical ROI at resale.
+- dealRating should assess whether the MEDIAN cost of this project is good value for what you get (not comparing to a user budget).
 - Include 2-4 video topic suggestions that would actually help someone doing this project.`;
 
     // --- CALL CLAUDE ---
@@ -288,6 +308,7 @@ IMPORTANT:
 
         const updatePayload: Record<string, unknown> = {
           ai_research: research,
+          ai_research_updated_at: new Date().toISOString(),
         };
 
         if (diyAvg !== null) {

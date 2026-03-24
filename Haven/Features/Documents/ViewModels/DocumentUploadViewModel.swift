@@ -298,11 +298,12 @@ final class DocumentUploadViewModel: ObservableObject {
 
             uploadProgress = 0.2
 
-            // Step 1: Upload file to storage
+            // Step 1: Encrypt and upload file to storage
+            let encryptedData = try DocumentEncryption.shared.encrypt(data: data, householdId: householdId)
             let filePath = try await db.uploadDocumentFile(
                 householdId: householdId,
                 fileName: selectedFileName,
-                data: data,
+                data: encryptedData,
                 contentType: selectedContentType
             )
 
@@ -581,11 +582,12 @@ final class DocumentUploadViewModel: ObservableObject {
                 batchProgress = Double(i) / Double(uploadItems.count)
 
                 do {
-                    // Upload file
+                    // Encrypt and upload file
+                    let encryptedBatchData = try DocumentEncryption.shared.encrypt(data: uploadItems[i].data, householdId: householdId)
                     let filePath = try await db.uploadDocumentFile(
                         householdId: householdId,
                         fileName: uploadItems[i].fileName,
-                        data: uploadItems[i].data,
+                        data: encryptedBatchData,
                         contentType: uploadItems[i].contentType
                     )
 

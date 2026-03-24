@@ -161,7 +161,7 @@ async function scanHousehold(
   ] = await Promise.all([
     serviceClient.from("households").select("*").eq("id", householdId).single(),
     serviceClient.from("family_members").select("*").eq("household_id", householdId),
-    serviceClient.from("documents").select("*").eq("household_id", householdId),
+    serviceClient.from("documents").select("*").eq("household_id", householdId).is("deleted_at", null),
     serviceClient.from("document_content").select("document_id, extracted_text").eq("household_id", householdId),
     serviceClient.from("warranties").select("*").eq("household_id", householdId),
     serviceClient.from("maintenance_tasks").select("*").eq("household_id", householdId),

@@ -1166,4 +1166,31 @@ final class DatabaseService {
             .eq("id", value: id.uuidString)
             .execute()
     }
+
+    // MARK: - Household Toolkit
+
+    func fetchToolkit(householdId: UUID) async throws -> [HouseholdToolkitRow] {
+        try await from("household_toolkit")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .order("tool_name")
+            .execute()
+            .value
+    }
+
+    func addToToolkit(_ item: HouseholdToolkitInsert) async throws -> HouseholdToolkitRow {
+        try await from("household_toolkit")
+            .insert(item)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func removeFromToolkit(id: UUID) async throws {
+        try await from("household_toolkit")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
 }

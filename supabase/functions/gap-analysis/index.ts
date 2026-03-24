@@ -141,7 +141,7 @@ serve(async (req: Request) => {
       supabase.from("households").select("*").eq("id", householdId).single(),
       supabase.from("family_members").select("*").eq("household_id", householdId),
       supabase.from("properties").select("*").eq("household_id", householdId),
-      supabase.from("documents").select("*").eq("household_id", householdId),
+      supabase.from("documents").select("*").eq("household_id", householdId).is("deleted_at", null),
       supabase.from("home_systems").select("*").eq("household_id", householdId),
       supabase.from("warranties").select("*").eq("household_id", householdId),
       supabase.from("maintenance_tasks").select("*").eq("household_id", householdId),

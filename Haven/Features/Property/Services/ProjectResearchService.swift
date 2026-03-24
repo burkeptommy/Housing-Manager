@@ -40,12 +40,17 @@ final class ProjectResearchService: ObservableObject {
 
     private func executeResearch(project: PropertyProjectRow, location: String?) async {
         do {
+            // Load toolkit to exclude owned tools from suggestions
+            let toolkit = try? await DatabaseService.shared.fetchToolkit(householdId: project.householdId)
+            let toolkitNames = toolkit?.isEmpty == false ? toolkit?.map { $0.toolName } : nil
+
             let data = try await HavenSupabase.researchProject(
                 projectName: project.name,
                 category: project.category,
                 description: project.description,
                 propertyLocation: location,
-                projectId: project.id.uuidString
+                projectId: project.id.uuidString,
+                userToolkit: toolkitNames
             )
 
             // Debug log
@@ -92,6 +97,8 @@ final class ProjectResearchService: ObservableObject {
                     estimatedUnitPrice: item.resolvedPrice,
                     suggestedStore: item.resolvedStore,
                     isAiSuggested: true,
+                    necessity: item.necessity ?? "required",
+                    multiProjectUseful: item.multiProjectUseful ?? false,
                     notes: item.notes,
                     sortOrder: index
                 )
@@ -99,6 +106,27 @@ final class ProjectResearchService: ObservableObject {
             if !items.isEmpty {
                 try await DatabaseService.shared.createLineItems(items)
             }
+
+            // Auto-mark toolkit matches as owned
+            if let toolkit, !toolkit.isEmpty {
+                let toolkitNames = Set(toolkit.map { $0.normalizedName })
+                let createdItems = try await DatabaseService.shared.fetchLineItems(projectId: project.id)
+                for createdItem in createdItems {
+                    let isToolCategory = ["tools", "hardware", "safety"].contains(createdItem.category?.lowercased() ?? "")
+                    guard isToolCategory, !(createdItem.isOwned ?? false) else { continue }
+                    let normalized = createdItem.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+                    if toolkitNames.contains(where: { normalized.contains($0) || $0.contains(normalized) }) {
+                        _ = try? await DatabaseService.shared.updateLineItem(id: createdItem.id, ProjectLineItemUpdate(isOwned: true))
+                    }
+                }
+            }
+
+            // Recalculate estimated total
+            let allItems = try await DatabaseService.shared.fetchLineItems(projectId: project.id)
+            let estimatedTotal = allItems
+                .filter { !($0.isOwned ?? false) }
+                .reduce(0.0) { $0 + ($1.estimatedUnitPrice ?? 0) * ($1.quantity ?? 1) }
+            _ = try? await DatabaseService.shared.updateProject(id: project.id, PropertyProjectUpdate(estimatedTotal: estimatedTotal))
 
             completedProjectId = project.id
             hasUnviewedResult = true

@@ -10,6 +10,7 @@ struct NewProjectView: View {
     @State private var name = ""
     @State private var category: ProjectCategory = .other
     @State private var approach: ProjectApproach = .undecided
+    @State private var showQuoteUpload = false
     @State private var description = ""
     @State private var budgetText = ""
     @State private var targetStartDate: Date?
@@ -182,9 +183,19 @@ struct NewProjectView: View {
                     // CTAs
                     VStack(spacing: HavenTheme.spacing12) {
                         let budgetValid = justExploring || !budgetText.isEmpty
+
+                        // Primary: Upload a quote
+                        HavenButton(
+                            title: "I Have a Contractor Quote",
+                            action: { Task { await saveAndUploadQuote() } },
+                            icon: "doc.text.magnifyingglass",
+                            isDisabled: name.isEmpty || !budgetValid || isSaving
+                        )
+
                         HavenButton(
                             title: "Create & Research Costs",
                             action: { Task { await saveAndResearch() } },
+                            style: .secondary,
                             icon: "sparkle.magnifyingglass",
                             isLoading: viewModel.isResearching,
                             isDisabled: name.isEmpty || !budgetValid || isSaving
@@ -203,7 +214,14 @@ struct NewProjectView: View {
             }
             .background(HavenColors.background)
             .scrollDismissesKeyboard(.interactively)
-            .onTapGesture { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil) }
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Done") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
             .navigationTitle("New Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -305,6 +323,23 @@ struct NewProjectView: View {
 
     private func saveAndResearch() async {
         await save(research: true)
+    }
+
+    private func saveAndUploadQuote() async {
+        // Save the project, dismiss — user taps into project to upload quote
+        isSaving = true
+        error = nil
+        do {
+            let insert = buildInsert()
+            _ = try await viewModel.createProject(insert)
+            Analytics.track(.propertyCreated, ["project_name": name, "category": category.rawValue, "source": "quote_upload"])
+            Haptics.success()
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+        isSaving = false
     }
 
     private func buildInsert() -> PropertyProjectInsert {

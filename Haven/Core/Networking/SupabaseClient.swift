@@ -226,6 +226,41 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "simulate-scenario", body: body, timeoutSeconds: 180)
     }
 
+    // MARK: - Analyze Quote
+
+    struct AnalyzeQuoteRequest: Encodable {
+        let imageBase64: String?
+        let text: String?
+        let projectName: String?
+        let projectCategory: String?
+        let propertyLocation: String?
+
+        enum CodingKeys: String, CodingKey {
+            case text
+            case imageBase64 = "image_base64"
+            case projectName = "project_name"
+            case projectCategory = "project_category"
+            case propertyLocation = "property_location"
+        }
+    }
+
+    static func analyzeQuote(
+        imageBase64: String? = nil,
+        text: String? = nil,
+        projectName: String? = nil,
+        projectCategory: String? = nil,
+        propertyLocation: String? = nil
+    ) async throws -> Data {
+        let body = AnalyzeQuoteRequest(
+            imageBase64: imageBase64,
+            text: text,
+            projectName: projectName,
+            projectCategory: projectCategory,
+            propertyLocation: propertyLocation
+        )
+        return try await callEdgeFunction(name: "analyze-quote", body: body, timeoutSeconds: 120)
+    }
+
     // MARK: - Research Project
 
     struct ResearchProjectRequest: Encodable {
@@ -234,12 +269,14 @@ enum HavenSupabase {
         let description: String?
         let propertyLocation: String?
         let projectId: String?
+        let userToolkit: [String]?
 
         enum CodingKeys: String, CodingKey {
             case category, description
             case projectName = "project_name"
             case propertyLocation = "property_location"
             case projectId = "project_id"
+            case userToolkit = "user_toolkit"
         }
     }
 
@@ -248,14 +285,16 @@ enum HavenSupabase {
         category: String,
         description: String? = nil,
         propertyLocation: String? = nil,
-        projectId: String? = nil
+        projectId: String? = nil,
+        userToolkit: [String]? = nil
     ) async throws -> Data {
         let body = ResearchProjectRequest(
             projectName: projectName,
             category: category,
             description: description,
             propertyLocation: propertyLocation,
-            projectId: projectId
+            projectId: projectId,
+            userToolkit: userToolkit
         )
         return try await callEdgeFunction(name: "research-project", body: body, timeoutSeconds: 120)
     }
@@ -275,6 +314,14 @@ enum HavenSupabase {
     static func viewDocument(documentId: String) async throws -> Data {
         let body = ViewDocumentRequest(documentId: documentId)
         return try await callEdgeFunction(name: "view-document", body: body)
+    }
+
+    // MARK: - Delete Account
+
+    static func deleteAccount() async throws -> Data {
+        // Empty body — the Edge Function uses the auth token to identify the user
+        struct EmptyBody: Encodable {}
+        return try await callEdgeFunction(name: "delete-account", body: EmptyBody(), timeoutSeconds: 60)
     }
 
     // MARK: - Household Merge
