@@ -10,6 +10,7 @@ struct ProjectDetailView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var showQuoteUpload = false
+    @State private var expandedEmailIndex: Int?
     @State private var showQuoteComparison = false
     @State private var showDeleteConfirmation = false
     @State private var showEditProject = false
@@ -383,8 +384,8 @@ struct ProjectDetailView: View {
                                 .fontWeight(.semibold)
                                 .tracking(0.5)
 
-                            ForEach(Array(summaries.enumerated()), id: \.offset) { _, entry in
-                                VStack(alignment: .leading, spacing: 2) {
+                            ForEach(Array(summaries.enumerated()), id: \.offset) { index, entry in
+                                VStack(alignment: .leading, spacing: 4) {
                                     if let subj = entry.subject {
                                         Text(subj)
                                             .font(HavenTypography.uiLabel)
@@ -395,10 +396,34 @@ struct ProjectDetailView: View {
                                             .font(HavenTypography.uiCaption)
                                             .foregroundStyle(HavenColors.textSecondary)
                                     }
-                                    if let date = entry.date {
-                                        Text(date)
-                                            .font(.system(size: 9))
-                                            .foregroundStyle(HavenColors.textTertiary)
+                                    HStack {
+                                        if let date = entry.date {
+                                            Text(date)
+                                                .font(.system(size: 9))
+                                                .foregroundStyle(HavenColors.textTertiary)
+                                        }
+                                        if entry.rawBody != nil {
+                                            Spacer()
+                                            Button {
+                                                withAnimation {
+                                                    expandedEmailIndex = expandedEmailIndex == index ? nil : index
+                                                }
+                                            } label: {
+                                                Text(expandedEmailIndex == index ? "Hide Email" : "Show Original Email")
+                                                    .font(.system(size: 9))
+                                                    .foregroundStyle(HavenColors.navy700)
+                                            }
+                                        }
+                                    }
+                                    if expandedEmailIndex == index, let body = entry.rawBody {
+                                        Text(body)
+                                            .font(.system(size: 10, design: .monospaced))
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                            .padding(6)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .background(HavenColors.surface)
+                                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                                            .textSelection(.enabled)
                                     }
                                 }
                                 .padding(.vertical, 4)

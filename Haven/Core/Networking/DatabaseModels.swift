@@ -1749,6 +1749,7 @@ struct ClaimEmailSummary: Codable {
     let date: String?
     let summary: String?
     let subject: String?
+    let rawBody: String?
 }
 
 struct HomeValueImpact: Codable {

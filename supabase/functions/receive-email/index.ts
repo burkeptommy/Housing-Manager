@@ -762,7 +762,7 @@ Respond with ONLY valid JSON:
                   phone: claimInfo.adjusterPhone,
                   email: claimInfo.adjusterEmail,
                 } : null,
-                emailSummaries: [{ date: new Date().toISOString(), summary: classification.summary, subject }],
+                emailSummaries: [{ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: emailBody.substring(0, 10000) }],
               },
             })
             .select("id")
@@ -782,7 +782,7 @@ Respond with ONLY valid JSON:
 
           const existingResearch = (existingData?.ai_research as any) || {};
           const emailSummaries = existingResearch.emailSummaries || [];
-          emailSummaries.push({ date: new Date().toISOString(), summary: classification.summary, subject });
+          emailSummaries.push({ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: emailBody.substring(0, 10000) });
 
           // Merge any new info (adjuster, policy number, etc.)
           const merged = {
@@ -824,28 +824,8 @@ Respond with ONLY valid JSON:
             }
           }
 
-          // Save raw email as text file (truncated to 50KB to avoid memory issues)
-          if (emailBody && emailBody.length > 50) {
-            try {
-              const truncatedBody = emailBody.substring(0, 50000);
-              const emailFilePath = `${householdId}/claims/${claimProject.id}/${crypto.randomUUID()}_email.txt`;
-              const emailContent = `From: ${fromAddress}\nSubject: ${subject}\nDate: ${new Date().toISOString()}\n\n${truncatedBody}`;
-              const emailBuffer = new TextEncoder().encode(emailContent);
-              await supabase.storage.from("documents").upload(emailFilePath, emailBuffer, { contentType: "text/plain" });
-              await supabase.from("project_files").insert({
-                project_id: claimProject.id,
-                household_id: householdId,
-                file_path: emailFilePath,
-                filename: `Email: ${(subject || "Claim correspondence").substring(0, 100)}.txt`,
-                content_type: "text/plain",
-                file_size: emailBuffer.byteLength,
-                notes: `Raw email from ${fromAddress}`,
-              });
-              actions.push("claim_email_saved_as_file");
-            } catch (err) {
-              console.error(`[receive-email] Failed to save claim email as file: ${err}`);
-            }
-          }
+          // Raw email body is stored in ai_research.emailSummaries[].rawBody
+          // No separate file upload needed — viewable via "Show Original Email" in the app
         }
       } else {
         actions.push("insurance_claim_no_property");
