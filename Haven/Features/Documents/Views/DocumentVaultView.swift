@@ -166,8 +166,12 @@ struct DocumentVaultView: View {
                 await viewModel.loadData()
             }
             .task {
-                if viewModel.documents.isEmpty {
-                    await viewModel.loadData()
+                await viewModel.loadData()
+            }
+            .onAppear {
+                // Refresh on return from detail view (e.g. after deletion)
+                if !viewModel.documents.isEmpty {
+                    Task { await viewModel.loadData() }
                 }
             }
             .sheet(isPresented: $showUpload) {

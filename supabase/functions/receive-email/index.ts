@@ -863,18 +863,22 @@ Respond with ONLY valid JSON:
     // --- STEP 2.5a: SAVE ALL ATTACHMENTS FOR FAMILY/BILL ITEMS ---
     // Family and bill emails may have multiple attachments (e.g. front+back of insurance card)
     // Save additional attachments to inbox-attachments storage
+    const totalAttachments = 1 + additionalAttachments.length; // primary + additional
     if ((classification.type === "family" || classification.type === "bill_invoice") && additionalAttachments.length > 0) {
-      for (const att of additionalAttachments) {
+      for (let i = 0; i < additionalAttachments.length; i++) {
+        const att = additionalAttachments[i];
         try {
           const filePath = `${householdId}/family/${crypto.randomUUID()}_${att.filename}`;
           const fileBuffer = Uint8Array.from(atob(att.base64), c => c.charCodeAt(0));
           await supabase.storage.from("inbox-attachments").upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
-          // Create a separate inbox item for each additional attachment
+          // Generate descriptive title instead of raw filename
+          const docTitle = classification.documentTitle || subject || "Document";
+          const attachTitle = totalAttachments > 1 ? `${docTitle} (${i + 2} of ${totalAttachments})` : docTitle;
           await supabase.from("inbox_items").insert({
             household_id: householdId,
             type: "family",
-            title: att.filename || `Attachment from ${subject}`,
-            summary: `Additional attachment from: ${subject}`,
+            title: attachTitle,
+            summary: `Attachment ${i + 2} of ${totalAttachments} from: ${subject}`,
             from_email: fromAddress,
             attachment_path: filePath,
             attachment_content_type: att.contentType,
@@ -890,7 +894,8 @@ Respond with ONLY valid JSON:
     }
 
     // --- STEP 2.5: PROCESS ADDITIONAL ATTACHMENTS AS DOCUMENTS ---
-    if (additionalAttachments.length > 0 && property) {
+    // Skip for family/bill emails — those are handled by Step 2.5a above
+    if (additionalAttachments.length > 0 && property && classification.type !== "family" && classification.type !== "bill_invoice") {
       for (const att of additionalAttachments) {
         try {
           const filePath = `${householdId}/${crypto.randomUUID()}`;

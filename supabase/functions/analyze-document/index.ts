@@ -60,6 +60,23 @@ serve(async (req: Request) => {
 
     console.log(`[analyze] doc=${document_id} household=${household_id} hasText=${!!text} hasImage=${!!image_base64}`);
 
+    // --- FETCH PROPERTY CONTEXT ---
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    let propertyContext = "";
+    try {
+      const { data: properties } = await supabase
+        .from("properties")
+        .select("id, name, street, city, state, zip_code")
+        .eq("household_id", household_id)
+        .limit(5);
+      if (properties && properties.length > 0) {
+        const propList = properties.map((p: any) =>
+          `- "${p.name}": ${[p.street, p.city, p.state, p.zip_code].filter(Boolean).join(", ")} (id: ${p.id})`
+        ).join("\n");
+        propertyContext = `\n\nThe user owns these properties:\n${propList}\nIf this document relates to one of these properties (matching address, property name, or location), include the property_id in your response.`;
+      }
+    } catch { /* non-blocking */ }
+
     // --- BUILD CLAUDE REQUEST ---
     const messages_content: Array<Record<string, unknown>> = [];
 
@@ -130,8 +147,9 @@ serve(async (req: Request) => {
       "dueDate": "YYYY-MM-DD or null",
       "estimatedCost": "rough cost estimate or null"
     }
-  ]
-}
+  ],
+  "property_id": "UUID of the matching property if this document relates to a specific property (from the list below), or null"
+}${propertyContext}
 
 EXTRACTION RULES:
 - vendor_info: Extract if the document is from a contractor, service company, vendor, or business. Include for: quotes, invoices, service reports, warranties, vendor contracts, repair estimates, inspection reports.
@@ -236,8 +254,8 @@ Return ONLY JSON. No markdown. No explanation.`,
     if (supabaseUrl && serviceRoleKey) {
       const svc = createClient(supabaseUrl, serviceRoleKey);
 
-      // Update document record
-      svc.from("documents").update({
+      // Update document record (including property_id if AI matched a property)
+      const docUpdate: Record<string, unknown> = {
         ai_summary: analysis.summary,
         ai_flags: analysis.flags ?? [],
         category: analysis.category_suggestion,
@@ -245,7 +263,12 @@ Return ONLY JSON. No markdown. No explanation.`,
           cross_references: analysis.cross_reference_suggestions ?? [],
           extracted_metadata: analysis.extracted_metadata ?? {},
         },
-      }).eq("id", document_id).then(({ error }) => {
+      };
+      if (analysis.property_id) {
+        docUpdate.property_id = analysis.property_id;
+        console.log(`[analyze] Auto-linked to property: ${analysis.property_id}`);
+      }
+      svc.from("documents").update(docUpdate).eq("id", document_id).then(({ error }) => {
         if (error) console.error("[analyze] DB update failed:", error.message);
         else console.log("[analyze] Document updated in DB");
       });

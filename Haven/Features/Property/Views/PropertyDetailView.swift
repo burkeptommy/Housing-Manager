@@ -842,6 +842,7 @@ struct PropertyDetailView: View {
     // MARK: - Property Documents (moved higher in layout)
 
     private var propertyDocumentsSection: some View {
+        VStack(spacing: HavenTheme.spacing8) {
         NavigationLink {
             PropertyDocumentsView(propertyId: propertyID, propertyName: viewModel.property?.name ?? "Property")
         } label: {
@@ -913,6 +914,25 @@ struct PropertyDetailView: View {
             }
         }
         .buttonStyle(.plain)
+
+        // Quick upload button
+        Button {
+            showDocumentUpload = true
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.up.doc.fill")
+                    .font(.caption)
+                Text("Upload Property Document")
+                    .font(HavenTypography.uiLabel)
+            }
+            .foregroundStyle(HavenColors.navy700)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(HavenColors.navy.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+        } // end VStack wrapper
     }
 
     // MARK: - Vendors
