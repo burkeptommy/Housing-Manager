@@ -59,6 +59,7 @@ serve(async (req: Request) => {
     let fromAddress = "";
     let subject = "";
     let emailBody = "";
+    let fullRawEmail = ""; // longest version of the email for "Show Original Email"
     let attachmentBase64: string | null = null;
     let attachmentContentType: string | null = null;
     let attachmentFilename: string | null = null;
@@ -83,7 +84,13 @@ serve(async (req: Request) => {
       toAddress = (formData.get("to") as string) ?? "";
       fromAddress = (formData.get("from") as string) ?? "";
       subject = (formData.get("subject") as string) ?? "";
-      emailBody = (formData.get("text") as string) ?? (formData.get("html") as string) ?? "";
+      const textBody = (formData.get("text") as string) ?? "";
+      const htmlBody = (formData.get("html") as string) ?? "";
+      emailBody = textBody || htmlBody;
+      // For "Show Original Email" — use the longer version, strip HTML tags if using HTML
+      fullRawEmail = textBody.length >= htmlBody.length
+        ? textBody
+        : htmlBody.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/\s+/g, " ").trim();
 
       // Extract ALL attachments (SendGrid sends as attachment1, attachment2, etc.)
       const allAttachments: Array<{ base64: string; contentType: string; filename: string }> = [];
@@ -119,6 +126,7 @@ serve(async (req: Request) => {
       fromAddress = body.from ?? "";
       subject = body.subject ?? "";
       emailBody = body.text ?? body.body ?? "";
+      fullRawEmail = emailBody;
       attachmentBase64 = body.attachment_base64 ?? null;
       attachmentContentType = body.attachment_content_type ?? null;
       attachmentFilename = body.attachment_filename ?? null;
@@ -762,7 +770,7 @@ Respond with ONLY valid JSON:
                   phone: claimInfo.adjusterPhone,
                   email: claimInfo.adjusterEmail,
                 } : null,
-                emailSummaries: [{ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: emailBody.substring(0, 10000) }],
+                emailSummaries: [{ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: fullRawEmail.substring(0, 15000) }],
               },
             })
             .select("id")
@@ -782,7 +790,7 @@ Respond with ONLY valid JSON:
 
           const existingResearch = (existingData?.ai_research as any) || {};
           const emailSummaries = existingResearch.emailSummaries || [];
-          emailSummaries.push({ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: emailBody.substring(0, 10000) });
+          emailSummaries.push({ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: fullRawEmail.substring(0, 15000) });
 
           // Merge any new info (adjuster, policy number, etc.)
           const merged = {
