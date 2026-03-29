@@ -15,9 +15,7 @@ struct QuoteAnalysisView: View {
     @State private var isAnalyzing = false
     @State private var analysis: QuoteAnalysis?
     @State private var error: String?
-    @State private var importedCount = 0
-    @State private var showImportOptions = false
-    @State private var pendingImportItems: [QuoteLineItem] = []
+    @State private var quoteSaved = false
 
     var body: some View {
         NavigationStack {
@@ -55,19 +53,6 @@ struct QuoteAnalysisView: View {
                 case .failure(let err):
                     error = err.localizedDescription
                 }
-            }
-            .confirmationDialog("You already have items in this project", isPresented: $showImportOptions) {
-                Button("Replace All Existing Items") {
-                    Task { await importItems(pendingImportItems, replaceExisting: true) }
-                }
-                Button("Keep Existing & Add Quote Items") {
-                    Task { await importItems(pendingImportItems, replaceExisting: false) }
-                }
-                Button("Cancel", role: .cancel) {
-                    pendingImportItems = []
-                }
-            } message: {
-                Text("Would you like to replace your current line items with the quote, or add the quote items alongside them?")
             }
         }
     }
@@ -158,21 +143,12 @@ struct QuoteAnalysisView: View {
             tipsCard(tips)
         }
 
-        // Import button
-        if let items = analysis.lineItems, !items.isEmpty, importedCount == 0 {
-            HavenButton(title: "Import \(items.count) Items to Project", action: {
-                if !viewModel.lineItems.isEmpty {
-                    pendingImportItems = items
-                    showImportOptions = true
-                } else {
-                    Task { await importItems(items, replaceExisting: false) }
-                }
-            }, icon: "square.and.arrow.down")
-        } else if importedCount > 0 {
+        // Save quote confirmation
+        if quoteSaved {
             HStack(spacing: 6) {
                 Image(systemName: "checkmark.circle.fill")
                     .foregroundStyle(HavenColors.success)
-                Text("\(importedCount) items imported to project")
+                Text("Quote saved to project")
                     .font(HavenTypography.uiLabel)
                     .foregroundStyle(HavenColors.success)
             }
@@ -285,21 +261,26 @@ struct QuoteAnalysisView: View {
                             ratingBadge(item.rating ?? "fair")
                         }
 
-                        HStack(spacing: HavenTheme.spacing16) {
-                            if let qty = item.quantity, let unit = item.unit {
-                                Text("\(qty.formatted()) \(unit)")
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
-                            if let total = item.totalPrice {
-                                Text("Quoted: $\(total, specifier: "%.2f")")
-                                    .font(HavenTypography.uiLabel)
-                                    .foregroundStyle(HavenColors.textPrimary)
-                            }
-                            if let median = item.marketMedianPrice {
-                                Text("Market: $\(median, specifier: "%.2f")")
-                                    .font(HavenTypography.uiLabel)
-                                    .foregroundStyle(HavenColors.success)
+                        if let qty = item.quantity, let unit = item.unit {
+                            Text("\(qty.formatted()) \(unit)")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+
+                        if let range = item.localPriceRange, let low = range.low, let high = range.high, high > low {
+                            localRangeBar(item: item, low: low, high: high, countyName: range.countyName, costIndex: range.costIndex)
+                        } else {
+                            HStack(spacing: HavenTheme.spacing16) {
+                                if let total = item.displayPrice {
+                                    Text("Quoted: $\(total, specifier: "%.0f")")
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                }
+                                if let median = item.marketMedianPrice {
+                                    Text("Fair: $\(median, specifier: "%.0f")")
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.success)
+                                }
                             }
                         }
 
@@ -371,6 +352,107 @@ struct QuoteAnalysisView: View {
 
     // MARK: - Rating Helpers
 
+    /// Visual range bar showing where the quoted price falls within the local county range.
+    private func localRangeBar(item: QuoteLineItem, low: Double, high: Double, countyName: String?, costIndex: String?) -> some View {
+        let quoted = item.displayPrice
+        let fair = item.marketMedianPrice
+
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 4) {
+                if let county = countyName {
+                    Text(county)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                if let idx = costIndex {
+                    let idxLabel = switch idx {
+                    case "very_high": "Very High Cost Area"
+                    case "high": "High Cost Area"
+                    case "low": "Low Cost Area"
+                    default: ""
+                    }
+                    if !idxLabel.isEmpty {
+                        Text("·")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(idxLabel)
+                            .font(.system(size: 9))
+                            .foregroundStyle(idx == "very_high" || idx == "high" ? HavenColors.warning : HavenColors.success)
+                    }
+                }
+            }
+
+            HStack {
+                Text("$\(Int(low).formatted())")
+                    .font(.system(size: 10))
+                    .foregroundStyle(HavenColors.success)
+                Spacer()
+                if let f = fair {
+                    Text("Fair: $\(Int(f).formatted())")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                }
+                Spacer()
+                Text("$\(Int(high).formatted())")
+                    .font(.system(size: 10))
+                    .foregroundStyle(HavenColors.critical)
+            }
+
+            GeometryReader { geo in
+                let barWidth = geo.size.width
+                let range = high - low
+
+                ZStack(alignment: .leading) {
+                    LinearGradient(
+                        colors: [HavenColors.success.opacity(0.3), HavenColors.warning.opacity(0.3), HavenColors.critical.opacity(0.3)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(height: 8)
+                    .clipShape(Capsule())
+
+                    if let f = fair, range > 0 {
+                        let fairPos = max(0, min(barWidth, CGFloat((f - low) / range) * barWidth))
+                        Rectangle()
+                            .fill(HavenColors.navy700)
+                            .frame(width: 2, height: 14)
+                            .offset(x: fairPos - 1)
+                    }
+
+                    if let q = quoted, range > 0 {
+                        let pos = max(0, min(barWidth - 12, CGFloat((q - low) / range) * barWidth - 6))
+                        Circle()
+                            .fill(q > high ? HavenColors.critical : q < low ? HavenColors.success : HavenColors.navy700)
+                            .frame(width: 12, height: 12)
+                            .overlay(Circle().stroke(Color.white, lineWidth: 1.5))
+                            .offset(x: pos)
+                    }
+                }
+            }
+            .frame(height: 14)
+
+            if let q = quoted {
+                HStack(spacing: 4) {
+                    Text("Quoted:")
+                        .font(.system(size: 10))
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("$\(Int(q).formatted())")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(q > high ? HavenColors.critical : q < low ? HavenColors.success : HavenColors.textPrimary)
+                    if q > high {
+                        Text("above range")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.critical)
+                    } else if q < low {
+                        Text("below range")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.success)
+                    }
+                }
+            }
+        }
+    }
+
     private func ratingBadge(_ rating: String) -> some View {
         Text(ratingLabel(rating))
             .font(HavenTypography.uiLabelSmall)
@@ -432,11 +514,18 @@ struct QuoteAnalysisView: View {
         isAnalyzing = true
         error = nil
 
-        let base64 = data.base64EncodedString()
+        // Prepare data: compress images, handle large PDFs with text extraction
+        let (imageBase64, extractedText, prepError) = await DocumentAnalysisService.shared.prepareForQuoteAnalysis(data)
+        if let prepError {
+            self.error = prepError
+            isAnalyzing = false
+            return
+        }
 
         do {
             let responseData = try await HavenSupabase.analyzeQuote(
-                imageBase64: base64,
+                imageBase64: imageBase64,
+                text: extractedText,
                 projectName: project.name,
                 projectCategory: project.category
             )
@@ -449,52 +538,61 @@ struct QuoteAnalysisView: View {
                 let analysis: QuoteAnalysis?
             }
 
+            // Check for server-side errors first
+            struct ErrorResponse: Decodable {
+                let error: String?
+                let detail: String?
+            }
+            if let errResp = try? JSONDecoder().decode(ErrorResponse.self, from: responseData),
+               let serverError = errResp.error {
+                print("[QuoteAnalysis] Server error: \(serverError), detail: \(errResp.detail ?? "none")")
+                self.error = "Quote analysis failed: \(serverError)"
+                isAnalyzing = false
+                return
+            }
+
             let response = try JSONDecoder().decode(AnalyzeResponse.self, from: responseData)
-            analysis = response.analysis
+            guard let parsed = response.analysis else {
+                self.error = "Couldn't parse the quote. Try uploading a clearer photo or PDF."
+                isAnalyzing = false
+                return
+            }
+            analysis = parsed
             Haptics.success()
             Analytics.track(.documentAIAnalysisCompleted, ["type": "quote", "items": analysis?.lineItems?.count ?? 0])
+
+            // Auto-create vendor from quote if we got vendor info
+            if let vendorName = analysis?.vendor?.name, !vendorName.isEmpty {
+                let vendorInsert = ContractorInsert(
+                    householdId: project.householdId,
+                    companyName: vendorName,
+                    phone: analysis?.vendor?.phone ?? "Not provided",
+                    contactName: nil,
+                    email: analysis?.vendor?.email,
+                    address: analysis?.vendor?.address,
+                    licenseNumber: analysis?.vendor?.license
+                )
+                _ = try? await DatabaseService.shared.createContractor(vendorInsert)
+            }
         } catch {
             print("[QuoteAnalysis] Error: \(error)")
-            self.error = "Quote analysis failed. Please try again."
+            let nsError = error as NSError
+            if nsError.domain == "EdgeFunction" || nsError.domain == "NSURLErrorDomain" {
+                let msg = nsError.localizedDescription
+                if msg.contains("timed out") || msg.contains("timeout") {
+                    self.error = "Analysis timed out. Try a smaller or clearer file."
+                } else if msg.contains("too large") || msg.contains("413") {
+                    self.error = "File is too large. Try a smaller document."
+                } else {
+                    self.error = "Quote analysis failed: \(msg)"
+                }
+            } else {
+                self.error = "Quote analysis failed. Please try again."
+            }
             Haptics.error()
         }
 
         isAnalyzing = false
     }
 
-    // MARK: - Import Items
-
-    private func importItems(_ items: [QuoteLineItem], replaceExisting: Bool) async {
-        let inserts = items.enumerated().compactMap { index, item -> ProjectLineItemInsert? in
-            guard let desc = item.description else { return nil }
-            return ProjectLineItemInsert(
-                projectId: project.id,
-                householdId: project.householdId,
-                name: desc,
-                category: item.category ?? "materials",
-                quantity: item.quantity ?? 1,
-                unit: item.unit ?? "each",
-                estimatedUnitPrice: item.unitPrice ?? item.totalPrice,
-                notes: item.ratingReason,
-                sortOrder: index
-            )
-        }
-
-        do {
-            // Delete existing items if replacing
-            if replaceExisting {
-                for item in viewModel.lineItems {
-                    try await viewModel.deleteLineItem(id: item.id)
-                }
-            }
-            try await DatabaseService.shared.createLineItems(inserts)
-            await viewModel.loadLineItems(projectId: project.id)
-            try? await viewModel.recalculateActualSpend(projectId: project.id)
-            importedCount = inserts.count
-            Haptics.success()
-        } catch {
-            self.error = "Failed to import items: \(error.localizedDescription)"
-            Haptics.error()
-        }
-    }
 }

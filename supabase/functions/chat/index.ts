@@ -14,6 +14,20 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// AES-256-GCM encryption for at-rest chat message protection
+async function encryptMessage(plaintext: string, keyBase64: string): Promise<string> {
+  const keyBytes = Uint8Array.from(atob(keyBase64), (c) => c.charCodeAt(0));
+  const key = await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, ["encrypt"]);
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const encoded = new TextEncoder().encode(plaintext);
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoded);
+  // Combine IV + ciphertext, return as base64
+  const combined = new Uint8Array(iv.length + ciphertext.byteLength);
+  combined.set(iv);
+  combined.set(new Uint8Array(ciphertext), iv.length);
+  return btoa(String.fromCharCode(...combined));
+}
+
 interface ChatRequest {
   message: string;
   conversation_history: Array<{
@@ -24,6 +38,7 @@ interface ChatRequest {
   context_id?: string;
   household_id: string;
   user_id?: string;
+  encryption_key?: string; // Base64-encoded AES-256 key from client for at-rest encryption
 }
 
 interface ChatResponse {
@@ -190,15 +205,28 @@ serve(async (req: Request) => {
     const claudeData = await claudeResponse.json();
     const reply = claudeData.content?.[0]?.text ?? "I apologize, but I wasn't able to generate a response. Please try again.";
 
-    // Persist both messages to chat_messages table
+    // Persist both messages to chat_messages table (encrypted at rest if key provided)
     const now = new Date().toISOString();
     try {
+      let storedUserContent = body.message;
+      let storedReply = reply;
+
+      if (body.encryption_key) {
+        try {
+          storedUserContent = await encryptMessage(body.message, body.encryption_key);
+          storedReply = await encryptMessage(reply, body.encryption_key);
+        } catch (encErr) {
+          console.warn("Chat encryption failed, storing plaintext:", encErr);
+          // Fall back to plaintext — don't block the chat
+        }
+      }
+
       await supabase.from("chat_messages").insert([
         {
           household_id: body.household_id,
           user_id: userId ?? null,
           role: "user",
-          content: body.message,
+          content: storedUserContent,
           context_type: body.context_type ?? "general",
           context_id: body.context_id ?? null,
           created_at: now,
@@ -207,7 +235,7 @@ serve(async (req: Request) => {
           household_id: body.household_id,
           user_id: userId ?? null,
           role: "assistant",
-          content: reply,
+          content: storedReply,
           context_type: body.context_type ?? "general",
           context_id: body.context_id ?? null,
           created_at: now,

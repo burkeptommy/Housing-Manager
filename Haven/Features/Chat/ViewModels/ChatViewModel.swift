@@ -41,7 +41,14 @@ final class ChatViewModel: ObservableObject {
             householdId = user.householdId
 
             let rows = try await db.fetchChatMessages(limit: 50)
-            messages = rows.reversed().map { ChatMessage(from: $0) }
+            // Decrypt messages (backwards compat: plaintext messages pass through unchanged)
+            messages = rows.reversed().map { row in
+                if let hhId = householdId {
+                    let decryptedContent = DocumentEncryption.shared.decryptString(row.content, householdId: hhId)
+                    return ChatMessage(from: row, decryptedContent: decryptedContent)
+                }
+                return ChatMessage(from: row)
+            }
         } catch {
             self.error = error.localizedDescription
         }
@@ -68,12 +75,16 @@ final class ChatViewModel: ObservableObject {
                 ["role": msg.role == .user ? "user" : "assistant", "content": msg.content]
             }
 
+            // Pass encryption key so Edge Function encrypts messages at rest
+            let encKey = DocumentEncryption.shared.keyBase64(for: householdId)
+
             let data = try await HavenSupabase.chat(
                 message: text,
                 history: Array(history),
                 contextType: contextType,
                 contextId: contextId?.uuidString,
-                householdId: householdId.uuidString
+                householdId: householdId.uuidString,
+                encryptionKey: encKey
             )
 
             let responseText: String
@@ -551,6 +562,13 @@ struct ChatMessage: Identifiable {
         self.id = row.id
         self.role = row.role == "user" ? .user : .assistant
         self.content = row.content
+        self.timestamp = row.createdAt ?? .now
+    }
+
+    init(from row: ChatMessageRow, decryptedContent: String) {
+        self.id = row.id
+        self.role = row.role == "user" ? .user : .assistant
+        self.content = decryptedContent
         self.timestamp = row.createdAt ?? .now
     }
 }

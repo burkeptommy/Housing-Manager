@@ -1,4 +1,5 @@
 import Foundation
+import PDFKit
 import Vision
 import UIKit
 
@@ -191,6 +192,50 @@ final class DocumentAnalysisService {
         ))
 
         return analysis
+    }
+
+    // MARK: - Quote Preparation
+
+    /// Prepare file data for quote analysis. Handles PDFs and images with appropriate
+    /// compression and text extraction to stay within edge function body limits.
+    /// Returns (imageBase64, text, error) — at least one of imageBase64/text will be non-nil on success.
+    func prepareForQuoteAnalysis(_ data: Data) async -> (imageBase64: String?, text: String?, error: String?) {
+        let isPDF = data.count >= 4 && data.prefix(4) == Data([0x25, 0x50, 0x44, 0x46]) // %PDF
+
+        if isPDF {
+            // Small PDF (<4.5MB raw = ~6MB base64): send directly, Claude handles natively
+            if data.count <= 4_500_000 {
+                return (data.base64EncodedString(), nil, nil)
+            }
+            // Large PDF: extract text via PDFKit as fallback
+            if let text = extractPDFText(from: data), text.count >= 50 {
+                print("[QuotePrep] Large PDF (\(data.count / 1_048_576)MB) — using extracted text (\(text.count) chars)")
+                return (nil, text, nil)
+            }
+            // PDF too large and text extraction failed
+            let sizeMB = data.count / 1_048_576
+            return (nil, nil, "This PDF is \(sizeMB)MB, which is too large. Try a smaller or clearer file.")
+        }
+
+        // Image: always compress (camera photos can be 10-20MB raw)
+        guard let image = UIImage(data: data) else {
+            return (nil, nil, "Couldn't process this file. Please try a different image or PDF.")
+        }
+        let compressed = compressImageForAPI(image)
+        print("[QuotePrep] Image compressed from \(data.count / 1024)KB to \(compressed.count / 1024)KB")
+        return (compressed.base64EncodedString(), nil, nil)
+    }
+
+    /// Extract text from a PDF using PDFKit (on-device, no network)
+    private func extractPDFText(from data: Data) -> String? {
+        guard let document = PDFDocument(data: data) else { return nil }
+        var pages: [String] = []
+        for i in 0..<document.pageCount {
+            if let page = document.page(at: i), let text = page.string, !text.isEmpty {
+                pages.append(text)
+            }
+        }
+        return pages.isEmpty ? nil : pages.joined(separator: "\n\n")
     }
 
     // MARK: - OCR

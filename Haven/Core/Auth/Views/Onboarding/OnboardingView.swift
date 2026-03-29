@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Multi-step onboarding flow for new households.
+/// Post-auth onboarding: the user already saw the address hook and maintenance preview.
+/// This screen collects their name, then creates household + property + systems + tasks.
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = OnboardingViewModel()
@@ -10,12 +11,13 @@ struct OnboardingView: View {
             if viewModel.pendingInvitation != nil {
                 invitedView
             } else {
-                normalOnboardingView
+                nameEntryView
             }
         }
         .trackScreen("OnboardingView")
         .task {
             Analytics.track(.onboardingStarted)
+            viewModel.loadCachedAddress()
             await viewModel.prefillFromAuth()
             await viewModel.checkForInvitation()
         }
@@ -61,52 +63,100 @@ struct OnboardingView: View {
         .padding()
     }
 
-    // MARK: - Normal Onboarding
+    // MARK: - Name Entry (post-auth, post-address-hook)
 
-    private var normalOnboardingView: some View {
+    private var nameEntryView: some View {
         VStack(spacing: 0) {
-            // Progress indicator
-            ProgressView(value: viewModel.progress)
-                .tint(HavenColors.navy)
-                .padding(.horizontal)
+            ScrollView {
+                VStack(spacing: HavenTheme.spacing24) {
+                    VStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 48))
+                            .foregroundStyle(HavenColors.success)
+                        Text("Account created!")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.navy800)
 
-            TabView(selection: $viewModel.currentStep) {
-                OnboardingCombinedInfoStep(
-                    firstName: $viewModel.primaryFirstName,
-                    lastName: $viewModel.primaryLastName,
-                    email: $viewModel.primaryEmail,
-                    phone: $viewModel.primaryPhone,
-                    gender: $viewModel.primaryGender
-                )
-                    .tag(OnboardingStep.yourInfo)
-
-                OnboardingSpouseStep(
-                    addSpouse: $viewModel.addSpouse,
-                    firstName: $viewModel.spouseFirstName,
-                    lastName: $viewModel.spouseLastName,
-                    email: $viewModel.spouseEmail,
-                    gender: $viewModel.spouseGender,
-                    spouseHasExistingAccount: viewModel.spouseHasExistingAccount,
-                    isCheckingSpouseEmail: viewModel.isCheckingSpouseEmail,
-                    onEmailChanged: { newEmail in
-                        Task { await viewModel.checkSpouseEmail() }
+                        if !viewModel.street.isEmpty {
+                            Text("We'll save your home plan for \(viewModel.street). Just add your name to get started.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        } else {
+                            Text("Add your name to personalize your experience.")
+                                .font(HavenTypography.bodySmall)
+                                .foregroundStyle(HavenColors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
                     }
-                )
-                    .tag(OnboardingStep.spouse)
+                    .padding(.top, 32)
 
-                OnboardingFamilyStep(members: $viewModel.additionalMembers)
-                    .tag(OnboardingStep.family)
+                    VStack(spacing: HavenTheme.spacing16) {
+                        HStack(spacing: 12) {
+                            HavenTextField(title: "First Name", text: $viewModel.primaryFirstName)
+                                .textContentType(.givenName)
+                                .textInputAutocapitalization(.words)
+                            HavenTextField(title: "Last Name", text: $viewModel.primaryLastName)
+                                .textContentType(.familyName)
+                                .textInputAutocapitalization(.words)
+                        }
 
-                OnboardingFeaturesStep()
-                    .tag(OnboardingStep.features)
+                        if !viewModel.primaryEmail.isEmpty {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Email")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text(viewModel.primaryEmail)
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                }
+                                Spacer()
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(HavenColors.success)
+                                    .font(.caption)
+                            }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 10)
+                            .background(HavenColors.creamLight)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                    }
 
-                OnboardingModulesStep()
-                    .tag(OnboardingStep.allSet)
-            }
-            .tabViewStyle(.page(indexDisplayMode: .never))
-            .animation(.easeInOut, value: viewModel.currentStep)
-            .onChange(of: viewModel.currentStep) { _, _ in
-                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    // Show what will be saved
+                    if !viewModel.street.isEmpty {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("What we'll set up for you")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+
+                            HStack(spacing: 8) {
+                                Image(systemName: "house.fill")
+                                    .foregroundStyle(HavenColors.navy700)
+                                Text("\(viewModel.street), \(viewModel.city)")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+
+                            if viewModel.propertyLookupResult != nil {
+                                HStack(spacing: 8) {
+                                    Image(systemName: "wrench.fill")
+                                        .foregroundStyle(HavenColors.navy700)
+                                    Text("Home systems + 12-month maintenance plan")
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(HavenTheme.spacing12)
+                        .background(HavenColors.navy.opacity(0.04))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, HavenTheme.pageMargin)
             }
 
             // Bottom buttons
@@ -118,42 +168,14 @@ struct OnboardingView: View {
                 }
 
                 HavenButton(
-                    title: viewModel.isLastStep
-                        ? (viewModel.isLoading ? viewModel.setupProgress : "Get Started")
-                        : "Continue"
+                    title: viewModel.isLoading ? viewModel.setupProgress : "Get Started"
                 ) {
-                    if viewModel.isLastStep {
-                        Task { await viewModel.complete(authService: appState.authService) }
-                    } else {
-                        viewModel.nextStep()
-                    }
+                    Task { await viewModel.complete(authService: appState.authService) }
                 }
                 .disabled(viewModel.isLoading || !viewModel.canProceed)
 
-                if viewModel.currentStep != .yourInfo && !viewModel.isLastStep {
-                    Button("Back") { viewModel.previousStep() }
-                        .font(HavenTypography.bodySmall)
-                        .foregroundStyle(HavenColors.textSecondary)
-                }
-
-                if viewModel.currentStep == .spouse || viewModel.currentStep == .family
-                    || viewModel.currentStep == .features || viewModel.currentStep == .allSet {
-                    Button("Skip") {
-                        Analytics.track(.onboardingSkipped, ["step": viewModel.currentStep.rawValue])
-                        if viewModel.isLastStep {
-                            Task { await viewModel.complete(authService: appState.authService) }
-                        } else {
-                            viewModel.nextStep()
-                        }
-                    }
-                        .font(HavenTypography.bodySmall)
-                        .foregroundStyle(HavenColors.textSecondary)
-                }
-
-                // Invite code option on first step
-                if viewModel.currentStep == .yourInfo {
-                    inviteCodeSection
-                }
+                // Invite code
+                inviteCodeSection
             }
             .padding(.horizontal, HavenTheme.padding)
             .padding(.bottom, 24)

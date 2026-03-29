@@ -1461,138 +1461,118 @@ struct PropertyProjectUpdate: Codable {
     }
 }
 
-// MARK: - Project Line Items
+// MARK: - Project Files
 
-struct ProjectLineItemRow: Codable, Identifiable {
+struct ProjectFileRow: Codable, Identifiable {
     let id: UUID
     let projectId: UUID
     let householdId: UUID
-    let name: String
-    let category: String?
-    let quantity: Double?
-    let unit: String?
-    let estimatedUnitPrice: Double?
-    let actualUnitPrice: Double?
-    let suggestedStore: String?
-    let suggestedUrl: String?
-    let isPurchased: Bool
-    let isAiSuggested: Bool
-    let isOwned: Bool?
-    let necessity: String?
-    let multiProjectUseful: Bool?
+    let filePath: String
+    let filename: String
+    let contentType: String?
+    let fileSize: Int?
+    let thumbnailPath: String?
     let notes: String?
-    let sortOrder: Int?
+    let uploadedBy: UUID?
     let createdAt: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, quantity, unit, notes, necessity
+        case id, filename, notes
         case projectId = "project_id"
         case householdId = "household_id"
-        case estimatedUnitPrice = "estimated_unit_price"
-        case actualUnitPrice = "actual_unit_price"
-        case suggestedStore = "suggested_store"
-        case suggestedUrl = "suggested_url"
-        case isPurchased = "is_purchased"
-        case isAiSuggested = "is_ai_suggested"
-        case isOwned = "is_owned"
-        case multiProjectUseful = "multi_project_useful"
-        case sortOrder = "sort_order"
+        case filePath = "file_path"
+        case contentType = "content_type"
+        case fileSize = "file_size"
+        case thumbnailPath = "thumbnail_path"
+        case uploadedBy = "uploaded_by"
         case createdAt = "created_at"
+    }
+
+    var isImage: Bool {
+        contentType?.hasPrefix("image/") == true
     }
 }
 
-struct ProjectLineItemInsert: Codable {
+struct ProjectFileInsert: Codable {
     let projectId: UUID
     let householdId: UUID
-    let name: String
-    var category: String?
-    var quantity: Double? = 1
-    var unit: String?
-    var estimatedUnitPrice: Double?
-    var actualUnitPrice: Double?
-    var suggestedStore: String?
-    var suggestedUrl: String?
-    var isPurchased: Bool = false
-    var isAiSuggested: Bool = false
-    var necessity: String? = "required"
-    var multiProjectUseful: Bool? = false
+    let filePath: String
+    let filename: String
+    var contentType: String?
+    var fileSize: Int?
+    var thumbnailPath: String?
     var notes: String?
-    var sortOrder: Int? = 0
+    var uploadedBy: UUID?
 
     enum CodingKeys: String, CodingKey {
-        case name, category, quantity, unit, notes, necessity
+        case filename, notes
         case projectId = "project_id"
         case householdId = "household_id"
-        case estimatedUnitPrice = "estimated_unit_price"
-        case actualUnitPrice = "actual_unit_price"
-        case suggestedStore = "suggested_store"
-        case suggestedUrl = "suggested_url"
-        case isPurchased = "is_purchased"
-        case isAiSuggested = "is_ai_suggested"
-        case multiProjectUseful = "multi_project_useful"
-        case sortOrder = "sort_order"
+        case filePath = "file_path"
+        case contentType = "content_type"
+        case fileSize = "file_size"
+        case thumbnailPath = "thumbnail_path"
+        case uploadedBy = "uploaded_by"
     }
 }
 
-struct ProjectLineItemUpdate: Codable {
-    var name: String?
-    var category: String?
-    var quantity: Double?
-    var unit: String?
-    var estimatedUnitPrice: Double?
-    var actualUnitPrice: Double?
-    var suggestedStore: String?
-    var isPurchased: Bool?
-    var isOwned: Bool?
-    var necessity: String?
-    var notes: String?
-    var sortOrder: Int?
+// MARK: - Project Quotes
 
-    enum CodingKeys: String, CodingKey {
-        case name, category, quantity, unit, notes, necessity
-        case estimatedUnitPrice = "estimated_unit_price"
-        case actualUnitPrice = "actual_unit_price"
-        case suggestedStore = "suggested_store"
-        case isPurchased = "is_purchased"
-        case isOwned = "is_owned"
-        case sortOrder = "sort_order"
-    }
-}
-
-// MARK: - Household Toolkit
-
-struct HouseholdToolkitRow: Codable, Identifiable {
+struct ProjectQuoteRow: Codable, Identifiable {
     let id: UUID
+    let projectId: UUID
     let householdId: UUID
-    let toolName: String
-    let normalizedName: String
-    let category: String?
-    let addedFromProjectId: UUID?
+    let contractorId: UUID?
+    let quoteDate: String?
+    let quoteTotal: Double?
+    let estimatedFairTotal: Double?
+    let overallRating: String?
+    let analysis: QuoteAnalysis
+    let filePath: String?
+    let notes: String?
     let createdAt: Date?
+    let updatedAt: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, category
+        case id, analysis, notes
+        case projectId = "project_id"
         case householdId = "household_id"
-        case toolName = "tool_name"
-        case normalizedName = "normalized_name"
-        case addedFromProjectId = "added_from_project_id"
+        case contractorId = "contractor_id"
+        case quoteDate = "quote_date"
+        case quoteTotal = "quote_total"
+        case estimatedFairTotal = "estimated_fair_total"
+        case overallRating = "overall_rating"
+        case filePath = "file_path"
         case createdAt = "created_at"
+        case updatedAt = "updated_at"
     }
+
+    /// Vendor name from the quote analysis
+    var vendorName: String? { analysis.vendor?.name }
 }
 
-struct HouseholdToolkitInsert: Codable {
+struct ProjectQuoteInsert: Codable {
+    let projectId: UUID
     let householdId: UUID
-    let toolName: String
-    let normalizedName: String
-    var category: String? = "tools"
-    var addedFromProjectId: UUID?
+    var contractorId: UUID?
+    var quoteDate: String?
+    var quoteTotal: Double?
+    var estimatedFairTotal: Double?
+    var overallRating: String?
+    let analysis: QuoteAnalysis
+    var filePath: String?
+    var notes: String?
 
     enum CodingKeys: String, CodingKey {
-        case category
+        case analysis, notes
+        case projectId = "project_id"
         case householdId = "household_id"
-        case toolName = "tool_name"
-        case normalizedName = "normalized_name"
-        case addedFromProjectId = "added_from_project_id"
+        case contractorId = "contractor_id"
+        case quoteDate = "quote_date"
+        case quoteTotal = "quote_total"
+        case estimatedFairTotal = "estimated_fair_total"
+        case overallRating = "overall_rating"
+        case filePath = "file_path"
     }
 }
 
@@ -1603,6 +1583,7 @@ struct QuoteAnalysis: Codable {
     let projectType: String?
     let quoteDate: String?
     let quoteTotal: Double?
+    let hasItemizedPricing: Bool?
     let lineItems: [QuoteLineItem]?
     let overallAssessment: QuoteOverallAssessment?
     let suggestedDiyAlternative: QuoteDiyAlternative?
@@ -1622,11 +1603,35 @@ struct QuoteLineItem: Codable, Identifiable {
     let category: String?
     let quantity: Double?
     let unit: String?
-    let unitPrice: Double?
-    let totalPrice: Double?
+    // Price from the contractor's quote (null if quote only has a lump sum total)
+    let quotedPrice: Double?
+    // Haven's independent cost estimates for this specific location
+    let estimatedMaterialsCost: Double?
+    let estimatedLaborCost: Double?
+    // Total fair market estimate (materials + labor)
     let marketMedianPrice: Double?
+    // Local county price range (low-high) adjusted for cost of living
+    let localPriceRange: LocalPriceRange?
+    // "quoted" if contractor provided the price, "estimated" if Haven researched it
+    let priceSource: String?
     let rating: String?
     let ratingReason: String?
+
+    // Backwards compat: old responses used unitPrice/totalPrice
+    let unitPrice: Double?
+    let totalPrice: Double?
+
+    /// The price to display — prefers quotedPrice, falls back to totalPrice (old format)
+    var displayPrice: Double? { quotedPrice ?? totalPrice }
+    /// The combined Haven estimate
+    var havenEstimate: Double? { marketMedianPrice ?? estimatedMaterialsCost.flatMap { m in estimatedLaborCost.map { l in m + l } } }
+}
+
+struct LocalPriceRange: Codable {
+    let low: Double?
+    let high: Double?
+    let countyName: String?
+    let costIndex: String? // "low", "average", "high", "very_high"
 }
 
 struct QuoteOverallAssessment: Codable {
@@ -1634,6 +1639,8 @@ struct QuoteOverallAssessment: Codable {
     let summary: String?
     let totalQuoted: Double?
     let estimatedFairTotal: Double?
+    let estimatedMaterials: Double?
+    let estimatedLabor: Double?
     let potentialSavings: Double?
     let negotiationTips: [String]?
 }
@@ -1659,21 +1666,89 @@ struct ProjectAIResearch: Codable {
     let dealRating: String?
     let dealRatingReason: String?
     let homeValueImpact: HomeValueImpact?
+    // Style/design fields
+    let designMoodDescription: String?
+    let styleNotes: String?
+    let colorPalette: [ColorSuggestion]?
+    let materialPairings: [MaterialPairing]?
+    // Insurance claim fields
+    let claimNumber: String?
+    let claimType: String?
+    let policyNumber: String?
+    let insuranceCompany: String?
+    let adjuster: ClaimAdjuster?
+    let emailSummaries: [ClaimEmailSummary]?
 
-    enum CodingKeys: String, CodingKey {
-        case projectSummary = "projectSummary"
-        case typicalItems = "typicalItems"
-        case estimatedDiyCost = "estimatedDiyCost"
-        case estimatedProCost = "estimatedProCost"
-        case tipsAndWarnings = "tipsAndWarnings"
-        case suggestedVideoTopics = "suggestedVideoTopics"
-        case permitNotes = "permitNotes"
-        case difficultyLevel = "difficultyLevel"
-        case estimatedTimeframe = "estimatedTimeframe"
-        case dealRating = "dealRating"
-        case dealRatingReason = "dealRatingReason"
-        case homeValueImpact = "homeValueImpact"
+    /// Whether this research has style/design data
+    var hasDesignData: Bool {
+        designMoodDescription != nil || colorPalette?.isEmpty == false
     }
+
+    /// Resilient decoder — any single field with an unexpected type
+    /// silently becomes nil instead of failing the entire struct.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        projectSummary = try? c.decodeIfPresent(String.self, forKey: .projectSummary)
+        typicalItems = try? c.decodeIfPresent([ResearchLineItem].self, forKey: .typicalItems)
+        estimatedDiyCost = try? c.decodeIfPresent(CostEstimate.self, forKey: .estimatedDiyCost)
+        estimatedProCost = try? c.decodeIfPresent(CostEstimate.self, forKey: .estimatedProCost)
+        tipsAndWarnings = try? c.decodeIfPresent([String].self, forKey: .tipsAndWarnings)
+        suggestedVideoTopics = try? c.decodeIfPresent([String].self, forKey: .suggestedVideoTopics)
+        permitNotes = try? c.decodeIfPresent(String.self, forKey: .permitNotes)
+        difficultyLevel = try? c.decodeIfPresent(String.self, forKey: .difficultyLevel)
+        estimatedTimeframe = try? c.decodeIfPresent(FlexibleTimeframe.self, forKey: .estimatedTimeframe)
+        dealRating = try? c.decodeIfPresent(String.self, forKey: .dealRating)
+        dealRatingReason = try? c.decodeIfPresent(String.self, forKey: .dealRatingReason)
+        homeValueImpact = try? c.decodeIfPresent(HomeValueImpact.self, forKey: .homeValueImpact)
+        designMoodDescription = try? c.decodeIfPresent(String.self, forKey: .designMoodDescription)
+        styleNotes = try? c.decodeIfPresent(String.self, forKey: .styleNotes)
+        colorPalette = try? c.decodeIfPresent([ColorSuggestion].self, forKey: .colorPalette)
+        materialPairings = try? c.decodeIfPresent([MaterialPairing].self, forKey: .materialPairings)
+        claimNumber = try? c.decodeIfPresent(String.self, forKey: .claimNumber)
+        claimType = try? c.decodeIfPresent(String.self, forKey: .claimType)
+        policyNumber = try? c.decodeIfPresent(String.self, forKey: .policyNumber)
+        insuranceCompany = try? c.decodeIfPresent(String.self, forKey: .insuranceCompany)
+        adjuster = try? c.decodeIfPresent(ClaimAdjuster.self, forKey: .adjuster)
+        emailSummaries = try? c.decodeIfPresent([ClaimEmailSummary].self, forKey: .emailSummaries)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case projectSummary, typicalItems, estimatedDiyCost, estimatedProCost
+        case tipsAndWarnings, suggestedVideoTopics, permitNotes, difficultyLevel
+        case estimatedTimeframe, dealRating, dealRatingReason, homeValueImpact
+        case designMoodDescription, styleNotes, colorPalette, materialPairings
+        case claimNumber, claimType, policyNumber, insuranceCompany, adjuster, emailSummaries
+    }
+}
+
+struct ColorSuggestion: Codable {
+    let name: String?
+    let hex: String?
+    let usage: String?
+    let role: String? // primary, accent, neutral, trim
+
+    /// Display-safe name — falls back to hex or "Color"
+    var displayName: String { name ?? hex ?? "Color" }
+    /// Display-safe hex — falls back to gray
+    var displayHex: String { hex ?? "#999999" }
+}
+
+struct MaterialPairing: Codable {
+    let primary: String?
+    let secondary: String?
+    let location: String?
+}
+
+struct ClaimAdjuster: Codable {
+    let name: String?
+    let phone: String?
+    let email: String?
+}
+
+struct ClaimEmailSummary: Codable {
+    let date: String?
+    let summary: String?
+    let subject: String?
 }
 
 struct HomeValueImpact: Codable {
@@ -1686,6 +1761,7 @@ struct HomeValueImpact: Codable {
 struct ResearchLineItem: Codable {
     let name: String
     let category: String?
+    let designGroup: String? // "design" or "construction"
     // Edge Function may return "estimatedQuantity" or "quantity"
     let estimatedQuantity: Double?
     let quantity: Double?
@@ -1699,6 +1775,12 @@ struct ResearchLineItem: Codable {
     let store: String?
     let necessity: String?
     let multiProjectUseful: Bool?
+    // Product image and link (enriched via Google Custom Search)
+    let imageUrl: String?
+    let productUrl: String?
+
+    /// Whether this is a design/style item vs construction/utilitarian
+    var isDesignItem: Bool { designGroup == "design" }
 
     /// Resolved quantity from whichever field is present
     var resolvedQuantity: Double { estimatedQuantity ?? quantity ?? 1 }
@@ -1779,6 +1861,46 @@ struct CostBreakdownItem: Codable {
         default: return ""
         }
     }
+}
+
+// MARK: - Project Feasibility Response
+
+struct ProjectFeasibility: Codable {
+    let projectName: String?
+    let estimatedCostRange: FeasibilityCostRange?
+    let estimatedDiyCostRange: FeasibilityCostRange?
+    let estimatedMaterialsCost: FeasibilityCostRange?
+    let complexity: String?
+    let complexityNote: String?
+    let estimatedTimeframe: String?
+    let roi: FeasibilityROI?
+    let valueIncrease: FeasibilityValueIncrease?
+    let marketDemand: String?
+    let marketDemandNote: String?
+    let quickTip: String?
+}
+
+struct FeasibilityCostRange: Codable {
+    let low: Double?
+    let high: Double?
+
+    var displayRange: String {
+        guard let low, let high else { return "N/A" }
+        return "$\(Int(low).formatted()) – $\(Int(high).formatted())"
+    }
+}
+
+struct FeasibilityROI: Codable {
+    let score: Int?
+    let label: String?
+    let typicalReturn: String?
+    let explanation: String?
+}
+
+struct FeasibilityValueIncrease: Codable {
+    let estimatedDollarIncrease: Double?
+    let percentageIncrease: String?
+    let timeToRecoup: String?
 }
 
 // MARK: - Merge Preview Models

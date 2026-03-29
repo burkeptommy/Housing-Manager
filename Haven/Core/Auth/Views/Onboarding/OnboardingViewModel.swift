@@ -1,13 +1,5 @@
 import SwiftUI
 
-enum OnboardingStep: Int, CaseIterable {
-    case yourInfo = 0
-    case spouse
-    case family
-    case features
-    case allSet
-}
-
 struct AdditionalMember: Identifiable {
     let id = UUID()
     var firstName = ""
@@ -15,9 +7,10 @@ struct AdditionalMember: Identifiable {
     var relationship = "Child"
 }
 
+/// Post-auth onboarding: user already saw the address hook and value preview.
+/// This view just collects their name and creates everything.
 @MainActor
 final class OnboardingViewModel: ObservableObject {
-    @Published var currentStep: OnboardingStep = .yourInfo
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var setupProgress: String = ""
@@ -28,6 +21,25 @@ final class OnboardingViewModel: ObservableObject {
     @Published var isCheckingInvite = false
     @Published var inviteError: String?
 
+    // Address — loaded from cache (set during pre-auth AddressHookView)
+    @Published var street = ""
+    @Published var unit = ""
+    @Published var city = ""
+    @Published var state = ""
+    @Published var zipCode = ""
+
+    // Property lookup — loaded from cache
+    @Published var propertyLookupResult: PropertyLookupResult?
+
+    // Spouse / partner check
+    @Published var spouseEmail = ""
+    @Published var spouseHasExistingAccount = false
+    @Published var spouseExistingUserId: UUID?
+    @Published var isCheckingSpouseEmail = false
+
+    // Maintenance schedule preview (populated during property enrichment)
+    @Published var schedulePreview: [SchedulePreviewItem] = []
+
     // Primary member
     @Published var primaryFirstName = ""
     @Published var primaryLastName = ""
@@ -35,18 +47,17 @@ final class OnboardingViewModel: ObservableObject {
     @Published var primaryPhone = ""
     @Published var primaryGender = "male"
 
-    // Spouse
-    @Published var addSpouse = false
-    @Published var spouseFirstName = ""
-    @Published var spouseLastName = ""
-    @Published var spouseEmail = ""
-    @Published var spouseGender = "female"
-    @Published var spouseHasExistingAccount = false
-    @Published var spouseExistingUserId: UUID?
-    @Published var isCheckingSpouseEmail = false
-
-    // Additional members
-    @Published var additionalMembers: [AdditionalMember] = []
+    /// Load address data cached by AddressHookView before auth.
+    func loadCachedAddress() {
+        if let cached = AddressHookViewModel.loadCachedData() {
+            street = cached.street
+            unit = cached.unit
+            city = cached.city
+            state = cached.state
+            zipCode = cached.zipCode
+            propertyLookupResult = cached.propertyResult
+        }
+    }
 
     func prefillFromAuth() async {
         do {
@@ -80,58 +91,12 @@ final class OnboardingViewModel: ObservableObject {
         }
     }
 
-    /// Check if the spouse email belongs to an existing Haven user
-    func checkSpouseEmail() async {
-        let email = spouseEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !email.isEmpty, email.contains("@") else {
-            spouseHasExistingAccount = false
-            spouseExistingUserId = nil
-            return
-        }
-        isCheckingSpouseEmail = true
-        do {
-            if let existingUser = try await DatabaseService.shared.checkExistingUser(email: email) {
-                spouseHasExistingAccount = true
-                spouseExistingUserId = existingUser.id
-            } else {
-                spouseHasExistingAccount = false
-                spouseExistingUserId = nil
-            }
-        } catch {
-            spouseHasExistingAccount = false
-            spouseExistingUserId = nil
-        }
-        isCheckingSpouseEmail = false
-    }
-
-    var progress: Double {
-        Double(currentStep.rawValue + 1) / Double(OnboardingStep.allCases.count)
-    }
-
-    var isLastStep: Bool { currentStep == .allSet }
-
     var canProceed: Bool {
-        switch currentStep {
-        case .yourInfo:
-            return !primaryFirstName.trimmingCharacters(in: .whitespaces).isEmpty
-                && !primaryLastName.trimmingCharacters(in: .whitespaces).isEmpty
-        case .spouse, .family, .features, .allSet:
-            return true
-        }
+        !primaryFirstName.trimmingCharacters(in: .whitespaces).isEmpty
+            && !primaryLastName.trimmingCharacters(in: .whitespaces).isEmpty
     }
 
-    func nextStep() {
-        guard let next = OnboardingStep(rawValue: currentStep.rawValue + 1) else { return }
-        Analytics.track(.onboardingStepCompleted, ["step": currentStep.rawValue])
-        errorMessage = nil
-        currentStep = next
-    }
-
-    func previousStep() {
-        guard let prev = OnboardingStep(rawValue: currentStep.rawValue - 1) else { return }
-        errorMessage = nil
-        currentStep = prev
-    }
+    // MARK: - Invitation Handling
 
     /// Check if the current user's email has a pending invitation
     func checkForInvitation() async {
@@ -199,6 +164,32 @@ final class OnboardingViewModel: ObservableObject {
         isCheckingInvite = false
     }
 
+    /// Check if the spouse email belongs to an existing Haven user
+    func checkSpouseEmail() async {
+        let email = spouseEmail.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !email.isEmpty, email.contains("@") else {
+            spouseHasExistingAccount = false
+            spouseExistingUserId = nil
+            return
+        }
+        isCheckingSpouseEmail = true
+        do {
+            if let existingUser = try await DatabaseService.shared.checkExistingUser(email: email) {
+                spouseHasExistingAccount = true
+                spouseExistingUserId = existingUser.id
+            } else {
+                spouseHasExistingAccount = false
+                spouseExistingUserId = nil
+            }
+        } catch {
+            spouseHasExistingAccount = false
+            spouseExistingUserId = nil
+        }
+        isCheckingSpouseEmail = false
+    }
+
+    // MARK: - Complete Onboarding
+
     func complete(authService: AuthService) async {
         isLoading = true
         errorMessage = nil
@@ -231,49 +222,231 @@ final class OnboardingViewModel: ObservableObject {
                 avatarColor: "navy"
             ))
 
-            if addSpouse && !spouseFirstName.trimmingCharacters(in: .whitespaces).isEmpty {
-                setupProgress = "Adding \(spouseFirstName)..."
+            // Create property from the address entered in step 1
+            if !street.isEmpty {
+                setupProgress = "Setting up your home..."
+                let propertyName = [street, city].filter { !$0.isEmpty }.joined(separator: ", ")
 
-                if spouseHasExistingAccount, !spouseEmail.isEmpty {
-                    // Spouse already has a Haven account — send them an invitation
-                    // instead of creating a duplicate family member
-                    let session = try await HavenSupabase.auth.session
-                    let inviteCode = String((0..<6).map { _ in "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789".randomElement()! })
-                    _ = try await DatabaseService.shared.createInvitation(HouseholdInvitationInsert(
-                        householdId: householdId,
-                        invitedBy: session.user.id,
-                        invitedEmail: spouseEmail.trimmingCharacters(in: .whitespaces).lowercased(),
-                        inviteCode: inviteCode,
-                        role: "member"
-                    ))
-                } else {
-                    _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
-                        householdId: householdId,
-                        firstName: spouseFirstName.trimmingCharacters(in: .whitespaces),
-                        lastName: spouseLastName.trimmingCharacters(in: .whitespaces),
-                        relationship: "Spouse/Partner",
-                        email: spouseEmail.isEmpty ? nil : spouseEmail.trimmingCharacters(in: .whitespaces),
-                        gender: spouseGender,
-                        avatarColor: "sage"
-                    ))
+                var propertyInsert = PropertyInsert(
+                    householdId: householdId,
+                    name: propertyName,
+                    propertyType: propertyLookupResult?.propertyType ?? "Single Family",
+                    street: street,
+                    unit: unit.isEmpty ? nil : unit,
+                    city: city,
+                    state: state,
+                    zipCode: zipCode,
+                    country: "US"
+                )
+                propertyInsert.yearBuilt = propertyLookupResult?.yearBuilt
+                propertyInsert.squareFootage = propertyLookupResult?.squareFootage
+                propertyInsert.currentEstimatedValue = propertyLookupResult?.estimatedValue
+
+                let property = try await DatabaseService.shared.createProperty(propertyInsert)
+
+                // Auto-create home systems from RentCast features
+                if let features = propertyLookupResult?.features {
+                    setupProgress = "Adding your home systems..."
+                    let systems = homeSystemsFromFeatures(features, propertyId: property.id, householdId: householdId)
+                    for system in systems {
+                        _ = try? await DatabaseService.shared.createHomeSystem(system)
+                    }
+                }
+
+                // Generate and create maintenance tasks
+                let schedulePreview = OnboardingScheduleGenerator.generate(
+                    from: propertyLookupResult,
+                    state: state
+                )
+                if !schedulePreview.isEmpty {
+                    setupProgress = "Building your maintenance plan..."
+                    for item in schedulePreview {
+                        let nextDue = nextDueDate(forMonth: item.month)
+                        let insert = MaintenanceTaskInsert(
+                            propertyId: property.id,
+                            householdId: householdId,
+                            title: item.title,
+                            frequency: item.frequency,
+                            nextDueDate: nextDue,
+                            description: item.description,
+                            priority: priorityFromCategory(item.category),
+                            isTemplateBased: true,
+                            seasonalTiming: seasonFromMonth(item.month),
+                            isDiy: item.isDIY,
+                            costRange: item.estimatedCost
+                        )
+                        _ = try? await DatabaseService.shared.createMaintenanceTask(insert)
+                    }
                 }
             }
 
-            for member in additionalMembers where !member.firstName.trimmingCharacters(in: .whitespaces).isEmpty {
-                setupProgress = "Adding \(member.firstName)..."
-                _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
-                    householdId: householdId,
-                    firstName: member.firstName.trimmingCharacters(in: .whitespaces),
-                    lastName: member.lastName.trimmingCharacters(in: .whitespaces),
-                    relationship: member.relationship
-                ))
-            }
+            // Clear cached address data now that it's been consumed
+            AddressHookViewModel.clearCachedData()
 
             setupProgress = "All done!"
-            Analytics.track(.onboardingCompleted, ["member_count": additionalMembers.count, "has_spouse": addSpouse])
+            Analytics.track(.onboardingCompleted, [
+                "has_property": !street.isEmpty,
+                "property_enriched": propertyLookupResult != nil,
+            ])
         } catch {
             print("[Onboarding] Setup failed: \(error)")
             errorMessage = "Setup failed: \(error.localizedDescription)"
         }
+    }
+
+    // MARK: - Helpers
+
+    private func nextDueDate(forMonth month: Int) -> String {
+        let now = Date()
+        let calendar = Calendar.current
+        let currentMonth = calendar.component(.month, from: now)
+        let currentYear = calendar.component(.year, from: now)
+
+        var targetYear = currentYear
+        if month < currentMonth {
+            targetYear += 1
+        }
+
+        var components = DateComponents()
+        components.year = targetYear
+        components.month = month
+        components.day = 15 // mid-month
+
+        let date = calendar.date(from: components) ?? now
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: date)
+    }
+
+    private func priorityFromCategory(_ category: String) -> String {
+        switch category {
+        case "HVAC", "Plumbing", "Electrical", "Fire Protection", "Roofing":
+            return "High"
+        case "Water Heater", "Garage Door", "Security System":
+            return "Medium"
+        default:
+            return "Low"
+        }
+    }
+
+    private func seasonFromMonth(_ month: Int) -> String? {
+        switch month {
+        case 3, 4, 5: return "Spring"
+        case 6, 7, 8: return "Summer"
+        case 9, 10, 11: return "Fall"
+        case 12, 1, 2: return "Winter"
+        default: return nil
+        }
+    }
+
+    // MARK: - Auto-Create Home Systems from API Features
+
+    /// Converts RentCast property features into HomeSystem records.
+    /// Each detected system becomes a tracked item with maintenance templates.
+    private func homeSystemsFromFeatures(
+        _ features: PropertyLookupResult.PropertyFeatures,
+        propertyId: UUID,
+        householdId: UUID
+    ) -> [HomeSystemInsert] {
+        var systems: [HomeSystemInsert] = []
+        let yearBuilt = propertyLookupResult?.yearBuilt
+
+        // HVAC — heating + cooling as one combined system
+        if features.heatingType != nil || features.coolingType != nil {
+            let heatingDesc = [features.heatingType, features.heatingFuel].compactMap { $0 }.joined(separator: " / ")
+            let coolingDesc = features.coolingType ?? ""
+            let parts = [heatingDesc, coolingDesc].filter { !$0.isEmpty }
+            let name = parts.isEmpty ? "HVAC System" : parts.joined(separator: " + ")
+
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: name,
+                category: "HVAC",
+                installDate: yearBuilt.map { "\($0)-01-01" },
+                notes: "Auto-detected from property records. Update with your actual system details."
+            ))
+        }
+
+        // Roof
+        if let roofType = features.roofType {
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: "\(roofType) Roof",
+                category: "Roofing",
+                installDate: yearBuilt.map { "\($0)-01-01" },
+                notes: "Auto-detected from property records."
+            ))
+        }
+
+        // Water Heater — always exists, just unknown type
+        systems.append(HomeSystemInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            name: "Water Heater",
+            category: "Plumbing",
+            notes: "Auto-created. Update with your water heater type, brand, and age."
+        ))
+
+        // Electrical panel — always exists
+        systems.append(HomeSystemInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            name: "Electrical Panel",
+            category: "Electrical",
+            installDate: yearBuilt.map { "\($0)-01-01" },
+            notes: "Auto-created from property records."
+        ))
+
+        // Foundation
+        if let foundationType = features.foundationType {
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: "\(foundationType) Foundation",
+                category: "Other",
+                notes: "Auto-detected from property records."
+            ))
+        }
+
+        // Pool
+        if features.pool == true {
+            let name = features.poolType.map { "\($0) Pool" } ?? "Swimming Pool"
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: name,
+                category: "Pool/Spa",
+                notes: "Auto-detected from property records."
+            ))
+        }
+
+        // Garage Door
+        if features.garage == true {
+            let spaces = features.garageSpaces.map { "\($0)-Car " } ?? ""
+            let type = features.garageType.map { "\($0) " } ?? ""
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: "\(spaces)\(type)Garage",
+                category: "Garage Door",
+                notes: "Auto-detected from property records."
+            ))
+        }
+
+        // Fireplace
+        if features.fireplace == true {
+            let name = features.fireplaceType.map { "\($0) Fireplace" } ?? "Fireplace"
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: name,
+                category: "Fire Protection",
+                notes: "Auto-detected from property records."
+            ))
+        }
+
+        return systems
     }
 }

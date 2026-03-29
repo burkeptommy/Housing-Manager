@@ -121,6 +121,24 @@ struct SettingsView: View {
             }
 
             Section {
+                NavigationLink {
+                    ProjectEmailView()
+                } label: {
+                    Label("Household Email", systemImage: "envelope.open.fill")
+                        .font(HavenTypography.body)
+                }
+            } header: {
+                Text("ALFRED")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+            } footer: {
+                Text("Forward quotes, documents, vendor info, and anything home or estate related. Alfred processes and organizes everything automatically.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+
+            Section {
                 if AuthService.isBiometricAvailable {
                     Toggle(isOn: $biometricEnabled) {
                         Label(AuthService.biometricName, systemImage: AuthService.biometricIcon)

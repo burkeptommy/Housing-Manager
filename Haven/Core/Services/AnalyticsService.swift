@@ -334,11 +334,11 @@ final class Analytics: @unchecked Sendable {
                     .execute()
             } catch {
                 // Re-queue failed events for retry
-                lock.lock()
-                queue.insert(contentsOf: batch, at: 0)
-                // Cap the queue at 500 to avoid unbounded memory growth
-                if queue.count > 500 { queue = Array(queue.suffix(500)) }
-                lock.unlock()
+                await MainActor.run {
+                    queue.insert(contentsOf: batch, at: 0)
+                    // Cap the queue at 500 to avoid unbounded memory growth
+                    if queue.count > 500 { queue = Array(queue.suffix(500)) }
+                }
                 print("[Analytics] Flush failed, \(batch.count) events re-queued: \(error.localizedDescription)")
             }
         }
@@ -359,9 +359,8 @@ final class Analytics: @unchecked Sendable {
         NotificationCenter.default.addObserver(forName: UIApplication.willResignActiveNotification, object: nil, queue: .main) { [weak self] _ in
             self?.flush()
         }
-        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in
+        NotificationCenter.default.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { _ in
             Analytics.track(.appForegrounded)
-            // Refresh session if it's been a while
         }
     }
 

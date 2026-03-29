@@ -3,10 +3,11 @@ import Foundation
 @MainActor
 final class ProjectsViewModel: ObservableObject {
     @Published var projects: [PropertyProjectRow] = []
-    @Published var lineItems: [ProjectLineItemRow] = []
-    @Published var toolkit: [HouseholdToolkitRow] = []
+    @Published var quotes: [ProjectQuoteRow] = []
+    @Published var projectFiles: [ProjectFileRow] = []
+    @Published var feasibility: ProjectFeasibility?
     @Published var isLoading = false
-    @Published var isResearching = false
+    @Published var isLoadingFeasibility = false
     @Published var error: String?
 
     private let db = DatabaseService.shared
@@ -33,56 +34,58 @@ final class ProjectsViewModel: ObservableObject {
         isLoading = false
     }
 
-    func loadLineItems(projectId: UUID) async {
-        do {
-            lineItems = try await db.fetchLineItems(projectId: projectId)
-        } catch {
-            self.error = error.localizedDescription
+    // MARK: - Project Quotes
+
+    func loadQuotes(projectId: UUID) async {
+        quotes = (try? await db.fetchProjectQuotes(projectId: projectId)) ?? []
+    }
+
+    func addQuote(_ insert: ProjectQuoteInsert) async throws -> ProjectQuoteRow {
+        let quote = try await db.createProjectQuote(insert)
+        quotes.insert(quote, at: 0)
+        return quote
+    }
+
+    func deleteQuote(id: UUID) async throws {
+        try await db.deleteProjectQuote(id: id)
+        quotes.removeAll { $0.id == id }
+    }
+
+    /// Find an existing project that matches a quote's detected category.
+    func findMatchingProject(category: String, propertyId: UUID) -> PropertyProjectRow? {
+        let normalized = category.lowercased()
+        return projects.first { project in
+            project.propertyId == propertyId &&
+            project.status != "completed" &&
+            (project.category.lowercased() == normalized ||
+             project.category.lowercased().contains(normalized) ||
+             normalized.contains(project.category.lowercased()) ||
+             project.name.lowercased().contains(normalized) ||
+             normalized.contains(project.name.lowercased()))
         }
     }
 
-    // MARK: - Toolkit
+    /// Find or create a contractor from quote vendor info, avoiding duplicates.
+    func findOrCreateContractor(vendor: QuoteVendor, householdId: UUID) async -> UUID? {
+        guard let vendorName = vendor.name, !vendorName.isEmpty else { return nil }
 
-    func loadToolkit(householdId: UUID) async {
-        toolkit = (try? await db.fetchToolkit(householdId: householdId)) ?? []
-    }
+        if let existing = try? await db.findContractorByName(householdId: householdId, name: vendorName) {
+            return existing.id
+        }
 
-    func addToolToToolkit(name: String, householdId: UUID, projectId: UUID?) async {
-        let normalized = name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-        // Skip if already in toolkit
-        guard !toolkit.contains(where: { $0.normalizedName == normalized }) else { return }
-        let insert = HouseholdToolkitInsert(
+        let insert = ContractorInsert(
             householdId: householdId,
-            toolName: name,
-            normalizedName: normalized,
-            addedFromProjectId: projectId
+            companyName: vendorName,
+            phone: vendor.phone ?? "Not provided",
+            contactName: nil,
+            email: vendor.email,
+            address: vendor.address,
+            licenseNumber: vendor.license
         )
-        if let added = try? await db.addToToolkit(insert) {
-            toolkit.append(added)
+        if let contractor = try? await db.createContractor(insert) {
+            return contractor.id
         }
-    }
-
-    func removeToolFromToolkit(id: UUID) async {
-        try? await db.removeFromToolkit(id: id)
-        toolkit.removeAll { $0.id == id }
-    }
-
-    /// Check toolkit and auto-mark matching line items as owned
-    func autoMarkToolkitItems(projectId: UUID, householdId: UUID) async {
-        let toolkitNames = Set(toolkit.map { $0.normalizedName })
-        guard !toolkitNames.isEmpty else { return }
-
-        let items = try? await db.fetchLineItems(projectId: projectId)
-        for item in (items ?? []) {
-            let isToolCategory = ["tools", "hardware", "safety"].contains(item.category?.lowercased() ?? "")
-            guard isToolCategory, !(item.isOwned ?? false) else { continue }
-            let normalized = item.name.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
-            // Fuzzy match: toolkit name contained in item name or vice versa
-            let matches = toolkitNames.contains(where: { normalized.contains($0) || $0.contains(normalized) })
-            if matches {
-                _ = try? await db.updateLineItem(id: item.id, ProjectLineItemUpdate(isOwned: true))
-            }
-        }
+        return nil
     }
 
     // MARK: - Project CRUD
@@ -105,130 +108,63 @@ final class ProjectsViewModel: ObservableObject {
         projects.removeAll { $0.id == id }
     }
 
-    func researchProject(_ project: PropertyProjectRow, location: String?) async throws -> ProjectAIResearch {
-        isResearching = true
-        defer { isResearching = false }
+    // MARK: - Project Files (DIY)
 
-        // Pass toolkit to exclude owned tools from suggestions
-        let toolkitNames = toolkit.isEmpty ? nil : toolkit.map { $0.toolName }
+    func loadProjectFiles(projectId: UUID) async {
+        projectFiles = (try? await db.fetchProjectFiles(projectId: projectId)) ?? []
+    }
 
-        let data = try await HavenSupabase.researchProject(
-            projectName: project.name,
-            category: project.category,
-            description: project.description,
-            propertyLocation: location,
-            projectId: project.id.uuidString,
-            userToolkit: toolkitNames
+    func uploadProjectFile(projectId: UUID, householdId: UUID, data: Data, filename: String, contentType: String) async throws {
+        let storagePath = "\(householdId.uuidString)/projects/\(projectId.uuidString)/\(UUID().uuidString)_\(filename)"
+        _ = try await db.uploadDocumentFile(householdId: householdId, fileName: storagePath, data: data, contentType: contentType)
+
+        let insert = ProjectFileInsert(
+            projectId: projectId,
+            householdId: householdId,
+            filePath: storagePath,
+            filename: filename,
+            contentType: contentType,
+            fileSize: data.count
         )
+        let file = try await db.createProjectFile(insert)
+        projectFiles.insert(file, at: 0)
+    }
 
-        if let rawString = String(data: data, encoding: .utf8) {
-            print("[ResearchProject] Raw response: \(rawString.prefix(1000))")
-        }
+    func deleteProjectFile(id: UUID) async throws {
+        try await db.deleteProjectFile(id: id)
+        projectFiles.removeAll { $0.id == id }
+    }
 
-        struct ResearchResponse: Decodable {
-            let research: ProjectAIResearch?
-        }
+    // MARK: - Feasibility / ROI
 
-        let response: ResearchResponse
+    func loadFeasibility(projectName: String, category: String, description: String?, location: String?) async {
+        isLoadingFeasibility = true
+        defer { isLoadingFeasibility = false }
+
         do {
-            response = try JSONDecoder().decode(ResearchResponse.self, from: data)
-        } catch let decodingError {
-            print("[ResearchProject] Decoding error: \(decodingError)")
-            throw decodingError
-        }
-        guard let research = response.research else {
-            throw NSError(domain: "Haven", code: 0, userInfo: [NSLocalizedDescriptionKey: "No research data in response"])
-        }
+            // When category is "Other", send the project name + description
+            // so the AI has real context for the ROI estimate
+            let projectType: String
+            if category == "Other" || category.lowercased() == "other" {
+                let parts = [projectName, description].compactMap { $0 }.filter { !$0.isEmpty }
+                projectType = parts.joined(separator: " — ")
+            } else {
+                projectType = "\(category): \(projectName)"
+            }
 
-        // Insert AI-suggested line items with necessity/multiProjectUseful
-        let items = (research.typicalItems ?? []).enumerated().map { index, item in
-            ProjectLineItemInsert(
-                projectId: project.id,
-                householdId: project.householdId,
-                name: item.name,
-                category: item.category ?? "materials",
-                quantity: item.resolvedQuantity,
-                unit: item.unit ?? "each",
-                estimatedUnitPrice: item.resolvedPrice,
-                suggestedStore: item.resolvedStore,
-                isAiSuggested: true,
-                necessity: item.necessity ?? "required",
-                multiProjectUseful: item.multiProjectUseful ?? false,
-                notes: item.notes,
-                sortOrder: index
+            let data = try await HavenSupabase.projectFeasibility(
+                projectType: projectType,
+                propertyLocation: location
             )
-        }
-        if !items.isEmpty {
-            try await db.createLineItems(items)
-        }
 
-        // Auto-mark toolkit matches as owned
-        await autoMarkToolkitItems(projectId: project.id, householdId: project.householdId)
-
-        // Recalculate totals
-        try? await recalculateProjectTotals(projectId: project.id)
-
-        // Reload
-        if let idx = projects.firstIndex(where: { $0.id == project.id }) {
-            let refreshed = try await db.fetchProjects(propertyId: project.propertyId)
-            if let updated = refreshed.first(where: { $0.id == project.id }) {
-                projects[idx] = updated
+            struct FeasibilityResponse: Decodable {
+                let feasibility: ProjectFeasibility?
             }
+
+            let response = try JSONDecoder().decode(FeasibilityResponse.self, from: data)
+            feasibility = response.feasibility
+        } catch {
+            print("[ProjectsVM] Feasibility error: \(error)")
         }
-        lineItems = try await db.fetchLineItems(projectId: project.id)
-
-        return research
-    }
-
-    // MARK: - Budget Calculations
-
-    /// Recalculate both actual spend and estimated total for a project.
-    func recalculateProjectTotals(projectId: UUID) async throws {
-        let items = try await db.fetchLineItems(projectId: projectId)
-
-        let actualSpend = items
-            .filter { $0.isPurchased && !($0.isOwned ?? false) }
-            .reduce(0.0) { $0 + ($1.actualUnitPrice ?? $1.estimatedUnitPrice ?? 0) * ($1.quantity ?? 1) }
-
-        let estimatedTotal = items
-            .filter { !($0.isOwned ?? false) }
-            .reduce(0.0) { $0 + ($1.estimatedUnitPrice ?? 0) * ($1.quantity ?? 1) }
-
-        _ = try await db.updateProject(id: projectId, PropertyProjectUpdate(
-            actualSpend: actualSpend,
-            estimatedTotal: estimatedTotal
-        ))
-
-        // Update local state
-        if let idx = projects.firstIndex(where: { $0.id == projectId }) {
-            let refreshed = try await db.fetchProjects(propertyId: projects[idx].propertyId)
-            if let updated = refreshed.first(where: { $0.id == projectId }) {
-                projects[idx] = updated
-            }
-        }
-    }
-
-    /// Legacy alias — calls recalculateProjectTotals
-    func recalculateActualSpend(projectId: UUID) async throws {
-        try await recalculateProjectTotals(projectId: projectId)
-    }
-
-    // MARK: - Line Item CRUD
-
-    func addLineItem(_ insert: ProjectLineItemInsert) async throws {
-        let item = try await db.createLineItem(insert)
-        lineItems.append(item)
-    }
-
-    func updateLineItem(id: UUID, _ updates: ProjectLineItemUpdate) async throws {
-        let updated = try await db.updateLineItem(id: id, updates)
-        if let idx = lineItems.firstIndex(where: { $0.id == id }) {
-            lineItems[idx] = updated
-        }
-    }
-
-    func deleteLineItem(id: UUID) async throws {
-        try await db.deleteLineItem(id: id)
-        lineItems.removeAll { $0.id == id }
     }
 }

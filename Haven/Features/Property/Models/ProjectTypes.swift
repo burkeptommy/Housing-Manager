@@ -42,7 +42,7 @@ enum ProjectCategory: String, CaseIterable, Identifiable {
         case .basement: return "stairs"
         case .garage: return "car.fill"
         case .builtins: return "books.vertical.fill"
-        case .fencing: return "fence.fill"
+        case .fencing: return "square.split.2x2"
         case .siding: return "building.2.fill"
         case .insulation: return "thermometer.snowflake"
         case .smartHome: return "homekit"
@@ -88,13 +88,12 @@ enum ProjectStatus: String, CaseIterable {
 // MARK: - Project Type (DIY vs Pro)
 
 enum ProjectApproach: String, CaseIterable {
-    case diy, professional, undecided
+    case diy, professional
 
     var displayName: String {
         switch self {
         case .diy: return "DIY"
-        case .professional: return "Hire a Pro"
-        case .undecided: return "Not Sure Yet"
+        case .professional: return "Hiring a Pro"
         }
     }
 
@@ -102,65 +101,6 @@ enum ProjectApproach: String, CaseIterable {
         switch self {
         case .diy: return "hammer.fill"
         case .professional: return "person.badge.shield.checkmark.fill"
-        case .undecided: return "questionmark.circle.fill"
-        }
-    }
-}
-
-// MARK: - Line Item Category
-
-enum LineItemCategory: String, CaseIterable {
-    case materials, tools, permits, labor, rental, other
-
-    var displayName: String { rawValue.capitalized }
-
-    var icon: String {
-        switch self {
-        case .materials: return "shippingbox.fill"
-        case .tools: return "wrench.fill"
-        case .permits: return "doc.text.fill"
-        case .labor: return "person.fill"
-        case .rental: return "clock.arrow.2.circlepath"
-        case .other: return "ellipsis.circle.fill"
-        }
-    }
-}
-
-// MARK: - Item Units
-
-enum ItemUnit: String, CaseIterable {
-    case each, sqFt = "sq ft", linearFt = "linear ft"
-    case gallon, quart, hour, bundle, box, bag, roll, sheet, set
-}
-
-// MARK: - Necessity Group (for line item sectioning)
-
-enum NecessityGroup: String, CaseIterable {
-    case required
-    case optional
-    case likelyOwned = "likely_owned"
-
-    var displayName: String {
-        switch self {
-        case .required: return "REQUIRED"
-        case .optional: return "OPTIONAL"
-        case .likelyOwned: return "YOU MAY ALREADY HAVE"
-        }
-    }
-
-    var icon: String {
-        switch self {
-        case .required: return "checkmark.circle.fill"
-        case .optional: return "sparkles"
-        case .likelyOwned: return "house.circle.fill"
-        }
-    }
-
-    var color: Color {
-        switch self {
-        case .required: return HavenColors.textPrimary
-        case .optional: return HavenColors.info
-        case .likelyOwned: return HavenColors.textTertiary
         }
     }
 }

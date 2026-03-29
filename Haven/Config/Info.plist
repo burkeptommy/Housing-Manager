@@ -52,6 +52,8 @@
     <string>Haven needs calendar access to show your events and help manage your schedule.</string>
     <key>NSCameraUsageDescription</key>
     <string>Haven needs camera access to scan documents.</string>
+    <key>NSContactsUsageDescription</key>
+    <string>Haven uses contacts access to save your household forwarding email as a contact for easy access.</string>
     <key>NSFaceIDUsageDescription</key>
     <string>Allow Haven to use Face ID for quick login.</string>
     <key>NSLocationWhenInUseUsageDescription</key>

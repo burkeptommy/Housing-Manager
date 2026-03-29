@@ -1,38 +1,56 @@
 import SwiftUI
+import PhotosUI
 
-/// Full project detail — status, budget, line items, AI research, tips, videos.
+/// Simplified project detail — dual mode:
+/// - Pro: quote uploads, deal ratings, gap analysis, ROI
+/// - DIY: materials cost, complexity, files, Alfred Q&A, ROI
 struct ProjectDetailView: View {
     let project: PropertyProjectRow
     @ObservedObject var viewModel: ProjectsViewModel
     @Environment(\.dismiss) private var dismiss
 
-    @State private var showEditLineItem: ProjectLineItemRow?
-    @State private var showAddLineItem = false
-    @State private var showQuoteAnalysis = false
+    @State private var showQuoteUpload = false
+    @State private var showQuoteComparison = false
     @State private var showDeleteConfirmation = false
+    @State private var showEditProject = false
     @State private var showStatusPicker = false
     @State private var showNotesEditor = false
     @State private var editedNotes = ""
+    // File upload (DIY)
+    @State private var showPhotoPicker = false
+    @State private var showFilePicker = false
+    @State private var selectedPhoto: PhotosPickerItem?
 
-    /// The live project from the viewModel (may have been updated).
     private var liveProject: PropertyProjectRow {
         viewModel.projects.first(where: { $0.id == project.id }) ?? project
+    }
+
+    private var isDIY: Bool {
+        liveProject.projectType == "diy"
+    }
+
+    private var isInsuranceClaim: Bool {
+        liveProject.projectType == "insurance_claim"
     }
 
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: HavenTheme.spacing16) {
                 statusCard
-                budgetCard
-                quoteUploadButton
-                lineItemsSection
-                if liveProject.aiResearch != nil {
-                    tipsSection
-                    learnSection
-                    homeValueImpactSection
+                if isInsuranceClaim {
+                    claimInfoCard
+                    filesSection
+                } else {
+                    roiCard
+                    if isDIY {
+                        diyOverviewCard
+                        filesSection
+                    } else {
+                        quotesSection
+                    }
                 }
+                askAlfredButton
                 notesSection
-                reResearchButton
             }
             .padding(HavenTheme.pageMargin)
         }
@@ -42,6 +60,11 @@ struct ProjectDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    Button {
+                        showEditProject = true
+                    } label: {
+                        Label("Edit Project", systemImage: "pencil")
+                    }
                     Button {
                         showStatusPicker = true
                     } label: {
@@ -61,20 +84,39 @@ struct ProjectDetailView: View {
         }
         .trackScreen("ProjectDetailView", properties: ["project_id": project.id.uuidString])
         .task {
-            await viewModel.loadLineItems(projectId: project.id)
-            await viewModel.loadToolkit(householdId: project.householdId)
+            if isDIY || isInsuranceClaim {
+                await viewModel.loadProjectFiles(projectId: project.id)
+            }
+            if !isDIY && !isInsuranceClaim {
+                await viewModel.loadQuotes(projectId: project.id)
+            }
+            if !isInsuranceClaim && viewModel.feasibility == nil {
+                await viewModel.loadFeasibility(projectName: liveProject.name, category: liveProject.category, description: liveProject.description, location: nil)
+            }
         }
-        .sheet(item: $showEditLineItem) { item in
-            EditLineItemView(item: item, householdId: project.householdId, projectId: project.id, viewModel: viewModel)
+        .sheet(isPresented: $showQuoteUpload) {
+            QuoteUploadEntryView(
+                propertyID: liveProject.propertyId,
+                householdId: liveProject.householdId,
+                location: nil,
+                viewModel: viewModel,
+                onComplete: {
+                    showQuoteUpload = false
+                    Task { await viewModel.loadQuotes(projectId: project.id) }
+                },
+                attachToProject: liveProject
+            )
         }
-        .sheet(isPresented: $showAddLineItem) {
-            EditLineItemView(item: nil, householdId: project.householdId, projectId: project.id, viewModel: viewModel)
-        }
-        .sheet(isPresented: $showQuoteAnalysis) {
-            QuoteAnalysisView(project: liveProject, viewModel: viewModel)
+        .sheet(isPresented: $showQuoteComparison) {
+            NavigationStack {
+                QuoteComparisonView(quotes: viewModel.quotes, projectName: liveProject.name)
+            }
         }
         .sheet(isPresented: $showNotesEditor) {
             notesEditorSheet
+        }
+        .sheet(isPresented: $showEditProject) {
+            EditProjectSheet(project: liveProject, viewModel: viewModel)
         }
         .confirmationDialog("Change Status", isPresented: $showStatusPicker) {
             ForEach(ProjectStatus.allCases, id: \.self) { status in
@@ -95,7 +137,15 @@ struct ProjectDetailView: View {
                 }
             }
         } message: {
-            Text("This will delete the project and all line items.")
+            Text("This will permanently delete this project.")
+        }
+        .photosPicker(isPresented: $showPhotoPicker, selection: $selectedPhoto, matching: .any(of: [.images]))
+        .fileImporter(isPresented: $showFilePicker, allowedContentTypes: [.image, .pdf]) { result in
+            Task { await handleFileSelection(result) }
+        }
+        .onChange(of: selectedPhoto) { _, item in
+            guard let item else { return }
+            Task { await handlePhotoSelection(item) }
         }
     }
 
@@ -117,23 +167,6 @@ struct ProjectDetailView: View {
                     HStack(spacing: HavenTheme.spacing8) {
                         statusBadge(liveProject.status)
                         approachBadge(liveProject.projectType)
-                        if let p = liveProject.priority {
-                            priorityBadge(p)
-                        }
-                    }
-
-                    if let start = liveProject.targetStartDate {
-                        HStack(spacing: 4) {
-                            Image(systemName: "calendar")
-                                .font(.caption2)
-                            Text("Target: \(start)")
-                                .font(HavenTypography.uiCaption)
-                            if let end = liveProject.targetEndDate {
-                                Text("– \(end)")
-                                    .font(HavenTypography.uiCaption)
-                            }
-                        }
-                        .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
 
@@ -142,588 +175,649 @@ struct ProjectDetailView: View {
         }
     }
 
-    // MARK: - Budget Card
+    // MARK: - ROI Card
 
-    /// Total estimated cost from line items (excludes owned items)
-    private var lineItemsTotal: Double {
-        viewModel.lineItems
-            .filter { !($0.isOwned ?? false) }
-            .reduce(0) { $0 + ($1.estimatedUnitPrice ?? $1.actualUnitPrice ?? 0) * ($1.quantity ?? 1) }
-    }
-
-    private var budgetCard: some View {
+    private var roiCard: some View {
         HavenCard {
-            Text("BUDGET & COST")
-                .font(HavenTypography.uiSectionHeader)
-                .tracking(1.5)
-                .foregroundStyle(HavenColors.textTertiary)
-
-            // Show line items total when we have items
-            if !viewModel.lineItems.isEmpty && lineItemsTotal > 0 {
+            if viewModel.isLoadingFeasibility {
                 HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Projected Cost")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Text("$\(Int(lineItemsTotal))")
-                            .font(HavenTypography.title2)
-                            .foregroundStyle(HavenColors.textPrimary)
-                    }
-                    Spacer()
-                    Text("\(viewModel.lineItems.filter { !($0.isOwned ?? false) }.count) items")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                    ProgressView()
+                    Text("Calculating ROI...")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
                 }
-            }
-
-            // Deal rating
-            if let research = liveProject.aiResearch, let rating = research.dealRating {
-                let (label, icon, color): (String, String, Color) = {
-                    switch rating {
-                    case "good_value": return ("Good Value Project", "hand.thumbsup.fill", HavenColors.success)
-                    case "premium": return ("Premium Project", "star.fill", HavenColors.warning)
-                    default: return ("Fair Value Project", "equal.circle.fill", HavenColors.info)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, HavenTheme.spacing8)
+            } else if let f = viewModel.feasibility {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "chart.line.uptrend.xyaxis")
+                            .foregroundStyle(HavenColors.navy)
+                        Text("ROI ESTIMATE")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
                     }
-                }()
-                HStack(spacing: 6) {
-                    Image(systemName: icon)
-                        .font(.caption)
-                        .foregroundStyle(color)
-                    Text(label)
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(color)
-                    if let reason = research.dealRatingReason {
-                        Text("— \(reason)")
-                            .font(HavenTypography.uiCaption)
+
+                    // Hero ROI %
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(f.roi?.typicalReturn ?? "N/A")
+                            .font(.system(size: 36, weight: .bold, design: .rounded))
+                            .foregroundStyle(roiColor(f.roi?.label))
+                        Text("typical return")
+                            .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
-                            .lineLimit(2)
                     }
-                }
-            }
 
-            // Always show median market cost when AI data is available
-            if let research = liveProject.aiResearch {
-                // Market cost estimates (always visible, primary info)
-                HStack(spacing: HavenTheme.spacing16) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Typical DIY Cost")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Text("$\(Int(research.estimatedDiyCost?.resolvedLow ?? 0))–$\(Int(research.estimatedDiyCost?.resolvedHigh ?? 0))")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.success)
+                    if let label = f.roi?.label {
+                        Text(label)
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(roiColor(label))
+                            .clipShape(Capsule())
                     }
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Typical Pro Cost")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Text("$\(Int(research.estimatedProCost?.resolvedLow ?? 0))–$\(Int(research.estimatedProCost?.resolvedHigh ?? 0))")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.textPrimary)
-                    }
-                    Spacer()
-                }
 
-                // Suggested budget (when user has no budget set)
-                if liveProject.estimatedBudget == nil || liveProject.estimatedBudget == 0 {
-                    let isPro = liveProject.projectType == "professional"
-                    let suggestedLow = isPro ? research.estimatedProCost?.resolvedLow : research.estimatedDiyCost?.resolvedLow
-                    let suggestedHigh = isPro ? research.estimatedProCost?.resolvedHigh : research.estimatedDiyCost?.resolvedHigh
-                    if let low = suggestedLow, let high = suggestedHigh, low > 0 {
-                        HStack(spacing: 6) {
+                    if let explanation = f.roi?.explanation {
+                        Text(explanation)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    Divider()
+
+                    // Cost range
+                    HStack {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Pro Cost")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text(f.estimatedCostRange?.displayRange ?? "N/A")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        Spacer()
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Text("DIY Cost")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text(f.estimatedDiyCostRange?.displayRange ?? "N/A")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+
+                    // Value increase
+                    if let vi = f.valueIncrease {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Value Increase")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(vi.percentageIncrease ?? "N/A")
+                                    .font(HavenTypography.body)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Text("Time to Recoup")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(vi.timeToRecoup ?? "N/A")
+                                    .font(HavenTypography.body)
+                            }
+                        }
+                    }
+
+                    if let tip = f.quickTip {
+                        HStack(alignment: .top, spacing: 6) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.caption)
                                 .foregroundStyle(HavenColors.warning)
-                            Text("Suggested budget: $\(Int(low))–$\(Int(high))")
-                                .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(tip)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
-                        .padding(HavenTheme.spacing8)
-                        .background(HavenColors.warning.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                        .padding(.top, 4)
                     }
                 }
-            }
-
-            // User budget + spending progress (when set)
-            if let budget = liveProject.estimatedBudget, budget > 0 {
-                let spent = liveProject.actualSpend ?? 0
-                let pct = budget > 0 ? spent / budget : 0
-                let barColor: Color = pct > 1.0 ? HavenColors.critical : pct > 0.8 ? HavenColors.warning : HavenColors.success
-
-                Divider()
-
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Your Budget")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Text("$\(Int(spent)) of $\(Int(budget))")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(pct > 1.0 ? HavenColors.critical : HavenColors.textPrimary)
-                    }
-                    Spacer()
-                    if pct > 1.0 {
-                        HStack(spacing: 4) {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                            Text("$\(Int(spent - budget)) over")
-                        }
-                        .font(HavenTypography.uiLabelSmall)
-                        .foregroundStyle(HavenColors.critical)
-                    }
-                }
-
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        Capsule().fill(HavenColors.beige200).frame(height: 8)
-                        Capsule().fill(barColor)
-                            .frame(width: geo.size.width * min(pct, 1.0), height: 8)
-                            .animation(HavenTheme.animationProgress, value: pct)
-                    }
-                }
-                .frame(height: 8)
-
-                // Budget adequacy (compare to median market cost)
-                if let research = liveProject.aiResearch {
-                    let isPro = liveProject.projectType == "professional"
-                    let medianLow = isPro ? (research.estimatedProCost?.resolvedLow ?? 0) : (research.estimatedDiyCost?.resolvedLow ?? 0)
-                    let medianHigh = isPro ? (research.estimatedProCost?.resolvedHigh ?? 0) : (research.estimatedDiyCost?.resolvedHigh ?? 0)
-                    let median = (medianLow + medianHigh) / 2
-                    if median > 0 {
-                        let ratio = budget / median
-                        let (label, icon, color): (String, String, Color) = {
-                            if ratio < 0.7 { return ("Budget is below typical cost — may need to adjust", "exclamationmark.triangle.fill", HavenColors.critical) }
-                            if ratio < 0.9 { return ("Budget is a bit tight for this project", "exclamationmark.circle.fill", HavenColors.warning) }
-                            if ratio > 1.5 { return ("Budget is generous — plenty of room", "checkmark.seal.fill", HavenColors.success) }
-                            return ("Budget is realistic for this project", "checkmark.circle.fill", HavenColors.success)
-                        }()
-                        HStack(spacing: 6) {
-                            Image(systemName: icon)
-                                .font(.caption)
-                                .foregroundStyle(color)
-                            Text(label)
-                                .font(HavenTypography.uiLabelSmall)
-                                .foregroundStyle(color)
-                        }
-                    }
-                }
-            }
-
-            // No data at all
-            if liveProject.aiResearch == nil && (liveProject.estimatedBudget == nil || liveProject.estimatedBudget == 0) {
-                Text("Tap Re-Research to get AI cost estimates, or set a budget manually.")
+            } else {
+                Text("ROI data unavailable")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, HavenTheme.spacing8)
             }
         }
     }
 
-    // MARK: - Line Items
+    private func roiColor(_ label: String?) -> Color {
+        switch label?.lowercased() {
+        case "high roi": return HavenColors.success
+        case "moderate roi": return HavenColors.warning
+        case "low roi": return HavenColors.critical
+        default: return HavenColors.textTertiary
+        }
+    }
 
-    // MARK: - Upload Quote
+    // MARK: - DIY Overview Card
 
-    private var quoteUploadButton: some View {
-        Button {
-            showQuoteAnalysis = true
-            Analytics.track(.documentUploadStarted, ["type": "quote", "project_id": project.id.uuidString])
-        } label: {
-            HavenCard(padding: HavenTheme.spacing12) {
-                HStack(spacing: HavenTheme.spacing8) {
-                    Image(systemName: "doc.text.magnifyingglass")
-                        .font(.title3)
+    // MARK: - Insurance Claim Card
+
+    private var claimInfoCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack(spacing: 8) {
+                    Image(systemName: "shield.fill")
                         .foregroundStyle(HavenColors.navy)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("Upload a Contractor Quote")
-                            .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.navy800)
-                        Text("Get a line-by-line deal analysis")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.caption)
+                    Text("CLAIM DETAILS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
-            }
-        }
-        .buttonStyle(.plain)
-    }
 
-    private var lineItemsSection: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            HStack {
-                Text("MATERIALS & SUPPLIES")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-                Spacer()
-                Button {
-                    showAddLineItem = true
-                } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: "plus")
-                        Text("Add Item")
+                if let research = liveProject.aiResearch {
+                    // Claim number
+                    if let claimNum = research.claimNumber {
+                        claimDetailRow(label: "Claim #", value: claimNum)
                     }
-                    .font(HavenTypography.uiLabelSmall)
-                    .foregroundStyle(HavenColors.navy)
-                }
-                .buttonStyle(.plain)
-            }
+                    // Policy number
+                    if let policyNum = research.policyNumber {
+                        claimDetailRow(label: "Policy #", value: policyNum)
+                    }
+                    // Insurance company
+                    if let company = research.insuranceCompany {
+                        claimDetailRow(label: "Insurance", value: company)
+                    }
+                    // Claim type
+                    if let claimType = research.claimType {
+                        claimDetailRow(label: "Type", value: claimType.replacingOccurrences(of: "_", with: " ").capitalized)
+                    }
 
-            if viewModel.lineItems.isEmpty {
-                HavenCard {
-                    Text("No items yet. Add materials manually or use AI research to populate.")
+                    // Adjuster info
+                    if let adjuster = research.adjuster {
+                        Divider()
+                        HStack(spacing: 8) {
+                            Image(systemName: "person.badge.shield.checkmark.fill")
+                                .foregroundStyle(HavenColors.navy.opacity(0.6))
+                            Text("CLAIMS ADVISOR")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .fontWeight(.semibold)
+                                .tracking(0.5)
+                        }
+                        if let name = adjuster.name {
+                            Text(name)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        HStack(spacing: 12) {
+                            if let phone = adjuster.phone {
+                                Link(destination: URL(string: "tel:\(phone.filter { $0.isNumber })")!) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "phone.fill").font(.caption)
+                                        Text(phone).font(HavenTypography.uiCaption)
+                                    }
+                                    .foregroundStyle(HavenColors.navy700)
+                                }
+                            }
+                            if let email = adjuster.email {
+                                Link(destination: URL(string: "mailto:\(email)")!) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "envelope.fill").font(.caption)
+                                        Text(email).font(HavenTypography.uiCaption)
+                                    }
+                                    .foregroundStyle(HavenColors.navy700)
+                                }
+                            }
+                        }
+                    }
+
+                    // Email timeline
+                    if let summaries = research.emailSummaries, !summaries.isEmpty {
+                        Divider()
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("CORRESPONDENCE")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .fontWeight(.semibold)
+                                .tracking(0.5)
+
+                            ForEach(Array(summaries.enumerated()), id: \.offset) { _, entry in
+                                VStack(alignment: .leading, spacing: 2) {
+                                    if let subj = entry.subject {
+                                        Text(subj)
+                                            .font(HavenTypography.uiLabel)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                    }
+                                    if let summary = entry.summary {
+                                        Text(summary)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textSecondary)
+                                    }
+                                    if let date = entry.date {
+                                        Text(date)
+                                            .font(.system(size: 9))
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                } else {
+                    Text("Claim details will appear as you forward related emails.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
-            } else {
-                // Group by necessity first
-                ForEach(NecessityGroup.allCases, id: \.self) { group in
-                    let groupItems = viewModel.lineItems.filter { ($0.necessity ?? "required") == group.rawValue }
-                    if !groupItems.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
-                                Image(systemName: group.icon)
-                                    .font(.caption)
-                                Text(group.displayName)
-                                    .font(HavenTypography.uiSectionHeader)
-                                    .tracking(1.5)
-                            }
-                            .foregroundStyle(group.color)
-                            .padding(.top, 4)
+            }
+        }
+    }
 
-                            // Sub-group by category within each necessity group
-                            let catGrouped = Dictionary(grouping: groupItems, by: { $0.category ?? "other" })
-                            ForEach(catGrouped.keys.sorted(), id: \.self) { key in
-                                let cat = LineItemCategory(rawValue: key)
-                                if catGrouped.keys.count > 1 {
-                                    Text((cat?.displayName ?? key).uppercased())
-                                        .font(.system(size: 10, weight: .medium))
-                                        .foregroundStyle(HavenColors.textTertiary)
-                                        .padding(.top, 2)
-                                }
-                                ForEach(catGrouped[key] ?? []) { item in
-                                    lineItemRow(item)
-                                }
-                            }
-                        }
-                    }
-                }
+    private func claimDetailRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+                .frame(width: 70, alignment: .leading)
+            Text(value)
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+                .textSelection(.enabled)
+        }
+    }
 
-                // Multi-project tools callout
-                let multiProjectItems = viewModel.lineItems.filter { $0.multiProjectUseful ?? false }
-                if !multiProjectItems.isEmpty {
-                    HavenCard {
-                        HStack(spacing: 6) {
-                            Image(systemName: "star.fill")
-                                .foregroundStyle(HavenColors.warning)
-                            Text("USEFUL FOR FUTURE PROJECTS")
+    // MARK: - DIY Overview Card
+
+    private var diyOverviewCard: some View {
+        Group {
+            if let f = viewModel.feasibility {
+                HavenCard {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hammer.fill")
+                                .foregroundStyle(HavenColors.navy)
+                            Text("DIY OVERVIEW")
                                 .font(HavenTypography.uiSectionHeader)
                                 .tracking(1.5)
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
-                        ForEach(multiProjectItems) { item in
-                            HStack(spacing: 8) {
-                                Image(systemName: "wrench.fill")
-                                    .font(.caption)
-                                    .foregroundStyle(HavenColors.navy)
-                                Text(item.name.count > 40 ? String(item.name.prefix(37)) + "..." : item.name)
-                                    .font(HavenTypography.bodySmall)
-                                    .foregroundStyle(HavenColors.textPrimary)
-                                Spacer()
-                                if let price = item.estimatedUnitPrice {
-                                    Text("$\(price, specifier: "%.0f")")
+
+                        // Materials cost
+                        if let mc = f.estimatedMaterialsCost {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Materials Cost")
                                         .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textSecondary)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text(mc.displayRange)
+                                        .font(HavenTypography.headline)
+                                        .foregroundStyle(HavenColors.navy800)
+                                }
+                                Spacer()
+                            }
+                        }
+
+                        HStack(spacing: HavenTheme.spacing16) {
+                            // Complexity
+                            if let complexity = f.complexity {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Complexity")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text(complexity)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(complexityColor(complexity))
+                                }
+                            }
+
+                            // Timeframe
+                            if let time = f.estimatedTimeframe {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Time Estimate")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text(time)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                }
+                            }
+
+                            // Market demand
+                            if let demand = f.marketDemand {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text("Buyer Demand")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                    Text(demand)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
                                 }
                             }
                         }
-                        Text("These tools will be saved to your toolkit when marked as owned, so Haven won't suggest buying them again.")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                    }
-                }
-            }
-        }
-    }
 
-    private func lineItemRow(_ item: ProjectLineItemRow) -> some View {
-        let isOwned = item.isOwned ?? false
-        return Button {
-            showEditLineItem = item
-        } label: {
-            HavenCard(padding: HavenTheme.spacing12) {
-                HStack(spacing: HavenTheme.spacing8) {
-                    // Status toggle: owned → purchased → unchecked
-                    Button {
-                        Task {
-                            if isOwned {
-                                // Owned → uncheck
-                                try? await viewModel.updateLineItem(id: item.id, ProjectLineItemUpdate(isOwned: false))
-                            } else if item.isPurchased {
-                                // Purchased → uncheck
-                                try? await viewModel.updateLineItem(id: item.id, ProjectLineItemUpdate(isPurchased: false))
-                            } else {
-                                // Unchecked → purchased
-                                try? await viewModel.updateLineItem(id: item.id, ProjectLineItemUpdate(isPurchased: true))
-                            }
-                            try? await viewModel.recalculateActualSpend(projectId: project.id)
-                            // Save tools to toolkit when marked as owned
-                            if !isOwned {
-                                let isToolCategory = ["tools", "hardware", "safety"].contains(item.category?.lowercased() ?? "")
-                                if isToolCategory {
-                                    await viewModel.addToolToToolkit(name: item.name, householdId: project.householdId, projectId: project.id)
-                                }
-                            }
-                            Haptics.light()
-                        }
-                    } label: {
-                        Image(systemName: isOwned ? "house.circle.fill" : item.isPurchased ? "checkmark.circle.fill" : "circle")
-                            .font(.title3)
-                            .foregroundStyle(isOwned ? HavenColors.info : item.isPurchased ? HavenColors.success : HavenColors.textTertiary)
-                    }
-                    .buttonStyle(.plain)
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        HStack(spacing: 4) {
-                            // Truncate long AI names — show first ~40 chars
-                            Text(item.name.count > 45 ? String(item.name.prefix(42)) + "..." : item.name)
-                                .font(HavenTypography.body)
-                                .foregroundStyle(isOwned ? HavenColors.textTertiary : HavenColors.textPrimary)
-                                .strikethrough(item.isPurchased || isOwned)
-                                .lineLimit(1)
-                            if isOwned {
-                                Text("OWNED")
-                                    .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(HavenColors.info)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(HavenColors.info.opacity(0.1))
-                                    .clipShape(Capsule())
-                            } else if item.isAiSuggested {
-                                Text("AI")
-                                    .font(.system(size: 9, weight: .bold))
-                                    .foregroundStyle(HavenColors.navy)
-                                    .padding(.horizontal, 4)
-                                    .padding(.vertical, 1)
-                                    .background(HavenColors.navy.opacity(0.1))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        HStack(spacing: 8) {
-                            if let qty = item.quantity, let unit = item.unit {
-                                Text("\(qty.formatted()) \(unit)")
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
-                            if let store = item.suggestedStore, !store.isEmpty {
-                                Text(store)
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
-                        }
-                    }
-
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        if let actual = item.actualUnitPrice {
-                            Text("$\(actual, specifier: "%.2f")")
-                                .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.textPrimary)
-                        } else if let est = item.estimatedUnitPrice {
-                            Text("~$\(est, specifier: "%.2f")")
-                                .font(HavenTypography.uiLabel)
+                        if let note = f.complexityNote {
+                            Text(note)
+                                .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textSecondary)
                         }
                     }
                 }
             }
         }
-        .buttonStyle(.plain)
-        .contextMenu {
-            if !(item.isOwned ?? false) {
-                Button {
-                    Task {
-                        try? await viewModel.updateLineItem(id: item.id, ProjectLineItemUpdate(isOwned: true))
-                        try? await viewModel.recalculateActualSpend(projectId: project.id)
-                        let isToolCategory = ["tools", "hardware", "safety"].contains(item.category?.lowercased() ?? "")
-                        if isToolCategory {
-                            await viewModel.addToolToToolkit(name: item.name, householdId: project.householdId, projectId: project.id)
-                        }
-                        Haptics.success()
-                    }
+    }
+
+    private func complexityColor(_ complexity: String) -> Color {
+        switch complexity.lowercased() {
+        case "easy": return HavenColors.success
+        case "moderate": return HavenColors.warning
+        case "complex": return HavenColors.critical
+        case "professional recommended": return HavenColors.critical
+        default: return HavenColors.textPrimary
+        }
+    }
+
+    // MARK: - Quotes Section (Pro)
+
+    private var quotesSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("QUOTES")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                if !viewModel.quotes.isEmpty {
+                    Text("\(viewModel.quotes.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+
+            ForEach(viewModel.quotes) { quote in
+                NavigationLink {
+                    QuoteDetailView(quote: quote, viewModel: viewModel)
                 } label: {
-                    Label("I Already Own This", systemImage: "house.circle.fill")
+                    quoteCard(quote)
                 }
+                .buttonStyle(.plain)
             }
-            Button(role: .destructive) {
-                Task {
-                    try? await viewModel.deleteLineItem(id: item.id)
-                    try? await viewModel.recalculateActualSpend(projectId: project.id)
-                    Haptics.light()
-                }
+
+            Button {
+                showQuoteUpload = true
+                Analytics.track(.documentUploadStarted, ["type": "quote", "project_id": project.id.uuidString])
             } label: {
-                Label("Remove", systemImage: "trash")
-            }
-        }
-    }
-
-    // MARK: - Tips & Warnings
-
-    @ViewBuilder
-    private var tipsSection: some View {
-        if let research = liveProject.aiResearch, !(research.tipsAndWarnings ?? []).isEmpty {
-            HavenCard {
-                Text("TIPS & WARNINGS")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-
-                ForEach(Array((research.tipsAndWarnings ?? []).enumerated()), id: \.offset) { _, tip in
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: tip.lowercased().contains("warn") || tip.lowercased().contains("careful") || tip.lowercased().contains("danger")
-                              ? "exclamationmark.triangle.fill"
-                              : "lightbulb.fill")
-                            .font(.caption)
-                            .foregroundStyle(HavenColors.warning)
-                            .frame(width: 16)
-                        Text(tip)
-                            .font(HavenTypography.bodySmall)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                }
-
-                if let permit = research.permitNotes, !permit.isEmpty {
-                    HStack(alignment: .top, spacing: 8) {
-                        Image(systemName: "doc.text.fill")
-                            .font(.caption)
-                            .foregroundStyle(HavenColors.info)
-                            .frame(width: 16)
-                        Text(permit)
-                            .font(HavenTypography.bodySmall)
-                            .foregroundStyle(HavenColors.textSecondary)
-                    }
-                }
-            }
-        }
-    }
-
-    // MARK: - Learn How (YouTube)
-
-    @ViewBuilder
-    private var learnSection: some View {
-        if let research = liveProject.aiResearch, !(research.suggestedVideoTopics ?? []).isEmpty {
-            HavenCard {
-                Text("LEARN HOW")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-
-                ForEach(research.suggestedVideoTopics ?? [], id: \.self) { topic in
-                    Button {
-                        let query = topic.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? topic
-                        if let url = URL(string: "https://www.youtube.com/results?search_query=\(query)") {
-                            UIApplication.shared.open(url)
-                            Analytics.track(.screenViewed, ["screen": "YouTube", "query": topic])
+                HavenCard(padding: HavenTheme.spacing12) {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "doc.text.magnifyingglass")
+                            .font(.title3)
+                            .foregroundStyle(HavenColors.navy)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(viewModel.quotes.isEmpty ? "Upload a Contractor Quote" : "Upload Another Quote")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy800)
+                            Text("Get a line-by-line deal analysis")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
                         }
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "play.circle.fill")
-                                .foregroundStyle(HavenColors.critical)
-                            Text(topic)
-                                .font(HavenTypography.body)
-                                .foregroundStyle(HavenColors.navy)
-                                .multilineTextAlignment(.leading)
-                            Spacer()
-                            Image(systemName: "arrow.up.right")
-                                .font(.caption)
-                                .foregroundStyle(HavenColors.textTertiary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-    }
-
-    // MARK: - Home Value Impact
-
-    @ViewBuilder
-    private var homeValueImpactSection: some View {
-        if let research = liveProject.aiResearch, let impact = research.homeValueImpact, let score = impact.score {
-            HavenCard {
-                Text("HOME VALUE IMPACT")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-
-                // Score bar
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack {
-                        Text(impact.label ?? "Unknown")
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(scoreColor(score))
                         Spacer()
-                        Text("\(score)/100")
+                        Image(systemName: "plus.circle.fill")
+                            .font(.caption)
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            if viewModel.quotes.count >= 2 {
+                Button {
+                    showQuoteComparison = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.left.arrow.right")
+                            .font(.caption)
+                        Text("Compare \(viewModel.quotes.count) Quotes")
                             .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.textSecondary)
-                        if let roi = impact.typicalRoi {
-                            Text("(\(roi) ROI)")
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func quoteCard(_ quote: ProjectQuoteRow) -> some View {
+        HavenCard(padding: HavenTheme.spacing12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(quote.vendorName ?? "Contractor Quote")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    HStack(spacing: 8) {
+                        if let date = quote.quoteDate {
+                            Text(date)
                                 .font(HavenTypography.uiCaption)
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
-                    }
-
-                    // Progress bar
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            // Track with gradient markers
-                            Capsule()
-                                .fill(HavenColors.beige200)
-                                .frame(height: 10)
-                            // Fill
-                            Capsule()
-                                .fill(
-                                    LinearGradient(
-                                        colors: [HavenColors.critical.opacity(0.6), HavenColors.warning, HavenColors.success],
-                                        startPoint: .leading,
-                                        endPoint: .trailing
-                                    )
-                                )
-                                .frame(width: geo.size.width * (Double(score) / 100.0), height: 10)
-                                .animation(HavenTheme.animationProgress, value: score)
+                        if let rating = quote.overallRating {
+                            quoteRatingBadge(rating)
                         }
                     }
-                    .frame(height: 10)
-
-                    // Scale labels
-                    HStack {
-                        Text("Lifestyle")
-                            .font(.system(size: 9))
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Spacer()
-                        Text("High ROI")
-                            .font(.system(size: 9))
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    if let total = quote.quoteTotal {
+                        Text("$\(Int(total).formatted())")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                    }
+                    if let fair = quote.estimatedFairTotal {
+                        Text("Fair: $\(Int(fair).formatted())")
+                            .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
-
-                if let explanation = impact.explanation {
-                    Text(explanation)
-                        .font(HavenTypography.bodySmall)
-                        .foregroundStyle(HavenColors.textSecondary)
-                }
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
             }
         }
     }
 
-    private func scoreColor(_ score: Int) -> Color {
-        if score >= 70 { return HavenColors.success }
-        if score >= 40 { return HavenColors.warning }
-        return HavenColors.textTertiary
+    private func quoteRatingBadge(_ rating: String) -> some View {
+        let (label, color): (String, Color) = {
+            switch rating.lowercased() {
+            case "good_deal": return ("Good Deal", HavenColors.success)
+            case "overpriced": return ("Overpriced", HavenColors.critical)
+            default: return ("Fair", HavenColors.warning)
+            }
+        }()
+
+        return Text(label)
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundStyle(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(color.opacity(0.12))
+            .clipShape(Capsule())
+    }
+
+    // MARK: - Files Section (DIY)
+
+    private var filesSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("FILES")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                if !viewModel.projectFiles.isEmpty {
+                    Text("\(viewModel.projectFiles.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+
+            // File grid
+            if !viewModel.projectFiles.isEmpty {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 100), spacing: 8)], spacing: 8) {
+                    ForEach(viewModel.projectFiles) { file in
+                        fileCard(file)
+                    }
+                }
+            }
+
+            // Upload buttons
+            HStack(spacing: HavenTheme.spacing8) {
+                Button {
+                    showPhotoPicker = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "photo.on.rectangle")
+                            .font(.caption)
+                        Text("Add Photo")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    showFilePicker = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.fill")
+                            .font(.caption)
+                        Text("Add File")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func fileCard(_ file: ProjectFileRow) -> some View {
+        VStack(spacing: 4) {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(HavenColors.navy.opacity(0.06))
+                .frame(height: 80)
+                .overlay {
+                    Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
+                        .font(.title2)
+                        .foregroundStyle(HavenColors.navy.opacity(0.4))
+                }
+
+            Text(file.filename)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textSecondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .contextMenu {
+            Button(role: .destructive) {
+                Task { try? await viewModel.deleteProjectFile(id: file.id) }
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    // MARK: - File Upload Handlers
+
+    private func handlePhotoSelection(_ item: PhotosPickerItem) async {
+        guard let data = try? await item.loadTransferable(type: Data.self) else { return }
+        let filename = "photo_\(Date().timeIntervalSince1970).jpg"
+        try? await viewModel.uploadProjectFile(
+            projectId: project.id,
+            householdId: project.householdId,
+            data: data,
+            filename: filename,
+            contentType: "image/jpeg"
+        )
+        selectedPhoto = nil
+        Haptics.success()
+    }
+
+    private func handleFileSelection(_ result: Result<URL, Error>) async {
+        guard case .success(let url) = result else { return }
+        guard url.startAccessingSecurityScopedResource() else { return }
+        defer { url.stopAccessingSecurityScopedResource() }
+        guard let data = try? Data(contentsOf: url) else { return }
+
+        let filename = url.lastPathComponent
+        let contentType = url.pathExtension.lowercased() == "pdf" ? "application/pdf" : "image/jpeg"
+        try? await viewModel.uploadProjectFile(
+            projectId: project.id,
+            householdId: project.householdId,
+            data: data,
+            filename: filename,
+            contentType: contentType
+        )
+        Haptics.success()
+    }
+
+    // MARK: - Ask Alfred
+
+    private var askAlfredButton: some View {
+        Button {
+            // Navigate to Alfred tab with project context
+            NotificationCenter.default.post(
+                name: .openAlfredWithContext,
+                object: nil,
+                userInfo: [
+                    "message": "I have a question about my \(liveProject.category) project: \(liveProject.name)",
+                    "projectId": project.id.uuidString,
+                ]
+            )
+        } label: {
+            HavenCard(padding: HavenTheme.spacing12) {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "bubble.left.and.text.bubble.right.fill")
+                        .font(.title3)
+                        .foregroundStyle(HavenColors.navy)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Ask Alfred About This Project")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy800)
+                        Text(isDIY ? "Get DIY tips, material advice, and planning help" : "Questions about quotes, contractors, or next steps")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer()
+                    Image(systemName: "arrow.right.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(HavenColors.navy)
+                }
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Notes
@@ -785,67 +879,33 @@ struct ProjectDetailView: View {
         }
     }
 
-    // MARK: - Re-Research
-
-    @ObservedObject private var researchService = ProjectResearchService.shared
-
-    private var reResearchButton: some View {
-        VStack(spacing: 4) {
-            HavenButton(
-                title: researchService.isResearching ? "Researching..." : "Re-Research Costs",
-                action: {
-                    researchService.research(project: liveProject, location: nil)
-                    Haptics.medium()
-                },
-                style: .secondary,
-                icon: "sparkle.magnifyingglass",
-                isLoading: researchService.isResearching
-            )
-
-            if let date = liveProject.aiResearchUpdatedAt {
-                Text("Last researched: \(date.formatted(date: .abbreviated, time: .shortened))")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textTertiary)
-            }
-        }
-    }
-
     // MARK: - Badges
 
     private func statusBadge(_ status: String) -> some View {
-        let ps = ProjectStatus(rawValue: status) ?? .planning
-        return HStack(spacing: 4) {
-            Image(systemName: ps.icon)
-                .font(.caption2)
-            Text(ps.displayName)
-        }
-        .font(HavenTypography.uiLabelSmall)
-        .foregroundStyle(ps.color)
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
-        .background(ps.color.opacity(0.12))
-        .clipShape(Capsule())
+        let ps = ProjectStatus(rawValue: status)
+        return Text(ps?.displayName ?? status.capitalized)
+            .font(.system(size: 10, weight: .semibold))
+            .foregroundStyle(ps?.color ?? HavenColors.textTertiary)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background((ps?.color ?? HavenColors.textTertiary).opacity(0.12))
+            .clipShape(Capsule())
     }
 
     private func approachBadge(_ type: String) -> some View {
-        let a = ProjectApproach(rawValue: type) ?? .undecided
-        return Text(a.displayName)
-            .font(HavenTypography.uiLabelSmall)
-            .foregroundStyle(HavenColors.textSecondary)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(HavenColors.beige200)
-            .clipShape(Capsule())
-    }
-
-    private func priorityBadge(_ priority: String) -> some View {
-        let color: Color = priority == "high" ? HavenColors.critical : priority == "low" ? HavenColors.textTertiary : HavenColors.warning
-        return Text(priority.capitalized)
-            .font(HavenTypography.uiLabelSmall)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.12))
-            .clipShape(Capsule())
+        let label = type == "diy" ? "DIY" : type == "insurance_claim" ? "Claim" : "Pro"
+        let icon = type == "diy" ? "hammer.fill" : type == "insurance_claim" ? "shield.fill" : "person.badge.shield.checkmark.fill"
+        return HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 8))
+            Text(label)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundStyle(HavenColors.navy700)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(HavenColors.navy.opacity(0.08))
+        .clipShape(Capsule())
     }
 }
+

@@ -90,6 +90,17 @@ struct ContractorDirectoryView: View {
                         contractorCard(contractor)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task {
+                                try? await DatabaseService.shared.deleteContractor(id: contractor.id)
+                                await viewModel.loadContractors()
+                                Haptics.success()
+                            }
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .simultaneousGesture(TapGesture().onEnded {
                         Analytics.track(.contractorViewed, ["contractor_id": contractor.id.uuidString])
                     })
@@ -172,6 +183,8 @@ struct ContractorDirectoryView: View {
 struct ContractorDetailView: View {
     let contractor: ContractorRow
     @State private var serviceRecords: [ServiceRecordRow] = []
+    @State private var showDeleteConfirmation = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
@@ -267,6 +280,27 @@ struct ContractorDetailView: View {
         .background(HavenColors.background)
         .navigationTitle(contractor.companyName)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .destructiveAction) {
+                Button(role: .destructive) {
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(HavenColors.critical)
+                }
+            }
+        }
+        .confirmationDialog("Delete \(contractor.companyName)?", isPresented: $showDeleteConfirmation) {
+            Button("Delete", role: .destructive) {
+                Task {
+                    try? await DatabaseService.shared.deleteContractor(id: contractor.id)
+                    Haptics.success()
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("This contact and their service history will be permanently removed.")
+        }
         .trackScreen("ContractorDetailView", properties: ["contractor_id": contractor.id.uuidString])
         .task {
             let allRecords = (try? await DatabaseService.shared.fetchServiceRecords()) ?? []

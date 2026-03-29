@@ -18,6 +18,9 @@ struct MaintenanceScheduleView: View {
     @State private var selectedTask: MaintenanceTaskDBRow?
     @State private var showDeleteConfirm = false
     @State private var taskToDelete: MaintenanceTaskDBRow?
+    @State private var showSnooze = false
+    @State private var taskToSnooze: MaintenanceTaskDBRow?
+    @State private var snoozeDate = Date()
 
     var body: some View {
         Group {
@@ -199,8 +202,8 @@ struct MaintenanceScheduleView: View {
     // MARK: - Task Content
 
     private var taskContent: some View {
-        ScrollView {
-            LazyVStack(spacing: 12) {
+        List {
+            Section {
                 // Property filter pills (only when 2+ properties)
                 if viewModel.properties.count > 1 {
                     propertyFilterBar
@@ -244,18 +247,22 @@ struct MaintenanceScheduleView: View {
                 if viewModel.filterStatus != .all || viewModel.filterPropertyId != nil || viewModel.filterCategory != nil {
                     activeFiltersBar
                 }
-
-                switch viewMode {
-                case .timeline:
-                    timelineContent
-                case .bySystem:
-                    bySystemContent
-                case .byType:
-                    byTypeContent
-                }
             }
-            .padding()
+            .listRowSeparator(.hidden)
+            .listRowBackground(Color.clear)
+            .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
+
+            switch viewMode {
+            case .timeline:
+                timelineContent
+            case .bySystem:
+                bySystemContent
+            case .byType:
+                byTypeContent
+            }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
         .background(HavenColors.background)
         .sheet(item: $selectedTask) { task in
             NavigationStack {
@@ -284,8 +291,8 @@ struct MaintenanceScheduleView: View {
             }
             .presentationDetents([.medium, .large])
         }
-        .alert("Remove Task?", isPresented: $showDeleteConfirm) {
-            Button("Remove Permanently", role: .destructive) {
+        .alert("Not Applicable?", isPresented: $showDeleteConfirm) {
+            Button("Remove This Task", role: .destructive) {
                 if let task = taskToDelete {
                     Task {
                         await viewModel.deleteTask(task)
@@ -296,8 +303,43 @@ struct MaintenanceScheduleView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             if let task = taskToDelete {
-                Text("Permanently remove \"\(task.title)\" from your maintenance schedule? This task won't come back unless you re-add the system.")
+                Text("Remove \"\(task.title)\" from your maintenance schedule? Future recurring tasks are not affected.")
             }
+        }
+        .sheet(isPresented: $showSnooze) {
+            NavigationStack {
+                DatePicker("Snooze Until", selection: $snoozeDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(HavenColors.navy800)
+                    .padding()
+                    .navigationTitle("Snooze Task")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Cancel") { showSnooze = false }
+                                .foregroundStyle(HavenColors.navy)
+                        }
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button("Save") {
+                                guard let task = taskToSnooze else { return }
+                                Task {
+                                    let formatter = DateFormatter()
+                                    formatter.dateFormat = "yyyy-MM-dd"
+                                    _ = try? await DatabaseService.shared.updateMaintenanceTask(
+                                        id: task.id,
+                                        MaintenanceTaskUpdate(nextDueDate: formatter.string(from: snoozeDate))
+                                    )
+                                    Haptics.success()
+                                    showSnooze = false
+                                    await viewModel.loadTasks()
+                                }
+                            }
+                            .foregroundStyle(HavenColors.navy)
+                            .fontWeight(.semibold)
+                        }
+                    }
+            }
+            .presentationDetents([.medium])
         }
     }
 
@@ -311,8 +353,13 @@ struct MaintenanceScheduleView: View {
             taskSection("Due This Month", tasks: viewModel.dueThisMonthTasks, accentColor: HavenColors.info)
             taskSection("Upcoming", tasks: viewModel.upcomingTasks, accentColor: HavenColors.success)
         } else {
-            ForEach(viewModel.filteredTasks) { task in
-                maintenanceRow(task)
+            Section {
+                ForEach(viewModel.filteredTasks) { task in
+                    maintenanceRow(task)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
             }
         }
     }
@@ -322,7 +369,14 @@ struct MaintenanceScheduleView: View {
     @ViewBuilder
     private var bySystemContent: some View {
         ForEach(viewModel.tasksBySystem, id: \.systemName) { group in
-            VStack(alignment: .leading, spacing: 8) {
+            Section {
+                ForEach(group.tasks) { task in
+                    maintenanceRow(task)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            } header: {
                 HStack {
                     Image(systemName: "gearshape.fill")
                         .foregroundStyle(HavenColors.navy700)
@@ -333,7 +387,6 @@ struct MaintenanceScheduleView: View {
                         .textCase(.uppercase)
                         .tracking(1.5)
 
-                    // Show property color dot if multiple properties
                     if viewModel.properties.count > 1, let firstTask = group.tasks.first {
                         Circle()
                             .fill(viewModel.propertyColor(for: firstTask.propertyId))
@@ -348,11 +401,6 @@ struct MaintenanceScheduleView: View {
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.navy700)
                 }
-                .padding(.top, 4)
-
-                ForEach(group.tasks) { task in
-                    maintenanceRow(task)
-                }
             }
         }
     }
@@ -362,7 +410,14 @@ struct MaintenanceScheduleView: View {
     @ViewBuilder
     private var byTypeContent: some View {
         ForEach(viewModel.tasksByType, id: \.type) { group in
-            VStack(alignment: .leading, spacing: 8) {
+            Section {
+                ForEach(group.tasks) { task in
+                    maintenanceRow(task)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            } header: {
                 HStack {
                     Image(systemName: group.type.icon)
                         .foregroundStyle(group.type.color)
@@ -376,11 +431,6 @@ struct MaintenanceScheduleView: View {
                     Text("\(group.tasks.count)")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(group.type.color)
-                }
-                .padding(.top, 4)
-
-                ForEach(group.tasks) { task in
-                    maintenanceRow(task)
                 }
             }
         }
@@ -483,7 +533,14 @@ struct MaintenanceScheduleView: View {
     @ViewBuilder
     private func taskSection(_ title: String, tasks: [MaintenanceTaskDBRow], accentColor: Color) -> some View {
         if !tasks.isEmpty {
-            VStack(alignment: .leading, spacing: 8) {
+            Section {
+                ForEach(tasks) { task in
+                    maintenanceRow(task)
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            } header: {
                 HStack {
                     Circle().fill(accentColor).frame(width: 8, height: 8)
                     Text(title)
@@ -495,11 +552,6 @@ struct MaintenanceScheduleView: View {
                     Text("\(tasks.count)")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(accentColor)
-                }
-                .padding(.top, 4)
-
-                ForEach(tasks) { task in
-                    maintenanceRow(task)
                 }
             }
         }
@@ -605,12 +657,58 @@ struct MaintenanceScheduleView: View {
             }
         }
         .buttonStyle(.plain)
-        .contextMenu {
+        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
             Button(role: .destructive) {
                 taskToDelete = task
                 showDeleteConfirm = true
             } label: {
-                Label("Remove Task", systemImage: "trash")
+                Label("Delete", systemImage: "trash")
+            }
+
+            Button {
+                taskToSnooze = task
+                snoozeDate = {
+                    let f = DateFormatter()
+                    f.dateFormat = "yyyy-MM-dd"
+                    let dueDate = f.date(from: task.nextDueDate) ?? Date()
+                    let baseDate = max(dueDate, Date())
+                    return Calendar.current.date(byAdding: .weekOfYear, value: 1, to: baseDate) ?? baseDate
+                }()
+                showSnooze = true
+            } label: {
+                Label("Snooze", systemImage: "moon.fill")
+            }
+            .tint(HavenColors.warning)
+        }
+        .contextMenu {
+            Button {
+                taskToSnooze = task
+                snoozeDate = {
+                    let f = DateFormatter()
+                    f.dateFormat = "yyyy-MM-dd"
+                    let dueDate = f.date(from: task.nextDueDate) ?? Date()
+                    let baseDate = max(dueDate, Date())
+                    return Calendar.current.date(byAdding: .weekOfYear, value: 1, to: baseDate) ?? baseDate
+                }()
+                showSnooze = true
+                Haptics.light()
+            } label: {
+                Label("Snooze", systemImage: "moon.fill")
+            }
+
+            Button {
+                selectedTask = task
+            } label: {
+                Label("Mark Complete", systemImage: "checkmark.circle")
+            }
+
+            Divider()
+
+            Button(role: .destructive) {
+                taskToDelete = task
+                showDeleteConfirm = true
+            } label: {
+                Label("Not Applicable", systemImage: "xmark.circle")
             }
         }
     }

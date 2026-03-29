@@ -19,6 +19,7 @@ enum EnrichmentInputType {
     case yesNo
     case serviceSetup(serviceType: String)
     case applianceChecklist
+    case projectSuggestion(estimatedCost: String, roiLabel: String, roiDetail: String)
 }
 
 struct EnrichmentQuestion: Identifiable {
@@ -52,7 +53,9 @@ struct EnrichmentEngine {
         propertyAttributes: [String: FlexibleValue],
         serviceContracts: [ServiceContractRow],
         homeSystems: [HomeSystemRow],
-        dismissedIds: Set<String>
+        dismissedIds: Set<String>,
+        yearBuilt: Int? = nil,
+        hasProjects: Bool = false
     ) -> [EnrichmentQuestion] {
         var questions: [EnrichmentQuestion] = []
 
@@ -218,8 +221,115 @@ struct EnrichmentEngine {
             ))
         }
 
+        // MARK: - Project Suggestions (ROI-based)
+
+        // Suggest projects based on property age and systems
+        if !hasProjects {
+            let homeAge = yearBuilt.map { Calendar.current.component(.year, from: Date()) - $0 }
+
+            // Old roof suggestion (15+ years)
+            let roofSystem = homeSystems.first { $0.category.lowercased().contains("roof") }
+            let roofAge: Int? = {
+                if let installDate = roofSystem?.installDate,
+                   let date = ISO8601DateFormatter().date(from: installDate) {
+                    return Calendar.current.dateComponents([.year], from: date, to: Date()).year
+                }
+                return homeAge
+            }()
+            if let age = roofAge, age >= 15, propertyAttributes["dismissed_project_roof"] == nil {
+                questions.append(EnrichmentQuestion(
+                    id: "project_suggest_roof",
+                    title: "Time for a roof assessment?",
+                    subtitle: "Homes that replace aging roofs see strong returns at resale",
+                    icon: "house.lodge.fill",
+                    iconColor: HavenColors.success,
+                    priority: 50,
+                    inputType: .projectSuggestion(
+                        estimatedCost: "$8,000 - $15,000",
+                        roiLabel: "High ROI",
+                        roiDetail: "Spend ~$12K, typical return ~$8K at resale. Buyers pay more for a new roof."
+                    )
+                ))
+            }
+
+            // Generator suggestion (all homes)
+            if propertyAttributes["has_generator"] == nil, propertyAttributes["dismissed_project_generator"] == nil {
+                questions.append(EnrichmentQuestion(
+                    id: "project_suggest_generator",
+                    title: "Backup generator?",
+                    subtitle: "Homes with generators see higher resale value and faster sales",
+                    icon: "bolt.shield.fill",
+                    iconColor: HavenColors.warning,
+                    priority: 55,
+                    inputType: .projectSuggestion(
+                        estimatedCost: "$3,000 - $12,000",
+                        roiLabel: "Moderate ROI",
+                        roiDetail: "Spend ~$7K, adds ~$5K in resale value. Sells 3-5% faster."
+                    )
+                ))
+            }
+
+            // Smart home / energy efficiency for newer homes
+            if let age = homeAge, age <= 20, propertyAttributes["dismissed_project_smart_home"] == nil {
+                questions.append(EnrichmentQuestion(
+                    id: "project_suggest_smart_home",
+                    title: "Smart home upgrades?",
+                    subtitle: "Smart thermostats, locks, and lighting pay for themselves in energy savings",
+                    icon: "homekit",
+                    iconColor: HavenColors.navy500,
+                    priority: 60,
+                    inputType: .projectSuggestion(
+                        estimatedCost: "$500 - $3,000",
+                        roiLabel: "High ROI",
+                        roiDetail: "Spend ~$1.5K, save $300/year on energy. Pays for itself in 5 years."
+                    )
+                ))
+            }
+
+            // Kitchen remodel for older homes (20+ years)
+            if let age = homeAge, age >= 20, propertyAttributes["dismissed_project_kitchen"] == nil {
+                questions.append(EnrichmentQuestion(
+                    id: "project_suggest_kitchen",
+                    title: "Kitchen refresh?",
+                    subtitle: "Minor kitchen remodels consistently deliver the highest ROI of any home project",
+                    icon: "fork.knife",
+                    iconColor: HavenColors.navy700,
+                    priority: 52,
+                    inputType: .projectSuggestion(
+                        estimatedCost: "$15,000 - $35,000",
+                        roiLabel: "High ROI",
+                        roiDetail: "Spend ~$25K, typical return ~$20K at resale. #1 ROI project nationwide."
+                    )
+                ))
+            }
+
+            // Deck/patio for homes without one
+            if propertyAttributes["has_deck"] == nil, propertyAttributes["dismissed_project_deck"] == nil {
+                questions.append(EnrichmentQuestion(
+                    id: "project_suggest_deck",
+                    title: "Add a deck or patio?",
+                    subtitle: "Outdoor living space is one of the most requested features by buyers",
+                    icon: "sun.and.horizon.fill",
+                    iconColor: HavenColors.warning,
+                    priority: 58,
+                    inputType: .projectSuggestion(
+                        estimatedCost: "$4,000 - $15,000",
+                        roiLabel: "Moderate ROI",
+                        roiDetail: "Spend ~$10K, typical return ~$7K at resale. High buyer appeal."
+                    )
+                ))
+            }
+        }
+
         let result = questions
             .filter { !dismissedIds.contains($0.id) }
+            .filter { question in
+                // Only show High ROI project suggestions — skip Moderate ones
+                if case .projectSuggestion(_, let roiLabel, _) = question.inputType {
+                    return roiLabel.lowercased().contains("high")
+                }
+                return true // Always show property questions
+            }
             .sorted { $0.priority < $1.priority }
             .prefix(2)
             .map { $0 }

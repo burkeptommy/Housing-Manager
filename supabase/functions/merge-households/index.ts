@@ -591,7 +591,36 @@ serve(async (req: Request) => {
         .update({ status: "accepted", resolved_at: new Date().toISOString() })
         .eq("id", merge_request_id);
 
-      // 11. Soft-delete the source household
+      // 11. Reconcile household email addresses
+      // Delete the source household's forwarding email (target keeps theirs)
+      await supabase
+        .from("household_email_addresses")
+        .delete()
+        .eq("household_id", sourceId);
+
+      // Ensure target household has an email address
+      const { data: targetEmail } = await supabase
+        .from("household_email_addresses")
+        .select("id")
+        .eq("household_id", targetId)
+        .limit(1);
+
+      if (!targetEmail || targetEmail.length === 0) {
+        await supabase
+          .from("household_email_addresses")
+          .insert({
+            household_id: targetId,
+            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.havenhome.dev",
+          });
+      }
+
+      // 12. Reconcile inbox items (move source inbox items to target)
+      await supabase
+        .from("inbox_items")
+        .update({ household_id: targetId })
+        .eq("household_id", sourceId);
+
+      // 13. Soft-delete the source household
       await supabase
         .from("households")
         .update({ deactivated_at: new Date().toISOString() })
@@ -695,6 +724,33 @@ serve(async (req: Request) => {
         .from("household_merge_requests")
         .update({ status: "accepted", resolved_at: new Date().toISOString() })
         .eq("id", merge_request_id);
+
+      // Reconcile household email addresses
+      await supabase
+        .from("household_email_addresses")
+        .delete()
+        .eq("household_id", sourceId);
+
+      const { data: targetEmailLegacy } = await supabase
+        .from("household_email_addresses")
+        .select("id")
+        .eq("household_id", targetId)
+        .limit(1);
+
+      if (!targetEmailLegacy || targetEmailLegacy.length === 0) {
+        await supabase
+          .from("household_email_addresses")
+          .insert({
+            household_id: targetId,
+            unique_address: targetId.substring(0, 8).toLowerCase() + "@alfred.havenhome.dev",
+          });
+      }
+
+      // Move inbox items to target
+      await supabase
+        .from("inbox_items")
+        .update({ household_id: targetId })
+        .eq("household_id", sourceId);
 
       // Soft-delete source household
       await supabase

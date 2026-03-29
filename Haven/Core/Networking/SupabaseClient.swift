@@ -122,6 +122,7 @@ enum HavenSupabase {
         let contextType: String?
         let contextId: String?
         let householdId: String
+        let encryptionKey: String?
 
         enum CodingKeys: String, CodingKey {
             case message
@@ -129,6 +130,7 @@ enum HavenSupabase {
             case contextType = "context_type"
             case contextId = "context_id"
             case householdId = "household_id"
+            case encryptionKey = "encryption_key"
         }
     }
 
@@ -162,13 +164,14 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "analyze-document", body: body)
     }
 
-    static func chat(message: String, history: [[String: String]], contextType: String?, contextId: String?, householdId: String) async throws -> Data {
+    static func chat(message: String, history: [[String: String]], contextType: String?, contextId: String?, householdId: String, encryptionKey: String? = nil) async throws -> Data {
         let body = ChatRequest(
             message: message,
             conversationHistory: history,
             contextType: contextType,
             contextId: contextId,
-            householdId: householdId
+            householdId: householdId,
+            encryptionKey: encryptionKey
         )
         return try await callEdgeFunction(name: "chat", body: body)
     }
@@ -261,42 +264,81 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "analyze-quote", body: body, timeoutSeconds: 120)
     }
 
-    // MARK: - Research Project
+    // MARK: - Property Lookup
 
-    struct ResearchProjectRequest: Encodable {
-        let projectName: String
-        let category: String
-        let description: String?
+    struct PropertyLookupRequest: Encodable {
+        let address: String
+    }
+
+    static func propertyLookup(address: String) async throws -> Data {
+        let body = PropertyLookupRequest(address: address)
+        return try await callEdgeFunction(name: "property-lookup", body: body, timeoutSeconds: 15)
+    }
+
+    // MARK: - Project Feasibility (ROI)
+
+    struct ProjectFeasibilityRequest: Encodable {
+        let projectType: String
         let propertyLocation: String?
-        let projectId: String?
-        let userToolkit: [String]?
+        let yearBuilt: Int?
+        let squareFootage: Int?
+        let propertyValue: Double?
 
         enum CodingKeys: String, CodingKey {
-            case category, description
-            case projectName = "project_name"
+            case projectType = "project_type"
             case propertyLocation = "property_location"
-            case projectId = "project_id"
-            case userToolkit = "user_toolkit"
+            case yearBuilt = "year_built"
+            case squareFootage = "square_footage"
+            case propertyValue = "property_value"
         }
     }
 
-    static func researchProject(
-        projectName: String,
-        category: String,
-        description: String? = nil,
+    static func projectFeasibility(
+        projectType: String,
         propertyLocation: String? = nil,
-        projectId: String? = nil,
-        userToolkit: [String]? = nil
+        yearBuilt: Int? = nil,
+        squareFootage: Int? = nil,
+        propertyValue: Double? = nil
     ) async throws -> Data {
-        let body = ResearchProjectRequest(
-            projectName: projectName,
-            category: category,
-            description: description,
+        let body = ProjectFeasibilityRequest(
+            projectType: projectType,
             propertyLocation: propertyLocation,
-            projectId: projectId,
-            userToolkit: userToolkit
+            yearBuilt: yearBuilt,
+            squareFootage: squareFootage,
+            propertyValue: propertyValue
         )
-        return try await callEdgeFunction(name: "research-project", body: body, timeoutSeconds: 120)
+        return try await callEdgeFunction(name: "project-feasibility", body: body, timeoutSeconds: 30)
+    }
+
+    // MARK: - Process Inbox Item
+
+    struct ProcessInboxItemRequest: Encodable {
+        let inboxItemId: String
+        let propertyId: String?
+        let action: String
+        let documentCategory: String?
+
+        enum CodingKeys: String, CodingKey {
+            case action
+            case inboxItemId = "inbox_item_id"
+            case propertyId = "property_id"
+            case documentCategory = "document_category"
+        }
+    }
+
+    static func processInboxItem(
+        inboxItemId: String,
+        propertyId: String? = nil,
+        action: String,
+        documentCategory: String? = nil
+    ) async throws -> Data {
+        let body = ProcessInboxItemRequest(
+            inboxItemId: inboxItemId,
+            propertyId: propertyId,
+            action: action,
+            documentCategory: documentCategory
+        )
+        return try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 120)
     }
 
     // MARK: - View Document (Zero-Access Model)

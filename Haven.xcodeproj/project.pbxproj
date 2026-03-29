@@ -115,6 +115,8 @@
 		B1A2C3D4E5F6789012345604 /* FamilyMembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F6789012345603 /* FamilyMembersView.swift */; };
 		152F97CC67274C27BB83106B /* HouseholdAccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CDC97EE041944D1BB2ECF3E2 /* HouseholdAccessView.swift */; };
 		B1A2C3D4E5F6789012345606 /* FamilyMemberFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1A2C3D4E5F6789012345605 /* FamilyMemberFormView.swift */; };
+		F4A5B6C7D8E9F0A1B2C3D4E6 /* FamilyInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4A5B6C7D8E9F0A1B2C3D4E5 /* FamilyInboxView.swift */; };
+		B7E8F9A0B1C2D3E4F5A6B7C9 /* FamilyItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F6A7B8C9D0E1F1 /* FamilyItemDetailView.swift */; };
 		B1C2D3E4F5A6B7C8D9E0F1A2 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2B3C4D5E6F7A8B9C0D1E2F3 /* CategoryPickerSheet.swift */; };
 		B1C696A52BA96E7920BCFA7A /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211F8CBA26112C97F2C08529 /* ChatViewModel.swift */; };
 		B22C3D4E5F6A7B8C9D0E1F2A /* SecurityDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB2C3D4E5F6A7B8C9D0E1F2A /* SecurityDashboardView.swift */; };
@@ -180,10 +182,23 @@
 		09AC0052B3FC6E6A78BC8D94 /* NewProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */; };
 		1792CBDFC18CC63A1A79C1D8 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */; };
 		8B9C0D1E2F3A4B5C6D7E8F0A /* QuoteAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7A8B9C0D1E2F3A4B5C6D7E8F /* QuoteAnalysisView.swift */; };
-		677840DC4B5E9480C17D8B92 /* EditLineItemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 05E02CA16C2CF788621F3866 /* EditLineItemView.swift */; };
 		85FA7718FBD50912F4C696FF /* ProjectsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FBB06D60A12902AE54892E9 /* ProjectsViewModel.swift */; };
 		36CD76C541EED3DBDAFC50EA /* ProjectTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52F4D32D60C3662D57FA6C10 /* ProjectTypes.swift */; };
-		C3D4E5F6A7B8C9D0E1F20314 /* ProjectResearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */; };
+		415C203F6F461356670CC327 /* AppliancesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B0B798E1D1F4EA11144560A /* AppliancesListView.swift */; };
+		6FFB0EE26A497F67CB2650CA /* EditProjectSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1840BB8B3A90CA1562E7EC6 /* EditProjectSheet.swift */; };
+		13F4335671F4EC4543A2F8D8 /* ProjectEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7B97B7C1E699F3E1977B5BE /* ProjectEmailView.swift */; };
+		A035F710575B6A7F85D903E6 /* QuoteComparisonView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7DCF9C0778CFDC65BEC3CDEF /* QuoteComparisonView.swift */; };
+		BAC570986777CA84214BDD51 /* QuoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC56AC7E4C54A244C52E3799 /* QuoteDetailView.swift */; };
+		FE211378C8FD36D5E8FEAE19 /* QuoteUploadEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA91E36E628DF25E9A5BCE5 /* QuoteUploadEntryView.swift */; };
+		67823D9FA876742EA7C9281C /* SystemGroupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D60D112D3CF102409AD59E8 /* SystemGroupListView.swift */; };
+		0F00BE13F2480C0E1FA843C8 /* SystemGroup.swift in Sources */ = {isa = PBXBuildFile; fileRef = E0D072B2B17FF9352B38A489 /* SystemGroup.swift */; };
+		673831AA5EDF7D9E64FB1CF5 /* OnboardingScheduleGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C39D1796932628A21EFC85 /* OnboardingScheduleGenerator.swift */; };
+		DB64C3B53B7F6F4F1964FA74 /* AddressHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AEC2110D9864EC73EE99A5F /* AddressHookView.swift */; };
+		A02E14FC5C185DE1C0CF41C7 /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69E65ABDFB818ED18F1A4D45 /* OnboardingAddressStep.swift */; };
+		853B64134A91E8EA4B06E56A /* OnboardingSchedulePreviewStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9264A07530D1834DBA80A75A /* OnboardingSchedulePreviewStep.swift */; };
+		0775CE70775F510190F41614 /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9D4B6DF1B214F064C51D57C8 /* InboxView.swift */; };
+		C2D76E51B6172394ECF8D913 /* InboxItemCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 89BDC6054DF90DAB60B77387 /* InboxItemCard.swift */; };
+		0FFD878C53D17764B1FA821E /* InboxItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EBD334B1C0F863A8B01BA886 /* InboxItemDetailView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -294,6 +309,8 @@
 		B1A2C3D4E5F6789012345603 /* FamilyMembersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMembersView.swift; sourceTree = "<group>"; };
 		CDC97EE041944D1BB2ECF3E2 /* HouseholdAccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdAccessView.swift; sourceTree = "<group>"; };
 		B1A2C3D4E5F6789012345605 /* FamilyMemberFormView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberFormView.swift; sourceTree = "<group>"; };
+		F4A5B6C7D8E9F0A1B2C3D4E5 /* FamilyInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyInboxView.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F6A7B8C9D0E1F1 /* FamilyItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyItemDetailView.swift; sourceTree = "<group>"; };
 		B1B8119785871802AF221E00 /* ScenarioDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDefinitions.swift; sourceTree = "<group>"; };
 		B1FD9EA967FA80EC697174F4 /* String+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "String+Extensions.swift"; sourceTree = "<group>"; };
 		B2C817E777D24E732912FBCA /* ScreenshotPrevention.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenshotPrevention.swift; sourceTree = "<group>"; };
@@ -361,10 +378,23 @@
 		D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewProjectView.swift; sourceTree = "<group>"; };
 		44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectDetailView.swift; sourceTree = "<group>"; };
 		7A8B9C0D1E2F3A4B5C6D7E8F /* QuoteAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteAnalysisView.swift; sourceTree = "<group>"; };
-		05E02CA16C2CF788621F3866 /* EditLineItemView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditLineItemView.swift; sourceTree = "<group>"; };
 		8FBB06D60A12902AE54892E9 /* ProjectsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectsViewModel.swift; sourceTree = "<group>"; };
 		52F4D32D60C3662D57FA6C10 /* ProjectTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTypes.swift; sourceTree = "<group>"; };
-		F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectResearchService.swift; sourceTree = "<group>"; };
+		6B0B798E1D1F4EA11144560A /* AppliancesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppliancesListView.swift; sourceTree = "<group>"; };
+		F1840BB8B3A90CA1562E7EC6 /* EditProjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProjectSheet.swift; sourceTree = "<group>"; };
+		C7B97B7C1E699F3E1977B5BE /* ProjectEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectEmailView.swift; sourceTree = "<group>"; };
+		7DCF9C0778CFDC65BEC3CDEF /* QuoteComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteComparisonView.swift; sourceTree = "<group>"; };
+		FC56AC7E4C54A244C52E3799 /* QuoteDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteDetailView.swift; sourceTree = "<group>"; };
+		EFA91E36E628DF25E9A5BCE5 /* QuoteUploadEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteUploadEntryView.swift; sourceTree = "<group>"; };
+		8D60D112D3CF102409AD59E8 /* SystemGroupListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemGroupListView.swift; sourceTree = "<group>"; };
+		E0D072B2B17FF9352B38A489 /* SystemGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemGroup.swift; sourceTree = "<group>"; };
+		F6C39D1796932628A21EFC85 /* OnboardingScheduleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScheduleGenerator.swift; sourceTree = "<group>"; };
+		7AEC2110D9864EC73EE99A5F /* AddressHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressHookView.swift; sourceTree = "<group>"; };
+		69E65ABDFB818ED18F1A4D45 /* OnboardingAddressStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingAddressStep.swift; sourceTree = "<group>"; };
+		9264A07530D1834DBA80A75A /* OnboardingSchedulePreviewStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingSchedulePreviewStep.swift; sourceTree = "<group>"; };
+		9D4B6DF1B214F064C51D57C8 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		89BDC6054DF90DAB60B77387 /* InboxItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemCard.swift; sourceTree = "<group>"; };
+		EBD334B1C0F863A8B01BA886 /* InboxItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemDetailView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -382,6 +412,9 @@
 		03E1FCA464AFCC1AF30FE480 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
+				7AEC2110D9864EC73EE99A5F /* AddressHookView.swift */,
+				69E65ABDFB818ED18F1A4D45 /* OnboardingAddressStep.swift */,
+				9264A07530D1834DBA80A75A /* OnboardingSchedulePreviewStep.swift */,
 				0D0451B033C02044D1EDA105 /* OnboardingSteps.swift */,
 				74FA247DDBF39F4193808F43 /* OnboardingView.swift */,
 				BFA4AB80D1956BBD146735AE /* OnboardingViewModel.swift */,
@@ -456,9 +489,9 @@
 		3DF84B25A57E4C0D8D8B63E2 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				F6C39D1796932628A21EFC85 /* OnboardingScheduleGenerator.swift */,
 				483098FC70EB489F89E2222E /* DefaultSystemsService.swift */,
 				B0C1D2E3F4A5B6C7D8E9F0A1 /* MaintenanceTemplates.swift */,
-				F1A2B3C4D5E6F7081920A1B2 /* ProjectResearchService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -579,9 +612,20 @@
 			path = Haven;
 			sourceTree = "<group>";
 		};
+		F4A5B6C7D8E9F0A1B2C3D4E7 /* Family */ = {
+			isa = PBXGroup;
+			children = (
+				F4A5B6C7D8E9F0A1B2C3D4E5 /* FamilyInboxView.swift */,
+				A1B2C3D4E5F6A7B8C9D0E1F1 /* FamilyItemDetailView.swift */,
+			);
+			path = Family;
+			sourceTree = "<group>";
+		};
 		75DB48E7FC25FB21463CA096 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				F4A5B6C7D8E9F0A1B2C3D4E7 /* Family */,
+				30480081C467E7AE2804E32C /* Inbox */,
 				09ECDBA0F53599B6648C4B01 /* Chat */,
 				711A3CFAA5B02F560EB98C9F /* Dashboard */,
 				AF470D2E6B351A405376A00E /* Documents */,
@@ -729,6 +773,13 @@
 		D05928A670D1180C65F19C7F /* Views */ = {
 			isa = PBXGroup;
 			children = (
+				6B0B798E1D1F4EA11144560A /* AppliancesListView.swift */,
+				F1840BB8B3A90CA1562E7EC6 /* EditProjectSheet.swift */,
+				C7B97B7C1E699F3E1977B5BE /* ProjectEmailView.swift */,
+				7DCF9C0778CFDC65BEC3CDEF /* QuoteComparisonView.swift */,
+				FC56AC7E4C54A244C52E3799 /* QuoteDetailView.swift */,
+				EFA91E36E628DF25E9A5BCE5 /* QuoteUploadEntryView.swift */,
+				8D60D112D3CF102409AD59E8 /* SystemGroupListView.swift */,
 				AA75F65A0C6C18B18A914E1A /* AddPropertyView.swift */,
 				D1E2F3A4B5C6D7E8F9A0B1C3 /* HomeSystemsSetupView.swift */,
 				F58EF9C9FB14640084B3DC45 /* AddSystemView.swift */,
@@ -754,7 +805,6 @@
 				D00A9C004B83CBFCCCF0F258 /* NewProjectView.swift */,
 				44A1F277E762C7BF403EBBA8 /* ProjectDetailView.swift */,
 				7A8B9C0D1E2F3A4B5C6D7E8F /* QuoteAnalysisView.swift */,
-				05E02CA16C2CF788621F3866 /* EditLineItemView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -833,6 +883,7 @@
 		F33AF97CD7A75CE057F60795 /* Models */ = {
 			isa = PBXGroup;
 			children = (
+				E0D072B2B17FF9352B38A489 /* SystemGroup.swift */,
 				CBEB808723C90E545D5F2F65 /* Contractor.swift */,
 				03D64EAE4435181BE7303600 /* HomeSystem.swift */,
 				A989A9100FAC81E52C371763 /* MaintenanceTask.swift */,
@@ -888,6 +939,16 @@
 				216CE36DEDB939EEC1D458C2 /* AppConfig.swift */,
 			);
 			path = Config;
+			sourceTree = "<group>";
+		};
+		30480081C467E7AE2804E32C /* Inbox */ = {
+			isa = PBXGroup;
+			children = (
+				9D4B6DF1B214F064C51D57C8 /* InboxView.swift */,
+				89BDC6054DF90DAB60B77387 /* InboxItemCard.swift */,
+				EBD334B1C0F863A8B01BA886 /* InboxItemDetailView.swift */,
+			);
+			path = Inbox;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -965,6 +1026,21 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				415C203F6F461356670CC327 /* AppliancesListView.swift in Sources */,
+				6FFB0EE26A497F67CB2650CA /* EditProjectSheet.swift in Sources */,
+				13F4335671F4EC4543A2F8D8 /* ProjectEmailView.swift in Sources */,
+				A035F710575B6A7F85D903E6 /* QuoteComparisonView.swift in Sources */,
+				BAC570986777CA84214BDD51 /* QuoteDetailView.swift in Sources */,
+				FE211378C8FD36D5E8FEAE19 /* QuoteUploadEntryView.swift in Sources */,
+				67823D9FA876742EA7C9281C /* SystemGroupListView.swift in Sources */,
+				0F00BE13F2480C0E1FA843C8 /* SystemGroup.swift in Sources */,
+				673831AA5EDF7D9E64FB1CF5 /* OnboardingScheduleGenerator.swift in Sources */,
+				DB64C3B53B7F6F4F1964FA74 /* AddressHookView.swift in Sources */,
+				A02E14FC5C185DE1C0CF41C7 /* OnboardingAddressStep.swift in Sources */,
+				853B64134A91E8EA4B06E56A /* OnboardingSchedulePreviewStep.swift in Sources */,
+				0775CE70775F510190F41614 /* InboxView.swift in Sources */,
+				C2D76E51B6172394ECF8D913 /* InboxItemCard.swift in Sources */,
+				0FFD878C53D17764B1FA821E /* InboxItemDetailView.swift in Sources */,
 				C05BFF1A06A535C280008996 /* APIClient.swift in Sources */,
 				F66A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift in Sources */,
 				4DBA962B7D67B40ACA1DF825 /* AddPropertyView.swift in Sources */,
@@ -1132,14 +1208,14 @@
 				B1A2C3D4E5F6789012345604 /* FamilyMembersView.swift in Sources */,
 				152F97CC67274C27BB83106B /* HouseholdAccessView.swift in Sources */,
 				B1A2C3D4E5F6789012345606 /* FamilyMemberFormView.swift in Sources */,
+				F4A5B6C7D8E9F0A1B2C3D4E6 /* FamilyInboxView.swift in Sources */,
+				B7E8F9A0B1C2D3E4F5A6B7C9 /* FamilyItemDetailView.swift in Sources */,
 				CD747E62AC4C033CF27E632B /* PropertyProjectsView.swift in Sources */,
 				09AC0052B3FC6E6A78BC8D94 /* NewProjectView.swift in Sources */,
 				1792CBDFC18CC63A1A79C1D8 /* ProjectDetailView.swift in Sources */,
 				8B9C0D1E2F3A4B5C6D7E8F0A /* QuoteAnalysisView.swift in Sources */,
-				677840DC4B5E9480C17D8B92 /* EditLineItemView.swift in Sources */,
 				85FA7718FBD50912F4C696FF /* ProjectsViewModel.swift in Sources */,
 				36CD76C541EED3DBDAFC50EA /* ProjectTypes.swift in Sources */,
-				C3D4E5F6A7B8C9D0E1F20314 /* ProjectResearchService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

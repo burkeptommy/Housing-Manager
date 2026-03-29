@@ -51,6 +51,30 @@ final class DocumentEncryption {
         }
     }
 
+    /// Export the household encryption key as base64 string (for sharing with Edge Functions).
+    func keyBase64(for householdId: UUID) -> String {
+        let symmetricKey = key(for: householdId)
+        return symmetricKey.withUnsafeBytes { Data($0).base64EncodedString() }
+    }
+
+    /// Decrypt a base64-encoded AES-256-GCM string (IV + ciphertext combined).
+    /// Used for chat messages encrypted by the Edge Function.
+    /// Returns the original string, or the input as-is if it's not encrypted (backwards compat).
+    func decryptString(_ base64String: String, householdId: UUID) -> String {
+        guard let combined = Data(base64Encoded: base64String) else {
+            return base64String // Not base64 — treat as plaintext
+        }
+        do {
+            let encryptionKey = key(for: householdId)
+            let sealedBox = try AES.GCM.SealedBox(combined: combined)
+            let decrypted = try AES.GCM.open(sealedBox, using: encryptionKey)
+            return String(data: decrypted, encoding: .utf8) ?? base64String
+        } catch {
+            // Not encrypted or wrong key — return as-is (backwards compat with old plaintext messages)
+            return base64String
+        }
+    }
+
     enum EncryptionError: LocalizedError {
         case encryptionFailed
         case decryptionFailed

@@ -1,10 +1,15 @@
 import SwiftUI
 
 struct LoginView: View {
+    enum InitialMode { case signIn, signUp }
+
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AuthViewModel()
     @StateObject private var appleSignIn = AppleSignInCoordinator()
     @State private var showBiometricPrompt = false
+
+    /// Whether to show sign-up immediately when this view appears.
+    var initialMode: InitialMode = .signIn
 
     var body: some View {
         NavigationStack {
@@ -136,6 +141,11 @@ struct LoginView: View {
                 .padding(.horizontal, HavenTheme.padding)
             }
             .trackScreen("LoginView")
+            .onAppear {
+                if initialMode == .signUp && !viewModel.showSignUp {
+                    viewModel.showSignUp = true
+                }
+            }
             .navigationDestination(isPresented: $viewModel.showSignUp) {
                 SignUpView()
                     .environmentObject(appState)

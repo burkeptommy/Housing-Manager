@@ -13,34 +13,60 @@ struct DocumentVaultView: View {
     @State private var showExpiring = false
     @State private var navigationPath = NavigationPath()
     @State private var selectedMemberId: UUID?
+    @State private var lifeTab: LifeTab = .documents
+
+    enum LifeTab: String, CaseIterable {
+        case documents = "Documents"
+        case family = "Family"
+    }
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
-            ScrollView {
-                screenTitle("Life")
-                    .padding(.horizontal, HavenTheme.spacing16)
-                    .padding(.top, HavenTheme.spacing4)
+            VStack(spacing: 0) {
+                // Fixed header: title + tab picker
+                VStack(spacing: 0) {
+                    screenTitle("Life")
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.top, HavenTheme.spacing4)
 
-                // Family member scroller
-                if !viewModel.familyMembers.isEmpty {
-                    familyMemberScroller
-                        .padding(.top, HavenTheme.spacing8)
-                        .padding(.bottom, HavenTheme.spacing4)
-                }
-
-                if viewModel.isLoading && viewModel.documents.isEmpty {
-                    VStack(spacing: HavenTheme.spacing16) {
-                        SkeletonCard()
-                        SkeletonScorecard()
-                        SkeletonCard(lineCount: 4)
+                    Picker("Section", selection: $lifeTab) {
+                        ForEach(LifeTab.allCases, id: \.self) { tab in
+                            Text(tab.rawValue).tag(tab)
+                        }
                     }
-                    .padding()
-                } else if viewModel.documents.isEmpty && viewModel.searchText.isEmpty {
-                    emptyVaultContent
-                } else {
-                    documentListContent
+                    .pickerStyle(.segmented)
+                    .padding(.horizontal, HavenTheme.pageMargin)
+                    .padding(.vertical, HavenTheme.spacing8)
                 }
-            }
+
+                if lifeTab == .family {
+                    // Family tab — NOT inside ScrollView (it has its own List)
+                    FamilyInboxView()
+                } else {
+                    // Documents tab — inside ScrollView
+                    ScrollView {
+                        // Family member scroller
+                        if !viewModel.familyMembers.isEmpty {
+                            familyMemberScroller
+                                .padding(.top, HavenTheme.spacing8)
+                                .padding(.bottom, HavenTheme.spacing4)
+                        }
+
+                        if viewModel.isLoading && viewModel.documents.isEmpty {
+                            VStack(spacing: HavenTheme.spacing16) {
+                                SkeletonCard()
+                                SkeletonScorecard()
+                                SkeletonCard(lineCount: 4)
+                            }
+                            .padding()
+                        } else if viewModel.documents.isEmpty && viewModel.searchText.isEmpty {
+                            emptyVaultContent
+                        } else {
+                            documentListContent
+                        }
+                    }
+                }
+            } // end VStack
             .background(HavenColors.background)
             .navigationTitle("Life")
             .navigationBarTitleDisplayMode(.inline)

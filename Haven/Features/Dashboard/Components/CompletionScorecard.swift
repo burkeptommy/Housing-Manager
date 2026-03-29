@@ -7,7 +7,13 @@ struct CompletionScorecard: View {
     @State private var hasAppeared = false
 
     private var level: DocumentVaultViewModel.ReadinessLevel { vaultViewModel.currentLevel }
-    private var levelColor: Color { level.color.color }
+    // Ensure the level icon is visible on the navy background
+    private var levelColor: Color {
+        let color = level.color.color
+        // If the level color is navy (Starter), use cream so it's visible on the navy card
+        if level.id == 1 { return HavenColors.beige300 }
+        return color
+    }
 
     var body: some View {
         VStack(spacing: HavenTheme.spacing16) {
@@ -74,19 +80,19 @@ struct CompletionScorecard: View {
         .background(
             ZStack {
                 HavenColors.navy
-                Circle()
-                    .fill(HavenColors.creamWhite.opacity(0.06))
-                    .frame(width: 120, height: 120)
-                    .offset(x: 50, y: -40)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                // Shield silhouette — branded estate/protection motif
+                Image(systemName: "shield.fill")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 140, height: 140)
+                    .foregroundStyle(HavenColors.creamWhite.opacity(0.08))
+                    .offset(x: 40, y: 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
             }
         )
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-        .accessibilityElement()
+        .contentShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         .accessibilityLabel("\(level.name), \(Int(vaultViewModel.levelProgress * 100)) percent to next level")
-        .simultaneousGesture(TapGesture().onEnded {
-            Analytics.track(.dashboardReadinessTapped, ["level": level.name, "progress": Int(vaultViewModel.levelProgress * 100)])
-        })
         .onAppear {
             guard !hasAppeared else { return }
             hasAppeared = true

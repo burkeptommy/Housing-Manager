@@ -3,6 +3,7 @@ import SwiftUI
 extension Notification.Name {
     static let switchToTab = Notification.Name("switchToTab")
     static let openScenarioStudio = Notification.Name("openScenarioStudio")
+    static let openAlfredWithContext = Notification.Name("openAlfredWithContext")
     static let popToRoot = Notification.Name("popToRoot")
 }
 
@@ -91,6 +92,10 @@ struct MainTabView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
             isKeyboardVisible = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .openAlfredWithContext)) { notification in
+            // Switch to Alfred tab when "Ask Alfred about this project" is tapped
+            selectedTab = 3
         }
         .onReceive(NotificationCenter.default.publisher(for: .openScenarioStudio)) { notification in
             if let query = notification.userInfo?["query"] as? String {

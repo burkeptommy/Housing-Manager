@@ -1098,6 +1098,403 @@ final class DatabaseService {
             .value
     }
 
+    // MARK: - Inbox Items (from forwarded emails)
+
+    struct InboxItemRow: Decodable, Identifiable {
+        let id: UUID
+        let householdId: UUID
+        let type: String
+        let title: String
+        let summary: String?
+        let fromEmail: String?
+        let relatedProjectId: UUID?
+        let relatedDocumentId: UUID?
+        let relatedContractorId: UUID?
+        let seen: Bool
+        let needsAction: Bool?
+        let actionType: String?
+        let actionCompleted: Bool?
+        let attachmentPath: String?
+        let attachmentContentType: String?
+        let attachmentFilename: String?
+        let status: String?  // "processing" or "ready"
+        let familyCategory: String?
+        let familyMemberName: String?
+        let eventDate: Date?
+        let taggedMemberIds: [UUID]?
+        let metadata: InboxMetadata?
+        let createdAt: Date?
+
+        /// True if still processing AND less than 5 minutes old (stale items show as complete)
+        var isProcessing: Bool {
+            guard status == "processing" else { return false }
+            guard let created = createdAt else { return false }
+            return Date().timeIntervalSince(created) < 300 // 5 minutes
+        }
+
+        enum CodingKeys: String, CodingKey {
+            case id, type, title, summary, seen, status
+            case householdId = "household_id"
+            case fromEmail = "from_email"
+            case relatedProjectId = "related_project_id"
+            case relatedDocumentId = "related_document_id"
+            case relatedContractorId = "related_contractor_id"
+            case needsAction = "needs_action"
+            case actionType = "action_type"
+            case actionCompleted = "action_completed"
+            case attachmentPath = "attachment_path"
+            case attachmentContentType = "attachment_content_type"
+            case attachmentFilename = "attachment_filename"
+            case familyCategory = "family_category"
+            case familyMemberName = "family_member_name"
+            case eventDate = "event_date"
+            case taggedMemberIds = "tagged_member_ids"
+            case metadata
+            case createdAt = "created_at"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            // Required fields — these must exist or the row is invalid
+            id = try c.decode(UUID.self, forKey: .id)
+            householdId = try c.decode(UUID.self, forKey: .householdId)
+            type = try c.decode(String.self, forKey: .type)
+            title = try c.decode(String.self, forKey: .title)
+            // Optional fields — use try? so one bad field doesn't kill the row
+            summary = try? c.decodeIfPresent(String.self, forKey: .summary)
+            fromEmail = try? c.decodeIfPresent(String.self, forKey: .fromEmail)
+            relatedProjectId = try? c.decodeIfPresent(UUID.self, forKey: .relatedProjectId)
+            relatedDocumentId = try? c.decodeIfPresent(UUID.self, forKey: .relatedDocumentId)
+            relatedContractorId = try? c.decodeIfPresent(UUID.self, forKey: .relatedContractorId)
+            seen = (try? c.decodeIfPresent(Bool.self, forKey: .seen)) ?? false
+            needsAction = try? c.decodeIfPresent(Bool.self, forKey: .needsAction)
+            actionType = try? c.decodeIfPresent(String.self, forKey: .actionType)
+            actionCompleted = try? c.decodeIfPresent(Bool.self, forKey: .actionCompleted)
+            attachmentPath = try? c.decodeIfPresent(String.self, forKey: .attachmentPath)
+            attachmentContentType = try? c.decodeIfPresent(String.self, forKey: .attachmentContentType)
+            attachmentFilename = try? c.decodeIfPresent(String.self, forKey: .attachmentFilename)
+            status = try? c.decodeIfPresent(String.self, forKey: .status)
+            familyCategory = try? c.decodeIfPresent(String.self, forKey: .familyCategory)
+            familyMemberName = try? c.decodeIfPresent(String.self, forKey: .familyMemberName)
+            eventDate = try? c.decodeIfPresent(Date.self, forKey: .eventDate)
+            taggedMemberIds = try? c.decodeIfPresent([UUID].self, forKey: .taggedMemberIds)
+            metadata = try? c.decodeIfPresent(InboxMetadata.self, forKey: .metadata)
+            createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        }
+
+        /// Whether this item requires user input before processing can complete
+        var isPending: Bool {
+            (needsAction ?? false) && !(actionCompleted ?? false)
+        }
+
+        /// Icon name for the item type
+        var iconName: String {
+            if isProcessing { return "arrow.trianglehead.2.clockwise" }
+            switch type {
+            case "project_created": return "hammer.fill"
+            case "document_stored": return "doc.fill"
+            case "vendor_added": return "person.crop.circle.badge.plus"
+            case "contractor_quote": return "doc.text.magnifyingglass"
+            case "family": return "person.2.fill"
+            default: return "envelope.fill"
+            }
+        }
+
+        /// Color for the item status
+        var statusColor: String {
+            if isProcessing { return "navy" }
+            if isPending { return "warning" }
+            if type == "project_created" || type == "document_stored" || type == "vendor_added" { return "success" }
+            return "secondary"
+        }
+
+        /// Raw email body from metadata (stored by receive-email)
+        var rawEmailBody: String? { metadata?.emailBody }
+
+        /// Email subject from metadata
+        var emailSubject: String? { metadata?.subject }
+    }
+
+    /// Metadata JSONB stored on inbox items by the receive-email edge function
+    struct InboxMetadata: Decodable {
+        let emailBody: String?
+        let subject: String?
+        let emailHash: String?
+
+        enum CodingKeys: String, CodingKey {
+            case subject
+            case emailBody = "email_body"
+            case emailHash = "email_hash"
+        }
+
+        init(from decoder: Decoder) throws {
+            let c = try decoder.container(keyedBy: CodingKeys.self)
+            emailBody = try? c.decodeIfPresent(String.self, forKey: .emailBody)
+            subject = try? c.decodeIfPresent(String.self, forKey: .subject)
+            emailHash = try? c.decodeIfPresent(String.self, forKey: .emailHash)
+        }
+    }
+
+    func fetchUnseenInboxItems() async throws -> [InboxItemRow] {
+        try await from("inbox_items")
+            .select()
+            .eq("seen", value: false)
+            .order("created_at", ascending: false)
+            .limit(10)
+            .execute()
+            .value
+    }
+
+    func fetchAllInboxItems() async throws -> [InboxItemRow] {
+        try await from("inbox_items")
+            .select()
+            .order("created_at", ascending: false)
+            .limit(100)
+            .execute()
+            .value
+    }
+
+    func fetchPendingInboxItems() async throws -> [InboxItemRow] {
+        try await from("inbox_items")
+            .select()
+            .eq("needs_action", value: true)
+            .eq("action_completed", value: false)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func markInboxItemsSeen(ids: [UUID]) async throws {
+        for id in ids {
+            try await from("inbox_items")
+                .update(["seen": true])
+                .eq("id", value: id.uuidString)
+                .execute()
+        }
+    }
+
+    func deleteInboxItem(id: UUID) async throws {
+        try await from("inbox_items")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func updateInboxItemEventDate(id: UUID, eventDate: Date?) async throws {
+        struct Update: Encodable {
+            let eventDate: Date?
+            enum CodingKeys: String, CodingKey { case eventDate = "event_date" }
+        }
+        try await from("inbox_items")
+            .update(Update(eventDate: eventDate))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func updateInboxItemTags(id: UUID, memberIds: [UUID]) async throws {
+        struct Update: Encodable {
+            let taggedMemberIds: [UUID]
+            enum CodingKeys: String, CodingKey { case taggedMemberIds = "tagged_member_ids" }
+        }
+        try await from("inbox_items")
+            .update(Update(taggedMemberIds: memberIds))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func insertFamilyInboxItem<T: Encodable>(_ item: T) async throws {
+        try await from("inbox_items")
+            .insert(item)
+            .execute()
+    }
+
+    func fetchFamilyInboxItems() async throws -> [InboxItemRow] {
+        // Fetch all inbox items and filter client-side for "family" type
+        // (avoids any potential server-side filter issues)
+        let all: [InboxItemRow] = try await from("inbox_items")
+            .select()
+            .order("created_at", ascending: false)
+            .limit(500)
+            .execute()
+            .value
+        print("[DB] fetchFamilyInboxItems: total=\(all.count), family=\(all.filter { $0.type == "family" }.count), types=\(Set(all.map { $0.type }))")
+        return all.filter { $0.type == "family" }
+    }
+
+    // MARK: - Household Email Address
+
+    func fetchHouseholdEmailAddress() async throws -> String? {
+        struct EmailRow: Decodable {
+            let uniqueAddress: String
+            enum CodingKeys: String, CodingKey {
+                case uniqueAddress = "unique_address"
+            }
+        }
+        let rows: [EmailRow] = try await from("household_email_addresses")
+            .select("unique_address")
+            .limit(1)
+            .execute()
+            .value
+        return rows.first?.uniqueAddress
+    }
+
+    func generateHouseholdEmailAddress() async throws -> String {
+        // Get the current user's household
+        let user = try await fetchCurrentUser()
+        guard let householdId = user.householdId else {
+            throw NSError(domain: "Haven", code: 0, userInfo: [NSLocalizedDescriptionKey: "No household found"])
+        }
+
+        // Get the household name to generate a readable email
+        struct HouseholdRow: Decodable { let name: String? }
+        let households: [HouseholdRow] = try await from("households")
+            .select("name")
+            .eq("id", value: householdId.uuidString)
+            .limit(1)
+            .execute()
+            .value
+
+        // Extract last name: "The Burke Family" -> "burke"
+        var baseName = households.first?.name ?? ""
+        baseName = baseName
+            .replacingOccurrences(of: "The ", with: "")
+            .replacingOccurrences(of: " Family", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+            .filter { $0.isLetter || $0.isNumber }
+
+        if baseName.isEmpty {
+            baseName = String(householdId.uuidString.prefix(8)).lowercased()
+        }
+
+        // Get street number from primary property for collision resolution
+        // e.g. "146 Oak Street" -> "146"
+        struct PropertyStreet: Decodable { let street: String? }
+        let properties: [PropertyStreet] = (try? await from("properties")
+            .select("street")
+            .eq("household_id", value: householdId.uuidString)
+            .limit(1)
+            .execute()
+            .value) ?? []
+
+        let streetNumber: String? = {
+            guard let street = properties.first?.street else { return nil }
+            // Extract leading digits: "146 Oak Street" -> "146"
+            let digits = String(street.prefix(while: { $0.isNumber }))
+            return digits.isEmpty ? nil : digits
+        }()
+
+        struct EmailInsert: Encodable {
+            let householdId: UUID
+            let uniqueAddress: String
+            enum CodingKeys: String, CodingKey {
+                case householdId = "household_id"
+                case uniqueAddress = "unique_address"
+            }
+        }
+
+        struct EmailRow: Decodable {
+            let uniqueAddress: String
+            enum CodingKeys: String, CodingKey {
+                case uniqueAddress = "unique_address"
+            }
+        }
+
+        // Build candidate addresses in priority order:
+        // 1. burke@alfred.havenhome.dev
+        // 2. 146burke@alfred.havenhome.dev (street number + last name)
+        // 3. burke-<short uuid>@alfred.havenhome.dev (failsafe)
+        var candidates: [String] = [
+            "\(baseName)@alfred.havenhome.dev"
+        ]
+
+        if let num = streetNumber {
+            candidates.append("\(num)\(baseName)@alfred.havenhome.dev")
+        }
+
+        // Failsafe: append short unique suffixes
+        for i in 1...5 {
+            let shortId = String(UUID().uuidString.prefix(4)).lowercased()
+            // Use street number variants first, then random
+            if let num = streetNumber, i <= 2 {
+                candidates.append("\(num)\(baseName)\(i)@alfred.havenhome.dev")
+            } else {
+                candidates.append("\(baseName)-\(shortId)@alfred.havenhome.dev")
+            }
+        }
+
+        // Try each candidate until one succeeds
+        for candidate in candidates {
+            do {
+                let result: EmailRow = try await from("household_email_addresses")
+                    .insert(EmailInsert(householdId: householdId, uniqueAddress: candidate))
+                    .select("unique_address")
+                    .single()
+                    .execute()
+                    .value
+                return result.uniqueAddress
+            } catch {
+                // Collision — try next candidate
+                continue
+            }
+        }
+
+        throw NSError(domain: "Haven", code: 0, userInfo: [NSLocalizedDescriptionKey: "Could not generate a unique email address"])
+    }
+
+    // MARK: - Allowed Senders (Email Whitelist)
+
+    struct AllowedSenderRow: Codable, Identifiable {
+        let id: UUID
+        let householdId: UUID
+        let email: String
+        let label: String?
+        let isAutoAdded: Bool?
+        let createdAt: Date?
+
+        enum CodingKeys: String, CodingKey {
+            case id, email, label
+            case householdId = "household_id"
+            case isAutoAdded = "is_auto_added"
+            case createdAt = "created_at"
+        }
+    }
+
+    func fetchAllowedSenders() async throws -> [AllowedSenderRow] {
+        try await from("household_allowed_senders")
+            .select()
+            .order("created_at")
+            .execute()
+            .value
+    }
+
+    func addAllowedSender(householdId: UUID, email: String, label: String?) async throws -> AllowedSenderRow {
+        struct Insert: Codable {
+            let householdId: UUID
+            let email: String
+            let label: String?
+            enum CodingKeys: String, CodingKey {
+                case email, label
+                case householdId = "household_id"
+            }
+        }
+        return try await from("household_allowed_senders")
+            .insert(Insert(householdId: householdId, email: email.lowercased().trimmingCharacters(in: .whitespaces), label: label))
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func deleteAllowedSender(id: UUID) async throws {
+        try await from("household_allowed_senders")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Projects
+
     func createProject(_ project: PropertyProjectInsert) async throws -> PropertyProjectRow {
         try await from("property_projects")
             .insert(project)
@@ -1126,69 +1523,67 @@ final class DatabaseService {
 
     // MARK: - Project Line Items
 
-    func fetchLineItems(projectId: UUID) async throws -> [ProjectLineItemRow] {
-        try await from("project_line_items")
+    // MARK: - Project Quotes
+
+    func createProjectQuote(_ quote: ProjectQuoteInsert) async throws -> ProjectQuoteRow {
+        try await from("project_quotes")
+            .insert(quote)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func fetchProjectQuotes(projectId: UUID) async throws -> [ProjectQuoteRow] {
+        try await from("project_quotes")
+            .select()
+            .eq("project_id", value: projectId)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func deleteProjectQuote(id: UUID) async throws {
+        try await from("project_quotes")
+            .delete()
+            .eq("id", value: id)
+            .execute()
+    }
+
+    /// Find an existing contractor by name (case-insensitive) to avoid duplicates
+    func findContractorByName(householdId: UUID, name: String) async throws -> ContractorRow? {
+        let results: [ContractorRow] = try await from("contractors")
+            .select()
+            .eq("household_id", value: householdId)
+            .ilike("company_name", pattern: "%\(name)%")
+            .limit(1)
+            .execute()
+            .value
+        return results.first
+    }
+
+    // MARK: - Project Files
+
+    func fetchProjectFiles(projectId: UUID) async throws -> [ProjectFileRow] {
+        try await from("project_files")
             .select()
             .eq("project_id", value: projectId.uuidString)
-            .order("sort_order")
+            .order("created_at", ascending: false)
             .execute()
             .value
     }
 
-    func createLineItem(_ item: ProjectLineItemInsert) async throws -> ProjectLineItemRow {
-        try await from("project_line_items")
-            .insert(item)
+    func createProjectFile(_ file: ProjectFileInsert) async throws -> ProjectFileRow {
+        try await from("project_files")
+            .insert(file)
             .select()
             .single()
             .execute()
             .value
     }
 
-    func createLineItems(_ items: [ProjectLineItemInsert]) async throws {
-        try await from("project_line_items")
-            .insert(items)
-            .execute()
-    }
-
-    func updateLineItem(id: UUID, _ updates: ProjectLineItemUpdate) async throws -> ProjectLineItemRow {
-        try await from("project_line_items")
-            .update(updates)
-            .eq("id", value: id.uuidString)
-            .select()
-            .single()
-            .execute()
-            .value
-    }
-
-    func deleteLineItem(id: UUID) async throws {
-        try await from("project_line_items")
-            .delete()
-            .eq("id", value: id.uuidString)
-            .execute()
-    }
-
-    // MARK: - Household Toolkit
-
-    func fetchToolkit(householdId: UUID) async throws -> [HouseholdToolkitRow] {
-        try await from("household_toolkit")
-            .select()
-            .eq("household_id", value: householdId.uuidString)
-            .order("tool_name")
-            .execute()
-            .value
-    }
-
-    func addToToolkit(_ item: HouseholdToolkitInsert) async throws -> HouseholdToolkitRow {
-        try await from("household_toolkit")
-            .insert(item)
-            .select()
-            .single()
-            .execute()
-            .value
-    }
-
-    func removeFromToolkit(id: UUID) async throws {
-        try await from("household_toolkit")
+    func deleteProjectFile(id: UUID) async throws {
+        try await from("project_files")
             .delete()
             .eq("id", value: id.uuidString)
             .execute()

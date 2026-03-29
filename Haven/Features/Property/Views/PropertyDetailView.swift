@@ -296,7 +296,11 @@ struct PropertyDetailView: View {
                     if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
 
                 case .projects:
-                    PropertyProjectsView(propertyID: propertyID, householdId: viewModel.property?.householdId)
+                    PropertyProjectsView(
+                        propertyID: propertyID,
+                        householdId: viewModel.property?.householdId,
+                        propertyLocation: [viewModel.property?.city, viewModel.property?.state].compactMap { $0 }.joined(separator: ", ")
+                    )
 
                 case .contacts:
                     vendorsSection
@@ -713,45 +717,32 @@ struct PropertyDetailView: View {
                     .padding(.vertical, 8)
                 }
             } else {
+                let groups = SystemGroup.group(viewModel.systems)
                 let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(viewModel.systems) { system in
-                        NavigationLink {
-                            SystemDetailRowView(system: system)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 6) {
-                                HStack(spacing: 6) {
-                                    Circle()
-                                        .fill(systemStatusColor(system.status))
-                                        .frame(width: 8, height: 8)
-                                    Text(system.name)
-                                        .font(HavenTypography.uiLabel)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                        .lineLimit(1)
-                                }
-                                if let mfr = system.manufacturer {
-                                    Text(mfr)
-                                        .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textTertiary)
-                                        .lineLimit(1)
-                                }
-                                if let nextDue = system.nextServiceDue {
-                                    Text("Due: \(nextDue)")
-                                        .font(.system(size: 10))
-                                        .foregroundStyle(HavenColors.textTertiary)
-                                }
+                    ForEach(groups) { group in
+                        if group.systems.count == 1, group.id != "other" {
+                            // Single system in a group: show directly
+                            NavigationLink {
+                                SystemDetailRowView(system: group.systems[0])
+                            } label: {
+                                systemGridCard(group.systems[0])
                             }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(12)
-                            .background(HavenColors.creamLight)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .stroke(HavenColors.beige300, lineWidth: 0.5)
-                            )
+                            .buttonStyle(.plain)
+                        } else if !group.systems.isEmpty {
+                            // Multiple systems: show grouped card
+                            NavigationLink {
+                                SystemGroupListView(
+                                    group: group,
+                                    propertyId: propertyID,
+                                    householdId: viewModel.property?.householdId ?? UUID()
+                                )
+                            } label: {
+                                systemGroupCard(group)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -952,7 +943,8 @@ struct PropertyDetailView: View {
                 }
             }
 
-            if viewModel.assignedContractors.isEmpty {
+            // Show ALL household contractors (not just system-assigned)
+            if viewModel.contractors.isEmpty {
                 HavenCard {
                     VStack(spacing: 10) {
                         Image(systemName: "person.2")
@@ -993,85 +985,57 @@ struct PropertyDetailView: View {
                     .padding(.vertical, 8)
                 }
             } else {
-                ForEach(viewModel.assignedContractors, id: \.0.id) { contractor, systemNames in
-                    HavenCard {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(contractor.companyName)
-                                        .font(HavenTypography.uiLabel)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                    if let contact = contractor.contactName {
-                                        Text(contact)
-                                            .font(HavenTypography.uiCaption)
-                                            .foregroundStyle(HavenColors.textSecondary)
-                                    }
-                                }
-                                Spacer()
-                                if let rating = contractor.rating {
-                                    HStack(spacing: 2) {
-                                        Image(systemName: "star.fill")
-                                            .font(.caption2)
-                                            .foregroundStyle(HavenColors.warning)
-                                        Text("\(rating)")
-                                            .font(HavenTypography.uiCaption)
-                                            .foregroundStyle(HavenColors.textSecondary)
-                                    }
-                                }
-                            }
+                ForEach(viewModel.contractors) { contractor in
+                    NavigationLink {
+                        ContractorDetailView(contractor: contractor)
+                    } label: {
+                        contractorCardInline(contractor)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
 
-                            // Specialties
-                            if let specialties = contractor.specialties, !specialties.isEmpty {
-                                HStack(spacing: 6) {
-                                    ForEach(specialties.prefix(3), id: \.self) { specialty in
-                                        Text(specialty)
-                                            .font(.system(size: 10, weight: .medium))
-                                            .foregroundStyle(HavenColors.navy700)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 3)
-                                            .background(HavenColors.navy.opacity(0.08))
-                                            .clipShape(Capsule())
-                                    }
-                                }
-                            }
+    private func contractorCardInline(_ contractor: ContractorRow) -> some View {
+        HavenCard(padding: HavenTheme.spacing12) {
+            HStack(spacing: 10) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.title3)
+                    .foregroundStyle(HavenColors.navy)
 
-                            // Assigned systems
-                            if !systemNames.isEmpty {
-                                Text("Assigned to: \(systemNames.joined(separator: ", "))")
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
-
-                            // Quick actions
-                            HStack(spacing: 16) {
-                                if let url = sanitizedPhoneURL(contractor.phone) {
-                                    Link(destination: url) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "phone.fill")
-                                                .font(.caption2)
-                                            Text("Call")
-                                                .font(HavenTypography.uiCaption)
-                                        }
-                                        .foregroundStyle(HavenColors.navy700)
-                                    }
-                                }
-
-                                if let email = contractor.email,
-                                   let url = sanitizedEmailURL(email) {
-                                    Link(destination: url) {
-                                        HStack(spacing: 4) {
-                                            Image(systemName: "envelope.fill")
-                                                .font(.caption2)
-                                            Text("Email")
-                                                .font(HavenTypography.uiCaption)
-                                        }
-                                        .foregroundStyle(HavenColors.navy700)
-                                    }
-                                }
-                            }
-                        }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(contractor.companyName)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if let specialties = contractor.specialties, !specialties.isEmpty {
+                        Text(specialties.joined(separator: ", "))
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(1)
+                    } else if let contact = contractor.contactName {
+                        Text(contact)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
                     }
                 }
+
+                Spacer()
+
+                if let rating = contractor.rating {
+                    HStack(spacing: 2) {
+                        Image(systemName: "star.fill")
+                            .font(.caption2)
+                            .foregroundStyle(HavenColors.warning)
+                        Text("\(rating)")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
             }
         }
     }
@@ -1293,6 +1257,86 @@ struct PropertyDetailView: View {
     }
 
     // MARK: - Helpers
+
+    private func systemGroupCard(_ group: SystemGroup) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: group.icon)
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.navy700)
+                Text(group.name)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                Spacer()
+                Text("\(group.systems.count)")
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(HavenColors.navy)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(HavenColors.navy.opacity(0.1))
+                    .clipShape(Capsule())
+            }
+            let preview = group.systems.prefix(3).map(\.name).joined(separator: ", ")
+            let remaining = group.systems.count - min(3, group.systems.count)
+            Text(preview + (remaining > 0 ? " +\(remaining)" : ""))
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+                .lineLimit(1)
+
+            let needsAttention = group.systems.filter { systemStatusColor($0.status) != HavenColors.success }
+            if !needsAttention.isEmpty {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(HavenColors.warning)
+                        .frame(width: 6, height: 6)
+                    Text("\(needsAttention.count) need attention")
+                        .font(.system(size: 10))
+                        .foregroundStyle(HavenColors.warning)
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(HavenColors.beige300, lineWidth: 0.5)
+        )
+    }
+
+    private func systemGridCard(_ system: HomeSystemRow) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Circle()
+                    .fill(systemStatusColor(system.status))
+                    .frame(width: 8, height: 8)
+                Text(system.name)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(1)
+            }
+            if let mfr = system.manufacturer {
+                Text(mfr)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .lineLimit(1)
+            }
+            if let nextDue = system.nextServiceDue {
+                Text("Due: \(nextDue)")
+                    .font(.system(size: 10))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(HavenColors.beige300, lineWidth: 0.5)
+        )
+    }
 
     private func systemStatusColor(_ status: String?) -> Color {
         switch status?.lowercased() {

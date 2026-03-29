@@ -382,6 +382,33 @@ verify_jwt = false
 [functions.test-ai]
 verify_jwt = false
 
+[functions.analyze-quote]
+verify_jwt = false
+
+[functions.receive-email]
+verify_jwt = false
+
+[functions.draft-negotiation-email]
+verify_jwt = false
+
+[functions.project-feasibility]
+verify_jwt = false
+
+[functions.research-project]
+verify_jwt = false
+
+[functions.merge-households]
+verify_jwt = false
+
+[functions.property-lookup]
+verify_jwt = false
+
+[functions.process-inbox-item]
+verify_jwt = false
+
+[functions.research-item-alternative]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

@@ -69,31 +69,32 @@ serve(async (req: Request) => {
         text: `Category hint: ${category ?? "Unknown"}\nTitle: ${document_title ?? "Unknown"}\n\nDocument text:\n${text}`,
       });
     } else {
-      messages_content.push({
-        type: "image",
-        source: { type: "base64", media_type: "image/jpeg", data: image_base64 },
-      });
+      // Detect media type — PDFs must use "document" type, images use "image" type
+      let mediaType = "image/jpeg";
+      if (image_base64.startsWith("/9j/")) mediaType = "image/jpeg";
+      else if (image_base64.startsWith("iVBOR")) mediaType = "image/png";
+      else if (image_base64.startsWith("JVBER")) mediaType = "application/pdf";
+
+      const isPdf = mediaType === "application/pdf";
+      messages_content.push(
+        isPdf
+          ? { type: "document", source: { type: "base64", media_type: mediaType, data: image_base64 } }
+          : { type: "image", source: { type: "base64", media_type: mediaType, data: image_base64 } }
+      );
       messages_content.push({
         type: "text",
         text: `Category hint: ${category ?? "Unknown"}\nTitle: ${document_title ?? "Unknown"}\n\nAnalyze this document. Extract all text and include in "extracted_text" field.`,
       });
     }
 
-    // --- CALL CLAUDE ---
+    // --- CALL CLAUDE WITH RETRY ---
     console.log("[analyze] Calling Claude API...");
     const t0 = Date.now();
 
-    const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": anthropicApiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 4096,
-        system: `You are a document analysis assistant for a home management and estate planning app. Return ONLY valid JSON with these fields:
+    const claudeRequestBody = JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 4096,
+      system: `You are a document analysis assistant for a home management and estate planning app. Return ONLY valid JSON with these fields:
 {
   "summary": "2-3 sentence summary",
   "category_suggestion": "one of: ${VALID_CATEGORIES.join(", ")}",
@@ -101,41 +102,102 @@ serve(async (req: Request) => {
   "key_parties": [{"name":"string","role":"string"}],
   "flags": [{"severity":"critical|warning|info","message":"string"}],
   "extracted_metadata": {"key":"value"},
-  "cross_reference_suggestions": ["category names"]
+  "cross_reference_suggestions": ["category names"],
+  "vendor_info": {
+    "name": "company/business name or null",
+    "phone": "phone number or null",
+    "email": "email or null",
+    "address": "address or null",
+    "license": "license/cert number or null",
+    "specialties": ["HVAC", "Plumbing", etc.] or []
+  },
+  "home_systems": [
+    {
+      "name": "system name (e.g., Central AC, Water Heater, Roof)",
+      "category": "HVAC|Plumbing|Electrical|Roofing|Appliance|Security|Other",
+      "manufacturer": "brand/manufacturer or null",
+      "model": "model number or null",
+      "serial": "serial number or null",
+      "installDate": "YYYY-MM-DD or null",
+      "condition": "good|fair|poor|critical or null",
+      "notes": "any relevant details"
+    }
+  ],
+  "maintenance_suggestions": [
+    {
+      "task": "what needs to be done",
+      "urgency": "critical|soon|routine",
+      "dueDate": "YYYY-MM-DD or null",
+      "estimatedCost": "rough cost estimate or null"
+    }
+  ]
 }
+
+EXTRACTION RULES:
+- vendor_info: Extract if the document is from a contractor, service company, vendor, or business. Include for: quotes, invoices, service reports, warranties, vendor contracts, repair estimates, inspection reports.
+- home_systems: Extract if the document mentions specific home systems, appliances, or equipment. Especially important for: inspection reports (extract ALL systems inspected), warranty cards (extract the covered system), appliance manuals, service reports, completion certificates.
+- maintenance_suggestions: Extract if the document recommends maintenance, repairs, or follow-up work. Especially from: inspection reports, service reports, warranty cards (maintenance requirements to keep warranty valid).
+- If none of these apply (e.g., a will or passport), return null/empty arrays for those fields.
 
 CLASSIFICATION RULES (follow strictly):
 - "Employment Agreement" means a SIGNED CONTRACT between employer and employee with terms of employment, compensation, termination clauses, etc. Do NOT use this for resumes, CVs, cover letters, or job descriptions.
-- Resumes, CVs, cover letters, job descriptions, LinkedIn profiles, and career documents → "Other Personal Documents" with an info flag: "This appears to be a resume/CV rather than a legal agreement. Filed under Other Personal Documents."
+- Resumes, CVs, cover letters, job descriptions, LinkedIn profiles, and career documents → "Other Personal Documents" with an info flag.
 - School transcripts, diplomas, report cards, course materials → "Other Personal Documents"
-- Recipes, personal letters, non-business correspondence → "Other Personal Documents"
-- Any document NOT directly relevant to home management, estate planning, insurance, financial records, property, or personal identification → "Other Personal Documents" with an info flag explaining what it is and why it was filed there.
-
-IMPORTANT: When in doubt between a specific category and "Other Personal Documents", consider whether the document has legal/financial significance to the household. A resume has no legal significance — it is NOT an employment agreement.
+- Any document NOT directly relevant to home management, estate planning, insurance, financial records, property, or personal identification → "Other Personal Documents" with an info flag.
 
 If analyzing an image, also include "extracted_text" with all readable text.
 Return ONLY JSON. No markdown. No explanation.`,
-        messages: [{ role: "user", content: messages_content }],
-      }),
+      messages: [{ role: "user", content: messages_content }],
     });
 
-    console.log(`[analyze] Claude responded in ${Date.now() - t0}ms with status ${claudeRes.status}`);
+    let claudeData: Record<string, unknown> | null = null;
+    let lastClaudeError = "";
 
-    if (!claudeRes.ok) {
-      const errText = await claudeRes.text();
-      console.error(`[analyze] Claude error ${claudeRes.status}: ${errText.substring(0, 300)}`);
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      try {
+        const claudeRes = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": anthropicApiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: claudeRequestBody,
+        });
+
+        console.log(`[analyze] Claude responded in ${Date.now() - t0}ms with status ${claudeRes.status} (attempt ${attempt})`);
+
+        if (claudeRes.ok) {
+          claudeData = await claudeRes.json();
+          break;
+        }
+
+        const errText = await claudeRes.text();
+        lastClaudeError = `${claudeRes.status}: ${errText.substring(0, 300)}`;
+        console.error(`[analyze] Claude error (attempt ${attempt}): ${lastClaudeError}`);
+
+        // Don't retry on 4xx client errors
+        if (claudeRes.status >= 400 && claudeRes.status < 500) break;
+
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      } catch (fetchErr) {
+        lastClaudeError = String(fetchErr);
+        console.error(`[analyze] Fetch error (attempt ${attempt}): ${lastClaudeError}`);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+
+    if (!claudeData) {
       return new Response(
         JSON.stringify({
-          error: `Claude API error (${claudeRes.status})`,
-          detail: errText.substring(0, 200),
-          claude_status: claudeRes.status,
+          error: `Claude API error`,
+          detail: lastClaudeError.substring(0, 200),
         }),
         { status: 502, headers }
       );
     }
 
-    const claudeData = await claudeRes.json();
-    const rawText = claudeData.content?.[0]?.text ?? "";
+    const rawText = (claudeData as any).content?.[0]?.text ?? "";
 
     // --- PARSE RESPONSE ---
     let analysis: Record<string, unknown>;
@@ -204,6 +266,109 @@ Return ONLY JSON. No markdown. No explanation.`,
         });
       }
 
+      // Auto-create vendor if extracted
+      const vendorInfo = analysis.vendor_info as Record<string, unknown> | null;
+      if (vendorInfo?.name && (vendorInfo?.phone || vendorInfo?.email)) {
+        const vendorName = vendorInfo.name as string;
+        // Check if vendor already exists
+        svc.from("contractors")
+          .select("id")
+          .eq("household_id", household_id)
+          .ilike("company_name", `%${vendorName}%`)
+          .limit(1)
+          .then(async ({ data: existing }) => {
+            if (!existing || existing.length === 0) {
+              const { error: vErr } = await svc.from("contractors").insert({
+                household_id,
+                company_name: vendorName,
+                phone: (vendorInfo.phone as string) || "Not provided",
+                email: vendorInfo.email as string || null,
+                address: vendorInfo.address as string || null,
+                license_number: vendorInfo.license as string || null,
+                specialties: (vendorInfo.specialties as string[])?.length > 0 ? vendorInfo.specialties : null,
+                notes: `Auto-added from document: ${document_title ?? document_id}`,
+              });
+              if (vErr) console.error("[analyze] Vendor creation failed:", vErr.message);
+              else console.log(`[analyze] Auto-created vendor: ${vendorName}`);
+            } else {
+              console.log(`[analyze] Vendor already exists: ${vendorName}`);
+            }
+          });
+      }
+
+      // Auto-create home systems if extracted (for inspection reports, warranty cards, etc.)
+      const homeSystems = analysis.home_systems as Array<Record<string, unknown>> | null;
+      if (homeSystems && homeSystems.length > 0) {
+        // Get property for this household
+        svc.from("properties")
+          .select("id")
+          .eq("household_id", household_id)
+          .limit(1)
+          .then(async ({ data: props }) => {
+            const propertyId = props?.[0]?.id;
+            if (!propertyId) return;
+
+            for (const sys of homeSystems) {
+              const sysName = sys.name as string;
+              if (!sysName) continue;
+
+              // Check if system already exists
+              const { data: existingSys } = await svc.from("home_systems")
+                .select("id")
+                .eq("property_id", propertyId)
+                .ilike("name", `%${sysName}%`)
+                .limit(1);
+
+              if (!existingSys || existingSys.length === 0) {
+                const { error: sysErr } = await svc.from("home_systems").insert({
+                  household_id,
+                  property_id: propertyId,
+                  name: sysName,
+                  category: (sys.category as string) || "Other",
+                  manufacturer: (sys.manufacturer as string) || null,
+                  model_number: (sys.model as string) || null,
+                  serial_number: (sys.serial as string) || null,
+                  install_date: (sys.installDate as string) || null,
+                  notes: `Auto-added from document: ${document_title ?? "uploaded document"}. ${(sys.notes as string) || ""}`.trim(),
+                });
+                if (sysErr) console.error(`[analyze] System creation failed for ${sysName}:`, sysErr.message);
+                else console.log(`[analyze] Auto-created home system: ${sysName}`);
+              }
+            }
+          });
+      }
+
+      // Auto-create maintenance tasks from suggestions
+      const maintSuggestions = analysis.maintenance_suggestions as Array<Record<string, unknown>> | null;
+      if (maintSuggestions && maintSuggestions.length > 0) {
+        svc.from("properties")
+          .select("id")
+          .eq("household_id", household_id)
+          .limit(1)
+          .then(async ({ data: props }) => {
+            const propertyId = props?.[0]?.id;
+            if (!propertyId) return;
+
+            for (const maint of maintSuggestions) {
+              const taskName = maint.task as string;
+              if (!taskName) continue;
+
+              const dueDate = (maint.dueDate as string) || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+              const { error: mErr } = await svc.from("maintenance_tasks").insert({
+                household_id,
+                property_id: propertyId,
+                title: taskName,
+                frequency: "once",
+                next_due_date: dueDate,
+                priority: maint.urgency === "critical" ? "high" : maint.urgency === "soon" ? "medium" : "low",
+                notes: `Auto-suggested from document analysis. ${(maint.estimatedCost as string) ? `Estimated cost: ${maint.estimatedCost}` : ""}`.trim(),
+              });
+              if (mErr) console.error(`[analyze] Maintenance task creation failed for ${taskName}:`, mErr.message);
+              else console.log(`[analyze] Auto-created maintenance task: ${taskName}`);
+            }
+          });
+      }
+
       // Log
       svc.from("access_log").insert({
         household_id,
@@ -212,7 +377,13 @@ Return ONLY JSON. No markdown. No explanation.`,
         resource_type: "document",
         resource_id: document_id,
         actor_type: "ai_analysis",
-        metadata: { model: "claude-sonnet-4-6", category: analysis.category_suggestion },
+        metadata: {
+          model: "claude-sonnet-4-6",
+          category: analysis.category_suggestion,
+          auto_created_vendor: !!vendorInfo?.name,
+          auto_created_systems: homeSystems?.length ?? 0,
+          auto_created_maintenance: maintSuggestions?.length ?? 0,
+        },
       }).then(({ error }) => {
         if (error) console.warn("[analyze] access_log insert failed:", error.message);
       });

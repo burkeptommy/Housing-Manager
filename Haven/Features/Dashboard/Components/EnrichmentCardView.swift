@@ -6,6 +6,7 @@ struct EnrichmentCardView: View {
     let onDismiss: () -> Void
     let onServiceSetup: (String) -> Void
     let onApplianceSetup: () -> Void
+    var onProjectExplore: ((String) -> Void)? = nil
 
     @State private var answered = false
     @State private var selectedId: String?
@@ -71,6 +72,8 @@ struct EnrichmentCardView: View {
                     serviceSetupButton(serviceType: serviceType)
                 case .applianceChecklist:
                     applianceButton
+                case .projectSuggestion(let cost, let roiLabel, let roiDetail):
+                    projectSuggestionView(cost: cost, roiLabel: roiLabel, roiDetail: roiDetail)
                 }
             }
         }
@@ -198,6 +201,82 @@ struct EnrichmentCardView: View {
             }
             .buttonStyle(.plain)
         }
+    }
+
+    // MARK: - Project Suggestion
+
+    private func projectSuggestionView(cost: String, roiLabel: String, roiDetail: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            // ROI badge + cost
+            HStack(spacing: 8) {
+                Text(roiLabel)
+                    .font(HavenTypography.uiLabelSmall)
+                    .foregroundStyle(roiColor(roiLabel))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(roiColor(roiLabel).opacity(0.12))
+                    .clipShape(Capsule())
+
+                Text(cost)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+
+                Spacer()
+            }
+
+            Text(roiDetail)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            // Two action buttons
+            HStack(spacing: HavenTheme.spacing8) {
+                Button {
+                    Haptics.medium()
+                    Analytics.track(.dashboardEnrichmentCardSubmitted, ["card_id": question.id, "action": "explore_project"])
+                    onProjectExplore?(question.title)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11))
+                        Text("Explore Project")
+                    }
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                        answered = true
+                    }
+                    onDismiss()
+                } label: {
+                    Text("Not now")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(HavenColors.creamLight)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                                .stroke(HavenColors.beige200, lineWidth: 1)
+                        )
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func roiColor(_ label: String) -> Color {
+        if label.contains("High") { return HavenColors.success }
+        if label.contains("Moderate") { return HavenColors.warning }
+        return HavenColors.textTertiary
     }
 
     // MARK: - Appliance Checklist

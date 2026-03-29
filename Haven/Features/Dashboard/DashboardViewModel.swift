@@ -81,7 +81,12 @@ final class DashboardViewModel: ObservableObject {
     @Published var homeSystems: [HomeSystemRow] = []
     @Published var dismissedEnrichmentIds: Set<String> = []
     @Published var primaryPropertyId: UUID?
+    @Published var primaryYearBuilt: Int?
+    @Published var primaryPropertyLocation: String?
     @Published var primaryHouseholdId: UUID?
+    @Published var inboxItems: [DatabaseService.InboxItemRow] = []
+    @Published var properties: [PropertyRow] = []
+    @Published var hasActiveProjects = false
 
     var showGettingStarted: Bool {
         !hasProperty || !hasDocuments || !hasUsedAlfred
@@ -112,7 +117,9 @@ final class DashboardViewModel: ObservableObject {
             propertyAttributes: propertyAttributes,
             serviceContracts: serviceContracts,
             homeSystems: homeSystems,
-            dismissedIds: dismissedEnrichmentIds
+            dismissedIds: dismissedEnrichmentIds,
+            yearBuilt: primaryYearBuilt,
+            hasProjects: hasActiveProjects
         )
     }
 
@@ -175,7 +182,8 @@ final class DashboardViewModel: ObservableObject {
         async let gettingStartedTask: Void = loadGettingStartedState()
         async let recommendationTask: Void = loadRecommendationData()
         async let enrichmentTask: Void = loadEnrichmentData()
-        _ = await (scoresTask, expirationsTask, maintenanceTask, recentTask, userTask, gettingStartedTask, recommendationTask, enrichmentTask)
+        async let inboxTask: Void = loadInboxItems()
+        _ = await (scoresTask, expirationsTask, maintenanceTask, recentTask, userTask, gettingStartedTask, recommendationTask, enrichmentTask, inboxTask)
     }
 
     private func loadUserName() async {
@@ -367,12 +375,46 @@ final class DashboardViewModel: ObservableObject {
         }.count
     }
 
+    private func loadInboxItems() async {
+        do {
+            let items = try await DatabaseService.shared.fetchUnseenInboxItems()
+            inboxItems = items
+        } catch {
+            print("[Dashboard] Failed to load inbox items: \(error)")
+        }
+    }
+
+    func dismissInboxItem(_ item: DatabaseService.InboxItemRow) {
+        inboxItems.removeAll { $0.id == item.id }
+        Task {
+            try? await DatabaseService.shared.markInboxItemsSeen(ids: [item.id])
+        }
+    }
+
+    func processInboxItem(_ item: DatabaseService.InboxItemRow, propertyId: UUID?, action: String, category: String?) async {
+        do {
+            _ = try await HavenSupabase.processInboxItem(
+                inboxItemId: item.id.uuidString,
+                propertyId: propertyId?.uuidString,
+                action: action,
+                documentCategory: category
+            )
+            Haptics.success()
+            await loadInboxItems()
+        } catch {
+            print("[Dashboard] Process inbox item failed: \(error)")
+        }
+    }
+
     private func loadEnrichmentData() async {
         do {
-            let properties = try await DatabaseService.shared.fetchProperties()
-            if let primary = properties.first {
+            let fetchedProperties = try await DatabaseService.shared.fetchProperties()
+            properties = fetchedProperties
+            if let primary = fetchedProperties.first {
                 primaryPropertyId = primary.id
                 primaryHouseholdId = primary.householdId
+                primaryYearBuilt = primary.yearBuilt
+                primaryPropertyLocation = [primary.city, primary.state].compactMap { $0 }.joined(separator: ", ")
                 propertyAttributes = primary.attributes ?? [:]
 
                 let contracts = try await DatabaseService.shared.fetchServiceContracts(propertyId: primary.id)
@@ -380,6 +422,10 @@ final class DashboardViewModel: ObservableObject {
 
                 let systems = try await DatabaseService.shared.fetchHomeSystems(propertyId: primary.id)
                 homeSystems = systems
+
+                // Check if user has any projects (to suppress ROI suggestions if they do)
+                let projects = try? await DatabaseService.shared.fetchProjects(propertyId: primary.id)
+                hasActiveProjects = !(projects?.isEmpty ?? true)
             }
         } catch {
             print("[Dashboard] Failed to load enrichment data: \(error)")

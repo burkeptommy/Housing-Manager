@@ -20,6 +20,9 @@ struct DashboardView: View {
     @State private var isAcceptingMerge = false
     @State private var showMergeResolution = false
     @State private var mergePreviewResponse: MergePreviewResponse?
+    @State private var showQuickProjectEntry = false
+    @State private var quickProjectPrefill: String = ""
+    @AppStorage("hasSeenEmailCallout") private var hasSeenEmailCallout = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -35,6 +38,16 @@ struct DashboardView: View {
                     } else {
                         // Greeting
                         greetingView
+
+                        // Inbox items from forwarded emails
+                        if !viewModel.inboxItems.isEmpty {
+                            inboxSection
+                        }
+
+                        // Email forwarding callout
+                        if !hasSeenEmailCallout {
+                            emailForwardingCallout
+                        }
 
                         // Pending merge request banner
                         if let merge = pendingMergeRequest {
@@ -137,17 +150,40 @@ struct DashboardView: View {
                     .accessibilityLabel("Security")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        Haptics.light()
-                        Analytics.track(.settingsViewed)
-                        showSettings = true
-                    } label: {
-                        Image(systemName: "gearshape.fill")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(HavenColors.navy800)
+                    HStack(spacing: 12) {
+                        NavigationLink(value: "inbox") {
+                            ZStack(alignment: .topTrailing) {
+                                Image(systemName: "tray.fill")
+                                    .font(.system(size: 18, weight: .semibold))
+                                    .foregroundStyle(HavenColors.navy800)
+
+                                let pendingCount = viewModel.inboxItems.filter { $0.isPending }.count
+                                if pendingCount > 0 {
+                                    Text("\(pendingCount)")
+                                        .font(.system(size: 9, weight: .bold))
+                                        .foregroundStyle(.white)
+                                        .frame(width: 16, height: 16)
+                                        .background(HavenColors.warning)
+                                        .clipShape(Circle())
+                                        .offset(x: 6, y: -6)
+                                }
+                            }
+                        }
+                        .accessibilityLabel("Inbox")
+                        .accessibilityHint("View forwarded emails")
+
+                        Button {
+                            Haptics.light()
+                            Analytics.track(.settingsViewed)
+                            showSettings = true
+                        } label: {
+                            Image(systemName: "gearshape.fill")
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(HavenColors.navy800)
+                        }
+                        .accessibilityLabel("Settings")
+                        .accessibilityHint("Open app settings")
                     }
-                    .accessibilityLabel("Settings")
-                    .accessibilityHint("Open app settings")
                 }
             }
             .sheet(isPresented: $showSettings) {
@@ -169,8 +205,25 @@ struct DashboardView: View {
                 })
             }
             .navigationDestination(for: String.self) { destination in
-                if destination == "security" {
+                if destination == "inbox" {
+                    InboxView()
+                } else if destination == "security" {
                     SecurityDashboardView()
+                } else if destination.hasPrefix("inbox_item_"),
+                          let itemId = UUID(uuidString: String(destination.dropFirst("inbox_item_".count))),
+                          let item = viewModel.inboxItems.first(where: { $0.id == itemId }) {
+                    InboxItemDetailView(
+                        item: item,
+                        properties: viewModel.properties,
+                        onProcess: { propertyId, action, category in
+                            Task {
+                                await viewModel.processInboxItem(item, propertyId: propertyId, action: action, category: category)
+                            }
+                        },
+                        onDismiss: {
+                            viewModel.dismissInboxItem(item)
+                        }
+                    )
                 } else if destination.hasPrefix("expecting_"),
                           let memberId = UUID(uuidString: String(destination.dropFirst("expecting_".count))),
                           let member = viewModel.expectingMembers.first(where: { $0.id == memberId }) {
@@ -198,6 +251,16 @@ struct DashboardView: View {
                         Task { await viewModel.refresh() }
                     }
                 )
+            }
+            .sheet(isPresented: $showQuickProjectEntry) {
+                if let propId = viewModel.primaryPropertyId,
+                   let hhId = viewModel.primaryHouseholdId {
+                    NewProjectView(
+                        propertyID: propId,
+                        householdId: hhId,
+                        viewModel: ProjectsViewModel()
+                    )
+                }
             }
             .fullScreenCover(isPresented: $showScenarioStudio) {
                 ScenarioStudioView()
@@ -249,6 +312,128 @@ struct DashboardView: View {
     }
 
     // MARK: - Greeting
+
+    // MARK: - Inbox Section
+
+    private var inboxSection: some View {
+        VStack(spacing: HavenTheme.spacing8) {
+            // Section header with "View All" link
+            HStack {
+                let pendingCount = viewModel.inboxItems.filter { $0.isPending }.count
+                HStack(spacing: 6) {
+                    Image(systemName: "envelope.fill")
+                        .font(.system(size: 12))
+                    Text("INBOX")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                    if pendingCount > 0 {
+                        Text("\(pendingCount)")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 18, height: 18)
+                            .background(HavenColors.warning)
+                            .clipShape(Circle())
+                    }
+                }
+                .foregroundStyle(HavenColors.textTertiary)
+
+                Spacer()
+
+                NavigationLink(value: "inbox") {
+                    Text("View All")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.navy)
+                }
+            }
+
+            ForEach(viewModel.inboxItems.prefix(5)) { item in
+                NavigationLink(value: "inbox_item_\(item.id.uuidString)") {
+                    inboxBanner(item)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func inboxBanner(_ item: DatabaseService.InboxItemRow) -> some View {
+        HStack(spacing: 12) {
+            Group {
+                if item.isProcessing {
+                    ProgressView()
+                        .controlSize(.small)
+                        .tint(.white)
+                } else {
+                    Image(systemName: item.iconName)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 30, height: 30)
+            .background(item.isProcessing ? HavenColors.navy500 : item.isPending ? HavenColors.warning : HavenColors.success)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(item.title)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.navy800)
+                        .lineLimit(1)
+                    if item.isProcessing {
+                        HStack(spacing: 4) {
+                            ProgressView()
+                                .controlSize(.mini)
+                            Text("Processing")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundStyle(HavenColors.navy500)
+                        }
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Capsule())
+                    } else if item.isPending {
+                        Text("Action needed")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(HavenColors.warning)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(HavenColors.warning.opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                }
+                if let summary = item.summary {
+                    Text(summary)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(2)
+                }
+            }
+
+            Spacer()
+
+            if !item.isPending {
+                Button {
+                    withAnimation { viewModel.dismissInboxItem(item) }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(6)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(item.isProcessing ? HavenColors.navy.opacity(0.04) : item.isPending ? HavenColors.warning.opacity(0.06) : HavenColors.success.opacity(0.06))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                .stroke((item.isProcessing ? HavenColors.navy : item.isPending ? HavenColors.warning : HavenColors.success).opacity(0.2), lineWidth: 1)
+        )
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
 
     private var greetingView: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -361,11 +546,14 @@ struct DashboardView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    Circle()
-                        .fill(Color.white.opacity(0.05))
-                        .frame(width: 140, height: 140)
-                        .offset(x: 60, y: -30)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    // House silhouette — branded property motif
+                    Image(systemName: "house.fill")
+                        .resizable()
+                        .aspectRatio(contentMode: .fit)
+                        .frame(width: 130, height: 130)
+                        .foregroundStyle(Color.white.opacity(0.08))
+                        .offset(x: 40, y: 15)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
                 }
             )
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
@@ -391,6 +579,61 @@ struct DashboardView: View {
     }
 
     // MARK: - What If Card
+
+    // MARK: - Email Forwarding Callout
+
+    private var emailForwardingCallout: some View {
+        NavigationLink {
+            ProjectEmailView()
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "envelope.arrow.triangle.branch.fill")
+                    .font(.system(size: 20))
+                    .foregroundStyle(HavenColors.navy)
+                    .frame(width: 36, height: 36)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("You have a forwarding email")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.navy800)
+                    Text("Forward quotes, documents, school emails & more to Haven")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing12)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.navy.opacity(0.12), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .overlay(alignment: .topTrailing) {
+            Button {
+                hasSeenEmailCallout = true
+                Haptics.light()
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(6)
+                    .background(HavenColors.surface)
+                    .clipShape(Circle())
+            }
+            .offset(x: 4, y: -4)
+        }
+    }
 
     private var whatIfCard: some View {
         Button {
@@ -713,6 +956,10 @@ struct DashboardView: View {
                         onApplianceSetup: {
                             Analytics.track(.dashboardEnrichmentCardTapped, ["card_id": question.id, "action": "appliance_setup"])
                             showApplianceSetup = true
+                        },
+                        onProjectExplore: { title in
+                            quickProjectPrefill = title
+                            showQuickProjectEntry = true
                         }
                     )
                 }
@@ -745,6 +992,8 @@ struct DashboardView: View {
                     householdId: viewModel.primaryHouseholdId ?? propertyId,
                     homeSystems: viewModel.homeSystems
                 )
+                // Delay refresh so card dismiss animation completes before view recreation
+                try? await Task.sleep(for: .seconds(0.5))
                 await viewModel.refresh()
             } catch {
                 print("[Enrichment] Failed to save \(key): \(error)")
