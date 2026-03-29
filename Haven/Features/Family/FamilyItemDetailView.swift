@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import QuickLook
 
 /// Detail view for a family inbox item — shows full info, edit capabilities, reminders.
 struct FamilyItemDetailView: View {
@@ -19,6 +20,11 @@ struct FamilyItemDetailView: View {
     @State private var selectedMemberIds: Set<UUID>
     @State private var activeReminders: Set<String> = []
     @State private var showRawEmail = false
+    @State private var quickLookURL: URL?
+    @State private var isLoadingAttachment = false
+    @State private var showRename = false
+    @State private var renameText: String = ""
+    @State private var showReclassify = false
 
     private let db = DatabaseService.shared
 
@@ -121,39 +127,45 @@ struct FamilyItemDetailView: View {
                     }
                 }
 
-                // Attachment
-                if let filename = item.attachmentFilename {
-                    HavenCard(padding: HavenTheme.spacing12) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("ATTACHMENT")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textTertiary)
-                                .fontWeight(.semibold)
-                                .tracking(0.5)
+                // Attachment (tappable — opens QuickLook)
+                if let filename = item.attachmentFilename, let path = item.attachmentPath {
+                    Button {
+                        Task { await loadAttachment(path: path, filename: filename) }
+                    } label: {
+                        HavenCard(padding: HavenTheme.spacing12) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("ATTACHMENT")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                    .fontWeight(.semibold)
+                                    .tracking(0.5)
 
-                            HStack(spacing: 10) {
-                                Image(systemName: item.attachmentContentType?.hasPrefix("image") == true ? "photo.fill" : "doc.fill")
-                                    .font(.title3)
-                                    .foregroundStyle(HavenColors.navy)
-                                    .frame(width: 36, height: 36)
-                                    .background(HavenColors.navy.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                HStack(spacing: 10) {
+                                    Image(systemName: item.attachmentContentType?.hasPrefix("image") == true ? "photo.fill" : "doc.fill")
+                                        .font(.title3)
+                                        .foregroundStyle(HavenColors.navy)
+                                        .frame(width: 36, height: 36)
+                                        .background(HavenColors.navy.opacity(0.08))
+                                        .clipShape(RoundedRectangle(cornerRadius: 8))
 
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(filename)
-                                        .font(HavenTypography.uiLabel)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                        .lineLimit(1)
-                                    if let ct = item.attachmentContentType {
-                                        Text(ct)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(filename)
+                                            .font(HavenTypography.uiLabel)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                            .lineLimit(1)
+                                        Text(isLoadingAttachment ? "Opening..." : "Tap to view")
                                             .font(HavenTypography.uiCaption)
-                                            .foregroundStyle(HavenColors.textTertiary)
+                                            .foregroundStyle(HavenColors.navy700)
                                     }
+                                    Spacer()
+                                    Image(systemName: "eye.fill")
+                                        .font(.caption)
+                                        .foregroundStyle(HavenColors.navy700)
                                 }
-                                Spacer()
                             }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
 
                 // Tagged members
@@ -297,6 +309,17 @@ struct FamilyItemDetailView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button {
+                        renameText = item.title
+                        showRename = true
+                    } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                    Button {
+                        showReclassify = true
+                    } label: {
+                        Label("Change Category", systemImage: "arrow.triangle.branch")
+                    }
+                    Button {
                         showReschedule = true
                     } label: {
                         Label("Set / Change Date", systemImage: "calendar")
@@ -408,6 +431,53 @@ struct FamilyItemDetailView: View {
                 }
             }
             .presentationDetents([.medium])
+        }
+        .quickLookPreview($quickLookURL)
+        .alert("Rename", isPresented: $showRename) {
+            TextField("Title", text: $renameText)
+            Button("Save") {
+                Task {
+                    try? await db.updateInboxItemTitle(id: item.id, title: renameText)
+                    Haptics.success()
+                    onUpdate()
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
+        .confirmationDialog("Change Category", isPresented: $showReclassify) {
+            Button("School") { reclassify(category: "school") }
+            Button("Events") { reclassify(category: "events") }
+            Button("Medical") { reclassify(category: "medical") }
+            Button("Activities") { reclassify(category: "activities") }
+            Button("Travel") { reclassify(category: "travel") }
+            Button("Bills") { reclassify(category: "bills") }
+            Button("Personal") { reclassify(category: "personal") }
+            Button("Cancel", role: .cancel) {}
+        }
+    }
+
+    private func reclassify(category: String) {
+        Task {
+            try? await db.updateInboxItemType(id: item.id, type: "family", familyCategory: category)
+            Haptics.success()
+            onUpdate()
+        }
+    }
+
+    private func loadAttachment(path: String, filename: String) async {
+        isLoadingAttachment = true
+        defer { isLoadingAttachment = false }
+        do {
+            let url = try await db.getInboxAttachmentSignedURL(path: path)
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let ext = (filename as NSString).pathExtension.isEmpty ? "pdf" : (filename as NSString).pathExtension
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(item.id.uuidString)
+                .appendingPathExtension(ext)
+            try data.write(to: tempURL)
+            quickLookURL = tempURL
+        } catch {
+            print("[FamilyDetail] Failed to load attachment: \(error)")
         }
     }
 

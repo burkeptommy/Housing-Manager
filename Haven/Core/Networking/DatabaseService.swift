@@ -306,6 +306,35 @@ final class DatabaseService {
             .createSignedURL(path: path, expiresIn: 3600)
     }
 
+    func getInboxAttachmentSignedURL(path: String) async throws -> URL {
+        try await HavenSupabase.storage
+            .from("inbox-attachments")
+            .createSignedURL(path: path, expiresIn: 3600)
+    }
+
+    func updateInboxItemTitle(id: UUID, title: String) async throws {
+        struct Update: Encodable { let title: String }
+        try await from("inbox_items")
+            .update(Update(title: title))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func updateInboxItemType(id: UUID, type: String, familyCategory: String?) async throws {
+        struct Update: Encodable {
+            let type: String
+            let familyCategory: String?
+            enum CodingKeys: String, CodingKey {
+                case type
+                case familyCategory = "family_category"
+            }
+        }
+        try await from("inbox_items")
+            .update(Update(type: type, familyCategory: familyCategory))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     // MARK: - Document Parties
 
     func fetchDocumentParties(documentId: UUID) async throws -> [DocumentPartyRow] {

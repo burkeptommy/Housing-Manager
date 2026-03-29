@@ -300,7 +300,7 @@ SUBJECT: ${subject}
 BODY (first 3000 chars):
 ${emailBody.substring(0, 3000)}
 ${attachmentBase64 ? `\n[Email has a ${attachmentContentType || "file"} attachment${attachmentFilename ? ` named "${attachmentFilename}"` : ""}]` : ""}
-${bodyIsMinimal && hasPdfAttachment ? `\n[NOTE: The email body is minimal/empty but has a PDF attachment. This is likely a forwarded document — classify based on the subject line, sender, and attachment name rather than the body text.]` : ""}
+${bodyIsMinimal && attachmentBase64 ? `\n[IMPORTANT: The email body is minimal/empty but has a ${attachmentContentType || "file"} attachment${attachmentFilename ? ` named "${attachmentFilename}"` : ""}. The user forwarded this specifically for the attachment. Classify based on the subject line, sender, attachment name, and most likely intent. If this looks like a home-related document (report, inspection, test, survey, appraisal), classify as "home_document". If it looks medical, classify as "family" with familyCategory "medical". Do NOT classify as "other" when an attachment is present — make your best guess.]` : ""}
 ${hasQuoteSignals ? `\n[NOTE: The subject line contains quote/estimate/proposal keywords — this is very likely a contractor_quote even if the body is empty.]` : ""}
 
 Classify this email into ONE of these types:

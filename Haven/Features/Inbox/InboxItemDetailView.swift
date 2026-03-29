@@ -1,4 +1,5 @@
 import SwiftUI
+import QuickLook
 
 /// Full detail view for an inbox item (forwarded email).
 /// Shows sender, subject, summary, attachment info, related items, and action buttons.
@@ -12,6 +13,8 @@ struct InboxItemDetailView: View {
     @State private var selectedPropertyId: UUID?
     @State private var selectedCategory: String = "Other"
     @State private var isProcessing = false
+    @State private var quickLookURL: URL?
+    @State private var isLoadingAttachment = false
 
     private let documentCategories = [
         "Contractor Quote", "Warranty Card", "Inspection Report",
@@ -70,6 +73,7 @@ struct InboxItemDetailView: View {
         .background(HavenColors.background)
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
+        .quickLookPreview($quickLookURL)
         .toolbar {
             if !item.isPending {
                 ToolbarItem(placement: .destructiveAction) {
@@ -187,35 +191,56 @@ struct InboxItemDetailView: View {
     }
 
     private func attachmentCard(_ filename: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: attachmentIcon)
-                .font(.system(size: 20))
-                .foregroundStyle(HavenColors.navy700)
-                .frame(width: 36, height: 36)
-                .background(HavenColors.navy.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+        Button {
+            guard let path = item.attachmentPath else { return }
+            Task { await loadAttachment(path: path, filename: filename) }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: attachmentIcon)
+                    .font(.system(size: 20))
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(width: 36, height: 36)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text(filename)
-                    .font(HavenTypography.body)
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .lineLimit(1)
-                if let contentType = item.attachmentContentType {
-                    Text(contentType)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(filename)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(1)
+                    Text(isLoadingAttachment ? "Opening..." : "Tap to view")
                         .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                        .foregroundStyle(HavenColors.navy700)
                 }
+
+                Spacer()
+
+                Image(systemName: "eye.fill")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.navy700)
             }
-
-            Spacer()
-
-            Image(systemName: "paperclip")
-                .font(.caption)
-                .foregroundStyle(HavenColors.textTertiary)
+            .padding(HavenTheme.spacing12)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
-        .padding(HavenTheme.spacing12)
-        .background(Color.white)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .buttonStyle(.plain)
+    }
+
+    private func loadAttachment(path: String, filename: String) async {
+        isLoadingAttachment = true
+        defer { isLoadingAttachment = false }
+        do {
+            let url = try await DatabaseService.shared.getInboxAttachmentSignedURL(path: path)
+            let (data, _) = try await URLSession.shared.data(from: url)
+            let ext = (filename as NSString).pathExtension.isEmpty ? "pdf" : (filename as NSString).pathExtension
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(item.id.uuidString)
+                .appendingPathExtension(ext)
+            try data.write(to: tempURL)
+            quickLookURL = tempURL
+        } catch {
+            print("[InboxDetail] Failed to load attachment: \(error)")
+        }
     }
 
     private var attachmentIcon: String {
