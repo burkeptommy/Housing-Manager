@@ -39,6 +39,8 @@ serve(async (req: Request) => {
   const headers = { ...corsHeaders, "Content-Type": "application/json" };
 
   try {
+    console.log(`[receive-email] Request received: method=${req.method}, content-type=${req.headers.get("content-type")?.substring(0, 50)}, content-length=${req.headers.get("content-length") || "unknown"}`);
+
     const anthropicApiKey = Deno.env.get("ANTHROPIC_API_KEY");
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -807,29 +809,34 @@ Respond with ONLY valid JSON:
 
           // Store attachment as a project file
           if (attachmentStoragePath) {
-            await supabase.from("project_files").insert({
-              project_id: claimProject.id,
-              household_id: householdId,
-              file_path: attachmentStoragePath,
-              filename: attachmentFilename || "claim_document",
-              content_type: attachmentContentType,
-              notes: `From email: ${subject}`,
-            });
-            actions.push("claim_file_attached");
+            try {
+              await supabase.from("project_files").insert({
+                project_id: claimProject.id,
+                household_id: householdId,
+                file_path: attachmentStoragePath,
+                filename: attachmentFilename || "claim_document",
+                content_type: attachmentContentType,
+                notes: `From email: ${subject}`,
+              });
+              actions.push("claim_file_attached");
+            } catch (err) {
+              console.error(`[receive-email] Failed to attach claim file: ${err}`);
+            }
           }
 
-          // Also save the raw email as a text file for the claim record
+          // Save raw email as text file (truncated to 50KB to avoid memory issues)
           if (emailBody && emailBody.length > 50) {
             try {
+              const truncatedBody = emailBody.substring(0, 50000);
               const emailFilePath = `${householdId}/claims/${claimProject.id}/${crypto.randomUUID()}_email.txt`;
-              const emailContent = `From: ${fromAddress}\nSubject: ${subject}\nDate: ${new Date().toISOString()}\n\n${emailBody}`;
+              const emailContent = `From: ${fromAddress}\nSubject: ${subject}\nDate: ${new Date().toISOString()}\n\n${truncatedBody}`;
               const emailBuffer = new TextEncoder().encode(emailContent);
               await supabase.storage.from("documents").upload(emailFilePath, emailBuffer, { contentType: "text/plain" });
               await supabase.from("project_files").insert({
                 project_id: claimProject.id,
                 household_id: householdId,
                 file_path: emailFilePath,
-                filename: `Email: ${subject || "Claim correspondence"}.txt`,
+                filename: `Email: ${(subject || "Claim correspondence").substring(0, 100)}.txt`,
                 content_type: "text/plain",
                 file_size: emailBuffer.byteLength,
                 notes: `Raw email from ${fromAddress}`,
