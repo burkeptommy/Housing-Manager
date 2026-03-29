@@ -25,7 +25,12 @@ struct HavenApp: App {
                     appState.initialize()
                     performSecurityChecks()
                     // Request notification permission for background upload alerts
-                    _ = await NotificationService.shared.requestPermission()
+                    let granted = await NotificationService.shared.requestPermission()
+                    if granted {
+                        await MainActor.run {
+                            PushNotificationService.shared.registerForPushNotifications()
+                        }
+                    }
                     Analytics.track(.appLaunched)
                 }
                 .alert("Security Warning", isPresented: $showJailbreakAlert) {
@@ -87,14 +92,29 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
         return true
     }
 
+    // MARK: - Remote Notifications
+
+    func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        PushNotificationService.shared.handleDeviceToken(deviceToken)
+    }
+
+    func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        PushNotificationService.shared.handleRegistrationError(error)
+    }
+
     // Show notification even when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
     }
 
-    // Handle notification tap — navigate to Documents tab
+    // Handle notification tap — navigate based on notification type
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
-        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+        let userInfo = response.notification.request.content.userInfo
+        if let type = userInfo["type"] as? String, type == "task_assignment" {
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+        } else {
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+        }
         completionHandler()
     }
 }

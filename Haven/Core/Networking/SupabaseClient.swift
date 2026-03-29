@@ -94,6 +94,41 @@ enum HavenSupabase {
         return data
     }
 
+    // MARK: - Push Notifications
+
+    struct PushNotificationRequest: Encodable {
+        let recipientUserIds: [String]
+        let title: String
+        let body: String
+        let data: [String: String]?
+
+        enum CodingKeys: String, CodingKey {
+            case recipientUserIds = "recipient_user_ids"
+            case title, body, data
+        }
+    }
+
+    static func sendPushNotification(
+        recipientUserIds: [String],
+        title: String,
+        body: String,
+        data: [String: String]? = nil
+    ) async throws {
+        let responseData = try await callEdgeFunction(
+            name: "send-push-notification",
+            body: PushNotificationRequest(
+                recipientUserIds: recipientUserIds,
+                title: title,
+                body: body,
+                data: data
+            ),
+            timeoutSeconds: 30
+        )
+        if let responseStr = String(data: responseData, encoding: .utf8) {
+            print("[Push] Response: \(responseStr)")
+        }
+    }
+
     // MARK: - Edge Functions
 
     struct AnalyzeDocumentRequest: Encodable {

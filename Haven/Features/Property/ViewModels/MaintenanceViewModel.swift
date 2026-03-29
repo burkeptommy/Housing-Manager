@@ -5,6 +5,8 @@ final class MaintenanceViewModel: ObservableObject {
     @Published var tasks: [MaintenanceTaskDBRow] = []
     @Published var properties: [PropertyRow] = []
     @Published var systems: [HomeSystemRow] = []
+    @Published var contractors: [ContractorRow] = []
+    @Published var users: [UserRow] = []
     @Published var isLoading = false
     @Published var error: String?
     @Published var filterPropertyId: UUID?
@@ -174,9 +176,12 @@ final class MaintenanceViewModel: ObservableObject {
         do {
             async let tasksResult = db.fetchMaintenanceTasks()
             async let propsResult = db.fetchProperties()
-            let (t, p) = try await (tasksResult, propsResult)
+            async let contractorsResult = db.fetchContractors()
+            let (t, p, c) = try await (tasksResult, propsResult, contractorsResult)
             tasks = t
             properties = p
+            contractors = c
+            users = (try? await db.fetchHouseholdUsers()) ?? []
 
             // Fetch systems for all properties
             var allSystems: [HomeSystemRow] = []
@@ -226,6 +231,17 @@ final class MaintenanceViewModel: ObservableObject {
     func systemName(for id: UUID?) -> String? {
         guard let id else { return nil }
         return systems.first { $0.id == id }?.name
+    }
+
+    func assignedUserName(for task: MaintenanceTaskDBRow) -> String? {
+        guard let userId = task.assignedToUserId else { return nil }
+        guard let user = users.first(where: { $0.id == userId }) else { return nil }
+        return user.fullName?.components(separatedBy: " ").first ?? user.fullName
+    }
+
+    func assignedContractorName(for task: MaintenanceTaskDBRow) -> String? {
+        guard let contractorId = task.assignedContractorId else { return nil }
+        return contractors.first(where: { $0.id == contractorId })?.companyName
     }
 
     func completeTask(_ task: MaintenanceTaskDBRow) async {

@@ -1,5 +1,6 @@
 import SwiftUI
 import PhotosUI
+import QuickLook
 
 /// Simplified project detail — dual mode:
 /// - Pro: quote uploads, deal ratings, gap analysis, ROI
@@ -21,6 +22,10 @@ struct ProjectDetailView: View {
     @State private var showPhotoPicker = false
     @State private var showFilePicker = false
     @State private var selectedPhoto: PhotosPickerItem?
+    @State private var quickLookURL: URL?
+    @State private var loadingFileId: UUID?
+    @State private var thumbnailURLs: [UUID: URL] = [:]
+    @State private var fileLoadError: String?
 
     private var liveProject: PropertyProjectRow {
         viewModel.projects.first(where: { $0.id == project.id }) ?? project
@@ -87,6 +92,7 @@ struct ProjectDetailView: View {
         .task {
             if isDIY || isInsuranceClaim {
                 await viewModel.loadProjectFiles(projectId: project.id)
+                await loadThumbnailURLs()
             }
             if !isDIY && !isInsuranceClaim {
                 await viewModel.loadQuotes(projectId: project.id)
@@ -94,6 +100,14 @@ struct ProjectDetailView: View {
             if !isInsuranceClaim && viewModel.feasibility == nil {
                 await viewModel.loadFeasibility(projectName: liveProject.name, category: liveProject.category, description: liveProject.description, location: nil)
             }
+        }
+        .alert("Preview Unavailable", isPresented: .init(
+            get: { fileLoadError != nil },
+            set: { if !$0 { fileLoadError = nil } }
+        )) {
+            Button("OK") { fileLoadError = nil }
+        } message: {
+            Text(fileLoadError ?? "")
         }
         .sheet(isPresented: $showQuoteUpload) {
             QuoteUploadEntryView(
@@ -148,6 +162,7 @@ struct ProjectDetailView: View {
             guard let item else { return }
             Task { await handlePhotoSelection(item) }
         }
+        .quickLookPreview($quickLookURL)
     }
 
     // MARK: - Status Card
@@ -749,27 +764,108 @@ struct ProjectDetailView: View {
     }
 
     private func fileCard(_ file: ProjectFileRow) -> some View {
-        VStack(spacing: 4) {
-            RoundedRectangle(cornerRadius: 8)
-                .fill(HavenColors.navy.opacity(0.06))
-                .frame(height: 80)
-                .overlay {
-                    Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
-                        .font(.title2)
-                        .foregroundStyle(HavenColors.navy.opacity(0.4))
-                }
+        Button {
+            Task { await loadProjectFile(file) }
+        } label: {
+            VStack(spacing: 4) {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(HavenColors.navy.opacity(0.06))
+                    .frame(height: 80)
+                    .overlay {
+                        if loadingFileId == file.id {
+                            ProgressView()
+                        } else if file.isImage, let url = thumbnailURLs[file.id] {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fill)
+                                case .failure:
+                                    Image(systemName: "photo.fill")
+                                        .font(.title2)
+                                        .foregroundStyle(HavenColors.navy.opacity(0.4))
+                                default:
+                                    ProgressView()
+                                }
+                            }
+                        } else {
+                            Image(systemName: file.isImage ? "photo.fill" : "doc.fill")
+                                .font(.title2)
+                                .foregroundStyle(HavenColors.navy.opacity(0.4))
+                        }
+                    }
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            Text(file.filename)
-                .font(HavenTypography.uiCaption)
-                .foregroundStyle(HavenColors.textSecondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
+                Text(file.filename)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
         }
+        .buttonStyle(.plain)
         .contextMenu {
             Button(role: .destructive) {
                 Task { try? await viewModel.deleteProjectFile(id: file.id) }
             } label: {
                 Label("Delete", systemImage: "trash")
+            }
+        }
+    }
+
+    private func loadProjectFile(_ file: ProjectFileRow) async {
+        loadingFileId = file.id
+        defer { loadingFileId = nil }
+        let db = DatabaseService.shared
+        do {
+            // Try documents bucket first (user uploads go here), fall back to inbox-attachments (email forwards)
+            var url = try await db.getDocumentSignedURL(path: file.filePath)
+            var (data, response) = try await URLSession.shared.data(from: url)
+            var statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+            if statusCode != 200 {
+                url = try await db.getInboxAttachmentSignedURL(path: file.filePath)
+                (data, response) = try await URLSession.shared.data(from: url)
+                statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            }
+
+            guard statusCode == 200, !data.isEmpty else {
+                await MainActor.run {
+                    fileLoadError = "Could not load this file. It may have been moved or deleted."
+                }
+                return
+            }
+
+            let ext = (file.filename as NSString).pathExtension.isEmpty ? "pdf" : (file.filename as NSString).pathExtension
+            let tempURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent(file.id.uuidString)
+                .appendingPathExtension(ext)
+            try data.write(to: tempURL)
+            quickLookURL = tempURL
+        } catch {
+            print("[ProjectDetail] Failed to load file: \(error)")
+            await MainActor.run {
+                fileLoadError = "Failed to preview file: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func loadThumbnailURLs() async {
+        let db = DatabaseService.shared
+        let imageFiles = viewModel.projectFiles.filter(\.isImage).prefix(6)
+        for file in imageFiles {
+            do {
+                // Try documents bucket first, fall back to inbox-attachments
+                if let url = try? await db.getDocumentSignedURL(path: file.filePath) {
+                    await MainActor.run { thumbnailURLs[file.id] = url }
+                } else {
+                    let url = try await db.getInboxAttachmentSignedURL(path: file.filePath)
+                    await MainActor.run { thumbnailURLs[file.id] = url }
+                }
+            } catch {
+                print("[ProjectDetail] Thumbnail URL failed for \(file.filename): \(error)")
             }
         }
     }
@@ -818,7 +914,8 @@ struct ProjectDetailView: View {
                 object: nil,
                 userInfo: [
                     "message": "I have a question about my \(liveProject.category) project: \(liveProject.name)",
-                    "projectId": project.id.uuidString,
+                    "contextType": "project",
+                    "contextId": project.id.uuidString,
                 ]
             )
         } label: {

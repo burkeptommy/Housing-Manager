@@ -34,7 +34,7 @@ interface ChatRequest {
     role: "user" | "assistant";
     content: string;
   }>;
-  context_type?: "general" | "document" | "property" | "maintenance";
+  context_type?: "general" | "document" | "property" | "project" | "maintenance";
   context_id?: string;
   household_id: string;
   user_id?: string;
@@ -130,7 +130,8 @@ serve(async (req: Request) => {
     const { systemPrompt, referencedDocumentIds } = await buildSystemPrompt(
       supabase,
       serviceClient,
-      body
+      body,
+      userId
     );
 
     // Build messages array
@@ -288,12 +289,13 @@ serve(async (req: Request) => {
 async function buildSystemPrompt(
   supabase: ReturnType<typeof createClient>,
   serviceClient: ReturnType<typeof createClient>,
-  body: ChatRequest
+  body: ChatRequest,
+  userId?: string
 ): Promise<{ systemPrompt: string; referencedDocumentIds: string[] }> {
   const householdId = body.household_id;
   const referencedDocumentIds: string[] = [];
 
-  // Fetch all household data in parallel
+  // Fetch all household data in parallel (including current user's name)
   const [
     householdResult,
     membersResult,
@@ -304,6 +306,7 @@ async function buildSystemPrompt(
     systemsResult,
     serviceContractsResult,
     projectsResult,
+    currentUserResult,
   ] = await Promise.all([
     supabase.from("households").select("*").eq("id", householdId).single(),
     supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -314,6 +317,7 @@ async function buildSystemPrompt(
     supabase.from("home_systems").select("*").eq("household_id", householdId),
     supabase.from("service_contracts").select("*").eq("household_id", householdId),
     supabase.from("property_projects").select("*").eq("household_id", householdId),
+    userId ? supabase.from("users").select("full_name").eq("id", userId).single() : Promise.resolve({ data: null }),
   ]);
 
   const household = householdResult.data;
@@ -325,6 +329,7 @@ async function buildSystemPrompt(
   const systems = systemsResult.data ?? [];
   const serviceContracts = (serviceContractsResult.data ?? []) as Record<string, unknown>[];
   const projects = projectsResult.data ?? [];
+  const currentUserName = currentUserResult.data?.full_name ?? null;
 
   // Fetch document content for context-specific or keyword-matched documents
   let documentContentSection = "";
@@ -524,6 +529,18 @@ async function buildSystemPrompt(
     if (prop) {
       contextPrefix = `\nCONTEXT: The user is currently viewing property: "${prop.name}" (${[prop.street, prop.city].filter(Boolean).join(", ")}).\nPrioritize answering questions about this specific property, but you can reference other household data as needed.\n`;
     }
+  } else if (body.context_type === "project" && body.context_id) {
+    const proj = projects.find(
+      (p: Record<string, unknown>) => p.id === body.context_id
+    );
+    if (proj) {
+      const property = properties.find((p: Record<string, unknown>) => p.id === proj.property_id);
+      const propName = property ? ` at ${property.name}` : "";
+      const budget = proj.estimated_budget ? `, Budget: $${Math.round(proj.estimated_budget as number)}` : "";
+      const spent = proj.actual_spend ? `, Spent: $${Math.round(proj.actual_spend as number)}` : "";
+      const notes = proj.notes ? `\nProject notes: ${proj.notes}` : "";
+      contextPrefix = `\nCONTEXT: The user is currently viewing project: "${proj.name}" (${proj.category}${propName}, Status: ${proj.status}${budget}${spent}).${notes}\nPrioritize answering questions about this specific project, but you can reference other household data as needed.\n`;
+    }
   }
 
   const systemPrompt = `You are Alfred, the intelligent concierge built into Haven — a premium estate document organization and home management platform for high-net-worth families.
@@ -531,6 +548,7 @@ async function buildSystemPrompt(
 You are named after the archetype of the trusted family butler — discreet, knowledgeable, always prepared. You speak with warmth, precision, and quiet confidence. You never use jargon when plain language works. You address the user by their first name when appropriate.
 
 HOUSEHOLD CONTEXT:
+Current User: ${currentUserName ?? "Unknown"} (this is the person you are speaking with right now — address them by their first name)
 Household: ${household?.name ?? "Unknown"}
 Family Members:
 ${membersList || "No family members added yet."}
@@ -559,6 +577,12 @@ YOUR ROLE:
 - When document content is provided above, use it to give specific, accurate answers
 - Be warm, professional, and reassuring — these are sensitive topics
 - Sound like a trusted private advisor, not a chatbot
+
+CRITICAL CONVERSATION RULE:
+- You MUST ONLY respond to the user's MOST RECENT message (the last message in the conversation)
+- Previous messages are provided for context only — do NOT re-answer, revisit, or summarize previous questions or your previous responses
+- Treat older messages as background context, not as things that need a response
+- If the user's latest message is a follow-up, answer just that follow-up
 
 IMPORTANT BOUNDARIES:
 - You are NOT a lawyer, financial advisor, CPA, or insurance agent

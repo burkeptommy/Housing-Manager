@@ -15,12 +15,16 @@ struct InboxItemDetailView: View {
     @State private var isProcessing = false
     @State private var quickLookURL: URL?
     @State private var isLoadingAttachment = false
+    @State private var attachmentError: String?
+    @State private var senderSaved = false
+    @State private var isSavingSender = false
 
     private let documentCategories = [
         "Contractor Quote", "Warranty Card", "Inspection Report",
-        "Homeowners Insurance", "Vehicle Title", "Deed", "Mortgage",
-        "Property Tax Records", "Utility Bill", "Vendor Contract",
-        "Appliance Manual", "Permit", "Home Bill/Invoice",
+        "Home Inspection/Test Report", "Homeowners Insurance",
+        "Vehicle Title", "Deed", "Mortgage", "Property Tax Records",
+        "Utility Bill", "Vendor Contract", "Appliance Manual",
+        "Permit", "Home Bill/Invoice", "Home Document",
         "Other Personal Documents"
     ]
 
@@ -138,13 +142,51 @@ struct InboxItemDetailView: View {
     private var emailInfoSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             if let from = item.fromEmail, !from.isEmpty {
-                HStack(spacing: 8) {
-                    Image(systemName: "envelope.fill")
-                        .font(.system(size: 12))
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text(from)
-                        .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.textPrimary)
+                let parsed = Self.parseEmailSender(from)
+                HStack(spacing: 10) {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.title2)
+                        .foregroundStyle(HavenColors.navy.opacity(0.5))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        if let name = parsed.name {
+                            Text(name)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        Text(parsed.email)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    if senderSaved {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(.green)
+                    } else {
+                        Button {
+                            Task { await saveSenderAsContact(name: parsed.name, email: parsed.email) }
+                        } label: {
+                            HStack(spacing: 4) {
+                                if isSavingSender {
+                                    ProgressView().controlSize(.mini)
+                                } else {
+                                    Image(systemName: "person.badge.plus")
+                                        .font(.caption)
+                                }
+                                Text("Save Contact")
+                                    .font(HavenTypography.uiCaption)
+                            }
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(HavenColors.navy.opacity(0.08))
+                            .clipShape(Capsule())
+                        }
+                        .disabled(isSavingSender)
+                    }
                 }
             }
 
@@ -193,14 +235,15 @@ struct InboxItemDetailView: View {
     private func attachmentCard(_ filename: String) -> some View {
         Button {
             guard let path = item.attachmentPath else { return }
+            attachmentError = nil
             Task { await loadAttachment(path: path, filename: filename) }
         } label: {
             HStack(spacing: 10) {
-                Image(systemName: attachmentIcon)
+                Image(systemName: attachmentError != nil ? "exclamationmark.triangle.fill" : attachmentIcon)
                     .font(.system(size: 20))
-                    .foregroundStyle(HavenColors.navy700)
+                    .foregroundStyle(attachmentError != nil ? .orange : HavenColors.navy700)
                     .frame(width: 36, height: 36)
-                    .background(HavenColors.navy.opacity(0.08))
+                    .background((attachmentError != nil ? Color.orange : HavenColors.navy).opacity(0.08))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -208,9 +251,15 @@ struct InboxItemDetailView: View {
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
                         .lineLimit(1)
-                    Text(isLoadingAttachment ? "Opening..." : "Tap to view")
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.navy700)
+                    if let error = attachmentError {
+                        Text(error)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(.orange)
+                    } else {
+                        Text(isLoadingAttachment ? "Opening..." : "Tap to view")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.navy700)
+                    }
                 }
 
                 Spacer()
@@ -229,9 +278,28 @@ struct InboxItemDetailView: View {
     private func loadAttachment(path: String, filename: String) async {
         isLoadingAttachment = true
         defer { isLoadingAttachment = false }
+        let db = DatabaseService.shared
         do {
-            let url = try await DatabaseService.shared.getInboxAttachmentSignedURL(path: path)
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // Try inbox-attachments bucket first (email-forwarded + new uploads)
+            var url = try await db.getInboxAttachmentSignedURL(path: path)
+            var (data, response) = try await URLSession.shared.data(from: url)
+            var statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+            // Fall back to documents bucket (older app-uploaded items)
+            if statusCode != 200 {
+                url = try await db.getDocumentSignedURL(path: path)
+                (data, response) = try await URLSession.shared.data(from: url)
+                statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            }
+
+            guard statusCode == 200 else {
+                attachmentError = "File not available"
+                return
+            }
+            guard !data.isEmpty else {
+                attachmentError = "File is empty"
+                return
+            }
             let ext = (filename as NSString).pathExtension.isEmpty ? "pdf" : (filename as NSString).pathExtension
             let tempURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent(item.id.uuidString)
@@ -240,6 +308,46 @@ struct InboxItemDetailView: View {
             quickLookURL = tempURL
         } catch {
             print("[InboxDetail] Failed to load attachment: \(error)")
+            attachmentError = "Unable to load file"
+        }
+    }
+
+    static func parseEmailSender(_ raw: String) -> (name: String?, email: String) {
+        if let angleBracket = raw.firstIndex(of: "<"),
+           let closeBracket = raw.firstIndex(of: ">") {
+            let name = String(raw[raw.startIndex..<angleBracket]).trimmingCharacters(in: .whitespaces)
+            let email = String(raw[raw.index(after: angleBracket)..<closeBracket])
+            return (name.isEmpty ? nil : name, email)
+        }
+        return (nil, raw.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func saveSenderAsContact(name: String?, email: String) async {
+        isSavingSender = true
+        defer { isSavingSender = false }
+        let db = DatabaseService.shared
+        do {
+            let user = try await db.fetchCurrentUser()
+            guard let householdId = user.householdId else { return }
+
+            let existing = try await db.fetchContractors()
+            if existing.contains(where: { $0.email?.lowercased() == email.lowercased() }) {
+                senderSaved = true
+                return
+            }
+
+            _ = try await db.createContractor(ContractorInsert(
+                householdId: householdId,
+                companyName: name ?? email,
+                phone: "Not provided",
+                email: email,
+                notes: "Added from forwarded email"
+            ))
+            senderSaved = true
+            Haptics.success()
+        } catch {
+            print("[InboxDetail] Failed to save sender as contact: \(error)")
+            Haptics.error()
         }
     }
 
@@ -379,7 +487,8 @@ struct InboxItemDetailView: View {
                         guard !isProcessing else { return }
                         isProcessing = true
                         let propId = selectedPropertyId ?? properties.first?.id
-                        onProcess(propId, primaryActionType, item.actionType == "classify_document" ? selectedCategory : nil)
+                        let category = (item.actionType == "classify_document" || item.actionType == "review") ? selectedCategory : nil
+                        onProcess(propId, primaryActionType, category)
                     },
                     icon: primaryActionIcon,
                     isLoading: isProcessing,
@@ -404,7 +513,11 @@ struct InboxItemDetailView: View {
         case "contractor_quote", "project_created": return "Create Project"
         case "document_stored": return "Save Document"
         case "vendor_added": return "Add Vendor"
-        default: return "Process"
+        default:
+            if item.actionType == "classify_document" || item.actionType == "review" {
+                return "Save Document"
+            }
+            return "Process"
         }
     }
 
@@ -412,7 +525,12 @@ struct InboxItemDetailView: View {
         switch item.type {
         case "contractor_quote", "project_created": return "process_quote"
         case "document_stored": return "process_document"
-        default: return "process_quote"
+        default:
+            // If user has a document category picker visible, treat as document
+            if item.actionType == "classify_document" || item.actionType == "review" {
+                return "process_document"
+            }
+            return "process_quote"
         }
     }
 
@@ -421,7 +539,11 @@ struct InboxItemDetailView: View {
         case "contractor_quote", "project_created": return "hammer.fill"
         case "document_stored": return "doc.fill"
         case "vendor_added": return "person.crop.circle.badge.plus"
-        default: return "checkmark.circle.fill"
+        default:
+            if item.actionType == "classify_document" || item.actionType == "review" {
+                return "doc.fill"
+            }
+            return "checkmark.circle.fill"
         }
     }
 

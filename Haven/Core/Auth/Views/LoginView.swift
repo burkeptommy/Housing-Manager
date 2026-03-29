@@ -21,15 +21,11 @@ struct LoginView: View {
                     VStack(spacing: 8) {
                         Text("H")
                             .font(Font.custom("Georgia", size: 88))
-                            .foregroundStyle(HavenColors.navy800)
+                            .foregroundStyle(HavenColors.creamLight)
                             .frame(width: 100, height: 100)
                             .background(
                                 RoundedRectangle(cornerRadius: 22)
-                                    .fill(HavenColors.creamLight)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 22)
-                                            .stroke(HavenColors.beige300, lineWidth: 1)
-                                    )
+                                    .fill(HavenColors.navy800)
                             )
                         Text("Haven")
                             .font(HavenTypography.largeTitle)

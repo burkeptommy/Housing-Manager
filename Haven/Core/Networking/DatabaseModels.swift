@@ -702,6 +702,7 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     let costRange: String?
     let lastEmailSentAt: Date?
     let recurrenceRule: String?
+    let scheduledDate: String?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -722,6 +723,7 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case costRange = "cost_range"
         case lastEmailSentAt = "last_email_sent_at"
         case recurrenceRule = "recurrence_rule"
+        case scheduledDate = "scheduled_date"
     }
 }
 
@@ -777,6 +779,7 @@ struct MaintenanceTaskUpdate: Codable {
     var assignedToUserId: UUID?
     var notes: String?
     var lastEmailSentAt: Date?
+    var scheduledDate: String?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -786,6 +789,21 @@ struct MaintenanceTaskUpdate: Codable {
         case assignedContractorId = "assigned_contractor_id"
         case assignedToUserId = "assigned_to_user_id"
         case lastEmailSentAt = "last_email_sent_at"
+        case scheduledDate = "scheduled_date"
+    }
+}
+
+// MARK: - Device Token
+
+struct DeviceTokenUpsert: Codable {
+    let userId: UUID
+    let token: String
+    let platform: String
+
+    enum CodingKeys: String, CodingKey {
+        case userId = "user_id"
+        case token
+        case platform
     }
 }
 

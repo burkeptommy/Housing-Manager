@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ContractorDirectoryView: View {
+    var onSelect: ((ContractorRow) -> Void)?
     @StateObject private var viewModel = ContractorViewModel()
     @State private var showAddContractor = false
 
@@ -83,27 +84,44 @@ struct ContractorDirectoryView: View {
     private var contractorList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                if onSelect != nil {
+                    Text("Tap a contact to assign them to this task")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 ForEach(viewModel.filteredContractors) { contractor in
-                    NavigationLink {
-                        ContractorDetailView(contractor: contractor)
-                    } label: {
-                        contractorCard(contractor)
-                    }
-                    .buttonStyle(.plain)
-                    .swipeActions(edge: .trailing) {
-                        Button(role: .destructive) {
-                            Task {
-                                try? await DatabaseService.shared.deleteContractor(id: contractor.id)
-                                await viewModel.loadContractors()
-                                Haptics.success()
-                            }
+                    if let onSelect {
+                        Button {
+                            Haptics.light()
+                            onSelect(contractor)
                         } label: {
-                            Label("Delete", systemImage: "trash")
+                            contractorCard(contractor)
                         }
+                        .buttonStyle(.plain)
+                    } else {
+                        NavigationLink {
+                            ContractorDetailView(contractor: contractor)
+                        } label: {
+                            contractorCard(contractor)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing) {
+                            Button(role: .destructive) {
+                                Task {
+                                    try? await DatabaseService.shared.deleteContractor(id: contractor.id)
+                                    await viewModel.loadContractors()
+                                    Haptics.success()
+                                }
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            Analytics.track(.contractorViewed, ["contractor_id": contractor.id.uuidString])
+                        })
                     }
-                    .simultaneousGesture(TapGesture().onEnded {
-                        Analytics.track(.contractorViewed, ["contractor_id": contractor.id.uuidString])
-                    })
                 }
             }
             .padding()

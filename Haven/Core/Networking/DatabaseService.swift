@@ -306,6 +306,12 @@ final class DatabaseService {
             .createSignedURL(path: path, expiresIn: 3600)
     }
 
+    func uploadInboxAttachment(path: String, data: Data, contentType: String) async throws {
+        try await HavenSupabase.storage
+            .from("inbox-attachments")
+            .upload(path, data: data, options: .init(contentType: contentType))
+    }
+
     func getInboxAttachmentSignedURL(path: String) async throws -> URL {
         try await HavenSupabase.storage
             .from("inbox-attachments")
@@ -665,10 +671,36 @@ final class DatabaseService {
         }
     }
 
+    /// Remove the assigned contractor from a task (sets to NULL)
+    func clearMaintenanceTaskContractor(id: UUID) async throws {
+        try await from("maintenance_tasks")
+            .update(["assigned_contractor_id": nil] as [String: String?])
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     func deleteMaintenanceTask(id: UUID) async throws {
         try await from("maintenance_tasks")
             .delete()
             .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Device Tokens
+
+    func upsertDeviceToken(userId: UUID, token: String) async throws {
+        try await from("device_tokens")
+            .upsert(
+                DeviceTokenUpsert(userId: userId, token: token, platform: "ios"),
+                onConflict: "user_id,token"
+            )
+            .execute()
+    }
+
+    func deleteDeviceToken(token: String) async throws {
+        try await from("device_tokens")
+            .delete()
+            .eq("token", value: token)
             .execute()
     }
 

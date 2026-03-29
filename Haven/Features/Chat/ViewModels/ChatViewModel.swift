@@ -71,7 +71,7 @@ final class ChatViewModel: ObservableObject {
                 throw ChatError.noHousehold
             }
 
-            let history = messages.dropLast().suffix(20).map { msg -> [String: String] in
+            let history = messages.dropLast().suffix(10).map { msg -> [String: String] in
                 ["role": msg.role == .user ? "user" : "assistant", "content": msg.content]
             }
 

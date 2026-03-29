@@ -38,12 +38,28 @@ struct FamilyInboxView: View {
     }
 
     private var allUpcomingEvents: [DatabaseService.InboxItemRow] {
-        items
-            .filter { $0.eventDate != nil && $0.eventDate! > Date() }
+        let startOfToday = Calendar.current.startOfDay(for: Date())
+        return items
+            .filter { $0.eventDate != nil && $0.eventDate! >= startOfToday }
             .sorted { ($0.eventDate ?? .distantFuture) < ($1.eventDate ?? .distantFuture) }
     }
 
-    private var upcomingEvents: [DatabaseService.InboxItemRow] {
+    /// Events this week (today through end of week)
+    private var thisWeekEvents: [DatabaseService.InboxItemRow] {
+        let calendar = Calendar.current
+        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))!
+        return allUpcomingEvents.filter { ($0.eventDate ?? .distantFuture) < endOfWeek }
+    }
+
+    /// Events after this week
+    private var laterEvents: [DatabaseService.InboxItemRow] {
+        let calendar = Calendar.current
+        let endOfWeek = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))!
+        return allUpcomingEvents.filter { ($0.eventDate ?? .distantFuture) >= endOfWeek }
+    }
+
+    /// Combined this week + upcoming, capped at 5 for the main view
+    private var visibleEvents: [DatabaseService.InboxItemRow] {
         Array(allUpcomingEvents.prefix(5))
     }
 
@@ -53,7 +69,7 @@ struct FamilyInboxView: View {
 
     private var availableCategories: [String] {
         let cats = Set(items.compactMap { $0.familyCategory?.lowercased() })
-        let order = ["school", "events", "medical", "activities", "travel", "personal", "other"]
+        let order = ["school", "events", "medical", "activities", "travel", "bills", "personal", "other"]
         return order.filter { cats.contains($0) }
     }
 
@@ -76,28 +92,57 @@ struct FamilyInboxView: View {
                 .modifier(FamilyFilePickerModifiers(showPhotoPicker: $showPhotoPicker, showFilePicker: $showFilePicker, selectedPhoto: $selectedPhoto, onPhoto: handlePhotoSelection, onFile: handleFileSelection))
         } else {
             List {
-                // Upcoming events hero (next 5) — no sticky header
-                if !upcomingEvents.isEmpty {
-                    Section {
-                        Text("UPCOMING")
-                            .font(HavenTypography.uiSectionHeader)
-                            .tracking(1.5)
-                            .foregroundStyle(HavenColors.textTertiary)
-                            .listRowSeparator(.hidden)
-                            .listRowBackground(Color.clear)
-                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
-                        ForEach(upcomingEvents) { event in
-                            upcomingEventRow(event)
+                // This Week + Upcoming events (max 5, with "View More")
+                if !visibleEvents.isEmpty {
+                    // This Week section
+                    let visibleThisWeek = thisWeekEvents.filter { item in visibleEvents.contains(where: { $0.id == item.id }) }
+                    let visibleLater = laterEvents.filter { item in visibleEvents.contains(where: { $0.id == item.id }) }
+
+                    if !visibleThisWeek.isEmpty {
+                        Section {
+                            Text("THIS WEEK")
+                                .font(HavenTypography.uiSectionHeader)
+                                .tracking(1.5)
+                                .foregroundStyle(HavenColors.textTertiary)
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
-                                .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                            ForEach(visibleThisWeek) { event in
+                                upcomingEventRow(event)
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                            }
                         }
-                        if allUpcomingEvents.count > upcomingEvents.count {
+                    }
+
+                    // Upcoming (beyond this week)
+                    if !visibleLater.isEmpty {
+                        Section {
+                            Text("UPCOMING")
+                                .font(HavenTypography.uiSectionHeader)
+                                .tracking(1.5)
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .listRowSeparator(.hidden)
+                                .listRowBackground(Color.clear)
+                                .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
+                            ForEach(visibleLater) { event in
+                                upcomingEventRow(event)
+                                    .listRowSeparator(.hidden)
+                                    .listRowBackground(Color.clear)
+                                    .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
+                            }
+                        }
+                    }
+
+                    // View More button if there are more than 5 total
+                    if allUpcomingEvents.count > 5 {
+                        Section {
                             Button {
                                 showAllUpcoming = true
                             } label: {
                                 HStack {
-                                    Text("View All \(allUpcomingEvents.count) Upcoming")
+                                    Text("View More (\(allUpcomingEvents.count - 5) more)")
                                         .font(HavenTypography.uiLabel)
                                     Spacer()
                                     Image(systemName: "chevron.right")
@@ -271,10 +316,10 @@ struct FamilyInboxView: View {
                             .foregroundStyle(HavenColors.textSecondary)
                     }
 
-                    // Tagged members (with avatar colors)
+                    // Tagged members (with avatar colors, oldest first)
                     if let ids = event.taggedMemberIds, !ids.isEmpty {
                         HStack(spacing: 4) {
-                            ForEach(ids, id: \.self) { memberId in
+                            ForEach(sortedTagIds(ids), id: \.self) { memberId in
                                 if let member = familyMembers.first(where: { $0.id == memberId }) {
                                     let tagColor = memberColor(member.avatarColor)
                                     Text(member.firstName)
@@ -460,10 +505,10 @@ struct FamilyInboxView: View {
                                 }
                             }
 
-                            // Tagged members (own row, wraps naturally)
+                            // Tagged members (own row, wraps naturally, oldest first)
                             if let ids = item.taggedMemberIds, !ids.isEmpty {
                                 WrappingHStack(spacing: 4) {
-                                    ForEach(ids, id: \.self) { memberId in
+                                    ForEach(sortedTagIds(ids), id: \.self) { memberId in
                                         if let member = familyMembers.first(where: { $0.id == memberId }) {
                                             let tagColor = memberColor(member.avatarColor)
                                             Text(member.firstName)
@@ -596,33 +641,44 @@ struct FamilyInboxView: View {
 
     private var rescheduleSheet: some View {
         NavigationStack {
-            DatePicker("Event Date", selection: $rescheduleDate, displayedComponents: [.date, .hourAndMinute])
-                .datePickerStyle(.graphical)
-                .tint(HavenColors.navy800)
-                .padding()
-                .navigationTitle("Set Event Date")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button("Cancel") { showReschedule = false }
-                            .foregroundStyle(HavenColors.navy)
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button("Save") {
-                            guard let item = itemToReschedule else { return }
-                            Task {
-                                try? await db.updateInboxItemEventDate(id: item.id, eventDate: rescheduleDate)
-                                Haptics.success()
-                                showReschedule = false
-                                await loadItems()
-                            }
-                        }
+            VStack(spacing: 0) {
+                DatePicker("Date", selection: $rescheduleDate, displayedComponents: .date)
+                    .datePickerStyle(.graphical)
+                    .tint(HavenColors.navy800)
+                    .padding(.horizontal)
+
+                Divider().padding(.horizontal)
+
+                DatePicker("Time", selection: $rescheduleDate, displayedComponents: .hourAndMinute)
+                    .datePickerStyle(.wheel)
+                    .labelsHidden()
+                    .frame(height: 100)
+                    .clipped()
+                    .padding(.horizontal)
+            }
+            .navigationTitle("Set Event Date & Time")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button("Cancel") { showReschedule = false }
                         .foregroundStyle(HavenColors.navy)
-                        .fontWeight(.semibold)
-                    }
                 }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Save") {
+                        guard let item = itemToReschedule else { return }
+                        Task {
+                            try? await db.updateInboxItemEventDate(id: item.id, eventDate: rescheduleDate)
+                            Haptics.success()
+                            showReschedule = false
+                            await loadItems()
+                        }
+                    }
+                    .foregroundStyle(HavenColors.navy)
+                    .fontWeight(.semibold)
+                }
+            }
         }
-        .presentationDetents([.medium])
+        .presentationDetents([.large])
     }
 
     // MARK: - Tagging Sheet
@@ -737,6 +793,24 @@ struct FamilyInboxView: View {
         case "personal": return "person.fill"
         case "bills": return "dollarsign.circle.fill"
         default: return "envelope.fill"
+        }
+    }
+
+    /// Sort tagged member IDs by date of birth (oldest first), nil DOB at end
+    private func sortedTagIds(_ ids: [UUID]) -> [UUID] {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return ids.sorted { a, b in
+            let memberA = familyMembers.first(where: { $0.id == a })
+            let memberB = familyMembers.first(where: { $0.id == b })
+            let dateA = memberA?.dateOfBirth.flatMap { df.date(from: $0) }
+            let dateB = memberB?.dateOfBirth.flatMap { df.date(from: $0) }
+            switch (dateA, dateB) {
+            case let (a?, b?): return a < b  // older (earlier date) first
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return false
+            }
         }
     }
 
@@ -858,7 +932,7 @@ struct FamilyInboxView: View {
             let user = try await db.fetchCurrentUser()
             guard let householdId = user.householdId else { return }
             let storagePath = "\(householdId.uuidString)/family/\(UUID().uuidString)_\(filename)"
-            _ = try await db.uploadDocumentFile(householdId: householdId, fileName: storagePath, data: data, contentType: contentType)
+            try await db.uploadInboxAttachment(path: storagePath, data: data, contentType: contentType)
 
             struct FamilyItemInsert: Encodable {
                 let householdId: UUID; let type: String; let title: String; let summary: String?

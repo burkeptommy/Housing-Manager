@@ -15,9 +15,10 @@ struct InboxItemCard: View {
 
     private let documentCategories = [
         "Contractor Quote", "Warranty Card", "Inspection Report",
-        "Homeowners Insurance", "Vehicle Title", "Deed", "Mortgage",
-        "Property Tax Records", "Utility Bill", "Vendor Contract",
-        "Appliance Manual", "Permit", "Home Bill/Invoice",
+        "Home Inspection/Test Report", "Homeowners Insurance",
+        "Vehicle Title", "Deed", "Mortgage", "Property Tax Records",
+        "Utility Bill", "Vendor Contract", "Appliance Manual",
+        "Permit", "Home Bill/Invoice", "Home Document",
         "Other Personal Documents"
     ]
 
@@ -335,7 +336,7 @@ struct InboxItemCard: View {
 
             // Action buttons
             HStack(spacing: HavenTheme.spacing8) {
-                if item.actionType == "assign_property" || item.type == "contractor_quote" || item.type == "project_created" || item.type == "other" {
+                if item.actionType == "assign_property" || item.type == "contractor_quote" || item.type == "project_created" || (item.type == "other" && item.actionType != "classify_document" && item.actionType != "review") {
                     Button {
                         guard !isProcessing else { return }
                         isProcessing = true

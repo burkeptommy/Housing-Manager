@@ -17,11 +17,14 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var lastServicedDate = Date()
     @State private var showEditFrequency = false
     @State private var editedFrequency: String = ""
+    @State private var showScheduledPicker = false
+    @State private var scheduledPickerDate = Date()
 
     // Vendor state
     @State private var assignedContractor: ContractorRow?
     @State private var systemCategory: String?
     @State private var vendorLoaded = false
+    @State private var showVendorAssignedToast = false
 
     // User assignment state
     @State private var householdUsers: [UserRow] = []
@@ -82,6 +85,33 @@ struct MaintenanceTaskDetailSheet: View {
             .padding(.vertical, HavenTheme.spacing16)
         }
         .background(HavenColors.background)
+        .overlay(alignment: .bottom) {
+            if showVendorAssignedToast {
+                HStack(spacing: 10) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.success)
+                    Text("\(assignedContractor?.companyName ?? "Vendor") assigned")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                }
+                .padding()
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .shadow(color: .black.opacity(0.08), radius: 8, y: 4)
+                .padding()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.easeInOut, value: showVendorAssignedToast)
+        .onChange(of: showVendorAssignedToast) { _, showing in
+            if showing {
+                Task {
+                    try? await Task.sleep(for: .seconds(3))
+                    withAnimation { showVendorAssignedToast = false }
+                }
+            }
+        }
         .navigationTitle("Task Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -112,7 +142,10 @@ struct MaintenanceTaskDetailSheet: View {
         }
         .sheet(isPresented: $showContractorDirectory) {
             NavigationStack {
-                ContractorDirectoryView()
+                ContractorDirectoryView(onSelect: { contractor in
+                    showContractorDirectory = false
+                    Task { await assignContractorToTask(contractor) }
+                })
             }
         }
         .task {
@@ -152,6 +185,51 @@ struct MaintenanceTaskDetailSheet: View {
             print("[TaskDetail] Failed to load vendor info: \(error.localizedDescription)")
         }
         vendorLoaded = true
+    }
+
+    private func assignContractorToTask(_ contractor: ContractorRow) async {
+        do {
+            _ = try await db.updateMaintenanceTask(
+                id: task.id,
+                MaintenanceTaskUpdate(assignedContractorId: contractor.id)
+            )
+            await MainActor.run {
+                assignedContractor = contractor
+                withAnimation { showVendorAssignedToast = true }
+            }
+            Haptics.success()
+            Analytics.track(.maintenanceTaskAssigned, [
+                "task_id": task.id.uuidString,
+                "contractor_id": contractor.id.uuidString,
+                "contractor_name": contractor.companyName
+            ])
+
+            // Remember this vendor as the system's preferred contractor for future suggestions
+            if let systemId = task.systemId {
+                _ = try? await db.updateHomeSystem(
+                    id: systemId,
+                    HomeSystemUpdate(preferredContractorId: contractor.id)
+                )
+            }
+        } catch {
+            print("[TaskDetail] Failed to assign contractor: \(error)")
+            Haptics.error()
+        }
+    }
+
+    private func unassignContractor() async {
+        do {
+            try await db.clearMaintenanceTaskContractor(id: task.id)
+            await MainActor.run { assignedContractor = nil }
+            Haptics.success()
+            Analytics.track(.maintenanceTaskAssigned, [
+                "task_id": task.id.uuidString,
+                "contractor_id": "unassigned"
+            ])
+        } catch {
+            print("[TaskDetail] Failed to unassign contractor: \(error)")
+            Haptics.error()
+        }
     }
 
     private func loadExistingReminders() async {
@@ -274,6 +352,23 @@ struct MaintenanceTaskDetailSheet: View {
                         Text(lastCompleted.havenDateFormatted)
                             .font(HavenTypography.body)
                             .foregroundStyle(HavenColors.textPrimary)
+                    }
+                }
+
+                if let scheduled = task.scheduledDate {
+                    HStack {
+                        Text("Scheduled")
+                            .font(HavenTypography.uiLabelMedium)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "calendar.badge.checkmark")
+                                .font(.system(size: 12))
+                                .foregroundStyle(HavenColors.success)
+                            Text(scheduled.havenDateFormatted)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.success)
+                        }
                     }
                 }
 
@@ -597,7 +692,7 @@ struct MaintenanceTaskDetailSheet: View {
                     .foregroundStyle(HavenColors.textTertiary)
 
                 if let contractor = assignedContractor {
-                    // Vendor is assigned — show info + Schedule For Me
+                    // Vendor is assigned — show info + Call button
                     HStack(spacing: HavenTheme.spacing12) {
                         Image(systemName: "person.crop.circle.fill")
                             .font(.title2)
@@ -621,11 +716,14 @@ struct MaintenanceTaskDetailSheet: View {
 
                     Button {
                         Haptics.light()
-                        showScheduleChat = true
+                        let digits = contractor.phone.filter(\.isNumber)
+                        if let url = URL(string: "tel://\(digits)") {
+                            UIApplication.shared.open(url)
+                        }
                     } label: {
                         HStack {
-                            Image(systemName: "calendar.badge.clock")
-                            Text("Schedule For Me")
+                            Image(systemName: "phone.fill")
+                            Text("Call \(contractor.companyName)")
                         }
                         .font(HavenTypography.uiButton)
                         .foregroundStyle(HavenColors.textOnNavy)
@@ -633,6 +731,23 @@ struct MaintenanceTaskDetailSheet: View {
                         .frame(height: HavenTheme.buttonHeight)
                         .background(HavenColors.navy)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+
+                    HStack {
+                        Spacer()
+                        Button {
+                            Haptics.light()
+                            Task { await unassignContractor() }
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.circle")
+                                Text("Remove Vendor")
+                            }
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.critical)
+                        }
+                        .buttonStyle(.plain)
+                        Spacer()
                     }
                 } else {
                     // No vendor — prompt to set one up
@@ -730,9 +845,10 @@ struct MaintenanceTaskDetailSheet: View {
                 ForEach(householdUsers, id: \.id) { user in
                     Button {
                         Haptics.light()
+                        let previousId = assignedUserId
                         let newId = assignedUserId == user.id ? nil : user.id
                         assignedUserId = newId
-                        Task { await updateAssignment(userId: newId) }
+                        Task { await updateAssignment(userId: newId, previousUserId: previousId) }
                     } label: {
                         HStack(spacing: 10) {
                             Image(systemName: assignedUserId == user.id ? "checkmark.circle.fill" : "circle")
@@ -768,12 +884,31 @@ struct MaintenanceTaskDetailSheet: View {
         assignedUserId = task.assignedToUserId
     }
 
-    private func updateAssignment(userId: UUID?) async {
+    private func updateAssignment(userId: UUID?, previousUserId: UUID?) async {
         do {
             _ = try await db.clearMaintenanceTaskAssignment(id: task.id, userId: userId)
+            Haptics.success()
             Analytics.track(.maintenanceTaskAssigned, ["task_id": task.id.uuidString, "assigned_user_id": userId?.uuidString ?? "unassigned"])
+
+            // Send push notification to other household members (not the person doing the assigning)
+            if let userId {
+                let assigneeName = householdUsers.first(where: { $0.id == userId })?.fullName?.components(separatedBy: " ").first ?? "Someone"
+                Task {
+                    let currentUserId = try? await HavenSupabase.auth.session.user.id
+                    let recipientIds = householdUsers.map(\.id).filter { $0 != currentUserId }
+                    guard !recipientIds.isEmpty else { return }
+                    await PushNotificationService.shared.sendTaskAssignmentNotification(
+                        taskTitle: task.title,
+                        assigneeName: assigneeName,
+                        recipientUserIds: recipientIds,
+                        taskId: task.id
+                    )
+                }
+            }
         } catch {
             print("[TaskDetail] Failed to update assignment: \(error)")
+            // Revert UI to previous state on failure
+            await MainActor.run { assignedUserId = previousUserId }
             Haptics.error()
         }
     }
@@ -796,6 +931,29 @@ struct MaintenanceTaskDetailSheet: View {
                 .frame(maxWidth: .infinity)
                 .frame(height: HavenTheme.buttonHeight)
                 .background(HavenColors.navy)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+            }
+
+            Button {
+                Haptics.light()
+                if let scheduled = task.scheduledDate, let date = dateFormatter.date(from: scheduled) {
+                    scheduledPickerDate = date
+                }
+                showScheduledPicker = true
+            } label: {
+                HStack {
+                    Image(systemName: "calendar.badge.checkmark")
+                    Text(task.scheduledDate != nil ? "Reschedule" : "Scheduled")
+                }
+                .font(HavenTypography.uiButton)
+                .foregroundStyle(HavenColors.navy800)
+                .frame(maxWidth: .infinity)
+                .frame(height: HavenTheme.buttonHeight)
+                .background(HavenColors.creamLight)
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                        .stroke(HavenColors.beige300, lineWidth: 1)
+                )
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
             }
 
@@ -866,6 +1024,47 @@ struct MaintenanceTaskDetailSheet: View {
                                             dismiss()
                                         } catch {
                                             print("[Snooze] Failed: \(error.localizedDescription)")
+                                            Haptics.error()
+                                        }
+                                    }
+                                }
+                                .foregroundStyle(HavenColors.navy)
+                                .fontWeight(.semibold)
+                            }
+                        }
+                }
+                .presentationDetents([.medium])
+            }
+            .sheet(isPresented: $showScheduledPicker) {
+                NavigationStack {
+                    DatePicker("Scheduled Date", selection: $scheduledPickerDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(HavenColors.navy800)
+                        .padding()
+                        .navigationTitle("Schedule Task")
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .topBarLeading) {
+                                Button("Cancel") { showScheduledPicker = false }
+                                    .foregroundStyle(HavenColors.navy)
+                            }
+                            ToolbarItem(placement: .topBarTrailing) {
+                                Button("Save") {
+                                    Task {
+                                        let formatter = DateFormatter()
+                                        formatter.dateFormat = "yyyy-MM-dd"
+                                        do {
+                                            _ = try await DatabaseService.shared.updateMaintenanceTask(
+                                                id: task.id,
+                                                MaintenanceTaskUpdate(
+                                                    scheduledDate: formatter.string(from: scheduledPickerDate)
+                                                )
+                                            )
+                                            Task { await NotificationScheduler.shared.rescheduleAll() }
+                                            Haptics.success()
+                                            showScheduledPicker = false
+                                        } catch {
+                                            print("[Schedule] Failed: \(error.localizedDescription)")
                                             Haptics.error()
                                         }
                                     }

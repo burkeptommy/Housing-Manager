@@ -264,7 +264,9 @@ struct MaintenanceScheduleView: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .background(HavenColors.background)
-        .sheet(item: $selectedTask) { task in
+        .sheet(item: $selectedTask, onDismiss: {
+            Task { await viewModel.loadTasks() }
+        }) { task in
             NavigationStack {
                 MaintenanceTaskDetailSheet(
                     task: task,
@@ -630,6 +632,12 @@ struct MaintenanceScheduleView: View {
 
                     // Metadata row
                     HStack(spacing: 12) {
+                        if let userName = viewModel.assignedUserName(for: task) {
+                            metadataBadge(userName, icon: "person.fill", color: HavenColors.navy)
+                        }
+                        if let vendorName = viewModel.assignedContractorName(for: task) {
+                            metadataBadge(vendorName, icon: "wrench.and.screwdriver", color: HavenColors.info)
+                        }
                         if task.isDiy == true {
                             metadataBadge("DIY", icon: "hand.raised.fill", color: HavenColors.success)
                         }

@@ -22,11 +22,26 @@ struct FamilyItemDetailView: View {
     @State private var showRawEmail = false
     @State private var quickLookURL: URL?
     @State private var isLoadingAttachment = false
+    @State private var attachmentError: String?
     @State private var showRename = false
     @State private var renameText: String = ""
     @State private var showReclassify = false
+    @State private var showSaveAsDocument = false
+    @State private var selectedDocCategory = "Home Inspection/Test Report"
+    @State private var isSavingDocument = false
+    @State private var properties: [PropertyRow] = []
+    @State private var senderSaved = false
+    @State private var isSavingSender = false
 
     private let db = DatabaseService.shared
+
+    private let documentCategories = [
+        "Home Inspection/Test Report", "Inspection Report",
+        "Homeowners Insurance", "Warranty Card",
+        "Vehicle Title", "Deed", "Mortgage", "Property Tax Records",
+        "Utility Bill", "Vendor Contract", "Appliance Manual",
+        "Permit", "Home Document", "Other Personal Documents"
+    ]
 
     init(item: DatabaseService.InboxItemRow, onDelete: @escaping () -> Void, onUpdate: @escaping () -> Void) {
         self.item = item
@@ -130,6 +145,7 @@ struct FamilyItemDetailView: View {
                 // Attachment (tappable — opens QuickLook)
                 if let filename = item.attachmentFilename, let path = item.attachmentPath {
                     Button {
+                        attachmentError = nil
                         Task { await loadAttachment(path: path, filename: filename) }
                     } label: {
                         HavenCard(padding: HavenTheme.spacing12) {
@@ -141,11 +157,11 @@ struct FamilyItemDetailView: View {
                                     .tracking(0.5)
 
                                 HStack(spacing: 10) {
-                                    Image(systemName: item.attachmentContentType?.hasPrefix("image") == true ? "photo.fill" : "doc.fill")
+                                    Image(systemName: attachmentError != nil ? "exclamationmark.triangle.fill" : (item.attachmentContentType?.hasPrefix("image") == true ? "photo.fill" : "doc.fill"))
                                         .font(.title3)
-                                        .foregroundStyle(HavenColors.navy)
+                                        .foregroundStyle(attachmentError != nil ? .orange : HavenColors.navy)
                                         .frame(width: 36, height: 36)
-                                        .background(HavenColors.navy.opacity(0.08))
+                                        .background((attachmentError != nil ? Color.orange : HavenColors.navy).opacity(0.08))
                                         .clipShape(RoundedRectangle(cornerRadius: 8))
 
                                     VStack(alignment: .leading, spacing: 2) {
@@ -153,9 +169,15 @@ struct FamilyItemDetailView: View {
                                             .font(HavenTypography.uiLabel)
                                             .foregroundStyle(HavenColors.textPrimary)
                                             .lineLimit(1)
-                                        Text(isLoadingAttachment ? "Opening..." : "Tap to view")
-                                            .font(HavenTypography.uiCaption)
-                                            .foregroundStyle(HavenColors.navy700)
+                                        if let error = attachmentError {
+                                            Text(error)
+                                                .font(HavenTypography.uiCaption)
+                                                .foregroundStyle(.orange)
+                                        } else {
+                                            Text(isLoadingAttachment ? "Opening..." : "Tap to view")
+                                                .font(HavenTypography.uiCaption)
+                                                .foregroundStyle(HavenColors.navy700)
+                                        }
                                     }
                                     Spacer()
                                     Image(systemName: "eye.fill")
@@ -190,7 +212,7 @@ struct FamilyItemDetailView: View {
 
                         if let ids = item.taggedMemberIds, !ids.isEmpty {
                             FamilyTagFlowLayout(spacing: 6) {
-                                ForEach(ids, id: \.self) { memberId in
+                                ForEach(sortedTagIds(ids), id: \.self) { memberId in
                                     if let member = familyMembers.first(where: { $0.id == memberId }) {
                                         Text("\(member.firstName) \(member.lastName)")
                                             .font(HavenTypography.uiLabelSmall)
@@ -264,15 +286,63 @@ struct FamilyItemDetailView: View {
                     }
                 }
 
-                // From email
-                if let from = item.fromEmail {
-                    HStack(spacing: 6) {
-                        Image(systemName: "envelope.fill")
-                            .font(.caption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        Text(from)
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
+                // Sender contact card
+                if let from = item.fromEmail, !from.isEmpty {
+                    let parsed = Self.parseEmailSender(from)
+                    HavenCard(padding: HavenTheme.spacing12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("FROM")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .fontWeight(.semibold)
+                                .tracking(0.5)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: "person.crop.circle.fill")
+                                    .font(.title2)
+                                    .foregroundStyle(HavenColors.navy.opacity(0.5))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    if let name = parsed.name {
+                                        Text(name)
+                                            .font(HavenTypography.uiLabel)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                    }
+                                    Text(parsed.email)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                }
+
+                                Spacer()
+
+                                if senderSaved {
+                                    Label("Saved", systemImage: "checkmark.circle.fill")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Button {
+                                        Task { await saveSenderAsContact(name: parsed.name, email: parsed.email) }
+                                    } label: {
+                                        HStack(spacing: 4) {
+                                            if isSavingSender {
+                                                ProgressView().controlSize(.mini)
+                                            } else {
+                                                Image(systemName: "person.badge.plus")
+                                                    .font(.caption)
+                                            }
+                                            Text("Save Contact")
+                                                .font(HavenTypography.uiCaption)
+                                        }
+                                        .foregroundStyle(HavenColors.navy700)
+                                        .padding(.horizontal, 10)
+                                        .padding(.vertical, 6)
+                                        .background(HavenColors.navy.opacity(0.08))
+                                        .clipShape(Capsule())
+                                    }
+                                    .disabled(isSavingSender)
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -358,32 +428,43 @@ struct FamilyItemDetailView: View {
         }
         .sheet(isPresented: $showReschedule) {
             NavigationStack {
-                DatePicker("Event Date", selection: $rescheduleDate, displayedComponents: [.date, .hourAndMinute])
-                    .datePickerStyle(.graphical)
-                    .tint(HavenColors.navy800)
-                    .padding()
-                    .navigationTitle("Set Event Date")
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .topBarLeading) {
-                            Button("Cancel") { showReschedule = false }
-                                .foregroundStyle(HavenColors.navy)
-                        }
-                        ToolbarItem(placement: .topBarTrailing) {
-                            Button("Save") {
-                                Task {
-                                    try? await db.updateInboxItemEventDate(id: item.id, eventDate: rescheduleDate)
-                                    Haptics.success()
-                                    showReschedule = false
-                                    onUpdate()
-                                }
-                            }
+                VStack(spacing: 0) {
+                    DatePicker("Date", selection: $rescheduleDate, displayedComponents: .date)
+                        .datePickerStyle(.graphical)
+                        .tint(HavenColors.navy800)
+                        .padding(.horizontal)
+
+                    Divider().padding(.horizontal)
+
+                    DatePicker("Time", selection: $rescheduleDate, displayedComponents: .hourAndMinute)
+                        .datePickerStyle(.wheel)
+                        .labelsHidden()
+                        .frame(height: 100)
+                        .clipped()
+                        .padding(.horizontal)
+                }
+                .navigationTitle("Set Event Date & Time")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { showReschedule = false }
                             .foregroundStyle(HavenColors.navy)
-                            .fontWeight(.semibold)
-                        }
                     }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Save") {
+                            Task {
+                                try? await db.updateInboxItemEventDate(id: item.id, eventDate: rescheduleDate)
+                                Haptics.success()
+                                showReschedule = false
+                                onUpdate()
+                            }
+                        }
+                        .foregroundStyle(HavenColors.navy)
+                        .fontWeight(.semibold)
+                    }
+                }
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.large])
         }
         .sheet(isPresented: $showTagging) {
             NavigationStack {
@@ -452,7 +533,138 @@ struct FamilyItemDetailView: View {
             Button("Travel") { reclassify(category: "travel") }
             Button("Bills") { reclassify(category: "bills") }
             Button("Personal") { reclassify(category: "personal") }
+            if item.attachmentPath != nil {
+                Button("Save as Property Document") { showSaveAsDocument = true }
+            }
             Button("Cancel", role: .cancel) {}
+        }
+        .sheet(isPresented: $showSaveAsDocument) {
+            NavigationStack {
+                List {
+                    Section("Document Type") {
+                        Menu {
+                            ForEach(documentCategories, id: \.self) { cat in
+                                Button { selectedDocCategory = cat } label: {
+                                    HStack {
+                                        Text(cat)
+                                        if selectedDocCategory == cat { Image(systemName: "checkmark") }
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text(selectedDocCategory)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Spacer()
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+
+                    if !properties.isEmpty {
+                        Section("Property") {
+                            ForEach(properties) { prop in
+                                Button {
+                                    Task { await saveAsPropertyDocument(propertyId: prop.id) }
+                                } label: {
+                                    HStack {
+                                        VStack(alignment: .leading) {
+                                            Text(prop.name)
+                                                .font(HavenTypography.body)
+                                                .foregroundStyle(HavenColors.textPrimary)
+                                        }
+                                        Spacer()
+                                        if isSavingDocument {
+                                            ProgressView().controlSize(.mini)
+                                        } else {
+                                            Image(systemName: "arrow.right.circle.fill")
+                                                .foregroundStyle(HavenColors.navy)
+                                        }
+                                    }
+                                }
+                                .disabled(isSavingDocument)
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("Save as Property Document")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Cancel") { showSaveAsDocument = false }
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                }
+                .task {
+                    if properties.isEmpty {
+                        properties = (try? await db.fetchProperties()) ?? []
+                    }
+                }
+            }
+            .presentationDetents([.medium])
+        }
+    }
+
+    static func parseEmailSender(_ raw: String) -> (name: String?, email: String) {
+        // "Tom Burke <tom@example.com>" → ("Tom Burke", "tom@example.com")
+        if let match = raw.range(of: #"^(.+?)\s*<([^>]+)>$"#, options: .regularExpression) {
+            let parts = raw[match]
+            if let angleBracket = raw.firstIndex(of: "<"),
+               let closeBracket = raw.firstIndex(of: ">") {
+                let name = String(raw[raw.startIndex..<angleBracket]).trimmingCharacters(in: .whitespaces)
+                let email = String(raw[raw.index(after: angleBracket)..<closeBracket])
+                return (name.isEmpty ? nil : name, email)
+            }
+        }
+        return (nil, raw.trimmingCharacters(in: .whitespaces))
+    }
+
+    private func saveSenderAsContact(name: String?, email: String) async {
+        isSavingSender = true
+        defer { isSavingSender = false }
+        do {
+            let user = try await db.fetchCurrentUser()
+            guard let householdId = user.householdId else { return }
+
+            // Check if already exists by email
+            let existing = try await db.fetchContractors()
+            if existing.contains(where: { $0.email?.lowercased() == email.lowercased() }) {
+                senderSaved = true
+                return
+            }
+
+            _ = try await db.createContractor(ContractorInsert(
+                householdId: householdId,
+                companyName: name ?? email,
+                phone: "Not provided",
+                email: email,
+                notes: "Added from forwarded email"
+            ))
+            senderSaved = true
+            Haptics.success()
+        } catch {
+            print("[FamilyDetail] Failed to save sender as contact: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Sort tagged member IDs by date of birth (oldest first), nil DOB at end
+    private func sortedTagIds(_ ids: [UUID]) -> [UUID] {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        return ids.sorted { a, b in
+            let memberA = familyMembers.first(where: { $0.id == a })
+            let memberB = familyMembers.first(where: { $0.id == b })
+            let dateA = memberA?.dateOfBirth.flatMap { df.date(from: $0) }
+            let dateB = memberB?.dateOfBirth.flatMap { df.date(from: $0) }
+            switch (dateA, dateB) {
+            case let (a?, b?): return a < b
+            case (_?, nil): return true
+            case (nil, _?): return false
+            case (nil, nil): return false
+            }
         }
     }
 
@@ -464,12 +676,49 @@ struct FamilyItemDetailView: View {
         }
     }
 
+    private func saveAsPropertyDocument(propertyId: UUID) async {
+        isSavingDocument = true
+        defer { isSavingDocument = false }
+        do {
+            _ = try await HavenSupabase.processInboxItem(
+                inboxItemId: item.id.uuidString,
+                propertyId: propertyId.uuidString,
+                action: "process_document",
+                documentCategory: selectedDocCategory
+            )
+            Haptics.success()
+            showSaveAsDocument = false
+            onUpdate()
+        } catch {
+            print("[FamilyDetail] Failed to save as property document: \(error)")
+            Haptics.error()
+        }
+    }
+
     private func loadAttachment(path: String, filename: String) async {
         isLoadingAttachment = true
         defer { isLoadingAttachment = false }
         do {
-            let url = try await db.getInboxAttachmentSignedURL(path: path)
-            let (data, _) = try await URLSession.shared.data(from: url)
+            // Try inbox-attachments bucket first (email-forwarded + new uploads)
+            var url = try await db.getInboxAttachmentSignedURL(path: path)
+            var (data, response) = try await URLSession.shared.data(from: url)
+            var statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+
+            // Fall back to documents bucket (older app-uploaded items)
+            if statusCode != 200 {
+                url = try await db.getDocumentSignedURL(path: path)
+                (data, response) = try await URLSession.shared.data(from: url)
+                statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+            }
+
+            guard statusCode == 200 else {
+                attachmentError = "File not available"
+                return
+            }
+            guard !data.isEmpty else {
+                attachmentError = "File is empty"
+                return
+            }
             let ext = (filename as NSString).pathExtension.isEmpty ? "pdf" : (filename as NSString).pathExtension
             let tempURL = FileManager.default.temporaryDirectory
                 .appendingPathComponent(item.id.uuidString)
@@ -478,6 +727,7 @@ struct FamilyItemDetailView: View {
             quickLookURL = tempURL
         } catch {
             print("[FamilyDetail] Failed to load attachment: \(error)")
+            attachmentError = "Unable to load file"
         }
     }
 

@@ -4,6 +4,7 @@ struct OverdueTasksDetailView: View {
     let tasks: [MaintenanceTaskDBRow]
     let systemNameLookup: (UUID?) -> String?
     let propertyAddress: String
+    @State private var selectedTask: MaintenanceTaskDBRow?
 
     var body: some View {
         ScrollView {
@@ -30,46 +31,56 @@ struct OverdueTasksDetailView: View {
 
                 // Task list
                 ForEach(tasks) { task in
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(HavenColors.critical)
-                            .frame(width: 8, height: 8)
+                    Button {
+                        Haptics.light()
+                        selectedTask = task
+                    } label: {
+                        HStack(spacing: 12) {
+                            Circle()
+                                .fill(HavenColors.critical)
+                                .frame(width: 8, height: 8)
 
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(task.title)
-                                .font(HavenTypography.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundStyle(HavenColors.textPrimary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(task.title)
+                                    .font(HavenTypography.subheadline)
+                                    .fontWeight(.medium)
+                                    .foregroundStyle(HavenColors.textPrimary)
 
-                            HStack(spacing: 8) {
-                                if let systemName = systemNameLookup(task.systemId) {
-                                    Text(systemName)
+                                HStack(spacing: 8) {
+                                    if let systemName = systemNameLookup(task.systemId) {
+                                        Text(systemName)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+
+                                    Text(task.frequency)
                                         .font(HavenTypography.uiCaption)
                                         .foregroundStyle(HavenColors.textTertiary)
                                 }
 
-                                Text(task.frequency)
+                                Text("Due: \(task.nextDueDate.havenDateShort)")
                                     .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
+                                    .foregroundStyle(HavenColors.critical)
+
+                                if let costRange = task.costRange {
+                                    Text("Est. \(costRange)")
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
                             }
 
-                            Text("Due: \(task.nextDueDate.havenDateShort)")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.critical)
+                            Spacer()
 
-                            if let costRange = task.costRange {
-                                Text("Est. \(costRange)")
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(HavenColors.textTertiary)
                         }
-
-                        Spacer()
+                        .padding()
+                        .background(HavenColors.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .havenShadow()
                     }
-                    .padding()
-                    .background(HavenColors.surface)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .havenShadow()
+                    .buttonStyle(.plain)
                 }
 
                 // Scenario prompt
@@ -102,5 +113,11 @@ struct OverdueTasksDetailView: View {
         .navigationTitle("Overdue Tasks")
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("OverdueTasksDetailView", properties: ["task_count": tasks.count])
+        .sheet(item: $selectedTask) { task in
+            NavigationStack {
+                MaintenanceTaskDetailSheet(task: task)
+            }
+            .presentationDetents([.medium, .large])
+        }
     }
 }

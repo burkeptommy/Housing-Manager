@@ -409,6 +409,9 @@ verify_jwt = false
 [functions.research-item-alternative]
 verify_jwt = false
 
+[functions.send-push-notification]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327

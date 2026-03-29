@@ -54,20 +54,31 @@ struct ChatView: View {
                 viewModel.contextId = contextId
                 await viewModel.loadHistory()
                 if let contextId, let contextType {
-                    do {
-                        if contextType == "document" {
-                            let doc = try await DatabaseService.shared.fetchDocument(id: contextId)
-                            contextName = doc.title
-                        } else if contextType == "property" {
-                            let prop = try await DatabaseService.shared.fetchProperty(id: contextId)
-                            contextName = prop.name
-                        }
-                    } catch {}
+                    await loadContextName(type: contextType, id: contextId)
                 }
                 if let initialPrompt, !initialPrompt.isEmpty {
                     viewModel.inputText = initialPrompt
                     try? await Task.sleep(nanoseconds: 500_000_000)
                     await viewModel.sendMessage()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openAlfredWithContext)) { notification in
+                guard let userInfo = notification.userInfo,
+                      let ctxType = userInfo["contextType"] as? String,
+                      let ctxIdStr = userInfo["contextId"] as? String,
+                      let ctxId = UUID(uuidString: ctxIdStr) else { return }
+                let message = userInfo["message"] as? String
+
+                viewModel.contextType = ctxType
+                viewModel.contextId = ctxId
+
+                Task {
+                    await loadContextName(type: ctxType, id: ctxId)
+                    if let message, !message.isEmpty {
+                        viewModel.inputText = message
+                        try? await Task.sleep(nanoseconds: 300_000_000)
+                        await viewModel.sendMessage()
+                    }
                 }
             }
             .sheet(isPresented: $showScanner) {
@@ -428,6 +439,21 @@ struct ChatView: View {
     private func sendMessage() async {
         Haptics.light()
         await viewModel.sendMessage()
+    }
+
+    private func loadContextName(type: String, id: UUID) async {
+        do {
+            if type == "document" {
+                let doc = try await DatabaseService.shared.fetchDocument(id: id)
+                contextName = doc.title
+            } else if type == "property" {
+                let prop = try await DatabaseService.shared.fetchProperty(id: id)
+                contextName = prop.name
+            } else if type == "project" {
+                let allProjects = try await DatabaseService.shared.fetchAllProjects()
+                contextName = allProjects.first(where: { $0.id == id })?.name
+            }
+        } catch {}
     }
 
     // MARK: - File Handling

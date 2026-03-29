@@ -165,56 +165,14 @@ serve(async (req: Request) => {
 
     const householdId = emailRecord.household_id;
 
-    // --- WHITELIST CHECK: Only process emails from allowed senders ---
-    // SendGrid's "from" can be "Display Name <email@example.com>" — extract just the email
-    const senderEmail = (() => {
-      const match = fromAddress.match(/<([^>]+)>/);
-      return (match ? match[1] : fromAddress).trim().toLowerCase();
-    })();
-
-    if (senderEmail) {
-      const { data: allowedSender } = await supabase
-        .from("household_allowed_senders")
-        .select("id")
-        .eq("household_id", householdId)
-        .ilike("email", senderEmail)
-        .limit(1);
-
-      if (!allowedSender || allowedSender.length === 0) {
-        console.log(`[receive-email] Sender not whitelisted: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
-        return new Response(
-          JSON.stringify({ success: true, rejected: true, reason: "sender_not_whitelisted" }),
-          { status: 200, headers }
-        );
-      }
-    }
-
-    // --- DEDUPLICATION: Prevent SendGrid retries from creating duplicate items ---
-    // Hash the email fingerprint (from + subject + attachment name + body length)
+    // --- COMPUTE EMAIL HASH (needed for dedup + placeholder) ---
     const emailFingerprint = `${fromAddress}|${subject}|${attachmentFilename || ""}|${emailBody.length}`;
     const encoder = new TextEncoder();
     const hashBuffer = await crypto.subtle.digest("SHA-256", encoder.encode(emailFingerprint));
     const emailHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
 
-    // Check if we already processed this exact email (48-hour window covers all SendGrid retries)
-    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-    const { data: existing } = await supabase
-      .from("inbox_items")
-      .select("id")
-      .eq("household_id", householdId)
-      .gte("created_at", twoDaysAgo)
-      .eq("email_hash", emailHash)
-      .limit(1);
-
-    if (existing && existing.length > 0) {
-      console.log(`[receive-email] Duplicate detected (hash=${emailHash.substring(0, 12)}), skipping`);
-      return new Response(
-        JSON.stringify({ success: true, deduplicated: true }),
-        { status: 200, headers }
-      );
-    }
-
     // --- CREATE "PROCESSING" PLACEHOLDER so user sees immediate feedback ---
+    // This is created BEFORE whitelist/dedup checks so the user always knows an email arrived.
     const placeholderTitle = subject
       ? `Processing email: ${subject}`
       : fromAddress
@@ -242,6 +200,63 @@ serve(async (req: Request) => {
     const placeholderId = placeholderItem?.id;
     console.log(`[receive-email] Created processing placeholder: ${placeholderId}`);
 
+    // --- WHITELIST CHECK: Only process emails from allowed senders ---
+    // SendGrid's "from" can be "Display Name <email@example.com>" — extract just the email
+    const senderEmail = (() => {
+      const match = fromAddress.match(/<([^>]+)>/);
+      return (match ? match[1] : fromAddress).trim().toLowerCase();
+    })();
+
+    if (senderEmail) {
+      const { data: allowedSender } = await supabase
+        .from("household_allowed_senders")
+        .select("id")
+        .eq("household_id", householdId)
+        .ilike("email", senderEmail)
+        .limit(1);
+
+      if (!allowedSender || allowedSender.length === 0) {
+        console.log(`[receive-email] Sender not whitelisted: ${senderEmail} (raw: ${fromAddress}) for household ${householdId}`);
+        // Update placeholder to show rejection reason instead of silently returning
+        if (placeholderId) {
+          await supabase.from("inbox_items").update({
+            type: "other",
+            title: `Email not processed: sender not recognized`,
+            summary: `An email from ${senderEmail} was received but not processed because this sender is not in your allowed senders list. You can add them in Settings → Allowed Senders.`,
+            status: "ready",
+            needs_action: false,
+          }).eq("id", placeholderId);
+        }
+        return new Response(
+          JSON.stringify({ success: true, rejected: true, reason: "sender_not_whitelisted" }),
+          { status: 200, headers }
+        );
+      }
+    }
+
+    // --- DEDUPLICATION: Prevent SendGrid retries from creating duplicate items ---
+    const twoDaysAgo = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+    const { data: existing } = await supabase
+      .from("inbox_items")
+      .select("id")
+      .eq("household_id", householdId)
+      .gte("created_at", twoDaysAgo)
+      .eq("email_hash", emailHash)
+      .neq("status", "processing")
+      .limit(1);
+
+    if (existing && existing.length > 0) {
+      console.log(`[receive-email] Duplicate detected (hash=${emailHash.substring(0, 12)}), skipping`);
+      // Remove the placeholder — the original item already exists
+      if (placeholderId) {
+        await supabase.from("inbox_items").delete().eq("id", placeholderId);
+      }
+      return new Response(
+        JSON.stringify({ success: true, deduplicated: true }),
+        { status: 200, headers }
+      );
+    }
+
     // --- PERSIST ATTACHMENT TO STORAGE (before any processing) ---
     let attachmentStoragePath: string | null = null;
     if (attachmentBase64) {
@@ -264,14 +279,14 @@ serve(async (req: Request) => {
       }
     }
 
-    // Get the primary property
+    // Get ALL properties for this household (for address matching)
     const { data: properties } = await supabase
       .from("properties")
-      .select("id, city, state, name")
-      .eq("household_id", householdId)
-      .limit(1);
+      .select("id, name, street, city, state, zip_code")
+      .eq("household_id", householdId);
 
-    const property = properties?.[0];
+    // Default to first property; may be overridden by address matching below
+    let property = properties?.[0] ?? null;
     const location = property ? [property.city, property.state].filter(Boolean).join(", ") : null;
 
     // --- CLASSIFY EMAIL WITH CLAUDE ---
@@ -310,7 +325,7 @@ SUBJECT: ${subject}
 BODY (first 3000 chars):
 ${emailBody.substring(0, 3000)}
 ${attachmentBase64 ? `\n[Email has a ${attachmentContentType || "file"} attachment${attachmentFilename ? ` named "${attachmentFilename}"` : ""}]` : ""}
-${bodyIsMinimal && attachmentBase64 ? `\n[IMPORTANT: The email body is minimal/empty but has a ${attachmentContentType || "file"} attachment${attachmentFilename ? ` named "${attachmentFilename}"` : ""}. The user forwarded this specifically for the attachment. Classify based on the subject line, sender, attachment name, and most likely intent. If this looks like a home-related document (report, inspection, test, survey, appraisal), classify as "home_document". If it looks medical, classify as "family" with familyCategory "medical". Do NOT classify as "other" when an attachment is present — make your best guess.]` : ""}
+${bodyIsMinimal && attachmentBase64 ? `\n[IMPORTANT: The email body is minimal/empty but has a ${attachmentContentType || "file"} attachment${attachmentFilename ? ` named "${attachmentFilename}"` : ""}. The user forwarded this specifically for the attachment. Classify based on the attachment content, subject line, sender, attachment name, and most likely intent. Reports about the property (radon, inspection, mold, water, lead, energy, termite, appraisal, survey, environmental, air quality) MUST be classified as "home_document" — these are NOT "family" or "other". Only classify as "family" if it's clearly about a person (medical, school, activities). Do NOT classify as "other" when an attachment is present — make your best guess.]` : ""}
 ${hasQuoteSignals ? `\n[NOTE: The subject line contains quote/estimate/proposal keywords — this is very likely a contractor_quote even if the body is empty.]` : ""}
 
 Classify this email into ONE of these types:
@@ -319,7 +334,7 @@ Classify this email into ONE of these types:
 - "bill_invoice": A bill, invoice, statement, payment notice, membership dues, or recurring charge NOT related to home renovation/repair. Examples: club memberships, subscriptions, utility bills, tuition, medical bills. If it could be a contractor invoice for home work, classify as "contractor_quote" instead.
 - "estate_document": A legal document, HOMEOWNERS insurance policy, property tax, deed, mortgage, trust, will, or financial planning document. IMPORTANT: health/medical insurance cards, medical records, prescriptions, and doctor correspondence are NOT estate documents — classify those as "family" with familyCategory "medical".
 - "vendor_contact": Contact information for a service provider, contractor, or vendor (not a quote)
-- "home_document": A home-related document (warranty, receipt, manual, permit, inspection report)
+- "home_document": A home-related document — warranty, receipt, manual, permit, inspection report, test report (radon, water quality, mold, lead, asbestos, air quality, termite, pest), home inspection, appraisal, survey, property assessment, environmental report, energy audit, or any document about the physical property/home itself
 - "family": Personal/family email — school communications, event invitations, birthday/party info, kids' activities, sports/extracurriculars, family travel, personal appointments, work/school schedules, newsletters, permission slips, report cards, medical/dental appointments, health insurance cards, medical records, prescriptions, or any personal/family life content. Also use for health/medical insurance documents.
 - "other": Anything that doesn't fit the above categories
 
@@ -351,8 +366,41 @@ Respond with ONLY valid JSON:
   "adjusterPhone": "Phone number of adjuster if mentioned, or null",
   "adjusterEmail": "Email of adjuster if mentioned, or null",
   "insuranceCompany": "Name of insurance company if mentioned, or null",
-  "policyNumber": "Policy number if mentioned, or null"
+  "policyNumber": "Policy number if mentioned, or null",
+  "propertyAddress": "Street address of the property this document relates to, if mentioned anywhere in the email or document (e.g. '123 Main St', '456 Oak Ave, Springfield'), or null"
 }`;
+
+    // Build classification message — include PDF content when body is minimal
+    const classMessages: Array<{ role: string; content: unknown }> = [];
+    if (bodyIsMinimal && attachmentBase64 && hasPdfAttachment) {
+      // Send the PDF to Claude so it can read the actual content for classification
+      console.log(`[receive-email] Including PDF in classification (minimal body + PDF attachment)`);
+      classMessages.push({
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: "application/pdf", data: attachmentBase64 },
+          },
+          { type: "text", text: classificationPrompt },
+        ],
+      });
+    } else if (bodyIsMinimal && attachmentBase64 && attachmentContentType?.startsWith("image/")) {
+      // Send images to Claude too
+      console.log(`[receive-email] Including image in classification (minimal body + image attachment)`);
+      classMessages.push({
+        role: "user",
+        content: [
+          {
+            type: "image",
+            source: { type: "base64", media_type: attachmentContentType, data: attachmentBase64 },
+          },
+          { type: "text", text: classificationPrompt },
+        ],
+      });
+    } else {
+      classMessages.push({ role: "user", content: classificationPrompt });
+    }
 
     const classResponse = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -364,12 +412,22 @@ Respond with ONLY valid JSON:
       body: JSON.stringify({
         model: "claude-sonnet-4-6",
         max_tokens: 1024,
-        messages: [{ role: "user", content: classificationPrompt }],
+        messages: classMessages,
       }),
     });
 
     if (!classResponse.ok) {
       console.error(`[receive-email] Classification failed: ${classResponse.status}`);
+      // Update placeholder to show failure instead of leaving it stuck
+      if (placeholderId) {
+        await supabase.from("inbox_items").update({
+          type: "other",
+          title: `Email could not be processed: ${subject || "No subject"}`,
+          summary: `We received your email from ${fromAddress || "unknown sender"} but couldn't classify it. Try forwarding it again.`,
+          status: "ready",
+          needs_action: false,
+        }).eq("id", placeholderId);
+      }
       return new Response(
         JSON.stringify({ error: "Failed to classify email" }),
         { status: 502, headers }
@@ -388,6 +446,41 @@ Respond with ONLY valid JSON:
     }
 
     console.log(`[receive-email] Classification: type=${classification.type}, confidence=${classification.confidence}, vendor=${classification.vendorName}`);
+
+    // --- PROPERTY ADDRESS MATCHING ---
+    // If Claude extracted an address from the document, match it to a property
+    const extractedAddress = (classification as any).propertyAddress;
+    let addressMatched = false;
+    let addressUnmatched = false;
+    if (extractedAddress && properties && properties.length > 0) {
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const extracted = normalize(extractedAddress);
+      let matched = false;
+      for (const prop of properties) {
+        const propStreet = normalize(prop.street || "");
+        // Match if the extracted address contains the property's street name
+        if (propStreet.length > 3 && extracted.includes(propStreet)) {
+          property = prop;
+          matched = true;
+          addressMatched = true;
+          console.log(`[receive-email] Address matched to property: ${prop.name} (${prop.street})`);
+          break;
+        }
+      }
+      // If no street match, try city as a weaker signal (only for single-property households)
+      if (!matched && properties.length === 1) {
+        const propCity = normalize(properties[0].city || "");
+        if (propCity.length > 3 && extracted.includes(propCity)) {
+          matched = true;
+          addressMatched = true;
+          console.log(`[receive-email] City matched to single property: ${properties[0].name}`);
+        }
+      }
+      if (!matched) {
+        addressUnmatched = true;
+        console.log(`[receive-email] Address "${extractedAddress}" did not match any property`);
+      }
+    }
 
     // --- ACTION RESULTS ---
     const actions: string[] = [];
@@ -815,10 +908,10 @@ Respond with ONLY valid JSON:
         if (claimProject) {
           createdProjectId = claimProject.id;
 
-          // Store attachment as a project file
+          // Store primary attachment as a project file
           if (attachmentStoragePath) {
             try {
-              await supabase.from("project_files").insert({
+              const { error: pfErr } = await supabase.from("project_files").insert({
                 project_id: claimProject.id,
                 household_id: householdId,
                 file_path: attachmentStoragePath,
@@ -826,14 +919,92 @@ Respond with ONLY valid JSON:
                 content_type: attachmentContentType,
                 notes: `From email: ${subject}`,
               });
-              actions.push("claim_file_attached");
+              if (pfErr) {
+                console.error(`[receive-email] project_files insert failed: ${pfErr.message}`);
+              } else {
+                actions.push("claim_file_attached");
+              }
             } catch (err) {
               console.error(`[receive-email] Failed to attach claim file: ${err}`);
+            }
+          } else {
+            console.log(`[receive-email] Insurance claim has no primary attachment to store`);
+          }
+
+          // Store additional attachments as project files too
+          for (const att of additionalAttachments) {
+            try {
+              const filePath = `${householdId}/${crypto.randomUUID()}`;
+              const fileBuffer = Uint8Array.from(atob(att.base64), c => c.charCodeAt(0));
+              const { error: upErr } = await supabase.storage
+                .from("inbox-attachments")
+                .upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
+              if (!upErr) {
+                const { error: pfErr } = await supabase.from("project_files").insert({
+                  project_id: claimProject.id,
+                  household_id: householdId,
+                  file_path: filePath,
+                  filename: att.filename || "claim_document",
+                  content_type: att.contentType,
+                  notes: `From email: ${subject}`,
+                });
+                if (pfErr) {
+                  console.error(`[receive-email] Additional claim file insert failed: ${pfErr.message}`);
+                } else {
+                  actions.push(`claim_file_attached:${att.filename}`);
+                }
+              } else {
+                console.error(`[receive-email] Additional claim file upload failed: ${upErr.message}`);
+              }
+            } catch (err) {
+              console.error(`[receive-email] Failed to attach additional claim file: ${err}`);
             }
           }
 
           // Raw email body is stored in ai_research.emailSummaries[].rawBody
           // No separate file upload needed — viewable via "Show Original Email" in the app
+
+          // --- Add adjuster as a home contact ---
+          if (claimInfo.adjusterName && (claimInfo.adjusterPhone || claimInfo.adjusterEmail)) {
+            try {
+              // Check if adjuster already exists
+              const { data: existingAdj } = await supabase
+                .from("contractors")
+                .select("id")
+                .eq("household_id", householdId)
+                .ilike("company_name", `%${claimInfo.adjusterName}%`)
+                .limit(1);
+
+              if (!existingAdj || existingAdj.length === 0) {
+                const adjCompany = claimInfo.insuranceCompany
+                  ? `${claimInfo.adjusterName} (${claimInfo.insuranceCompany})`
+                  : claimInfo.adjusterName;
+                const { data: newAdj } = await supabase
+                  .from("contractors")
+                  .insert({
+                    household_id: householdId,
+                    company_name: adjCompany,
+                    contact_name: claimInfo.adjusterName,
+                    phone: claimInfo.adjusterPhone || "Not provided",
+                    email: claimInfo.adjusterEmail || null,
+                    specialties: ["Insurance Claims"],
+                    notes: `Claims adjuster${claimInfo.insuranceCompany ? ` at ${claimInfo.insuranceCompany}` : ""}.\nAdded from insurance claim email: ${subject}`,
+                  })
+                  .select("id")
+                  .single();
+                if (newAdj) {
+                  createdContractorId = newAdj.id;
+                  actions.push(`created_vendor:${adjCompany}`);
+                  console.log(`[receive-email] Added adjuster as contact: ${adjCompany}`);
+                }
+              } else {
+                createdContractorId = existingAdj[0].id;
+                actions.push(`matched_existing_vendor:${claimInfo.adjusterName}`);
+              }
+            } catch (err) {
+              console.error(`[receive-email] Failed to add adjuster as contact: ${err}`);
+            }
+          }
         }
       } else {
         actions.push("insurance_claim_no_property");
@@ -889,8 +1060,8 @@ Respond with ONLY valid JSON:
     }
 
     // --- STEP 2.5: PROCESS ADDITIONAL ATTACHMENTS AS DOCUMENTS ---
-    // Skip for family/bill emails — those are handled by Step 2.5a above
-    if (additionalAttachments.length > 0 && property && classification.type !== "family" && classification.type !== "bill_invoice") {
+    // Skip for family/bill/insurance_claim emails — those are handled above
+    if (additionalAttachments.length > 0 && property && classification.type !== "family" && classification.type !== "bill_invoice" && classification.type !== "insurance_claim") {
       for (const att of additionalAttachments) {
         try {
           const filePath = `${householdId}/${crypto.randomUUID()}`;
@@ -966,7 +1137,15 @@ Respond with ONLY valid JSON:
           : `New project: ${projectLabel}`;
       } else if (createdDocumentId) {
         mainType = "document_stored";
-        mainTitle = `Document saved: ${classification.documentTitle || subject}`;
+        if (addressMatched && property) {
+          mainTitle = `Document saved to ${property.name}: ${classification.documentTitle || subject}`;
+        } else if (addressUnmatched) {
+          mainTitle = `Document saved: ${classification.documentTitle || subject}`;
+          mainNeedsAction = true;
+          mainActionType = "review";
+        } else {
+          mainTitle = `Document saved: ${classification.documentTitle || subject}`;
+        }
       } else if (actions.includes("needs_property_assignment")) {
         mainType = "contractor_quote";
         mainTitle = `Quote received: ${classification.projectType || classification.vendorName || subject || "Contractor Quote"}`;
@@ -1000,18 +1179,8 @@ Respond with ONLY valid JSON:
         mainActionType = "review";
       }
 
-      // Delete the processing placeholder and any stale processing items (>10 min old)
-      if (placeholderId) {
-        await supabase.from("inbox_items").delete().eq("id", placeholderId);
-      }
-      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
-      await supabase.from("inbox_items")
-        .delete()
-        .eq("household_id", householdId)
-        .eq("status", "processing")
-        .lt("created_at", tenMinAgo);
-
-      await supabase.from("inbox_items").insert({
+      // Insert the final inbox item FIRST, then delete placeholder only on success
+      const { error: inboxInsertErr } = await supabase.from("inbox_items").insert({
         household_id: householdId,
         type: mainType,
         title: mainTitle,
@@ -1032,29 +1201,73 @@ Respond with ONLY valid JSON:
         family_member_name: classification.type === "family" ? ((classification as any).familyMemberName || null) : null,
         event_date: (classification as any).eventDate || null,
       });
-      actions.push("inbox_item_created");
 
-      // --- Confirmation prompt: new vendor added ---
+      if (inboxInsertErr) {
+        console.error(`[receive-email] Final inbox item insert failed: ${inboxInsertErr.message}`);
+        // Update placeholder to show failure instead of deleting it
+        if (placeholderId) {
+          await supabase.from("inbox_items").update({
+            type: mainType || "other",
+            title: mainTitle || `Email processed: ${subject || "No subject"}`,
+            summary: (baseSummary || `Email from ${fromAddress}`) + "\n\n(Note: Some details may not have saved correctly.)",
+            status: "ready",
+            from_email: fromAddress,
+            attachment_path: attachmentStoragePath,
+            attachment_content_type: attachmentContentType,
+            attachment_filename: attachmentFilename,
+            related_project_id: createdProjectId,
+            needs_action: false,
+          }).eq("id", placeholderId);
+        }
+        actions.push("inbox_item_insert_failed");
+      } else {
+        actions.push("inbox_item_created");
+        // Delete the processing placeholder now that the real item exists
+        if (placeholderId) {
+          await supabase.from("inbox_items").delete().eq("id", placeholderId);
+        }
+      }
+
+      // Clean up stale processing items (>10 min old)
+      const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+      await supabase.from("inbox_items")
+        .delete()
+        .eq("household_id", householdId)
+        .eq("status", "processing")
+        .lt("created_at", tenMinAgo);
+
+      // --- Confirmation prompt: new vendor/contact added ---
       const isNewVendor = actions.some(a => a.startsWith("created_vendor:"));
-      if (isNewVendor && classification.vendorName) {
-        await supabase.from("inbox_items").insert({
-          household_id: householdId,
-          type: "vendor_added",
-          email_hash: emailHash + ":vendor",
-          title: `Add ${classification.vendorName} as a Home Contact?`,
-          summary: `We detected ${classification.vendorName} from your forwarded email. They've been added to your contacts${classification.vendorSpecialties?.length > 0 ? ` as a ${classification.vendorSpecialties.join(", ")} specialist` : ""}. You can edit their details anytime.`,
-          from_email: fromAddress,
-          related_contractor_id: createdContractorId,
-          needs_action: false,
-          metadata: {
-            ...baseMetadata,
-            proposed_action: "confirm_vendor",
-            vendor_name: classification.vendorName,
-            vendor_phone: classification.vendorPhone,
-            vendor_specialties: classification.vendorSpecialties,
-          },
-        });
-        actions.push("vendor_notification_created");
+      if (isNewVendor) {
+        // Get the vendor name from the action (handles both regular vendors and insurance adjusters)
+        const vendorAction = actions.find(a => a.startsWith("created_vendor:"));
+        const vendorDisplayName = vendorAction ? vendorAction.split(":").slice(1).join(":") : classification.vendorName;
+        if (vendorDisplayName) {
+          const claimInfo = classification as any;
+          const isAdjuster = classification.type === "insurance_claim" && claimInfo.adjusterName;
+          await supabase.from("inbox_items").insert({
+            household_id: householdId,
+            type: "vendor_added",
+            email_hash: emailHash + ":vendor",
+            title: isAdjuster
+              ? `Added claims adjuster: ${vendorDisplayName}`
+              : `Add ${vendorDisplayName} as a Home Contact?`,
+            summary: isAdjuster
+              ? `${claimInfo.adjusterName} from ${claimInfo.insuranceCompany || "your insurance company"} has been added to your contacts as an Insurance Claims specialist. You can edit their details anytime.`
+              : `We detected ${vendorDisplayName} from your forwarded email. They've been added to your contacts${classification.vendorSpecialties?.length > 0 ? ` as a ${classification.vendorSpecialties.join(", ")} specialist` : ""}. You can edit their details anytime.`,
+            from_email: fromAddress,
+            related_contractor_id: createdContractorId,
+            needs_action: false,
+            metadata: {
+              ...baseMetadata,
+              proposed_action: "confirm_vendor",
+              vendor_name: vendorDisplayName,
+              vendor_phone: isAdjuster ? claimInfo.adjusterPhone : classification.vendorPhone,
+              vendor_specialties: isAdjuster ? ["Insurance Claims"] : classification.vendorSpecialties,
+            },
+          });
+          actions.push("vendor_notification_created");
+        }
       }
 
       // --- Confirmation prompt: project match (when we matched an existing project) ---
@@ -1102,6 +1315,28 @@ Respond with ONLY valid JSON:
           },
         });
         actions.push("document_category_confirmation_created");
+      }
+
+      // --- Confirmation prompt: unrecognized property address ---
+      if (addressUnmatched && extractedAddress) {
+        const propNames = (properties || []).map((p: any) => p.name).join(", ");
+        await supabase.from("inbox_items").insert({
+          household_id: householdId,
+          type: "other",
+          email_hash: emailHash + ":address",
+          title: `Unknown property address: ${extractedAddress}`,
+          summary: `This document references "${extractedAddress}" which doesn't match any of your properties${propNames ? ` (${propNames})` : ""}. You can add this property in Settings, or save this as a personal document instead.`,
+          from_email: fromAddress,
+          related_document_id: createdDocumentId,
+          needs_action: true,
+          action_type: "review",
+          metadata: {
+            ...baseMetadata,
+            proposed_action: "review_property_address",
+            extracted_address: extractedAddress,
+          },
+        });
+        actions.push("unmatched_address_notification_created");
       }
     }
 

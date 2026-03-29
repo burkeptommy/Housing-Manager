@@ -102,10 +102,7 @@ struct DashboardView: View {
                         )
 
                         // ESTATE READINESS (uses shared vault view model for consistent levels)
-                        NavigationLink {
-                            ReadinessDetailView()
-                                .environmentObject(vaultViewModel)
-                        } label: {
+                        NavigationLink(value: "estate_readiness") {
                             CompletionScorecard(vaultViewModel: vaultViewModel)
                         }
                         .buttonStyle(.plain)
@@ -209,6 +206,13 @@ struct DashboardView: View {
                     InboxView()
                 } else if destination == "security" {
                     SecurityDashboardView()
+                } else if destination == "maintenance" {
+                    MaintenanceScheduleView()
+                } else if destination == "estate_readiness" {
+                    ReadinessDetailView()
+                        .environmentObject(vaultViewModel)
+                } else if destination == "email_forwarding" {
+                    ProjectEmailView()
                 } else if destination.hasPrefix("inbox_item_"),
                           let itemId = UUID(uuidString: String(destination.dropFirst("inbox_item_".count))),
                           let item = viewModel.inboxItems.first(where: { $0.id == itemId }) {
@@ -463,9 +467,7 @@ struct DashboardView: View {
     // MARK: - Home Maintenance Card
 
     private var homeMaintenanceCard: some View {
-        NavigationLink {
-            MaintenanceScheduleView()
-        } label: {
+        NavigationLink(value: "maintenance") {
             VStack(spacing: HavenTheme.spacing16) {
                 HStack(spacing: HavenTheme.spacing24) {
                     VStack(alignment: .leading, spacing: 4) {
@@ -583,9 +585,7 @@ struct DashboardView: View {
     // MARK: - Email Forwarding Callout
 
     private var emailForwardingCallout: some View {
-        NavigationLink {
-            ProjectEmailView()
-        } label: {
+        NavigationLink(value: "email_forwarding") {
             HStack(spacing: 12) {
                 Image(systemName: "envelope.arrow.triangle.branch.fill")
                     .font(.system(size: 20))
