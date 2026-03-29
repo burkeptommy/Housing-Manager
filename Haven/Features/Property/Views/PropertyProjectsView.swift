@@ -93,10 +93,10 @@ struct PropertyProjectsView: View {
     private func projectCard(_ project: PropertyProjectRow) -> some View {
         HavenCard {
             HStack(alignment: .top) {
-                let cat = ProjectCategory(rawValue: project.category)
-                Image(systemName: cat?.icon ?? "hammer.fill")
+                let cardIcon = project.projectType == "insurance_claim" ? "shield.fill" : (ProjectCategory(rawValue: project.category)?.icon ?? "hammer.fill")
+                Image(systemName: cardIcon)
                     .font(.title3)
-                    .foregroundStyle(HavenColors.navy)
+                    .foregroundStyle(project.projectType == "insurance_claim" ? HavenColors.critical : HavenColors.navy)
                     .frame(width: 32, height: 32)
 
                 VStack(alignment: .leading, spacing: 4) {
@@ -133,13 +133,23 @@ struct PropertyProjectsView: View {
     }
 
     private func approachBadge(_ type: String) -> some View {
-        let label = type == "diy" ? "DIY" : "Pro"
-        return Text(label)
-            .font(.system(size: 9, weight: .semibold))
-            .foregroundStyle(HavenColors.navy700)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(HavenColors.navy.opacity(0.08))
-            .clipShape(Capsule())
+        let (label, icon, color): (String, String?, Color) = switch type {
+        case "diy": ("DIY", nil, HavenColors.navy700)
+        case "insurance_claim": ("Insurance Claim", "shield.fill", HavenColors.critical)
+        default: ("Pro", nil, HavenColors.navy700)
+        }
+        return HStack(spacing: 3) {
+            if let icon {
+                Image(systemName: icon)
+                    .font(.system(size: 8))
+            }
+            Text(label)
+        }
+        .font(.system(size: 9, weight: .semibold))
+        .foregroundStyle(color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.08))
+        .clipShape(Capsule())
     }
 }
