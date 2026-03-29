@@ -76,9 +76,16 @@ struct FamilyInboxView: View {
                 .modifier(FamilyFilePickerModifiers(showPhotoPicker: $showPhotoPicker, showFilePicker: $showFilePicker, selectedPhoto: $selectedPhoto, onPhoto: handlePhotoSelection, onFile: handleFileSelection))
         } else {
             List {
-                // Upcoming events hero (next 5)
+                // Upcoming events hero (next 5) — no sticky header
                 if !upcomingEvents.isEmpty {
                     Section {
+                        Text("UPCOMING")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                         ForEach(upcomingEvents) { event in
                             upcomingEventRow(event)
                                 .listRowSeparator(.hidden)
@@ -103,11 +110,6 @@ struct FamilyInboxView: View {
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
                         }
-                    } header: {
-                        Text("UPCOMING")
-                            .font(HavenTypography.uiSectionHeader)
-                            .tracking(1.5)
-                            .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
 
@@ -124,6 +126,13 @@ struct FamilyInboxView: View {
                 // All items grouped by date
                 ForEach(groupedItems, id: \.label) { group in
                     Section {
+                        Text(group.label)
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 4, trailing: 16))
                         ForEach(group.items) { item in
                             familyItemCard(item)
                                 .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -138,11 +147,6 @@ struct FamilyInboxView: View {
                                 .listRowBackground(Color.clear)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                         }
-                    } header: {
-                        Text(group.label)
-                            .font(HavenTypography.uiSectionHeader)
-                            .tracking(1.5)
-                            .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
 
@@ -731,6 +735,7 @@ struct FamilyInboxView: View {
         case "activities": return "figure.run"
         case "travel": return "airplane"
         case "personal": return "person.fill"
+        case "bills": return "dollarsign.circle.fill"
         default: return "envelope.fill"
         }
     }
@@ -748,6 +753,7 @@ struct FamilyInboxView: View {
         case "activities": return HavenColors.success
         case "travel": return HavenColors.navy
         case "personal": return HavenColors.textSecondary
+        case "bills": return .orange
         default: return HavenColors.navy
         }
     }

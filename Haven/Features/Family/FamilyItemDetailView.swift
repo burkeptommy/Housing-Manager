@@ -121,6 +121,41 @@ struct FamilyItemDetailView: View {
                     }
                 }
 
+                // Attachment
+                if let filename = item.attachmentFilename {
+                    HavenCard(padding: HavenTheme.spacing12) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("ATTACHMENT")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .fontWeight(.semibold)
+                                .tracking(0.5)
+
+                            HStack(spacing: 10) {
+                                Image(systemName: item.attachmentContentType?.hasPrefix("image") == true ? "photo.fill" : "doc.fill")
+                                    .font(.title3)
+                                    .foregroundStyle(HavenColors.navy)
+                                    .frame(width: 36, height: 36)
+                                    .background(HavenColors.navy.opacity(0.08))
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(filename)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                        .lineLimit(1)
+                                    if let ct = item.attachmentContentType {
+                                        Text(ct)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+
                 // Tagged members
                 HavenCard(padding: HavenTheme.spacing12) {
                     VStack(alignment: .leading, spacing: 8) {

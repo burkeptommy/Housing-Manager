@@ -17,7 +17,7 @@ const corsHeaders = {
 };
 
 interface EmailClassification {
-  type: "contractor_quote" | "estate_document" | "vendor_contact" | "home_document" | "family" | "insurance_claim" | "other";
+  type: "contractor_quote" | "estate_document" | "vendor_contact" | "home_document" | "family" | "insurance_claim" | "bill_invoice" | "other";
   confidence: "high" | "medium" | "low";
   vendorName: string | null;
   vendorPhone: string | null;
@@ -306,17 +306,18 @@ ${hasQuoteSignals ? `\n[NOTE: The subject line contains quote/estimate/proposal 
 Classify this email into ONE of these types:
 - "contractor_quote": A quote, estimate, proposal, or bid from a contractor/vendor for home work
 - "insurance_claim": An insurance claim, claim update, adjuster communication, damage assessment, claim number reference, repair authorization, or any correspondence about an active insurance claim process. This is different from a policy document — this is about an ACTIVE CLAIM (damage, loss, incident).
-- "estate_document": A legal, estate, insurance POLICY (not claim), tax, or financial document
+- "bill_invoice": A bill, invoice, statement, payment notice, membership dues, or recurring charge NOT related to home renovation/repair. Examples: club memberships, subscriptions, utility bills, tuition, medical bills. If it could be a contractor invoice for home work, classify as "contractor_quote" instead.
+- "estate_document": A legal document, HOMEOWNERS insurance policy, property tax, deed, mortgage, trust, will, or financial planning document. IMPORTANT: health/medical insurance cards, medical records, prescriptions, and doctor correspondence are NOT estate documents — classify those as "family" with familyCategory "medical".
 - "vendor_contact": Contact information for a service provider, contractor, or vendor (not a quote)
 - "home_document": A home-related document (warranty, receipt, manual, permit, inspection report)
-- "family": Personal/family email — school communications, event invitations, birthday/party info, kids' activities, sports/extracurriculars, family travel, personal appointments, work/school schedules, newsletters from schools/organizations, permission slips, report cards, medical/dental appointments, or any personal/family life content
+- "family": Personal/family email — school communications, event invitations, birthday/party info, kids' activities, sports/extracurriculars, family travel, personal appointments, work/school schedules, newsletters, permission slips, report cards, medical/dental appointments, health insurance cards, medical records, prescriptions, or any personal/family life content. Also use for health/medical insurance documents.
 - "other": Anything that doesn't fit the above categories
 
 For ALL types, extract vendor/contact information if present in the email.
 
 Respond with ONLY valid JSON:
 {
-  "type": "contractor_quote" | "insurance_claim" | "estate_document" | "vendor_contact" | "home_document" | "family" | "other",
+  "type": "contractor_quote" | "insurance_claim" | "bill_invoice" | "estate_document" | "vendor_contact" | "home_document" | "family" | "other",
   "confidence": "high" | "medium" | "low",
   "vendorName": "company/business name or null",
   "vendorPhone": "phone number or null",
@@ -331,6 +332,9 @@ Respond with ONLY valid JSON:
   "familyCategory": "school | events | medical | activities | travel | personal | other — only if type is family, otherwise null",
   "familyMemberName": "name of the family member this relates to, or null",
   "eventDate": "ISO 8601 datetime of the event/appointment/deadline if one is mentioned (e.g. '2026-03-29T13:00:00'), or null. Extract from the forwarded content, not the forward date.",
+  "billVendor": "Name of billing company/vendor if type is bill_invoice, or null",
+  "billAmount": "Dollar amount of the bill if present (number, not string), or null",
+  "billDueDate": "Due date in ISO 8601 if present, or null",
   "claimNumber": "Insurance claim number if present, or null",
   "claimType": "Type of claim: water_damage | fire | storm | theft | liability | vehicle | other — only if insurance_claim, otherwise null",
   "adjusterName": "Name of claims adjuster/advisor if mentioned, or null",
@@ -382,7 +386,7 @@ Respond with ONLY valid JSON:
     let createdDocumentId: string | null = null;
 
     // --- STEP 1: AUTO-CREATE VENDOR (for any type that has vendor info, except family emails) ---
-    if (classification.type !== "family" && classification.type !== "insurance_claim" && classification.vendorName && (classification.vendorPhone || classification.vendorEmail)) {
+    if (classification.type !== "family" && classification.type !== "insurance_claim" && classification.type !== "bill_invoice" && classification.vendorName && (classification.vendorPhone || classification.vendorEmail)) {
       // Check if vendor already exists (by name + household)
       const { data: existingVendors } = await supabase
         .from("contractors")
@@ -842,6 +846,11 @@ Respond with ONLY valid JSON:
 
       console.log(`[receive-email] Insurance claim: ${claimLabel}`);
 
+    } else if (classification.type === "bill_invoice") {
+      // Bills/invoices — save as family item with "bills" category
+      actions.push("bill_saved");
+      console.log(`[receive-email] Bill/invoice: ${(classification as any).billVendor || "Unknown vendor"}`);
+
     } else if (classification.type === "family") {
       // Family emails (school, events, invitations, etc.) — just save them
       actions.push("family_email_saved");
@@ -849,6 +858,35 @@ Respond with ONLY valid JSON:
 
     } else {
       actions.push("unclassified_email");
+    }
+
+    // --- STEP 2.5a: SAVE ALL ATTACHMENTS FOR FAMILY/BILL ITEMS ---
+    // Family and bill emails may have multiple attachments (e.g. front+back of insurance card)
+    // Save additional attachments to inbox-attachments storage
+    if ((classification.type === "family" || classification.type === "bill_invoice") && additionalAttachments.length > 0) {
+      for (const att of additionalAttachments) {
+        try {
+          const filePath = `${householdId}/family/${crypto.randomUUID()}_${att.filename}`;
+          const fileBuffer = Uint8Array.from(atob(att.base64), c => c.charCodeAt(0));
+          await supabase.storage.from("inbox-attachments").upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
+          // Create a separate inbox item for each additional attachment
+          await supabase.from("inbox_items").insert({
+            household_id: householdId,
+            type: "family",
+            title: att.filename || `Attachment from ${subject}`,
+            summary: `Additional attachment from: ${subject}`,
+            from_email: fromAddress,
+            attachment_path: filePath,
+            attachment_content_type: att.contentType,
+            attachment_filename: att.filename,
+            family_category: classification.type === "bill_invoice" ? "bills" : ((classification as any).familyCategory || "other"),
+            status: "ready",
+          });
+          actions.push(`saved_additional_attachment:${att.filename}`);
+        } catch (err) {
+          console.error(`[receive-email] Failed to save family attachment: ${err}`);
+        }
+      }
     }
 
     // --- STEP 2.5: PROCESS ADDITIONAL ATTACHMENTS AS DOCUMENTS ---
@@ -934,6 +972,13 @@ Respond with ONLY valid JSON:
         mainTitle = `Quote received: ${classification.projectType || classification.vendorName || subject || "Contractor Quote"}`;
         mainNeedsAction = true;
         mainActionType = "assign_property";
+      } else if (classification.type === "bill_invoice") {
+        mainType = "family";
+        const billInfo = classification as any;
+        const vendor = billInfo.billVendor || classification.vendorName || "Bill";
+        const amount = billInfo.billAmount ? ` — $${billInfo.billAmount}` : "";
+        mainTitle = `Bill: ${vendor}${amount}`;
+        mainNeedsAction = false;
       } else if (classification.type === "family") {
         mainType = "family";
         const familyCat = (classification as any).familyCategory;
@@ -983,7 +1028,7 @@ Respond with ONLY valid JSON:
         email_hash: emailHash,
         metadata: baseMetadata,
         status: "ready",
-        family_category: classification.type === "family" ? ((classification as any).familyCategory || "other") : null,
+        family_category: classification.type === "bill_invoice" ? "bills" : (classification.type === "family" ? ((classification as any).familyCategory || "other") : null),
         family_member_name: classification.type === "family" ? ((classification as any).familyMemberName || null) : null,
         event_date: (classification as any).eventDate || null,
       });
