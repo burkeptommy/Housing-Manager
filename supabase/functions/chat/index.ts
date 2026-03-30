@@ -127,7 +127,7 @@ serve(async (req: Request) => {
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
     // Fetch household context + document content for system prompt
-    const { systemPrompt, referencedDocumentIds } = await buildSystemPrompt(
+    const { systemPrompt, referencedDocumentIds, equipmentContext } = await buildSystemPrompt(
       supabase,
       serviceClient,
       body,
@@ -291,7 +291,7 @@ async function buildSystemPrompt(
   serviceClient: ReturnType<typeof createClient>,
   body: ChatRequest,
   userId?: string
-): Promise<{ systemPrompt: string; referencedDocumentIds: string[] }> {
+): Promise<{ systemPrompt: string; referencedDocumentIds: string[]; equipmentContext: string }> {
   const householdId = body.household_id;
   const referencedDocumentIds: string[] = [];
 
@@ -513,6 +513,33 @@ async function buildSystemPrompt(
       }).join("\n")
     : "No active projects";
 
+  // Build equipment catalog context for the user's home systems
+  let equipmentContext = "";
+  const systemsWithCatalog = systems.filter((s: any) => s.catalog_entry_id);
+  if (systemsWithCatalog.length > 0) {
+    const catalogIds = systemsWithCatalog.map((s: any) => s.catalog_entry_id);
+    const { data: catalogEntries } = await serviceClient
+      .from("equipment_catalog")
+      .select(`
+        id, model_number, model_name, series, expected_lifespan_years, key_features, specs,
+        equipment_manufacturers!inner (name, support_url, support_phone),
+        equipment_categories!inner (name)
+      `)
+      .in("id", catalogIds);
+
+    if (catalogEntries && catalogEntries.length > 0) {
+      equipmentContext = "\nEQUIPMENT DATABASE MATCHES:\n" + catalogEntries.map((e: any) => {
+        const mfg = e.equipment_manufacturers;
+        return `- ${mfg.name} ${e.model_number} (${e.model_name}): ${e.expected_lifespan_years}yr lifespan. Support: ${mfg.support_phone ?? mfg.support_url ?? "N/A"}`;
+      }).join("\n");
+    }
+  }
+
+  // If user mentions equipment-related keywords, note the lookup capability
+  const msgLower = body.message.toLowerCase();
+  const equipmentKeywords = ["manual", "model", "filter", "part", "repair", "maintenance", "install", "spec", "troubleshoot", "fix", "replace", "broken", "not working", "warranty"];
+  const mentionsEquipment = equipmentKeywords.some(kw => msgLower.includes(kw));
+
   // Build context-specific prefix
   let contextPrefix = "";
   if (body.context_type === "document" && body.context_id) {
@@ -566,7 +593,15 @@ ${propertyStatus || "No properties added yet."}
 
 ACTIVE HOME PROJECTS:
 ${projectsList}
-${contextPrefix}${documentContentSection}
+${contextPrefix}${documentContentSection}${equipmentContext}
+EQUIPMENT REFERENCE DATABASE:
+Haven has an extensive equipment catalog with 2,800+ models across 219 brands covering kitchen appliances, HVAC, water heaters, laundry, generators, sump pumps, well water systems, bathroom fixtures, irrigation, and pool systems. When users ask about specific equipment:
+- You can reference model specs, expected lifespan, common issues, and maintenance schedules
+- You can direct them to the manufacturer's support portal or provide a cached PDF manual
+- If the user mentions a model number or brand, you can look it up and provide detailed information
+- For troubleshooting, reference common issues and typical fixes from the database
+- For maintenance, provide the recommended service schedule with parts lists and costs${mentionsEquipment ? "\n- The user appears to be asking about equipment — be proactive about referencing the catalog data." : ""}
+
 YOUR ROLE:
 - Help families understand their document coverage and estate readiness
 - Explain estate planning concepts in plain, accessible language
@@ -629,7 +664,7 @@ Things the concierge handles:
 
 You can help PREPARE for these tasks (draft emails, research options, organize information) but let the concierge EXECUTE them. When handing off, include a summary of the conversation context so the concierge team has full context.`;
 
-  return { systemPrompt, referencedDocumentIds };
+  return { systemPrompt, referencedDocumentIds, equipmentContext };
 }
 
 // Extract likely search keywords from user message
