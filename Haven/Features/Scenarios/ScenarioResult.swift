@@ -62,6 +62,8 @@ struct ScenarioResult {
     // Personalization
     let documentsUsed: [String]?
     let documentsMissing: [String]?
+    let isHypothetical: Bool
+    let hypotheticalDocuments: [String]?
 
     init(from json: [String: Any]) {
         title = json["title"] as? String ?? "Scenario Analysis"
@@ -213,6 +215,8 @@ struct ScenarioResult {
         // Personalization
         documentsUsed = json["documents_used"] as? [String]
         documentsMissing = json["documents_missing"] as? [String]
+        isHypothetical = json["is_hypothetical"] as? Bool ?? false
+        hypotheticalDocuments = json["hypothetical_documents"] as? [String]
     }
 
     var personalizationScore: Double {

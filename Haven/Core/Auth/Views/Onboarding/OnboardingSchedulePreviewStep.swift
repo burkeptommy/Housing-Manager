@@ -1,15 +1,24 @@
 import SwiftUI
 
 /// Step 2 of onboarding: The "instant payoff" — property details + 12-month maintenance plan.
+/// Property details are tappable for inline correction if the API returned wrong data.
 struct OnboardingSchedulePreviewStep: View {
     let street: String
     let city: String
     let state: String
-    let propertyResult: PropertyLookupResult?
-    let scheduleItems: [SchedulePreviewItem]
+    @Binding var propertyResult: PropertyLookupResult?
+    @Binding var scheduleItems: [SchedulePreviewItem]
     let isLoading: Bool
+    var onPropertyEdited: () -> Void = {}
+
+    @State private var editingField: EditableField?
+    @State private var hasEdited = false
 
     private let monthNames = Calendar.current.shortMonthSymbols
+
+    enum EditableField: Hashable {
+        case yearBuilt, squareFootage, bedrooms, bathrooms, propertyType
+    }
 
     var body: some View {
         if isLoading {
@@ -54,6 +63,7 @@ struct OnboardingSchedulePreviewStep: View {
             .padding(.top, HavenTheme.spacing12)
             .padding(.bottom, 80) // room for bottom buttons
         }
+        .scrollDismissesKeyboard(.interactively)
     }
 
     // MARK: - Property Card
@@ -77,7 +87,19 @@ struct OnboardingSchedulePreviewStep: View {
 
             if propertyResult != nil {
                 Divider()
-                propertyDetailsGrid
+                editablePropertyDetailsGrid
+
+                // Hint text — fades out after first edit
+                if !hasEdited {
+                    HStack(spacing: 4) {
+                        Image(systemName: "hand.tap")
+                            .font(.system(size: 10))
+                        Text("Tap any value to correct it")
+                            .font(HavenTypography.uiCaption)
+                    }
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .transition(.opacity)
+                }
 
                 // Show detected home systems
                 let detectedSystems = detectedSystemsList
@@ -107,55 +129,226 @@ struct OnboardingSchedulePreviewStep: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private var propertyDetailsGrid: some View {
-        let items = propertyDetailItems
-        return LazyVGrid(columns: [
+    // MARK: - Editable Property Details Grid
+
+    private var editablePropertyDetailsGrid: some View {
+        LazyVGrid(columns: [
             GridItem(.flexible()),
             GridItem(.flexible()),
             GridItem(.flexible()),
         ], spacing: HavenTheme.spacing12) {
-            ForEach(items, id: \.label) { item in
+            if propertyResult?.yearBuilt != nil || editingField == .yearBuilt {
+                editableCell(
+                    field: .yearBuilt,
+                    label: "Built",
+                    value: propertyResult?.yearBuilt.map { "\($0)" } ?? "—"
+                )
+            }
+            if propertyResult?.squareFootage != nil || editingField == .squareFootage {
+                editableCell(
+                    field: .squareFootage,
+                    label: "Sq Ft",
+                    value: propertyResult?.squareFootage.map { $0.formatted() } ?? "—"
+                )
+            }
+            if propertyResult?.bedrooms != nil || editingField == .bedrooms {
+                editableCell(
+                    field: .bedrooms,
+                    label: "Beds",
+                    value: propertyResult?.bedrooms.map { "\($0)" } ?? "—"
+                )
+            }
+            if propertyResult?.bathrooms != nil || editingField == .bathrooms {
+                editableCell(
+                    field: .bathrooms,
+                    label: "Baths",
+                    value: propertyResult?.bathrooms.map { "\($0)" } ?? "—"
+                )
+            }
+            if propertyResult?.estimatedValue != nil {
                 VStack(spacing: 2) {
-                    Text(item.value)
+                    Text("$\(Int((propertyResult?.estimatedValue ?? 0) / 1000))K")
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.navy800)
-                    Text(item.label)
+                    Text("Est. Value")
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textTertiary)
                 }
             }
+            if propertyResult?.propertyType != nil || editingField == .propertyType {
+                editableCell(
+                    field: .propertyType,
+                    label: "Type",
+                    value: propertyResult?.propertyType.map { formatPropertyType($0) } ?? "—"
+                )
+            }
         }
     }
 
-    private struct DetailItem {
-        let label: String
-        let value: String
+    @ViewBuilder
+    private func editableCell(field: EditableField, label: String, value: String) -> some View {
+        if editingField == field {
+            editingView(for: field, label: label)
+        } else {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    editingField = field
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Text(value)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.navy800)
+                    HStack(spacing: 2) {
+                        Text(label)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Image(systemName: "pencil")
+                            .font(.system(size: 8))
+                            .foregroundStyle(HavenColors.textTertiary.opacity(0.6))
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+        }
     }
 
-    private var propertyDetailItems: [DetailItem] {
-        guard let p = propertyResult else { return [] }
-        var items: [DetailItem] = []
+    @ViewBuilder
+    private func editingView(for field: EditableField, label: String) -> some View {
+        switch field {
+        case .yearBuilt:
+            numericEditor(
+                label: label,
+                value: propertyResult?.yearBuilt ?? 2000,
+                range: 1800...2026,
+                onCommit: { newValue in
+                    propertyResult?.yearBuilt = newValue
+                    commitEdit()
+                }
+            )
+        case .squareFootage:
+            numericEditor(
+                label: label,
+                value: propertyResult?.squareFootage ?? 2000,
+                range: 200...50000,
+                onCommit: { newValue in
+                    propertyResult?.squareFootage = newValue
+                    commitEdit()
+                }
+            )
+        case .bedrooms:
+            stepperEditor(
+                label: label,
+                value: propertyResult?.bedrooms ?? 3,
+                range: 1...10,
+                onCommit: { newValue in
+                    propertyResult?.bedrooms = newValue
+                    commitEdit()
+                }
+            )
+        case .bathrooms:
+            stepperEditor(
+                label: label,
+                value: propertyResult?.bathrooms ?? 2,
+                range: 1...10,
+                onCommit: { newValue in
+                    propertyResult?.bathrooms = newValue
+                    commitEdit()
+                }
+            )
+        case .propertyType:
+            propertyTypePicker(label: label)
+        }
+    }
 
-        if let year = p.yearBuilt {
-            items.append(DetailItem(label: "Built", value: "\(year)"))
-        }
-        if let sqft = p.squareFootage {
-            items.append(DetailItem(label: "Sq Ft", value: sqft.formatted()))
-        }
-        if let beds = p.bedrooms {
-            items.append(DetailItem(label: "Beds", value: "\(beds)"))
-        }
-        if let baths = p.bathrooms {
-            items.append(DetailItem(label: "Baths", value: "\(baths)"))
-        }
-        if let value = p.estimatedValue {
-            items.append(DetailItem(label: "Est. Value", value: "$\(Int(value / 1000))K"))
-        }
-        if let type = p.propertyType {
-            items.append(DetailItem(label: "Type", value: formatPropertyType(type)))
-        }
+    // MARK: - Inline Editors
 
-        return items
+    private func numericEditor(label: String, value: Int, range: ClosedRange<Int>, onCommit: @escaping (Int) -> Void) -> some View {
+        VStack(spacing: 4) {
+            NumericTextField(value: value, range: range, onCommit: onCommit)
+                .frame(width: 70, height: 30)
+
+            Text(label)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+    }
+
+    private func stepperEditor(label: String, value: Int, range: ClosedRange<Int>, onCommit: @escaping (Int) -> Void) -> some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 8) {
+                Button {
+                    let newVal = max(range.lowerBound, value - 1)
+                    onCommit(newVal)
+                } label: {
+                    Image(systemName: "minus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(value > range.lowerBound ? HavenColors.navy700 : HavenColors.textTertiary.opacity(0.3))
+                }
+                .disabled(value <= range.lowerBound)
+
+                Text("\(value)")
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.navy800)
+                    .frame(minWidth: 20)
+
+                Button {
+                    let newVal = min(range.upperBound, value + 1)
+                    onCommit(newVal)
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 18))
+                        .foregroundStyle(value < range.upperBound ? HavenColors.navy700 : HavenColors.textTertiary.opacity(0.3))
+                }
+                .disabled(value >= range.upperBound)
+            }
+
+            Text(label)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+    }
+
+    private func propertyTypePicker(label: String) -> some View {
+        let types = ["Single Family", "Condo", "Townhouse", "Multi-Family"]
+        return VStack(spacing: 4) {
+            VStack(spacing: 4) {
+                ForEach(types, id: \.self) { type in
+                    Button {
+                        propertyResult?.propertyType = type
+                        commitEdit()
+                    } label: {
+                        Text(type)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundStyle(
+                                propertyResult?.propertyType == type
+                                    ? .white
+                                    : HavenColors.navy700
+                            )
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity)
+                            .background(
+                                propertyResult?.propertyType == type
+                                    ? HavenColors.navy
+                                    : HavenColors.navy.opacity(0.06)
+                            )
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+            Text(label)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+    }
+
+    private func commitEdit() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            editingField = nil
+            hasEdited = true
+        }
+        onPropertyEdited()
     }
 
     private func formatPropertyType(_ type: String) -> String {
@@ -313,5 +506,52 @@ struct OnboardingSchedulePreviewStep: View {
         systems.append("Water Heater") // every home has one
         systems.append("Electrical")
         return systems
+    }
+}
+
+// MARK: - NumericTextField
+
+/// A compact text field for entering numeric values with validation.
+private struct NumericTextField: View {
+    let value: Int
+    let range: ClosedRange<Int>
+    let onCommit: (Int) -> Void
+
+    @State private var text: String = ""
+    @FocusState private var isFocused: Bool
+
+    var body: some View {
+        TextField("", text: $text)
+            .keyboardType(.numberPad)
+            .multilineTextAlignment(.center)
+            .font(HavenTypography.headline)
+            .foregroundStyle(HavenColors.navy800)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 4)
+            .background(Color.white)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(HavenColors.navy.opacity(0.3), lineWidth: 1)
+            )
+            .focused($isFocused)
+            .onAppear {
+                text = "\(value)"
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    isFocused = true
+                }
+            }
+            .onSubmit { commit() }
+            .onChange(of: isFocused) { _, focused in
+                if !focused { commit() }
+            }
+    }
+
+    private func commit() {
+        if let parsed = Int(text), range.contains(parsed) {
+            onCommit(parsed)
+        } else {
+            onCommit(value) // revert to original
+        }
     }
 }

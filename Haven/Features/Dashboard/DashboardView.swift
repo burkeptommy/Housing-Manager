@@ -677,51 +677,112 @@ struct DashboardView: View {
 
     // MARK: - Getting Started
 
+    /// The name of the top missing document for Alfred's micro-action prompt
+    private var topMissingDocumentName: String {
+        vaultViewModel.highestImpactMissing.first?.category ?? "Homeowners Insurance"
+    }
+
+    /// Contextual copy for Alfred's micro-action prompt based on the missing document
+    private var alfredPromptCopy: String {
+        let docName = topMissingDocumentName
+        if vaultViewModel.documents.isEmpty {
+            return "Your property baseline is set. To unlock your financial gap analysis, tap here to scan your \(docName)."
+        } else {
+            return "Great progress! Upload your \(docName) to strengthen your estate protection."
+        }
+    }
+
+    @ViewBuilder
     private var gettingStartedCard: some View {
+        if viewModel.hasProperty && !viewModel.hasDocuments {
+            // Alfred's personalized "one thing" prompt — replaces generic checklist
+            alfredNextActionCard
+        } else if viewModel.hasProperty && viewModel.hasDocuments && !viewModel.hasUsedAlfred {
+            // Only Alfred left — simple nudge
+            HavenCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: false, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
+                }
+            }
+        } else {
+            // Full getting started checklist (no property yet)
+            HavenCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) { gettingStartedExpanded.toggle() }
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "hand.wave.fill")
+                                .font(.system(size: 16))
+                                .foregroundStyle(HavenColors.navy700)
+                            Text("Getting Started")
+                                .font(Font.custom("Georgia-Bold", size: 15))
+                                .foregroundStyle(HavenColors.navy800)
+
+                            let completed = [viewModel.hasProperty, viewModel.hasDocuments, viewModel.hasUsedAlfred].filter { $0 }.count
+                            Text("\(completed)/3")
+                                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 2)
+                                .background(HavenColors.beige200)
+                                .clipShape(Capsule())
+
+                            Spacer()
+
+                            Image(systemName: gettingStartedExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+
+                    if gettingStartedExpanded {
+                        gettingStartedRow(step: 1, title: "Add your home", subtitle: "We'll set up maintenance tracking automatically", icon: "house.fill", done: viewModel.hasProperty, action: { showAddProperty = true })
+                        gettingStartedRow(step: 2, title: "Upload your first document", subtitle: "A deed, insurance policy, or will — Alfred analyzes it instantly", icon: "doc.badge.plus", done: viewModel.hasDocuments, action: { showUploadDocument = true })
+                        gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: viewModel.hasUsedAlfred, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
+                    } else {
+                        gettingStartedRow(step: 1, title: "Add your home", subtitle: "We'll set up maintenance tracking automatically", icon: "house.fill", done: false, action: { showAddProperty = true })
+                    }
+                }
+            }
+        }
+    }
+
+    /// Alfred's personalized micro-action card — asks for one specific high-value document
+    private var alfredNextActionCard: some View {
         HavenCard {
             VStack(alignment: .leading, spacing: 12) {
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) { gettingStartedExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "hand.wave.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(HavenColors.navy700)
-                        Text("Getting Started")
-                            .font(Font.custom("Georgia-Bold", size: 15))
-                            .foregroundStyle(HavenColors.navy800)
-
-                        let completed = [viewModel.hasProperty, viewModel.hasDocuments, viewModel.hasUsedAlfred].filter { $0 }.count
-                        Text("\(completed)/3")
-                            .font(.system(size: 12, weight: .semibold, design: .rounded))
-                            .foregroundStyle(HavenColors.textTertiary)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 2)
-                            .background(HavenColors.beige200)
-                            .clipShape(Capsule())
-
-                        Spacer()
-
-                        Image(systemName: gettingStartedExpanded ? "chevron.up" : "chevron.down")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(HavenColors.textTertiary)
-                    }
-                    .contentShape(Rectangle())
+                HStack(spacing: 8) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 18))
+                        .foregroundStyle(HavenColors.navy700)
+                    Text("Alfred")
+                        .font(Font.custom("Georgia-Bold", size: 15))
+                        .foregroundStyle(HavenColors.navy800)
                 }
-                .buttonStyle(.plain)
 
-                if gettingStartedExpanded {
-                    gettingStartedRow(step: 1, title: "Add your home", subtitle: "We'll set up maintenance tracking automatically", icon: "house.fill", done: viewModel.hasProperty, action: { showAddProperty = true })
-                    gettingStartedRow(step: 2, title: "Upload your first document", subtitle: "A deed, insurance policy, or will — Alfred analyzes it instantly", icon: "doc.badge.plus", done: viewModel.hasDocuments, action: { showUploadDocument = true })
-                    gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: viewModel.hasUsedAlfred, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
-                } else {
-                    if !viewModel.hasProperty {
-                        gettingStartedRow(step: 1, title: "Add your home", subtitle: "We'll set up maintenance tracking automatically", icon: "house.fill", done: false, action: { showAddProperty = true })
-                    } else if !viewModel.hasDocuments {
-                        gettingStartedRow(step: 2, title: "Upload your first document", subtitle: "A deed, insurance policy, or will — Alfred analyzes it instantly", icon: "doc.badge.plus", done: false, action: { showUploadDocument = true })
-                    } else if !viewModel.hasUsedAlfred {
-                        gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: false, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
+                Text(alfredPromptCopy)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textPrimary)
+
+                Button {
+                    Haptics.light()
+                    Analytics.track(.dashboardGettingStartedItemTapped, ["step": "alfred_next_action", "document": topMissingDocumentName])
+                    showUploadDocument = true
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "doc.badge.plus")
+                            .font(.system(size: 13))
+                        Text("Scan \(topMissingDocumentName)")
+                            .font(HavenTypography.uiLabel)
                     }
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy)
+                    .clipShape(Capsule())
                 }
             }
         }

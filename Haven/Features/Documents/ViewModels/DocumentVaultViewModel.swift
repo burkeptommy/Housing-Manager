@@ -29,6 +29,10 @@ final class DocumentVaultViewModel: ObservableObject {
     @Published var isRetagging = false
     @Published var retagProgress: String?
 
+    // Baseline endowment: credit for non-document achievements
+    @Published var hasPropertyData = false
+    @Published var hasDetectedSystems = false
+
     private let db = DatabaseService.shared
 
     var filteredDocuments: [DocumentRow] {
@@ -125,6 +129,16 @@ final class DocumentVaultViewModel: ObservableObject {
         "Personal Property", "Digital Assets", "Professional & Business"
     ]
 
+    /// Baseline progress credit for completing onboarding steps (max 15%).
+    /// This ensures new users see immediate progress after setting up their property.
+    var baselineEndowment: Double {
+        var credit = 0.0
+        if !properties.isEmpty { credit += 0.05 }   // 5% for completing onboarding
+        if hasPropertyData { credit += 0.05 }        // 5% for having property data
+        if hasDetectedSystems { credit += 0.05 }     // 5% for auto-detected home systems
+        return credit
+    }
+
     var completionPercentage: Double {
         let existingCategories = Set(documents.map(\.category))
         var earnedWeight = 0.0
@@ -148,8 +162,10 @@ final class DocumentVaultViewModel: ObservableObject {
             }
         }
 
-        guard totalWeight > 0 else { return 0 }
-        return earnedWeight / totalWeight
+        guard totalWeight > 0 else { return baselineEndowment }
+        let documentPercentage = earnedWeight / totalWeight
+        // Blend: baseline fills the first 15%, documents fill the remaining 85%
+        return min(baselineEndowment + documentPercentage * (1.0 - 0.15), 1.0)
     }
 
     var missingCategories: [DocumentCategory] {
@@ -199,6 +215,11 @@ final class DocumentVaultViewModel: ObservableObject {
             familyMembers = members
             properties = props
             deletedDocuments = deleted
+
+            // Baseline endowment: detect property data + home systems
+            hasPropertyData = props.contains { $0.yearBuilt != nil || $0.squareFootage != nil }
+            let systems = (try? await db.fetchHomeSystems()) ?? []
+            hasDetectedSystems = !systems.isEmpty
 
             let dismissed = (try? await db.fetchDismissedCategories()) ?? []
             dismissedCategories = Set(dismissed.map(\.category))

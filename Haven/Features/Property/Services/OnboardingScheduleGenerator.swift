@@ -3,15 +3,15 @@ import Foundation
 // MARK: - Property Lookup Result
 
 struct PropertyLookupResult: Codable {
-    let yearBuilt: Int?
-    let squareFootage: Int?
-    let lotSize: Int?
-    let bedrooms: Int?
-    let bathrooms: Int?
-    let propertyType: String?
+    var yearBuilt: Int?
+    var squareFootage: Int?
+    var lotSize: Int?
+    var bedrooms: Int?
+    var bathrooms: Int?
+    var propertyType: String?
     let lastSaleDate: String?
     let lastSalePrice: Double?
-    let estimatedValue: Double?
+    var estimatedValue: Double?
     let estimatedValueLow: Double?
     let estimatedValueHigh: Double?
     let features: PropertyFeatures?

@@ -257,6 +257,49 @@ serve(async (req: Request) => {
       );
     }
 
+    // --- SEND INSTANT PUSH NOTIFICATION (fire-and-forget) ---
+    // Acknowledge receipt immediately so the user doesn't think their email was lost.
+    // This runs in the background — we don't await it.
+    let householdUserIds: string[] = [];
+    const pushNotificationPromise = (async () => {
+      try {
+        const { data: householdUsers } = await supabase
+          .from("users")
+          .select("id")
+          .eq("household_id", householdId);
+        if (!householdUsers || householdUsers.length === 0) return;
+        householdUserIds = householdUsers.map((u: { id: string }) => u.id);
+
+        const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+        if (!supabaseUrl || !serviceRoleKey) return;
+
+        const truncatedSubject = subject
+          ? subject.substring(0, 80)
+          : "a new document";
+
+        await fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${serviceRoleKey}`,
+          },
+          body: JSON.stringify({
+            recipient_user_ids: householdUserIds,
+            title: "Alfred is reviewing your forwarded document",
+            body: `Analyzing: ${truncatedSubject}`,
+            data: {
+              type: "inbox_processing",
+              inbox_item_id: placeholderId ?? "",
+            },
+          }),
+        });
+      } catch (err) {
+        console.error(`[receive-email] Push notification failed (non-blocking): ${err}`);
+      }
+    })();
+    // Don't await pushNotificationPromise — continue processing immediately
+
     // --- PERSIST ATTACHMENT TO STORAGE (before any processing) ---
     let attachmentStoragePath: string | null = null;
     if (attachmentBase64) {
@@ -1225,6 +1268,42 @@ Respond with ONLY valid JSON:
         // Delete the processing placeholder now that the real item exists
         if (placeholderId) {
           await supabase.from("inbox_items").delete().eq("id", placeholderId);
+        }
+      }
+
+      // --- SEND COMPLETION PUSH NOTIFICATION (fire-and-forget) ---
+      if (householdUserIds.length > 0) {
+        try {
+          const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+          const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+          if (supabaseUrl && serviceRoleKey) {
+            const completionBody = classification.type === "contractor_quote"
+              ? `Quote from ${classification.vendorName || "vendor"} is ready to review`
+              : classification.type === "insurance_claim"
+                ? `Insurance claim details from ${classification.vendorName || "your provider"} are ready`
+                : classification.type === "bill_invoice"
+                  ? `Bill from ${classification.vendorName || "vendor"} has been processed`
+                  : `Your ${classification.documentTitle || classification.type.replace(/_/g, " ")} is ready to review`;
+
+            fetch(`${supabaseUrl}/functions/v1/send-push-notification`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify({
+                recipient_user_ids: householdUserIds,
+                title: "Alfred finished reviewing",
+                body: completionBody,
+                data: {
+                  type: "inbox_ready",
+                  inbox_item_id: placeholderId ?? "",
+                },
+              }),
+            });
+          }
+        } catch {
+          // Non-blocking — don't let notification failure affect the response
         }
       }
 

@@ -360,6 +360,8 @@ IMPORTANT: In the "summary" field of your JSON response, always begin with: "Thi
     // Inject personalization data
     result.documents_used = documentsUsed;
     result.documents_missing = documentsMissing;
+    result.is_hypothetical = documentsMissing.length > 0 && documentsUsed.length < 3;
+    result.hypothetical_documents = documentsMissing;
 
     console.log(`[simulate-scenario] Success for scenario: ${scenario_id}`);
 
@@ -390,21 +392,25 @@ function buildScenarioPrompt(
   const hasDocuments = documentsUsed.length > 0;
   const hasMinimalData = documentsUsed.length === 0 && documentsMissing.length > 0;
 
+  const hypotheticalBaselines = buildHypotheticalBaselines(documentsMissing);
+
   const baseInstructions = `You are a financial and estate planning scenario simulator for Haven, a home management app. You have access to this family's document vault and financial picture. Generate a detailed scenario analysis.
 
 IMPORTANT RULES:
 1. Use the ACTUAL names, amounts, and details from the household data below when available. Never use generic placeholders if real data exists.
-2. If specific data is missing, provide GENERAL expert advice about the topic. Explain the general benefits, typical numbers, and considerations. Clearly note what you're estimating or generalizing.
-3. ${hasMinimalData ? "The user has very few documents uploaded. Provide helpful general guidance while noting that uploading specific documents (list which ones) would allow much more personalized analysis." : "Be specific and actionable — this should feel like a personal consultation."}
+2. If specific data is missing, use the HYPOTHETICAL BASELINES below (if provided) to generate CONCRETE projections with specific dollar amounts and timelines. Do NOT give vague advice — show the user exactly what's at stake using national averages.
+3. ${hasMinimalData ? "The user has very few documents uploaded. Run the scenario using hypothetical baselines to produce a visceral, specific projection. For each key finding, note which specific document would replace the estimate with their real numbers (e.g., 'Upload your Trust to replace this estimate')." : "Be specific and actionable — this should feel like a personal consultation."}
 4. Always include that this is for educational/planning purposes only, not legal or financial advice.
 5. Recommend consulting appropriate professionals.
-6. Return ONLY valid JSON — no markdown, no code blocks, no explanation outside the JSON.
+6. When using hypothetical baseline data, prefix dollar amounts with [EST] so the app can highlight them. Be explicit about WHICH document would improve which part of the analysis.
+7. Return ONLY valid JSON — no markdown, no code blocks, no explanation outside the JSON.
 
 ${householdContext}
 
 PERSONALIZATION:
 - Documents available: ${documentsUsed.join(", ") || "None"}
 - Missing documents: ${documentsMissing.join(", ") || "None"}
+${hypotheticalBaselines}
 ${params ? `\nUSER-PROVIDED PARAMETERS:\n${Object.entries(params).map(([k, v]) => `- ${k}: ${v}`).join("\n")}` : ""}
 `;
 
@@ -646,12 +652,13 @@ function buildCustomPrompt(
   documentsMissing: string[]
 ): string {
   const hasAnyDocs = documentsUsed.length > 0;
+  const hypotheticalBaselines = buildHypotheticalBaselines(documentsMissing);
 
   return `You are the "What If?" Scenario Simulator for Haven, a premium estate and home management platform. You have access to this family's financial picture.
 
 ${hasAnyDocs
     ? "The user has uploaded documents. Analyze their question thoroughly using their actual data. Be specific — use real names, real dollar amounts, real policy numbers, real dates from their documents."
-    : "The user has NOT uploaded relevant documents yet. Provide helpful GENERAL expert advice about their question. Use typical industry numbers, general best practices, and expert guidance. Clearly note that this is general advice, and explain exactly which documents they should upload to get a personalized analysis. Still be thorough and actionable — make the general advice genuinely useful."
+    : "The user has NOT uploaded relevant documents yet. Use the HYPOTHETICAL BASELINES below to generate CONCRETE, visceral projections with specific dollar amounts and timelines. Do NOT give vague advice. Show the user exactly what's at stake. For each key finding, note which specific document would replace the estimate with their real numbers. Prefix estimated amounts with [EST]."
   }
 
 ${householdContext}
@@ -659,6 +666,7 @@ ${householdContext}
 PERSONALIZATION:
 - Documents available: ${documentsUsed.join(", ") || "None"}
 - Missing documents: ${documentsMissing.join(", ") || "None"}
+${hypotheticalBaselines}
 
 USER'S QUESTION: "${query}"
 
@@ -728,4 +736,87 @@ IMPORTANT RULES:
 - The "severity" field: use "opportunity" for scenarios where they could benefit from taking action (green/positive framing), "informational" for neutral analysis, "important" for things they should address soon, "critical" for urgent gaps or risks.
 - Include 3-5 sections that logically break down the analysis.
 - The "sections" array is the main content — structure it however makes sense for the question.`;
+}
+
+// --- HYPOTHETICAL BASELINES ---
+// When key documents are missing, provide concrete national-average data
+// so Claude can generate specific, visceral projections instead of vague advice.
+
+function buildHypotheticalBaselines(documentsMissing: string[]): string {
+  if (documentsMissing.length === 0) return "";
+
+  const baselines: string[] = [];
+
+  if (documentsMissing.includes("Trust")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Trust:
+- Average probate process: 12–18 months, costs 3–7% of estate value
+- All assets without beneficiary designations go through PUBLIC probate
+- Court records become PUBLIC — anyone can see asset details, debts, and distributions
+- In California, probate on a $1M estate costs ~$46,000 in statutory attorney + executor fees alone
+- In New York, ~$34,000; in Florida, ~$30,000 for a $1M estate
+- Family members may contest distribution, adding $20,000–$100,000+ in litigation
+- Upload their Trust to replace these estimates with their actual trust terms and asset protection`);
+  }
+
+  if (documentsMissing.includes("Will")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Will:
+- Without a will, state intestacy laws determine asset distribution (varies by state)
+- Surviving spouse typically receives 50–100% depending on state; children split remainder
+- No guardian designation for minor children — court decides based on petitions
+- Digital assets (crypto, social media, email) may be permanently inaccessible
+- Average contested estate litigation: $50,000–$100,000 in legal fees, 2–3 years
+- 55% of American adults do not have a will (Gallup 2024)
+- Upload their Will to show their actual designated beneficiaries and guardians`);
+  }
+
+  if (documentsMissing.includes("Life Insurance")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Life Insurance:
+- Average American household needs 10–12x annual income in coverage (DIME formula)
+- Average life insurance gap: $200,000 per household (LIMRA 2024)
+- Without coverage, surviving family faces average $11,618 funeral cost + total income replacement loss
+- Mortgage, childcare ($15,000–$25,000/yr per child), and education costs continue without income
+- Term life for a healthy 35-year-old: ~$30–50/month for $500K coverage
+- Upload their Life Insurance policy to show actual coverage amounts and gaps`);
+  }
+
+  if (documentsMissing.includes("Beneficiary Designations")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Beneficiary Designations:
+- Retirement accounts (IRA/401k) without beneficiaries default to the estate → goes through probate
+- Non-spouse beneficiaries lose stretch IRA tax advantages (must withdraw within 10 years under SECURE Act)
+- Life insurance without beneficiary: payout goes to estate, subject to creditors and probate
+- POD/TOD accounts bypass probate ONLY if beneficiary is designated
+- Upload their Beneficiary Designations to show which accounts are properly designated`);
+  }
+
+  if (documentsMissing.includes("Mortgage")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Mortgage Info:
+- Median US mortgage balance: $244,000 (2024)
+- Average mortgage rate: ~6.5–7% (2024–2025)
+- Monthly payment on $300K at 7% over 30 years: ~$1,996
+- Remaining mortgage balance is a liability that reduces net estate value
+- Upload their Mortgage to show actual balance, rate, and remaining term`);
+  }
+
+  if (documentsMissing.includes("Tax Returns")) {
+    baselines.push(`HYPOTHETICAL BASELINE — No Tax Returns:
+- Median household income: ~$80,000 (2024)
+- Average effective federal tax rate for middle-income: ~12–22%
+- Without tax data, income projections use national medians
+- Upload their Tax Returns for accurate income, deductions, and tax exposure analysis`);
+  }
+
+  if (baselines.length === 0) return "";
+
+  return `
+HYPOTHETICAL BASELINES FOR MISSING DOCUMENTS:
+Use these national-average baselines to generate CONCRETE projections with specific dollar amounts and timelines. Make it visceral — the user should understand exactly what's at stake. For each estimate, note which document would replace it with real numbers.
+
+STRICT CONSTRAINTS FOR HYPOTHETICAL MODE:
+- ONLY cite statistics and dollar amounts explicitly provided in the baselines above. Do NOT generate additional legal, financial, or tax statistics beyond what is listed.
+- Do NOT make state-specific legal claims unless the household's state is known AND the baseline includes data for that state.
+- When the household's state is unknown, use the national averages provided. Say "in most states" rather than citing a specific state's laws.
+- Always include the disclaimer that this is a generalized projection based on national averages, not personalized advice.
+- Clearly label every estimated figure with [EST] prefix so the app can distinguish real data from projections.
+
+${baselines.join("\n\n")}`;
 }

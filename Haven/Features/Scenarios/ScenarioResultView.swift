@@ -7,6 +7,9 @@ struct ScenarioResultView: View {
     var onRunRelated: ((String) -> Void)?
     var onDone: (() -> Void)?
 
+    @State private var showDocumentUpload = false
+    @State private var preselectedCategory: String?
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
@@ -24,6 +27,11 @@ struct ScenarioResultView: View {
                 .background(HavenColors.cream)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
                 .padding(.horizontal, HavenTheme.pageMargin)
+
+                // Hypothetical baseline banner — prominent warning when key docs are missing
+                if result.isHypothetical {
+                    hypotheticalBanner
+                }
 
                 // Personalization indicator
                 personalizationBar
@@ -114,6 +122,11 @@ struct ScenarioResultView: View {
             .padding(.bottom, HavenTheme.spacing32)
         }
         .background(HavenColors.background)
+        .sheet(isPresented: $showDocumentUpload) {
+            DocumentUploadView(
+                preselectedCategory: preselectedCategory.flatMap { DocumentCategory(rawValue: $0) }
+            )
+        }
         .trackScreen("ScenarioResultView")
         .screenshotProtected()
         .onAppear {
@@ -188,13 +201,22 @@ struct ScenarioResultView: View {
             }
 
             if let missing = result.documentsMissing, !missing.isEmpty {
-                HStack(spacing: 4) {
-                    Image(systemName: "arrow.up.doc")
-                        .font(.system(size: 10))
-                    Text("Missing: \(missing.joined(separator: ", "))")
-                        .font(HavenTypography.uiCaption)
+                VStack(alignment: .leading, spacing: 4) {
+                    ForEach(missing, id: \.self) { doc in
+                        Button {
+                            triggerDocumentUpload(category: doc)
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrow.up.doc")
+                                    .font(.system(size: 10))
+                                Text("Upload \(doc) for better results")
+                                    .font(HavenTypography.uiCaption)
+                            }
+                            .foregroundStyle(HavenColors.warning)
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
-                .foregroundStyle(HavenColors.warning)
             }
         }
         .padding(12)
@@ -733,6 +755,67 @@ struct ScenarioResultView: View {
             .multilineTextAlignment(.center)
             .padding(.horizontal, 20)
             .padding(.top, 8)
+    }
+
+    // MARK: - Hypothetical Baseline Banner
+
+    private var hypotheticalBanner: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(HavenColors.warning)
+                Text("Generalized Projection")
+                    .font(Font.custom("Georgia-Bold", size: 15))
+                    .foregroundStyle(HavenColors.navy800)
+            }
+
+            Text("This analysis uses national averages because key documents are missing from your vault. Upload them to see your family's actual exposure.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+
+            if let missing = result.hypotheticalDocuments, !missing.isEmpty {
+                VStack(spacing: 6) {
+                    ForEach(missing, id: \.self) { docName in
+                        Button {
+                            triggerDocumentUpload(category: docName)
+                        } label: {
+                            HStack(spacing: 8) {
+                                Image(systemName: "doc.badge.plus")
+                                    .font(.system(size: 14))
+                                Text("Upload your \(docName)")
+                                    .font(HavenTypography.uiLabel)
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                            }
+                            .foregroundStyle(HavenColors.navy800)
+                            .padding(12)
+                            .background(HavenColors.navy.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+        }
+        .padding(HavenTheme.spacing16)
+        .background(HavenColors.warning.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(HavenColors.warning.opacity(0.3), lineWidth: 1)
+        )
+    }
+
+    private func triggerDocumentUpload(category: String) {
+        Haptics.light()
+        Analytics.track(.scenarioCompleted, [
+            "action": "upload_from_scenario",
+            "document_category": category,
+            "scenario_title": String(result.title.prefix(100)),
+        ])
+        preselectedCategory = category
+        showDocumentUpload = true
     }
 
     // MARK: - Helpers

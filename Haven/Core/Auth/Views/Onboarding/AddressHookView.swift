@@ -27,9 +27,10 @@ struct AddressHookView: View {
                         street: viewModel.street,
                         city: viewModel.city,
                         state: viewModel.state,
-                        propertyResult: viewModel.propertyLookupResult,
-                        scheduleItems: viewModel.schedulePreview,
-                        isLoading: viewModel.isLookingUpProperty
+                        propertyResult: $viewModel.propertyLookupResult,
+                        scheduleItems: $viewModel.schedulePreview,
+                        isLoading: viewModel.isLookingUpProperty,
+                        onPropertyEdited: { viewModel.regenerateSchedule() }
                     )
                     .tag(AddressHookStep.preview)
                 }
@@ -222,6 +223,14 @@ final class AddressHookViewModel: ObservableObject {
         )
 
         isLookingUpProperty = false
+    }
+
+    /// Regenerate the schedule preview after the user corrects property details inline.
+    func regenerateSchedule() {
+        schedulePreview = OnboardingScheduleGenerator.generate(
+            from: propertyLookupResult,
+            state: state
+        )
     }
 
     /// Cache the address + lookup result to UserDefaults so it survives the auth flow.
