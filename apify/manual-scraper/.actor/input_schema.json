@@ -1,0 +1,42 @@
+{
+    "title": "Haven Manual Scraper Input",
+    "type": "object",
+    "schemaVersion": 1,
+    "properties": {
+        "supabaseUrl": {
+            "title": "Supabase URL",
+            "type": "string",
+            "description": "Your Supabase project URL (e.g., https://xxxx.supabase.co)",
+            "editor": "textfield"
+        },
+        "supabaseServiceKey": {
+            "title": "Supabase Service Role Key",
+            "type": "string",
+            "description": "Service role key for Supabase (used to read catalog and upload PDFs)",
+            "editor": "textfield",
+            "isSecret": true
+        },
+        "batchSize": {
+            "title": "Batch Size",
+            "type": "integer",
+            "description": "Number of models to process per run",
+            "default": 50,
+            "minimum": 1,
+            "maximum": 500
+        },
+        "manufacturerSlug": {
+            "title": "Manufacturer Slug (optional)",
+            "type": "string",
+            "description": "Process only this manufacturer (e.g., 'samsung'). Leave empty for all brands.",
+            "editor": "textfield",
+            "nullable": true
+        },
+        "onlyMissing": {
+            "title": "Only Missing PDFs",
+            "type": "boolean",
+            "description": "Only process models that don't have cached PDFs yet",
+            "default": true
+        }
+    },
+    "required": ["supabaseUrl", "supabaseServiceKey"]
+}

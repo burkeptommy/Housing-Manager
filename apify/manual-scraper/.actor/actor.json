@@ -1,0 +1,11 @@
+{
+    "actorSpecification": 1,
+    "name": "haven-manual-scraper",
+    "title": "Haven Equipment Manual Scraper",
+    "description": "Crawls manufacturer support portals to find and download equipment manual PDFs for the Haven equipment catalog. Handles JS-rendered sites via Playwright.",
+    "version": "1.0",
+    "buildTag": "latest",
+    "environmentVariables": {},
+    "usesStandbyMode": false,
+    "generatedBy": "Claude Code with Claude Opus 4.6"
+}
