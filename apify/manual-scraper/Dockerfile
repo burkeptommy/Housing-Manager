@@ -1,4 +1,4 @@
-FROM apify/actor-node:24
+FROM apify/actor-node-playwright-chrome:24
 
 # Check preinstalled packages
 RUN npm ls @crawlee/core apify
