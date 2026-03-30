@@ -39,7 +39,8 @@ async function getApnsJwt(): Promise<string> {
   const privateKeyBase64 = Deno.env.get("APNS_PRIVATE_KEY")!;
 
   // Decode the .p8 key (base64 → PEM text → import)
-  const privateKeyPem = atob(privateKeyBase64);
+  // Strip newlines that macOS base64 command may have added
+  const privateKeyPem = atob(privateKeyBase64.replace(/\s/g, ""));
   const privateKey = await jose.importPKCS8(privateKeyPem, "ES256");
 
   const jwt = await new jose.SignJWT({})
@@ -53,18 +54,26 @@ async function getApnsJwt(): Promise<string> {
   return jwt;
 }
 
+interface ApnsResult {
+  success: boolean;
+  status?: number;
+  error?: string;
+}
+
 async function sendApnsPush(
   token: string,
   title: string,
   body: string,
   data?: Record<string, string>
-): Promise<boolean> {
+): Promise<ApnsResult> {
   const bundleId = Deno.env.get("APNS_BUNDLE_ID") || "com.havenhome.app";
   const environment = Deno.env.get("APNS_ENVIRONMENT") || "production";
   const host =
     environment === "production"
       ? "api.push.apple.com"
       : "api.sandbox.push.apple.com";
+
+  console.log(`[APNs] Sending to ${host}, bundle: ${bundleId}, env: ${environment}`);
 
   const jwt = await getApnsJwt();
 
@@ -93,12 +102,12 @@ async function sendApnsPush(
     if (!response.ok) {
       const err = await response.text();
       console.error(`[APNs] Failed for token ${token.slice(0, 8)}...: ${response.status} ${err}`);
-      return false;
+      return { success: false, status: response.status, error: err };
     }
-    return true;
+    return { success: true };
   } catch (error) {
     console.error(`[APNs] Error sending to ${token.slice(0, 8)}...:`, error);
-    return false;
+    return { success: false, error: String(error) };
   }
 }
 
@@ -169,18 +178,23 @@ serve(async (req: Request) => {
     let sent = 0;
     let failed = 0;
     const staleTokens: string[] = [];
+    const errors: string[] = [];
 
     for (const { token } of tokens) {
-      const success = await sendApnsPush(token, title, body, data);
-      if (success) {
+      const result = await sendApnsPush(token, title, body, data);
+      if (result.success) {
         sent++;
       } else {
         failed++;
-        staleTokens.push(token);
+        if (result.error) errors.push(result.error);
+        // Only clean up tokens that Apple says are gone (410)
+        if (result.status === 410) {
+          staleTokens.push(token);
+        }
       }
     }
 
-    // Clean up stale tokens (410 Gone responses mean the token is invalid)
+    // Clean up truly stale tokens (410 Gone = token is permanently invalid)
     if (staleTokens.length > 0) {
       await supabase
         .from("device_tokens")
@@ -191,7 +205,7 @@ serve(async (req: Request) => {
     console.log(`[Push] Sent: ${sent}, Failed: ${failed}, Stale cleaned: ${staleTokens.length}`);
 
     return new Response(
-      JSON.stringify({ sent, failed, total_tokens: tokens.length }),
+      JSON.stringify({ sent, failed, total_tokens: tokens.length, errors: errors.length > 0 ? errors : undefined }),
       { status: 200, headers }
     );
   } catch (error) {

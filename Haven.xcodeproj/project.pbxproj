@@ -9,6 +9,7 @@
 /* Begin PBXBuildFile section */
 		00A0340E512F43534C4C8B56 /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = E26631A2D75332163B5BFE02 /* SupabaseClient.swift */; };
 		00FF37BE764C46D33B3A5678 /* MaintenanceScheduleView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */; };
+		ADDT0002ABCD1234567890EF /* AddMaintenanceTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADDT0001ABCD1234567890EF /* AddMaintenanceTaskSheet.swift */; };
 		04702FBE7335A739A3DD7E1F /* Warranty.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCED3F91C128394EBFF7BB27 /* Warranty.swift */; };
 		0481BDDFE4978139AC4B4263 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */; };
 		068A23E10B8847A2CE6A93A5 /* View+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC48B643D7B2E4D11B2A7853 /* View+Extensions.swift */; };
@@ -206,6 +207,7 @@
 		013974A131EC33DB20C08CEE /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
 		A1B2C3D4E5F60718293A4B5C /* ScenarioDisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDisclaimerView.swift; sourceTree = "<group>"; };
 		01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceScheduleView.swift; sourceTree = "<group>"; };
+		ADDT0001ABCD1234567890EF /* AddMaintenanceTaskSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddMaintenanceTaskSheet.swift; sourceTree = "<group>"; };
 		03D64EAE4435181BE7303600 /* HomeSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSystem.swift; sourceTree = "<group>"; };
 		065CD0193255DF7812606891 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		0A4EFE16C22592FE1D0F76B1 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
@@ -788,6 +790,7 @@
 				6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */,
 				E2F3A4B5C6D7E8F9A0B1C2D4 /* ContractorPickerSheet.swift */,
 				A1B2C3D4E5F60718293A4B5C /* EditPropertyView.swift */,
+				ADDT0001ABCD1234567890EF /* AddMaintenanceTaskSheet.swift */,
 				01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */,
 				0EE909F83D728399C6776DEA /* PropertyDetailView.swift */,
 				F2E1D0C9B8A7F6E5D4C3B2A1 /* PropertyDocumentsView.swift */,
@@ -1131,6 +1134,7 @@
 				084CA04C039143DDE70E4735 /* Logger.swift in Sources */,
 				487F35214AE587A6B21CDC5C /* LoginView.swift in Sources */,
 				B954FBF089BE6E6AB1B2DCE5 /* MainTabView.swift in Sources */,
+				ADDT0002ABCD1234567890EF /* AddMaintenanceTaskSheet.swift in Sources */,
 				00FF37BE764C46D33B3A5678 /* MaintenanceScheduleView.swift in Sources */,
 				955995EC1C69BA5FA32F53DB /* MaintenanceTask.swift in Sources */,
 				81EE6D934AAC2EDAAF568083 /* MaintenanceTaskRow.swift in Sources */,

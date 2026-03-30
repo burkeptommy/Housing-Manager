@@ -240,8 +240,15 @@ final class MaintenanceViewModel: ObservableObject {
     }
 
     func assignedContractorName(for task: MaintenanceTaskDBRow) -> String? {
-        guard let contractorId = task.assignedContractorId else { return nil }
-        return contractors.first(where: { $0.id == contractorId })?.companyName
+        // Check direct assignment first
+        if let contractorId = task.assignedContractorId {
+            return contractors.first(where: { $0.id == contractorId })?.companyName
+        }
+        // Fall back to system's preferred contractor
+        guard let systemId = task.systemId,
+              let system = systems.first(where: { $0.id == systemId }),
+              let prefId = system.preferredContractorId else { return nil }
+        return contractors.first(where: { $0.id == prefId })?.companyName
     }
 
     func completeTask(_ task: MaintenanceTaskDBRow) async {

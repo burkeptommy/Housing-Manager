@@ -29,6 +29,7 @@ struct MaintenanceTaskDetailSheet: View {
     // User assignment state
     @State private var householdUsers: [UserRow] = []
     @State private var assignedUserId: UUID?
+    @State private var originalAssignedUserId: UUID?
 
     // Reminder state
     @State private var reminder1Day = false
@@ -116,7 +117,22 @@ struct MaintenanceTaskDetailSheet: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                Button("Done") { dismiss() }
+                Button("Done") {
+                    // Send push notification if assignment changed
+                    if assignedUserId != originalAssignedUserId, let userId = assignedUserId {
+                        let assigneeName = householdUsers.first(where: { $0.id == userId })?.fullName?.components(separatedBy: " ").first ?? "Someone"
+                        let recipientIds = householdUsers.map(\.id)
+                        Task {
+                            await PushNotificationService.shared.sendTaskAssignmentNotification(
+                                taskTitle: task.title,
+                                assigneeName: assigneeName,
+                                recipientUserIds: recipientIds,
+                                taskId: task.id
+                            )
+                        }
+                    }
+                    dismiss()
+                }
                     .foregroundStyle(HavenColors.navy)
             }
         }
@@ -882,6 +898,7 @@ struct MaintenanceTaskDetailSheet: View {
     private func loadHouseholdUsers() async {
         householdUsers = (try? await db.fetchHouseholdUsers()) ?? []
         assignedUserId = task.assignedToUserId
+        originalAssignedUserId = task.assignedToUserId
     }
 
     private func updateAssignment(userId: UUID?, previousUserId: UUID?) async {
@@ -889,22 +906,6 @@ struct MaintenanceTaskDetailSheet: View {
             _ = try await db.clearMaintenanceTaskAssignment(id: task.id, userId: userId)
             Haptics.success()
             Analytics.track(.maintenanceTaskAssigned, ["task_id": task.id.uuidString, "assigned_user_id": userId?.uuidString ?? "unassigned"])
-
-            // Send push notification to other household members (not the person doing the assigning)
-            if let userId {
-                let assigneeName = householdUsers.first(where: { $0.id == userId })?.fullName?.components(separatedBy: " ").first ?? "Someone"
-                Task {
-                    let currentUserId = try? await HavenSupabase.auth.session.user.id
-                    let recipientIds = householdUsers.map(\.id).filter { $0 != currentUserId }
-                    guard !recipientIds.isEmpty else { return }
-                    await PushNotificationService.shared.sendTaskAssignmentNotification(
-                        taskTitle: task.title,
-                        assigneeName: assigneeName,
-                        recipientUserIds: recipientIds,
-                        taskId: task.id
-                    )
-                }
-            }
         } catch {
             print("[TaskDetail] Failed to update assignment: \(error)")
             // Revert UI to previous state on failure

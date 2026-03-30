@@ -689,12 +689,20 @@ final class DatabaseService {
     // MARK: - Device Tokens
 
     func upsertDeviceToken(userId: UUID, token: String) async throws {
-        try await from("device_tokens")
+        // Use select() to verify the row was actually written (RLS can silently block inserts)
+        let response: [DeviceTokenUpsert] = try await from("device_tokens")
             .upsert(
                 DeviceTokenUpsert(userId: userId, token: token, platform: "ios"),
                 onConflict: "user_id,token"
             )
+            .select("user_id,token,platform")
             .execute()
+            .value
+        if response.isEmpty {
+            print("[Push] WARNING: Upsert returned 0 rows — RLS may be blocking the insert for user \(userId)")
+        } else {
+            print("[Push] Token upsert confirmed: \(response.count) row(s)")
+        }
     }
 
     func deleteDeviceToken(token: String) async throws {

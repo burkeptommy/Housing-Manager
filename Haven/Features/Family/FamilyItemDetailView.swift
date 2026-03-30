@@ -609,8 +609,7 @@ struct FamilyItemDetailView: View {
 
     static func parseEmailSender(_ raw: String) -> (name: String?, email: String) {
         // "Tom Burke <tom@example.com>" → ("Tom Burke", "tom@example.com")
-        if let match = raw.range(of: #"^(.+?)\s*<([^>]+)>$"#, options: .regularExpression) {
-            let parts = raw[match]
+        if raw.range(of: #"^(.+?)\s*<([^>]+)>$"#, options: .regularExpression) != nil {
             if let angleBracket = raw.firstIndex(of: "<"),
                let closeBracket = raw.firstIndex(of: ">") {
                 let name = String(raw[raw.startIndex..<angleBracket]).trimmingCharacters(in: .whitespaces)

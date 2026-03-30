@@ -24,12 +24,13 @@ struct HavenApp: App {
                 .task {
                     appState.initialize()
                     performSecurityChecks()
-                    // Request notification permission for background upload alerts
+                    // Request notification permission
                     let granted = await NotificationService.shared.requestPermission()
-                    if granted {
-                        await MainActor.run {
-                            PushNotificationService.shared.registerForPushNotifications()
-                        }
+                    print("[Push] Notification permission granted: \(granted)")
+                    // Always register for remote notifications — iOS returns a device token
+                    // even without permission (permission only affects showing alerts)
+                    await MainActor.run {
+                        PushNotificationService.shared.registerForPushNotifications()
                     }
                     Analytics.track(.appLaunched)
                 }
@@ -95,10 +96,13 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     // MARK: - Remote Notifications
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        let tokenStr = deviceToken.map { String(format: "%02.2hhx", $0) }.joined()
+        print("[Push] APNs token received from iOS: \(tokenStr.prefix(16))...")
         PushNotificationService.shared.handleDeviceToken(deviceToken)
     }
 
     func application(_ application: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+        print("[Push] APNs registration FAILED: \(error.localizedDescription)")
         PushNotificationService.shared.handleRegistrationError(error)
     }
 

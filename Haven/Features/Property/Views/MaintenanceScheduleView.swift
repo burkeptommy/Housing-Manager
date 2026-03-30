@@ -21,6 +21,7 @@ struct MaintenanceScheduleView: View {
     @State private var showSnooze = false
     @State private var taskToSnooze: MaintenanceTaskDBRow?
     @State private var snoozeDate = Date()
+    @State private var showAddTask = false
 
     var body: some View {
         Group {
@@ -39,7 +40,16 @@ struct MaintenanceScheduleView: View {
         .navigationTitle("Maintenance")
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                filterMenu
+                HStack(spacing: 16) {
+                    filterMenu
+                    Button {
+                        Haptics.light()
+                        showAddTask = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .foregroundStyle(HavenColors.navy)
+                    }
+                }
             }
         }
         .refreshable {
@@ -165,15 +175,6 @@ struct MaintenanceScheduleView: View {
 
     private var filterMenu: some View {
         Menu {
-            // Status filter
-            Picker("Status", selection: $viewModel.filterStatus) {
-                ForEach(MaintenanceViewModel.TaskFilterStatus.allCases, id: \.self) { status in
-                    Text(status.rawValue).tag(status)
-                }
-            }
-
-            Divider()
-
             // Property filter
             if viewModel.properties.count > 1 {
                 Picker("Property", selection: $viewModel.filterPropertyId) {
@@ -229,17 +230,6 @@ struct MaintenanceScheduleView: View {
                     }
                 }
 
-                // View mode picker
-                Picker("View", selection: $viewMode) {
-                    ForEach(MaintenanceViewMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: viewMode) { _, newMode in
-                    Analytics.track(.maintenanceFilterChanged, ["filter_type": "view_mode", "value": newMode.rawValue])
-                }
-
                 // Summary bar
                 summaryBar
 
@@ -252,14 +242,7 @@ struct MaintenanceScheduleView: View {
             .listRowBackground(Color.clear)
             .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 0, trailing: 16))
 
-            switch viewMode {
-            case .timeline:
-                timelineContent
-            case .bySystem:
-                bySystemContent
-            case .byType:
-                byTypeContent
-            }
+            timelineContent
         }
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
@@ -342,6 +325,11 @@ struct MaintenanceScheduleView: View {
                     }
             }
             .presentationDetents([.medium])
+        }
+        .sheet(isPresented: $showAddTask) {
+            AddMaintenanceTaskSheet(properties: viewModel.properties, systems: viewModel.systems) {
+                Task { await viewModel.loadTasks() }
+            }
         }
     }
 
@@ -725,6 +713,7 @@ struct MaintenanceScheduleView: View {
         HStack(spacing: 3) {
             Image(systemName: icon)
             Text(label)
+                .lineLimit(1)
         }
         .font(HavenTypography.uiCaption)
         .foregroundStyle(color)

@@ -16,6 +16,9 @@ final class AppState: ObservableObject {
             for await isAuth in authService.$isAuthenticated.values {
                 isAuthenticated = isAuth
                 if isLoading { isLoading = false }
+                if isAuth {
+                    PushNotificationService.shared.ensureTokenStored()
+                }
             }
         }
 
