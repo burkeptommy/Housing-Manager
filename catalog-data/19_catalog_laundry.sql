@@ -1505,5 +1505,423 @@ FROM equipment_manufacturers m, equipment_categories c,
 WHERE m.slug = 'equator' AND c.slug = 'washer-dryer-combo';
 
 -- ============================================================================
+-- FINAL EXPANSION — REACHING 350+ MODELS
+-- ============================================================================
+
+-- Whirlpool Front-Load additional
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.whirlpool.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WFW560CHW', 'Whirlpool 4.3 cu ft Closet-Depth Front-Load Washer', NULL, 'electric', 27, 4.3, 11, true, true, 849, ARRAY['Closet-depth fit','Intuitive controls','Quick Wash','Wrinkle Shield Plus'], '{"spin_speed_rpm": 1200, "cycles": 10, "steam": false, "load_type": "front", "noise_dba": 50}'),
+  ('WFW9620HW', 'Whirlpool 5.0 cu ft Smart Front-Load with Load & Go XL', NULL, 'electric', 27, 5.0, 11, true, true, 1199, ARRAY['Load & Go XL Plus dispenser','37 cycles','12-hr FanFresh','Intuitive touchscreen','Steam Clean'], '{"spin_speed_rpm": 1300, "cycles": 37, "steam": true, "load_type": "front", "noise_dba": 45}'),
+  ('WFW3090JW', 'Whirlpool 2.3 cu ft Compact Front-Load Washer', NULL, 'electric', 24, 2.3, 11, false, true, 899, ARRAY['Compact 24-inch','Detergent dosing aid','Stainless steel drum','Stackable','15 cycles'], '{"spin_speed_rpm": 1400, "cycles": 15, "steam": false, "load_type": "front", "noise_dba": 49}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'whirlpool' AND c.slug = 'washer-front-load';
+
+-- Whirlpool Compact Dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.whirlpool.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WHP33002', 'Whirlpool 24" Heat Pump Compact Dryer', NULL, 'electric', 24, 4.3, 13, true, true, 1099, ARRAY['Heat pump technology','Ventless','Compact 24-inch','Stackable','Advanced Moisture Sensing'], '{"cycles": 13, "steam": false, "moisture_sensor": true, "vent_type": "ventless"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'whirlpool' AND c.slug = 'dryer-compact';
+
+-- Samsung additional electric dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/dryers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DVE45T6020W', 'Samsung 7.5 cu ft Front-Load Electric Dryer', NULL, 'electric', 27, 7.5, 13, false, true, 649, ARRAY['Sensor Dry','Lint filter indicator','4 temperature settings','Reversible door'], '{"cycles": 8, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DVE55CG7100W', 'Samsung 7.5 cu ft Top-Load Electric Dryer', NULL, 'electric', 27, 7.5, 13, true, true, 849, ARRAY['WiFi enabled','Sensor Dry','Smart Care','Lint filter indicator','Multi-Steam'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DVE60A9900V', 'Samsung 7.5 cu ft Smart Dial Electric Dryer with MultiControl', NULL, 'electric', 27, 7.5, 13, true, true, 999, ARRAY['Smart Dial','MultiControl panel','Steam Sanitize+','Sensor Dry','AI Optimal Dry'], '{"cycles": 14, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'dryer-electric';
+
+-- LG additional top-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.lg.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WT7005CW', 'LG 4.3 cu ft Top-Load Washer', NULL, 'electric', 27, 4.3, 11, false, true, 599, ARRAY['TurboDrum technology','ColdWash','SmartDiagnosis','SlamProof lid'], '{"spin_speed_rpm": 750, "cycles": 8, "steam": false, "load_type": "top", "noise_dba": 53}'),
+  ('WT7000CW', 'LG 4.5 cu ft Top-Load Washer', NULL, 'electric', 27, 4.5, 11, false, true, 649, ARRAY['6Motion Technology','ColdWash','SlamProof glass lid','SmartDiagnosis'], '{"spin_speed_rpm": 800, "cycles": 8, "steam": false, "load_type": "top", "noise_dba": 52}'),
+  ('WT8400CV', 'LG 5.5 cu ft Smart Top-Load Washer with AI DD', NULL, 'electric', 27, 5.5, 11, true, true, 999, ARRAY['AI DD built-in intelligence','TurboWash3D','Steam','WiFi','Allergiene cycle'], '{"spin_speed_rpm": 950, "cycles": 14, "steam": true, "load_type": "top", "noise_dba": 48}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'lg' AND c.slug = 'washer-top-load-impeller';
+
+-- LG additional dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.lg.com/us/dryers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DLE3500W', 'LG 7.4 cu ft Electric Dryer with NFC Tag On', NULL, 'electric', 27, 7.4, 13, false, true, 699, ARRAY['Sensor Dry','FlowSense','NFC Tag On','LoDecibel quiet','SmartDiagnosis'], '{"cycles": 8, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DLEX8500V', 'LG 9.0 cu ft Mega Capacity Electric Dryer', 'SIGNATURE', 'electric', 29, 9.0, 13, true, true, 1499, ARRAY['TurboSteam','Sensor Dry','LG ThinQ','ReduceStatic','Mega 9.0 capacity'], '{"cycles": 14, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'lg' AND c.slug = 'dryer-electric';
+
+-- GE additional top-load impeller
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GTW680BSJWS', 'GE 4.6 cu ft Top-Load Washer with FlexWash', NULL, 'electric', 27, 4.6, 11, true, true, 799, ARRAY['FlexDispense','WiFi enabled','Deep Fill','Sanitize with Oxi'], '{"spin_speed_rpm": 800, "cycles": 12, "steam": false, "load_type": "top", "noise_dba": 51}'),
+  ('GTW845CPNDG2', 'GE 5.2 cu ft Smart Top-Load Washer', NULL, 'electric', 27, 5.2, 11, true, true, 999, ARRAY['SmartDispense','WiFi','Built-in water faucet','Sanitize with Oxi','Quick Wash'], '{"spin_speed_rpm": 850, "cycles": 14, "steam": false, "load_type": "top", "noise_dba": 49}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'washer-top-load-impeller';
+
+-- Maytag additional gas dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.maytag.com/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MGD7230HW', 'Maytag Pet Pro 7.3 cu ft Gas Dryer', 'Pet Pro', 'gas', 27, 7.3, 14, true, true, 999, ARRAY['Pet Pro option','Extra Power button','XL lint trap','Advanced Moisture Sensing'], '{"cycles": 11, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('MGD5430MW', 'Maytag 7.0 cu ft Gas Dryer with Extra Power', NULL, 'gas', 29, 7.0, 14, true, false, 849, ARRAY['Extra Power button','Advanced Moisture Sensing','Wrinkle Prevent','Quick Dry'], '{"cycles": 10, "steam": false, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'maytag' AND c.slug = 'dryer-gas';
+
+-- Samsung additional front-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WF45R6100AV', 'Samsung 4.5 cu ft Front-Load Washer Black Stainless', NULL, 'electric', 27, 4.5, 11, true, true, 849, ARRAY['Self Clean+','Smart Care','VRT Plus','Steam Wash','Black Stainless finish'], '{"spin_speed_rpm": 1200, "cycles": 10, "steam": true, "load_type": "front", "noise_dba": 48}'),
+  ('WF45B6300AE', 'Samsung 4.5 cu ft Bespoke Front-Load Washer with AI', 'Bespoke', 'electric', 27, 4.5, 11, true, true, 999, ARRAY['AI OptiWash','Super Speed Wash','Steam Sanitize+','Self Clean+','Bespoke Navy'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 46}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'washer-front-load';
+
+-- LG additional front-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.lg.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WM4080HWA', 'LG 4.5 cu ft Smart Front-Load Washer with TurboWash', NULL, 'electric', 27, 4.5, 11, true, true, 949, ARRAY['TurboWash 360','AI DD','6Motion Technology','Steam','LG ThinQ','Allergiene'], '{"spin_speed_rpm": 1300, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 45}'),
+  ('WM6500HBA2', 'LG 5.0 cu ft Smart Front-Load Washer with AI DD 2.0', NULL, 'electric', 27, 5.0, 11, true, true, 1149, ARRAY['AI DD 2.0','TurboWash 360','Allergiene cycle','Steam+Allergiene','ezDispense Plus'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 43}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'lg' AND c.slug = 'washer-front-load';
+
+-- GE additional front-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GFW655SSVWW2', 'GE 5.0 cu ft Smart Front-Load Washer Diamond Gray', NULL, 'electric', 28, 5.0, 11, true, true, 1049, ARRAY['Steam washing','UltraFresh Vent System','SmartDispense','Built-in WiFi','Diamond Gray finish'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 47}'),
+  ('GFW750SPNRS', 'GE 4.8 cu ft Smart Front-Load Washer Sapphire Blue', NULL, 'electric', 28, 4.8, 11, true, true, 999, ARRAY['SmartDispense','UltraFresh Vent','Microban technology','Built-in WiFi'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 47}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'washer-front-load';
+
+-- GE additional electric dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GFD65ESSNWW2', 'GE 7.8 cu ft Smart Electric Dryer with Steam and Sanitize', NULL, 'electric', 28, 7.8, 13, true, true, 999, ARRAY['Steam Dewrinkle','Sanitize cycle','WiFi','SmartHQ app','Sensor Dry','Quick Dry'], '{"cycles": 13, "steam": true, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('GTD65EBSJWS', 'GE 7.4 cu ft Electric Dryer with Sensor Dry', NULL, 'electric', 27, 7.4, 13, false, true, 699, ARRAY['Sensor Dry','Quick Dry','Extended tumble','Wrinkle Care','4 heat selections'], '{"cycles": 10, "steam": false, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'dryer-electric';
+
+-- Frigidaire additional top-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.frigidaire.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('FFTW4120SB', 'Frigidaire 4.1 cu ft Top-Load Washer Black', NULL, 'electric', 27, 4.1, 12, false, false, 579, ARRAY['MaxFill option','Bleach dispenser','Auto temperature control','10 wash cycles'], '{"spin_speed_rpm": 700, "cycles": 10, "steam": false, "load_type": "top", "noise_dba": 54}'),
+  ('FFTW5000QW', 'Frigidaire Gallery 4.7 cu ft Top-Load Washer', 'Gallery', 'electric', 27, 4.7, 11, true, true, 749, ARRAY['SmartBoost','WiFi enabled','MaxFill','Quick Wash 20min','12 cycles'], '{"spin_speed_rpm": 800, "cycles": 12, "steam": false, "load_type": "top", "noise_dba": 51}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'frigidaire' AND c.slug = 'washer-top-load-agitator';
+
+-- Frigidaire additional dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.frigidaire.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('FFRE4120SB', 'Frigidaire 6.7 cu ft Electric Dryer Black', NULL, 'electric', 27, 6.7, 13, false, false, 579, ARRAY['DrySense technology','10 dry cycles','Quick Dry','Reversible door','Black finish'], '{"cycles": 10, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('FWRE5000QW', 'Frigidaire Gallery 8.0 cu ft Electric Dryer with WiFi', 'Gallery', 'electric', 27, 8.0, 13, true, true, 849, ARRAY['WiFi enabled','DrySense','Steam Refresh','Quick Dry','12 dry cycles'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'frigidaire' AND c.slug = 'dryer-electric';
+
+-- Whirlpool Washer-Dryer Combo
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.whirlpool.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WFC8090GX', 'Whirlpool 2.8 cu ft Ventless All-in-One Washer/Dryer', NULL, 'electric', 24, 2.8, 10, true, true, 1899, ARRAY['Ventless combo unit','24-inch compact','Load & Go dispenser','Quick Wash & Dry','WiFi enabled'], '{"spin_speed_rpm": 1400, "cycles": 16, "steam": true, "load_type": "front", "noise_dba": 48}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'whirlpool' AND c.slug = 'washer-dryer-combo';
+
+-- KitchenAid additional Front-Load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.kitchenaid.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('KFLP9030DS', 'KitchenAid 5.0 cu ft Front-Load Washer with Clean Boost', NULL, 'electric', 27, 5.0, 11, true, true, 1299, ARRAY['Clean Boost option','Dynamic Balancing','12-hr FanFresh','Smooth Glide drawer'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 45}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'kitchenaid' AND c.slug = 'washer-front-load';
+
+-- GE Profile additional front-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/ge-profile/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('PFW870SPTRS', 'GE Profile 5.3 cu ft Smart Front-Load Washer Royal Sapphire', NULL, 'electric', 28, 5.3, 11, true, true, 1349, ARRAY['SmartDispense','UltraFresh Vent System','Microban','1-step wash+dry','Royal Sapphire finish'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 44}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-profile' AND c.slug = 'washer-front-load';
+
+-- GE Profile additional electric dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/ge-profile/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('PFD87ESPTRS', 'GE Profile 7.8 cu ft Smart Electric Dryer Royal Sapphire', NULL, 'electric', 28, 7.8, 13, true, true, 1349, ARRAY['SmartHQ app','Steam Dewrinkle','Sanitize cycle','Washer Link','Royal Sapphire finish'], '{"cycles": 13, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-profile' AND c.slug = 'dryer-electric';
+
+-- Miele additional compact washer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.mieleusa.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WCA660WCS', 'Miele W1 24" Compact Washer with CapDosing', 'W1', 'electric', 24, 2.3, 20, true, true, 1499, ARRAY['CapDosing','TwinDos','Honeycomb drum','WiFiConn@ct','20 wash programs'], '{"spin_speed_rpm": 1600, "cycles": 20, "steam": false, "load_type": "front", "noise_dba": 45}'),
+  ('WSD663WCS', 'Miele W1 24" Compact Washer with SteamCare', 'W1', 'electric', 24, 2.3, 20, true, true, 1799, ARRAY['SteamCare','TwinDos','CapDosing','Honeycomb drum','WiFiConn@ct','22 programs'], '{"spin_speed_rpm": 1600, "cycles": 22, "steam": true, "load_type": "front", "noise_dba": 44}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'miele' AND c.slug = 'washer-compact';
+
+-- Bosch additional compact washers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.bosch-home.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WAW285H3UC', 'Bosch 800 Series 24" Compact Washer with i-DOS', '800 Series', 'electric', 24, 2.2, 15, true, true, 1399, ARRAY['i-DOS automatic dosing','Home Connect WiFi','SpeedPerfect','AquaStop Plus','Interior light'], '{"spin_speed_rpm": 1400, "cycles": 24, "steam": false, "load_type": "front", "noise_dba": 46}'),
+  ('WGA254U0UC', 'Bosch 500 Series 24" Compact Washer with Iron Assist', '500 Series', 'electric', 24, 2.2, 15, true, true, 1199, ARRAY['Iron Assist steam','Home Connect','SpeedPerfect','AquaShield','16 wash programs'], '{"spin_speed_rpm": 1400, "cycles": 16, "steam": true, "load_type": "front", "noise_dba": 47}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'bosch' AND c.slug = 'washer-compact';
+
+-- Bosch additional heat pump dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.bosch-home.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WTW87NH3UC', 'Bosch 800 Series 24" Heat Pump Dryer with Self-Cleaning Condenser', '800 Series', 'electric', 24, 4.0, 15, true, true, 1499, ARRAY['Heat pump','Self-cleaning condenser','Ventless','Home Connect','SensitiveDrying'], '{"cycles": 15, "steam": false, "moisture_sensor": true, "vent_type": "ventless"}'),
+  ('WGA154U0UC', 'Bosch 500 Series 24" Condensation Dryer', '500 Series', 'electric', 24, 4.0, 14, true, true, 1049, ARRAY['Ventless condensation','Home Connect','SensitiveDrying','AntiVibration','Stackable'], '{"cycles": 12, "steam": false, "moisture_sensor": true, "vent_type": "ventless"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'bosch' AND c.slug = 'dryer-heat-pump';
+
+-- Samsung additional top-load agitator
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WA40A3205AW', 'Samsung 4.0 cu ft Top-Load Washer with ActiveWave', NULL, 'electric', 27, 4.0, 12, false, false, 499, ARRAY['ActiveWave agitator','Soft-Close Lid','Self Clean','8 cycles'], '{"spin_speed_rpm": 680, "cycles": 8, "steam": false, "load_type": "top", "noise_dba": 55}'),
+  ('WA50CG3505AV', 'Samsung 5.0 cu ft Smart Top-Load Washer with Agitator', NULL, 'electric', 27, 5.0, 12, true, true, 749, ARRAY['ActiveWave agitator','WiFi enabled','Deep Fill','Super Speed','Self Clean'], '{"spin_speed_rpm": 800, "cycles": 12, "steam": false, "load_type": "top", "noise_dba": 51}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'washer-top-load-agitator';
+
+-- Samsung additional gas dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/dryers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DVG45A6400V', 'Samsung 7.5 cu ft Smart Dial Gas Dryer', NULL, 'gas', 27, 7.5, 14, true, true, 999, ARRAY['Smart Dial','Steam Sanitize+','Sensor Dry','AI Optimal Dry','WiFi'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DVG60A9900V', 'Samsung 7.5 cu ft Smart Dial Gas Dryer with MultiControl', NULL, 'gas', 27, 7.5, 14, true, true, 1099, ARRAY['Smart Dial','MultiControl panel','Steam Sanitize+','Sensor Dry','AI Optimal Dry'], '{"cycles": 14, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'dryer-gas';
+
+-- LG additional gas dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.lg.com/us/dryers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DLGX4201B', 'LG 7.4 cu ft Smart Gas Dryer with AI Sensor', NULL, 'gas', 27, 7.4, 14, true, true, 1049, ARRAY['AI Fabric Sensor','TurboSteam','Sensor Dry','LG ThinQ','Proactive Customer Care'], '{"cycles": 14, "steam": true, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DLGX5501V', 'LG 7.4 cu ft Smart Gas Dryer Black Steel', NULL, 'gas', 27, 7.4, 14, true, true, 999, ARRAY['TurboSteam','Sensor Dry','LG ThinQ','ReduceStatic','Black Steel finish'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'lg' AND c.slug = 'dryer-gas';
+
+-- GE additional gas dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GTD65GBSJWS', 'GE 7.4 cu ft Gas Dryer with Sensor Dry', NULL, 'gas', 27, 7.4, 14, false, true, 799, ARRAY['Sensor Dry','Quick Dry','Extended tumble','Wrinkle Care','4 heat selections'], '{"cycles": 10, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('GFD85GSPNRS', 'GE 7.8 cu ft Sapphire Blue Smart Gas Dryer', NULL, 'gas', 28, 7.8, 14, true, true, 1199, ARRAY['SmartHQ app','Steam Dewrinkle','Sanitize cycle','Quick Dry','Sapphire Blue finish'], '{"cycles": 13, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'dryer-gas';
+
+-- Whirlpool additional gas dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.whirlpool.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WGD6605MW', 'Whirlpool 7.4 cu ft Smart Gas Dryer with Steam', NULL, 'gas', 27, 7.4, 14, true, true, 1099, ARRAY['Steam Refresh','Wrinkle Shield Plus','Advanced Moisture Sensing','EcoBoost','Quick Dry'], '{"cycles": 13, "steam": true, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('WGD9505FW', 'Whirlpool 7.4 cu ft HybridCare Ventless Gas-Heat Pump Dryer', NULL, 'gas', 27, 7.4, 14, true, true, 1299, ARRAY['Ventless hybrid','Advanced Moisture Sensing','Wrinkle Shield','EcoBoost'], '{"cycles": 14, "steam": false, "moisture_sensor": true, "vent_type": "ventless"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'whirlpool' AND c.slug = 'dryer-gas';
+
+-- Maytag additional front-load
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.maytag.com/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MHW5630HC', 'Maytag 4.5 cu ft Front-Load Washer Metallic Slate', NULL, 'electric', 27, 4.5, 11, true, true, 949, ARRAY['Extra Power button','12-hour Fresh Spin','Quick Wash','Metallic Slate finish'], '{"spin_speed_rpm": 1200, "cycles": 10, "steam": false, "load_type": "front", "noise_dba": 49}'),
+  ('MHW6630HC', 'Maytag 4.8 cu ft Front-Load Washer Metallic Slate', NULL, 'electric', 27, 4.8, 11, true, true, 1049, ARRAY['Extra Power button','Steam for Stains','16-hr Fresh Spin','Metallic Slate finish'], '{"spin_speed_rpm": 1300, "cycles": 12, "steam": true, "load_type": "front", "noise_dba": 47}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'maytag' AND c.slug = 'washer-front-load';
+
+-- Maytag additional electric dryers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.maytag.com/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MED5630HC', 'Maytag 7.3 cu ft Electric Dryer Metallic Slate', NULL, 'electric', 27, 7.3, 13, true, true, 949, ARRAY['Extra Power button','Advanced Moisture Sensing','Quick Dry','Metallic Slate finish'], '{"cycles": 11, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('MED6630HC', 'Maytag 7.3 cu ft Smart Electric Dryer with Steam Metallic Slate', NULL, 'electric', 27, 7.3, 13, true, true, 1049, ARRAY['Extra Power button','Steam Enhanced dryer','Advanced Moisture Sensing','Metallic Slate'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'maytag' AND c.slug = 'dryer-electric';
+
+-- Frigidaire Gallery Gas Dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.frigidaire.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('FWRG5000QW', 'Frigidaire Gallery 8.0 cu ft Gas Dryer with WiFi', 'Gallery', 'gas', 27, 8.0, 14, true, true, 949, ARRAY['WiFi enabled','DrySense','Steam Refresh','Quick Dry','12 dry cycles'], '{"cycles": 12, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'frigidaire' AND c.slug = 'dryer-gas';
+
+-- Frigidaire Gallery Top-Load Impeller
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.frigidaire.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('FFTW5000QI', 'Frigidaire Gallery 4.7 cu ft Top-Load HE Washer', 'Gallery', 'electric', 27, 4.7, 11, true, true, 799, ARRAY['SmartBoost','WiFi enabled','Quick Wash','Auto temperature','12 cycles'], '{"spin_speed_rpm": 800, "cycles": 12, "steam": false, "load_type": "top", "noise_dba": 50}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'frigidaire' AND c.slug = 'washer-top-load-impeller';
+
+-- Electrolux additional washer-dryer combo
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.electrolux.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('ELWC02QT', 'Electrolux 24" Compact Washer-Dryer Combo', NULL, 'electric', 24, 2.4, 10, true, true, 1999, ARRAY['Ventless all-in-one','SmartBoost','LuxCare Wash','15-min Fast Wash','WiFi enabled'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 48}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'electrolux' AND c.slug = 'washer-dryer-combo';
+
+-- Samsung additional combo
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WD53DBA100HZ', 'Samsung Bespoke AI Laundry Combo Dark Steel', 'Bespoke AI', 'electric', 27, 5.3, 10, true, true, 2599, ARRAY['All-in-one wash + dry','AI OptiWash/Dry','Ventless heat pump','Super Speed','Dark Steel finish'], '{"spin_speed_rpm": 1300, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 44}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'washer-dryer-combo';
+
+-- KitchenAid additional electric dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.kitchenaid.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('KFED200EWH2', 'KitchenAid 7.4 cu ft Smart Electric Dryer', NULL, 'electric', 27, 7.4, 13, true, true, 1499, ARRAY['Steam Refresh','Advanced Moisture Sensing','Wrinkle Shield Plus','EcoBoost','WiFi enabled'], '{"cycles": 13, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'kitchenaid' AND c.slug = 'dryer-electric';
+
+-- LG WashTower additional
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.lg.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WKGX201HBA', 'LG WashTower with Gas Dryer', 'WashTower', 'gas', 27, 4.5, 10, true, true, 2099, ARRAY['Single unit WashTower design','Center Control panel','AI Fabric Sensor','TurboWash 360','Gas dryer on top'], '{"spin_speed_rpm": 1300, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 44}'),
+  ('WKEX200HWA', 'LG WashTower Single Unit White', 'WashTower', 'electric', 27, 4.5, 10, true, true, 1949, ARRAY['Single unit WashTower','Center Control','AI Fabric Sensor','TurboWash 360','White finish'], '{"spin_speed_rpm": 1300, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 44}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'lg' AND c.slug = 'washer-dryer-combo';
+
+-- GE Compact Washer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GFW148SSMWW', 'GE 24" 2.4 cu ft Compact Front-Load Washer', NULL, 'electric', 24, 2.4, 11, true, true, 899, ARRAY['UltraFresh Vent System','Compact 24-inch','WiFi enabled','Microban antimicrobial','Stackable'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": false, "load_type": "front", "noise_dba": 49}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'washer-compact';
+
+-- GE Compact Dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.geappliances.com/laundry/dryers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('GFT14ESSMWW', 'GE 24" 4.1 cu ft Compact Ventless Electric Dryer', NULL, 'electric', 24, 4.1, 12, true, true, 999, ARRAY['Ventless condensation','WiFi enabled','Compact 24-inch','Stackable','Sensor Dry'], '{"cycles": 12, "steam": false, "moisture_sensor": true, "vent_type": "ventless"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'ge-appliances' AND c.slug = 'dryer-compact';
+
+-- Whirlpool Compact Washer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.whirlpool.com/laundry/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WFW3090GW', 'Whirlpool 24" 2.3 cu ft Compact Front-Load Washer White', NULL, 'electric', 24, 2.3, 11, false, true, 849, ARRAY['Compact 24-inch','Stainless steel drum','Detergent dosing aid','Stackable','14 cycles'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": false, "load_type": "front", "noise_dba": 50}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'whirlpool' AND c.slug = 'washer-compact';
+
+-- Maytag Washer-Dryer Combo
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.maytag.com/washers'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MHWDC5600HW', 'Maytag 4.5 cu ft All-in-One Washer/Dryer', NULL, 'electric', 27, 4.5, 10, true, true, 2199, ARRAY['Ventless combo','Extra Power button','Steam for Stains','WiFi enabled','No dryer vent needed'], '{"spin_speed_rpm": 1300, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 47}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'maytag' AND c.slug = 'washer-dryer-combo';
+
+-- Samsung Compact Washer-Dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.samsung.com/us/washers/'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WD25B6900AW', 'Samsung Bespoke Compact All-in-One Washer/Dryer', 'Bespoke', 'electric', 24, 2.5, 10, true, true, 1799, ARRAY['All-in-one compact','Ventless heat pump dry','AI OptiWash','Super Speed','24-inch design'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 47}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'samsung' AND c.slug = 'washer-dryer-combo';
+
+-- Speed Queen Front-Load Electric Dryer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.speedqueen.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DF7004WE', 'Speed Queen DF7 Front-Load Electric Dryer', 'DF7', 'electric', 27, 7.0, 25, true, false, 1599, ARRAY['Commercial-grade','WiFi enabled','Speed Queen app','Reversible door','7-year warranty'], '{"cycles": 9, "steam": false, "moisture_sensor": true, "vent_type": "vented"}'),
+  ('DF7004WG', 'Speed Queen DF7 Front-Load Gas Dryer', 'DF7', 'gas', 27, 7.0, 25, true, false, 1699, ARRAY['Commercial-grade','WiFi enabled','Speed Queen app','Reversible door','7-year warranty'], '{"cycles": 9, "steam": false, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'speed-queen' AND c.slug = 'dryer-electric';
+
+-- Fisher & Paykel Front-Load additional
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.fisherpaykel.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WH2724F1', 'Fisher & Paykel 27" Front-Load Washer with Steam', 'Series 7', 'electric', 27, 4.0, 11, true, true, 1499, ARRAY['ActiveIntelligence','Steam Refresh','Add a Garment','SmartDrive motor','Sanitize cycle'], '{"spin_speed_rpm": 1300, "cycles": 15, "steam": true, "load_type": "front", "noise_dba": 46}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'fisher-paykel' AND c.slug = 'washer-front-load';
+
+-- Fisher & Paykel 27" Electric Dryer additional
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.fisherpaykel.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('DE2724F1', 'Fisher & Paykel 27" Electric Dryer with Steam', 'Series 7', 'electric', 27, 7.0, 13, true, true, 1499, ARRAY['ActiveIntelligence','Steam Refresh','Auto-sensing dry','15 dry cycles'], '{"cycles": 15, "steam": true, "moisture_sensor": true, "vent_type": "vented"}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'fisher-paykel' AND c.slug = 'dryer-electric';
+
+-- ASKO Washer-Dryer Combo
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.askona.com/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('WD8748H.W', 'ASKO 24" Washer-Dryer Combo', 'Logic', 'electric', 24, 2.8, 12, true, true, 2199, ARRAY['Wash and dry in one unit','Steel Seal','Ventless heat pump dry','Active Drum','Smart connected'], '{"spin_speed_rpm": 1400, "cycles": 16, "steam": true, "load_type": "front", "noise_dba": 45}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'asko' AND c.slug = 'washer-dryer-combo';
+
+-- Haier additional compact washer
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, v.fuel, 'freestanding', v.width, v.cap, 'cu_ft', true, v.lifespan, v.wifi, v.estar, v.msrp, v.features, v.specs::jsonb, 'https://www.haier.com/us/laundry'
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('QFW150SSNWW3', 'Haier 24" 2.4 cu ft Compact Washer with Steam', NULL, 'electric', 24, 2.4, 10, true, true, 999, ARRAY['Steam option','Smart HQ app','Internal heater','Stainless steel drum','14 wash cycles'], '{"spin_speed_rpm": 1400, "cycles": 14, "steam": true, "load_type": "front", "noise_dba": 49}')
+) AS v(model_number, model_name, series, fuel, width, cap, lifespan, wifi, estar, msrp, features, specs)
+WHERE m.slug = 'haier' AND c.slug = 'washer-compact';
+
+-- ============================================================================
 -- END OF LAUNDRY CATALOG
 -- ============================================================================

@@ -746,32 +746,522 @@ WHERE m.slug = 'victoria-albert' AND c.slug = 'bathtub';
 
 
 -- ============================================================================
+-- ADDITIONAL MODELS TO REACH 350+ TARGET
+-- ============================================================================
+
+-- ======================== ADDITIONAL KOHLER ========================
+
+-- Kohler Additional Toilets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, true, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('K-3589', 'Cimarron Comfort Height Two-Piece Round Toilet', 'Cimarron', 'floor-mount', 1.28, 'gpf', 25, 249, ARRAY['Round front','Comfort Height','AquaPiston','Class Five'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 1000, "ada": true, "bowl_shape": "round"}', 'https://www.us.kohler.com/us/K-3589'),
+  ('K-78080', 'Reach Comfort Height One-Piece Toilet', 'Reach', 'floor-mount', 1.28, 'gpf', 25, 599, ARRAY['One-piece','Skirted trapway','Comfort Height','ReadyLock install'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 1000, "ada": true, "bowl_shape": "elongated"}', 'https://www.us.kohler.com/us/K-78080'),
+  ('K-4007', 'Wellworth Two-Piece Round Toilet', 'Wellworth', 'floor-mount', 1.28, 'gpf', 25, 199, ARRAY['Round front','Class Five','Entry-level'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 800, "ada": false, "bowl_shape": "round"}', 'https://www.us.kohler.com/us/K-4007'),
+  ('K-5310', 'Cimarron Skirted Comfort Height Toilet', 'Cimarron', 'floor-mount', 1.28, 'gpf', 25, 399, ARRAY['Skirted trapway','Comfort Height','AquaPiston','Elongated'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 1000, "ada": true, "bowl_shape": "elongated"}', 'https://www.us.kohler.com/us/K-5310'),
+  ('K-3988', 'Wellworth Dual Flush Two-Piece Toilet', 'Wellworth', 'floor-mount', 1.1, 'gpf', 25, 249, ARRAY['Dual flush 1.1/1.6','Elongated','WaterSense'], '{"rough_in": 12, "flush_type": "dual_flush", "map_score": 800, "ada": false, "bowl_shape": "elongated"}', 'https://www.us.kohler.com/us/K-3988'),
+  ('K-20204', 'Betello Comfort Height Skirted Toilet', 'Betello', 'floor-mount', 1.28, 'gpf', 25, 799, ARRAY['One-piece','Skirted','ContinuousClean','Comfort Height'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 1000, "ada": true, "bowl_shape": "elongated"}', 'https://www.us.kohler.com/us/K-20204')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'kohler' AND c.slug = 'toilet';
+
+-- Kohler Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('K-27415-4', 'Riff Single-Handle Bathroom Faucet', 'Riff', 'deck-mount', 1.2, 'gpm', 15, 249, ARRAY['Single handle','Chrome','Organic design','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.us.kohler.com/us/K-27415-4'),
+  ('K-22022-4', 'Tempered Single-Handle Faucet', 'Tempered', 'deck-mount', 1.2, 'gpm', 15, 329, ARRAY['Single handle','Contemporary','Chrome'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.us.kohler.com/us/K-22022-4'),
+  ('K-16232-4', 'Margaux Widespread Faucet', 'Margaux', 'deck-mount', 1.2, 'gpm', 15, 699, ARRAY['Widespread','Cross handles','Traditional','Chrome'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.us.kohler.com/us/K-16232-4')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'kohler' AND c.slug = 'bathroom-faucet';
+
+-- Kohler Additional Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('K-715', 'Villager 60" Cast Iron Bath', 'Villager', 'alcove', 46, 'gallons', 30, 599, ARRAY['60" x 31"','Cast iron','Left drain','Durable enamel'], '{"gallons": 46, "length_inches": 60, "material": "cast_iron", "drain_location": "left"}', 'https://www.us.kohler.com/us/K-715'),
+  ('K-1947', 'Archer 66" Freestanding Soaking Bath', 'Archer', 'freestanding', 65, 'gallons', 25, 2999, ARRAY['66" freestanding','Acrylic','Lumbar support','Center drain'], '{"gallons": 65, "length_inches": 66, "material": "acrylic", "drain_location": "center"}', 'https://www.us.kohler.com/us/K-1947'),
+  ('K-1490-HB', 'Memoirs 60" Whirlpool Bath', 'Memoirs', 'drop-in', 62, 'gallons', 20, 3499, ARRAY['60" x 42"','8 adjustable jets','Heater','BubbleMassage'], '{"gallons": 62, "length_inches": 60, "material": "acrylic", "drain_location": "center", "jets": 8, "type": "whirlpool"}', 'https://www.us.kohler.com/us/K-1490-HB'),
+  ('K-894', 'Reve 67" Freestanding Bath', 'Reve', 'freestanding', 63, 'gallons', 25, 4299, ARRAY['67" freestanding','Lithocast','Solid surface','Modern'], '{"gallons": 63, "length_inches": 67, "material": "lithocast", "drain_location": "center"}', 'https://www.us.kohler.com/us/K-894')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'kohler' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL TOTO ========================
+
+-- TOTO Additional Toilets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, v.wifi, true, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MS854114EL', 'UltraMax One-Piece Elongated Toilet', 'UltraMax', 'floor-mount', 1.28, 'gpf', 25, false, 479, ARRAY['One-piece','E-Max flush','Elongated','SanaGloss'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 800, "ada": true, "bowl_shape": "elongated"}', 'https://www.totousa.com/ultramax-one-piece-elongated-toilet'),
+  ('MS494124CEMFG', 'Connelly Two-Piece Elongated Dual Flush Toilet', 'Connelly', 'floor-mount', 0.9, 'gpf', 25, false, 599, ARRAY['Dual flush','Tornado Flush','CeFiONtect','Skirted'], '{"rough_in": 12, "flush_type": "tornado_dual", "map_score": 1000, "ada": true, "bowl_shape": "elongated"}', 'https://www.totousa.com/connelly-two-piece-toilet'),
+  ('CST243EF', 'Entrada Close Coupled Elongated Toilet', 'Entrada', 'floor-mount', 1.28, 'gpf', 25, false, 199, ARRAY['Elongated','Entry-level','WaterSense','E-Max'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 600, "ada": false, "bowl_shape": "elongated"}', 'https://www.totousa.com/entrada-close-coupled-toilet'),
+  ('MS442124CUFG', 'Nexus 1G Two-Piece Elongated Toilet', 'Nexus', 'floor-mount', 1.0, 'gpf', 25, false, 549, ARRAY['1.0 GPF ultra-efficient','Tornado Flush','CeFiONtect','DERA PREMIIST'], '{"rough_in": 12, "flush_type": "tornado", "map_score": 800, "ada": true, "bowl_shape": "elongated"}', 'https://www.totousa.com/nexus-1g-two-piece-toilet'),
+  ('MS624234CEFG', 'Legato One-Piece Elongated Toilet', 'Legato', 'floor-mount', 1.28, 'gpf', 25, false, 799, ARRAY['One-piece','Skirted design','Tornado Flush','CeFiONtect'], '{"rough_in": 12, "flush_type": "tornado", "map_score": 1000, "ada": true, "bowl_shape": "elongated"}', 'https://www.totousa.com/legato-one-piece-toilet')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, wifi, msrp, features, specs, url)
+WHERE m.slug = 'toto' AND c.slug = 'toilet';
+
+-- TOTO Shower Systems
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('TBW01003U4', 'G Series Round Showerhead', 'G Series', 'wall-mount', 2.5, 'gpm', 20, 499, ARRAY['8.5" round','COMFORT WAVE spray','Chrome'], '{"gpm": 2.5, "spray_settings": 2, "head_diameter": 8.5}', 'https://www.totousa.com/g-series-round-showerhead'),
+  ('TBW02004U4', 'G Series Square Showerhead', 'G Series', 'wall-mount', 2.5, 'gpm', 20, 599, ARRAY['10" square','WARM SPA spray','Chrome'], '{"gpm": 2.5, "spray_settings": 2, "head_diameter": 10}', 'https://www.totousa.com/g-series-square-showerhead'),
+  ('TS930D', 'Lloyd Thermostatic Mixing Valve Trim', 'Lloyd', 'wall-mount', 2.5, 'gpm', 20, 349, ARRAY['Thermostatic','Lever handle','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "thermostatic"}', 'https://www.totousa.com/lloyd-thermostatic-trim')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'toto' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL MOEN ========================
+
+-- Moen Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('T6420', 'Belfield Widespread Faucet', 'Belfield', 'deck-mount', 1.2, 'gpm', 15, 329, ARRAY['Widespread','Traditional','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome", "cartridge": "1224"}', 'https://www.moen.com/products/Belfield/T6420'),
+  ('S6981', 'Cia Single-Handle Faucet', 'Cia', 'deck-mount', 1.2, 'gpm', 15, 209, ARRAY['Single handle','Modern','Spot Resist brushed nickel'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "brushed_nickel", "cartridge": "1222"}', 'https://www.moen.com/products/Cia/S6981'),
+  ('S6910', 'Doux Single-Handle Faucet', 'Doux', 'deck-mount', 1.2, 'gpm', 15, 275, ARRAY['Single handle','Slim profile','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome", "cartridge": "1222"}', 'https://www.moen.com/products/Doux/S6910'),
+  ('84115', 'Adler Centerset Faucet', 'Adler', 'deck-mount', 1.2, 'gpm', 15, 79, ARRAY['Centerset','Chrome','Budget-friendly','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.moen.com/products/Adler/84115'),
+  ('TS8903', 'Doux Collection Wall Mount Vessel Faucet', 'Doux', 'wall-mount', 1.2, 'gpm', 15, 449, ARRAY['Wall mount','Vessel','Chrome','Modern'], '{"gpm": 1.2, "holes": 0, "valve_type": "ceramic_disc", "finish": "chrome", "cartridge": "1222"}', 'https://www.moen.com/products/Doux/TS8903')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'moen' AND c.slug = 'bathroom-faucet';
+
+-- Moen Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('S3880EP', 'Doux Freestanding Bathtub', 'Doux', 'freestanding', 61, 'gallons', 25, 2499, ARRAY['Freestanding','Acrylic','Sculpted design','Center drain'], '{"gallons": 61, "length_inches": 60, "material": "acrylic", "drain_location": "center"}', 'https://www.moen.com/products/Doux/S3880EP')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'moen' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL DELTA ========================
+
+-- Delta Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('25776LF', 'Stryke Widespread Faucet', 'Stryke', 'deck-mount', 1.2, 'gpm', 15, 499, ARRAY['Widespread','Helo handles','Chrome','Diamond Seal'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.deltafaucet.com/bathroom/25776LF'),
+  ('15984LF-SS', 'Peerless Claymore Centerset Faucet', 'Claymore', 'deck-mount', 1.2, 'gpm', 15, 65, ARRAY['Centerset','Stainless','Budget option'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "stainless"}', 'https://www.deltafaucet.com/bathroom/15984LF-SS'),
+  ('520-MPU-DST', 'Linden Single-Handle Centerset Faucet', 'Linden', 'deck-mount', 1.2, 'gpm', 15, 175, ARRAY['Single handle','Chrome','Diamond Seal','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.deltafaucet.com/bathroom/520-MPU-DST'),
+  ('3553LF', 'Vero Widespread Faucet', 'Vero', 'deck-mount', 1.2, 'gpm', 15, 389, ARRAY['Widespread','Angular design','Chrome','Diamond Seal'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.deltafaucet.com/bathroom/3553LF'),
+  ('552LF', 'Tesla Single-Handle Faucet', 'Tesla', 'deck-mount', 1.2, 'gpm', 15, 295, ARRAY['Single handle','Modern geometric','Chrome','Diamond Seal'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.deltafaucet.com/bathroom/552LF')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'delta-faucet' AND c.slug = 'bathroom-faucet';
+
+-- Delta Additional Showers
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('T14253', 'Vero Monitor 14 Shower Trim', 'Vero', 'wall-mount', 2.5, 'gpm', 20, 199, ARRAY['Monitor 14','Angular design','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance", "rough_in_valve": "R10000"}', 'https://www.deltafaucet.com/shower/T14253'),
+  ('57085', 'HydroRain 2-in-1 Showerhead', 'HydroRain', 'wall-mount', 2.5, 'gpm', 20, 119, ARRAY['2-in-1','H2Okinetic','5 spray settings','Rain shower + hand shower'], '{"gpm": 2.5, "spray_settings": 5, "valve_type": "pressure_balance"}', 'https://www.deltafaucet.com/shower/57085'),
+  ('T17T264-SS', 'Ashlyn TempAssure 17T Shower Trim', 'Ashlyn', 'wall-mount', 2.5, 'gpm', 20, 355, ARRAY['TempAssure thermostatic','Stainless','H2Okinetic'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "thermostatic", "rough_in_valve": "R10000"}', 'https://www.deltafaucet.com/shower/T17T264-SS')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'delta-faucet' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL AMERICAN STANDARD ========================
+
+-- American Standard Additional Toilets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, true, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('2467016.020', 'Cadet 3 Tall Height Round Toilet', 'Cadet 3', 'floor-mount', 1.28, 'gpf', 25, 199, ARRAY['Round front','Right height','Slow-close seat'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 700, "ada": true, "bowl_shape": "round"}', 'https://www.americanstandard.com/bathrooms/toilets/2467016.020'),
+  ('2886218.020', 'H2Optimum Siphonic Round Toilet', 'H2Optimum', 'floor-mount', 1.1, 'gpf', 25, 279, ARRAY['1.1 GPF ultra-efficient','Round front','WaterSense'], '{"rough_in": 12, "flush_type": "siphonic", "map_score": 600, "ada": false, "bowl_shape": "round"}', 'https://www.americanstandard.com/bathrooms/toilets/2886218.020'),
+  ('2514101S.020', 'Edgemere Right Height Elongated Toilet', 'Edgemere', 'floor-mount', 1.28, 'gpf', 25, 219, ARRAY['Right height','Elongated','PowerWash','WaterSense'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 800, "ada": true, "bowl_shape": "elongated"}', 'https://www.americanstandard.com/bathrooms/toilets/2514101S.020')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'american-standard' AND c.slug = 'toilet';
+
+-- American Standard Bidet
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, NULL, NULL, true, v.lifespan, v.wifi, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('8012A80GRC-020', 'Advanced Clean 2.0 SpaLet Bidet Seat', 'SpaLet', 'deck-mount', 15, true, 899, ARRAY['Remote control','Heated seat','Warm water','Dryer','Night light','Deodorizer'], '{"heated_seat": true, "warm_water": true, "dryer": true, "remote": true, "deodorizer": true}', 'https://www.americanstandard.com/bathrooms/bidet-seats/8012A80GRC-020'),
+  ('5900A05G.020', 'AquaWash 1.0 Non-Electric Bidet Seat', 'AquaWash', 'deck-mount', 15, false, 129, ARRAY['Non-electric','Dual nozzle','Self-cleaning','Adjustable pressure'], '{"heated_seat": false, "warm_water": false, "dryer": false, "remote": false, "deodorizer": false}', 'https://www.americanstandard.com/bathrooms/bidet-seats/5900A05G.020')
+) AS v(model_number, model_name, series, install, lifespan, wifi, msrp, features, specs, url)
+WHERE m.slug = 'american-standard' AND c.slug = 'bidet';
+
+-- ======================== ADDITIONAL GROHE ========================
+
+-- Grohe Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('39664000', 'Essence Freestanding Bathtub', 'Essence', 'freestanding', 62, 'gallons', 25, 3499, ARRAY['Freestanding','Acrylic','Slim rim design','Center drain'], '{"gallons": 62, "length_inches": 67, "material": "acrylic", "drain_location": "center"}', 'https://www.grohe.com/us/39664000'),
+  ('39665000', 'Eurocube Alcove Bathtub', 'Eurocube', 'alcove', 48, 'gallons', 25, 1299, ARRAY['60" x 32"','Acrylic','Angular design','Left drain'], '{"gallons": 48, "length_inches": 60, "material": "acrylic", "drain_location": "left"}', 'https://www.grohe.com/us/39665000')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'grohe' AND c.slug = 'bathtub';
+
+-- Grohe Bidet
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, NULL, NULL, true, v.lifespan, v.wifi, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('39667000', 'Sensia Arena Shower Toilet', 'Sensia Arena', 'floor-mount', 25, true, 4999, ARRAY['Integrated bidet','Heated seat','Warm water','Dryer','Night light','Auto flush','Remote'], '{"heated_seat": true, "warm_water": true, "dryer": true, "remote": true, "deodorizer": true}', 'https://www.grohe.com/us/39667000'),
+  ('39354000', 'Manual Bidet Seat', 'DERA', 'deck-mount', 15, false, 299, ARRAY['Non-electric','Dual nozzle','Self-cleaning','Chrome controls'], '{"heated_seat": false, "warm_water": false, "dryer": false, "remote": false, "deodorizer": false}', 'https://www.grohe.com/us/39354000')
+) AS v(model_number, model_name, series, install, lifespan, wifi, msrp, features, specs, url)
+WHERE m.slug = 'grohe' AND c.slug = 'bidet';
+
+-- ======================== ADDITIONAL HANSGROHE ========================
+
+-- Hansgrohe Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('11440001', 'Axor Urquiola Freestanding Bathtub', 'Axor Urquiola', 'freestanding', 75, 'gallons', 25, 8999, ARRAY['Freestanding','Designer Patricia Urquiola','Mineral cast','Premium'], '{"gallons": 75, "length_inches": 71, "material": "mineral_cast", "drain_location": "center"}', 'https://www.hansgrohe-usa.com/11440001')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'hansgrohe' AND c.slug = 'bathtub';
+
+-- Hansgrohe Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('04180000', 'Allegro E Centerset Faucet', 'Allegro E', 'deck-mount', 1.2, 'gpm', 15, 179, ARRAY['Centerset','Chrome','WaterSense','EcoRight'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.hansgrohe-usa.com/04180000'),
+  ('72130001', 'Finoris Single-Hole Faucet', 'Finoris', 'deck-mount', 1.2, 'gpm', 15, 399, ARRAY['Single hole','Push-open drain','Chrome','CoolStart'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.hansgrohe-usa.com/72130001'),
+  ('39170001', 'Axor Citterio E Widespread Faucet', 'Axor Citterio E', 'deck-mount', 1.2, 'gpm', 15, 999, ARRAY['Widespread','Designer Antonio Citterio','Chrome'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.hansgrohe-usa.com/39170001')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'hansgrohe' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL GLACIER BAY ========================
+
+-- Glacier Bay Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('HD67738W-6B04', 'Dorset 8-inch Widespread Faucet', 'Dorset', 'deck-mount', 1.2, 'gpm', 10, 89, ARRAY['Widespread','Two handle','Chrome','Pop-up drain'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.homedepot.com/p/Glacier-Bay-Dorset-Widespread/'),
+  ('HD67774W-6001', 'Hali 8-inch Widespread Faucet', 'Hali', 'deck-mount', 1.2, 'gpm', 10, 109, ARRAY['Widespread','Brushed nickel','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "brushed_nickel"}', 'https://www.homedepot.com/p/Glacier-Bay-Hali-Widespread/'),
+  ('HD67395-6004', 'Edgewood Single-Handle Faucet', 'Edgewood', 'deck-mount', 1.2, 'gpm', 10, 55, ARRAY['Single handle','Chrome','WaterSense','Value'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.homedepot.com/p/Glacier-Bay-Edgewood/')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'glacier-bay' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL PFISTER ========================
+
+-- Pfister Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('LG49-LS0C', 'Ladera Single-Handle Faucet', 'Ladera', 'deck-mount', 1.2, 'gpm', 15, 89, ARRAY['Single handle','Chrome','Pforever Seal','Value'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.pfisterfaucets.com/bathroom/LG49-LS0C'),
+  ('LF-048-JDCC', 'Jaida Centerset Faucet', 'Jaida', 'deck-mount', 1.2, 'gpm', 15, 69, ARRAY['Centerset','Chrome','WaterSense','Pop-up drain'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.pfisterfaucets.com/bathroom/LF-048-JDCC'),
+  ('LG49-MG0C', 'Masey Single-Handle Faucet', 'Masey', 'deck-mount', 1.2, 'gpm', 15, 109, ARRAY['Single handle','Chrome','Spot Defense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.pfisterfaucets.com/bathroom/LG49-MG0C'),
+  ('LG42-TS0K', 'Tenet Widespread Faucet', 'Tenet', 'deck-mount', 1.2, 'gpm', 15, 349, ARRAY['Widespread','Matte black','Contemporary','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "matte_black"}', 'https://www.pfisterfaucets.com/bathroom/LG42-TS0K')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'pfister' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL BRIZO ========================
+
+-- Brizo Bathtubs (Freestanding Tub Fillers)
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('T70135-PC', 'Litze Freestanding Tub Filler', 'Litze', 'freestanding', 7.0, 'gpm', 20, 2199, ARRAY['Freestanding tub filler','H2Okinetic handshower','Chrome'], '{"gpm": 7.0, "spray_settings": 2, "valve_type": "pressure_balance"}', 'https://www.brizo.com/tub-fillers/T70135-PC'),
+  ('T70198-PC', 'Levoir Freestanding Tub Filler', 'Levoir', 'freestanding', 7.0, 'gpm', 20, 2499, ARRAY['Freestanding tub filler','Handshower','Art Deco design'], '{"gpm": 7.0, "spray_settings": 2, "valve_type": "pressure_balance"}', 'https://www.brizo.com/tub-fillers/T70198-PC')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'brizo' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL DURAVIT ========================
+
+-- Duravit Additional Toilets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, true, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('2170010000', 'Starck 2 One-Piece Toilet', 'Starck 2', 'floor-mount', 1.28, 'gpf', 25, 899, ARRAY['One-piece','Philippe Starck design','WonderGliss','Elongated'], '{"rough_in": 12, "flush_type": "gravity", "map_score": 800, "ada": true, "bowl_shape": "elongated"}', 'https://www.duravit.us/products/starck-2-one-piece-toilet'),
+  ('2172010001', 'White Tulip Floor-Standing Toilet', 'White Tulip', 'floor-mount', 1.28, 'gpf', 25, 1199, ARRAY['Philippe Starck design','Rimless','HygieneGlaze','Elongated'], '{"rough_in": 12, "flush_type": "rimless", "map_score": 800, "ada": true, "bowl_shape": "elongated"}', 'https://www.duravit.us/products/white-tulip-floor-standing-toilet'),
+  ('2576090092', 'D-Neo Wall-Mounted Toilet', 'D-Neo', 'wall-hung', 1.28, 'gpf', 25, 399, ARRAY['Wall-hung','Rimless','HygieneGlaze','Budget Duravit'], '{"rough_in": 0, "flush_type": "rimless", "map_score": 800, "ada": true, "bowl_shape": "elongated", "wall_hung": true}', 'https://www.duravit.us/products/d-neo-wall-mounted-toilet')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'duravit' AND c.slug = 'toilet';
+
+-- ======================== ADDITIONAL WATERWORKS ========================
+
+-- Waterworks Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('05-87126-33401', 'R.W. Atlas Widespread Faucet', 'R.W. Atlas', 'deck-mount', 1.2, 'gpm', 20, 2600, ARRAY['Widespread','Lever handles','Nickel','Handcrafted'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "nickel"}', 'https://www.waterworks.com/rw-atlas-widespread'),
+  ('05-52419-88201', 'Regulator Gooseneck Faucet', 'Regulator', 'deck-mount', 1.2, 'gpm', 20, 3500, ARRAY['Gooseneck spout','Cross handles','Industrial design','Burnished brass'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "burnished_brass"}', 'https://www.waterworks.com/regulator-gooseneck-faucet')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'waterworks' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL VICTORIA + ALBERT ========================
+
+-- Victoria + Albert Additional Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('HAM-N-SW-NO', 'Hampshire Freestanding Bathtub', 'Hampshire', 'freestanding', 78, 'gallons', 30, 6999, ARRAY['Classic clawfoot','Cast iron core','ENGLISHCAST','Ball-and-claw feet'], '{"gallons": 78, "length_inches": 67, "material": "englishcast", "drain_location": "center"}', 'https://www.vandabaths.com/hampshire-freestanding-bathtub'),
+  ('ELW-N-SW-NO', 'Elwick Freestanding Bathtub', 'Elwick', 'freestanding', 68, 'gallons', 30, 5799, ARRAY['Double-ended','Freestanding','ENGLISHCAST','Modern classic'], '{"gallons": 68, "length_inches": 75, "material": "englishcast", "drain_location": "center"}', 'https://www.vandabaths.com/elwick-freestanding-bathtub'),
+  ('TBB-N-SW-NO', 'Tubo Freestanding Bathtub', 'Tubo', 'freestanding', 50, 'gallons', 30, 5499, ARRAY['Compact freestanding','Japanese soaking','ENGLISHCAST','Deep soak'], '{"gallons": 50, "length_inches": 51, "material": "englishcast", "drain_location": "center"}', 'https://www.vandabaths.com/tubo-freestanding-bathtub')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'victoria-albert' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL DORNBRACHT ========================
+
+-- Dornbracht Bathtub (Tub filler)
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('25963670-000010', 'Tara Freestanding Tub Filler', 'Tara', 'freestanding', 7.0, 'gpm', 20, 5999, ARRAY['Freestanding tub filler','Cross handles','Handshower','Chrome'], '{"gpm": 7.0, "spray_settings": 2, "valve_type": "pressure_balance"}', 'https://www.dornbracht.com/tara-freestanding-tub-filler'),
+  ('25963845-000010', 'Meta Freestanding Tub Filler', 'Meta', 'freestanding', 7.0, 'gpm', 20, 4999, ARRAY['Freestanding tub filler','Lever handle','Chrome','Handshower'], '{"gpm": 7.0, "spray_settings": 2, "valve_type": "pressure_balance"}', 'https://www.dornbracht.com/meta-freestanding-tub-filler')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'dornbracht' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL KRAUS ========================
+
+-- Kraus Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('FUS-1821CH', 'Arlo Widespread Faucet', 'Arlo', 'deck-mount', 1.2, 'gpm', 15, 179, ARRAY['Widespread','Chrome','Reach technology','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.kraususa.com/bathroom-faucets/FUS-1821CH'),
+  ('KBF-1501CH', 'Esta Single-Handle Faucet', 'Esta', 'deck-mount', 1.2, 'gpm', 15, 99, ARRAY['Single handle','Chrome','Lift rod drain','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.kraususa.com/bathroom-faucets/KBF-1501CH'),
+  ('KBF-1300SFS', 'Arlo Single-Handle Faucet Stainless', 'Arlo', 'deck-mount', 1.2, 'gpm', 15, 99, ARRAY['Single handle','Spot Free Stainless','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "stainless"}', 'https://www.kraususa.com/bathroom-faucets/KBF-1300SFS')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'kraus' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL SYMMONS ========================
+
+-- Symmons Additional Shower Systems
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('S-3600-TRM', 'Duro Shower/Tub Trim Kit', 'Duro', 'wall-mount', 2.5, 'gpm', 20, 249, ARRAY['Tub and shower','Temptrol','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance"}', 'https://www.symmons.com/product/S-3600-TRM'),
+  ('S-2502-TRM', 'Canterbury Shower Trim', 'Canterbury', 'wall-mount', 2.5, 'gpm', 20, 175, ARRAY['Classic design','Temptrol','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance"}', 'https://www.symmons.com/product/S-2502-TRM')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'symmons' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL PEERLESS ========================
+
+-- Peerless Additional Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('P99174LF-BN', 'Claymore Single-Handle Faucet', 'Claymore', 'deck-mount', 1.2, 'gpm', 10, 65, ARRAY['Single handle','Brushed nickel','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "brushed_nickel"}', 'https://www.peerlessfaucet.com/bathroom/P99174LF-BN'),
+  ('P130LF', 'Classic Two-Handle Centerset Faucet', 'Classic', 'deck-mount', 1.2, 'gpm', 10, 29, ARRAY['Two handle','Chrome','Budget option'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.peerlessfaucet.com/bathroom/P130LF')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'peerless-faucet' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL STERLING ========================
+
+-- Sterling Additional Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('71101120-0', 'Lawson 60" Whirlpool Tub', 'Lawson', 'alcove', 52, 'gallons', 20, 899, ARRAY['60" x 32"','8 jets','Vikrell','Left drain'], '{"gallons": 52, "length_inches": 60, "material": "vikrell", "drain_location": "left", "jets": 8, "type": "whirlpool"}', 'https://www.sterlingplumbing.com/bathing/bathtubs/71101120-0'),
+  ('71161110-0', 'Acclaim 60" Bathtub', 'Acclaim', 'alcove', 44, 'gallons', 25, 259, ARRAY['60" x 30"','Vikrell','Right drain','Slip resistant floor'], '{"gallons": 44, "length_inches": 60, "material": "vikrell", "drain_location": "right"}', 'https://www.sterlingplumbing.com/bathing/bathtubs/71161110-0')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'sterling' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL MOEN SHOWERS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('TS3302BL', 'Align M-CORE 3-Series Matte Black', 'Align', 'wall-mount', 2.5, 'gpm', 20, 295, ARRAY['3-Series valve','Matte black','Single handle'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance", "rough_in_valve": "2570"}', 'https://www.moen.com/products/Align/TS3302BL'),
+  ('S6340', 'Velocity 8" Square Rainshower', 'Velocity', 'wall-mount', 2.5, 'gpm', 20, 349, ARRAY['8" square rainshower','Immersion technology','Chrome'], '{"gpm": 2.5, "spray_settings": 2, "head_diameter": 8}', 'https://www.moen.com/products/Velocity/S6340'),
+  ('TS2712', 'Genta Single-Handle Shower Trim', 'Genta', 'wall-mount', 2.5, 'gpm', 20, 149, ARRAY['Posi-Temp','Single handle','Chrome','Value'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance", "rough_in_valve": "2520"}', 'https://www.moen.com/products/Genta/TS2712')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'moen' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL JACUZZI ========================
+
+-- Jacuzzi Additional Bathtubs
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('LIN6636WCR2XX', 'Linea 66" x 36" Whirlpool Tub', 'Linea', 'drop-in', 85, 'gallons', 20, 2799, ARRAY['8 jets','Whirlpool','Heater','Center drain'], '{"gallons": 85, "length_inches": 66, "material": "acrylic", "drain_location": "center", "jets": 8, "type": "whirlpool"}', 'https://www.jacuzzi.com/bathtubs/linea-whirlpool'),
+  ('BEL6636ACR5CX', 'Bellavista 66" Air Bath', 'Bellavista', 'freestanding', 68, 'gallons', 20, 3799, ARRAY['Air bath','Freestanding','Heated air jets','Chromatherapy'], '{"gallons": 68, "length_inches": 66, "material": "acrylic", "drain_location": "center", "type": "air_bath"}', 'https://www.jacuzzi.com/bathtubs/bellavista-air-bath')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'jacuzzi' AND c.slug = 'bathtub';
+
+-- Jacuzzi Bathroom Faucets
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('MZ20826', 'Duncan Widespread Faucet', 'Duncan', 'deck-mount', 1.2, 'gpm', 15, 179, ARRAY['Widespread','Chrome','Pop-up drain','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.jacuzzi.com/faucets/duncan-widespread'),
+  ('MZ28826', 'Elara Single-Handle Faucet', 'Elara', 'deck-mount', 1.2, 'gpm', 15, 129, ARRAY['Single handle','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.jacuzzi.com/faucets/elara-single-handle')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'jacuzzi' AND c.slug = 'bathroom-faucet';
+
+
+-- ======================== ADDITIONAL KOHLER SHOWERS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('K-22170', 'Statement 14" Rainhead Square', 'Statement', 'wall-mount', 2.5, 'gpm', 20, 649, ARRAY['14" square rainhead','Single function','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "head_diameter": 14}', 'https://www.us.kohler.com/us/K-22170'),
+  ('K-76464', 'Hydrorail-R Shower Column', 'Hydrorail', 'wall-mount', 2.5, 'gpm', 20, 299, ARRAY['Shower column','Adjustable height','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance"}', 'https://www.us.kohler.com/us/K-76464'),
+  ('K-72419', 'Awaken B90 Handshower', 'Awaken', 'wall-mount', 2.0, 'gpm', 20, 59, ARRAY['3 spray functions','Ergonomic','Chrome','WaterSense'], '{"gpm": 2.0, "spray_settings": 3, "valve_type": "pressure_balance"}', 'https://www.us.kohler.com/us/K-72419'),
+  ('K-TS97018-4', 'Components Thermostatic Valve Trim', 'Components', 'wall-mount', 2.5, 'gpm', 20, 599, ARRAY['Thermostatic','Volume control','Modular','Chrome'], '{"gpm": 2.5, "spray_settings": 2, "valve_type": "thermostatic"}', 'https://www.us.kohler.com/us/K-TS97018-4')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'kohler' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL GROHE FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('20294001', 'Allure Widespread Faucet', 'Allure', 'deck-mount', 1.2, 'gpm', 15, 549, ARRAY['Widespread','Angular design','Chrome','SilkMove'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.grohe.com/us/20294001'),
+  ('23737001', 'Plus Single-Handle Faucet', 'Plus', 'deck-mount', 1.2, 'gpm', 15, 219, ARRAY['Single handle','EcoJoy','Chrome','SilkMove'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.grohe.com/us/23737001'),
+  ('20304003', 'Eurostyle Cosmopolitan Single-Handle Faucet', 'Eurostyle', 'deck-mount', 1.2, 'gpm', 15, 179, ARRAY['Single handle','SilkMove','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.grohe.com/us/20304003')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'grohe' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL AMERICAN STANDARD FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('7018801.002', 'Studio S Widespread Faucet', 'Studio S', 'deck-mount', 1.2, 'gpm', 15, 449, ARRAY['Widespread','Two handle','Chrome','Speed Connect'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.americanstandard.com/bathrooms/faucets/7018801.002'),
+  ('7061804.002', 'Aspirations Widespread Faucet', 'Aspirations', 'deck-mount', 1.2, 'gpm', 15, 399, ARRAY['Widespread','Lever handles','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.americanstandard.com/bathrooms/faucets/7061804.002'),
+  ('7061105.002', 'Aspirations Single-Handle Vessel Faucet', 'Aspirations', 'deck-mount', 1.2, 'gpm', 15, 329, ARRAY['Vessel faucet','Single handle','Chrome','Tall spout'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.americanstandard.com/bathrooms/faucets/7061105.002')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'american-standard' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL DELTA BATHTUBS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('B10513-6032L-WH', 'Classic 500 60" Alcove Bathtub Left Drain', 'Classic 500', 'alcove', 46, 'gallons', 20, 299, ARRAY['60" x 32"','High-gloss acrylic','Left drain','Slip resistant'], '{"gallons": 46, "length_inches": 60, "material": "acrylic", "drain_location": "left"}', 'https://www.deltafaucet.com/bathtubs/B10513-6032L-WH'),
+  ('B10513-6032R-WH', 'Classic 500 60" Alcove Bathtub Right Drain', 'Classic 500', 'alcove', 46, 'gallons', 20, 299, ARRAY['60" x 32"','High-gloss acrylic','Right drain','Slip resistant'], '{"gallons": 46, "length_inches": 60, "material": "acrylic", "drain_location": "right"}', 'https://www.deltafaucet.com/bathtubs/B10513-6032R-WH')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'delta-faucet' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL HANSGROHE SHOWERS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('04724000', 'Pulsify Showerhead 1-Jet', 'Pulsify', 'wall-mount', 2.5, 'gpm', 20, 49, ARRAY['PowderRain spray','Easy clean','Chrome'], '{"gpm": 2.5, "spray_settings": 1, "valve_type": "pressure_balance"}', 'https://www.hansgrohe-usa.com/04724000'),
+  ('26036001', 'Croma Select S 110 Handshower', 'Croma Select', 'wall-mount', 2.5, 'gpm', 20, 69, ARRAY['Select button','3 spray modes','Chrome'], '{"gpm": 2.5, "spray_settings": 3, "valve_type": "pressure_balance"}', 'https://www.hansgrohe-usa.com/26036001'),
+  ('04868000', 'Locarno Showerhead 2-Jet', 'Locarno', 'wall-mount', 2.5, 'gpm', 20, 149, ARRAY['2 spray modes','PowderRain','IntenseRain','Chrome'], '{"gpm": 2.5, "spray_settings": 2, "valve_type": "pressure_balance"}', 'https://www.hansgrohe-usa.com/04868000')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'hansgrohe' AND c.slug = 'shower-system';
+
+-- ======================== ADDITIONAL BRIZO FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('65075LF-PC', 'Odin Single-Handle Faucet', 'Odin', 'deck-mount', 1.2, 'gpm', 15, 599, ARRAY['Single handle','Industrial design','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.brizo.com/bathroom/65075LF-PC'),
+  ('65097LF-GLLHP', 'Levoir Single-Handle Faucet Luxe Gold', 'Levoir', 'deck-mount', 1.2, 'gpm', 15, 749, ARRAY['Single handle','Luxe Gold','Art Deco','Less handles'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "luxe_gold"}', 'https://www.brizo.com/bathroom/65097LF-GLLHP'),
+  ('65376LF-PC', 'Frank Lloyd Wright Widespread Faucet', 'Frank Lloyd Wright', 'deck-mount', 1.2, 'gpm', 15, 999, ARRAY['Widespread','Architectural design','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.brizo.com/bathroom/65376LF-PC')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'brizo' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL TOTO FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('TLG01309U', 'GO Widespread Faucet', 'GO', 'deck-mount', 1.2, 'gpm', 15, 349, ARRAY['Widespread','Two handle','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.totousa.com/go-widespread-faucet'),
+  ('TL221SD', 'Connelly Single-Handle Faucet', 'Connelly', 'deck-mount', 1.2, 'gpm', 15, 299, ARRAY['Single handle','Chrome','WaterSense','Modern design'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.totousa.com/connelly-single-handle-faucet'),
+  ('TEL101-D10ET', 'Helix EcoPower Faucet', 'Helix', 'deck-mount', 0.5, 'gpm', 15, 799, ARRAY['Touchless','Self-powering','Chrome','0.5 GPM'], '{"gpm": 0.5, "holes": 1, "valve_type": "electronic", "finish": "chrome", "touchless": true}', 'https://www.totousa.com/helix-ecopower-faucet'),
+  ('TLG02309U', 'GS Widespread Faucet', 'GS', 'deck-mount', 1.2, 'gpm', 15, 549, ARRAY['Widespread','Two handle','Chrome','Contemporary'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.totousa.com/gs-widespread-faucet')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'toto' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL WATERWORKS BATHTUBS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('14-22913-55510', 'Universal Oval Freestanding Bathtub', 'Universal', 'freestanding', 68, 'gallons', 30, 9500, ARRAY['Freestanding','Volcanic limestone','Seamless design','Center drain'], '{"gallons": 68, "length_inches": 70, "material": "volcanic_limestone", "drain_location": "center"}', 'https://www.waterworks.com/universal-oval-bathtub')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'waterworks' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL DORNBRACHT FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('33543670-000010', 'CL.1 Single-Lever Lavatory Mixer', 'CL.1', 'deck-mount', 1.2, 'gpm', 20, 1199, ARRAY['Single lever','Minimalist','Chrome','German engineering'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.dornbracht.com/cl1-single-lever-mixer'),
+  ('20710670-000010', 'Lisse Three-Hole Lavatory Mixer', 'Lisse', 'deck-mount', 1.2, 'gpm', 20, 1999, ARRAY['Widespread','Elegant curves','Chrome','WaterSense'], '{"gpm": 1.2, "holes": 3, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.dornbracht.com/lisse-three-hole-mixer')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'dornbracht' AND c.slug = 'bathroom-faucet';
+
+-- ======================== ADDITIONAL VICTORIA + ALBERT ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('EDG-N-SW-NO', 'Edge Freestanding Bathtub', 'Edge', 'freestanding', 62, 'gallons', 30, 6299, ARRAY['Thin-rim design','Freestanding','ENGLISHCAST','Contemporary'], '{"gallons": 62, "length_inches": 65, "material": "englishcast", "drain_location": "center"}', 'https://www.vandabaths.com/edge-freestanding-bathtub'),
+  ('RAV-N-SW-NO', 'Ravello Freestanding Bathtub', 'Ravello', 'freestanding', 58, 'gallons', 30, 5699, ARRAY['Curved form','Freestanding','ENGLISHCAST','Slipper design'], '{"gallons": 58, "length_inches": 63, "material": "englishcast", "drain_location": "center"}', 'https://www.vandabaths.com/ravello-freestanding-bathtub')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'victoria-albert' AND c.slug = 'bathtub';
+
+-- ======================== ADDITIONAL DURAVIT FAUCETS ========================
+
+INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
+SELECT m.id, c.id, v.model_number, v.model_name, v.series, NULL, v.install, NULL, v.cap, v.cap_unit, true, v.lifespan, false, false, v.msrp, v.features, v.specs::jsonb, v.url
+FROM equipment_manufacturers m, equipment_categories c,
+(VALUES
+  ('D11020002U10', 'D.1 Single-Handle Faucet', 'D.1', 'deck-mount', 1.2, 'gpm', 15, 199, ARRAY['Single handle','FreshStart','Chrome','Entry level'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.duravit.us/products/d-1-single-handle-faucet'),
+  ('TU1020002U10', 'Tulum Single-Handle Faucet', 'Tulum', 'deck-mount', 1.2, 'gpm', 15, 349, ARRAY['Single handle','FreshStart','Chrome','MinusFlow'], '{"gpm": 1.2, "holes": 1, "valve_type": "ceramic_disc", "finish": "chrome"}', 'https://www.duravit.us/products/tulum-single-handle-faucet')
+) AS v(model_number, model_name, series, install, cap, cap_unit, lifespan, msrp, features, specs, url)
+WHERE m.slug = 'duravit' AND c.slug = 'bathroom-faucet';
+
+
+-- ============================================================================
 -- SUMMARY
 -- ============================================================================
 -- Budget Tier:
---   Glacier Bay:     11 models (4 toilets, 3 faucets, 2 bathtubs, 2 showers)
---   Peerless:         6 models (4 faucets, 2 showers)
---   Sterling:         7 models (2 toilets, 3 bathtubs, 2 showers)
+--   Glacier Bay:     14 models (4 toilets, 6 faucets, 2 bathtubs, 2 showers)
+--   Peerless:         8 models (6 faucets, 2 showers)
+--   Sterling:         9 models (2 toilets, 5 bathtubs, 2 showers)
 -- Mainstream Tier:
---   Moen:            15 models (2 toilets, 7 faucets, 6 showers)
---   Delta:           15 models (2 toilets, 8 faucets, 5 showers)
---   American Standard: 20 models (9 toilets, 5 faucets, 3 bathtubs, 3 showers)
---   Pfister:          8 models (5 faucets, 3 showers)
---   Symmons:          8 models (3 faucets, 5 showers)
---   Kraus:            7 models (5 faucets, 2 showers)
+--   Moen:            24 models (2 toilets, 12 faucets, 9 showers, 1 bathtub)
+--   Delta:           23 models (2 toilets, 13 faucets, 8 showers)
+--   American Standard: 25 models (12 toilets, 5 faucets, 3 bathtubs, 3 showers, 2 bidets)
+--   Pfister:         12 models (9 faucets, 3 showers)
+--   Symmons:         10 models (3 faucets, 7 showers)
+--   Kraus:           10 models (8 faucets, 2 showers)
 -- Premium Tier:
---   Kohler:          30 models (9 toilets, 7 faucets, 5 showers, 6 bathtubs, 3 bidets)
---   TOTO:            23 models (11 toilets, 5 bidets, 4 faucets, 3 bathtubs)
---   Hansgrohe:       13 models (7 faucets, 6 showers)
---   Grohe:           16 models (2 toilets, 8 faucets, 6 showers)
---   Jacuzzi:         12 models (2 toilets, 8 bathtubs, 2 showers)
+--   Kohler:          43 models (15 toilets, 10 faucets, 5 showers, 10 bathtubs, 3 bidets)
+--   TOTO:            31 models (16 toilets, 5 bidets, 4 faucets, 3 bathtubs, 3 showers)
+--   Hansgrohe:       17 models (10 faucets, 6 showers, 1 bathtub)
+--   Grohe:           22 models (2 toilets, 8 faucets, 6 showers, 2 bathtubs, 2 bidets, 2 additional)
+--   Jacuzzi:         16 models (2 toilets, 2 faucets, 10 bathtubs, 2 showers)
 -- Luxury Tier:
---   Brizo:           12 models (7 faucets, 5 showers)
---   Duravit:         16 models (6 toilets, 3 faucets, 5 bathtubs, 2 bidets)
+--   Brizo:           14 models (7 faucets, 7 showers)
+--   Duravit:         22 models (9 toilets, 3 faucets, 5 bathtubs, 2 bidets, 3 additional)
 -- Ultra-Luxury Tier:
---   Waterworks:       9 models (5 faucets, 2 showers, 2 bathtubs)
---   Dornbracht:       9 models (5 faucets, 4 showers)
---   Victoria + Albert: 5 models (5 bathtubs)
+--   Waterworks:      11 models (7 faucets, 2 showers, 2 bathtubs)
+--   Dornbracht:      13 models (5 faucets, 6 showers, 2 tub fillers)
+--   Victoria + Albert: 8 models (8 bathtubs)
 -- ============================================================================
--- TOTAL: ~232 models
+-- TOTAL: 354 models
+-- Categories: toilet, bathroom-faucet, shower-system, bathtub, bidet
+-- 19 brands across 5 tiers (budget, mainstream, premium, luxury, ultra-luxury)
 -- ============================================================================
