@@ -29,7 +29,7 @@ WHERE m.slug = 'whirlpool' AND c.slug = v.cat_slug;
 -- ======================== MAYTAG ========================
 
 INSERT INTO equipment_catalog (manufacturer_id, category_id, model_number, model_name, series, fuel_type, installation_type, width_inches, capacity_value, capacity_unit, is_current_model, expected_lifespan_years, wifi_enabled, energy_star, msrp_usd, key_features, specs, product_url)
-SELECT m.id, c.id, v.model_number, v.model_name, NULL, v.fuel, v.install, v.width, v.cap, v.cap_unit, true, v.lifespan, false, true, v.msrp, v.features, v.specs::jsonb, 'https://www.maytag.com'
+SELECT m.id, c.id, v.model_number, v.model_name, NULL, v.fuel, v.install, v.width, v.cap, v.cap_unit, true, v.lifespan, false, true, v.msrp::numeric, v.features, v.specs::jsonb, 'https://www.maytag.com'
 FROM equipment_manufacturers m, equipment_categories c,
 (VALUES
   -- French Door Refrigerators
