@@ -1,28 +1,24 @@
 /**
- * Haven Equipment Manual Scraper
+ * Haven Equipment Manual Scraper v3
  *
- * Crawls manufacturer support portals to find and download equipment manual PDFs.
- * Uses PlaywrightCrawler for JS-heavy sites (Samsung, GE, Carrier, etc.).
+ * Uses Google Search to find direct PDF URLs for equipment manuals,
+ * then downloads and uploads them to Supabase storage.
  *
- * Input: List of models to find manuals for (fetched from Supabase).
- * Output: Dataset of found PDF URLs + downloaded PDFs to key-value store.
- *
- * Designed to run on a weekly/monthly schedule via Apify Scheduler.
+ * This approach works for ALL brands including JS-heavy sites like
+ * Samsung, GE, and Carrier because Google already indexes their PDFs.
  */
 
 import { Actor, log } from 'apify';
-import { PlaywrightCrawler, createPlaywrightRouter } from '@crawlee/playwright';
 
 await Actor.init();
 
-// Get input
 const input = await Actor.getInput() ?? {};
 const {
     supabaseUrl = '',
     supabaseServiceKey = '',
     batchSize = 50,
-    manufacturerSlug = null, // null = all brands, or specific slug like 'samsung'
-    onlyMissing = true, // Only process models without cached PDFs
+    manufacturerSlug = null,
+    onlyMissing = true,
 } = input;
 
 if (!supabaseUrl || !supabaseServiceKey) {
@@ -30,231 +26,205 @@ if (!supabaseUrl || !supabaseServiceKey) {
     await Actor.exit({ exitCode: 1 });
 }
 
-// Fetch models that need manuals from Supabase
+// ── Fetch models from Supabase ──────────────────────────────────────────────
+
 log.info('Fetching models from Supabase...');
 
-let url = `${supabaseUrl}/rest/v1/equipment_catalog?select=id,model_number,model_name,equipment_manufacturers!inner(name,slug,support_url,website_url),equipment_categories!inner(name,slug)&limit=${batchSize}`;
-
-if (manufacturerSlug) {
-    url += `&equipment_manufacturers.slug=eq.${manufacturerSlug}`;
+// First, get IDs of models that already have cached PDFs
+let cachedIds = new Set();
+if (onlyMissing) {
+    const manualsUrl = `${supabaseUrl}/rest/v1/equipment_manuals?select=catalog_entry_id&file_size_bytes=gt.0&limit=10000`;
+    const manualsResponse = await fetch(manualsUrl, {
+        headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}` },
+    });
+    cachedIds = new Set((await manualsResponse.json()).map(m => m.catalog_entry_id));
+    log.info(`Found ${cachedIds.size} models with cached PDFs`);
 }
 
-const modelsResponse = await fetch(url, {
-    headers: {
-        'apikey': supabaseServiceKey,
-        'Authorization': `Bearer ${supabaseServiceKey}`,
-    },
+// Fetch ALL catalog entries (paginated) then filter
+let allModels = [];
+let offset = 0;
+const PAGE_SIZE = 1000;
+
+while (true) {
+    let url = `${supabaseUrl}/rest/v1/equipment_catalog?select=id,model_number,model_name,equipment_manufacturers!inner(name,slug,support_url),equipment_categories!inner(name,slug)&limit=${PAGE_SIZE}&offset=${offset}&order=id`;
+    if (manufacturerSlug) {
+        url += `&equipment_manufacturers.slug=eq.${manufacturerSlug}`;
+    }
+
+    const modelsResponse = await fetch(url, {
+        headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}` },
+    });
+    const page = await modelsResponse.json();
+    if (!page || page.length === 0) break;
+
+    allModels.push(...page);
+    offset += PAGE_SIZE;
+    if (page.length < PAGE_SIZE) break;
+}
+
+log.info(`Fetched ${allModels.length} total models from catalog`);
+
+// Filter to only uncovered models
+let models;
+if (onlyMissing) {
+    models = allModels.filter(m => !cachedIds.has(m.id));
+    log.info(`${models.length} models need manuals (${cachedIds.size} already cached)`);
+} else {
+    models = allModels;
+}
+
+// Limit to batchSize
+if (models.length > batchSize) {
+    models = models.slice(0, batchSize);
+    log.info(`Processing first ${batchSize} of ${models.length} uncovered models`);
+}
+
+if (models.length === 0) {
+    log.info('No models need manuals. Exiting.');
+    await Actor.pushData({ totalProcessed: 0, pdfsDownloaded: 0, notFound: 0, timestamp: new Date().toISOString(), results: [] });
+    await Actor.exit();
+}
+
+// ── Build Google Search queries ─────────────────────────────────────────────
+
+// Batch models into groups of 5 queries per Google Search run
+// (to stay within rate limits and costs)
+const queries = models.map(model => {
+    const mfg = model.equipment_manufacturers;
+    return {
+        query: `${mfg.name} ${model.model_number} owner manual PDF filetype:pdf`,
+        model,
+    };
 });
 
-const models = await modelsResponse.json();
-log.info(`Fetched ${models.length} models to process`);
+log.info(`Built ${queries.length} Google Search queries`);
 
-if (onlyMissing) {
-    // Filter to only models without cached PDFs
-    const manualsUrl = `${supabaseUrl}/rest/v1/equipment_manuals?select=catalog_entry_id&file_size_bytes=gt.0`;
-    const manualsResponse = await fetch(manualsUrl, {
-        headers: {
-            'apikey': supabaseServiceKey,
-            'Authorization': `Bearer ${supabaseServiceKey}`,
-        },
+// ── Run Google Search Scraper ───────────────────────────────────────────────
+
+const GOOGLE_SCRAPER_ID = 'apify/google-search-scraper';
+
+// Process in batches of 20 queries to manage costs
+const BATCH_SIZE = 20;
+const allResults = [];
+
+for (let i = 0; i < queries.length; i += BATCH_SIZE) {
+    const batch = queries.slice(i, i + BATCH_SIZE);
+    const queryString = batch.map(q => q.query).join('\n');
+
+    log.info(`Running Google Search batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(queries.length / BATCH_SIZE)} (${batch.length} queries)...`);
+
+    // Call Google Search Scraper via Apify API
+    const searchRun = await Actor.call(GOOGLE_SCRAPER_ID, {
+        queries: queryString,
+        maxPagesPerQuery: 1,
+        resultsPerPage: 5,
+        countryCode: 'us',
+        languageCode: 'en',
     });
-    const cachedManuals = await manualsResponse.json();
-    const cachedIds = new Set(cachedManuals.map(m => m.catalog_entry_id));
 
-    const filteredModels = models.filter(m => !cachedIds.has(m.id));
-    log.info(`After filtering: ${filteredModels.length} models need manuals (${models.length - filteredModels.length} already cached)`);
-    models.length = 0;
-    models.push(...filteredModels);
-}
+    // Get the results
+    const searchDataset = await Actor.apifyClient.dataset(searchRun.defaultDatasetId);
+    const { items: searchResults } = await searchDataset.listItems();
 
-// Build search URLs for each model based on manufacturer
-const searchRequests = [];
+    // Match search results back to models
+    for (let j = 0; j < batch.length && j < searchResults.length; j++) {
+        const model = batch[j].model;
+        const searchResult = searchResults[j];
+        const organicResults = searchResult?.organicResults || [];
 
-for (const model of models) {
-    const mfg = model.equipment_manufacturers;
-    const slug = mfg.slug;
-    const modelNumber = model.model_number;
-    const supportUrl = mfg.support_url || mfg.website_url;
+        // Find PDF URLs in the results
+        const pdfUrls = [];
+        for (const result of organicResults) {
+            const resultUrl = result.url || '';
+            if (resultUrl.toLowerCase().includes('.pdf')) {
+                pdfUrls.push({
+                    url: resultUrl,
+                    title: (result.title || '').toLowerCase(),
+                    description: (result.description || '').toLowerCase(),
+                });
+            }
+        }
 
-    // Build the search URL based on manufacturer
-    let searchUrl;
-    switch (slug) {
-        // Samsung
-        case 'samsung':
-            searchUrl = `https://www.samsung.com/us/support/model/${modelNumber}/`;
-            break;
-        // GE family
-        case 'ge-appliances':
-        case 'ge-profile':
-        case 'monogram':
-        case 'cafe':
-        case 'hotpoint':
-            searchUrl = `https://www.geappliances.com/ge/service-and-support/manuals-and-downloads.htm?smartNumber=${modelNumber}`;
-            break;
-        // Whirlpool family
-        case 'whirlpool':
-        case 'maytag':
-        case 'kitchenaid':
-        case 'amana':
-        case 'jennair':
-            searchUrl = `https://www.${slug === 'jennair' ? 'jennair' : slug}.com/owners-center-pdp.${modelNumber}.html`;
-            break;
-        // Carrier family
-        case 'carrier':
-        case 'bryant':
-        case 'payne':
-            searchUrl = `https://www.${slug}.com/en/us/support/product-literature/`;
-            break;
-        // Frigidaire / Electrolux
-        case 'frigidaire':
-            searchUrl = `https://support.frigidaire.com/Owner-Center/Product-Support/${modelNumber}`;
-            break;
-        case 'electrolux':
-            searchUrl = `https://www.electrolux.com/us/support/product-support/${modelNumber}`;
-            break;
-        // BSH family
-        case 'bosch':
-        case 'thermador':
-        case 'gaggenau':
-            searchUrl = `https://www.${slug === 'bosch' ? 'bosch-home.com/us' : slug + '.com/us'}/support/${modelNumber}`;
-            break;
-        // Bathroom
-        case 'kohler':
-            searchUrl = `https://www.us.kohler.com/us/search?q=${modelNumber}&type=documents`;
-            break;
-        case 'delta-faucet':
-            searchUrl = `https://www.deltafaucet.com/own/${modelNumber}`;
-            break;
-        case 'moen':
-            searchUrl = `https://www.moen.com/support/product-support?modelNumber=${modelNumber}`;
-            break;
-        // Default: use support URL with model as query
-        default:
-            searchUrl = `${supportUrl}?q=${modelNumber}`;
-            break;
+        allResults.push({
+            model,
+            pdfUrls,
+        });
     }
 
-    searchRequests.push({
-        url: searchUrl,
-        userData: {
-            catalogEntryId: model.id,
-            modelNumber,
-            manufacturerName: mfg.name,
-            manufacturerSlug: slug,
-        },
-        label: 'SEARCH',
-    });
+    // Small delay between batches
+    if (i + BATCH_SIZE < queries.length) {
+        await new Promise(r => setTimeout(r, 2000));
+    }
 }
 
-log.info(`Built ${searchRequests.length} search requests`);
+log.info(`Google Search complete. Found PDF URLs for ${allResults.filter(r => r.pdfUrls.length > 0).length}/${allResults.length} models`);
 
-// Results collection
+// ── Download PDFs and upload to Supabase ────────────────────────────────────
+
 const results = [];
 
-// Create router
-const router = createPlaywrightRouter();
+for (const { model, pdfUrls } of allResults) {
+    const mfg = model.equipment_manufacturers;
+    const modelNumber = model.model_number;
 
-router.addHandler('SEARCH', async ({ page, request, log: reqLog }) => {
-    const { catalogEntryId, modelNumber, manufacturerName, manufacturerSlug } = request.userData;
-
-    reqLog.info(`Searching for ${manufacturerName} ${modelNumber}...`);
-
-    // Wait for page to fully load (JS rendering)
-    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => {});
-
-    // Find all PDF links on the page
-    const pdfLinks = await page.evaluate(() => {
-        const links = [];
-
-        // Strategy 1: Find <a> tags with .pdf hrefs
-        document.querySelectorAll('a[href*=".pdf"]').forEach(a => {
-            links.push({
-                url: a.href,
-                text: (a.textContent || '').trim().toLowerCase(),
-            });
-        });
-
-        // Strategy 2: Find download buttons/links that might have data attributes
-        document.querySelectorAll('[data-url*=".pdf"], [data-href*=".pdf"]').forEach(el => {
-            const url = el.getAttribute('data-url') || el.getAttribute('data-href');
-            if (url) links.push({ url, text: (el.textContent || '').trim().toLowerCase() });
-        });
-
-        // Strategy 3: Check for iframe or embed src with .pdf
-        document.querySelectorAll('iframe[src*=".pdf"], embed[src*=".pdf"]').forEach(el => {
-            links.push({ url: el.src, text: 'embedded pdf' });
-        });
-
-        // Strategy 4: Check onclick handlers that reference PDFs
-        document.querySelectorAll('[onclick*=".pdf"]').forEach(el => {
-            const match = el.getAttribute('onclick').match(/https?:\/\/[^\s'"]+\.pdf/i);
-            if (match) links.push({ url: match[0], text: (el.textContent || '').trim().toLowerCase() });
-        });
-
-        return links;
-    });
-
-    if (pdfLinks.length === 0) {
-        reqLog.warning(`No PDF links found for ${manufacturerName} ${modelNumber}`);
+    if (pdfUrls.length === 0) {
         results.push({
-            catalogEntryId,
+            catalogEntryId: model.id,
             modelNumber,
-            manufacturer: manufacturerName,
+            manufacturer: mfg.name,
             status: 'no_pdfs_found',
-            pageUrl: request.url,
         });
-        return;
+        continue;
     }
 
-    reqLog.info(`Found ${pdfLinks.length} PDF links for ${modelNumber}`);
-
-    // Classify PDFs by type
+    // Classify the PDFs
     const classified = { owners_manual: null, installation_guide: null, spec_sheet: null };
 
-    for (const link of pdfLinks) {
-        const text = link.text;
-        const urlLower = link.url.toLowerCase();
+    for (const pdf of pdfUrls) {
+        const text = pdf.title + ' ' + pdf.description;
+        const urlLower = pdf.url.toLowerCase();
 
         if (!classified.owners_manual && (
             text.includes('owner') || text.includes('manual') || text.includes('use') ||
-            text.includes('care') || text.includes('guide') ||
+            text.includes('care') || text.includes('user guide') ||
             urlLower.includes('owner') || urlLower.includes('manual') ||
-            urlLower.includes('useandcare') || urlLower.includes('use-and-care')
+            urlLower.includes('useandcare') || urlLower.includes('user')
         )) {
-            classified.owners_manual = link.url;
+            classified.owners_manual = pdf.url;
         } else if (!classified.installation_guide && (
-            text.includes('install') || text.includes('setup') ||
+            text.includes('install') || text.includes('setup') || text.includes('quick') ||
             urlLower.includes('install') || urlLower.includes('setup')
         )) {
-            classified.installation_guide = link.url;
+            classified.installation_guide = pdf.url;
         } else if (!classified.spec_sheet && (
             text.includes('spec') || text.includes('dimension') || text.includes('data sheet') ||
             urlLower.includes('spec') || urlLower.includes('dimension')
         )) {
-            classified.spec_sheet = link.url;
+            classified.spec_sheet = pdf.url;
         }
     }
 
-    // If nothing classified, use first PDF as owners_manual
-    if (!classified.owners_manual && pdfLinks.length > 0) {
-        classified.owners_manual = pdfLinks[0].url;
+    // Fallback: first PDF is owners_manual
+    if (!classified.owners_manual && pdfUrls.length > 0) {
+        classified.owners_manual = pdfUrls[0].url;
     }
 
-    // Download PDFs and upload to Supabase storage
+    // Download and upload each PDF
     for (const [manualType, pdfUrl] of Object.entries(classified)) {
         if (!pdfUrl) continue;
 
         try {
-            reqLog.info(`Downloading ${manualType} for ${modelNumber}: ${pdfUrl}`);
+            log.info(`Downloading ${mfg.name} ${modelNumber} ${manualType}...`);
 
             const pdfResponse = await fetch(pdfUrl, {
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                },
+                headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36' },
+                redirect: 'follow',
+                signal: AbortSignal.timeout(30000),
             });
 
             if (!pdfResponse.ok) {
-                reqLog.warning(`Failed to download ${pdfUrl}: HTTP ${pdfResponse.status}`);
+                log.warning(`HTTP ${pdfResponse.status} for ${modelNumber} from ${new URL(pdfUrl).hostname}`);
                 continue;
             }
 
@@ -262,20 +232,16 @@ router.addHandler('SEARCH', async ({ page, request, log: reqLog }) => {
             const pdfBytes = new Uint8Array(pdfBuffer);
 
             // Verify PDF magic bytes
-            if (pdfBytes[0] !== 0x25 || pdfBytes[1] !== 0x50 || pdfBytes[2] !== 0x44 || pdfBytes[3] !== 0x46) {
-                reqLog.warning(`Response is not a PDF for ${modelNumber} ${manualType}`);
+            if (pdfBytes.length < 5 || pdfBytes[0] !== 0x25 || pdfBytes[1] !== 0x50 ||
+                pdfBytes[2] !== 0x44 || pdfBytes[3] !== 0x46) {
+                log.warning(`Not a PDF for ${modelNumber} ${manualType}`);
                 continue;
             }
 
-            const fileSize = pdfBuffer.byteLength;
-            if (fileSize < 1000) {
-                reqLog.warning(`PDF too small (${fileSize} bytes) for ${modelNumber}`);
-                continue;
-            }
+            if (pdfBuffer.byteLength < 1000) continue;
 
             // Upload to Supabase storage
-            const storagePath = `${manufacturerSlug}/${modelNumber}/${manualType}.pdf`;
-
+            const storagePath = `${mfg.slug}/${modelNumber}/${manualType}.pdf`;
             const uploadResponse = await fetch(
                 `${supabaseUrl}/storage/v1/object/equipment-manuals/${storagePath}`,
                 {
@@ -290,14 +256,13 @@ router.addHandler('SEARCH', async ({ page, request, log: reqLog }) => {
             );
 
             if (!uploadResponse.ok) {
-                const err = await uploadResponse.text();
-                reqLog.warning(`Upload failed for ${storagePath}: ${err}`);
+                log.warning(`Upload failed for ${storagePath}: ${await uploadResponse.text()}`);
                 continue;
             }
 
             // Update equipment_manuals record
-            const updateResponse = await fetch(
-                `${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${catalogEntryId}&manual_type=eq.${manualType}`,
+            await fetch(
+                `${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${model.id}&manual_type=eq.${manualType}`,
                 {
                     method: 'PATCH',
                     headers: {
@@ -309,63 +274,58 @@ router.addHandler('SEARCH', async ({ page, request, log: reqLog }) => {
                     body: JSON.stringify({
                         source_url: pdfUrl,
                         file_path: storagePath,
-                        file_size_bytes: fileSize,
+                        file_size_bytes: pdfBuffer.byteLength,
                         last_verified_at: new Date().toISOString(),
                     }),
                 }
             );
 
-            reqLog.info(`✓ ${manufacturerName} ${modelNumber} ${manualType} (${Math.round(fileSize / 1024)} KB)`);
+            const sizeKB = Math.round(pdfBuffer.byteLength / 1024);
+            log.info(`✓ ${mfg.name} ${modelNumber} ${manualType} (${sizeKB} KB)`);
 
             results.push({
-                catalogEntryId,
+                catalogEntryId: model.id,
                 modelNumber,
-                manufacturer: manufacturerName,
+                manufacturer: mfg.name,
                 manualType,
                 status: 'downloaded',
                 pdfUrl,
-                fileSize,
+                fileSize: pdfBuffer.byteLength,
                 storagePath,
             });
         } catch (err) {
-            reqLog.warning(`Error processing ${modelNumber} ${manualType}: ${err.message}`);
+            log.warning(`Error: ${modelNumber} ${manualType}: ${err.message}`);
         }
     }
-});
 
-// Create and run the crawler
-const crawler = new PlaywrightCrawler({
-    requestHandler: router,
-    maxConcurrency: 3, // Be respectful to manufacturer sites
-    navigationTimeoutSecs: 30,
-    requestHandlerTimeoutSecs: 60,
-    maxRequestRetries: 1,
-    headless: true,
-    launchContext: {
-        launchOptions: {
-            args: ['--disable-dev-shm-usage'],
-        },
-    },
-});
-
-if (searchRequests.length > 0) {
-    await crawler.run(searchRequests);
+    // If nothing downloaded for this model
+    const downloadedForModel = results.filter(r => r.modelNumber === modelNumber && r.status === 'downloaded');
+    if (downloadedForModel.length === 0 && !results.find(r => r.modelNumber === modelNumber)) {
+        results.push({
+            catalogEntryId: model.id,
+            modelNumber,
+            manufacturer: mfg.name,
+            status: 'pdf_found_but_download_failed',
+            pdfUrl: classified.owners_manual,
+        });
+    }
 }
 
-// Push summary to dataset
+// ── Summary ─────────────────────────────────────────────────────────────────
+
 const downloaded = results.filter(r => r.status === 'downloaded');
 const notFound = results.filter(r => r.status === 'no_pdfs_found');
+const failedDownload = results.filter(r => r.status === 'pdf_found_but_download_failed');
 
-const summary = {
-    totalProcessed: searchRequests.length,
+await Actor.pushData({
+    totalProcessed: models.length,
     pdfsDownloaded: downloaded.length,
     notFound: notFound.length,
+    downloadFailed: failedDownload.length,
     timestamp: new Date().toISOString(),
     results,
-};
+});
 
-await Actor.pushData(summary);
-
-log.info(`Done! ${downloaded.length} PDFs downloaded, ${notFound.length} not found out of ${searchRequests.length} models`);
+log.info(`Done! ${downloaded.length} PDFs downloaded, ${notFound.length} not found, ${failedDownload.length} download failed out of ${models.length} models`);
 
 await Actor.exit();
