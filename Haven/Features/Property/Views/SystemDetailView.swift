@@ -15,6 +15,8 @@ struct SystemDetailRowView: View {
     @State private var linkedDocuments: [DocumentRow] = []
     @State private var showDocumentUpload = false
     @State private var showAddWarranty = false
+    @State private var showEquipmentIdentify = false
+    @State private var catalogLinked = false
 
     private let db = DatabaseService.shared
     private let dateFormatter: DateFormatter = {
@@ -26,6 +28,11 @@ struct SystemDetailRowView: View {
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                // Equipment catalog identification prompt
+                if !catalogLinked {
+                    identifyEquipmentCard
+                }
+
                 systemInfoCard
                 preferredVendorCard
                 maintenanceCard
@@ -75,6 +82,70 @@ struct SystemDetailRowView: View {
                     Task { await loadDetails() }
                 })
             }
+        }
+        .sheet(isPresented: $showEquipmentIdentify) {
+            EquipmentIdentifySheet(systemCategory: system.category) { result, serialNumber in
+                Task { await linkEquipment(result, serialNumber: serialNumber) }
+            }
+        }
+    }
+
+    // MARK: - Identify Equipment Card
+
+    private var identifyEquipmentCard: some View {
+        Button {
+            Haptics.light()
+            showEquipmentIdentify = true
+        } label: {
+            HavenCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "sparkle.magnifyingglass")
+                        .font(.system(size: 24))
+                        .foregroundStyle(HavenColors.navy700)
+                        .frame(width: 44, height: 44)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Identify Your Equipment")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                        Text("Search or take a photo for manuals, specs & maintenance tips")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(2)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Link Equipment to Catalog
+
+    private func linkEquipment(_ result: EquipmentSearchResult, serialNumber: String?) async {
+        do {
+            var updates = HomeSystemUpdate()
+            updates.manufacturer = result.manufacturer.name
+            updates.modelNumber = result.modelNumber
+            if let serial = serialNumber { updates.serialNumber = serial }
+            if let lifespan = result.specs.expectedLifespanYears { updates.expectedLifespanYears = lifespan }
+            _ = try await db.updateHomeSystem(id: system.id, updates)
+            await MainActor.run {
+                catalogLinked = true
+                Haptics.success()
+            }
+            Analytics.track(.systemIdentified, [
+                "system_id": system.id.uuidString,
+                "catalog_model": result.modelNumber,
+                "manufacturer": result.manufacturer.name,
+                "method": serialNumber != nil ? "photo" : "search",
+            ])
+        } catch {
+            print("[SystemDetail] Failed to link equipment: \(error)")
         }
     }
 

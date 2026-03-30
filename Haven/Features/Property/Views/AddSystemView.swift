@@ -17,6 +17,7 @@ struct AddSystemView: View {
     @State private var isSaving = false
     @State private var error: String?
     @State private var addMaintenanceTemplates = true
+    @State private var showEquipmentSearch = false
 
     // Warranty fields
     @State private var addWarranty = false
@@ -40,6 +41,27 @@ struct AddSystemView: View {
                             Text(cat).tag(cat)
                         }
                     }
+                }
+
+                Section {
+                    Button {
+                        Haptics.light()
+                        showEquipmentSearch = true
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "sparkle.magnifyingglass")
+                                .foregroundStyle(HavenColors.navy700)
+                            Text("Find in Equipment Catalog")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.navy700)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                } footer: {
+                    Text("Search by brand or product type to auto-fill details, or enter manually below.")
                 }
 
                 Section("Details") {
@@ -132,6 +154,22 @@ struct AddSystemView: View {
             }
             .tint(HavenColors.navy)
             .trackScreen("AddSystemView", properties: ["property_id": propertyID.uuidString])
+            .sheet(isPresented: $showEquipmentSearch) {
+                EquipmentIdentifySheet(systemCategory: category) { result, serialNumber in
+                    // Pre-fill from catalog selection
+                    name = result.displayName
+                    manufacturer = result.manufacturer.name
+                    modelNumber = result.modelNumber
+                    if let serial = serialNumber { serialNumber = serial }
+                    if let lifespan = result.specs.expectedLifespanYears {
+                        expectedLifespan = "\(lifespan)"
+                    }
+                    // Map catalog category to our SystemCategory
+                    if let catName = SystemCategory.allCases.first(where: { $0.rawValue.lowercased().contains(result.category.name.lowercased()) })?.rawValue {
+                        category = catName
+                    }
+                }
+            }
         }
     }
 

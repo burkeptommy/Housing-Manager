@@ -437,4 +437,41 @@ enum HavenSupabase {
         )
         return try await callEdgeFunction(name: "merge-households", body: body)
     }
+
+    // MARK: - Equipment Catalog Search
+
+    struct EquipmentSearchRequest: Encodable {
+        let query: String
+        let limit: Int?
+        let category: String?
+    }
+
+    /// Search the equipment catalog for models matching a natural language query.
+    /// Supports queries like "bosch stove", "samsung fridge", "carrier ac", or model numbers.
+    static func searchEquipment(query: String, limit: Int? = 15, category: String? = nil) async throws -> EquipmentSearchResponse {
+        let body = EquipmentSearchRequest(query: query, limit: limit, category: category)
+        let data = try await callEdgeFunction(name: "search-equipment", body: body, timeoutSeconds: 15)
+        return try JSONDecoder().decode(EquipmentSearchResponse.self, from: data)
+    }
+
+    // MARK: - Equipment Photo Identification
+
+    struct IdentifyEquipmentRequest: Encodable {
+        let imageBase64: String
+        let category: String?
+
+        enum CodingKeys: String, CodingKey {
+            case imageBase64 = "image_base64"
+            case category
+        }
+    }
+
+    /// Identify equipment from a photo of the model/serial plate.
+    /// Uses Claude Vision to extract manufacturer, model number, and serial number,
+    /// then matches against the equipment catalog.
+    static func identifyEquipment(imageBase64: String, category: String? = nil) async throws -> EquipmentIdentifyResponse {
+        let body = IdentifyEquipmentRequest(imageBase64: imageBase64, category: category)
+        let data = try await callEdgeFunction(name: "identify-equipment", body: body, timeoutSeconds: 30)
+        return try JSONDecoder().decode(EquipmentIdentifyResponse.self, from: data)
+    }
 }
