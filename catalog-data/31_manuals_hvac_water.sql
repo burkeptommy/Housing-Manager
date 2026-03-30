@@ -1,3 +1,6 @@
+SET ROLE postgres;
+
+-- ============================================================================
 -- Equipment Manuals: HVAC Systems & Water Heaters
 -- ============================================================================
 -- Covers manuals for HVAC brands (Goodman, Carrier, Trane, Lennox, Rheem,
@@ -5,8 +8,6 @@
 -- Rheem, Bradford White, Rinnai, Navien, Noritz).
 -- 310 manual entries across 14 brands.
 -- ============================================================================
-
-SET ROLE postgres;
 
 -- ======================== HVAC — GOODMAN ========================
 
@@ -18,19 +19,19 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('GSXC180361', 'owners_manual',       'GSXC18 Owner''s Manual',                 'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsxc18.pdf'),
-  ('GSXC180361', 'installation_guide',  'GSXC18 Installation Instructions',       'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gsxc18.pdf'),
-  ('GSXC180361', 'spec_sheet',          'GSXC18 3-Ton Specification Sheet',       'https://apps.goodmanmfg.com/brochures/files/ss-gsxc18.pdf'),
-  ('GSXC180481', 'owners_manual',       'GSXC18 Owner''s Manual',                 'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsxc18.pdf'),
-  ('GSXC180481', 'installation_guide',  'GSXC18 Installation Instructions',       'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gsxc18.pdf'),
-  ('GSX160361',  'owners_manual',       'GSX16 Owner''s Manual',                  'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsx16.pdf'),
-  ('GSX160361',  'installation_guide',  'GSX16 Installation Instructions',        'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gsx16.pdf'),
-  ('GSX160361',  'spec_sheet',          'GSX16 3-Ton Specification Sheet',        'https://apps.goodmanmfg.com/brochures/files/ss-gsx16.pdf'),
-  ('GSX160481',  'owners_manual',       'GSX16 Owner''s Manual',                  'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsx16.pdf'),
-  ('GSX140361',  'owners_manual',       'GSX14 Owner''s Manual',                  'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsx14.pdf'),
-  ('GSX140361',  'installation_guide',  'GSX14 Installation Instructions',        'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gsx14.pdf'),
-  ('GSXN403610', 'owners_manual',       'GSXN4 Owner''s Manual',                  'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gsxn4.pdf'),
-  ('GSXN403610', 'installation_guide',  'GSXN4 Installation Instructions',        'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gsxn4.pdf')
+  ('GSXC180361', 'owners_manual',       'GSXC18 Owner''s Manual',                 'https://iwae.com/media/manuals/goodman/gsx18-owner.pdf'),
+  ('GSXC180361', 'installation_guide',  'GSXC18 Installation Instructions',       'https://documents.alpinehomeair.com/product/GSXC18%20Installation%20Instructions%202019.pdf'),
+  ('GSXC180361', 'spec_sheet',          'GSXC18 3-Ton Specification Sheet',       'https://buy.goodmanmfg.com/assets/Documents/SS-GSXC18.pdf'),
+  ('GSXC180481', 'owners_manual',       'GSXC18 Owner''s Manual',                 'https://iwae.com/media/manuals/goodman/gsx18-owner.pdf'),
+  ('GSXC180481', 'installation_guide',  'GSXC18 Installation Instructions',       'https://documents.alpinehomeair.com/product/GSXC18%20Installation%20Instructions%202019.pdf'),
+  ('GSX160361',  'owners_manual',       'GSX16 Owner''s Manual',                  'https://www.goodmanmfg.com/support/literature-library?model=GSX16'),
+  ('GSX160361',  'installation_guide',  'GSX16 Installation Instructions',        'https://documents.alpinehomeair.com/product/Goodman%20GSX16%20Technical%20Information%202.2014.pdf'),
+  ('GSX160361',  'spec_sheet',          'GSX16 3-Ton Specification Sheet',        'https://apps.goodmanmfg.com/brochures/files/5b9686fe6c593SS-FGSXC16.pdf'),
+  ('GSX160481',  'owners_manual',       'GSX16 Owner''s Manual',                  'https://www.goodmanmfg.com/support/literature-library?model=GSX16'),
+  ('GSX140361',  'owners_manual',       'GSX14 Owner''s Manual',                  'https://www.goodmanmfg.com/support/literature-library?model=GSX14'),
+  ('GSX140361',  'installation_guide',  'GSX14 Installation Instructions',        'https://www.goodmanmfg.com/support/literature-library?model=GSX14'),
+  ('GSXN403610', 'owners_manual',       'GSXN4 Owner''s Manual',                  'https://www.goodmanmfg.com/support/literature-library?model=GSXN4'),
+  ('GSXN403610', 'installation_guide',  'GSXN4 Installation Instructions',        'https://www.goodmanmfg.com/support/literature-library?model=GSXN4')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -42,18 +43,18 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('GMVC961005CN', 'owners_manual',       'GMVC96 Owner''s Manual',               'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gmvc96.pdf'),
-  ('GMVC961005CN', 'installation_guide',  'GMVC96 Installation Instructions',     'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gmvc96.pdf'),
-  ('GMVC961005CN', 'spec_sheet',          'GMVC96 Specification Sheet',           'https://apps.goodmanmfg.com/brochures/files/ss-gmvc96.pdf'),
-  ('GMVC960804CN', 'owners_manual',       'GMVC96 Owner''s Manual',               'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gmvc96.pdf'),
-  ('GMVC960804CN', 'installation_guide',  'GMVC96 Installation Instructions',     'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gmvc96.pdf'),
-  ('GCVM970804CN', 'owners_manual',       'GCVM97 Owner''s Manual',               'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gcvm97.pdf'),
-  ('GCVM970804CN', 'installation_guide',  'GCVM97 Installation Instructions',     'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gcvm97.pdf'),
-  ('GCVM970804CN', 'spec_sheet',          'GCVM97 Specification Sheet',           'https://apps.goodmanmfg.com/brochures/files/ss-gcvm97.pdf'),
-  ('GMSS920804CN', 'owners_manual',       'GMSS92 Owner''s Manual',               'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gmss92.pdf'),
-  ('GMSS920804CN', 'installation_guide',  'GMSS92 Installation Instructions',     'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gmss92.pdf'),
-  ('GMS80804BN',   'owners_manual',       'GMS80 Owner''s Manual',                'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gms80.pdf'),
-  ('GMS80804BN',   'installation_guide',  'GMS80 Installation Instructions',      'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gms80.pdf')
+  ('GMVC961005CN', 'owners_manual',       'GMVC96 Owner''s Manual',               'https://www.goodmanmfg.com/support/literature-library?model=GMVC96'),
+  ('GMVC961005CN', 'installation_guide',  'GMVC96 Installation Instructions',     'https://www.acdirect.com/media/specs/Goodman/goodman-gmes96-u-installation-instructions.pdf'),
+  ('GMVC961005CN', 'spec_sheet',          'GMVC96 Specification Sheet',           'https://apps.goodmanmfg.com/brochures/files/5d94ab7d6f9adSS-FGMVC96.pdf'),
+  ('GMVC960804CN', 'owners_manual',       'GMVC96 Owner''s Manual',               'https://www.goodmanmfg.com/support/literature-library?model=GMVC96'),
+  ('GMVC960804CN', 'installation_guide',  'GMVC96 Installation Instructions',     'https://www.acdirect.com/media/specs/Goodman/goodman-gmes96-u-installation-instructions.pdf'),
+  ('GCVM970804CN', 'owners_manual',       'GCVM97 Owner''s Manual',               'https://www.goodmanmfg.com/support/literature-library?model=GCVM97'),
+  ('GCVM970804CN', 'installation_guide',  'GCVM97 Installation Instructions',     'https://www.goodmanmfg.com/support/literature-library?model=GCVM97'),
+  ('GCVM970804CN', 'spec_sheet',          'GCVM97 Specification Sheet',           'https://apps.goodmanmfg.com/brochures/files/5ba3984a94c6fSS-GMEC96.pdf'),
+  ('GMSS920804CN', 'owners_manual',       'GMSS92 Owner''s Manual',               'https://www.goodmanmfg.com/support/literature-library?model=GMSS92'),
+  ('GMSS920804CN', 'installation_guide',  'GMSS92 Installation Instructions',     'https://www.goodmanmfg.com/support/literature-library?model=GMSS92'),
+  ('GMS80804BN',   'owners_manual',       'GMS80 Owner''s Manual',                'https://www.goodmanmfg.com/support/literature-library?model=GMS80'),
+  ('GMS80804BN',   'installation_guide',  'GMS80 Installation Instructions',      'https://www.goodmanmfg.com/support/literature-library?model=GMS80')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -65,12 +66,12 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('GSZC180361', 'owners_manual',       'GSZC18 Heat Pump Owner''s Manual',      'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gszc18.pdf'),
-  ('GSZC180361', 'installation_guide',  'GSZC18 Heat Pump Installation Guide',   'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gszc18.pdf'),
-  ('GSZC180361', 'spec_sheet',          'GSZC18 Specification Sheet',            'https://apps.goodmanmfg.com/brochures/files/ss-gszc18.pdf'),
-  ('GSZC180481', 'owners_manual',       'GSZC18 Heat Pump Owner''s Manual',      'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gszc18.pdf'),
-  ('GSZB600361', 'owners_manual',       'GSZB6 Heat Pump Owner''s Manual',       'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/io-gszb6.pdf'),
-  ('GSZB600361', 'installation_guide',  'GSZB6 Heat Pump Installation Guide',    'https://www.goodmanmfg.com/docs/librariesprovider6/default-document-library/ii-gszb6.pdf')
+  ('GSZC180361', 'owners_manual',       'GSZC18 Heat Pump Owner''s Manual',      'https://www.goodmanmfg.com/support/literature-library?model=GSZC18'),
+  ('GSZC180361', 'installation_guide',  'GSZC18 Heat Pump Installation Guide',   'https://hvacdirect.com/media/hvac/pdf/goodman-gszc18-installation.pdf'),
+  ('GSZC180361', 'spec_sheet',          'GSZC18 Specification Sheet',            'https://apps.goodmanmfg.com/brochures/files/5a9ec51f02a3fCB-GSZC18.pdf'),
+  ('GSZC180481', 'owners_manual',       'GSZC18 Heat Pump Owner''s Manual',      'https://www.goodmanmfg.com/support/literature-library?model=GSZC18'),
+  ('GSZB600361', 'owners_manual',       'GSZB6 Heat Pump Owner''s Manual',       'https://www.goodmanmfg.com/support/literature-library?model=GSZB6'),
+  ('GSZB600361', 'installation_guide',  'GSZB6 Heat Pump Installation Guide',    'https://www.goodmanmfg.com/support/literature-library?model=GSZB6')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -202,17 +203,17 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('XC25-036-230',    'owners_manual',       'Lennox XC25 Owner''s Manual',                    'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC25-036-230'),
-  ('XC25-036-230',    'installation_guide',  'Lennox XC25 Installation Instructions',          'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC25-036-230'),
-  ('XC25-036-230',    'spec_sheet',          'Lennox XC25 Product Specifications',             'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC25-036-230'),
-  ('XC25-048-230',    'owners_manual',       'Lennox XC25 Owner''s Manual',                    'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC25-048-230'),
-  ('XC21-036-230',    'owners_manual',       'Lennox XC21 Owner''s Manual',                    'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC21-036-230'),
-  ('XC21-036-230',    'installation_guide',  'Lennox XC21 Installation Instructions',          'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XC21-036-230'),
-  ('EL18XCV-036-230', 'owners_manual',       'Lennox EL18XCV Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL18XCV-036-230'),
-  ('EL18XCV-036-230', 'installation_guide',  'Lennox EL18XCV Installation Instructions',       'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL18XCV-036-230'),
-  ('EL16XC1-036-230', 'owners_manual',       'Lennox EL16XC1 Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL16XC1-036-230'),
-  ('ML14XC1-036-230', 'owners_manual',       'Lennox ML14XC1 Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=ML14XC1-036-230'),
-  ('ML18XC2-036-230', 'owners_manual',       'Lennox ML18XC2 Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=ML18XC2-036-230')
+  ('XC25-036-230',    'owners_manual',       'Lennox XC25 Owner''s Manual',                    'https://www.lennox.com/lib/legacy-res/pdfs/brochures/lennox_xc25_air_conditioner.pdf'),
+  ('XC25-036-230',    'installation_guide',  'Lennox XC25 Installation Instructions',          'https://www.lennox.com/dA/9269906c48/508066-01.pdf'),
+  ('XC25-036-230',    'spec_sheet',          'Lennox XC25 Product Specifications',             'https://www.lennox.com/owners/assistance/product-literature/?model=XC25-036-230'),
+  ('XC25-048-230',    'owners_manual',       'Lennox XC25 Owner''s Manual',                    'https://www.lennox.com/lib/legacy-res/pdfs/brochures/lennox_xc25_air_conditioner.pdf'),
+  ('XC21-036-230',    'owners_manual',       'Lennox XC21 Owner''s Manual',                    'https://www.lennox.com/owners/assistance/product-literature/?model=XC21-036-230'),
+  ('XC21-036-230',    'installation_guide',  'Lennox XC21 Installation Instructions',          'https://www.lennox.com/dA/8d83fa736b/Lennox_XC21_IOM.pdf'),
+  ('EL18XCV-036-230', 'owners_manual',       'Lennox EL18XCV Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=EL18XCV-036-230'),
+  ('EL18XCV-036-230', 'installation_guide',  'Lennox EL18XCV Installation Instructions',       'https://www.lennox.com/owners/assistance/product-literature/?model=EL18XCV-036-230'),
+  ('EL16XC1-036-230', 'owners_manual',       'Lennox EL16XC1 Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=EL16XC1-036-230'),
+  ('ML14XC1-036-230', 'owners_manual',       'Lennox ML14XC1 Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=ML14XC1-036-230'),
+  ('ML18XC2-036-230', 'owners_manual',       'Lennox ML18XC2 Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=ML18XC2-036-230')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -224,15 +225,15 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('SLP99V070XP36C',  'owners_manual',       'Lennox SLP99V Owner''s Manual',                  'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SLP99V070XP36C'),
-  ('SLP99V070XP36C',  'installation_guide',  'Lennox SLP99V Installation Instructions',        'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SLP99V070XP36C'),
-  ('SLP99V070XP36C',  'spec_sheet',          'Lennox SLP99V Product Specifications',           'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SLP99V070XP36C'),
-  ('SLP99V090XP48C',  'owners_manual',       'Lennox SLP99V Owner''s Manual',                  'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SLP99V090XP48C'),
-  ('SL297NV070XP36C', 'owners_manual',       'Lennox SL297NV Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SL297NV070XP36C'),
-  ('SL297NV070XP36C', 'installation_guide',  'Lennox SL297NV Installation Instructions',       'https://www.lennox.com/residential/owners/assistance/product-literature/?model=SL297NV070XP36C'),
-  ('EL296V070XP36A',  'owners_manual',       'Lennox EL296V Owner''s Manual',                  'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL296V070XP36A'),
-  ('ML196UH070XP36B', 'owners_manual',       'Lennox ML196UH Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=ML196UH070XP36B'),
-  ('ML180UH070XP36B', 'owners_manual',       'Lennox ML180UH Owner''s Manual',                 'https://www.lennox.com/residential/owners/assistance/product-literature/?model=ML180UH070XP36B')
+  ('SLP99V070XP36C',  'owners_manual',       'Lennox SLP99V Owner''s Manual',                  'https://www.lennox.com/owners/assistance/product-literature/?model=SLP99V070XP36C'),
+  ('SLP99V070XP36C',  'installation_guide',  'Lennox SLP99V Installation Instructions',        'https://www.lennox.com/owners/assistance/product-literature/?model=SLP99V070XP36C'),
+  ('SLP99V070XP36C',  'spec_sheet',          'Lennox SLP99V Product Specifications',           'https://www.lennox.com/owners/assistance/product-literature/?model=SLP99V070XP36C'),
+  ('SLP99V090XP48C',  'owners_manual',       'Lennox SLP99V Owner''s Manual',                  'https://www.lennox.com/owners/assistance/product-literature/?model=SLP99V090XP48C'),
+  ('SL297NV070XP36C', 'owners_manual',       'Lennox SL297NV Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=SL297NV070XP36C'),
+  ('SL297NV070XP36C', 'installation_guide',  'Lennox SL297NV Installation Instructions',       'https://www.lennox.com/owners/assistance/product-literature/?model=SL297NV070XP36C'),
+  ('EL296V070XP36A',  'owners_manual',       'Lennox EL296V Owner''s Manual',                  'https://www.lennox.com/dA/e876acaf5a/506771f.pdf'),
+  ('ML196UH070XP36B', 'owners_manual',       'Lennox ML196UH Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=ML196UH070XP36B'),
+  ('ML180UH070XP36B', 'owners_manual',       'Lennox ML180UH Owner''s Manual',                 'https://www.lennox.com/owners/assistance/product-literature/?model=ML180UH070XP36B')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -244,12 +245,12 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('XP25-036-230',    'owners_manual',       'Lennox XP25 Heat Pump Owner''s Manual',          'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XP25-036-230'),
-  ('XP25-036-230',    'installation_guide',  'Lennox XP25 Heat Pump Installation Guide',       'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XP25-036-230'),
-  ('XP21-036-230',    'owners_manual',       'Lennox XP21 Heat Pump Owner''s Manual',          'https://www.lennox.com/residential/owners/assistance/product-literature/?model=XP21-036-230'),
-  ('EL18XPV-036-230', 'owners_manual',       'Lennox EL18XPV Heat Pump Owner''s Manual',       'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL18XPV-036-230'),
-  ('EL18XPV-036-230', 'installation_guide',  'Lennox EL18XPV Heat Pump Installation Guide',    'https://www.lennox.com/residential/owners/assistance/product-literature/?model=EL18XPV-036-230'),
-  ('14HPX-036-230',   'owners_manual',       'Lennox 14HPX Heat Pump Owner''s Manual',         'https://www.lennox.com/residential/owners/assistance/product-literature/?model=14HPX-036-230')
+  ('XP25-036-230',    'owners_manual',       'Lennox XP25 Heat Pump Owner''s Manual',          'https://www.lennox.com/lib/legacy-res/pdfs/installation_maintenance/lennox_xp17_iom.pdf'),
+  ('XP25-036-230',    'installation_guide',  'Lennox XP25 Heat Pump Installation Guide',       'https://www.lennox.com/owners/assistance/product-literature/?model=XP25-036-230'),
+  ('XP21-036-230',    'owners_manual',       'Lennox XP21 Heat Pump Owner''s Manual',          'https://www.lennox.com/owners/assistance/product-literature/?model=XP21-036-230'),
+  ('EL18XPV-036-230', 'owners_manual',       'Lennox EL18XPV Heat Pump Owner''s Manual',       'https://www.lennox.com/owners/assistance/product-literature/?model=EL18XPV-036-230'),
+  ('EL18XPV-036-230', 'installation_guide',  'Lennox EL18XPV Heat Pump Installation Guide',    'https://www.lennox.com/owners/assistance/product-literature/?model=EL18XPV-036-230'),
+  ('14HPX-036-230',   'owners_manual',       'Lennox 14HPX Heat Pump Owner''s Manual',         'https://www.lennox.com/owners/assistance/product-literature/?model=14HPX-036-230')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -268,7 +269,7 @@ JOIN (VALUES
   ('RA20AZ036', 'spec_sheet',          'Rheem RA20AZ Product Specification',          'https://www.rheem.com/document-finder/?model=RA20AZ036'),
   ('RA20AZ048', 'owners_manual',       'Rheem RA20AZ Owner''s Manual',                'https://www.rheem.com/document-finder/?model=RA20AZ048'),
   ('RA17AZ036', 'owners_manual',       'Rheem RA17AZ Owner''s Manual',                'https://www.rheem.com/document-finder/?model=RA17AZ036'),
-  ('RA17AZ036', 'installation_guide',  'Rheem RA17AZ Installation Instructions',      'https://www.rheem.com/document-finder/?model=RA17AZ036'),
+  ('RA17AZ036', 'installation_guide',  'Rheem RA17AZ Installation Instructions',      'https://pts.myrheem.com/docstore/webdocs/Public/ServicePublic/Trouble2a/pdfs/AC/RA17/92-104921-07-00_RA17.pdf'),
   ('RA16AZ036', 'owners_manual',       'Rheem RA16AZ Owner''s Manual',                'https://www.rheem.com/document-finder/?model=RA16AZ036'),
   ('RA14AZ036', 'owners_manual',       'Rheem RA14AZ Owner''s Manual',                'https://www.rheem.com/document-finder/?model=RA14AZ036')
 ) AS v(model_number, manual_type, title, source_url)
@@ -427,24 +428,24 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('MSZ-FH09NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://mylinkdrive.com/files/MSZ-FH09NA_Operation_Manual.pdf'),
-  ('MSZ-FH09NA',     'installation_guide',  'Mitsubishi MSZ-FH Installation Manual',              'https://mylinkdrive.com/files/MSZ-FH09NA_Installation_Manual.pdf'),
-  ('MSZ-FH12NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://mylinkdrive.com/files/MSZ-FH12NA_Operation_Manual.pdf'),
-  ('MSZ-FH15NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://mylinkdrive.com/files/MSZ-FH15NA_Operation_Manual.pdf'),
-  ('MSZ-FH18NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://mylinkdrive.com/files/MSZ-FH18NA_Operation_Manual.pdf'),
-  ('MSZ-GL09NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://mylinkdrive.com/files/MSZ-GL09NA_Operation_Manual.pdf'),
-  ('MSZ-GL09NA',     'installation_guide',  'Mitsubishi MSZ-GL Installation Manual',              'https://mylinkdrive.com/files/MSZ-GL09NA_Installation_Manual.pdf'),
-  ('MSZ-GL12NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://mylinkdrive.com/files/MSZ-GL12NA_Operation_Manual.pdf'),
-  ('MSZ-GL18NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://mylinkdrive.com/files/MSZ-GL18NA_Operation_Manual.pdf'),
-  ('MSZ-GL24NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://mylinkdrive.com/files/MSZ-GL24NA_Operation_Manual.pdf'),
-  ('MXZ-2C20NAHZ2',  'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://mylinkdrive.com/files/MXZ-2C20NAHZ2_Operation_Manual.pdf'),
-  ('MXZ-2C20NAHZ2',  'installation_guide',  'Mitsubishi MXZ Multi-Zone Installation Manual',      'https://mylinkdrive.com/files/MXZ-2C20NAHZ2_Installation_Manual.pdf'),
-  ('MXZ-3C30NAHZ2',  'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://mylinkdrive.com/files/MXZ-3C30NAHZ2_Operation_Manual.pdf'),
-  ('MXZ-4C36NAHZ',   'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://mylinkdrive.com/files/MXZ-4C36NAHZ_Operation_Manual.pdf'),
-  ('MXZ-5C42NAHZ',   'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://mylinkdrive.com/files/MXZ-5C42NAHZ_Operation_Manual.pdf'),
-  ('PUZ-HA36NHA5',   'owners_manual',       'Mitsubishi PUZ-HA Ducted Heat Pump Owner''s Manual', 'https://mylinkdrive.com/files/PUZ-HA36NHA5_Operation_Manual.pdf'),
-  ('PUZ-HA36NHA5',   'installation_guide',  'Mitsubishi PUZ-HA Installation Manual',              'https://mylinkdrive.com/files/PUZ-HA36NHA5_Installation_Manual.pdf'),
-  ('PUZ-HA42NHA5',   'owners_manual',       'Mitsubishi PUZ-HA Ducted Heat Pump Owner''s Manual', 'https://mylinkdrive.com/files/PUZ-HA42NHA5_Operation_Manual.pdf')
+  ('MSZ-FH09NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-FH09NA',     'installation_guide',  'Mitsubishi MSZ-FH Installation Manual',              'http://meus1.mylinkdrive.com/files/MSZ-06-15NA(H)-U1_MSY-GL09-15NA(H)-U1_Install_12-15.pdf'),
+  ('MSZ-FH12NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-FH15NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-FH18NA',     'owners_manual',       'Mitsubishi MSZ-FH Hyper-Heating Owner''s Manual',    'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-GL09NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-GL09NA',     'installation_guide',  'Mitsubishi MSZ-GL Installation Manual',              'http://meus1.mylinkdrive.com/files/MSZ-06-15NA(H)-U1_MSY-GL09-15NA(H)-U1_Install_12-15.pdf'),
+  ('MSZ-GL12NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-GL18NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MSZ-GL24NA',     'owners_manual',       'Mitsubishi MSZ-GL Owner''s Manual',                  'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MXZ-2C20NAHZ2',  'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MXZ-2C20NAHZ2',  'installation_guide',  'Mitsubishi MXZ Multi-Zone Installation Manual',      'https://genscocustomer.com/pages/product-resources/catalog/MXZ_Multizone_Tech_Manual.pdf'),
+  ('MXZ-3C30NAHZ2',  'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MXZ-4C36NAHZ',   'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('MXZ-5C42NAHZ',   'owners_manual',       'Mitsubishi MXZ Multi-Zone Owner''s Manual',          'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('PUZ-HA36NHA5',   'owners_manual',       'Mitsubishi PUZ-HA Ducted Heat Pump Owner''s Manual', 'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('PUZ-HA36NHA5',   'installation_guide',  'Mitsubishi PUZ-HA Installation Manual',              'https://www.mitsubishicomfort.com/brochures-catalogs'),
+  ('PUZ-HA42NHA5',   'owners_manual',       'Mitsubishi PUZ-HA Ducted Heat Pump Owner''s Manual', 'https://www.mitsubishicomfort.com/brochures-catalogs')
 ) AS v(model_number, manual_type, title, source_url)
 ON ec.model_number = v.model_number;
 
@@ -705,22 +706,22 @@ SELECT ec.id, v.manual_type, v.title, v.source_url,
 FROM equipment_catalog ec
 JOIN equipment_manufacturers em ON ec.manufacturer_id = em.id
 JOIN (VALUES
-  ('NPE-2S',        'owners_manual',       'Navien NPE-2S Condensing Tankless Owner''s Manual',          'https://us.navien.com/__DATA/ProductDocument/NPE-2S_User_Information_Manual_Eng.pdf'),
-  ('NPE-2S',        'installation_guide',  'Navien NPE-2S Condensing Tankless Installation Manual',      'https://us.navien.com/__DATA/ProductDocument/NPE-2S_Installation_Manual_Eng.pdf'),
-  ('NPE-2S-LP',     'owners_manual',       'Navien NPE-2S (LP) Condensing Tankless Owner''s Manual',     'https://us.navien.com/__DATA/ProductDocument/NPE-2S_User_Information_Manual_Eng.pdf'),
-  ('NPE-A2',        'owners_manual',       'Navien NPE-A2 Premium Condensing Owner''s Manual',           'https://us.navien.com/__DATA/ProductDocument/NPE-A2_User_Information_Manual_Eng.pdf'),
-  ('NPE-A2',        'installation_guide',  'Navien NPE-A2 Premium Condensing Installation Manual',       'https://us.navien.com/__DATA/ProductDocument/NPE-A2_Installation_Manual_Eng.pdf'),
-  ('NPE-240A2',     'owners_manual',       'Navien NPE-240A2 Owner''s Manual',                           'https://us.navien.com/__DATA/ProductDocument/NPE-A2_User_Information_Manual_Eng.pdf'),
-  ('NPE-240S2',     'owners_manual',       'Navien NPE-240S2 Owner''s Manual',                           'https://us.navien.com/__DATA/ProductDocument/NPE-2S_User_Information_Manual_Eng.pdf'),
-  ('NPE-180S2',     'owners_manual',       'Navien NPE-180S2 Owner''s Manual',                           'https://us.navien.com/__DATA/ProductDocument/NPE-2S_User_Information_Manual_Eng.pdf'),
-  ('NPE-150S2',     'owners_manual',       'Navien NPE-150S2 Owner''s Manual',                           'https://us.navien.com/__DATA/ProductDocument/NPE-2S_User_Information_Manual_Eng.pdf'),
-  ('NPE-E-24',      'owners_manual',       'Navien NPE-E Tankless Electric Owner''s Manual',             'https://us.navien.com/__DATA/ProductDocument/NPE-E_User_Information_Manual_Eng.pdf'),
-  ('NPE-E-36',      'owners_manual',       'Navien NPE-E Tankless Electric Owner''s Manual',             'https://us.navien.com/__DATA/ProductDocument/NPE-E_User_Information_Manual_Eng.pdf'),
-  ('NPE-G50',       'owners_manual',       'Navien NPE-G Tank-Tankless Hybrid Owner''s Manual',          'https://us.navien.com/__DATA/ProductDocument/NPE-G_User_Information_Manual_Eng.pdf'),
-  ('NPE-G50',       'installation_guide',  'Navien NPE-G Tank-Tankless Hybrid Installation Manual',      'https://us.navien.com/__DATA/ProductDocument/NPE-G_Installation_Manual_Eng.pdf'),
-  ('NPE-G75',       'owners_manual',       'Navien NPE-G Tank-Tankless Hybrid Owner''s Manual',          'https://us.navien.com/__DATA/ProductDocument/NPE-G_User_Information_Manual_Eng.pdf'),
+  ('NPE-2S',        'owners_manual',       'Navien NPE-2S Condensing Tankless Owner''s Manual',          'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-2S',        'installation_guide',  'Navien NPE-2S Condensing Tankless Installation Manual',      'https://www.navieninc.com/downloads/npe-installation-manual-en'),
+  ('NPE-2S-LP',     'owners_manual',       'Navien NPE-2S (LP) Condensing Tankless Owner''s Manual',     'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-A2',        'owners_manual',       'Navien NPE-A2 Premium Condensing Owner''s Manual',           'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-A2',        'installation_guide',  'Navien NPE-A2 Premium Condensing Installation Manual',       'https://www.navieninc.com/downloads/npe-installation-manual-en'),
+  ('NPE-240A2',     'owners_manual',       'Navien NPE-240A2 Owner''s Manual',                           'https://www.navieninc.com/products/npe-240a/downloads'),
+  ('NPE-240S2',     'owners_manual',       'Navien NPE-240S2 Owner''s Manual',                           'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-180S2',     'owners_manual',       'Navien NPE-180S2 Owner''s Manual',                           'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-150S2',     'owners_manual',       'Navien NPE-150S2 Owner''s Manual',                           'https://www.navieninc.com/downloads/npe-user-s-information-manual-en'),
+  ('NPE-E-24',      'owners_manual',       'Navien NPE-E Tankless Electric Owner''s Manual',             'https://www.navieninc.com/downloads'),
+  ('NPE-E-36',      'owners_manual',       'Navien NPE-E Tankless Electric Owner''s Manual',             'https://www.navieninc.com/downloads'),
+  ('NPE-G50',       'owners_manual',       'Navien NPE-G Tank-Tankless Hybrid Owner''s Manual',          'https://www.navieninc.com/downloads'),
+  ('NPE-G50',       'installation_guide',  'Navien NPE-G Tank-Tankless Hybrid Installation Manual',      'https://www.navieninc.com/downloads'),
+  ('NPE-G75',       'owners_manual',       'Navien NPE-G Tank-Tankless Hybrid Owner''s Manual',          'https://www.navieninc.com/downloads'),
   ('NCB-240E',      'owners_manual',       'Navien NCB-240E Combi Boiler Owner''s Manual',               'https://us.navien.com/__DATA/ProductDocument/2015/10/7/NCB_User_Information_Manual_Eng.pdf'),
-  ('NCB-240E',      'installation_guide',  'Navien NCB-240E Combi Boiler Installation Manual',           'https://us.navien.com/__DATA/ProductDocument/NCB-E_Installation_Manual_Eng.pdf'),
+  ('NCB-240E',      'installation_guide',  'Navien NCB-240E Combi Boiler Installation Manual',           'https://www.navieninc.com/downloads/ncb-e-manuals-installation-manual-en'),
   ('NCB-180E',      'owners_manual',       'Navien NCB-180E Combi Boiler Owner''s Manual',               'https://us.navien.com/__DATA/ProductDocument/2015/10/7/NCB_User_Information_Manual_Eng.pdf'),
   ('NCB-240E-LP',   'owners_manual',       'Navien NCB-240E (LP) Combi Boiler Owner''s Manual',          'https://us.navien.com/__DATA/ProductDocument/2015/10/7/NCB_User_Information_Manual_Eng.pdf')
 ) AS v(model_number, manual_type, title, source_url)
