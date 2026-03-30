@@ -92,6 +92,9 @@ enum AnalyticsEvent: String {
     case warrantyCreated = "warranty_created"
     case warrantyEdited = "warranty_edited"
 
+    // MARK: - Equipment Catalog
+    case systemIdentified = "system_identified"
+
     // MARK: - Documents
     case documentVaultViewed = "document_vault_viewed"
     case documentViewed = "document_viewed"

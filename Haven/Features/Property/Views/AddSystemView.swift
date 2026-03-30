@@ -155,12 +155,12 @@ struct AddSystemView: View {
             .tint(HavenColors.navy)
             .trackScreen("AddSystemView", properties: ["property_id": propertyID.uuidString])
             .sheet(isPresented: $showEquipmentSearch) {
-                EquipmentIdentifySheet(systemCategory: category) { result, serialNumber in
+                EquipmentIdentifySheet(systemCategory: category) { result, detectedSerial in
                     // Pre-fill from catalog selection
                     name = result.displayName
                     manufacturer = result.manufacturer.name
                     modelNumber = result.modelNumber
-                    if let serial = serialNumber { serialNumber = serial }
+                    if let serial = detectedSerial { serialNumber = serial }
                     if let lifespan = result.specs.expectedLifespanYears {
                         expectedLifespan = "\(lifespan)"
                     }
