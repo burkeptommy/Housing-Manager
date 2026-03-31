@@ -9,6 +9,7 @@
 	"dependencies": {
 		"@crawlee/cheerio": "^3.15.3",
 		"@crawlee/playwright": "^3.16.0",
+		"2captcha-ts": "^2.4.1",
 		"apify": "^3.7.0",
 		"crawlee": "^3.16.0",
 		"pdf-parse": "^2.4.5",
