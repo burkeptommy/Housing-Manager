@@ -57,6 +57,8 @@ serve(async (req: Request) => {
       furnace: ["hvac-furnace"],
       boiler: ["hvac-boiler"],
       "mini split": ["hvac-mini-split"],
+      induction: ["range-induction", "cooktop-induction"],
+      "heat pump": ["hvac-heat-pump", "dryer-heat-pump"],
       toilet: ["toilet"],
       faucet: ["bathroom-faucet"],
       shower: ["shower-system"],
@@ -71,6 +73,10 @@ serve(async (req: Request) => {
       "range hood": ["range-hood", "range-hood-wall", "range-hood-island", "range-hood-under-cabinet"],
       sprinkler: ["irrigation-controller", "sprinkler-head"],
       softener: ["water-treatment-softener"],
+      freezer: ["freezer-upright", "freezer-chest"],
+      garbage: ["garbage-disposal"],
+      disposal: ["garbage-disposal"],
+      wine: ["wine-cooler", "wine-cellar-cooling"],
     };
 
     // Detect if any word is a category alias
@@ -87,11 +93,14 @@ serve(async (req: Request) => {
       } else if (categoryAliases[word]) {
         detectedCategorySlugs.push(...categoryAliases[word]);
       } else {
-        // Check if it looks like a model number (has digits)
-        if (/\d/.test(word) && word.length > 3) {
-          otherWords.push(word); // Likely model number fragment
+        // Check prefix match — "induc" should match "induction"
+        const prefixMatch = Object.keys(categoryAliases).find(alias => alias.startsWith(word) && word.length >= 3);
+        if (prefixMatch) {
+          detectedCategorySlugs.push(...categoryAliases[prefixMatch]);
+        } else if (/\d/.test(word)) {
+          otherWords.push(word); // Model number, series number, or spec (e.g., "800", "RF29DB")
         } else {
-          brandWords.push(word); // Likely brand name
+          brandWords.push(word); // Likely brand name (e.g., "bosch", "samsung")
         }
       }
     }
@@ -118,7 +127,7 @@ serve(async (req: Request) => {
       installation_type, capacity_value, capacity_unit,
       msrp_usd, expected_lifespan_years, key_features,
       is_current_model, width_inches, specs,
-      equipment_manufacturers!inner (id, name, slug, tier),
+      equipment_manufacturers!inner (id, name, slug, tier, reliability_score, score_summary),
       equipment_categories!inner (id, name, slug, room)
     `;
 
@@ -132,7 +141,13 @@ serve(async (req: Request) => {
       if (cats) matchedCategoryIds = cats.map((c: any) => c.id);
     }
 
-    // Strategy 1: Brand + category (e.g., "bosch stove")
+    // Collect unmatched words (not brand, not category) — these might be series names,
+    // model fragments, or specs like "800", "pro", "profile", etc.
+    const unmatchedWords = otherWords.concat(
+      brandWords.filter(() => matchedManufacturerIds.length === 0) // only if brand didn't match
+    );
+
+    // Strategy 1: Brand + category (e.g., "bosch stove", "bosch 800 induction")
     if (matchedCategoryIds.length > 0 && matchedManufacturerIds.length > 0) {
       const { data } = await supabase
         .from("equipment_catalog")
@@ -140,9 +155,22 @@ serve(async (req: Request) => {
         .in("manufacturer_id", matchedManufacturerIds)
         .in("category_id", matchedCategoryIds)
         .order("is_current_model", { ascending: false })
-        .limit(limit);
+        .limit(100); // Fetch more, then filter client-side for leftover words
 
-      if (data) results = data;
+      if (data && data.length > 0) {
+        // If there are leftover words (e.g., "800"), narrow results by matching
+        // them anywhere in series, model_name, or model_number
+        if (unmatchedWords.length > 0) {
+          const filtered = data.filter((r: any) => {
+            const haystack = [r.series, r.model_name, r.model_number]
+              .filter(Boolean).join(" ").toLowerCase();
+            return unmatchedWords.every(w => haystack.includes(w.toLowerCase()));
+          });
+          results = filtered.length > 0 ? filtered.slice(0, limit) : data.slice(0, limit);
+        } else {
+          results = data.slice(0, limit);
+        }
+      }
     }
 
     // Strategy 2: Brand only (e.g., "bosch")
@@ -220,9 +248,6 @@ serve(async (req: Request) => {
       const mfg = r.equipment_manufacturers;
       const cat = r.equipment_categories;
 
-      // Check if this model has a cached PDF
-      const hasPdf = false; // We'll check this separately if needed
-
       return {
         id: r.id,
         model_number: r.model_number,
@@ -260,6 +285,11 @@ serve(async (req: Request) => {
           key_features: r.key_features,
           details: r.specs,
         },
+        scores: mfg.reliability_score ? {
+          reliability: mfg.reliability_score,
+          summary: mfg.score_summary,
+          source: "brand",
+        } : null,
       };
     });
 

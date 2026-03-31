@@ -13,7 +13,9 @@
 		"apify": "^3.7.0",
 		"crawlee": "^3.16.0",
 		"pdf-parse": "^2.4.5",
-		"playwright": "^1.58.2"
+		"playwright": "^1.58.2",
+		"playwright-extra": "^4.3.6",
+		"puppeteer-extra-plugin-stealth": "^2.11.2"
 	},
 	"devDependencies": {
 		"@apify/eslint-config": "^1.0.0",

@@ -16,6 +16,13 @@
             "editor": "textfield",
             "isSecret": true
         },
+        "twoCaptchaApiKey": {
+            "title": "2Captcha API Key",
+            "type": "string",
+            "description": "API key for 2Captcha CAPTCHA solving service",
+            "editor": "textfield",
+            "isSecret": true
+        },
         "batchSize": {
             "title": "Batch Size",
             "type": "integer",
@@ -38,5 +45,5 @@
             "default": true
         }
     },
-    "required": ["supabaseUrl", "supabaseServiceKey"]
+    "required": ["supabaseUrl", "supabaseServiceKey", "twoCaptchaApiKey"]
 }

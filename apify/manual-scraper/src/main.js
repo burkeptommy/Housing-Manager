@@ -1,24 +1,34 @@
 /**
- * Haven Equipment Manual Scraper v8 — Active Emulation
+ * Haven Equipment Manual Scraper v9 — Production
  *
  * Pipeline:
- * 1. Supabase fetch + color-code stripping
- * 2. Google Search (site:manualslib.com, US region, fuzzy brand+model)
- * 3. URL rewrite /manual/ → /download/
- * 4. 2Captcha solve with fast polling
- * 5. Network interception + double-tap injection + immediate click
- * 6. "Something went wrong" retry with cookie clear + fresh proxy
- * 7. CDN link extraction → PDF fetch → verification → upload
+ * 1. Fetch uncached models from Supabase equipment_catalog
+ * 2. Google Search (site:manualslib.com) to find manual pages
+ * 3. URL rewrite /manual/ -> /download/ to reach CAPTCHA gate
+ * 4. 2Captcha reCAPTCHA v2 solve + single clean token injection
+ * 5. CDN URL extraction via network interception + DOM polling
+ * 6. PDF fetch (with session cookies), validation, model verification
+ * 7. Upload to Supabase storage + multi-model mapping
  */
 
 import { Actor, log } from 'apify';
 import { PlaywrightCrawler, createPlaywrightRouter } from '@crawlee/playwright';
 import { Solver } from '2captcha-ts';
+import { setTimeout as sleep } from 'node:timers/promises';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 
-const TWOCAPTCHA_KEY = '91a11773cf07e2e561c0fd5e3980f258';
-const solver = new Solver(TWOCAPTCHA_KEY);
+// Apply stealth plugin — hides headless browser fingerprints
+chromium.use(StealthPlugin());
 
-function extractPdfText(buffer, maxBytes = 500000) {
+/** Random delay between min and max ms to avoid robotic timing */
+function humanDelay(minMs = 1000, maxMs = 3000) {
+    return sleep(Math.floor(Math.random() * (maxMs - minMs)) + minMs);
+}
+
+// ── Helper Functions ───────────────────────────────────────────────────────
+
+function extractPdfText(buffer, maxBytes = 500_000) {
     const slice = buffer.slice(0, Math.min(buffer.length, maxBytes));
     const str = slice.toString('latin1');
     const matches = str.match(/[\x20-\x7E]{4,}/g) || [];
@@ -32,24 +42,187 @@ function stripColorCode(model) {
     return match ? match[1] : cleaned;
 }
 
+function isValidPdf(buffer) {
+    return buffer.length >= 1000 && buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+}
+
+function verifyModelInPdf(pdfBuffer, modelNumber) {
+    const text = extractPdfText(pdfBuffer);
+    const textClean = text.replace(/[^A-Z0-9]/g, '');
+    const exactUpper = modelNumber.toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const baseUpper = stripColorCode(modelNumber).toUpperCase().replace(/[^A-Z0-9]/g, '');
+    return textClean.includes(exactUpper) || textClean.includes(baseUpper);
+}
+
+async function extractSitekey(page) {
+    const iframe = await page.$('iframe[src*="recaptcha/api2/anchor"]');
+    if (!iframe) return null;
+    const src = await iframe.getAttribute('src');
+    const match = src?.match(/k=([^&]+)/);
+    return match?.[1] || null;
+}
+
+async function solveCaptchaAndInject(page, pageUrl, solver) {
+    const sitekey = await extractSitekey(page);
+    if (!sitekey) return { success: false, reason: 'no_recaptcha' };
+
+    log.info(`Solving reCAPTCHA (sitekey: ${sitekey.substring(0, 12)}...)...`);
+    const solution = await solver.recaptcha({
+        pageurl: pageUrl,
+        googlekey: sitekey,
+        pollingInterval: 5000,
+    });
+    const token = solution.data;
+    log.info(`2Captcha solved. Token: ${token.substring(0, 30)}...`);
+
+    // Set the textarea AND call the callback.
+    // The callback sets up the page state for the download.
+    // ManualsLib uses "captcha" as the POST field name (not g-recaptcha-response).
+    const result = await page.evaluate((tok) => {
+        const info = [];
+
+        // Set ALL recaptcha response textareas
+        document.querySelectorAll(
+            'textarea[name="g-recaptcha-response"], #g-recaptcha-response'
+        ).forEach(el => {
+            el.style.display = 'block';
+            el.value = tok;
+            el.innerHTML = tok;
+            info.push('textarea_set');
+        });
+
+        // Override grecaptcha.getResponse to return our token
+        try {
+            if (typeof grecaptcha !== 'undefined') {
+                grecaptcha.getResponse = () => tok;
+                info.push('getResponse_overridden');
+            }
+        } catch (e) {}
+
+        // Call the callback — this makes an AJAX POST to /download with captcha=TOKEN
+        // which is the ACTUAL download flow (not a form submission)
+        const rcDiv = document.querySelector('.g-recaptcha[data-callback], [data-callback]');
+        if (rcDiv) {
+            const cbName = rcDiv.getAttribute('data-callback');
+            if (cbName && typeof window[cbName] === 'function') {
+                try { window[cbName](tok); info.push(`callback:${cbName}`); }
+                catch (e) { info.push(`callback-err:${e.message}`); }
+            }
+        }
+        if (!info.some(i => i.startsWith('callback:'))) {
+            // Try known callback names
+            for (const name of ['recaptchaCallback', 'onRecaptchaSuccess', 'onSubmit']) {
+                if (typeof window[name] === 'function') {
+                    try { window[name](tok); info.push(`callback:${name}`); break; }
+                    catch (e) {}
+                }
+            }
+        }
+
+        return { info, called: true };
+    }, token);
+
+    log.info(`Injection result: ${result.info.join(', ')}`);
+    return { success: true, details: result.info, token };
+}
+
+async function extractCdnUrl(page, interceptState, timeoutMs = 25_000) {
+    const CDN_RE = /https?:\/\/data[12]\.manualslib\.com[^\s"'<>]+/i;
+    const PDF_RE = /https?:\/\/[^\s"'<>]*\.pdf[^\s"'<>]*/i;
+    const start = Date.now();
+
+    while (Date.now() - start < timeoutMs) {
+        // Source 1: Network-intercepted PDF URLs
+        if (interceptState.pdfUrls.length > 0) {
+            return interceptState.pdfUrls[0];
+        }
+
+        // Source 2: Check ALL accumulated POST responses for PDF URLs
+        for (const body of interceptState.postResponses) {
+            // Try JSON parse — ManualsLib returns {"url":"...","customPdfPath":"..."}
+            try {
+                const json = JSON.parse(body);
+                if (json.error && json.error !== '') continue; // error response, skip
+                const pdfPath = json.customPdfPath || json.url;
+                if (pdfPath) {
+                    const fullUrl = pdfPath.startsWith('//') ? `https:${pdfPath}` : pdfPath;
+                    return fullUrl;
+                }
+            } catch { /* not JSON, try regex */ }
+
+            const cdnMatch = body.match(CDN_RE);
+            if (cdnMatch) return cdnMatch[0];
+            const pdfMatch = body.match(PDF_RE);
+            if (pdfMatch) return pdfMatch[0];
+        }
+
+        // Source 3: DOM selectors for populated hrefs
+        const domUrl = await page.evaluate(() => {
+            const selectors = [
+                'a.download-url[href]', 'a.view-url[href]',
+                '.download-url a[href]', '.view-url a[href]',
+                'a[href*="data1.manualslib.com"]', 'a[href*="data2.manualslib.com"]',
+            ];
+            for (const sel of selectors) {
+                const el = document.querySelector(sel);
+                const href = el?.href || el?.getAttribute('href') || '';
+                if (href.length > 10 && href.startsWith('http')) return href;
+            }
+            // Check any link with .pdf in href
+            const allLinks = document.querySelectorAll('a[href*=".pdf"]');
+            for (const a of allLinks) {
+                const href = a.href || a.getAttribute('href') || '';
+                if (href.includes('manualslib') && href.length > 10) return href;
+            }
+            return null;
+        }).catch(() => null);
+
+        if (domUrl) return domUrl;
+
+        // Source 4: Full page HTML regex scan (expensive, do less frequently)
+        if ((Date.now() - start) % 2500 < 500) {
+            const html = await page.content().catch(() => '');
+            const htmlCdn = html.match(CDN_RE);
+            if (htmlCdn) return htmlCdn[0];
+        }
+
+        await sleep(500);
+    }
+
+    return null;
+}
+
+// ── Actor Init ─────────────────────────────────────────────────────────────
+
 await Actor.init();
 
-const input = await Actor.getInput() ?? {};
-const { supabaseUrl = '', supabaseServiceKey = '', batchSize = 50, manufacturerSlug = null, onlyMissing = true } = input;
+Actor.on('aborting', async () => {
+    log.warning('Actor aborting — cleaning up...');
+    await sleep(1000);
+    await Actor.exit();
+});
 
-if (!supabaseUrl || !supabaseServiceKey) {
-    log.error('Missing supabaseUrl or supabaseServiceKey');
+const input = await Actor.getInput() ?? {};
+const {
+    supabaseUrl = '', supabaseServiceKey = '', twoCaptchaApiKey = '',
+    batchSize = 50, manufacturerSlug = null, onlyMissing = true,
+} = input;
+
+if (!supabaseUrl || !supabaseServiceKey || !twoCaptchaApiKey) {
+    log.error('Missing required input: supabaseUrl, supabaseServiceKey, or twoCaptchaApiKey');
     await Actor.exit({ exitCode: 1 });
 }
 
-// ── Fetch models ────────────────────────────────────────────────────────────
+const solver = new Solver(twoCaptchaApiKey);
+
+// ── Supabase: Fetch models ────────────────────────────────────────────────
 
 log.info('Fetching models from Supabase...');
 
 let cachedIds = new Set();
 if (onlyMissing) {
     const resp = await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?select=catalog_entry_id&file_size_bytes=gt.0&limit=10000`, {
-        headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}` },
+        headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}` },
     });
     cachedIds = new Set((await resp.json()).map(m => m.catalog_entry_id));
 }
@@ -59,7 +232,7 @@ let offset = 0;
 while (true) {
     let url = `${supabaseUrl}/rest/v1/equipment_catalog?select=id,model_number,model_name,equipment_manufacturers!inner(name,slug),equipment_categories!inner(name)&limit=1000&offset=${offset}&order=id`;
     if (manufacturerSlug) url += `&equipment_manufacturers.slug=eq.${manufacturerSlug}`;
-    const resp = await fetch(url, { headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}` } });
+    const resp = await fetch(url, { headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}` } });
     const page = await resp.json();
     if (!page || page.length === 0) break;
     allModels.push(...page);
@@ -72,11 +245,11 @@ if (models.length > batchSize) models = models.slice(0, batchSize);
 log.info(`Processing ${models.length} models (${allModels.length} total, ${cachedIds.size} cached)`);
 
 if (models.length === 0) {
-    await Actor.pushData({ totalProcessed: 0, pdfsDownloaded: 0, verified: 0, needsReview: 0, notFound: 0, results: [] });
+    await Actor.pushData({ totalProcessed: 0, pdfsDownloaded: 0, verified: 0, needsReview: 0, linkOnly: 0, notFound: 0, multiModelMapped: 0, results: [] });
     await Actor.exit();
 }
 
-// ── Google Search ───────────────────────────────────────────────────────────
+// ── Google Search: Find ManualsLib pages ──────────────────────────────────
 
 log.info('Searching Google for ManualsLib pages...');
 
@@ -113,45 +286,197 @@ for (let i = 0; i < models.length; i += SEARCH_BATCH) {
         log.warning(`Google batch failed: ${err.message}`);
     }
 
-    if (i + SEARCH_BATCH < models.length) await new Promise(r => setTimeout(r, 2000));
+    if (i + SEARCH_BATCH < models.length) await sleep(2000);
 }
 
 log.info(`Found ManualsLib pages for ${modelToUrl.size}/${models.length} models`);
 
-// ── Build crawl requests ────────────────────────────────────────────────────
-
-const HARDCODED_TEST = true; // REMOVE AFTER TESTING
+// ── Build crawl requests ───────────────────────────────────────────────────
 
 const results = [];
+let multiModelTotal = 0;
 const crawlRequests = [];
 
-if (HARDCODED_TEST) {
-    const testUrl = 'https://www.manualslib.com/manual/797523/Lincat-Eco8.html';
-    const downloadUrl = testUrl.split('?')[0].split('#')[0].replace('/manual/', '/download/');
-    log.info(`HARDCODED TEST: ${downloadUrl}`);
+for (const [catalogId, info] of modelToUrl) {
+    const cleanUrl = info.url.split('?')[0].split('#')[0];
+    const downloadUrl = cleanUrl.replace('/manual/', '/download/');
     crawlRequests.push({
         url: downloadUrl,
-        userData: { supabaseId: 'test', modelNumber: 'Eco8', brand: 'Lincat', brandSlug: 'lincat', originalModel: 'Eco8', manualPageUrl: testUrl },
+        userData: {
+            supabaseId: catalogId,
+            modelNumber: info.model.model_number,
+            brand: info.model.equipment_manufacturers.name,
+            brandSlug: info.model.equipment_manufacturers.slug,
+            originalModel: info.model.model_number,
+            manualPageUrl: info.url,
+        },
         label: 'MANUALSLIB',
     });
-} else {
-    for (const [catalogId, info] of modelToUrl) {
-        const cleanUrl = info.url.split('?')[0].split('#')[0];
-        const downloadUrl = cleanUrl.replace('/manual/', '/download/');
-        crawlRequests.push({
-            url: downloadUrl,
-            userData: { supabaseId: catalogId, modelNumber: info.model.model_number, brand: info.model.equipment_manufacturers.name, brandSlug: info.model.equipment_manufacturers.slug, originalModel: info.model.model_number, manualPageUrl: info.url },
-            label: 'MANUALSLIB',
-        });
-    }
-    for (const model of models) {
-        if (!modelToUrl.has(model.id)) {
-            results.push({ supabase_id: model.id, brand: model.equipment_manufacturers.name, original_model: model.model_number, pdf_url: null, verification_status: 'NOT_FOUND' });
-        }
+}
+
+for (const model of models) {
+    if (!modelToUrl.has(model.id)) {
+        results.push({ supabase_id: model.id, brand: model.equipment_manufacturers.name, original_model: model.model_number, pdf_url: null, verification_status: 'NOT_FOUND', multi_model_count: 0 });
     }
 }
 
-// ── Router ──────────────────────────────────────────────────────────────────
+// ── Supabase helpers ───────────────────────────────────────────────────────
+
+async function saveSourceUrl(supabaseId, url) {
+    await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${supabaseId}&manual_type=eq.owners_manual`, {
+        method: 'PATCH',
+        headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ source_url: url, last_verified_at: new Date().toISOString() }),
+    });
+}
+
+async function uploadPdfToSupabase(pdfBuffer, storagePath, supabaseId, manualPageUrl) {
+    const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/equipment-manuals/${storagePath}`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
+        body: pdfBuffer,
+    });
+    if (uploadResp.ok) {
+        await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${supabaseId}&manual_type=eq.owners_manual`, {
+            method: 'PATCH',
+            headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+            body: JSON.stringify({ source_url: manualPageUrl, file_path: storagePath, file_size_bytes: pdfBuffer.length, last_verified_at: new Date().toISOString() }),
+        });
+    }
+    return uploadResp.ok;
+}
+
+async function detectMultiModelMatches(pdfBuffer, primaryCatalogId, brandSlug, storagePath, manualPageUrl) {
+    const text = extractPdfText(pdfBuffer);
+    const textClean = text.replace(/[^A-Z0-9]/g, '');
+
+    // Fetch all models for this brand
+    const resp = await fetch(
+        `${supabaseUrl}/rest/v1/equipment_catalog?select=id,model_number&equipment_manufacturers!inner(slug)&equipment_manufacturers.slug=eq.${brandSlug}&limit=5000`,
+        { headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}` } },
+    );
+    if (!resp.ok) return [];
+    const brandModels = await resp.json();
+
+    const matched = [];
+    for (const model of brandModels) {
+        if (model.id === primaryCatalogId) continue;
+        const modelUpper = model.model_number.toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (modelUpper.length < 5) continue; // skip short model numbers to avoid false matches
+        // Must contain both letters and numbers to be specific enough
+        if (!/[A-Z]/.test(modelUpper) || !/[0-9]/.test(modelUpper)) continue;
+        const baseUpper = stripColorCode(model.model_number).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (textClean.includes(modelUpper) || (baseUpper.length >= 5 && textClean.includes(baseUpper))) {
+            matched.push(model);
+        }
+    }
+
+    // UPSERT equipment_manuals rows for each matched model
+    for (const model of matched) {
+        const checkResp = await fetch(
+            `${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${model.id}&manual_type=eq.owners_manual&select=id`,
+            { headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}` } },
+        );
+        const existing = await checkResp.json();
+        const payload = {
+            source_url: manualPageUrl,
+            file_path: storagePath,
+            file_size_bytes: pdfBuffer.length,
+            last_verified_at: new Date().toISOString(),
+        };
+
+        if (existing.length > 0) {
+            await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?id=eq.${existing[0].id}`, {
+                method: 'PATCH',
+                headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                body: JSON.stringify(payload),
+            });
+        } else {
+            await fetch(`${supabaseUrl}/rest/v1/equipment_manuals`, {
+                method: 'POST',
+                headers: { apikey: supabaseServiceKey, Authorization: `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+                body: JSON.stringify({
+                    catalog_entry_id: model.id,
+                    manual_type: 'owners_manual',
+                    title: `${model.model_number} Owner's Manual`,
+                    ...payload,
+                }),
+            });
+        }
+    }
+
+    if (matched.length > 0) {
+        log.info(`Multi-model: mapped ${matched.length} additional models: ${matched.map(m => m.model_number).join(', ')}`);
+    }
+    return matched;
+}
+
+async function fetchAndUploadPdf(pdfUrl, pageContext, metadata) {
+    const { supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl } = metadata;
+
+    // Try with session cookies first (CDN may require them)
+    let pdfBuffer;
+    const cookies = await pageContext.cookies().catch(() => []);
+    const cookieHeader = cookies.map(c => `${c.name}=${c.value}`).join('; ');
+    const baseHeaders = { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36' };
+
+    for (const attempt of [1, 2]) {
+        try {
+            const headers = attempt === 1
+                ? { ...baseHeaders, Referer: manualPageUrl, Cookie: cookieHeader }
+                : { ...baseHeaders, Referer: manualPageUrl };
+            const resp = await fetch(pdfUrl, { headers, redirect: 'follow', signal: AbortSignal.timeout(60_000) });
+            if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+            pdfBuffer = Buffer.from(await resp.arrayBuffer());
+            break;
+        } catch (err) {
+            if (attempt === 2) {
+                log.warning(`[${modelNumber}] PDF fetch failed after 2 attempts: ${err.message}`);
+                await saveSourceUrl(supabaseId, manualPageUrl);
+                results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'FETCH_FAILED', multi_model_count: 0 });
+                return;
+            }
+            log.info(`[${modelNumber}] PDF fetch attempt ${attempt} failed (${err.message}), retrying without cookies...`);
+        }
+    }
+
+    if (!isValidPdf(pdfBuffer)) {
+        log.warning(`[${modelNumber}] Not a valid PDF (${pdfBuffer.length} bytes)`);
+        await saveSourceUrl(supabaseId, manualPageUrl);
+        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'NOT_PDF', multi_model_count: 0 });
+        return;
+    }
+
+    const verified = verifyModelInPdf(pdfBuffer, originalModel);
+    const status = verified ? 'VERIFIED' : 'NEEDS_REVIEW';
+
+    // Only upload + map PDFs that are VERIFIED (model number found in PDF text).
+    // NEEDS_REVIEW means Google may have matched the wrong manual — save source URL only.
+    if (!verified) {
+        log.warning(`[${modelNumber}] Model not found in PDF text — saving source URL only (NEEDS_REVIEW)`);
+        await saveSourceUrl(supabaseId, manualPageUrl);
+        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'NEEDS_REVIEW', multi_model_count: 0 });
+        return;
+    }
+
+    const storagePath = `${brandSlug}/${safeModel}/owners_manual.pdf`;
+    const uploaded = await uploadPdfToSupabase(pdfBuffer, storagePath, supabaseId, manualPageUrl);
+
+    if (!uploaded) {
+        log.warning(`[${modelNumber}] Supabase upload failed`);
+        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'UPLOAD_FAILED', multi_model_count: 0 });
+        return;
+    }
+
+    // Multi-model detection — only for VERIFIED PDFs
+    const extraModels = await detectMultiModelMatches(pdfBuffer, supabaseId, brandSlug, storagePath, manualPageUrl);
+    multiModelTotal += extraModels.length;
+
+    log.info(`${brand} ${modelNumber} -- VERIFIED (${Math.round(pdfBuffer.length / 1024)} KB, +${extraModels.length} multi-model)`);
+    results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'VERIFIED', multi_model_count: extraModels.length });
+}
+
+// ── Router ─────────────────────────────────────────────────────────────────
 
 const router = createPlaywrightRouter();
 
@@ -159,428 +484,184 @@ router.addHandler('MANUALSLIB', async ({ page, request, session }) => {
     const { supabaseId, modelNumber, brand, brandSlug, originalModel, manualPageUrl } = request.userData;
     const safeModel = modelNumber.replace(/[^a-zA-Z0-9_-]/g, '_');
     const retryCount = request.retryCount || 0;
+    const metadata = { supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl };
 
-    log.info(`[${brand} ${modelNumber}] Attempt ${retryCount + 1} — download page: ${request.url}`);
+    log.info(`[${brand} ${modelNumber}] Attempt ${retryCount + 1} -- ${request.url}`);
 
-    await page.waitForLoadState('domcontentloaded', { timeout: 20000 }).catch(() => {});
-    await page.waitForTimeout(2000);
+    // 1. Wait for page load + human-like settle time
+    await page.waitForLoadState('domcontentloaded', { timeout: 20_000 }).catch(() => {});
+    await humanDelay(2000, 4000);
 
-    // Step 1: Start network interception BEFORE any CAPTCHA interaction
-    const interceptedPosts = [];
-    page.on('request', req => {
+    // 2. Network interception — BEFORE any CAPTCHA work
+    const interceptState = { pdfUrls: [], postResponses: [] };
+
+    // Log ALL requests (not just responses) to see what's being sent
+    page.on('request', (req) => {
         if (req.method() === 'POST' && req.url().includes('manualslib.com')) {
-            log.info(`[API_WATCH] POST ${req.url()} | Payload: ${(req.postData() || '').substring(0, 200)}`);
-            interceptedPosts.push({ url: req.url(), data: req.postData() });
+            const postData = req.postData() || '';
+            log.info(`[${modelNumber}] POST request -> ${req.url().substring(0, 80)} | body: ${postData.substring(0, 200)}`);
         }
     });
 
-    // Watch for ALL responses from manualslib.com — especially the /download POST response
-    const interceptedResponses = [];
-    let downloadPostResponse = null;
     page.on('response', async (res) => {
-        const ct = res.headers()['content-type'] || '';
-        const url = res.url();
+        try {
+            const url = res.url();
+            const ct = res.headers()['content-type'] || '';
 
-        if (ct.includes('application/pdf') || url.includes('.pdf') || url.includes('cpdf')) {
-            log.info(`[API_WATCH] PDF Response: ${url}`);
-            interceptedResponses.push(url);
-        }
-
-        // Capture the /download POST response — this contains the CDN URL
-        if (url.includes('manualslib.com/download') && res.request().method() === 'POST') {
-            try {
-                const body = await res.text();
-                log.info(`[API_WATCH] Download POST response (${res.status()}): ${body.substring(0, 500)}`);
-                downloadPostResponse = body;
-            } catch(e) {
-                log.info(`[API_WATCH] Could not read download response: ${e.message}`);
+            // Capture direct PDF responses
+            if (ct.includes('application/pdf') || url.endsWith('.pdf') || url.includes('cpdf')) {
+                interceptState.pdfUrls.push(url);
+                log.info(`[${modelNumber}] Intercepted PDF: ${url.substring(0, 80)}`);
             }
-        }
+
+            // Capture ALL POST responses from manualslib.com
+            if (url.includes('manualslib.com') && res.request().method() === 'POST') {
+                const body = await res.text();
+                interceptState.postResponses.push(body);
+                log.info(`[${modelNumber}] POST response #${interceptState.postResponses.length} from ${url.substring(0, 80)} (${res.status()}, ${body.length} chars): ${body.substring(0, 300)}`);
+            }
+        } catch (e) { /* response already disposed, ignore */ }
     });
 
     try {
-        // Screenshot: download page
-        const ss1 = await page.screenshot({ fullPage: true });
-        await Actor.setValue(`debug-downloadpage-${safeModel}-${retryCount}`, ss1, { contentType: 'image/png' });
+        // 3. Debug screenshot
+        const ss = await page.screenshot({ fullPage: true });
+        await Actor.setValue(`debug-page-${safeModel}-${retryCount}`, ss, { contentType: 'image/png' });
 
-        // Step 2: Check for "Something went wrong" from a previous attempt
-        const errorText = await page.textContent('body');
-        if (errorText?.includes('Something went wrong')) {
-            log.warning(`[${modelNumber}] "Something went wrong" detected — clearing cookies and retrying`);
-            if (session) session.retire();
-            throw new Error('Something went wrong detected. Retrying with fresh session.');
-        }
-
-        // Step 3: Find reCAPTCHA and solve via 2Captcha
-        const captchaIframe = await page.$('iframe[src*="recaptcha/api2/anchor"]');
-        if (captchaIframe) {
-            const iframeSrc = await captchaIframe.getAttribute('src');
-            const sitekeyMatch = iframeSrc?.match(/k=([^&]+)/);
-            const sitekey = sitekeyMatch?.[1];
-
-            if (sitekey) {
-                log.info(`[${modelNumber}] Sending to 2Captcha (sitekey: ${sitekey.substring(0, 12)}...)...`);
-
-                // Fast polling — check every 5 seconds instead of default 10
-                const solution = await solver.recaptcha({
-                    pageurl: request.url,
-                    googlekey: sitekey,
-                    pollingInterval: 5000,
-                });
-
-                log.info(`[${modelNumber}] ✓ 2Captcha solved! Token: ${solution.data.substring(0, 30)}...`);
-
-                // Step 4: Double-tap injection — set textarea + call ALL known callbacks + click immediately
-                const injectionResult = await page.evaluate((token) => {
-                    const info = [];
-
-                    // Inject into ALL reCAPTCHA textareas
-                    document.querySelectorAll('textarea[name="g-recaptcha-response"], #g-recaptcha-response').forEach(el => {
-                        el.style.display = 'block';
-                        el.value = token;
-                        info.push('textarea_set');
-                    });
-
-                    // Call recaptchaCallback
-                    if (typeof window.recaptchaCallback === 'function') {
-                        try { window.recaptchaCallback(token); info.push('recaptchaCallback_OK'); } catch(e) { info.push('recaptchaCallback_ERR:' + e.message); }
-                    }
-
-                    // Call onSubmit
-                    if (typeof window.onSubmit === 'function') {
-                        try { window.onSubmit(token); info.push('onSubmit_OK'); } catch(e) { info.push('onSubmit_ERR'); }
-                    }
-
-                    // Try grecaptcha.execute if v3
-                    try {
-                        if (typeof grecaptcha !== 'undefined' && grecaptcha.execute) {
-                            info.push('grecaptcha_exists');
-                        }
-                    } catch(e) {}
-
-                    return info;
-                }, solution.data);
-
-                log.info(`[${modelNumber}] Injection: ${injectionResult.join(', ')}`);
-
-                // Step 5: Set textarea + force-click "Get Manual" (bypass any overlay)
-                log.info(`[${modelNumber}] Injecting token into textarea...`);
-
-                await page.evaluate((token) => {
-                    document.querySelectorAll('textarea[name="g-recaptcha-response"]').forEach(el => {
-                        el.value = token;
-                    });
-                }, solution.data);
-
-                // Call recaptchaCallback via evaluate — this triggers an AJAX POST
-                // The callback may cause a navigation — we need to prevent that
-                log.info(`[${modelNumber}] Calling recaptchaCallback...`);
-
-                // Set up a MutationObserver to watch for href changes on .download-url and .view-url
-                const hrefPromise = page.evaluate(() => {
-                    return new Promise((resolve) => {
-                        const targets = document.querySelectorAll('.download-url, .view-url');
-                        if (!targets.length) { resolve(null); return; }
-
-                        const observer = new MutationObserver((mutations) => {
-                            for (const m of mutations) {
-                                if (m.type === 'attributes' && m.attributeName === 'href') {
-                                    const href = m.target.getAttribute('href');
-                                    if (href && href.length > 10) {
-                                        observer.disconnect();
-                                        resolve(href);
-                                        return;
-                                    }
-                                }
-                            }
-                        });
-
-                        targets.forEach(t => observer.observe(t, { attributes: true, attributeFilter: ['href'] }));
-
-                        // Timeout after 20s
-                        setTimeout(() => { observer.disconnect(); resolve(null); }, 20000);
-                    });
-                });
-
-                // Inject token into grecaptcha internals AND textarea, then call callback
-                log.info(`[${modelNumber}] Injecting token into grecaptcha + calling callback...`);
-                await page.evaluate((token) => {
-                    // Set textarea
-                    document.querySelectorAll('textarea[name="g-recaptcha-response"]').forEach(el => {
-                        el.value = token;
-                    });
-
-                    // Try to set grecaptcha's internal response
-                    try {
-                        if (typeof grecaptcha !== 'undefined') {
-                            // Override getResponse to return our token
-                            const origGetResponse = grecaptcha.getResponse;
-                            grecaptcha.getResponse = () => token;
-                        }
-                    } catch(e) {}
-
-                    // Make the POST ourselves via XMLHttpRequest (synchronous with the callback)
-                    const xhr = new XMLHttpRequest();
-                    xhr.open('POST', window.location.href, true);
-                    xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded');
-                    xhr.onreadystatechange = function() {
-                        if (xhr.readyState === 4 && xhr.status === 200) {
-                            try {
-                                const resp = JSON.parse(xhr.responseText);
-                                if (resp.error === '') {
-                                    // Success! Now call the callback which should populate the hrefs
-                                    if (typeof window.recaptchaCallback === 'function') {
-                                        window.recaptchaCallback(token);
-                                    }
-                                }
-                            } catch(e) {
-                                // Response might be HTML — try callback anyway
-                                if (typeof window.recaptchaCallback === 'function') {
-                                    window.recaptchaCallback(token);
-                                }
-                            }
-                        }
-                    };
-                    xhr.send('captcha=' + encodeURIComponent(token));
-                }, solution.data);
-
-                // Wait for the observer to catch the href
-                const capturedHref = await hrefPromise;
-
-                if (capturedHref) {
-                    const fullUrl = capturedHref.startsWith('http') ? capturedHref : `https://www.manualslib.com${capturedHref}`;
-                    log.info(`[${modelNumber}] ✓✓✓ MutationObserver captured CDN URL: ${fullUrl.substring(0, 80)}`);
-                    await fetchAndUploadPdf(fullUrl, request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
-                    return;
-                }
-
-                log.info(`[${modelNumber}] MutationObserver timed out — no href change detected`);
-                await page.waitForTimeout(2000);
-
-                const ssPost = await page.screenshot({ fullPage: true });
-                await Actor.setValue(`debug-postcallback-${safeModel}`, ssPost, { contentType: 'image/png' });
-
-                const postResult = { body: null };
-
-                log.info(`[${modelNumber}] Direct POST result: status=${postResult.status}, bodyLength=${(postResult.body || '').length}`);
-
-                // Search the full HTML response for any PDF or CDN links
-                if (postResult.body) {
-                    const body = postResult.body;
-
-                    // Look for CDN URLs
-                    const cdnMatch = body.match(/https?:\/\/data[12]\.manualslib\.com[^\s"'<>]+/i);
-                    const cpdfMatch = body.match(/https?:\/\/[^\s"'<>]*cpdf[^\s"'<>]+\.pdf/i);
-                    const anyPdfHref = body.match(/href="([^"]*\.pdf[^"]*)"/i);
-                    const downloadLink = body.match(/href="(\/download\/[^"]+)"/ig);
-
-                    log.info(`[${modelNumber}] POST body scan — cdn:${!!cdnMatch} cpdf:${!!cpdfMatch} pdfHref:${!!anyPdfHref} downloadLinks:${downloadLink?.length || 0}`);
-
-                    // Also look for any data-url or onclick with PDF
-                    const dataUrlMatch = body.match(/data-url="([^"]*\.pdf[^"]*)"/i);
-                    const onclickPdf = body.match(/onclick="[^"]*([^"]*\.pdf[^"]*)/i);
-
-                    // Dump a chunk of the body around "Download PDF" or "View in browser"
-                    const downloadPdfIdx = body.indexOf('Download PDF');
-                    const viewBrowserIdx = body.indexOf('View in browser');
-                    if (downloadPdfIdx > -1) {
-                        log.info(`[${modelNumber}] HTML around "Download PDF": ...${body.substring(Math.max(0, downloadPdfIdx - 100), downloadPdfIdx + 200)}...`);
-                    }
-                    if (viewBrowserIdx > -1) {
-                        log.info(`[${modelNumber}] HTML around "View in browser": ...${body.substring(Math.max(0, viewBrowserIdx - 100), viewBrowserIdx + 200)}...`);
-                    }
-
-                    const foundInPost = cdnMatch?.[0] || cpdfMatch?.[0] || anyPdfHref?.[1] || dataUrlMatch?.[1];
-                    if (foundInPost) {
-                        const fullUrl = foundInPost.startsWith('http') ? foundInPost : `https://www.manualslib.com${foundInPost}`;
-                        log.info(`[${modelNumber}] ✓ Found CDN URL in POST response: ${fullUrl.substring(0, 80)}`);
-                        await fetchAndUploadPdf(fullUrl, request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
-                        return;
-                    }
-                }
-
-                // Reload the page to see if the session now has download access
-                await page.reload({ waitUntil: 'domcontentloaded' });
-                await page.waitForTimeout(3000);
-            }
-        } else {
-            log.info(`[${modelNumber}] No reCAPTCHA found`);
-            // Try clicking Get Manual directly
-            const btn = await page.$('button:has-text("Get manual"), a:has-text("Get manual")');
-            if (btn) { await btn.click(); await page.waitForTimeout(5000); }
-        }
-
-        // Step 6: Screenshot after click
-        const ss2 = await page.screenshot({ fullPage: true });
-        await Actor.setValue(`debug-afterclick-${safeModel}-${retryCount}`, ss2, { contentType: 'image/png' });
-
-        // Step 7: Check for "Something went wrong" after click
+        // 4. Check for "Something went wrong"
         const bodyText = await page.textContent('body').catch(() => '');
         if (bodyText?.includes('Something went wrong')) {
-            log.warning(`[${modelNumber}] "Something went wrong" after click — retiring session, retrying`);
-            if (session) session.retire();
-            throw new Error('Something went wrong after click. Retrying with fresh session.');
+            log.warning(`[${modelNumber}] "Something went wrong" — retiring session`);
+            session?.retire();
+            throw new Error('Something went wrong. Retrying with fresh session.');
         }
 
-        // Step 8: Look for download/view links
-        log.info(`[${modelNumber}] Looking for PDF download links...`);
+        // 5. Detect CAPTCHA type
+        const hasRecaptcha = await page.$('iframe[src*="recaptcha/api2/anchor"]');
+        const hasHcaptcha = await page.$('iframe[src*="hcaptcha.com"]');
 
-        // Check the /download POST response for a CDN URL
-        if (downloadPostResponse) {
-            log.info(`[${modelNumber}] Analyzing download POST response...`);
-            // Look for CDN URLs in the response
-            const cdnMatch = downloadPostResponse.match(/https?:\/\/data[12]\.manualslib\.com[^\s"'<>]+\.pdf/i);
-            const cpdfMatch = downloadPostResponse.match(/https?:\/\/[^\s"'<>]*cpdf[^\s"'<>]+\.pdf/i);
-            const anyPdfMatch = downloadPostResponse.match(/https?:\/\/[^\s"'<>]+\.pdf/i);
-            const foundUrl = cdnMatch?.[0] || cpdfMatch?.[0] || anyPdfMatch?.[0];
-            if (foundUrl) {
-                log.info(`[${modelNumber}] ✓ Found CDN URL in POST response: ${foundUrl.substring(0, 80)}`);
-                await fetchAndUploadPdf(foundUrl, request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
-                return;
-            }
-        }
-
-        // Check intercepted responses
-        if (interceptedResponses.length > 0) {
-            log.info(`[${modelNumber}] ✓ Intercepted PDF response: ${interceptedResponses[0]}`);
-            await fetchAndUploadPdf(interceptedResponses[0], request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
+        if (hasHcaptcha) {
+            log.warning(`[${modelNumber}] hCaptcha detected — not supported, saving source URL`);
+            await saveSourceUrl(supabaseId, manualPageUrl);
+            results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: manualPageUrl, verification_status: 'HCAPTCHA_UNSUPPORTED', multi_model_count: 0 });
             return;
         }
 
-        // Poll for hrefs to populate — ManualsLib fills them via JS after POST response
-        log.info(`[${modelNumber}] Polling for non-empty download hrefs (up to 15s)...`);
-        let pdfLink = null;
-        for (let poll = 0; poll < 15; poll++) {
-            await page.waitForTimeout(1000);
-            pdfLink = await page.evaluate(() => {
-                const links = Array.from(document.querySelectorAll('a'));
-                for (const a of links) {
-                    const text = (a.textContent || '').toLowerCase();
-                    const href = a.href || a.getAttribute('href') || '';
-                    if ((text.includes('download pdf') || text.includes('view in browser') || text.includes('view pdf')) && href && href.length > 10 && href.startsWith('http')) {
-                        return href;
-                    }
-                    if (href.includes('data2.manualslib.com') || href.includes('data1.manualslib.com') || (href.includes('.pdf') && href.includes('manualslib'))) {
-                        return href;
-                    }
-                }
-                return null;
+        let captchaToken = null;
+        if (hasRecaptcha) {
+            const captchaResult = await solveCaptchaAndInject(page, request.url, solver);
+            captchaToken = captchaResult.token;
+            if (!captchaResult.success) {
+                log.warning(`[${modelNumber}] CAPTCHA injection failed: ${captchaResult.reason || captchaResult.details?.join(', ')}`);
+            }
+        } else {
+            log.info(`[${modelNumber}] No CAPTCHA found — trying direct access`);
+        }
+
+        // 6. Submit the CAPTCHA token to get download links
+        // Human-like pause after CAPTCHA solve before taking action
+        await humanDelay(1500, 3000);
+
+        if (hasRecaptcha && captchaToken) {
+            // After callback, click the "Get manual" button — it's an <a> tag that triggers
+            // a jQuery AJAX POST to /download with the captcha token.
+            // The callback just enables the button; the click makes the actual POST.
+            await humanDelay(500, 1500);
+
+            // Log all clickable elements near the CAPTCHA for debugging
+            const pageElements = await page.evaluate(() => {
+                const els = document.querySelectorAll('a.btn, a[class*="manual"], a[class*="download"], button[class*="manual"], .get-manual, #get-manual');
+                return Array.from(els).map(el => ({ tag: el.tagName, class: el.className, text: (el.textContent || '').trim().substring(0, 50), href: el.href?.substring(0, 80) || '', id: el.id }));
+            }).catch(() => []);
+            log.info(`[${modelNumber}] Clickable elements: ${JSON.stringify(pageElements).substring(0, 500)}`);
+
+            // Click the "Get manual" button: <button id="get-manual-button" class="button-get-manual btn btn-lg btn-success">
+            const getManualBtn = await page.$('#get-manual-button, .button-get-manual, button:has-text("Get manual"), a:has-text("Get manual")');
+            if (getManualBtn) {
+                log.info(`[${modelNumber}] Clicking "Get manual" button...`);
+                await humanDelay(300, 800);
+                await getManualBtn.click().catch(() => {});
+                await humanDelay(5000, 8000);
+            } else {
+                log.warning(`[${modelNumber}] No "Get manual" element found`);
+            }
+
+            // Check for server errors in captured responses
+            const errorResponse = interceptState.postResponses.find(body => {
+                try { const j = JSON.parse(body); return j.error && j.error.includes('Something went wrong'); } catch { return false; }
             });
-            if (pdfLink) {
-                log.info(`[${modelNumber}] ✓ href populated after ${poll + 1}s: ${pdfLink.substring(0, 80)}`);
-                break;
+            if (errorResponse) {
+                log.warning(`[${modelNumber}] Server returned error — retiring session`);
+                session?.retire();
+                throw new Error('Server error. Retrying.');
+            }
+        } else {
+            // No CAPTCHA — try clicking download buttons
+            const btn = await page.$('a:has-text("Get manual"), button:has-text("Get manual"), a:has-text("Download"), button:has-text("Download")');
+            if (btn) {
+                log.info(`[${modelNumber}] Clicking download button...`);
+                await humanDelay(500, 1500);
+                await btn.click().catch(() => {});
+                await humanDelay(2000, 4000);
             }
         }
 
-        if (pdfLink) {
-            await fetchAndUploadPdf(pdfLink, request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
+        // 7. Extract CDN URL
+        log.info(`[${modelNumber}] Extracting CDN URL...`);
+        const cdnUrl = await extractCdnUrl(page, interceptState, 25_000);
+
+        // 8. Debug screenshot post-extraction
+        const ss2 = await page.screenshot({ fullPage: true });
+        await Actor.setValue(`debug-post-${safeModel}-${retryCount}`, ss2, { contentType: 'image/png' });
+
+        if (cdnUrl) {
+            log.info(`[${modelNumber}] CDN URL found: ${cdnUrl.substring(0, 80)}`);
+            await fetchAndUploadPdf(cdnUrl, page.context(), metadata);
             return;
         }
 
-        // Legacy selector check
-        const legacyLink = await page.$(
-            'a[href*="data2.manualslib.com"], a[href*="data1.manualslib.com"], a[href*="cpdf"]'
-        );
-
-        if (legacyLink) {
-            const href = await legacyLink.getAttribute('href');
-            if (href && href.length > 10) {
-                const fullUrl = href.startsWith('http') ? href : `https://www.manualslib.com${href}`;
-                log.info(`[${modelNumber}] ✓ Found legacy PDF link: ${fullUrl.substring(0, 80)}`);
-                await fetchAndUploadPdf(fullUrl, request.url, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl);
-                return;
-            }
+        // 9. No CDN URL — check for errors
+        const bodyAfter = await page.textContent('body').catch(() => '');
+        if (bodyAfter?.includes('Something went wrong')) {
+            log.warning(`[${modelNumber}] "Something went wrong" after extraction — retrying`);
+            session?.retire();
+            throw new Error('Something went wrong post-extraction. Retrying.');
         }
 
-        // Log all links on the page for debugging
-        const allLinks = await page.evaluate(() => {
+        if (bodyAfter?.includes('rate limit') || bodyAfter?.includes('too many requests')) {
+            log.warning(`[${modelNumber}] Rate limited — retrying`);
+            session?.retire();
+            throw new Error('Rate limited. Retrying with fresh session.');
+        }
+
+        // 10. Log page state for debugging
+        if (interceptState.postResponses.length > 0) {
+            log.info(`[${modelNumber}] ${interceptState.postResponses.length} POST responses captured, none had PDF URLs. Bodies: ${interceptState.postResponses.map(b => b.substring(0, 100)).join(' | ')}`);
+        } else {
+            log.info(`[${modelNumber}] No /download POST response was captured`);
+        }
+        const links = await page.evaluate(() => {
             return Array.from(document.querySelectorAll('a')).map(a => ({
                 text: (a.textContent || '').trim().substring(0, 50),
                 href: (a.href || '').substring(0, 100),
-            })).filter(l => l.text.toLowerCase().includes('download') || l.text.toLowerCase().includes('pdf') || l.text.toLowerCase().includes('view') || l.text.toLowerCase().includes('manual') || l.href.includes('.pdf'));
-        });
-        log.info(`[${modelNumber}] Relevant links on page: ${JSON.stringify(allLinks).substring(0, 500)}`);
+            })).filter(l => l.text.toLowerCase().includes('download') || l.text.toLowerCase().includes('pdf') || l.text.toLowerCase().includes('view') || l.href.includes('.pdf'));
+        }).catch(() => []);
+        log.info(`[${modelNumber}] Page links: ${JSON.stringify(links).substring(0, 500)}`);
 
-        // Fallback
-        log.info(`[${modelNumber}] No PDF link found — saving ManualsLib URL`);
-        await saveSource(supabaseId, manualPageUrl);
-        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: manualPageUrl, verification_status: 'LINK_ONLY' });
+        // 11. Fallback: save source URL
+        log.info(`[${modelNumber}] No PDF link found — saving source URL`);
+        await saveSourceUrl(supabaseId, manualPageUrl);
+        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: manualPageUrl, verification_status: 'LINK_ONLY', multi_model_count: 0 });
 
     } catch (err) {
-        if (err.message.includes('Retrying with fresh session')) {
-            throw err; // Let Crawlee retry
-        }
+        if (err.message.includes('Retrying')) throw err; // Let Crawlee retry
         log.warning(`[${modelNumber}] Error: ${err.message}`);
-        await saveSource(supabaseId, manualPageUrl || request.url);
-        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: request.url, verification_status: 'ERROR' });
+        await saveSourceUrl(supabaseId, manualPageUrl || request.url);
+        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: request.url, verification_status: 'ERROR', multi_model_count: 0 });
     }
 });
 
-// ── Helpers ─────────────────────────────────────────────────────────────────
-
-async function fetchAndUploadPdf(pdfUrl, referer, supabaseId, modelNumber, brand, brandSlug, originalModel, safeModel, manualPageUrl) {
-    const pdfResp = await fetch(pdfUrl, {
-        headers: { 'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)', 'Referer': referer },
-        redirect: 'follow', signal: AbortSignal.timeout(60000),
-    });
-
-    if (!pdfResp.ok) {
-        log.warning(`[${modelNumber}] PDF fetch failed: HTTP ${pdfResp.status}`);
-        await saveSource(supabaseId, manualPageUrl);
-        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'FETCH_FAILED' });
-        return;
-    }
-
-    const pdfBuffer = Buffer.from(await pdfResp.arrayBuffer());
-
-    if (pdfBuffer.length < 1000 || pdfBuffer[0] !== 0x25 || pdfBuffer[1] !== 0x50 || pdfBuffer[2] !== 0x44 || pdfBuffer[3] !== 0x46) {
-        log.warning(`[${modelNumber}] Not a valid PDF (${pdfBuffer.length} bytes)`);
-        await saveSource(supabaseId, manualPageUrl);
-        results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: 'NOT_PDF' });
-        return;
-    }
-
-    // Verify model in PDF text
-    let verificationStatus = 'NEEDS_REVIEW';
-    const text = extractPdfText(pdfBuffer);
-    const exactUpper = originalModel.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const baseUpper = stripColorCode(originalModel).toUpperCase().replace(/[^A-Z0-9]/g, '');
-    const textClean = text.replace(/[^A-Z0-9]/g, '');
-    if (textClean.includes(exactUpper) || textClean.includes(baseUpper)) {
-        verificationStatus = 'VERIFIED';
-        log.info(`[${modelNumber}] ✓ VERIFIED — model found in PDF`);
-    }
-
-    // Upload
-    const storagePath = `${brandSlug}/${safeModel}/owners_manual.pdf`;
-    const uploadResp = await fetch(`${supabaseUrl}/storage/v1/object/equipment-manuals/${storagePath}`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/pdf', 'x-upsert': 'true' },
-        body: pdfBuffer,
-    });
-
-    if (uploadResp.ok) {
-        await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${supabaseId}&manual_type=eq.owners_manual`, {
-            method: 'PATCH',
-            headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-            body: JSON.stringify({ source_url: manualPageUrl, file_path: storagePath, file_size_bytes: pdfBuffer.length, last_verified_at: new Date().toISOString() }),
-        });
-    }
-
-    log.info(`✓ ${brand} ${modelNumber} — ${verificationStatus} (${Math.round(pdfBuffer.length / 1024)} KB)`);
-    results.push({ supabase_id: supabaseId, brand, original_model: originalModel, pdf_url: pdfUrl, verification_status: verificationStatus });
-}
-
-async function saveSource(supabaseId, url) {
-    if (supabaseId === 'test') return; // Skip for hardcoded test
-    await fetch(`${supabaseUrl}/rest/v1/equipment_manuals?catalog_entry_id=eq.${supabaseId}&manual_type=eq.owners_manual`, {
-        method: 'PATCH',
-        headers: { 'apikey': supabaseServiceKey, 'Authorization': `Bearer ${supabaseServiceKey}`, 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({ source_url: url, last_verified_at: new Date().toISOString() }),
-    });
-}
-
-// ── Crawler ─────────────────────────────────────────────────────────────────
+// ── Crawler ────────────────────────────────────────────────────────────────
 
 if (crawlRequests.length > 0) {
     const crawler = new PlaywrightCrawler({
@@ -589,36 +670,40 @@ if (crawlRequests.length > 0) {
         navigationTimeoutSecs: 30,
         requestHandlerTimeoutSecs: 180,
         maxRequestRetries: 3,
-        headless: true,
+        headless: false, // Headful — Apify uses Xvfb, locally opens a browser window
         useSessionPool: true,
         sessionPoolOptions: { maxPoolSize: 10 },
-        proxyConfiguration: await Actor.createProxyConfiguration({
-            groups: ['RESIDENTIAL'],
-            useApifyProxy: true,
-        }),
+        proxyConfiguration: Actor.isAtHome()
+            ? await Actor.createProxyConfiguration({ groups: ['RESIDENTIAL'], useApifyProxy: true })
+            : undefined,
         browserPoolOptions: { useFingerprints: true },
         launchContext: {
-            launchOptions: { args: ['--disable-dev-shm-usage', '--no-sandbox'] },
+            // Use stealth-patched chromium from playwright-extra
+            launcher: chromium,
+            launchOptions: {
+                headless: false,
+                args: ['--disable-dev-shm-usage', '--no-sandbox', '--disable-blink-features=AutomationControlled'],
+            },
         },
     });
     await crawler.run(crawlRequests);
 }
 
-// ── Output ──────────────────────────────────────────────────────────────────
+// ── Output ─────────────────────────────────────────────────────────────────
 
-const downloaded = results.filter(r => r.verification_status === 'VERIFIED' || r.verification_status === 'NEEDS_REVIEW');
-const notFound = results.filter(r => r.verification_status === 'NOT_FOUND');
-
-await Actor.pushData({
+const downloaded = results.filter(r => ['VERIFIED', 'NEEDS_REVIEW'].includes(r.verification_status));
+const summary = {
     totalProcessed: models.length,
     pdfsDownloaded: downloaded.length,
     verified: results.filter(r => r.verification_status === 'VERIFIED').length,
     needsReview: results.filter(r => r.verification_status === 'NEEDS_REVIEW').length,
     linkOnly: results.filter(r => r.verification_status === 'LINK_ONLY').length,
-    notFound: notFound.length,
+    notFound: results.filter(r => r.verification_status === 'NOT_FOUND').length,
+    multiModelMapped: multiModelTotal,
     timestamp: new Date().toISOString(),
     results,
-});
+};
 
-log.info(`Done! ${downloaded.length} PDFs (${results.filter(r => r.verification_status === 'VERIFIED').length} verified), ${results.filter(r => r.verification_status === 'LINK_ONLY').length} links, ${notFound.length} not found`);
+await Actor.pushData(summary);
+log.info(`Done! ${downloaded.length} PDFs (${summary.verified} verified), ${summary.linkOnly} links, ${summary.notFound} not found, ${multiModelTotal} multi-model mappings`);
 await Actor.exit();
