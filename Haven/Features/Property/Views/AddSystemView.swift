@@ -18,6 +18,7 @@ struct AddSystemView: View {
     @State private var error: String?
     @State private var addMaintenanceTemplates = true
     @State private var showEquipmentSearch = false
+    @State private var catalogEntryId: UUID?
 
     // Warranty fields
     @State private var addWarranty = false
@@ -157,6 +158,7 @@ struct AddSystemView: View {
             .sheet(isPresented: $showEquipmentSearch) {
                 EquipmentIdentifySheet(systemCategory: category) { result, detectedSerial in
                     // Pre-fill from catalog selection
+                    catalogEntryId = result.id
                     name = result.displayName
                     manufacturer = result.manufacturer.name
                     modelNumber = result.modelNumber
@@ -186,7 +188,7 @@ struct AddSystemView: View {
                 return
             }
 
-            let insert = HomeSystemInsert(
+            var insert = HomeSystemInsert(
                 propertyId: propertyID,
                 householdId: householdId,
                 name: name,
@@ -199,6 +201,7 @@ struct AddSystemView: View {
                 status: "Good",
                 notes: notes.isEmpty ? nil : notes
             )
+            insert.catalogEntryId = catalogEntryId
 
             let system = try await DatabaseService.shared.createHomeSystem(insert)
 
@@ -246,8 +249,11 @@ struct AddSystemView: View {
 
             Haptics.success()
             Analytics.track(.systemCreated, ["category": category, "system_id": system.id.uuidString, "has_warranty": addWarranty])
-            onComplete?()
+            // Dismiss first so the sheet is gone, then refresh the parent list
             dismiss()
+            // Small delay to let sheet animation start before parent reloads
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            onComplete?()
         } catch {
             self.error = error.localizedDescription
             Haptics.error()

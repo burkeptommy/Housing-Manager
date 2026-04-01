@@ -148,20 +148,116 @@ Respond with ONLY valid JSON in this exact format:
     // Step 2: Search the catalog for a match
     let catalogMatch = null;
 
-    // Try exact model number match
-    const { data: exactMatch } = await supabase
-      .from("equipment_catalog")
-      .select(`
-        id, model_number, model_name, series, fuel_type,
-        installation_type, capacity_value, capacity_unit,
-        msrp_usd, expected_lifespan_years, key_features,
-        is_current_model, width_inches, specs,
-        equipment_manufacturers!inner (id, name, slug, tier),
-        equipment_categories!inner (id, name, slug, room)
-      `)
-      .ilike("model_number", `%${extracted.model_number}%`)
-      .limit(1)
-      .single();
+    const catalogSelect = `
+      id, model_number, model_name, series, fuel_type,
+      installation_type, capacity_value, capacity_unit,
+      msrp_usd, expected_lifespan_years, key_features,
+      is_current_model, width_inches, specs,
+      equipment_manufacturers!inner (id, name, slug, tier),
+      equipment_categories!inner (id, name, slug, room)
+    `;
+
+    // Clean model number: strip suffix like "/28", "/01" (Bosch variant codes)
+    const rawModel = extracted.model_number ?? "";
+    const cleanModel = rawModel.replace(/\/\d+$/, "").trim();
+
+    // Strategy 1: Exact substring match on full model number
+    // Prefer matching within the detected manufacturer first
+    let exactMatch: any = null;
+    const detectedMfg = extracted.manufacturer ?? "";
+
+    if (detectedMfg) {
+      // Try to find manufacturer ID first
+      const mfgTerms = [detectedMfg];
+      if (detectedMfg.toUpperCase() === "BSH") mfgTerms.push("Bosch");
+      if (detectedMfg.toLowerCase().includes("bsh")) mfgTerms.push("Bosch");
+
+      for (const term of mfgTerms) {
+        const { data: mfgs } = await supabase
+          .from("equipment_manufacturers")
+          .select("id")
+          .ilike("name", `%${term}%`);
+        if (mfgs && mfgs.length > 0) {
+          const { data: match } = await supabase
+            .from("equipment_catalog")
+            .select(catalogSelect)
+            .ilike("model_number", `%${cleanModel}%`)
+            .in("manufacturer_id", mfgs.map((m: any) => m.id))
+            .limit(1)
+            .single();
+          if (match) { exactMatch = match; break; }
+        }
+      }
+    }
+
+    // Fallback: search all brands (only if no manufacturer detected)
+    if (!exactMatch && !detectedMfg) {
+      const { data: match } = await supabase
+        .from("equipment_catalog")
+        .select(catalogSelect)
+        .ilike("model_number", `%${cleanModel}%`)
+        .limit(1)
+        .single();
+      exactMatch = match;
+    }
+
+    // Strategy 2: Fuzzy match — MUST respect manufacturer to avoid cross-brand matches
+    // Try multiple core positions since OCR errors can shift characters
+    if (!exactMatch && cleanModel.length >= 6) {
+      // Try cores from different positions to handle OCR misreads
+      const corePositions = [
+        cleanModel.substring(3, 7),  // Standard: skip type prefix
+        cleanModel.substring(2, 6),  // Shifted left
+        cleanModel.substring(1, 5),  // More shifted
+      ].filter(c => c.length >= 3);
+
+      const modelCore = corePositions[0]; // Use first for the search
+      if (modelCore.length >= 3) {
+        const mfgName = extracted.manufacturer ?? "";
+
+        // Resolve manufacturer — try multiple name variations
+        // "BSH" → "Bosch", handle parent company names
+        const mfgSearchTerms = [mfgName];
+        if (mfgName.toUpperCase() === "BSH") mfgSearchTerms.push("Bosch"); // BSH = Bosch parent
+        if (mfgName.toLowerCase().includes("bsh")) mfgSearchTerms.push("Bosch");
+
+        let matchedMfgIds: string[] = [];
+        for (const term of mfgSearchTerms) {
+          if (!term) continue;
+          const { data: mfgs } = await supabase
+            .from("equipment_manufacturers")
+            .select("id")
+            .ilike("name", `%${term}%`);
+          if (mfgs && mfgs.length > 0) {
+            matchedMfgIds = mfgs.map((m: any) => m.id);
+            break;
+          }
+        }
+
+        // ONLY fuzzy match within the SAME manufacturer — never cross-brand
+        // Try each core position until we find a match
+        if (matchedMfgIds.length > 0) {
+          for (const core of corePositions) {
+            const { data: fuzzyResults } = await supabase
+              .from("equipment_catalog")
+              .select(catalogSelect)
+              .ilike("model_number", `%${core}%`)
+              .in("manufacturer_id", matchedMfgIds)
+              .limit(5);
+
+            if (fuzzyResults && fuzzyResults.length > 0) {
+              const prefix = cleanModel.substring(0, 3).toLowerCase();
+              exactMatch = fuzzyResults.find((r: any) =>
+                r.model_number.toLowerCase().startsWith(prefix)
+              ) || fuzzyResults[0];
+              break;
+            }
+          }
+        }
+        // If no manufacturer match found, don't fuzzy match at all —
+        // let auto-catalog create the correct entry below
+      }
+    }
 
     if (exactMatch) {
       const mfg = (exactMatch as any).equipment_manufacturers;
@@ -193,6 +289,109 @@ Respond with ONLY valid JSON in this exact format:
           details: exactMatch.specs,
         },
       };
+    }
+
+    // Auto-catalog: if no match found and we have brand + model with HIGH confidence,
+    // create a catalog entry so this model is never "missing" again.
+    // Only auto-create when confidence is high AND model number looks valid (has both letters and digits, 5+ chars)
+    const modelForAutoCreate = cleanModel || rawModel;
+    const isValidModel = modelForAutoCreate.length >= 5
+      && /[A-Z]/i.test(modelForAutoCreate)
+      && /\d/.test(modelForAutoCreate)
+      && extracted.confidence === "high";
+
+    if (!catalogMatch && extracted.manufacturer && extracted.model_number && isValidModel) {
+      try {
+        // Find or create manufacturer
+        let { data: mfgRow } = await supabase
+          .from("equipment_manufacturers")
+          .select("id, name, slug")
+          .ilike("name", `%${extracted.manufacturer}%`)
+          .limit(1)
+          .single();
+
+        if (mfgRow) {
+          // Determine category from product_type or default to "Appliance"
+          const productType = (extracted.product_type || "appliance").toLowerCase();
+          let categorySlug = "appliance"; // default
+          if (productType.includes("dishwasher")) categorySlug = "dishwasher";
+          else if (productType.includes("refrigerator") || productType.includes("fridge")) categorySlug = "refrigerator";
+          else if (productType.includes("washer")) categorySlug = "washer";
+          else if (productType.includes("dryer")) categorySlug = "dryer";
+          else if (productType.includes("range") || productType.includes("oven") || productType.includes("stove")) categorySlug = "range";
+          else if (productType.includes("microwave")) categorySlug = "microwave";
+          else if (productType.includes("cooktop")) categorySlug = "cooktop-gas";
+          else if (productType.includes("furnace") || productType.includes("hvac")) categorySlug = "hvac-furnace";
+          else if (productType.includes("air conditioner") || productType.includes("ac")) categorySlug = "hvac-central-ac";
+          else if (productType.includes("water heater")) categorySlug = "water-heater";
+          else if (productType.includes("generator")) categorySlug = "generator";
+
+          const { data: catRow } = await supabase
+            .from("equipment_categories")
+            .select("id, name, slug, room")
+            .ilike("slug", `%${categorySlug}%`)
+            .limit(1)
+            .single();
+
+          if (catRow) {
+            const modelNum = cleanModel || rawModel;
+            // Insert catalog entry
+            const { data: newEntry } = await supabase
+              .from("equipment_catalog")
+              .insert({
+                manufacturer_id: mfgRow.id,
+                category_id: catRow.id,
+                model_number: modelNum,
+                model_name: `${extracted.manufacturer} ${modelNum}`,
+                is_current_model: true,
+                key_features: [],
+                specs: {},
+              })
+              .select("id")
+              .single();
+
+            if (newEntry) {
+              // Create the catalog match response from the new entry
+              catalogMatch = {
+                id: newEntry.id,
+                model_number: modelNum,
+                model_name: `${extracted.manufacturer} ${modelNum}`,
+                display_name: `${mfgRow.name} ${modelNum}`,
+                subtitle: catRow.name,
+                manufacturer: { id: mfgRow.id, name: mfgRow.name, slug: mfgRow.slug, tier: "" },
+                category: { id: catRow.id, name: catRow.name, slug: catRow.slug, room: catRow.room },
+                specs: {},
+              };
+
+              // Add manual links using manufacturer support URL
+              const supportUrls: Record<string, string> = {
+                "bosch": "https://www.bosch-home.com/us/en/productservice/{MODEL}-01",
+                "samsung": "https://www.samsung.com/us/support/model/{MODEL}/",
+                "lg": "https://www.lg.com/us/support/products/{MODEL}.html",
+                "whirlpool": "https://www.whirlpool.com/support/product-help.html?model={MODEL}",
+                "kitchenaid": "https://www.kitchenaid.com/support/product-help.html?model={MODEL}",
+                "miele": "https://www.mieleusa.com/e/support-7594.htm?q={MODEL}",
+              };
+              const pattern = supportUrls[mfgRow.slug];
+              if (pattern) {
+                const url = pattern.replace("{MODEL}", modelNum);
+                for (const mt of ["owners_manual", "spec_sheet"]) {
+                  await supabase.from("equipment_manuals").insert({
+                    catalog_entry_id: newEntry.id,
+                    manual_type: mt,
+                    title: mt.replace(/_/g, " ").replace(/\b\w/g, (l: string) => l.toUpperCase()),
+                    source_url: url,
+                    language: "en",
+                  }).catch(() => {});
+                }
+              }
+            }
+          }
+        }
+      } catch (autoErr) {
+        // Auto-catalog is best-effort — don't fail the response
+        console.error("[identify-equipment] Auto-catalog error:", autoErr);
+      }
     }
 
     return new Response(

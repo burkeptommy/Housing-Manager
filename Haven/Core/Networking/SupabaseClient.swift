@@ -474,4 +474,16 @@ enum HavenSupabase {
         let data = try await callEdgeFunction(name: "identify-equipment", body: body, timeoutSeconds: 30)
         return try JSONDecoder().decode(EquipmentIdentifyResponse.self, from: data)
     }
+
+    // MARK: - Manual Lookup
+
+    /// Look up manuals, common issues, and maintenance schedules for a model number.
+    static func lookupManual(modelNumber: String) async throws -> [String: Any] {
+        let body: [String: String] = ["model_number": modelNumber]
+        let data = try await callEdgeFunction(name: "lookup-manual", body: body, timeoutSeconds: 15)
+        guard let json = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return json
+    }
 }

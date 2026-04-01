@@ -240,6 +240,7 @@ final class OnboardingViewModel: ObservableObject {
                 )
                 propertyInsert.yearBuilt = propertyLookupResult?.yearBuilt
                 propertyInsert.squareFootage = propertyLookupResult?.squareFootage
+                propertyInsert.purchasePrice = propertyLookupResult?.lastSalePrice
                 propertyInsert.currentEstimatedValue = propertyLookupResult?.estimatedValue
 
                 let property = try await DatabaseService.shared.createProperty(propertyInsert)

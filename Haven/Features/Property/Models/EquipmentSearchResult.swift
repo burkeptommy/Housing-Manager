@@ -17,6 +17,7 @@ struct EquipmentSearchResult: Codable, Identifiable {
     let manufacturer: EquipmentManufacturer
     let category: EquipmentCategory
     let specs: EquipmentSpecs
+    let scores: EquipmentScores?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -27,6 +28,7 @@ struct EquipmentSearchResult: Codable, Identifiable {
         case manufacturer
         case category
         case specs
+        case scores
     }
 }
 
@@ -35,6 +37,12 @@ struct EquipmentManufacturer: Codable {
     let name: String
     let slug: String
     let tier: String
+}
+
+struct EquipmentScores: Codable {
+    let reliability: Int?
+    let summary: String?
+    let source: String?
 }
 
 struct EquipmentCategory: Codable {

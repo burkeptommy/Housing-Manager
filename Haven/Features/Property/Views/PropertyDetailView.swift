@@ -89,6 +89,12 @@ struct PropertyDetailView: View {
         .task {
             await viewModel.loadProperty(id: propertyID)
         }
+        .onAppear {
+            // Refresh when returning from detail views so edits reflect immediately
+            if viewModel.property != nil {
+                Task { await viewModel.loadProperty(id: propertyID) }
+            }
+        }
         .refreshable {
             Analytics.track(.propertyRefreshed, ["property_id": propertyID.uuidString])
             await viewModel.loadProperty(id: propertyID)
@@ -1337,10 +1343,21 @@ struct PropertyDetailView: View {
                     .lineLimit(1)
             }
             if let mfr = system.manufacturer {
-                Text(mfr)
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textTertiary)
-                    .lineLimit(1)
+                HStack(spacing: 4) {
+                    Text(mfr)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .lineLimit(1)
+                    if let model = system.modelNumber {
+                        Text("·")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(model)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .lineLimit(1)
+                    }
+                }
             }
             if let nextDue = system.nextServiceDue {
                 Text("Due: \(nextDue)")

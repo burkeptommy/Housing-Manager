@@ -157,6 +157,9 @@ struct EquipmentSearchSheet: View {
                     .foregroundStyle(HavenColors.navy800)
                     .lineLimit(1)
                 Spacer()
+                if let score = result.scores?.reliability {
+                    reliabilityBadge(score)
+                }
                 tierBadge(result.manufacturer.tier)
             }
             Text(result.subtitle)
@@ -172,6 +175,22 @@ struct EquipmentSearchSheet: View {
         }
         .padding(.vertical, 4)
         .contentShape(Rectangle())
+    }
+
+    @ViewBuilder
+    private func reliabilityBadge(_ score: Int) -> some View {
+        let color: Color = score >= 85 ? .green : score >= 70 ? .blue : score >= 55 ? .orange : .red
+        HStack(spacing: 2) {
+            Image(systemName: "shield.checkered")
+                .font(.system(size: 8))
+            Text("\(score)")
+                .font(.system(size: 9, weight: .bold, design: .rounded))
+        }
+        .foregroundStyle(color)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .background(color.opacity(0.1))
+        .clipShape(Capsule())
     }
 
     @ViewBuilder

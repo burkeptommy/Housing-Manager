@@ -6,6 +6,16 @@ struct SystemGroupListView: View {
     let propertyId: UUID
     let householdId: UUID
     @State private var showAddSystem = false
+    @State private var brandScores: [String: Int] = [:]
+    @State private var catalogSeries: [UUID: String] = [:]
+    @State private var systems: [HomeSystemRow]
+
+    init(group: SystemGroup, propertyId: UUID, householdId: UUID) {
+        self.group = group
+        self.propertyId = propertyId
+        self.householdId = householdId
+        _systems = State(initialValue: group.systems)
+    }
 
     var body: some View {
         ScrollView {
@@ -21,11 +31,11 @@ struct SystemGroupListView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(group.systems.count) System\(group.systems.count == 1 ? "" : "s")")
+                            Text("\(systems.count) System\(systems.count == 1 ? "" : "s")")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.navy800)
 
-                            let needsAttention = group.systems.filter {
+                            let needsAttention = systems.filter {
                                 let s = $0.status?.lowercased() ?? ""
                                 return s.contains("maintenance") || s.contains("repair") || s.contains("replacement")
                             }
@@ -45,7 +55,7 @@ struct SystemGroupListView: View {
                 }
 
                 // System list
-                ForEach(group.systems) { system in
+                ForEach(systems) { system in
                     NavigationLink {
                         SystemDetailRowView(system: system)
                     } label: {
@@ -79,23 +89,19 @@ struct SystemGroupListView: View {
         .background(HavenColors.background)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
+        .task { await loadBrandScores() }
+        .onAppear { Task { await reloadSystems() } }
         .sheet(isPresented: $showAddSystem) {
-            if group.id == "appliances" {
-                ApplianceSetupSheet(
-                    propertyId: propertyId,
-                    householdId: householdId,
-                    existingSystems: group.systems,
-                    onComplete: {}
-                )
-            } else {
-                AddSystemView(propertyID: propertyId, onComplete: {})
-            }
+            AddSystemView(propertyID: propertyId, onComplete: { Task { await reloadSystems() } })
         }
     }
 
     private func systemRow(_ system: HomeSystemRow) -> some View {
-        HavenCard {
+        let score = system.manufacturer.flatMap { brandScores[$0] }
+
+        return HavenCard {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                // Top row: icon + name ... logo + score
                 HStack(spacing: 10) {
                     Image(systemName: systemIcon(system))
                         .font(.system(size: 18))
@@ -104,57 +110,76 @@ struct SystemGroupListView: View {
                         .background(HavenColors.navy.opacity(0.06))
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(system.name)
-                            .font(HavenTypography.headline)
-                            .foregroundStyle(HavenColors.navy800)
-
-                        if let mfr = system.manufacturer {
-                            Text(mfr)
-                                .font(HavenTypography.caption)
-                                .foregroundStyle(HavenColors.textSecondary)
-                        }
-                    }
+                    Text(system.name)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.navy800)
 
                     Spacer()
 
-                    statusBadge(system.status)
+                    // Logo + score on the right
+                    HStack(spacing: 8) {
+                        if let brand = system.manufacturer {
+                            AppliancesListView.brandLogoView(brand, size: 24)
+                        }
+                        if let score {
+                            AppliancesListView.miniScoreRing(score)
+                        }
+                    }
                 }
 
-                HStack(spacing: 16) {
+                // Details row: Brand | Series | Model
+                HStack(spacing: 0) {
+                    if let mfr = system.manufacturer {
+                        detailChip(label: "Brand", value: mfr)
+                        Spacer()
+                    }
+                    if let seriesName = catalogSeries[system.id] {
+                        detailChip(label: "Series", value: seriesName)
+                        Spacer()
+                    }
                     if let model = system.modelNumber {
                         detailChip(label: "Model", value: model)
                     }
-                    if let installDate = system.installDate {
+                    if system.manufacturer == nil, let installDate = system.installDate {
+                        Spacer()
                         detailChip(label: "Installed", value: String(installDate.prefix(4)))
-                    }
-                    if let nextDue = system.nextServiceDue {
-                        detailChip(label: "Service Due", value: nextDue)
                     }
                 }
             }
         }
     }
 
-    private func statusBadge(_ status: String?) -> some View {
-        let (label, color) = statusInfo(status)
-        return Text(label)
-            .font(HavenTypography.uiLabelSmall)
-            .foregroundStyle(color)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 3)
-            .background(color.opacity(0.12))
-            .clipShape(Capsule())
+    private func reloadSystems() async {
+        do {
+            let allSystems = try await DatabaseService.shared.fetchHomeSystems(propertyId: propertyId)
+            let myGroupId = group.id
+            await MainActor.run {
+                systems = allSystems.filter { SystemGroup.groupId(for: $0.category) == myGroupId }
+            }
+            await loadBrandScores()
+        } catch { }
     }
 
-    private func statusInfo(_ status: String?) -> (String, Color) {
-        switch status?.lowercased() {
-        case "good": return ("Good", HavenColors.success)
-        case "needs maintenance": return ("Maintenance", HavenColors.warning)
-        case "needs repair": return ("Repair", HavenColors.critical)
-        case "needs replacement": return ("Replace", HavenColors.critical)
-        case "under warranty": return ("Warranty", HavenColors.info)
-        default: return ("Good", HavenColors.success)
+    private func loadBrandScores() async {
+        let brands = Set(systems.compactMap(\.manufacturer))
+        for brand in brands {
+            do {
+                let result = try await HavenSupabase.searchEquipment(query: brand, limit: 1)
+                if let score = result.results.first?.scores?.reliability {
+                    await MainActor.run { brandScores[brand] = score }
+                }
+            } catch { }
+        }
+        // Fetch catalog series for each system with a model number
+        for system in systems {
+            guard let model = system.modelNumber, !model.isEmpty else { continue }
+            do {
+                let result = try await HavenSupabase.searchEquipment(query: model, limit: 1)
+                if let match = result.results.first(where: { $0.modelNumber == model }),
+                   let series = match.specs.series {
+                    await MainActor.run { catalogSeries[system.id] = series }
+                }
+            } catch { }
         }
     }
 

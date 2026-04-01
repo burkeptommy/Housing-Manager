@@ -2,8 +2,14 @@ import SwiftUI
 
 /// Detail view for a HomeSystemRow from the database.
 struct SystemDetailRowView: View {
-    let system: HomeSystemRow
+    let initialSystem: HomeSystemRow
+    @State private var system: HomeSystemRow
     @State private var warranties: [WarrantyRow] = []
+
+    init(system: HomeSystemRow) {
+        self.initialSystem = system
+        _system = State(initialValue: system)
+    }
     @State private var tasks: [MaintenanceTaskDBRow] = []
     @State private var records: [ServiceRecordRow] = []
     @State private var preferredContractor: ContractorRow?
@@ -17,6 +23,12 @@ struct SystemDetailRowView: View {
     @State private var showAddWarranty = false
     @State private var showEquipmentIdentify = false
     @State private var catalogLinked = false
+    @State private var showEditSystem = false
+    @State private var showDeleteConfirm = false
+    @State private var manualLinks: [ManualLink] = []
+    @State private var equipmentScore: EquipmentDetailScore?
+    @State private var catalogDetails: CatalogDetails?
+    @Environment(\.dismiss) private var dismiss
 
     private let db = DatabaseService.shared
     private let dateFormatter: DateFormatter = {
@@ -33,7 +45,17 @@ struct SystemDetailRowView: View {
                     identifyEquipmentCard
                 }
 
-                systemInfoCard
+                if system.manufacturer != nil {
+                    brandCard
+                        .onTapGesture {
+                            Haptics.light()
+                            showEditSystem = true
+                        }
+                } else {
+                    systemInfoCard
+                }
+                if equipmentScore != nil && system.manufacturer == nil { reliabilityCard }
+                if !manualLinks.isEmpty { manualsCard }
                 preferredVendorCard
                 maintenanceCard
                 warrantiesCard
@@ -46,6 +68,30 @@ struct SystemDetailRowView: View {
         .background(HavenColors.background)
         .navigationTitle(system.name)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showEditSystem = true } label: {
+                        Label("Edit System", systemImage: "pencil")
+                    }
+                    Divider()
+                    Button(role: .destructive) { showDeleteConfirm = true } label: {
+                        Label("Delete System", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(HavenColors.navy700)
+                }
+            }
+        }
+        .alert("Delete System", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                Task { await deleteSystem() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently delete \"\(system.name)\" and all its maintenance tasks, warranties, and service records.")
+        }
         .trackScreen("SystemDetailView", properties: ["system_id": system.id.uuidString, "category": system.category])
         .task {
             await loadDetails()
@@ -86,6 +132,11 @@ struct SystemDetailRowView: View {
         .sheet(isPresented: $showEquipmentIdentify) {
             EquipmentIdentifySheet(systemCategory: system.category) { result, serialNumber in
                 Task { await linkEquipment(result, serialNumber: serialNumber) }
+            }
+        }
+        .sheet(isPresented: $showEditSystem) {
+            EditSystemSheet(system: system) {
+                Task { await reloadSystem() }
             }
         }
     }
@@ -129,24 +180,232 @@ struct SystemDetailRowView: View {
     private func linkEquipment(_ result: EquipmentSearchResult, serialNumber: String?) async {
         do {
             var updates = HomeSystemUpdate()
+            updates.catalogEntryId = result.id
             updates.manufacturer = result.manufacturer.name
             updates.modelNumber = result.modelNumber
             if let serial = serialNumber { updates.serialNumber = serial }
             if let lifespan = result.specs.expectedLifespanYears { updates.expectedLifespanYears = lifespan }
+            // Also update the name to include the proper display name
+            updates.name = result.displayName
             _ = try await db.updateHomeSystem(id: system.id, updates)
-            await MainActor.run {
-                catalogLinked = true
-                Haptics.success()
-            }
+            Haptics.success()
             Analytics.track(.systemIdentified, [
                 "system_id": system.id.uuidString,
                 "catalog_model": result.modelNumber,
                 "manufacturer": result.manufacturer.name,
                 "method": serialNumber != nil ? "photo" : "search",
             ])
+            // Reload system data to show updated brand card immediately
+            await reloadSystem()
+            await MainActor.run { catalogLinked = true }
         } catch {
             print("[SystemDetail] Failed to link equipment: \(error)")
         }
+    }
+
+    // MARK: - Delete System
+
+    private func deleteSystem() async {
+        do {
+            try await db.deleteHomeSystem(id: system.id)
+            await MainActor.run {
+                Haptics.success()
+                dismiss()
+            }
+        } catch {
+            print("[SystemDetail] Failed to delete system: \(error)")
+        }
+    }
+
+    // MARK: - Brand Card (enhanced with series, features, website)
+
+    private var brandCard: some View {
+        let brand = system.manufacturer ?? ""
+        let brandColor = BrandTheme.color(for: brand) ?? HavenColors.navy700
+        let score = equipmentScore?.reliability
+        let series = catalogDetails?.series ?? deriveSeries()
+        let features = catalogDetails?.keyFeatures ?? []
+
+        return VStack(spacing: 0) {
+            ZStack {
+                // Gradient background with brand accent
+                LinearGradient(
+                    colors: [brandColor.opacity(0.10), HavenColors.creamLight.opacity(0.95)],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                )
+
+                VStack(spacing: HavenTheme.spacing16) {
+                    // Top: Logo + Brand + Series + Score
+                    HStack(spacing: 14) {
+                        AppliancesListView.brandLogoView(brand, size: 48)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(brand)
+                                .font(HavenTypography.title2)
+                                .foregroundStyle(HavenColors.navy800)
+                            HStack(spacing: 6) {
+                                if let series {
+                                    Text(series)
+                                        .font(HavenTypography.uiLabelMedium)
+                                        .foregroundStyle(brandColor)
+                                }
+                                if let fuelType = catalogDetails?.fuelType {
+                                    Text(fuelType.capitalized)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(brandColor)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 2)
+                                        .background(brandColor.opacity(0.10))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+
+                        Spacer()
+
+                        if let score {
+                            // Score in a circular ring
+                            ZStack {
+                                Circle()
+                                    .stroke(scoreColor(score).opacity(0.15), lineWidth: 3)
+                                    .frame(width: 50, height: 50)
+                                Circle()
+                                    .trim(from: 0, to: Double(score) / 100)
+                                    .stroke(scoreColor(score), style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                                    .frame(width: 50, height: 50)
+                                    .rotationEffect(.degrees(-90))
+                                VStack(spacing: 0) {
+                                    Text("\(score)")
+                                        .font(.system(size: 16, weight: .bold, design: .rounded))
+                                        .foregroundStyle(scoreColor(score))
+                                    Text("score")
+                                        .font(.system(size: 7, weight: .medium))
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                        }
+                    }
+
+                    // Model name (descriptive)
+                    if let modelName = catalogDetails?.modelName, modelName != system.name {
+                        Text(modelName)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .lineLimit(2)
+                    }
+
+                    // Key features chips
+                    if !features.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(features.prefix(5), id: \.self) { feature in
+                                    Text(feature)
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(brandColor)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(brandColor.opacity(0.08))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                        }
+                    }
+
+                    // Divider
+                    Rectangle()
+                        .fill(brandColor.opacity(0.2))
+                        .frame(height: 1)
+
+                    // Details row: Model | Fuel | Serial | Lifespan
+                    HStack(spacing: 0) {
+                        if let model = system.modelNumber {
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text("Model")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(model)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                        }
+                        Spacer()
+                        if let fuelType = catalogDetails?.fuelType {
+                            VStack(alignment: .center, spacing: 1) {
+                                Text("Fuel")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(fuelType.capitalized)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                            Spacer()
+                        }
+                        if let serial = system.serialNumber {
+                            VStack(alignment: .center, spacing: 1) {
+                                Text("Serial")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text(serial)
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        Spacer()
+                        if let lifespan = system.expectedLifespanYears {
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text("Lifespan")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text("\(lifespan) yrs")
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                            }
+                        }
+                    }
+
+                    // Edit hint
+                    HStack {
+                        Spacer()
+                        HStack(spacing: 4) {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 9))
+                            Text("Tap to edit")
+                                .font(.system(size: 9))
+                        }
+                        .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+                .padding(HavenTheme.spacing16)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .stroke(brandColor.opacity(0.15), lineWidth: 1)
+            )
+        }
+    }
+
+    private func deriveSeries() -> String? {
+        let model = (system.modelNumber ?? "").uppercased()
+        let name = system.name.lowercased()
+
+        if model.hasPrefix("SH") && model.contains("78") { return "800 Series" }
+        if model.hasPrefix("SH") && model.contains("65") { return "500 Series" }
+        if model.hasPrefix("SH") && model.contains("41") { return "100 Series" }
+        if model.hasPrefix("SHX89") || model.hasPrefix("SHP9") { return "Benchmark" }
+        if model.hasPrefix("RF29") { return "Bespoke" }
+        if name.contains("profile") { return "Profile" }
+        if name.contains("cafe") || name.contains("café") { return "Café" }
+        if name.contains("monogram") { return "Monogram" }
+
+        let patterns = ["100 series", "200 series", "300 series", "500 series", "800 series",
+                        "benchmark", "profile", "bespoke", "café"]
+        for pattern in patterns {
+            if name.contains(pattern) { return pattern.capitalized }
+        }
+        return nil
     }
 
     // MARK: - System Info
@@ -203,6 +462,75 @@ struct SystemDetailRowView: View {
                 }
                 if let nextDue = system.nextServiceDue {
                     infoRow("Next Service Due", value: nextDue.havenDateFormatted)
+                }
+            }
+        }
+    }
+
+    // MARK: - Reliability Score Card
+
+    private var reliabilityCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack {
+                    Image(systemName: "shield.checkered")
+                        .font(.system(size: 16))
+                        .foregroundStyle(scoreColor(equipmentScore?.reliability ?? 0))
+                    Text("Reliability Score")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    if let score = equipmentScore?.reliability {
+                        Text("\(score)/100")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
+                            .foregroundStyle(scoreColor(score))
+                    }
+                }
+                if let summary = equipmentScore?.summary {
+                    Text(summary)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+        }
+    }
+
+    private func scoreColor(_ score: Int) -> Color {
+        score >= 85 ? .green : score >= 70 ? .blue : score >= 55 ? .orange : .red
+    }
+
+    // MARK: - Manuals Card
+
+    private var manualsCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack {
+                    Image(systemName: "book.closed")
+                        .font(.system(size: 16))
+                        .foregroundStyle(HavenColors.navy700)
+                    Text("Manuals & Guides")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                }
+                ForEach(manualLinks) { manual in
+                    if let url = URL(string: manual.url) {
+                        Link(destination: url) {
+                            HStack {
+                                Image(systemName: manual.cached ? "doc.fill" : "link")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(HavenColors.navy)
+                                    .frame(width: 24)
+                                Text(manual.displayName)
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.navy700)
+                                Spacer()
+                                Image(systemName: "arrow.up.right.square")
+                                    .font(.system(size: 12))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .padding(.vertical, 4)
+                        }
+                    }
                 }
             }
         }
@@ -886,35 +1214,133 @@ struct SystemDetailRowView: View {
         isAddingQuickTask = false
     }
 
+    private func reloadSystem() async {
+        // Reload the system from DB to get updated fields
+        do {
+            let allSystems = try await db.fetchHomeSystems(propertyId: system.propertyId)
+            if let updated = allSystems.first(where: { $0.id == system.id }) {
+                await MainActor.run { system = updated }
+            }
+        } catch { }
+        await loadDetails()
+    }
+
     private func loadDetails() async {
         isLoading = true
+
+        // Start equipment intelligence in parallel with main data
+        let modelNum = system.modelNumber
+        let mfr = system.manufacturer
+        async let intelligenceTask: () = loadEquipmentIntelligence(modelNumber: modelNum, manufacturer: mfr)
+
         do {
             async let w = db.fetchWarranties(systemId: system.id)
             async let t = db.fetchMaintenanceTasks(propertyId: system.propertyId)
             async let r = db.fetchServiceRecords(systemId: system.id)
+            async let docs = db.fetchDocuments()
+            async let contractors: [ContractorRow] = system.preferredContractorId != nil
+                ? db.fetchContractors() : []
 
-            let (wResult, tResult, rResult) = try await (w, t, r)
-            warranties = wResult
-            tasks = tResult.filter { $0.systemId == system.id }
-            records = rResult
-
-            // Load preferred contractor
-            if let contractorId = system.preferredContractorId {
-                let contractors = try await db.fetchContractors()
-                preferredContractor = contractors.first { $0.id == contractorId }
+            let (wResult, tResult, rResult, allDocs, contractorList) = try await (w, t, r, docs, contractors)
+            await MainActor.run {
+                warranties = wResult
+                tasks = tResult.filter { $0.systemId == system.id }
+                records = rResult
+                if let contractorId = system.preferredContractorId {
+                    preferredContractor = contractorList.first { $0.id == contractorId }
+                }
+                linkedDocuments = allDocs.filter { doc in
+                    guard doc.propertyId == system.propertyId else { return false }
+                    let searchTerms = [system.name.lowercased(), system.category.lowercased()]
+                    let docText = "\(doc.title) \(doc.category) \(doc.notes ?? "")".lowercased()
+                    return searchTerms.contains(where: { docText.contains($0) })
+                }
             }
+        } catch { }
 
-            // Load documents linked to this property that mention this system
-            let allDocs = try await db.fetchDocuments()
-            linkedDocuments = allDocs.filter { doc in
-                guard doc.propertyId == system.propertyId else { return false }
-                let searchTerms = [system.name.lowercased(), system.category.lowercased()]
-                let docText = "\(doc.title) \(doc.category) \(doc.notes ?? "")".lowercased()
-                return searchTerms.contains(where: { docText.contains($0) })
-            }
-        } catch {
-            // silently handle
-        }
         isLoading = false
+        await intelligenceTask
     }
+
+    private func loadEquipmentIntelligence(modelNumber: String?, manufacturer: String?) async {
+        guard let modelNum = modelNumber, !modelNum.isEmpty else { return }
+
+        // Run manual lookup and catalog search in parallel
+        async let manualTask: () = loadManuals(modelNumber: modelNum)
+        async let catalogTask: () = loadCatalogDetails(modelNumber: modelNum, manufacturer: manufacturer)
+        await (manualTask, catalogTask)
+    }
+
+    private func loadManuals(modelNumber: String) async {
+        do {
+            let data = try await HavenSupabase.lookupManual(modelNumber: modelNumber)
+            if let manuals = data["manuals"] as? [String: Any] {
+                var links: [ManualLink] = []
+                for (type, info) in manuals {
+                    if let dict = info as? [String: Any],
+                       let url = dict["url"] as? String, !url.isEmpty {
+                        let cached = dict["cached"] as? Bool ?? false
+                        links.append(ManualLink(type: type, url: url, cached: cached))
+                    }
+                }
+                await MainActor.run { self.manualLinks = links.sorted { $0.type < $1.type } }
+            }
+        } catch { }
+    }
+
+    private func loadCatalogDetails(modelNumber: String, manufacturer: String?) async {
+        guard let mfr = manufacturer else { return }
+        do {
+            let query = "\(mfr) \(modelNumber)"
+            let searchResult = try await HavenSupabase.searchEquipment(query: query, limit: 5)
+
+            let match = searchResult.results.first(where: {
+                $0.modelNumber == modelNumber
+            }) ?? searchResult.results.first
+
+            if let match {
+                await MainActor.run {
+                    self.catalogDetails = CatalogDetails(
+                        series: match.specs.series,
+                        modelName: match.modelName ?? match.displayName,
+                        keyFeatures: match.specs.keyFeatures ?? [],
+                        websiteUrl: nil,
+                        fuelType: match.specs.fuelType
+                    )
+                    if let scores = match.scores {
+                        self.equipmentScore = EquipmentDetailScore(
+                            reliability: scores.reliability ?? 0,
+                            summary: scores.summary
+                        )
+                    }
+                }
+            }
+        } catch { }
+    }
+}
+
+// MARK: - Equipment Intelligence Models
+
+struct ManualLink: Identifiable {
+    let id = UUID()
+    let type: String
+    let url: String
+    let cached: Bool
+
+    var displayName: String {
+        type.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+}
+
+struct EquipmentDetailScore {
+    let reliability: Int
+    let summary: String?
+}
+
+struct CatalogDetails {
+    let series: String?
+    let modelName: String?
+    let keyFeatures: [String]
+    let websiteUrl: String?
+    let fuelType: String?
 }

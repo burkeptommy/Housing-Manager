@@ -113,6 +113,23 @@ struct PropertyListView: View {
 struct PropertyCardRow: View {
     let property: PropertyRow
 
+    private var estimatedValue: String? {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 0
+
+        // Use stored estimate if available
+        if let value = property.currentEstimatedValue, value > 0 {
+            return formatter.string(from: NSNumber(value: value))
+        }
+        // Otherwise project 3% above purchase price (optimistic baseline)
+        if let price = property.purchasePrice, price > 0 {
+            let projected = price * 1.03
+            return formatter.string(from: NSNumber(value: projected))
+        }
+        return nil
+    }
+
     private var propertyIcon: String {
         switch property.propertyType.lowercased() {
         case "vacation home": return "sun.max.fill"
@@ -151,6 +168,17 @@ struct PropertyCardRow: View {
                 }
 
                 Spacer()
+
+                if let estimate = estimatedValue {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text(estimate)
+                            .font(.system(size: 15, weight: .semibold, design: .rounded))
+                            .foregroundStyle(HavenColors.success)
+                        Text("Est. Value")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
 
                 Image(systemName: "chevron.right")
                     .foregroundStyle(HavenColors.textTertiary)

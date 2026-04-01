@@ -1,0 +1,13 @@
+{
+  "images" : [
+    {
+      "filename" : "brand-maytag.png",
+      "idiom" : "universal",
+      "scale" : "1x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

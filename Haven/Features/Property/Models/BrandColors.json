@@ -1,0 +1,434 @@
+{
+  "amana": {
+    "primary": "#f42434"
+  },
+  "american-standard": {
+    "primary": "#000000"
+  },
+  "american-standard-hvac": {
+    "primary": "#0067b0"
+  },
+  "american-water-heaters": {
+    "primary": "#ed174b"
+  },
+  "ameristar": {
+    "primary": "#003087"
+  },
+  "amtrol": {
+    "primary": "#0693e3"
+  },
+  "armstrong-air": {
+    "primary": "#003a70"
+  },
+  "anker-solix": {
+    "primary": "#40C7FB"
+  },
+  "ao-smith": {
+    "primary": "#007E44"
+  },
+  "aquasana": {
+    "primary": "#0079c2"
+  },
+  "asko": {
+    "primary": "#7390ca"
+  },
+  "basement-watchdog": {
+    "primary": "#1153aa"
+  },
+  "beko": {
+    "primary": "#0089cf"
+  },
+  "bertazzoni": {
+    "primary": "#7b7a7f"
+  },
+  "bestway": {
+    "primary": "#822265"
+  },
+  "blomberg": {
+    "primary": "#dd052b"
+  },
+  "bluetti": {
+    "primary": "#00a2e4"
+  },
+  "bosch": {
+    "primary": "#2648a4"
+  },
+  "bradford-white": {
+    "primary": "#5174a3"
+  },
+  "briggs-stratton": {
+    "primary": "#999999"
+  },
+  "brizo": {
+    "primary": "#295ae5"
+  },
+  "bryant": {
+    "primary": "#ed1c2e"
+  },
+  "buderus": {
+    "primary": "#007bbf"
+  },
+  "cafe": {
+    "primary": "#6496c8"
+  },
+  "carrier": {
+    "primary": "#002EFF"
+  },
+  "caterpillar": {
+    "primary": "#FFCD11"
+  },
+  "champion-power": {
+    "primary": "#ffdf00"
+  },
+  "coleman-hvac": {
+    "primary": "#003a70"
+  },
+  "comfortmaker": {
+    "primary": "#003a70"
+  },
+  "craftsman": {
+    "primary": "#d6001c"
+  },
+  "culligan": {
+    "primary": "#0072BC"
+  },
+  "cummins": {
+    "primary": "#666666"
+  },
+  "dacor": {
+    "primary": "#fd421f"
+  },
+  "daikin": {
+    "primary": "#44c8f5"
+  },
+  "delta-faucet": {
+    "primary": "#AC0535"
+  },
+  "dornbracht": {
+    "primary": "#d5783f"
+  },
+  "ducane": {
+    "primary": "#003a70"
+  },
+  "duravit": {
+    "primary": "#1414B9"
+  },
+  "dxv": {
+    "primary": "#699dcc"
+  },
+  "ecoflow": {
+    "primary": "#ed9e42"
+  },
+  "ecosmart": {
+    "primary": "#74bc1f"
+  },
+  "ego-power": {
+    "primary": "#6ec72e"
+  },
+  "electrolux": {
+    "primary": "#041e51"
+  },
+  "everbilt": {
+    "primary": "#F96302"
+  },
+  "fisher-paykel": {
+    "primary": "#006ebf"
+  },
+  "flume": {
+    "primary": "#5fd0df"
+  },
+  "franklin-electric": {
+    "primary": "#004085"
+  },
+  "frigidaire": {
+    "primary": "#ed114c"
+  },
+  "fujitsu": {
+    "primary": "#D80084"
+  },
+  "gaggenau": {
+    "primary": "#10204b"
+  },
+  "ge-appliances": {
+    "primary": "#0a2c74"
+  },
+  "ge-profile": {
+    "primary": "#0a2c74"
+  },
+  "generac": {
+    "primary": "#f46800"
+  },
+  "goal-zero": {
+    "primary": "#bfd22b"
+  },
+  "goodman": {
+    "primary": "#e51636"
+  },
+  "grohe": {
+    "primary": "#666666"
+  },
+  "grundfos": {
+    "primary": "#063175"
+  },
+  "haier": {
+    "primary": "#005baa"
+  },
+  "heil": {
+    "primary": "#e31837"
+  },
+  "hansgrohe": {
+    "primary": "#26a791"
+  },
+  "hayward": {
+    "primary": "#0082c8"
+  },
+  "hisense": {
+    "primary": "#00a4a0"
+  },
+  "honda": {
+    "primary": "#CC0001"
+  },
+  "honda-power": {
+    "primary": "#CC0001"
+  },
+  "hotpoint": {
+    "primary": "#011a5a"
+  },
+  "hunter-industries": {
+    "primary": "#fec200"
+  },
+  "intex": {
+    "primary": "#2f90a5"
+  },
+  "jackery": {
+    "primary": "#fd5000"
+  },
+  "jacuzzi": {
+    "primary": "#df782d"
+  },
+  "jandy": {
+    "primary": "#29d4ee"
+  },
+  "jennair": {
+    "primary": "#666666"
+  },
+  "kallista": {
+    "primary": "#00abeb"
+  },
+  "kenmore": {
+    "primary": "#136ff8"
+  },
+  "kinetico": {
+    "primary": "#008abe"
+  },
+  "kitchenaid": {
+    "primary": "#c41230"
+  },
+  "kohler": {
+    "primary": "#212121"
+  },
+  "kohler-generators": {
+    "primary": "#212121"
+  },
+  "kraus": {
+    "primary": "#3399cc"
+  },
+  "la-cornue": {
+    "primary": "#c1a367"
+  },
+  "lennox": {
+    "primary": "#c9202f"
+  },
+  "lg": {
+    "primary": "#EA1917"
+  },
+  "luxaire": {
+    "primary": "#003087"
+  },
+  "liberty-pumps": {
+    "primary": "#b25326"
+  },
+  "little-giant": {
+    "primary": "#014983"
+  },
+  "lochinvar": {
+    "primary": "#9d9d9d"
+  },
+  "magic-chef": {
+    "primary": "#ee3e26"
+  },
+  "maytag": {
+    "primary": "#d7a684"
+  },
+  "miele": {
+    "primary": "#8C0014"
+  },
+  "mitsubishi": {
+    "primary": "#0f0000"
+  },
+  "mitsubishi-electric": {
+    "primary": "#e42526"
+  },
+  "moen": {
+    "primary": "#666666"
+  },
+  "monogram": {
+    "primary": "#ddc07e"
+  },
+  "napoleon": {
+    "primary": "#d4a843"
+  },
+  "navien": {
+    "primary": "#68cdd9"
+  },
+  "newport-brass": {
+    "primary": "#585856"
+  },
+  "noritz": {
+    "primary": "#ed1c24"
+  },
+  "orbit": {
+    "primary": "#8cc8e7"
+  },
+  "payne": {
+    "primary": "#e67a1d"
+  },
+  "pelican": {
+    "primary": "#09244f"
+  },
+  "pentair": {
+    "primary": "#0c3471"
+  },
+  "pfister": {
+    "primary": "#8e2c2d"
+  },
+  "polaris-pool": {
+    "primary": "#2a6cab"
+  },
+  "pumpspy": {
+    "primary": "#48b461"
+  },
+  "rachio": {
+    "primary": "#25aaff"
+  },
+  "rain-bird": {
+    "primary": "#047a4b"
+  },
+  "raypak": {
+    "primary": "#f1231d"
+  },
+  "reliance": {
+    "primary": "#1fb25a"
+  },
+  "rheem": {
+    "primary": "#e4002b"
+  },
+  "ridgid": {
+    "primary": "#d9222a"
+  },
+  "rinnai": {
+    "primary": "#cf000f"
+  },
+  "runtru": {
+    "primary": "#ee3524"
+  },
+  "ruud": {
+    "primary": "#ac2925"
+  },
+  "ryobi": {
+    "primary": "#7c7e1b"
+  },
+  "samsung": {
+    "primary": "#1428a0"
+  },
+  "sharp": {
+    "primary": "#ff9616"
+  },
+  "smeg": {
+    "primary": "#F3ECE0"
+  },
+  "speed-queen": {
+    "primary": "#f04923"
+  },
+  "springwell": {
+    "primary": "#3085c7"
+  },
+  "state-water-heaters": {
+    "primary": "#055ca9"
+  },
+  "stiebel-eltron": {
+    "primary": "#ba0c2f"
+  },
+  "sub-zero": {
+    "primary": "#0080c5"
+  },
+  "symmons": {
+    "primary": "#58ae55"
+  },
+  "tempstar": {
+    "primary": "#003a70"
+  },
+  "thermo-pride": {
+    "primary": "#d4272e"
+  },
+  "thermador": {
+    "primary": "#888888"
+  },
+  "toro": {
+    "primary": "#cd2027"
+  },
+  "toto": {
+    "primary": "#12449d"
+  },
+  "trane": {
+    "primary": "#ef3c13"
+  },
+  "triangle-tube": {
+    "primary": "#da291c"
+  },
+  "vigo": {
+    "primary": "#1c1c1e"
+  },
+  "viking": {
+    "primary": "#0070c7"
+  },
+  "villeroy-boch": {
+    "primary": "#1b458f"
+  },
+  "waterworks": {
+    "primary": "#313131"
+  },
+  "watts": {
+    "primary": "#0079c2"
+  },
+  "wayne": {
+    "primary": "#21b259"
+  },
+  "weil-mclain": {
+    "primary": "#0084d5"
+  },
+  "westinghouse-power": {
+    "primary": "#295bdd"
+  },
+  "whirlpool": {
+    "primary": "#edac09"
+  },
+  "wolf": {
+    "primary": "#0080c5"
+  },
+  "yamaha": {
+    "primary": "#4B1E78"
+  },
+  "yamaha-power": {
+    "primary": "#B40606"
+  },
+  "york": {
+    "primary": "#5097a9"
+  },
+  "zodiac": {
+    "primary": "#0c95b5"
+  },
+  "zoeller": {
+    "primary": "#53732a"
+  }
+}

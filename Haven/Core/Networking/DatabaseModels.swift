@@ -453,6 +453,7 @@ struct HomeSystemRow: Codable, Identifiable {
     let notes: String?
     let createdAt: Date?
     let preferredContractorId: UUID?
+    let catalogEntryId: UUID?
     let lastServiceDate: String?
     let nextServiceDue: String?
     let totalSpent: Double?
@@ -467,6 +468,7 @@ struct HomeSystemRow: Codable, Identifiable {
         case expectedLifespanYears = "expected_lifespan_years"
         case createdAt = "created_at"
         case preferredContractorId = "preferred_contractor_id"
+        case catalogEntryId = "catalog_entry_id"
         case lastServiceDate = "last_service_date"
         case nextServiceDue = "next_service_due"
         case totalSpent = "total_spent"
@@ -485,6 +487,7 @@ struct HomeSystemInsert: Codable {
     var expectedLifespanYears: Int?
     var status: String?
     var notes: String?
+    var catalogEntryId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status
@@ -494,6 +497,7 @@ struct HomeSystemInsert: Codable {
         case serialNumber = "serial_number"
         case installDate = "install_date"
         case expectedLifespanYears = "expected_lifespan_years"
+        case catalogEntryId = "catalog_entry_id"
     }
 }
 
@@ -508,6 +512,7 @@ struct HomeSystemUpdate: Codable {
     var status: String?
     var notes: String?
     var preferredContractorId: UUID?
+    var catalogEntryId: UUID?
     var lastServiceDate: String?
     var nextServiceDue: String?
     var totalSpent: Double?
@@ -519,6 +524,7 @@ struct HomeSystemUpdate: Codable {
         case installDate = "install_date"
         case expectedLifespanYears = "expected_lifespan_years"
         case preferredContractorId = "preferred_contractor_id"
+        case catalogEntryId = "catalog_entry_id"
         case lastServiceDate = "last_service_date"
         case nextServiceDue = "next_service_due"
         case totalSpent = "total_spent"
