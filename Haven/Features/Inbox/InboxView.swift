@@ -53,9 +53,12 @@ struct InboxView: View {
                             InboxItemDetailView(
                                 item: item,
                                 properties: viewModel.properties,
+                                projects: viewModel.projects,
                                 onProcess: { propertyId, action, category in
-                                    Task {
-                                        await viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category)
+                                    if action == "add_to_project", let projectIdStr = category, let projectId = UUID(uuidString: projectIdStr) {
+                                        viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: nil, targetProjectId: projectId)
+                                    } else {
+                                        viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category)
                                     }
                                 },
                                 onDismiss: {
@@ -72,8 +75,9 @@ struct InboxView: View {
                             InboxItemCard(
                                 item: item,
                                 properties: viewModel.properties,
-                                onProcess: { propertyId, action, category in
-                                    Task { await viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category) }
+                                projects: viewModel.projects,
+                                onProcess: { propertyId, action, category, targetProjectId in
+                                    viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, targetProjectId: targetProjectId)
                                 },
                                 onDismiss: {
                                     withAnimation { viewModel.dismissItem(item) }
@@ -125,10 +129,18 @@ struct InboxView: View {
         .alert("Delete this item?", isPresented: $showDeleteConfirm) {
             Button("Delete", role: .destructive) {
                 if let item = itemToDelete {
+                    // Remove from UI immediately
+                    viewModel.items.removeAll { $0.id == item.id }
+                    Haptics.success()
+                    // Delete from DB in background
                     Task {
-                        try? await DatabaseService.shared.deleteInboxItem(id: item.id)
-                        viewModel.items.removeAll { $0.id == item.id }
-                        Haptics.success()
+                        do {
+                            try await DatabaseService.shared.deleteInboxItem(id: item.id)
+                        } catch {
+                            print("[Inbox] Delete failed: \(error)")
+                            // Reload to restore if delete failed
+                            await viewModel.load()
+                        }
                     }
                 }
             }
@@ -191,6 +203,7 @@ struct InboxView: View {
 final class InboxViewModel: ObservableObject {
     @Published var items: [DatabaseService.InboxItemRow] = []
     @Published var properties: [PropertyRow] = []
+    @Published var projects: [PropertyProjectRow] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -202,6 +215,11 @@ final class InboxViewModel: ObservableObject {
             let (loadedItems, loadedProps) = try await (itemsReq, propsReq)
             items = loadedItems
             properties = loadedProps
+            // Load active projects for "Add to Project" option
+            if let propId = loadedProps.first?.id {
+                projects = (try? await DatabaseService.shared.fetchProjects(propertyId: propId)) ?? []
+                projects = projects.filter { $0.status == "planning" || $0.status == "in_progress" }
+            }
         } catch {
             print("[InboxVM] Load failed: \(error)")
         }
@@ -212,22 +230,34 @@ final class InboxViewModel: ObservableObject {
         _ item: DatabaseService.InboxItemRow,
         propertyId: UUID?,
         action: String,
-        documentCategory: String?
-    ) async {
-        do {
-            let _ = try await HavenSupabase.processInboxItem(
-                inboxItemId: item.id.uuidString,
-                propertyId: propertyId?.uuidString,
-                action: action,
-                documentCategory: documentCategory
-            )
-            Haptics.success()
-            // Reload to reflect changes
-            await load()
-        } catch {
-            print("[InboxVM] Process failed: \(error)")
-            Haptics.error()
-            self.error = "Processing failed: \(error.localizedDescription)"
+        documentCategory: String?,
+        targetProjectId: UUID? = nil
+    ) {
+        // Remove the item from the list immediately — processing happens in background
+        if let idx = items.firstIndex(where: { $0.id == item.id }) {
+            items.remove(at: idx)
+        }
+        Haptics.success()
+
+        // Process in background — no blocking the UI
+        Task {
+            do {
+                let _ = try await HavenSupabase.processInboxItem(
+                    inboxItemId: item.id.uuidString,
+                    propertyId: propertyId?.uuidString,
+                    action: action,
+                    documentCategory: documentCategory,
+                    targetProjectId: targetProjectId?.uuidString
+                )
+                // Reload to reflect final state
+                await load()
+            } catch {
+                print("[InboxVM] Process failed: \(error)")
+                Haptics.error()
+                self.error = "Processing failed: \(error.localizedDescription)"
+                // Re-add the item on failure so user can retry
+                await load()
+            }
         }
     }
 

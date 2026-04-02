@@ -5,6 +5,7 @@ struct QuoteDetailView: View {
     let quote: ProjectQuoteRow
     @ObservedObject var viewModel: ProjectsViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var googleRating: GooglePlacesService.BusinessRating?
 
     private var analysis: QuoteAnalysis { quote.analysis }
 
@@ -13,10 +14,6 @@ struct QuoteDetailView: View {
             VStack(spacing: HavenTheme.spacing20) {
                 vendorCard
                 overallAssessmentCard
-                lineItemsSection
-                if let diy = analysis.suggestedDiyAlternative, diy.feasible == true {
-                    diyAlternativeCard(diy)
-                }
                 negotiationTipsSection
             }
             .padding(.horizontal, HavenTheme.pageMargin)
@@ -78,11 +75,43 @@ struct QuoteDetailView: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)
             }
+
+            // Google rating
+            if let rating = googleRating {
+                Divider()
+                HStack(spacing: 6) {
+                    HStack(spacing: 2) {
+                        ForEach(0..<5, id: \.self) { i in
+                            Image(systemName: Double(i) + 0.5 <= rating.rating ? "star.fill" : (Double(i) < rating.rating ? "star.leadinghalf.filled" : "star"))
+                                .font(.system(size: 11))
+                                .foregroundStyle(.yellow)
+                        }
+                    }
+                    Text(String(format: "%.1f", rating.rating))
+                        .font(.system(size: 13, weight: .semibold, design: .rounded))
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("(\(rating.reviewCount) reviews)")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Spacer()
+                    Image(systemName: "g.circle.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.blue.opacity(0.6))
+                }
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HavenTheme.spacing16)
         .background(Color.white)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .task {
+            if let vendorName = analysis.vendor?.name {
+                googleRating = await GooglePlacesService.shared.lookupBusinessRating(
+                    name: vendorName,
+                    near: analysis.vendor?.address
+                )
+            }
+        }
     }
 
     // MARK: - Overall Assessment
@@ -264,8 +293,14 @@ struct QuoteDetailView: View {
 
     private var negotiationTipsSection: some View {
         let tips = analysis.overallAssessment?.negotiationTips ?? []
+        // Add itemized quote tip if the quote wasn't itemized
+        var allTips = tips
+        if analysis.hasItemizedPricing == false && !tips.contains(where: { $0.lowercased().contains("itemized") }) {
+            allTips.insert("Ask your contractor for an itemized quote breakdown. This helps you compare specific line items across vendors and negotiate individual costs.", at: 0)
+        }
+
         return Group {
-            if !tips.isEmpty {
+            if !allTips.isEmpty {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     Text("NEGOTIATION TIPS")
                         .font(HavenTypography.uiCaption)
@@ -273,7 +308,7 @@ struct QuoteDetailView: View {
                         .fontWeight(.semibold)
                         .tracking(1)
 
-                    ForEach(Array(tips.enumerated()), id: \.offset) { _, tip in
+                    ForEach(Array(allTips.enumerated()), id: \.offset) { _, tip in
                         HStack(alignment: .top, spacing: 8) {
                             Image(systemName: "lightbulb.fill")
                                 .font(.caption)

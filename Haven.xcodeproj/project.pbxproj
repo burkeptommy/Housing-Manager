@@ -210,6 +210,10 @@
 		F66A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF6A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift */; };
 		FE211378C8FD36D5E8FEAE19 /* QuoteUploadEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFA91E36E628DF25E9A5BCE5 /* QuoteUploadEntryView.swift */; };
 		FEEAF0C71107387A5BCCD8DA /* HavenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCD278A06338019D17B809C /* HavenTheme.swift */; };
+		ED13363B264E4EFEB37718FB /* CalendarSyncService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 58DFCF592A754BA0910A1DC2 /* CalendarSyncService.swift */; };
+		390249035BB34EF3866411B7 /* CalendarSyncSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36C61EB578624423B4755C54 /* CalendarSyncSheet.swift */; };
+		A87A00C4615E4688A9AFD835 /* CalendarEventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3F81B6F5C23649BC9658364D /* CalendarEventDetailView.swift */; };
+		111C32EE3B524E1DB3340185 /* UtilityAccountsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 763B2D7F7F214611B1B1CE31 /* UtilityAccountsSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -416,6 +420,10 @@
 		FDDD425AF92101F7B1B5793E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorViewModel.swift; sourceTree = "<group>"; };
 		FF6A7B8C9D0E1F2A3B4C5D6E /* AddressAutocompleteField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressAutocompleteField.swift; sourceTree = "<group>"; };
+		58DFCF592A754BA0910A1DC2 /* CalendarSyncService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarSyncService.swift; path = Haven/Core/Services/CalendarSyncService.swift; sourceTree = SOURCE_ROOT; };
+		36C61EB578624423B4755C54 /* CalendarSyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarSyncSheet.swift; path = Haven/Features/Family/CalendarSyncSheet.swift; sourceTree = SOURCE_ROOT; };
+		3F81B6F5C23649BC9658364D /* CalendarEventDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = CalendarEventDetailView.swift; path = Haven/Features/Family/CalendarEventDetailView.swift; sourceTree = SOURCE_ROOT; };
+		763B2D7F7F214611B1B1CE31 /* UtilityAccountsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = UtilityAccountsSection.swift; path = Haven/Features/Property/Views/UtilityAccountsSection.swift; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -520,6 +528,7 @@
 		3DF84B25A57E4C0D8D8B63E2 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				58DFCF592A754BA0910A1DC2 /* CalendarSyncService.swift */,
 				F6C39D1796932628A21EFC85 /* OnboardingScheduleGenerator.swift */,
 				483098FC70EB489F89E2222E /* DefaultSystemsService.swift */,
 				B0C1D2E3F4A5B6C7D8E9F0A1 /* MaintenanceTemplates.swift */,
@@ -942,6 +951,8 @@
 		F4A5B6C7D8E9F0A1B2C3D4E7 /* Family */ = {
 			isa = PBXGroup;
 			children = (
+				3F81B6F5C23649BC9658364D /* CalendarEventDetailView.swift */,
+				36C61EB578624423B4755C54 /* CalendarSyncSheet.swift */,
 				F4A5B6C7D8E9F0A1B2C3D4E5 /* FamilyInboxView.swift */,
 				A1B2C3D4E5F6A7B8C9D0E1F1 /* FamilyItemDetailView.swift */,
 			);
@@ -1058,6 +1069,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				111C32EE3B524E1DB3340185 /* UtilityAccountsSection.swift in Sources */,
+				A87A00C4615E4688A9AFD835 /* CalendarEventDetailView.swift in Sources */,
+				390249035BB34EF3866411B7 /* CalendarSyncSheet.swift in Sources */,
+				ED13363B264E4EFEB37718FB /* CalendarSyncService.swift in Sources */,
 				415C203F6F461356670CC327 /* AppliancesListView.swift in Sources */,
 				6FFB0EE26A497F67CB2650CA /* EditProjectSheet.swift in Sources */,
 				13F4335671F4EC4543A2F8D8 /* ProjectEmailView.swift in Sources */,

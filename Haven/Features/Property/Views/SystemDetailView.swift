@@ -123,7 +123,8 @@ struct SystemDetailRowView: View {
         }
         .sheet(isPresented: $showAddWarranty) {
             NavigationStack {
-                AddWarrantySheet(systemId: system.id, householdId: nil, onComplete: {
+                AddWarrantySheet(systemId: system.id, householdId: nil, onComplete: { newWarranty in
+                    warranties.append(newWarranty)
                     Analytics.track(.warrantyCreated, ["system_id": system.id.uuidString, "source": "system_detail"])
                     Task { await loadDetails() }
                 })
@@ -135,7 +136,8 @@ struct SystemDetailRowView: View {
             }
         }
         .sheet(isPresented: $showEditSystem) {
-            EditSystemSheet(system: system) {
+            EditSystemSheet(system: system) { updatedSystem in
+                system = updatedSystem
                 Task { await reloadSystem() }
             }
         }
@@ -1268,10 +1270,21 @@ struct SystemDetailRowView: View {
         // Run manual lookup and catalog search in parallel
         async let manualTask: () = loadManuals(modelNumber: modelNum)
         async let catalogTask: () = loadCatalogDetails(modelNumber: modelNum, manufacturer: manufacturer)
-        await (manualTask, catalogTask)
+        _ = await (manualTask, catalogTask)
     }
 
     private func loadManuals(modelNumber: String) async {
+        // Use cached manual links if available
+        if let cached = system.cachedManualLinks, !cached.isEmpty {
+            await MainActor.run {
+                self.manualLinks = cached.map {
+                    ManualLink(type: $0.type, url: $0.url, cached: $0.cached ?? false)
+                }.sorted { $0.type < $1.type }
+            }
+            return
+        }
+
+        // No cache — fetch from API and persist
         do {
             let data = try await HavenSupabase.lookupManual(modelNumber: modelNumber)
             if let manuals = data["manuals"] as? [String: Any] {
@@ -1283,37 +1296,142 @@ struct SystemDetailRowView: View {
                         links.append(ManualLink(type: type, url: url, cached: cached))
                     }
                 }
-                await MainActor.run { self.manualLinks = links.sorted { $0.type < $1.type } }
+                let sorted = links.sorted { $0.type < $1.type }
+                await MainActor.run { self.manualLinks = sorted }
+
+                // Persist to DB for instant load next time
+                let cachePayload = sorted.map { CachedManualLink(type: $0.type, url: $0.url, cached: $0.cached) }
+                try? await DatabaseService.shared.updateHomeSystemManualCache(
+                    id: system.id,
+                    links: cachePayload
+                )
             }
         } catch { }
     }
 
     private func loadCatalogDetails(modelNumber: String, manufacturer: String?) async {
         guard let mfr = manufacturer else { return }
-        do {
-            let query = "\(mfr) \(modelNumber)"
-            let searchResult = try await HavenSupabase.searchEquipment(query: query, limit: 5)
 
+        // Use cached catalog data if available (no network call needed)
+        if let cached = system.catalogSeries ?? system.catalogModelName ?? (system.catalogFeatures?.isEmpty == false ? "" : nil),
+           !cached.isEmpty || system.reliabilityScore != nil {
+            await MainActor.run {
+                self.catalogDetails = CatalogDetails(
+                    series: system.catalogSeries,
+                    modelName: system.catalogModelName ?? system.name,
+                    keyFeatures: system.catalogFeatures ?? [],
+                    websiteUrl: nil,
+                    fuelType: system.catalogFuelType
+                )
+                if let score = system.reliabilityScore {
+                    self.equipmentScore = EquipmentDetailScore(
+                        reliability: score,
+                        summary: system.scoreSummary
+                    )
+                }
+            }
+
+            // Refresh in background if cache is stale, incomplete, or missing score
+            let needsRefresh = system.catalogEnrichedAt == nil
+                || system.reliabilityScore == nil
+                || Date().timeIntervalSince(system.catalogEnrichedAt ?? .distantPast) > 30 * 24 * 3600
+            if needsRefresh {
+                Task { await refreshCatalogCache(modelNumber: modelNumber, manufacturer: mfr) }
+            }
+            return
+        }
+
+        // No cache — fetch from API and persist
+        await refreshCatalogCache(modelNumber: modelNumber, manufacturer: mfr)
+    }
+
+    private func refreshCatalogCache(modelNumber: String, manufacturer: String) async {
+        do {
+            // Search by model number first for exact match, then fall back to brand+model
+            var searchResult = try await HavenSupabase.searchEquipment(query: modelNumber, limit: 5)
+            if searchResult.results.isEmpty {
+                searchResult = try await HavenSupabase.searchEquipment(query: "\(manufacturer) \(modelNumber)", limit: 15)
+            }
+
+            // Normalize for comparison: strip hyphens, underscores, spaces
+            let normalizedInput = modelNumber.replacingOccurrences(of: "-", with: "")
+                .replacingOccurrences(of: "_", with: "")
+                .replacingOccurrences(of: " ", with: "")
+                .lowercased()
+
+            // Priority 1: Exact model number match
             let match = searchResult.results.first(where: {
-                $0.modelNumber == modelNumber
-            }) ?? searchResult.results.first
+                $0.modelNumber.lowercased() == modelNumber.lowercased()
+            })
+            // Priority 2: Delimiter-normalized match
+            ?? searchResult.results.first(where: {
+                $0.modelNumber.replacingOccurrences(of: "-", with: "")
+                    .replacingOccurrences(of: "_", with: "")
+                    .replacingOccurrences(of: " ", with: "")
+                    .lowercased() == normalizedInput
+            })
+            // Priority 3: Same category match (don't show dishwasher data for a fridge)
+            ?? searchResult.results.first(where: {
+                $0.category.name.lowercased().contains(system.category.lowercased())
+                || system.category.lowercased().contains($0.category.name.lowercased())
+            })
 
             if let match {
+                // Exact or category-matched model — show full enrichment
+                let series = match.specs.series
+                let modelName = match.modelName ?? match.displayName
+                let features = match.specs.keyFeatures ?? []
+                let fuelType = match.specs.fuelType
+                let reliability = match.scores?.reliability
+                let summary = match.scores?.summary
+
                 await MainActor.run {
                     self.catalogDetails = CatalogDetails(
-                        series: match.specs.series,
-                        modelName: match.modelName ?? match.displayName,
-                        keyFeatures: match.specs.keyFeatures ?? [],
+                        series: series,
+                        modelName: modelName,
+                        keyFeatures: features,
                         websiteUrl: nil,
-                        fuelType: match.specs.fuelType
+                        fuelType: fuelType
                     )
-                    if let scores = match.scores {
+                    if let reliability {
                         self.equipmentScore = EquipmentDetailScore(
-                            reliability: scores.reliability ?? 0,
-                            summary: scores.summary
+                            reliability: reliability,
+                            summary: summary
                         )
                     }
                 }
+
+                // Persist to DB so next load is instant
+                _ = try? await db.updateHomeSystem(
+                    id: system.id,
+                    HomeSystemUpdate(
+                        catalogSeries: series,
+                        catalogModelName: modelName,
+                        catalogFeatures: features,
+                        reliabilityScore: reliability,
+                        scoreSummary: summary,
+                        catalogFuelType: fuelType,
+                        catalogEnrichedAt: Date()
+                    )
+                )
+            } else if let anyResult = searchResult.results.first,
+                      let score = anyResult.scores?.reliability {
+                // No model match, but we have the brand — show brand-level score only
+                await MainActor.run {
+                    self.equipmentScore = EquipmentDetailScore(
+                        reliability: score,
+                        summary: anyResult.scores?.summary
+                    )
+                }
+                // Cache just the score (not wrong model details)
+                _ = try? await db.updateHomeSystem(
+                    id: system.id,
+                    HomeSystemUpdate(
+                        reliabilityScore: score,
+                        scoreSummary: anyResult.scores?.summary,
+                        catalogEnrichedAt: Date()
+                    )
+                )
             }
         } catch { }
     }

@@ -369,6 +369,7 @@ struct FamilyItemDetailView: View {
             .padding(HavenTheme.pageMargin)
         }
         .background(HavenColors.background)
+        .trackScreen("FamilyItemDetailView", properties: ["item_id": item.id.uuidString, "category": item.familyCategory ?? "unknown"])
         .navigationTitle(isEditing ? "Edit" : "Details")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {

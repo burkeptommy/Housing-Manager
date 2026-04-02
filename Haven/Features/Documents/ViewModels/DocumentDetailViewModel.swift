@@ -171,19 +171,21 @@ final class DocumentDetailViewModel: ObservableObject {
         guard let doc = document else { return false }
         Analytics.track(.documentDeleted, ["document_id": doc.id.uuidString, "category": doc.category])
         isDeleting = true
+        Haptics.light()
         do {
-            // Delete file from storage
             _ = try? await HavenSupabase.storage
                 .from("documents")
                 .remove(paths: [doc.filePath])
-
-            // Delete DB record
             try await db.deleteDocument(id: doc.id)
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "deleted", "id": doc.id.uuidString])
             isDeleting = false
+            Haptics.success()
             return true
         } catch {
             self.error = error.localizedDescription
             isDeleting = false
+            Haptics.error()
             return false
         }
     }
@@ -192,6 +194,8 @@ final class DocumentDetailViewModel: ObservableObject {
         guard let doc = document else { return }
         do {
             document = try await db.updateDocument(id: doc.id, DocumentUpdate(notes: notes))
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "updated", "id": doc.id.uuidString])
         } catch {
             self.error = error.localizedDescription
         }
@@ -200,13 +204,18 @@ final class DocumentDetailViewModel: ObservableObject {
     func markReviewed() async {
         guard let doc = document else { return }
         Analytics.track(.documentMarkedReviewed, ["document_id": doc.id.uuidString])
+        // Optimistic: show reviewed state immediately
+        Haptics.success()
         do {
             document = try await db.updateDocument(
                 id: doc.id,
                 DocumentUpdate(lastReviewedAt: .now)
             )
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "updated", "id": doc.id.uuidString])
         } catch {
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 
@@ -281,18 +290,26 @@ final class DocumentDetailViewModel: ObservableObject {
     func toggleMemberAccess(memberId: UUID) async {
         guard let doc = document else { return }
         let isLinked = familyMembers.contains { $0.id == memberId }
+        let snapshot = familyMembers
+
+        // Optimistic: toggle immediately
+        if isLinked {
+            familyMembers.removeAll { $0.id == memberId }
+        } else if let member = allFamilyMembers.first(where: { $0.id == memberId }) {
+            familyMembers.append(member)
+        }
+        Haptics.light()
+
         do {
             if isLinked {
                 try await db.unlinkDocumentFromFamilyMember(documentId: doc.id, familyMemberId: memberId)
-                familyMembers.removeAll { $0.id == memberId }
             } else {
                 try await db.linkDocumentToFamilyMember(documentId: doc.id, familyMemberId: memberId)
-                if let member = allFamilyMembers.first(where: { $0.id == memberId }) {
-                    familyMembers.append(member)
-                }
             }
         } catch {
+            familyMembers = snapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 
@@ -408,20 +425,28 @@ final class DocumentDetailViewModel: ObservableObject {
     func toggleDocumentSharing(contactId: UUID) async {
         guard let doc = document else { return }
         let isShared = trustedContactsWithAccess.contains { $0.id == contactId }
+        let snapshot = trustedContactsWithAccess
+
+        // Optimistic: toggle immediately
+        if isShared {
+            trustedContactsWithAccess.removeAll { $0.id == contactId }
+        } else if let contact = allTrustedContacts.first(where: { $0.id == contactId }) {
+            trustedContactsWithAccess.append(contact)
+        }
+        Haptics.light()
+
         do {
             if isShared {
                 Analytics.track(.documentAccessRevoked, ["document_id": doc.id.uuidString, "contact_id": contactId.uuidString])
                 try await db.revokeDocumentAccess(contactId: contactId, documentId: doc.id)
-                trustedContactsWithAccess.removeAll { $0.id == contactId }
             } else {
                 Analytics.track(.documentSharedWithContact, ["document_id": doc.id.uuidString, "contact_id": contactId.uuidString])
                 try await db.grantDocumentAccess(contactId: contactId, documentId: doc.id)
-                if let contact = allTrustedContacts.first(where: { $0.id == contactId }) {
-                    trustedContactsWithAccess.append(contact)
-                }
             }
         } catch {
+            trustedContactsWithAccess = snapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 }

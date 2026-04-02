@@ -13,7 +13,11 @@ struct ProjectDetailView: View {
     @State private var showQuoteUpload = false
     @State private var expandedEmailIndex: Int?
     @State private var showQuoteComparison = false
+    @State private var compareTrade: String?
     @State private var showDeleteConfirmation = false
+    @State private var showLinkProject = false
+    @State private var showPersonalPropertyEdit = false
+    @State private var personalPropertyInput = ""
     @State private var showEditProject = false
     @State private var showStatusPicker = false
     @State private var showNotesEditor = false
@@ -45,6 +49,8 @@ struct ProjectDetailView: View {
                 statusCard
                 if isInsuranceClaim {
                     claimInfoCard
+                    subProjectsSection
+                    quotesSection
                     filesSection
                 } else {
                     roiCard
@@ -54,6 +60,9 @@ struct ProjectDetailView: View {
                     } else {
                         quotesSection
                     }
+                }
+                if !viewModel.projectContacts.isEmpty {
+                    projectContactsSection
                 }
                 askAlfredButton
                 notesSection
@@ -94,12 +103,16 @@ struct ProjectDetailView: View {
                 await viewModel.loadProjectFiles(projectId: project.id)
                 await loadThumbnailURLs()
             }
-            if !isDIY && !isInsuranceClaim {
+            if !isDIY {
                 await viewModel.loadQuotes(projectId: project.id)
+            }
+            if isInsuranceClaim {
+                await viewModel.loadSubProjects(parentId: project.id)
             }
             if !isInsuranceClaim && viewModel.feasibility == nil {
                 await viewModel.loadFeasibility(projectName: liveProject.name, category: liveProject.category, description: liveProject.description, location: nil)
             }
+            await viewModel.loadProjectContacts(projectId: project.id)
         }
         .alert("Preview Unavailable", isPresented: .init(
             get: { fileLoadError != nil },
@@ -124,7 +137,17 @@ struct ProjectDetailView: View {
         }
         .sheet(isPresented: $showQuoteComparison) {
             NavigationStack {
-                QuoteComparisonView(quotes: viewModel.quotes, projectName: liveProject.name)
+                if let trade = compareTrade {
+                    // Match quotes using substring logic (same as grouping)
+                    let tradeLower = trade.lowercased()
+                    let tradeQuotes = viewModel.quotes.filter {
+                        let t = $0.tradeName.lowercased()
+                        return t == tradeLower || t.contains(tradeLower) || tradeLower.contains(t)
+                    }
+                    QuoteComparisonView(quotes: tradeQuotes, projectName: "\(liveProject.name) — \(trade)")
+                } else {
+                    QuoteComparisonView(quotes: viewModel.quotes, projectName: liveProject.name)
+                }
             }
         }
         .sheet(isPresented: $showNotesEditor) {
@@ -133,12 +156,16 @@ struct ProjectDetailView: View {
         .sheet(isPresented: $showEditProject) {
             EditProjectSheet(project: liveProject, viewModel: viewModel)
         }
+        .sheet(isPresented: $showPersonalPropertyEdit) {
+            personalPropertySheet
+        }
         .confirmationDialog("Change Status", isPresented: $showStatusPicker) {
             ForEach(ProjectStatus.allCases, id: \.self) { status in
                 Button(status.displayName) {
                     Task {
                         try? await viewModel.updateProject(id: project.id, PropertyProjectUpdate(status: status.rawValue))
                         Haptics.success()
+                        Analytics.track(.projectStatusChanged, ["project_id": project.id.uuidString, "new_status": status.rawValue])
                     }
                 }
             }
@@ -146,6 +173,7 @@ struct ProjectDetailView: View {
         .confirmationDialog("Delete Project?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task {
+                    Analytics.track(.projectDeleted, ["project_id": project.id.uuidString, "category": liveProject.category])
                     try? await viewModel.deleteProject(id: project.id)
                     Haptics.success()
                     dismiss()
@@ -557,7 +585,425 @@ struct ProjectDetailView: View {
         }
     }
 
+    // MARK: - Sub-Projects Section (Insurance Claims)
+
+    private var subProjectsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("LINKED PROJECTS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                if !viewModel.subProjects.isEmpty {
+                    Text("\(viewModel.subProjects.count)")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy700)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Capsule())
+                }
+
+                Spacer()
+            }
+
+            // Claim total card (show even without sub-projects if personal property exists)
+            if !viewModel.subProjects.isEmpty || (liveProject.personalPropertyAmount ?? 0) > 0 {
+                HavenCard {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Total Claim Amount")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Text("$\(Int(viewModel.claimTotal(for: liveProject)).formatted())")
+                                    .font(.system(size: 28, weight: .bold, design: .rounded))
+                                    .foregroundStyle(HavenColors.navy800)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                Text("\(viewModel.subProjects.count) project\(viewModel.subProjects.count == 1 ? "" : "s")")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                                Image(systemName: "chart.bar.doc.horizontal")
+                                    .font(.system(size: 20))
+                                    .foregroundStyle(HavenColors.navy.opacity(0.3))
+                            }
+                        }
+
+                        // Personal property line item
+                        HStack {
+                            Image(systemName: "archivebox.fill")
+                                .font(.caption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("Personal Property")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            Spacer()
+                            if let amount = liveProject.personalPropertyAmount, amount > 0 {
+                                Text("$\(Int(amount).formatted())")
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.navy800)
+                            }
+                            Button {
+                                showPersonalPropertyEdit = true
+                            } label: {
+                                Image(systemName: (liveProject.personalPropertyAmount ?? 0) > 0 ? "pencil" : "plus.circle")
+                                    .font(.caption)
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                }
+
+                // Sub-project cards
+                ForEach(viewModel.subProjects) { subProject in
+                    NavigationLink {
+                        ProjectDetailView(project: subProject, viewModel: viewModel)
+                    } label: {
+                        subProjectCard(subProject)
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task { await viewModel.unlinkProjectFromClaim(projectId: subProject.id) }
+                        } label: {
+                            Label("Unlink", systemImage: "link.badge.minus")
+                        }
+                    }
+                }
+            } else {
+                HavenCard {
+                    VStack(spacing: 8) {
+                        Image(systemName: "rectangle.stack.badge.plus")
+                            .font(.system(size: 28))
+                            .foregroundStyle(HavenColors.navy.opacity(0.3))
+                        Text("No linked projects yet")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("Link existing projects to build your total claim")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                }
+            }
+
+            // Link project button
+            Button {
+                Haptics.light()
+                showLinkProject = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "link.badge.plus")
+                        .font(.system(size: 14))
+                    Text("Link a Project")
+                        .font(HavenTypography.uiLabel)
+                }
+                .foregroundStyle(HavenColors.navy800)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(HavenColors.navy.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            }
+            .buttonStyle(.plain)
+        }
+        .sheet(isPresented: $showLinkProject) {
+            linkProjectSheet
+        }
+    }
+
+    private func subProjectCard(_ project: PropertyProjectRow) -> some View {
+        HavenCard(padding: HavenTheme.spacing12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(project.name)
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    HStack(spacing: 8) {
+                        Text(project.category)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        approachBadge(project.projectType)
+                    }
+                }
+                Spacer()
+                VStack(alignment: .trailing, spacing: 2) {
+                    if let cost = project.aiEstimatedProCost ?? project.estimatedBudget {
+                        Text("$\(Int(cost).formatted())")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                    }
+                    Text(project.status.replacingOccurrences(of: "_", with: " ").capitalized)
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+    }
+
+    private var linkProjectSheet: some View {
+        NavigationStack {
+            let linkable = viewModel.linkableProjects(excludingClaimId: project.id)
+            List {
+                if linkable.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "tray")
+                            .font(.system(size: 32))
+                            .foregroundStyle(HavenColors.navy.opacity(0.2))
+                        Text("No projects available to link")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("Create a project first, then link it to this claim")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 24)
+                    .listRowBackground(Color.clear)
+                } else {
+                    ForEach(linkable) { proj in
+                        Button {
+                            Task {
+                                await viewModel.linkProjectToClaim(projectId: proj.id, claimId: project.id)
+                                showLinkProject = false
+                            }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(proj.name)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    HStack(spacing: 6) {
+                                        Text(proj.category)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                        approachBadge(proj.projectType)
+                                    }
+                                }
+                                Spacer()
+                                if let cost = proj.aiEstimatedProCost ?? proj.estimatedBudget {
+                                    Text("$\(Int(cost).formatted())")
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.navy800)
+                                }
+                                Image(systemName: "link.badge.plus")
+                                    .font(.caption)
+                                    .foregroundStyle(HavenColors.navy)
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Link to Claim")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showLinkProject = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+
+    // MARK: - Personal Property Edit
+
+    @ViewBuilder
+    private var personalPropertySheet: some View {
+        NavigationStack {
+            Form {
+                Section("Personal Property Value") {
+                    TextField("Amount", text: $personalPropertyInput)
+                        .keyboardType(.decimalPad)
+                }
+                Section {
+                    Text("Enter the total value of personal property (contents) for this claim. This will be added to the linked project costs for the total claim amount.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .navigationTitle("Personal Property")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showPersonalPropertyEdit = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        let amount = Double(personalPropertyInput) ?? 0
+                        Task {
+                            var updates = PropertyProjectUpdate()
+                            updates.personalPropertyAmount = amount
+                            try? await viewModel.updateProject(id: project.id, updates)
+                            showPersonalPropertyEdit = false
+                            Haptics.success()
+                        }
+                    }
+                    .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                if let amount = liveProject.personalPropertyAmount, amount > 0 {
+                    personalPropertyInput = String(Int(amount))
+                }
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: - Project Contacts Section
+
+    private var projectContactsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("CONTACTS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                Text("\(viewModel.projectContacts.count)")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(Capsule())
+
+                Spacer()
+            }
+
+            ForEach(viewModel.projectContacts) { contact in
+                HavenCard(padding: HavenTheme.spacing12) {
+                    HStack(spacing: 10) {
+                        Image(systemName: contactRoleIcon(contact.role))
+                            .font(.title3)
+                            .foregroundStyle(HavenColors.navy)
+                            .frame(width: 28)
+
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(contact.displayName)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+
+                            Text(contact.roleLabel)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+
+                            if let email = contact.contactEmail {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "envelope")
+                                        .font(.system(size: 9))
+                                    Text(email)
+                                }
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            }
+
+                            if let phone = contact.contactPhone, phone != "Not provided" {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "phone")
+                                        .font(.system(size: 9))
+                                    Text(phone)
+                                }
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                            }
+                        }
+
+                        Spacer()
+
+                        if let addedFrom = contact.addedFrom {
+                            Text(addedFrom == "email" ? "Auto-added" : addedFrom.capitalized)
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundStyle(HavenColors.textTertiary)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(HavenColors.navy.opacity(0.04))
+                                .clipShape(Capsule())
+                        }
+                    }
+                }
+                .contextMenu {
+                    if let phone = contact.contactPhone, phone != "Not provided",
+                       let url = URL(string: "tel:\(phone.replacingOccurrences(of: " ", with: ""))") {
+                        Link(destination: url) {
+                            Label("Call", systemImage: "phone")
+                        }
+                    }
+                    if let email = contact.contactEmail,
+                       let url = URL(string: "mailto:\(email)") {
+                        Link(destination: url) {
+                            Label("Email", systemImage: "envelope")
+                        }
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        Analytics.track(.projectContactRemoved, ["project_id": project.id.uuidString, "contact_name": contact.displayName])
+                        Task { await viewModel.removeProjectContact(id: contact.id) }
+                    } label: {
+                        Label("Remove", systemImage: "trash")
+                    }
+                }
+            }
+        }
+    }
+
+    private func contactRoleIcon(_ role: String?) -> String {
+        switch role {
+        case "adjuster": return "shield.lefthalf.filled"
+        case "inspector": return "magnifyingglass"
+        case "architect": return "pencil.and.ruler"
+        default: return "person.crop.circle"
+        }
+    }
+
     // MARK: - Quotes Section (Pro)
+
+    /// Groups quotes by trade for organized display
+    /// Normalize trade names for grouping — e.g., "Basement Waterproofing & Crawl Space Encapsulation"
+    /// groups with "Basement Waterproofing" by using the shorter name as the key
+    private func normalizedTradeName(_ quote: ProjectQuoteRow) -> String {
+        quote.tradeName
+    }
+
+    private var quotesByTrade: [(trade: String, quotes: [ProjectQuoteRow])] {
+        // First pass: group by exact trade name
+        let exactGrouped = Dictionary(grouping: viewModel.quotes) { $0.tradeName }
+
+        // Second pass: merge groups with similar names (one is a substring of another)
+        var merged: [(String, [ProjectQuoteRow])] = []
+        var consumedKeys: Set<String> = []
+
+        let sortedKeys = exactGrouped.keys.sorted()
+        for key in sortedKeys {
+            if consumedKeys.contains(key) { continue }
+            var groupQuotes = exactGrouped[key] ?? []
+            var groupName = key
+
+            // Find other keys that are substrings of this key or vice versa
+            for otherKey in sortedKeys where otherKey != key && !consumedKeys.contains(otherKey) {
+                let a = key.lowercased()
+                let b = otherKey.lowercased()
+                if a.contains(b) || b.contains(a) {
+                    groupQuotes.append(contentsOf: exactGrouped[otherKey] ?? [])
+                    consumedKeys.insert(otherKey)
+                    // Use the shorter name as the group label
+                    if otherKey.count < groupName.count { groupName = otherKey }
+                }
+            }
+            consumedKeys.insert(key)
+            merged.append((groupName, groupQuotes))
+        }
+
+        let grouped = Dictionary(uniqueKeysWithValues: merged)
+        return grouped.sorted { $0.key < $1.key }.map { (trade: $0.key, quotes: $0.value) }
+    }
 
     private var quotesSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
@@ -580,15 +1026,69 @@ struct ProjectDetailView: View {
                 Spacer()
             }
 
-            ForEach(viewModel.quotes) { quote in
-                NavigationLink {
-                    QuoteDetailView(quote: quote, viewModel: viewModel)
-                } label: {
-                    quoteCard(quote)
+            let trades = quotesByTrade
+            if trades.count <= 1 {
+                // Single trade or no quotes — show flat list (original behavior)
+                ForEach(viewModel.quotes) { quote in
+                    NavigationLink {
+                        QuoteDetailView(quote: quote, viewModel: viewModel)
+                    } label: {
+                        quoteCard(quote)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+
+                if viewModel.quotes.count >= 2 {
+                    compareButton(trade: trades.first?.trade, count: viewModel.quotes.count)
+                }
+            } else {
+                // Multiple trades — group into collapsible sections
+                ForEach(trades, id: \.trade) { group in
+                    VStack(alignment: .leading, spacing: 6) {
+                        // Trade header
+                        HStack(spacing: 8) {
+                            Image(systemName: tradeIcon(group.trade))
+                                .font(.system(size: 13))
+                                .foregroundStyle(HavenColors.navy700)
+                                .frame(width: 24)
+                            Text(group.trade)
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.navy800)
+                            Text("\(group.quotes.count)")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(HavenColors.navy700)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(Capsule())
+                            Spacer()
+
+                            // Lowest price badge
+                            if let lowest = group.quotes.compactMap(\.quoteTotal).min() {
+                                Text("from $\(Int(lowest).formatted())")
+                                    .font(.system(size: 10, weight: .medium))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                        .padding(.top, 6)
+
+                        ForEach(group.quotes) { quote in
+                            NavigationLink {
+                                QuoteDetailView(quote: quote, viewModel: viewModel)
+                            } label: {
+                                quoteCard(quote)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if group.quotes.count >= 2 {
+                            compareButton(trade: group.trade, count: group.quotes.count)
+                        }
+                    }
+                }
             }
 
+            // Upload button
             Button {
                 showQuoteUpload = true
                 Analytics.track(.documentUploadStarted, ["type": "quote", "project_id": project.id.uuidString])
@@ -614,25 +1114,49 @@ struct ProjectDetailView: View {
                 }
             }
             .buttonStyle(.plain)
+        }
+    }
 
-            if viewModel.quotes.count >= 2 {
-                Button {
-                    showQuoteComparison = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "arrow.left.arrow.right")
-                            .font(.caption)
-                        Text("Compare \(viewModel.quotes.count) Quotes")
-                            .font(HavenTypography.uiLabel)
-                    }
-                    .foregroundStyle(HavenColors.navy700)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(HavenColors.navy.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .buttonStyle(.plain)
+    private func compareButton(trade: String?, count: Int) -> some View {
+        Button {
+            compareTrade = trade
+            showQuoteComparison = true
+            Analytics.track(.projectQuoteCompared, ["project_id": project.id.uuidString, "trade": trade ?? "all", "quote_count": count])
+        } label: {
+            HStack(spacing: 6) {
+                Image(systemName: "arrow.left.arrow.right")
+                    .font(.caption)
+                Text("Compare \(count) \(trade ?? "") Quotes")
+                    .font(HavenTypography.uiLabel)
             }
+            .foregroundStyle(HavenColors.navy700)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(HavenColors.navy.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func tradeIcon(_ trade: String) -> String {
+        switch trade.lowercased() {
+        case "electrical": return "bolt.fill"
+        case "plumbing": return "drop.fill"
+        case "hvac": return "fan.fill"
+        case "general contractor": return "hammer.fill"
+        case "roofing": return "house.lodge.fill"
+        case "painting": return "paintbrush.fill"
+        case "flooring": return "square.grid.3x3.fill"
+        case "carpentry": return "wrench.and.screwdriver.fill"
+        case "masonry": return "building.2.fill"
+        case "landscaping": return "leaf.fill"
+        case "insulation": return "thermometer.snowflake"
+        case "drywall": return "square.stack.3d.up.fill"
+        case "demolition": return "trash.fill"
+        case "windows & doors": return "window.horizontal"
+        case "solar": return "sun.max.fill"
+        case "pool/spa": return "figure.pool.swim"
+        default: return "doc.text.fill"
         }
     }
 
@@ -643,6 +1167,7 @@ struct ProjectDetailView: View {
                     Text(quote.vendorName ?? "Contractor Quote")
                         .font(HavenTypography.body)
                         .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
                     HStack(spacing: 8) {
                         if let date = quote.quoteDate {
                             Text(date)

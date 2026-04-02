@@ -6,6 +6,7 @@ import QuickLook
 struct InboxItemDetailView: View {
     let item: DatabaseService.InboxItemRow
     let properties: [PropertyRow]
+    var projects: [PropertyProjectRow] = []
     let onProcess: (UUID?, String, String?) -> Void
     let onDismiss: () -> Void
     @Environment(\.dismiss) private var dismiss
@@ -18,6 +19,7 @@ struct InboxItemDetailView: View {
     @State private var attachmentError: String?
     @State private var senderSaved = false
     @State private var isSavingSender = false
+    @State private var showProjectPicker = false
 
     private let documentCategories = [
         "Contractor Quote", "Warranty Card", "Inspection Report",
@@ -78,6 +80,44 @@ struct InboxItemDetailView: View {
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
         .quickLookPreview($quickLookURL)
+        .sheet(isPresented: $showProjectPicker) {
+            NavigationStack {
+                List {
+                    ForEach(projects) { project in
+                        Button {
+                            Haptics.medium()
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "add_to_project", project.id.uuidString)
+                            showProjectPicker = false
+                            dismiss()
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "folder.fill")
+                                    .foregroundStyle(HavenColors.navy)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(project.name)
+                                        .font(HavenTypography.uiLabel)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text(project.category)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .navigationTitle("Add to Project")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showProjectPicker = false }
+                    }
+                }
+            }
+            .presentationDetents([.medium, .large])
+        }
         .toolbar {
             if !item.isPending {
                 ToolbarItem(placement: .destructiveAction) {
@@ -139,35 +179,48 @@ struct InboxItemDetailView: View {
 
     // MARK: - Email Info
 
+    /// The vendor/contact to offer saving — use classification vendor info, NOT the forwarder
+    private var vendorContact: (name: String?, email: String?, phone: String?)? {
+        // Priority 1: Vendor info from AI classification in metadata
+        if let meta = item.metadata,
+           let vendorName = meta.vendorName, !vendorName.isEmpty {
+            return (vendorName, meta.vendorEmail, meta.vendorPhone)
+        }
+        // Priority 2: If there's already a related contractor, don't show Save Contact at all
+        if item.relatedContractorId != nil { return nil }
+        return nil
+    }
+
     private var emailInfoSection: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            if let from = item.fromEmail, !from.isEmpty {
-                let parsed = Self.parseEmailSender(from)
+            if let vendor = vendorContact {
                 HStack(spacing: 10) {
                     Image(systemName: "person.crop.circle.fill")
                         .font(.title2)
                         .foregroundStyle(HavenColors.navy.opacity(0.5))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        if let name = parsed.name {
+                        if let name = vendor.name {
                             Text(name)
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
                         }
-                        Text(parsed.email)
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
+                        if let email = vendor.email {
+                            Text(email)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
                     }
 
                     Spacer()
 
-                    if senderSaved {
+                    if senderSaved || item.relatedContractorId != nil {
                         Label("Saved", systemImage: "checkmark.circle.fill")
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(.green)
                     } else {
                         Button {
-                            Task { await saveSenderAsContact(name: parsed.name, email: parsed.email) }
+                            Task { await saveSenderAsContact(name: vendor.name, email: vendor.email ?? "") }
                         } label: {
                             HStack(spacing: 4) {
                                 if isSavingSender {
@@ -185,7 +238,7 @@ struct InboxItemDetailView: View {
                             .background(HavenColors.navy.opacity(0.08))
                             .clipShape(Capsule())
                         }
-                        .disabled(isSavingSender)
+                        .disabled(isSavingSender || vendor.email == nil)
                     }
                 }
             }
@@ -481,21 +534,74 @@ struct InboxItemDetailView: View {
 
             // Action buttons
             VStack(spacing: HavenTheme.spacing8) {
-                HavenButton(
-                    title: isProcessing ? "Processing..." : primaryActionTitle,
-                    action: {
+                if isQuoteAction {
+                    // Quote actions: New Project, Add to Project, Save as Document
+                    HStack(spacing: HavenTheme.spacing8) {
+                        HavenButton(
+                            title: "New Project",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                let propId = selectedPropertyId ?? properties.first?.id
+                                onProcess(propId, "process_quote", nil)
+                                dismiss()
+                            },
+                            icon: "hammer.fill",
+                            isLoading: isProcessing,
+                            isDisabled: isProcessing
+                        )
+
+                        if !projects.isEmpty {
+                            Button {
+                                showProjectPicker = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder.badge.plus")
+                                    Text("Add to Project")
+                                }
+                                .font(HavenTypography.uiButton)
+                                .foregroundStyle(HavenColors.navy)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                            }
+                            .disabled(isProcessing)
+                        }
+                    }
+
+                    Button {
                         guard !isProcessing else { return }
                         isProcessing = true
                         let propId = selectedPropertyId ?? properties.first?.id
-                        let category = (item.actionType == "classify_document" || item.actionType == "review") ? selectedCategory : nil
-                        onProcess(propId, primaryActionType, category)
-                    },
-                    icon: primaryActionIcon,
-                    isLoading: isProcessing,
-                    isDisabled: isProcessing
-                )
+                        onProcess(propId, "process_document", "Contractor Quote")
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "doc.fill").font(.caption)
+                            Text("Just Save Document")
+                                .font(HavenTypography.uiLabel)
+                        }
+                        .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .disabled(isProcessing)
+                } else {
+                    HavenButton(
+                        title: isProcessing ? "Processing..." : primaryActionTitle,
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            let category = (item.actionType == "classify_document" || item.actionType == "review") ? selectedCategory : nil
+                            onProcess(propId, primaryActionType, category)
+                        },
+                        icon: primaryActionIcon,
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing
+                    )
+                }
 
-                Button("Skip") {
+                Button("Dismiss") {
                     onDismiss()
                     dismiss()
                 }
@@ -506,6 +612,10 @@ struct InboxItemDetailView: View {
         .padding(HavenTheme.spacing16)
         .background(HavenColors.navy.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private var isQuoteAction: Bool {
+        item.actionType == "quote_received" || item.type == "contractor_quote" || (item.type == "project_created" && item.isPending)
     }
 
     private var primaryActionTitle: String {

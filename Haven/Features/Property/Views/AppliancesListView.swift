@@ -95,7 +95,10 @@ struct AppliancesListView: View {
                 propertyId: propertyId,
                 householdId: householdId,
                 existingSystems: appliances,
-                onComplete: { Task { await reloadAppliances() } }
+                onComplete: { newSystems in
+                    appliances.append(contentsOf: newSystems)
+                    Task { await reloadAppliances() }
+                }
             )
         }
     }
@@ -232,9 +235,11 @@ struct AppliancesListView: View {
 
         if hasImage, let name = fullAssetName {
             Image(name)
+                .renderingMode(isTemplateRendered(name) ? .template : .original)
                 .resizable()
                 .scaledToFit()
                 .frame(width: size, height: size)
+                .foregroundStyle(BrandTheme.color(for: brand) ?? HavenColors.navy800)
                 .clipShape(RoundedRectangle(cornerRadius: size * 0.16))
         } else {
             // Fallback: colored initial for brands without logos
@@ -251,6 +256,12 @@ struct AppliancesListView: View {
     @ViewBuilder
     private func brandLogo(_ brand: String) -> some View {
         Self.brandLogoView(brand, size: 24)
+    }
+
+    /// Brands whose logos are white/light and need template rendering with tint
+    private static func isTemplateRendered(_ assetName: String) -> Bool {
+        let templateBrands: Set<String> = ["brand-ao-smith", "brand-zoeller"]
+        return templateBrands.contains(assetName)
     }
 
     static func scoreColor(_ score: Int) -> Color {

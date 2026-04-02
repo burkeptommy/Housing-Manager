@@ -83,20 +83,33 @@ serve(async (req: Request) => {
     let detectedCategorySlugs: string[] = [];
     let brandWords: string[] = [];
     let otherWords: string[] = [];
+    const consumedIndices = new Set<number>();
 
-    for (const word of words) {
-      // Check single words and two-word combos
-      const twoWord = words.slice(words.indexOf(word), words.indexOf(word) + 2).join(" ");
+    for (let i = 0; i < words.length; i++) {
+      if (consumedIndices.has(i)) continue;
+      const word = words[i];
 
-      if (categoryAliases[twoWord]) {
-        detectedCategorySlugs.push(...categoryAliases[twoWord]);
-      } else if (categoryAliases[word]) {
+      // Check two-word combos first (e.g., "heat pump", "water heater", "mini split")
+      if (i + 1 < words.length) {
+        const twoWord = `${word} ${words[i + 1]}`;
+        if (categoryAliases[twoWord]) {
+          detectedCategorySlugs.push(...categoryAliases[twoWord]);
+          consumedIndices.add(i);
+          consumedIndices.add(i + 1);
+          continue;
+        }
+      }
+
+      // Single-word category match
+      if (categoryAliases[word]) {
         detectedCategorySlugs.push(...categoryAliases[word]);
+        consumedIndices.add(i);
       } else {
         // Check prefix match — "induc" should match "induction"
         const prefixMatch = Object.keys(categoryAliases).find(alias => alias.startsWith(word) && word.length >= 3);
         if (prefixMatch) {
           detectedCategorySlugs.push(...categoryAliases[prefixMatch]);
+          consumedIndices.add(i);
         } else if (/\d/.test(word)) {
           otherWords.push(word); // Model number, series number, or spec (e.g., "800", "RF29DB")
         } else {
@@ -202,6 +215,31 @@ serve(async (req: Request) => {
         .limit(limit);
 
       if (data) results = data;
+    }
+
+    // Strategy 3b: Delimiter-normalized model number search
+    // Handles user input like "BOVA60HDN1M20G" matching "BOVA-60HDN1-M20G"
+    // Uses SQL replace() to strip delimiters server-side for efficient matching
+    if (results.length === 0) {
+      const normalizedQuery = query.replace(/[-_.\s]/g, "").toLowerCase();
+      if (normalizedQuery.length >= 4) {
+        const { data } = await supabase.rpc("search_model_normalized", {
+          search_query: normalizedQuery,
+          result_limit: limit,
+        });
+
+        if (data && data.length > 0) {
+          // Re-fetch full records with joins for the matched IDs
+          const matchedIds = data.map((r: any) => r.id);
+          const { data: fullResults } = await supabase
+            .from("equipment_catalog")
+            .select(selectFields)
+            .in("id", matchedIds)
+            .limit(limit);
+
+          if (fullResults) results = fullResults;
+        }
+      }
     }
 
     // Strategy 4: Full-text search on model_name

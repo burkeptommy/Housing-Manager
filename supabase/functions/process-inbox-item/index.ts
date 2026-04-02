@@ -66,6 +66,15 @@ serve(async (req: Request) => {
     const householdId = item.household_id;
     const metadata = item.metadata ?? {};
 
+    // --- DEDUP: Prevent double-processing ---
+    if (item.action_completed && action !== "dismiss" && action !== "move_to_project") {
+      console.log(`[process-inbox] Item ${inbox_item_id} already processed, skipping`);
+      return new Response(
+        JSON.stringify({ success: true, already_processed: true }),
+        { status: 200, headers }
+      );
+    }
+
     // --- HANDLE DISMISS ---
     if (action === "dismiss") {
       await supabase
@@ -255,6 +264,160 @@ serve(async (req: Request) => {
           related_contractor_id: contractorId,
         })
         .eq("id", inbox_item_id);
+    }
+
+    // --- ADD TO EXISTING PROJECT ---
+    else if (action === "add_to_project") {
+      const { target_project_id } = body;
+      if (!target_project_id) {
+        return new Response(
+          JSON.stringify({ error: "target_project_id required" }),
+          { status: 400, headers }
+        );
+      }
+
+      // Auto-create vendor if we have info
+      let contractorId: string | null = null;
+      if (classification?.vendorName) {
+        const vendorName = classification.vendorName as string;
+        const { data: existing } = await supabase
+          .from("contractors")
+          .select("id")
+          .eq("household_id", householdId)
+          .ilike("company_name", `%${vendorName}%`)
+          .limit(1);
+
+        if (existing && existing.length > 0) {
+          contractorId = existing[0].id;
+        } else {
+          const { data: newVendor } = await supabase
+            .from("contractors")
+            .insert({
+              household_id: householdId,
+              company_name: vendorName,
+              phone: (classification.vendorPhone as string) || "Not provided",
+              email: (classification.vendorEmail as string) || null,
+              address: (classification.vendorAddress as string) || null,
+              license_number: (classification.vendorLicense as string) || null,
+              notes: `Auto-added from forwarded email: ${subject}`,
+            })
+            .select("id")
+            .single();
+          if (newVendor) {
+            contractorId = newVendor.id;
+            actions.push(`created_vendor:${vendorName}`);
+          }
+        }
+      }
+
+      // Add contractor to project_contacts
+      if (contractorId) {
+        try {
+          await supabase.from("project_contacts").upsert({
+            project_id: target_project_id,
+            household_id: householdId,
+            contractor_id: contractorId,
+            contact_name: (classification?.vendorName as string) || null,
+            contact_email: (classification?.vendorEmail as string) || null,
+            contact_phone: (classification?.vendorPhone as string) || null,
+            role: "contractor",
+            added_from: "email",
+          }, { onConflict: "project_id,contractor_id" });
+        } catch (_e) { /* non-blocking */ }
+      }
+
+      // Run quote analysis and save to the target project
+      if (attachmentBase64 || emailBody) {
+        try {
+          // Get project info for analysis context
+          const { data: targetProject } = await supabase
+            .from("property_projects")
+            .select("name, category")
+            .eq("id", target_project_id)
+            .single();
+
+          const analyzePayload: Record<string, unknown> = {
+            project_name: targetProject?.name || (classification?.projectType as string) || "Project",
+            project_category: targetProject?.category || (classification?.projectType as string) || null,
+            property_location: location,
+          };
+          if (attachmentBase64) {
+            analyzePayload.image_base64 = attachmentBase64;
+          } else if (emailBody && emailBody.length > 100) {
+            analyzePayload.text = emailBody;
+          }
+
+          const analyzeRes = await fetch(
+            `${supabaseUrl}/functions/v1/analyze-quote`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${serviceRoleKey}`,
+              },
+              body: JSON.stringify(analyzePayload),
+            }
+          );
+
+          if (analyzeRes.ok) {
+            const analyzeData = await analyzeRes.json();
+            if (analyzeData.analysis) {
+              // Save as project_quote on the target project
+              await supabase.from("project_quotes").insert({
+                project_id: target_project_id,
+                household_id: householdId,
+                contractor_id: contractorId,
+                quote_date: analyzeData.analysis.quoteDate || null,
+                quote_total: analyzeData.analysis.overallAssessment?.totalQuoted ?? analyzeData.analysis.quoteTotal ?? null,
+                estimated_fair_total: analyzeData.analysis.overallAssessment?.estimatedFairTotal ?? null,
+                overall_rating: analyzeData.analysis.overallAssessment?.rating ?? null,
+                analysis: analyzeData.analysis,
+                file_path: item.attachment_path || null,
+              });
+              actions.push("analyzed_quote");
+              result.analysis = analyzeData.analysis;
+            }
+          }
+        } catch (err) {
+          console.error(`[process-inbox] Quote analysis for existing project failed: ${err}`);
+          actions.push("quote_analysis_failed");
+        }
+      }
+
+      // Append email summary to project
+      try {
+        const { data: projData } = await supabase
+          .from("property_projects")
+          .select("email_summaries")
+          .eq("id", target_project_id)
+          .single();
+        const summaries = (projData?.email_summaries as any[]) || [];
+        summaries.push({
+          date: new Date().toISOString(),
+          subject,
+          from: fromAddress,
+          summary: item.summary,
+          type: "contractor_quote",
+        });
+        await supabase
+          .from("property_projects")
+          .update({ email_summaries: summaries })
+          .eq("id", target_project_id);
+      } catch (_e) { /* non-blocking */ }
+
+      // Update inbox item
+      await supabase
+        .from("inbox_items")
+        .update({
+          action_completed: true,
+          type: "project_created",
+          related_project_id: target_project_id,
+          related_contractor_id: contractorId,
+        })
+        .eq("id", inbox_item_id);
+
+      result.project_id = target_project_id;
+      actions.push(`added_to_project:${target_project_id}`);
     }
 
     // --- PROCESS DOCUMENT ---

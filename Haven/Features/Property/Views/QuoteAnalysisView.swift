@@ -128,19 +128,10 @@ struct QuoteAnalysisView: View {
             overallCard(assessment)
         }
 
-        // Line items
-        if let items = analysis.lineItems, !items.isEmpty {
-            lineItemsSection(items)
-        }
-
-        // DIY alternative
-        if let diy = analysis.suggestedDiyAlternative {
-            diyCard(diy)
-        }
-
-        // Negotiation tips
-        if let tips = analysis.overallAssessment?.negotiationTips, !tips.isEmpty {
-            tipsCard(tips)
+        // Negotiation tips (prioritize itemized quote tip)
+        let allTips = buildTips(analysis)
+        if !allTips.isEmpty {
+            tipsCard(allTips)
         }
 
         // Save quote confirmation
@@ -156,6 +147,15 @@ struct QuoteAnalysisView: View {
     }
 
     // MARK: - Cards
+
+    private func buildTips(_ analysis: QuoteAnalysis) -> [String] {
+        var tips = analysis.overallAssessment?.negotiationTips ?? []
+        let hasItemized = analysis.hasItemizedPricing ?? true
+        if !hasItemized && !tips.contains(where: { $0.lowercased().contains("itemized") }) {
+            tips.insert("Ask your contractor for an itemized quote breakdown. This helps you compare specific line items across vendors and negotiate individual costs.", at: 0)
+        }
+        return tips
+    }
 
     private func vendorCard(_ vendor: QuoteVendor) -> some View {
         HavenCard {

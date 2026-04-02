@@ -113,7 +113,8 @@ Return this exact JSON structure:
     "phone": "Phone if visible",
     "email": "Email if visible",
     "address": "Address if visible",
-    "license": "License number if visible"
+    "license": "License number if visible",
+    "trade": "The contractor's primary trade/specialty (e.g., Electrical, Plumbing, HVAC, General Contractor, Roofing, Painting, Flooring, Carpentry, Masonry, Landscaping, Insulation, Drywall, Demolition, Windows & Doors, Solar, Fire Protection, Septic, Well, Pool/Spa)"
   },
   "projectType": "Inferred project category (e.g., Kitchen Renovation, Bathroom Remodel, Roofing)",
   "quoteDate": "Date on quote if visible, or null",

@@ -3,7 +3,7 @@ import SwiftUI
 struct AddWarrantySheet: View {
     let systemId: UUID
     var householdId: UUID?
-    var onComplete: (() -> Void)?
+    var onComplete: ((WarrantyRow) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var provider = ""
@@ -117,11 +117,11 @@ struct AddWarrantySheet: View {
                 claimPhone: claimPhone.isEmpty ? nil : claimPhone,
                 policyNumber: policyNumber.isEmpty ? nil : policyNumber
             )
-            _ = try await DatabaseService.shared.createWarranty(insert)
+            let warranty = try await DatabaseService.shared.createWarranty(insert)
 
             Haptics.success()
             Analytics.track(.warrantyCreated, ["system_id": systemId.uuidString, "warranty_type": warrantyType])
-            onComplete?()
+            onComplete?(warranty)
             dismiss()
         } catch {
             self.error = error.localizedDescription

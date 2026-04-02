@@ -5,13 +5,16 @@ import SwiftUI
 struct InboxItemCard: View {
     let item: DatabaseService.InboxItemRow
     let properties: [PropertyRow]
-    let onProcess: (UUID?, String, String?) -> Void
+    let projects: [PropertyProjectRow]
+    let onProcess: (UUID?, String, String?, UUID?) -> Void  // propertyId, action, category, targetProjectId
     let onDismiss: () -> Void
 
     @State private var selectedPropertyId: UUID?
     @State private var selectedCategory: String = "Other"
     @State private var isProcessing = false
     @State private var expanded = false
+    @State private var showProjectPicker = false
+    @State private var selectedProjectId: UUID?
 
     private let documentCategories = [
         "Contractor Quote", "Warranty Card", "Inspection Report",
@@ -180,7 +183,7 @@ struct InboxItemCard: View {
             HStack(spacing: HavenTheme.spacing8) {
                 HavenButton(title: "Yes, that's right", action: {
                     Haptics.medium()
-                    onProcess(nil, "confirm_project_match", nil)
+                    onProcess(nil, "confirm_project_match", nil, nil)
                 }, icon: "checkmark.circle.fill")
 
                 Button {
@@ -233,12 +236,12 @@ struct InboxItemCard: View {
             HStack(spacing: HavenTheme.spacing8) {
                 HavenButton(title: "Confirm", action: {
                     Haptics.medium()
-                    onProcess(nil, "confirm_document_category", nil)
+                    onProcess(nil, "confirm_document_category", nil, nil)
                 }, icon: "checkmark.circle.fill")
 
                 Button {
                     Haptics.medium()
-                    onProcess(nil, "change_document_category", selectedCategory)
+                    onProcess(nil, "change_document_category", selectedCategory, nil)
                 } label: {
                     Text("Change Category")
                         .font(HavenTypography.uiLabel)
@@ -335,73 +338,162 @@ struct InboxItemCard: View {
             }
 
             // Action buttons
-            HStack(spacing: HavenTheme.spacing8) {
-                if item.actionType == "assign_property" || item.type == "contractor_quote" || item.type == "project_created" || (item.type == "other" && item.actionType != "classify_document" && item.actionType != "review") {
-                    Button {
-                        guard !isProcessing else { return }
-                        isProcessing = true
-                        Haptics.medium()
-                        let propId = selectedPropertyId ?? properties.first?.id
-                        onProcess(propId, "process_quote", nil)
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isProcessing {
-                                ProgressView().tint(.white).controlSize(.mini)
-                            } else {
+            let isQuoteType = item.actionType == "quote_received" || item.actionType == "assign_property" || item.type == "contractor_quote" || item.type == "project_created" || (item.type == "other" && item.actionType != "classify_document" && item.actionType != "review")
+
+            if isQuoteType {
+                VStack(spacing: HavenTheme.spacing8) {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        Button {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            Haptics.medium()
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_quote", nil, nil)
+                        } label: {
+                            HStack(spacing: 6) {
                                 Image(systemName: "hammer.fill")
+                                Text("New Project")
                             }
-                            Text("Create Project")
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 8)
+                            .background(selectedPropertyId != nil || properties.count <= 1 ? HavenColors.navy : HavenColors.navy.opacity(0.4))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                         }
-                        .font(HavenTypography.uiButton)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, HavenTheme.spacing12)
-                        .padding(.vertical, 8)
-                        .background(selectedPropertyId != nil ? HavenColors.navy : HavenColors.navy.opacity(0.4))
-                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
-                    }
-                    .disabled(selectedPropertyId == nil && properties.count > 1 || isProcessing)
-                }
+                        .disabled(selectedPropertyId == nil && properties.count > 1 || isProcessing)
 
-                if item.actionType == "classify_document" || item.actionType == "review" || item.type == "document_stored" {
-                    Button {
-                        guard !isProcessing else { return }
-                        isProcessing = true
-                        Haptics.medium()
-                        let propId = selectedPropertyId ?? properties.first?.id
-                        onProcess(propId, "process_document", selectedCategory)
-                    } label: {
-                        HStack(spacing: 6) {
-                            if isProcessing {
-                                ProgressView().tint(.white).controlSize(.mini)
-                            } else {
+                        if !projects.isEmpty {
+                            Button {
+                                showProjectPicker = true
+                            } label: {
+                                HStack(spacing: 6) {
+                                    Image(systemName: "folder.badge.plus")
+                                    Text("Add to Project")
+                                }
+                                .font(HavenTypography.uiButton)
+                                .foregroundStyle(HavenColors.navy)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 8)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                            }
+                            .disabled(isProcessing)
+                        }
+                    }
+
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Button {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            Haptics.medium()
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_document", "Contractor Quote", nil)
+                        } label: {
+                            HStack(spacing: 4) {
                                 Image(systemName: "doc.fill")
+                                    .font(.caption)
+                                Text("Just Save Document")
+                                    .font(HavenTypography.uiLabel)
                             }
-                            Text("Save Document")
+                            .foregroundStyle(HavenColors.textTertiary)
                         }
-                        .font(HavenTypography.uiButton)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, HavenTheme.spacing12)
-                        .padding(.vertical, 8)
-                        .background(HavenColors.navy)
-                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        .disabled(isProcessing)
+
+                        Spacer()
+
+                        Button { onDismiss() } label: {
+                            Text("Dismiss")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
                     }
-                    .disabled(isProcessing)
                 }
+                .sheet(isPresented: $showProjectPicker) {
+                    projectPickerSheet
+                }
+            }
 
-                Spacer()
+            if !isQuoteType {
+                HStack(spacing: HavenTheme.spacing8) {
+                    if item.actionType == "classify_document" || item.actionType == "review" || item.type == "document_stored" {
+                        Button {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            Haptics.medium()
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_document", selectedCategory, nil)
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "doc.fill")
+                                Text("Save Document")
+                            }
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, HavenTheme.spacing12)
+                            .padding(.vertical, 8)
+                            .background(HavenColors.navy)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        }
+                        .disabled(isProcessing)
+                    }
 
-                Button {
-                    onDismiss()
-                } label: {
-                    Text("Skip")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textTertiary)
+                    Spacer()
+
+                    Button { onDismiss() } label: {
+                        Text("Skip")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
                 }
             }
         }
         .padding(HavenTheme.spacing12)
         .background(HavenColors.navy.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+    }
+
+    // MARK: - Project Picker Sheet
+
+    private var projectPickerSheet: some View {
+        NavigationStack {
+            List {
+                ForEach(projects) { project in
+                    Button {
+                        Haptics.medium()
+                        let propId = selectedPropertyId ?? properties.first?.id
+                        onProcess(propId, "add_to_project", nil, project.id)
+                        showProjectPicker = false
+                    } label: {
+                        HStack(spacing: 10) {
+                            Image(systemName: "folder.fill")
+                                .foregroundStyle(HavenColors.navy)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(project.name)
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text(project.category)
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            Spacer()
+                            Text(project.status.capitalized)
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                }
+            }
+            .listStyle(.plain)
+            .navigationTitle("Add to Project")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showProjectPicker = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Completed Action Area

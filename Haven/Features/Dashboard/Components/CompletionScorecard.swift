@@ -10,7 +10,7 @@ struct CompletionScorecard: View {
     // Ensure the level icon is visible on the navy background
     private var levelColor: Color {
         let color = level.color.color
-        // If the level color is navy (Starter), use cream so it's visible on the navy card
+        // If the level color is navy (The Foundation), use cream so it's visible on the navy card
         if level.id == 1 { return HavenColors.beige300 }
         return color
     }
@@ -40,7 +40,7 @@ struct CompletionScorecard: View {
                             .foregroundStyle(HavenColors.beige300)
                             .contentTransition(.numericText(value: animatedProgress))
                     } else {
-                        Text("Max Level — Estate Master!")
+                        Text("Max Level — The Legacy!")
                             .font(.system(size: 13, weight: .semibold, design: .rounded))
                             .foregroundStyle(HavenColors.beige300)
                     }

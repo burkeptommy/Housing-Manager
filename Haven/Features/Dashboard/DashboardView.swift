@@ -251,7 +251,8 @@ struct DashboardView: View {
                     propertyId: viewModel.primaryPropertyId ?? UUID(),
                     householdId: viewModel.primaryHouseholdId ?? UUID(),
                     existingSystems: viewModel.homeSystems,
-                    onComplete: {
+                    onComplete: { newSystems in
+                        viewModel.homeSystems.append(contentsOf: newSystems)
                         Task { await viewModel.refresh() }
                     }
                 )

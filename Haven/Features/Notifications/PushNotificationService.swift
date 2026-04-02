@@ -86,4 +86,25 @@ final class PushNotificationService {
             print("[Push] Failed to send task assignment notification: \(error)")
         }
     }
+
+    func sendTaskCompletedNotification(
+        taskTitle: String,
+        completedByName: String,
+        recipientUserIds: [UUID],
+        taskId: UUID
+    ) async {
+        guard !recipientUserIds.isEmpty else { return }
+        print("[Push] Sending task completion to \(recipientUserIds.count) recipient(s)")
+        do {
+            try await HavenSupabase.sendPushNotification(
+                recipientUserIds: recipientUserIds.map(\.uuidString),
+                title: "Task Completed",
+                body: "\(completedByName) completed: \(taskTitle)",
+                data: ["type": "task_completed", "task_id": taskId.uuidString]
+            )
+            print("[Push] Task completion notification sent successfully")
+        } catch {
+            print("[Push] Failed to send task completion notification: \(error)")
+        }
+    }
 }

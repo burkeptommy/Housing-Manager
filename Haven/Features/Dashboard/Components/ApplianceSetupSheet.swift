@@ -11,7 +11,7 @@ struct ApplianceSetupSheet: View {
     let propertyId: UUID
     let householdId: UUID
     let existingSystems: [HomeSystemRow]
-    var onComplete: (() -> Void)?
+    var onComplete: (([HomeSystemRow]) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var appliances: [ApplianceOption] = []
@@ -145,6 +145,7 @@ struct ApplianceSetupSheet: View {
         let existingNames = Set(existingSystems.filter { $0.category == "Appliance" }.map { $0.name.lowercased() })
         let toCreate = appliances.filter { $0.isSelected && !existingNames.contains($0.name.lowercased()) }
 
+        var createdSystems: [HomeSystemRow] = []
         for appliance in toCreate {
             let insert = HomeSystemInsert(
                 propertyId: propertyId,
@@ -153,12 +154,18 @@ struct ApplianceSetupSheet: View {
                 category: "Appliance",
                 status: "Good"
             )
-            _ = try? await DatabaseService.shared.createHomeSystem(insert)
+            if let system = try? await DatabaseService.shared.createHomeSystem(insert) {
+                createdSystems.append(system)
+            }
         }
 
         Analytics.track(.applianceSetupCompleted, ["count": toCreate.count, "appliances": toCreate.map(\.name).joined(separator: ",")])
         Haptics.success()
-        onComplete?()
+        if !createdSystems.isEmpty {
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
+                userInfo: ["action": "created", "id": createdSystems.first!.id.uuidString])
+        }
+        onComplete?(createdSystems)
         dismiss()
     }
 }

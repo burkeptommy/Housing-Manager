@@ -31,6 +31,117 @@ interface EmailClassification {
   summary: string;
 }
 
+// --- iCal PARSER ---
+// Lightweight parser for VCALENDAR/VEVENT data from calendar invite emails.
+// No external dependencies — handles the standard fields we need.
+interface ParsedICalEvent {
+  summary: string | null;
+  dtstart: string | null;
+  dtend: string | null;
+  allDay: boolean;
+  location: string | null;
+  description: string | null;
+  rrule: string | null;
+}
+
+function parseICalEvents(icalData: string): ParsedICalEvent[] {
+  const events: ParsedICalEvent[] = [];
+
+  // Unfold iCal line continuations (lines starting with space or tab are continuations)
+  const unfolded = icalData.replace(/\r?\n[ \t]/g, "");
+  const lines = unfolded.split(/\r?\n/);
+
+  let inEvent = false;
+  let current: ParsedICalEvent | null = null;
+
+  for (const line of lines) {
+    if (line === "BEGIN:VEVENT") {
+      inEvent = true;
+      current = {
+        summary: null,
+        dtstart: null,
+        dtend: null,
+        allDay: false,
+        location: null,
+        description: null,
+        rrule: null,
+      };
+      continue;
+    }
+
+    if (line === "END:VEVENT" && current) {
+      if (current.dtstart) {
+        events.push(current);
+      }
+      inEvent = false;
+      current = null;
+      continue;
+    }
+
+    if (!inEvent || !current) continue;
+
+    // Parse property:value, handling parameters like DTSTART;VALUE=DATE:20260401
+    const colonIdx = line.indexOf(":");
+    if (colonIdx === -1) continue;
+
+    const fullProp = line.substring(0, colonIdx);
+    const value = line.substring(colonIdx + 1).trim();
+    const propName = fullProp.split(";")[0].toUpperCase();
+    const params = fullProp.toUpperCase();
+
+    switch (propName) {
+      case "SUMMARY":
+        current.summary = unescapeIcal(value);
+        break;
+      case "DTSTART": {
+        current.dtstart = icalDateToISO(value);
+        // All-day events use VALUE=DATE (no time component)
+        current.allDay = params.includes("VALUE=DATE") && !params.includes("VALUE=DATE-TIME");
+        break;
+      }
+      case "DTEND":
+        current.dtend = icalDateToISO(value);
+        break;
+      case "LOCATION":
+        current.location = unescapeIcal(value);
+        break;
+      case "DESCRIPTION":
+        current.description = unescapeIcal(value);
+        break;
+      case "RRULE":
+        current.rrule = value;
+        break;
+    }
+  }
+
+  return events;
+}
+
+function icalDateToISO(value: string): string | null {
+  // Formats: 20260401T130000Z, 20260401T130000, 20260401
+  const cleaned = value.replace(/[^0-9TZ]/g, "");
+
+  if (cleaned.length === 8) {
+    // All-day: 20260401
+    return `${cleaned.substring(0, 4)}-${cleaned.substring(4, 6)}-${cleaned.substring(6, 8)}T00:00:00`;
+  }
+
+  // 20260401T130000 or 20260401T130000Z
+  const match = cleaned.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})(Z?)$/);
+  if (!match) return null;
+
+  const [, y, m, d, h, min, s, z] = match;
+  return `${y}-${m}-${d}T${h}:${min}:${s}${z ? "Z" : ""}`;
+}
+
+function unescapeIcal(value: string): string {
+  return value
+    .replace(/\\n/g, "\n")
+    .replace(/\\,/g, ",")
+    .replace(/\\;/g, ";")
+    .replace(/\\\\/g, "\\");
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -257,6 +368,103 @@ serve(async (req: Request) => {
       );
     }
 
+    // --- CALENDAR INVITE DETECTION ---
+    // When someone adds alfred@havenhome.dev as a guest on a calendar event,
+    // the email contains inline text/calendar (iCal) data with VEVENT blocks.
+    // Detect and parse these to create family_events directly.
+    const allParsedAttachments = [
+      ...(attachmentBase64 ? [{ base64: attachmentBase64, contentType: attachmentContentType || "", filename: attachmentFilename || "" }] : []),
+      ...additionalAttachments,
+    ];
+    const calendarAttachment = allParsedAttachments.find(
+      att => att.contentType.includes("text/calendar") || att.contentType.includes("application/ics") || att.filename.endsWith(".ics")
+    );
+
+    // Also check the email body for inline iCal data (some providers embed it directly)
+    const inlineIcal = emailBody.includes("BEGIN:VCALENDAR") ? emailBody : null;
+    const icalSource = calendarAttachment
+      ? atob(calendarAttachment.base64)
+      : inlineIcal;
+
+    if (icalSource) {
+      console.log(`[receive-email] Calendar invite detected — parsing iCal data`);
+      try {
+        const events = parseICalEvents(icalSource);
+        if (events.length > 0) {
+          console.log(`[receive-email] Parsed ${events.length} calendar event(s)`);
+          for (const event of events) {
+            await supabase.from("family_events").insert({
+              household_id: householdId,
+              title: event.summary || subject || "Calendar Event",
+              start_date: event.dtstart,
+              end_date: event.dtend || null,
+              all_day: event.allDay || false,
+              location: event.location || null,
+              notes: event.description || null,
+              source: "email_invite",
+              recurrence_rule: event.rrule || null,
+            });
+          }
+
+          // Update placeholder to show the imported events
+          const eventTitles = events.map(e => e.summary || "Untitled").join(", ");
+          if (placeholderId) {
+            await supabase.from("inbox_items").update({
+              type: "family",
+              title: events.length === 1
+                ? `Calendar invite: ${events[0].summary || subject}`
+                : `${events.length} calendar events added`,
+              summary: events.length === 1
+                ? `Event on ${events[0].dtstart} from calendar invite`
+                : `Events: ${eventTitles}`,
+              status: "ready",
+              family_category: "events",
+              event_date: events[0].dtstart,
+            }).eq("id", placeholderId);
+          }
+
+          // Send push notification about the calendar event
+          try {
+            const { data: householdUsers } = await supabase
+              .from("users")
+              .select("id")
+              .eq("household_id", householdId);
+            if (householdUsers && householdUsers.length > 0) {
+              const supabaseUrlEnv = Deno.env.get("SUPABASE_URL") ?? "";
+              const serviceRoleKeyEnv = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
+              await fetch(`${supabaseUrlEnv}/functions/v1/send-push-notification`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${serviceRoleKeyEnv}`,
+                },
+                body: JSON.stringify({
+                  recipient_user_ids: householdUsers.map((u: { id: string }) => u.id),
+                  title: "Calendar event added",
+                  body: events.length === 1
+                    ? `${events[0].summary || "New event"} added to family events`
+                    : `${events.length} events added to family events`,
+                  data: { type: "calendar_invite" },
+                }),
+              });
+            }
+          } catch (_pushErr) { /* non-blocking */ }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              type: "calendar_invite",
+              events_created: events.length,
+            }),
+            { status: 200, headers }
+          );
+        }
+      } catch (icalErr) {
+        console.error(`[receive-email] iCal parse failed, falling through to normal classification: ${icalErr}`);
+        // Fall through to normal email classification
+      }
+    }
+
     // --- SEND INSTANT PUSH NOTIFICATION (fire-and-forget) ---
     // Acknowledge receipt immediately so the user doesn't think their email was lost.
     // This runs in the background — we don't await it.
@@ -399,7 +607,8 @@ Respond with ONLY valid JSON:
   "summary": "1-2 sentence summary of what this email contains",
   "familyCategory": "school | events | medical | activities | travel | personal | other — only if type is family, otherwise null",
   "familyMemberName": "name of the family member this relates to, or null",
-  "eventDate": "ISO 8601 datetime of the event/appointment/deadline if one is mentioned (e.g. '2026-03-29T13:00:00'), or null. Extract from the forwarded content, not the forward date.",
+  "eventDate": "ISO 8601 datetime of the FIRST event/appointment/deadline if one is mentioned (e.g. '2026-03-29T13:00:00'), or null. Extract from the forwarded content, not the forward date.",
+  "events": "Array of ALL events/dates mentioned in the email. Each entry: { \"title\": \"Event name\", \"date\": \"ISO 8601\", \"endDate\": \"ISO 8601 or null\", \"allDay\": true/false, \"location\": \"location or null\" }. If only one event, array of one. If no events, empty array []. IMPORTANT: Extract ALL events — if email says 'here are 7 events', return all 7.",
   "billVendor": "Name of billing company/vendor if type is bill_invoice, or null",
   "billAmount": "Dollar amount of the bill if present (number, not string), or null",
   "billDueDate": "Due date in ISO 8601 if present, or null",
@@ -576,65 +785,202 @@ Respond with ONLY valid JSON:
     // --- STEP 2: TYPE-SPECIFIC ACTIONS ---
 
     if (classification.type === "contractor_quote") {
-      if (!property) {
-        // No property — can't auto-create project (property_id is required).
-        // Create actionable inbox item so user can assign a property.
-        console.log(`[receive-email] No property for household — creating actionable inbox item`);
-        actions.push("needs_property_assignment");
-        // The inbox item is created in Step 3 with needs_action = true
+      // QUOTES: Never auto-create a project. Save the attachment and vendor,
+      // then prompt the user to choose: New Project, Existing Project, or Save as Document.
+      actions.push("quote_received");
+      console.log(`[receive-email] Contractor quote received — awaiting user action. Vendor: ${classification.vendorName || "unknown"}`);
 
-      } else {
-      // CHECK FOR EXISTING MATCHING PROJECT first — so multiple quotes for the
-      // same type of work get attached to one project instead of creating duplicates.
+      if (false) {
+      // --- DISABLED: Auto project matching/creation ---
+      // This entire block is preserved but disabled. Quotes now always prompt the user.
+      // MULTI-SIGNAL PROJECT MATCHING — finds the right project using:
+      // 1. Sender email → contractor → project_contacts/project_quotes (strongest signal)
+      // 2. Email subject thread matching (Re:/Fwd: of known project name)
+      // 3. Category/name normalization (fallback)
       const projectName = classification.projectType || `Quote from ${classification.vendorName || "Contractor"}`;
       const projectCategory = classification.projectType || "Other";
 
       let project: { id: string } | null = null;
       let isExistingProject = false;
+      let matchMethod = "none";
 
-      // Look for an active project with matching category on this property
-      const { data: existingProjects } = await supabase
-        .from("property_projects")
-        .select("id, name, category")
-        .eq("household_id", householdId)
-        .eq("property_id", property.id)
-        .in("status", ["planning", "in_progress"])
-        .limit(10);
+      // --- SIGNAL 1: Sender email → existing contractor → project association ---
+      // If this sender is already a known contractor, find projects they're associated with.
+      if (!project && senderEmail) {
+        // Check project_contacts for this sender's email
+        const { data: contactMatches } = await supabase
+          .from("project_contacts")
+          .select("project_id, contact_email")
+          .eq("household_id", householdId)
+          .ilike("contact_email", senderEmail)
+          .limit(5);
 
-      if (existingProjects && existingProjects.length > 0) {
-        const categoryLower = projectCategory.toLowerCase();
-        // Synonyms for project types — "remodel", "renovation", "remodeling" are the same thing
-        const remodelWords = ["remodel", "remodeling", "renovation", "overhaul", "redo", "makeover", "update", "upgrade"];
+        if (contactMatches && contactMatches.length > 0) {
+          // Find which of these projects are still active
+          const contactProjectIds = contactMatches.map((c: any) => c.project_id);
+          const { data: activeContactProjects } = await supabase
+            .from("property_projects")
+            .select("id, name, category")
+            .in("id", contactProjectIds)
+            .in("status", ["planning", "in_progress"])
+            .limit(5);
 
-        const normalizeProjectType = (s: string) => {
-          let n = s.toLowerCase().trim();
-          for (const word of remodelWords) {
-            n = n.replace(new RegExp(`\\b${word}\\b`, "g"), "remodel");
+          if (activeContactProjects && activeContactProjects.length > 0) {
+            project = activeContactProjects[0];
+            isExistingProject = true;
+            matchMethod = "sender_project_contact";
+            console.log(`[receive-email] Matched project via sender's project_contact: ${(project as any).name}`);
+            actions.push(`matched_via_contact:${(activeContactProjects[0] as any).name}`);
           }
-          return n;
-        };
+        }
 
-        const normalizedCategory = normalizeProjectType(categoryLower);
+        // Also check if sender matches a contractor who has quotes on active projects
+        if (!project) {
+          const { data: senderContractors } = await supabase
+            .from("contractors")
+            .select("id")
+            .eq("household_id", householdId)
+            .ilike("email", `%${senderEmail}%`)
+            .limit(1);
 
-        const match = existingProjects.find((p: { category: string; name: string }) => {
-          const pCat = normalizeProjectType(p.category);
-          const pName = normalizeProjectType(p.name);
-          // Exact match after normalization
-          if (pCat === normalizedCategory || pName === normalizedCategory) return true;
-          // Substring match after normalization
-          if (pCat.includes(normalizedCategory) || normalizedCategory.includes(pCat)) return true;
-          if (pName.includes(normalizedCategory) || normalizedCategory.includes(pName)) return true;
-          return false;
-        });
-        if (match) {
-          project = match;
-          isExistingProject = true;
-          console.log(`[receive-email] Matched existing project: ${match.id} (${(match as any).name})`);
-          actions.push(`matched_existing_project:${(match as any).name}`);
+          if (senderContractors && senderContractors.length > 0) {
+            const contractorId = senderContractors[0].id;
+            const { data: quotedProjects } = await supabase
+              .from("project_quotes")
+              .select("project_id")
+              .eq("household_id", householdId)
+              .eq("contractor_id", contractorId)
+              .limit(5);
+
+            if (quotedProjects && quotedProjects.length > 0) {
+              const quotedProjectIds = quotedProjects.map((q: any) => q.project_id);
+              const { data: activeQuotedProjects } = await supabase
+                .from("property_projects")
+                .select("id, name, category")
+                .in("id", quotedProjectIds)
+                .in("status", ["planning", "in_progress"])
+                .limit(5);
+
+              if (activeQuotedProjects && activeQuotedProjects.length > 0) {
+                project = activeQuotedProjects[0];
+                isExistingProject = true;
+                matchMethod = "sender_existing_quote";
+                console.log(`[receive-email] Matched project via sender's existing quote: ${(project as any).name}`);
+                actions.push(`matched_via_contractor_quote:${(activeQuotedProjects[0] as any).name}`);
+              }
+            }
+          }
         }
       }
 
-      // No match — create new project
+      // Also check if the original sender (for forwarded emails) matches a contractor
+      if (!project && originalSender) {
+        const originalEmail = (() => {
+          const m = originalSender.match(/<([^>]+)>/);
+          return (m ? m[1] : originalSender.match(/[\w.-]+@[\w.-]+/) ? originalSender.match(/[\w.-]+@[\w.-]+/)![0] : null);
+        })();
+
+        if (originalEmail) {
+          const { data: origContactMatches } = await supabase
+            .from("project_contacts")
+            .select("project_id")
+            .eq("household_id", householdId)
+            .ilike("contact_email", originalEmail.toLowerCase())
+            .limit(5);
+
+          if (origContactMatches && origContactMatches.length > 0) {
+            const origProjectIds = origContactMatches.map((c: any) => c.project_id);
+            const { data: activeOrigProjects } = await supabase
+              .from("property_projects")
+              .select("id, name, category")
+              .in("id", origProjectIds)
+              .in("status", ["planning", "in_progress"])
+              .limit(5);
+
+            if (activeOrigProjects && activeOrigProjects.length > 0) {
+              project = activeOrigProjects[0];
+              isExistingProject = true;
+              matchMethod = "original_sender_contact";
+              console.log(`[receive-email] Matched project via original sender's contact: ${(project as any).name}`);
+              actions.push(`matched_via_original_sender:${(activeOrigProjects[0] as any).name}`);
+            }
+          }
+        }
+      }
+
+      // --- SIGNAL 2: Subject thread matching (Re:/Fwd: of known project) ---
+      if (!project) {
+        const cleanSubject = subject
+          .replace(/^(re:|fwd?:|fw:)\s*/gi, "")
+          .replace(/^(re:|fwd?:|fw:)\s*/gi, "") // strip double prefixes
+          .trim()
+          .toLowerCase();
+
+        if (cleanSubject.length > 3) {
+          const { data: subjectProjects } = await supabase
+            .from("property_projects")
+            .select("id, name, category")
+            .eq("household_id", householdId)
+            .in("status", ["planning", "in_progress"])
+            .limit(20);
+
+          if (subjectProjects && subjectProjects.length > 0) {
+            const subjectMatch = subjectProjects.find((p: any) => {
+              const pName = p.name.toLowerCase();
+              // Subject contains the project name or vice versa
+              return cleanSubject.includes(pName) || pName.includes(cleanSubject);
+            });
+            if (subjectMatch) {
+              project = subjectMatch;
+              isExistingProject = true;
+              matchMethod = "subject_thread";
+              console.log(`[receive-email] Matched project via subject thread: ${(subjectMatch as any).name}`);
+              actions.push(`matched_via_subject:${(subjectMatch as any).name}`);
+            }
+          }
+        }
+      }
+
+      // --- SIGNAL 3: Category/name normalization (existing fallback) ---
+      if (!project && property) {
+        const { data: existingProjects } = await supabase
+          .from("property_projects")
+          .select("id, name, category")
+          .eq("household_id", householdId)
+          .eq("property_id", property.id)
+          .in("status", ["planning", "in_progress"])
+          .limit(10);
+
+        if (existingProjects && existingProjects.length > 0) {
+          const remodelWords = ["remodel", "remodeling", "renovation", "overhaul", "redo", "makeover", "update", "upgrade"];
+          const normalizeProjectType = (s: string) => {
+            let n = s.toLowerCase().trim();
+            for (const word of remodelWords) {
+              n = n.replace(new RegExp(`\\b${word}\\b`, "g"), "remodel");
+            }
+            return n;
+          };
+          const normalizedCategory = normalizeProjectType(projectCategory.toLowerCase());
+
+          const match = existingProjects.find((p: { category: string; name: string }) => {
+            const pCat = normalizeProjectType(p.category);
+            const pName = normalizeProjectType(p.name);
+            if (pCat === normalizedCategory || pName === normalizedCategory) return true;
+            if (pCat.includes(normalizedCategory) || normalizedCategory.includes(pCat)) return true;
+            if (pName.includes(normalizedCategory) || normalizedCategory.includes(pName)) return true;
+            return false;
+          });
+          if (match) {
+            project = match;
+            isExistingProject = true;
+            matchMethod = "category_name";
+            console.log(`[receive-email] Matched existing project via category: ${match.id} (${(match as any).name})`);
+            actions.push(`matched_existing_project:${(match as any).name}`);
+          }
+        }
+      }
+
+      // No match from any signal — create new project
       if (!project) {
         const { data: newProject, error: projectError } = await supabase
           .from("property_projects")
@@ -661,7 +1007,56 @@ Respond with ONLY valid JSON:
 
       if (project) {
         createdProjectId = project.id;
-        console.log(`[receive-email] Using project: ${project.id} (existing=${isExistingProject})`);
+        console.log(`[receive-email] Using project: ${project.id} (existing=${isExistingProject}, method=${matchMethod})`);
+
+        // AUTO-ADD CONTRACTOR TO PROJECT CONTACTS — ensures future emails from
+        // this contractor automatically match to this project.
+        if (createdContractorId) {
+          const contactEmail = classification.vendorEmail || (originalSender
+            ? (() => { const m = originalSender.match(/<([^>]+)>/); return m ? m[1] : originalSender.match(/[\w.-]+@[\w.-]+/)?.[0] || null; })()
+            : senderEmail) || null;
+
+          try {
+            await supabase.from("project_contacts").upsert({
+              project_id: project.id,
+              household_id: householdId,
+              contractor_id: createdContractorId,
+              contact_name: classification.vendorName,
+              contact_email: contactEmail?.toLowerCase() || null,
+              contact_phone: classification.vendorPhone || null,
+              role: "contractor",
+              added_from: "email",
+            }, { onConflict: "project_id,contractor_id" });
+            actions.push("added_project_contact");
+          } catch (pcErr) {
+            console.error(`[receive-email] project_contacts upsert failed (non-blocking): ${pcErr}`);
+          }
+        }
+
+        // APPEND EMAIL SUMMARY to project (for all project types, not just insurance)
+        try {
+          const { data: projData } = await supabase
+            .from("property_projects")
+            .select("email_summaries")
+            .eq("id", project.id)
+            .single();
+
+          const existingSummaries = (projData?.email_summaries as any[]) || [];
+          existingSummaries.push({
+            date: new Date().toISOString(),
+            subject,
+            from: fromAddress,
+            summary: classification.summary,
+            type: classification.type,
+          });
+
+          await supabase
+            .from("property_projects")
+            .update({ email_summaries: existingSummaries })
+            .eq("id", project.id);
+        } catch (_sumErr) {
+          // non-blocking
+        }
 
         // ANALYZE QUOTE — awaited so the Deno runtime stays alive.
         // The inbox item is created in Step 3 AFTER this, but that's OK because
@@ -760,9 +1155,6 @@ Respond with ONLY valid JSON:
             actions.push("quote_analysis_failed");
           }
         }
-      } else {
-        console.error(`[receive-email] Failed to create project: ${projectError?.message}`);
-        actions.push("project_creation_failed");
       }
       } // end else (property exists)
 
@@ -1048,6 +1440,22 @@ Respond with ONLY valid JSON:
               console.error(`[receive-email] Failed to add adjuster as contact: ${err}`);
             }
           }
+
+          // Add adjuster/sender to project_contacts for future email matching
+          if (createdContractorId) {
+            try {
+              await supabase.from("project_contacts").upsert({
+                project_id: claimProject.id,
+                household_id: householdId,
+                contractor_id: createdContractorId,
+                contact_name: claimInfo.adjusterName || classification.vendorName || null,
+                contact_email: (claimInfo.adjusterEmail || senderEmail || null)?.toLowerCase(),
+                contact_phone: claimInfo.adjusterPhone || classification.vendorPhone || null,
+                role: "adjuster",
+                added_from: "email",
+              }, { onConflict: "project_id,contractor_id" });
+            } catch (_pcErr) { /* non-blocking */ }
+          }
         }
       } else {
         actions.push("insurance_claim_no_property");
@@ -1189,6 +1597,14 @@ Respond with ONLY valid JSON:
         } else {
           mainTitle = `Document saved: ${classification.documentTitle || subject}`;
         }
+      } else if (actions.includes("quote_received")) {
+        // Quote received — user chooses: New Project, Existing Project, or Save as Document
+        const vendorLabel = classification.vendorName || "Contractor";
+        const projectLabel = classification.projectType || subject || "Quote";
+        mainType = "contractor_quote";
+        mainTitle = `Quote from ${vendorLabel}: ${projectLabel}`;
+        mainNeedsAction = true;
+        mainActionType = "quote_received";
       } else if (actions.includes("needs_property_assignment")) {
         mainType = "contractor_quote";
         mainTitle = `Quote received: ${classification.projectType || classification.vendorName || subject || "Contractor Quote"}`;
@@ -1268,6 +1684,30 @@ Respond with ONLY valid JSON:
         // Delete the processing placeholder now that the real item exists
         if (placeholderId) {
           await supabase.from("inbox_items").delete().eq("id", placeholderId);
+        }
+
+        // --- MULTI-EVENT EXTRACTION ---
+        // If Claude extracted multiple events from this email, create family_events for each
+        const extractedEvents: Array<{ title: string; date: string; endDate?: string; allDay?: boolean; location?: string }> = (classification as any).events || [];
+        if (extractedEvents.length > 1 && classification.type === "family") {
+          console.log(`[receive-email] Multi-event email: creating ${extractedEvents.length} family_events`);
+          for (const evt of extractedEvents) {
+            if (!evt.date) continue;
+            try {
+              await supabase.from("family_events").insert({
+                household_id: householdId,
+                title: evt.title || subject || "Event",
+                start_date: evt.date,
+                end_date: evt.endDate || null,
+                all_day: evt.allDay || false,
+                location: evt.location || null,
+                source: "email_parsed",
+              });
+            } catch (evtErr) {
+              console.error(`[receive-email] Failed to insert family_event: ${evtErr}`);
+            }
+          }
+          actions.push(`created_${extractedEvents.length}_family_events`);
         }
       }
 

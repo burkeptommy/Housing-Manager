@@ -23,12 +23,22 @@ struct QuoteComparisonView: View {
         return items
     }
 
+    /// Whether all quotes have itemized line items
+    private var allQuotesItemized: Bool {
+        quotes.allSatisfy { ($0.analysis.lineItems ?? []).count > 1 }
+    }
+
     var body: some View {
         ScrollView {
             VStack(spacing: HavenTheme.spacing20) {
                 summaryCards
-                comparisonTable
-                gapAnalysis
+
+                if allQuotesItemized {
+                    comparisonTable
+                    gapAnalysis
+                } else {
+                    needItemizedCard
+                }
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.top, HavenTheme.spacing12)
@@ -37,6 +47,43 @@ struct QuoteComparisonView: View {
         .background(HavenColors.background)
         .navigationTitle("Compare Quotes")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    // MARK: - Need Itemized Quotes
+
+    private var needItemizedCard: some View {
+        HavenCard {
+            VStack(spacing: HavenTheme.spacing12) {
+                Image(systemName: "doc.text.magnifyingglass")
+                    .font(.system(size: 32))
+                    .foregroundStyle(HavenColors.warning)
+
+                Text("Itemized Quotes Needed")
+                    .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.navy800)
+
+                Text("To compare quotes line-by-line, both vendors need to provide itemized breakdowns. Ask your contractors for a detailed quote showing each item with its price.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+
+                // Show which quotes are missing itemization
+                ForEach(quotes) { quote in
+                    let hasItems = (quote.analysis.lineItems ?? []).count > 1
+                    HStack(spacing: 8) {
+                        Image(systemName: hasItems ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(hasItems ? HavenColors.success : HavenColors.critical)
+                        Text(quote.vendorName ?? "Contractor")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Text(hasItems ? "Itemized" : "Lump sum")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(hasItems ? HavenColors.success : HavenColors.textTertiary)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Summary Cards

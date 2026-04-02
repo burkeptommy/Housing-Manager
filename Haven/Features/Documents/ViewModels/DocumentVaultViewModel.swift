@@ -122,20 +122,22 @@ final class DocumentVaultViewModel: ObservableObject {
     /// Weight for categories not explicitly listed
     private static let defaultWeight: Double = 1
 
-    /// Core categories that count toward readiness (excludes Home Projects, Home Records, Home Financials by default)
-    private static let coreGroups: Set<String> = [
+    /// Estate-only groups that count toward readiness.
+    /// Home management docs (Home Projects, Home Records, Home Financials) are
+    /// intentionally excluded — estate readiness measures estate/legal/financial
+    /// preparedness, not home management.
+    private static let estateGroups: Set<String> = [
         "Estate Planning", "Real Estate", "Insurance", "Financial Accounts",
         "Tax Records", "Personal Identification", "Entity Documents",
         "Personal Property", "Digital Assets", "Professional & Business"
     ]
 
-    /// Baseline progress credit for completing onboarding steps (max 15%).
-    /// This ensures new users see immediate progress after setting up their property.
+    /// Baseline progress credit for completing onboarding steps (max 10%).
+    /// This ensures new users see immediate progress after setting up their profile.
     var baselineEndowment: Double {
         var credit = 0.0
         if !properties.isEmpty { credit += 0.05 }   // 5% for completing onboarding
         if hasPropertyData { credit += 0.05 }        // 5% for having property data
-        if hasDetectedSystems { credit += 0.05 }     // 5% for auto-detected home systems
         return credit
     }
 
@@ -147,10 +149,8 @@ final class DocumentVaultViewModel: ObservableObject {
         for (_, categories) in DocumentCategory.groupedCategories {
             for cat in categories {
                 let group = cat.sectionGroup
-                // Skip non-core groups unless user has docs in them
-                if !Self.coreGroups.contains(group) && !existingCategories.contains(cat.rawValue) {
-                    continue
-                }
+                // Only count estate-related groups — never home management docs
+                guard Self.estateGroups.contains(group) else { continue }
                 // Skip dismissed categories
                 if dismissedCategories.contains(cat.rawValue) { continue }
 
@@ -164,8 +164,8 @@ final class DocumentVaultViewModel: ObservableObject {
 
         guard totalWeight > 0 else { return baselineEndowment }
         let documentPercentage = earnedWeight / totalWeight
-        // Blend: baseline fills the first 15%, documents fill the remaining 85%
-        return min(baselineEndowment + documentPercentage * (1.0 - 0.15), 1.0)
+        // Blend: baseline fills the first 10%, documents fill the remaining 90%
+        return min(baselineEndowment + documentPercentage * (1.0 - 0.10), 1.0)
     }
 
     var missingCategories: [DocumentCategory] {
@@ -237,36 +237,57 @@ final class DocumentVaultViewModel: ObservableObject {
     }
 
     func deleteDocument(_ doc: DocumentRow) async {
+        let docSnapshot = documents
+        let deletedSnapshot = deletedDocuments
+        documents.removeAll { $0.id == doc.id }
+        deletedDocuments.insert(doc, at: 0)
+        Haptics.success()
+
         do {
             try await db.deleteDocument(id: doc.id)
-            documents.removeAll { $0.id == doc.id }
-            deletedDocuments.insert(doc, at: 0)
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "deleted", "id": doc.id.uuidString])
         } catch {
+            documents = docSnapshot
+            deletedDocuments = deletedSnapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 
     func restoreDocument(_ doc: DocumentRow) async {
+        let deletedSnapshot = deletedDocuments
+        deletedDocuments.removeAll { $0.id == doc.id }
+        Haptics.success()
+
         do {
             try await db.restoreDocument(id: doc.id)
-            deletedDocuments.removeAll { $0.id == doc.id }
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "restored", "id": doc.id.uuidString])
             await loadData()
-            Haptics.success()
         } catch {
+            deletedDocuments = deletedSnapshot
             self.error = "Failed to restore: \(error.localizedDescription)"
+            Haptics.error()
         }
     }
 
     func permanentlyDeleteDocument(_ doc: DocumentRow) async {
+        let snapshot = deletedDocuments
+        deletedDocuments.removeAll { $0.id == doc.id }
+        Haptics.success()
+
         do {
             _ = try? await HavenSupabase.storage
                 .from("documents")
                 .remove(paths: [doc.filePath])
             try await db.permanentlyDeleteDocument(id: doc.id)
-            deletedDocuments.removeAll { $0.id == doc.id }
-            Haptics.success()
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "deleted", "id": doc.id.uuidString])
         } catch {
+            deletedDocuments = snapshot
             self.error = "Failed to delete: \(error.localizedDescription)"
+            Haptics.error()
         }
     }
 
@@ -664,16 +685,16 @@ final class DocumentVaultViewModel: ObservableObject {
     }
 
     static let levels: [ReadinessLevel] = [
-        ReadinessLevel(id: 1, name: "Starter", icon: "leaf.fill", color: .navy, threshold: 0,
-                       description: "Upload your core documents to build your safety net"),
-        ReadinessLevel(id: 2, name: "Building Momentum", icon: "flame.fill", color: .coral, threshold: 0.20,
-                       description: "Your essentials are coming together — keep going"),
-        ReadinessLevel(id: 3, name: "Well Covered", icon: "bolt.fill", color: .teal, threshold: 0.45,
-                       description: "You're ahead of most families"),
-        ReadinessLevel(id: 4, name: "Fully Organized", icon: "star.fill", color: .amber, threshold: 0.70,
-                       description: "Strong foundation — just a few finishing touches"),
-        ReadinessLevel(id: 5, name: "Estate Master", icon: "checkmark.shield.fill", color: .sage, threshold: 0.90,
-                       description: "Outstanding — your estate is fully protected"),
+        ReadinessLevel(id: 1, name: "The Foundation", icon: "building.columns.fill", color: .navy, threshold: 0,
+                       description: "Basic property and profile established"),
+        ReadinessLevel(id: 2, name: "The Steward", icon: "key.fill", color: .coral, threshold: 0.20,
+                       description: "Active management of physical assets and insurance"),
+        ReadinessLevel(id: 3, name: "The Guardian", icon: "shield.fill", color: .teal, threshold: 0.45,
+                       description: "Family members added, life insurance and basic estate docs secured"),
+        ReadinessLevel(id: 4, name: "The Architect", icon: "pencil.and.ruler.fill", color: .amber, threshold: 0.70,
+                       description: "Trusts, complex financials, and advanced scenarios run"),
+        ReadinessLevel(id: 5, name: "The Legacy", icon: "checkmark.shield.fill", color: .sage, threshold: 0.90,
+                       description: "100% readiness — your estate is fully insulated"),
     ]
 
     var currentLevel: ReadinessLevel {

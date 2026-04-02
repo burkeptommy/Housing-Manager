@@ -208,6 +208,58 @@ enum AnalyticsEvent: String {
     case newArrivalChecklistViewed = "new_arrival_checklist_viewed"
     case newArrivalChecklistItemToggled = "new_arrival_checklist_item_toggled"
 
+    // MARK: - Projects
+    case projectViewed = "project_viewed"
+    case projectCreated = "project_created"
+    case projectStatusChanged = "project_status_changed"
+    case projectDeleted = "project_deleted"
+    case projectQuoteUploaded = "project_quote_uploaded"
+    case projectQuoteViewed = "project_quote_viewed"
+    case projectQuoteDeleted = "project_quote_deleted"
+    case projectQuoteCompared = "project_quote_compared"
+    case projectContactAdded = "project_contact_added"
+    case projectContactRemoved = "project_contact_removed"
+    case projectFileUploaded = "project_file_uploaded"
+    case projectFileDeleted = "project_file_deleted"
+    case projectSubProjectLinked = "project_sub_project_linked"
+    case projectSubProjectUnlinked = "project_sub_project_unlinked"
+    case projectFeasibilityViewed = "project_feasibility_viewed"
+
+    // MARK: - Family / Inbox
+    case familyTabViewed = "family_tab_viewed"
+    case familyItemViewed = "family_item_viewed"
+    case familyItemDeleted = "family_item_deleted"
+    case familyItemRescheduled = "family_item_rescheduled"
+    case familyItemTagged = "family_item_tagged"
+    case familyItemReminderSet = "family_item_reminder_set"
+    case familyFileUploaded = "family_file_uploaded"
+    case familyAllUpcomingViewed = "family_all_upcoming_viewed"
+
+    // MARK: - Calendar Sync
+    case calendarSyncOpened = "calendar_sync_opened"
+    case calendarSyncEnabled = "calendar_sync_enabled"
+    case calendarSyncDisabled = "calendar_sync_disabled"
+    case calendarSyncRefreshed = "calendar_sync_refreshed"
+    case calendarEventDeleted = "calendar_event_deleted"
+    case calendarAccessRequested = "calendar_access_requested"
+    case calendarAccessResult = "calendar_access_result"
+
+    // MARK: - Equipment Catalog
+    case equipmentSearched = "equipment_searched"
+    case equipmentResultSelected = "equipment_result_selected"
+    case equipmentPhotoIdentifyStarted = "equipment_photo_identify_started"
+    case equipmentPhotoIdentifyCompleted = "equipment_photo_identify_completed"
+    case equipmentCatalogRequestSent = "equipment_catalog_request_sent"
+
+    // MARK: - Money
+    case moneyTabViewed = "money_tab_viewed"
+    case moneyRecurringViewed = "money_recurring_viewed"
+    case moneyBudgetViewed = "money_budget_viewed"
+    case moneyTransactionsViewed = "money_transactions_viewed"
+    case moneyInsightsViewed = "money_insights_viewed"
+    case moneyTransactionRecategorized = "money_transaction_recategorized"
+    case moneyBudgetEdited = "money_budget_edited"
+
     // MARK: - Errors
     case errorOccurred = "error_occurred"
 }

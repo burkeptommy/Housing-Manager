@@ -210,7 +210,7 @@ final class DocumentUploadViewModel: ObservableObject {
 
     /// Checks extracted text for patterns that indicate a non-home-related document.
     /// Returns a user-facing warning message if irrelevant, nil if it looks fine.
-    private func detectIrrelevantContent(_ text: String) -> String? {
+    func detectIrrelevantContent(_ text: String) -> String? {
         let t = text.lowercased()
 
         // Resume / CV patterns

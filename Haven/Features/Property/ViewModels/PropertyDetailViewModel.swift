@@ -10,6 +10,7 @@ final class PropertyDetailViewModel: ObservableObject {
     @Published var serviceRecords: [ServiceRecordRow] = []
     @Published var linkedDocuments: [DocumentRow] = []
     @Published var contractors: [ContractorRow] = []
+    @Published var utilityAccounts: [UtilityAccountRow] = []
     @Published var isLoading = false
     @Published var error: String?
     @Published var justCompletedTaskId: UUID?
@@ -138,6 +139,8 @@ final class PropertyDetailViewModel: ObservableObject {
                 MaintenanceTaskUpdate(nextDueDate: formatter.string(from: newDate))
             )
             Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "updated", "id": task.id.uuidString])
             guard let prop = property else { return }
             await loadProperty(id: prop.id)
         } catch {
@@ -235,6 +238,9 @@ final class PropertyDetailViewModel: ObservableObject {
 
             // Fetch contractors
             contractors = try await db.fetchContractors()
+
+            // Fetch utility accounts
+            utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: id)) ?? []
         } catch {
             self.error = error.localizedDescription
         }
@@ -242,19 +248,30 @@ final class PropertyDetailViewModel: ObservableObject {
     }
 
     func deleteSystem(_ system: HomeSystemRow) async {
+        let snapshot = systems
+        systems.removeAll { $0.id == system.id }
+        Haptics.success()
+
         do {
             try await db.deleteHomeSystem(id: system.id)
-            systems.removeAll { $0.id == system.id }
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
+                userInfo: ["action": "deleted", "id": system.id.uuidString])
         } catch {
+            systems = snapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 
     func completeMaintenanceTask(_ task: MaintenanceTaskDBRow) async {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
+
+        // Optimistic: show completion animation immediately
+        justCompletedTaskId = task.id
+        Haptics.success()
+
         do {
-            // Mark as completed and calculate next due date
             let nextDate = calculateNextDueDate(frequency: task.frequency, from: .now)
             _ = try await db.updateMaintenanceTask(
                 id: task.id,
@@ -293,11 +310,12 @@ final class PropertyDetailViewModel: ObservableObject {
                 systemId: task.systemId
             ))
 
-            justCompletedTaskId = task.id
-            Haptics.success()
-
             // Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
+
+            // Notify other tabs
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "completed", "id": task.id.uuidString])
 
             // Clear animation after delay
             try? await Task.sleep(nanoseconds: 1_500_000_000)
@@ -306,7 +324,9 @@ final class PropertyDetailViewModel: ObservableObject {
             // Reload
             await loadProperty(id: prop.id)
         } catch {
+            justCompletedTaskId = nil
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 

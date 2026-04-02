@@ -69,11 +69,18 @@ final class ContractorViewModel: ObservableObject {
     }
 
     func deleteContractor(_ contractor: ContractorRow) async {
+        let snapshot = contractors
+        contractors.removeAll { $0.id == contractor.id }
+        Haptics.success()
+
         do {
             try await db.deleteContractor(id: contractor.id)
-            contractors.removeAll { $0.id == contractor.id }
+            NotificationCenter.default.post(name: .contractorChanged, object: nil,
+                userInfo: ["action": "deleted", "id": contractor.id.uuidString])
         } catch {
+            contractors = snapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 

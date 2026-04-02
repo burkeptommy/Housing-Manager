@@ -2,7 +2,7 @@ import SwiftUI
 
 struct AddSystemView: View {
     let propertyID: UUID
-    var onComplete: (() -> Void)?
+    var onComplete: ((HomeSystemRow) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var name = ""
@@ -19,6 +19,7 @@ struct AddSystemView: View {
     @State private var addMaintenanceTemplates = true
     @State private var showEquipmentSearch = false
     @State private var catalogEntryId: UUID?
+    @State private var selectedCatalogResult: EquipmentSearchResult?
 
     // Warranty fields
     @State private var addWarranty = false
@@ -166,6 +167,8 @@ struct AddSystemView: View {
                     if let lifespan = result.specs.expectedLifespanYears {
                         expectedLifespan = "\(lifespan)"
                     }
+                    // Cache catalog enrichment data for the selected result
+                    selectedCatalogResult = result
                     // Map catalog category to our SystemCategory
                     if let catName = SystemCategory.allCases.first(where: { $0.rawValue.lowercased().contains(result.category.name.lowercased()) })?.rawValue {
                         category = catName
@@ -204,6 +207,22 @@ struct AddSystemView: View {
             insert.catalogEntryId = catalogEntryId
 
             let system = try await DatabaseService.shared.createHomeSystem(insert)
+
+            // Cache catalog enrichment data so it's instant on next load
+            if let result = selectedCatalogResult {
+                _ = try? await DatabaseService.shared.updateHomeSystem(
+                    id: system.id,
+                    HomeSystemUpdate(
+                        catalogSeries: result.specs.series,
+                        catalogModelName: result.modelName ?? result.displayName,
+                        catalogFeatures: result.specs.keyFeatures,
+                        reliabilityScore: result.scores?.reliability,
+                        scoreSummary: result.scores?.summary,
+                        catalogFuelType: result.specs.fuelType,
+                        catalogEnrichedAt: Date()
+                    )
+                )
+            }
 
             // Add warranty if specified
             if addWarranty && !warrantyProvider.isEmpty {
@@ -249,11 +268,10 @@ struct AddSystemView: View {
 
             Haptics.success()
             Analytics.track(.systemCreated, ["category": category, "system_id": system.id.uuidString, "has_warranty": addWarranty])
-            // Dismiss first so the sheet is gone, then refresh the parent list
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
+                userInfo: ["action": "created", "id": system.id.uuidString])
+            onComplete?(system)
             dismiss()
-            // Small delay to let sheet animation start before parent reloads
-            try? await Task.sleep(nanoseconds: 300_000_000)
-            onComplete?()
         } catch {
             self.error = error.localizedDescription
             Haptics.error()

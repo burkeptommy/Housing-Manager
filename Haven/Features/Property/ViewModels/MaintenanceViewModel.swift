@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 @MainActor
 final class MaintenanceViewModel: ObservableObject {
@@ -14,6 +15,8 @@ final class MaintenanceViewModel: ObservableObject {
     @Published var filterStatus: TaskFilterStatus = .all
     @Published var recentlyCompletedIds: Set<UUID> = []
     @Published var completionToast: CompletionToast?
+
+    private var cancellables = Set<AnyCancellable>()
 
     struct CompletionToast: Identifiable {
         let id = UUID()
@@ -169,6 +172,16 @@ final class MaintenanceViewModel: ObservableObject {
 
     // MARK: - Loading
 
+    func subscribeToExternalChanges() {
+        guard cancellables.isEmpty else { return }
+        NotificationCenter.default.publisher(for: .maintenanceTaskChanged)
+            .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { [weak self] in await self?.loadTasks() }
+            }
+            .store(in: &cancellables)
+    }
+
     func loadTasks() async {
         isLoading = true
         recentlyCompletedIds.removeAll()
@@ -255,6 +268,17 @@ final class MaintenanceViewModel: ObservableObject {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
         let nextDate = calculateNextDueDate(frequency: task.frequency, from: .now)
+
+        // Optimistic: hide task and show toast immediately
+        recentlyCompletedIds.insert(task.id)
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateStyle = .medium
+        completionToast = CompletionToast(
+            taskTitle: task.title,
+            nextDueDate: displayFormatter.string(from: nextDate)
+        )
+        Haptics.success()
+
         do {
             let updated = try await db.updateMaintenanceTask(
                 id: task.id,
@@ -266,17 +290,6 @@ final class MaintenanceViewModel: ObservableObject {
             if let idx = tasks.firstIndex(where: { $0.id == task.id }) {
                 tasks[idx] = updated
             }
-
-            // Hide the task from the list temporarily
-            recentlyCompletedIds.insert(task.id)
-
-            // Show completion toast
-            let displayFormatter = DateFormatter()
-            displayFormatter.dateStyle = .medium
-            completionToast = CompletionToast(
-                taskTitle: task.title,
-                nextDueDate: displayFormatter.string(from: nextDate)
-            )
 
             // Update system's last_service_date and next_service_due
             if let systemId = task.systemId {
@@ -309,19 +322,44 @@ final class MaintenanceViewModel: ObservableObject {
             // Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
 
-            Haptics.success()
+            // Notify other tabs
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "completed", "id": task.id.uuidString])
+
+            // Push notification to all household members
+            Task {
+                let users = try? await db.fetchHouseholdUsers()
+                let currentUser = try? await db.fetchCurrentUser()
+                let completedBy = currentUser?.fullName?.components(separatedBy: " ").first ?? "Someone"
+                let recipientIds = (users ?? []).map(\.id)
+                await PushNotificationService.shared.sendTaskCompletedNotification(
+                    taskTitle: task.title,
+                    completedByName: completedBy,
+                    recipientUserIds: recipientIds,
+                    taskId: task.id
+                )
+            }
         } catch {
+            // Rollback: show the task again
+            recentlyCompletedIds.remove(task.id)
+            completionToast = nil
             self.error = error.localizedDescription
             Haptics.error()
         }
     }
 
     func deleteTask(_ task: MaintenanceTaskDBRow) async {
+        let snapshot = tasks
+        tasks.removeAll { $0.id == task.id }
+        Haptics.success()
+
         do {
             try await db.deleteMaintenanceTask(id: task.id)
-            tasks.removeAll { $0.id == task.id }
             Task { await NotificationScheduler.shared.rescheduleAll() }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "deleted", "id": task.id.uuidString])
         } catch {
+            tasks = snapshot
             self.error = error.localizedDescription
             Haptics.error()
         }

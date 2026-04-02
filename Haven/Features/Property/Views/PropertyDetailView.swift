@@ -101,7 +101,10 @@ struct PropertyDetailView: View {
         }
         .sheet(isPresented: $showEditProperty) {
             if let property = viewModel.property {
-                EditPropertyView(property: property) { _ in
+                EditPropertyView(property: property) { updatedProperty in
+                    viewModel.property = updatedProperty
+                    NotificationCenter.default.post(name: .propertyChanged, object: nil,
+                        userInfo: ["action": "updated", "id": propertyID.uuidString])
                     Task { await viewModel.loadProperty(id: propertyID) }
                 }
             }
@@ -112,7 +115,8 @@ struct PropertyDetailView: View {
             }
         }
         .sheet(isPresented: $showAddSystem) {
-            AddSystemView(propertyID: propertyID, onComplete: {
+            AddSystemView(propertyID: propertyID, onComplete: { newSystem in
+                viewModel.systems.append(newSystem)
                 Task { await viewModel.loadProperty(id: propertyID) }
             })
         }
@@ -287,6 +291,11 @@ struct PropertyDetailView: View {
 
                 switch activeTab {
                 case .overview:
+                    UtilityAccountsSection(
+                        propertyId: property.id,
+                        householdId: property.householdId,
+                        accounts: $viewModel.utilityAccounts
+                    )
                     propertyDocumentsSection
                     propertyMaintenanceCard
                     if !viewModel.serviceRecords.isEmpty { recentServiceHistoryCard }

@@ -88,6 +88,7 @@ struct MaintenanceScheduleView: View {
         .animation(.easeInOut, value: viewModel.completionToast?.id)
         .trackScreen("MaintenanceScheduleView")
         .task {
+            viewModel.subscribeToExternalChanges()
             if viewModel.tasks.isEmpty {
                 await viewModel.loadTasks()
             }

@@ -2,7 +2,7 @@ import SwiftUI
 
 struct EditSystemSheet: View {
     let system: HomeSystemRow
-    var onComplete: (() -> Void)?
+    var onComplete: ((HomeSystemRow) -> Void)?
     @Environment(\.dismiss) private var dismiss
 
     @State private var name: String
@@ -30,7 +30,7 @@ struct EditSystemSheet: View {
         return f
     }()
 
-    init(system: HomeSystemRow, onComplete: (() -> Void)? = nil) {
+    init(system: HomeSystemRow, onComplete: ((HomeSystemRow) -> Void)? = nil) {
         self.system = system
         self.onComplete = onComplete
         _name = State(initialValue: system.name)
@@ -165,15 +165,13 @@ struct EditSystemSheet: View {
             updates.notes = notes.isEmpty ? nil : notes
             updates.catalogEntryId = catalogEntryId
 
-            _ = try await db.updateHomeSystem(id: system.id, updates)
+            let updated = try await db.updateHomeSystem(id: system.id, updates)
             await MainActor.run {
                 Haptics.success()
+                NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
+                    userInfo: ["action": "updated", "id": system.id.uuidString])
+                onComplete?(updated)
                 dismiss()
-                // Delay to let dismiss animate, then refresh parent
-                Task {
-                    try? await Task.sleep(nanoseconds: 300_000_000)
-                    onComplete?()
-                }
             }
         } catch {
             self.error = error.localizedDescription

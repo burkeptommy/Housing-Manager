@@ -19,11 +19,18 @@ final class PropertyListViewModel: ObservableObject {
     }
 
     func deleteProperty(_ property: PropertyRow) async {
+        let snapshot = properties
+        properties.removeAll { $0.id == property.id }
+        Haptics.success()
+
         do {
             try await db.deleteProperty(id: property.id)
-            properties.removeAll { $0.id == property.id }
+            NotificationCenter.default.post(name: .propertyChanged, object: nil,
+                userInfo: ["action": "deleted", "id": property.id.uuidString])
         } catch {
+            properties = snapshot
             self.error = error.localizedDescription
+            Haptics.error()
         }
     }
 }

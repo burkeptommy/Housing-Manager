@@ -551,6 +551,60 @@ final class DatabaseService {
             .value
     }
 
+    // MARK: - Utility Accounts
+
+    func fetchUtilityAccounts(propertyId: UUID) async throws -> [UtilityAccountRow] {
+        try await from("utility_accounts")
+            .select()
+            .eq("property_id", value: propertyId.uuidString)
+            .order("provider_type", ascending: true)
+            .execute()
+            .value
+    }
+
+    func createUtilityAccount(_ account: UtilityAccountInsert) async throws -> UtilityAccountRow {
+        try await from("utility_accounts")
+            .insert(account)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateUtilityAccount(id: UUID, _ updates: [String: String]) async throws {
+        try await from("utility_accounts")
+            .update(updates)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func deleteUtilityAccount(id: UUID) async throws {
+        try await from("utility_accounts")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func fetchUtilityProviders(type: String? = nil) async throws -> [UtilityProviderRow] {
+        var query = from("utility_providers").select()
+        if let type { query = query.eq("provider_type", value: type) }
+        return try await query.order("name", ascending: true).execute().value
+    }
+
+    /// Update home system manual links cache
+    func updateHomeSystemManualCache(id: UUID, links: [CachedManualLink]) async throws {
+        struct Update: Encodable {
+            let cachedManualLinks: [CachedManualLink]
+            enum CodingKeys: String, CodingKey {
+                case cachedManualLinks = "cached_manual_links"
+            }
+        }
+        try await from("home_systems")
+            .update(Update(cachedManualLinks: links))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     func deleteHomeSystem(id: UUID) async throws {
         try await from("home_systems")
             .delete()
@@ -1159,6 +1213,28 @@ final class DatabaseService {
             .value
     }
 
+    func fetchProject(id: UUID) async throws -> PropertyProjectRow {
+        try await from("property_projects")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
+    func clearParentProject(id: UUID) async throws {
+        struct NullParent: Codable {
+            let parentProjectId: String? = nil
+            enum CodingKeys: String, CodingKey {
+                case parentProjectId = "parent_project_id"
+            }
+        }
+        try await from("property_projects")
+            .update(NullParent())
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     func fetchAllProjects() async throws -> [PropertyProjectRow] {
         try await from("property_projects")
             .select()
@@ -1289,11 +1365,20 @@ final class DatabaseService {
         let emailBody: String?
         let subject: String?
         let emailHash: String?
+        // Vendor info from classification (for Save Contact)
+        let vendorName: String?
+        let vendorEmail: String?
+        let vendorPhone: String?
 
         enum CodingKeys: String, CodingKey {
-            case subject
+            case subject, classification
             case emailBody = "email_body"
             case emailHash = "email_hash"
+        }
+
+        // The classification is nested inside metadata
+        private enum ClassificationKeys: String, CodingKey {
+            case vendorName, vendorEmail, vendorPhone
         }
 
         init(from decoder: Decoder) throws {
@@ -1301,6 +1386,16 @@ final class DatabaseService {
             emailBody = try? c.decodeIfPresent(String.self, forKey: .emailBody)
             subject = try? c.decodeIfPresent(String.self, forKey: .subject)
             emailHash = try? c.decodeIfPresent(String.self, forKey: .emailHash)
+            // Extract vendor info from nested classification object
+            if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
+                vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)
+                vendorEmail = try? classContainer.decodeIfPresent(String.self, forKey: .vendorEmail)
+                vendorPhone = try? classContainer.decodeIfPresent(String.self, forKey: .vendorPhone)
+            } else {
+                vendorName = nil
+                vendorEmail = nil
+                vendorPhone = nil
+            }
         }
     }
 
@@ -1619,6 +1714,60 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Project Contacts
+
+    func fetchProjectContacts(projectId: UUID) async throws -> [ProjectContactRow] {
+        try await from("project_contacts")
+            .select()
+            .eq("project_id", value: projectId.uuidString)
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+    }
+
+    func addProjectContact(projectId: UUID, householdId: UUID, contractorId: UUID?, name: String?, email: String?, phone: String?, role: String = "contractor") async throws {
+        struct Insert: Encodable {
+            let projectId: UUID
+            let householdId: UUID
+            let contractorId: UUID?
+            let contactName: String?
+            let contactEmail: String?
+            let contactPhone: String?
+            let role: String
+            let addedFrom: String
+
+            enum CodingKeys: String, CodingKey {
+                case role
+                case projectId = "project_id"
+                case householdId = "household_id"
+                case contractorId = "contractor_id"
+                case contactName = "contact_name"
+                case contactEmail = "contact_email"
+                case contactPhone = "contact_phone"
+                case addedFrom = "added_from"
+            }
+        }
+        try await from("project_contacts")
+            .insert(Insert(
+                projectId: projectId,
+                householdId: householdId,
+                contractorId: contractorId,
+                contactName: name,
+                contactEmail: email?.lowercased(),
+                contactPhone: phone,
+                role: role,
+                addedFrom: "manual"
+            ))
+            .execute()
+    }
+
+    func deleteProjectContact(id: UUID) async throws {
+        try await from("project_contacts")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Find an existing contractor by name (case-insensitive) to avoid duplicates
     func findContractorByName(householdId: UUID, name: String) async throws -> ContractorRow? {
         let results: [ContractorRow] = try await from("contractors")
@@ -1654,6 +1803,178 @@ final class DatabaseService {
     func deleteProjectFile(id: UUID) async throws {
         try await from("project_files")
             .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    // MARK: - Family Events
+
+    func fetchFamilyEvents(householdId: UUID) async throws -> [FamilyEventRow] {
+        try await from("family_events")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .order("start_date", ascending: true)
+            .execute()
+            .value
+    }
+
+    func fetchUpcomingFamilyEvents(householdId: UUID, limit: Int = 50) async throws -> [FamilyEventRow] {
+        let now = ISO8601DateFormatter().string(from: Date())
+        return try await from("family_events")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .gte("start_date", value: now)
+            .order("start_date", ascending: true)
+            .limit(limit)
+            .execute()
+            .value
+    }
+
+    func insertFamilyEvent(_ event: FamilyEventInsert) async throws -> FamilyEventRow {
+        try await from("family_events")
+            .insert(event)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func insertFamilyEvents(_ events: [FamilyEventInsert]) async throws {
+        // Use upsert to handle re-syncing the same calendar events
+        try await from("family_events")
+            .upsert(events, onConflict: "household_id,external_calendar_id,external_event_id")
+            .execute()
+    }
+
+    func updateFamilyEvent(id: UUID, title: String?, startDate: Date?, endDate: Date?, allDay: Bool?, taggedMemberIds: [UUID]?) async throws {
+        struct Update: Encodable {
+            let title: String?
+            let startDate: Date?
+            let endDate: Date?
+            let allDay: Bool?
+            let taggedMemberIds: [UUID]?
+            let updatedAt: Date
+
+            enum CodingKeys: String, CodingKey {
+                case title
+                case startDate = "start_date"
+                case endDate = "end_date"
+                case allDay = "all_day"
+                case taggedMemberIds = "tagged_member_ids"
+                case updatedAt = "updated_at"
+            }
+        }
+        try await from("family_events")
+            .update(Update(
+                title: title,
+                startDate: startDate,
+                endDate: endDate,
+                allDay: allDay,
+                taggedMemberIds: taggedMemberIds,
+                updatedAt: Date()
+            ))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func deleteFamilyEvent(id: UUID) async throws {
+        try await from("family_events")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func deleteFamilyEvents(householdId: UUID, externalCalendarId: String) async throws {
+        try await from("family_events")
+            .delete()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("external_calendar_id", value: externalCalendarId)
+            .execute()
+    }
+
+    func fetchFamilyEventExternalIds(householdId: UUID, calendarId: String) async throws -> [String] {
+        struct Row: Decodable {
+            let externalEventId: String?
+            enum CodingKeys: String, CodingKey {
+                case externalEventId = "external_event_id"
+            }
+        }
+        let rows: [Row] = try await from("family_events")
+            .select("external_event_id")
+            .eq("household_id", value: householdId.uuidString)
+            .eq("external_calendar_id", value: calendarId)
+            .execute()
+            .value
+        return rows.compactMap(\.externalEventId)
+    }
+
+    // MARK: - Synced Calendars
+
+    func fetchSyncedCalendars() async throws -> [SyncedCalendarRow] {
+        try await from("synced_calendars")
+            .select()
+            .order("calendar_title", ascending: true)
+            .execute()
+            .value
+    }
+
+    func upsertSyncedCalendar(
+        householdId: UUID,
+        userId: UUID,
+        calendarIdentifier: String,
+        calendarTitle: String,
+        calendarColor: String?,
+        isActive: Bool
+    ) async throws {
+        struct Upsert: Encodable {
+            let householdId: UUID
+            let userId: UUID
+            let calendarIdentifier: String
+            let calendarTitle: String
+            let calendarColor: String?
+            let isActive: Bool
+
+            enum CodingKeys: String, CodingKey {
+                case householdId = "household_id"
+                case userId = "user_id"
+                case calendarIdentifier = "calendar_identifier"
+                case calendarTitle = "calendar_title"
+                case calendarColor = "calendar_color"
+                case isActive = "is_active"
+            }
+        }
+        try await from("synced_calendars")
+            .upsert(
+                Upsert(
+                    householdId: householdId,
+                    userId: userId,
+                    calendarIdentifier: calendarIdentifier,
+                    calendarTitle: calendarTitle,
+                    calendarColor: calendarColor,
+                    isActive: isActive
+                ),
+                onConflict: "household_id,user_id,calendar_identifier"
+            )
+            .execute()
+    }
+
+    func deactivateSyncedCalendar(userId: UUID, calendarIdentifier: String) async throws {
+        try await from("synced_calendars")
+            .update(["is_active": false])
+            .eq("user_id", value: userId.uuidString)
+            .eq("calendar_identifier", value: calendarIdentifier)
+            .execute()
+    }
+
+    func updateSyncedCalendarLastSync(id: UUID) async throws {
+        struct Update: Encodable {
+            let lastSyncedAt: Date
+            enum CodingKeys: String, CodingKey {
+                case lastSyncedAt = "last_synced_at"
+            }
+        }
+        try await from("synced_calendars")
+            .update(Update(lastSyncedAt: Date()))
             .eq("id", value: id.uuidString)
             .execute()
     }

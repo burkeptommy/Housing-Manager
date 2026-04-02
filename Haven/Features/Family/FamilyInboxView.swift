@@ -5,6 +5,7 @@ import UserNotifications
 /// Family tab: upcoming events hero, category filters, items with event dates, reminders, tagging.
 struct FamilyInboxView: View {
     @State private var items: [DatabaseService.InboxItemRow] = []
+    @State private var calendarEvents: [FamilyEventRow] = []
     @State private var familyMembers: [FamilyMemberRow] = []
     @State private var hasLoaded = false
     @State private var expandedItem: UUID?
@@ -17,6 +18,8 @@ struct FamilyInboxView: View {
     // Delete
     @State private var showDeleteConfirm = false
     @State private var itemToDelete: DatabaseService.InboxItemRow?
+    @State private var showDeleteCalendarEventConfirm = false
+    @State private var calendarEventToDelete: FamilyEventRow?
     // Reschedule
     @State private var showReschedule = false
     @State private var itemToReschedule: DatabaseService.InboxItemRow?
@@ -27,8 +30,78 @@ struct FamilyInboxView: View {
     @State private var selectedMemberIds: Set<UUID> = []
     // Reminders
     @State private var activeReminders: Set<String> = []
+    // Calendar sync
+    @State private var showCalendarSync = false
+    @State private var selectedCalendarEvent: FamilyEventRow?
 
     private let db = DatabaseService.shared
+
+    // MARK: - Unified Event Type
+
+    /// Wraps both inbox items (email events) and calendar-synced events for unified display
+    enum UnifiedEvent: Identifiable {
+        case inbox(DatabaseService.InboxItemRow)
+        case calendar(FamilyEventRow)
+
+        var id: UUID {
+            switch self {
+            case .inbox(let item): return item.id
+            case .calendar(let event): return event.id
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .inbox(let item): return item.title
+            case .calendar(let event): return event.title
+            }
+        }
+
+        var eventDate: Date? {
+            switch self {
+            case .inbox(let item): return item.eventDate
+            case .calendar(let event): return event.startDate
+            }
+        }
+
+        var location: String? {
+            switch self {
+            case .inbox: return nil
+            case .calendar(let event): return event.location
+            }
+        }
+
+        var familyCategory: String? {
+            switch self {
+            case .inbox(let item): return item.familyCategory
+            case .calendar: return "events"
+            }
+        }
+
+        var taggedMemberIds: [UUID]? {
+            switch self {
+            case .inbox(let item): return item.taggedMemberIds
+            case .calendar(let event): return event.taggedMemberIds
+            }
+        }
+
+        var isCalendarEvent: Bool {
+            if case .calendar = self { return true }
+            return false
+        }
+
+        var isAllDay: Bool {
+            switch self {
+            case .inbox: return false
+            case .calendar(let event): return event.allDay
+            }
+        }
+
+        var source: String? {
+            if case .calendar(let event) = self { return event.source }
+            return nil
+        }
+    }
 
     // MARK: - Filtered items
 
@@ -37,29 +110,39 @@ struct FamilyInboxView: View {
         return items.filter { $0.familyCategory?.lowercased() == cat.lowercased() }
     }
 
-    private var allUpcomingEvents: [DatabaseService.InboxItemRow] {
+    private var allUpcomingEvents: [UnifiedEvent] {
         let startOfToday = Calendar.current.startOfDay(for: Date())
-        return items
+
+        // Email-sourced events from inbox_items
+        let inboxEvents: [UnifiedEvent] = items
             .filter { $0.eventDate != nil && $0.eventDate! >= startOfToday }
+            .map { .inbox($0) }
+
+        // Calendar-synced events from family_events
+        let calEvents: [UnifiedEvent] = calendarEvents
+            .filter { $0.startDate >= startOfToday }
+            .map { .calendar($0) }
+
+        return (inboxEvents + calEvents)
             .sorted { ($0.eventDate ?? .distantFuture) < ($1.eventDate ?? .distantFuture) }
     }
 
     /// Events this week (today through end of week)
-    private var thisWeekEvents: [DatabaseService.InboxItemRow] {
+    private var thisWeekEvents: [UnifiedEvent] {
         let calendar = Calendar.current
         let endOfWeek = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))!
         return allUpcomingEvents.filter { ($0.eventDate ?? .distantFuture) < endOfWeek }
     }
 
     /// Events after this week
-    private var laterEvents: [DatabaseService.InboxItemRow] {
+    private var laterEvents: [UnifiedEvent] {
         let calendar = Calendar.current
         let endOfWeek = calendar.date(byAdding: .day, value: 7, to: calendar.startOfDay(for: Date()))!
         return allUpcomingEvents.filter { ($0.eventDate ?? .distantFuture) >= endOfWeek }
     }
 
     /// Combined this week + upcoming, capped at 5 for the main view
-    private var visibleEvents: [DatabaseService.InboxItemRow] {
+    private var visibleEvents: [UnifiedEvent] {
         Array(allUpcomingEvents.prefix(5))
     }
 
@@ -95,8 +178,8 @@ struct FamilyInboxView: View {
                 // This Week + Upcoming events (max 5, with "View More")
                 if !visibleEvents.isEmpty {
                     // This Week section
-                    let visibleThisWeek = thisWeekEvents.filter { item in visibleEvents.contains(where: { $0.id == item.id }) }
-                    let visibleLater = laterEvents.filter { item in visibleEvents.contains(where: { $0.id == item.id }) }
+                    let visibleThisWeek = thisWeekEvents.filter { event in visibleEvents.contains(where: { $0.id == event.id }) }
+                    let visibleLater = laterEvents.filter { event in visibleEvents.contains(where: { $0.id == event.id }) }
 
                     if !visibleThisWeek.isEmpty {
                         Section {
@@ -140,6 +223,7 @@ struct FamilyInboxView: View {
                         Section {
                             Button {
                                 showAllUpcoming = true
+                                Analytics.track(.familyAllUpcomingViewed, ["total_events": allUpcomingEvents.count])
                             } label: {
                                 HStack {
                                     Text("View More (\(allUpcomingEvents.count - 5) more)")
@@ -155,6 +239,24 @@ struct FamilyInboxView: View {
                             .listRowBackground(Color.clear)
                             .listRowInsets(EdgeInsets(top: 2, leading: 16, bottom: 2, trailing: 16))
                         }
+                    }
+
+                    // Add Events From Calendar button
+                    Section {
+                        addEventsFromCalendarButton
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
+                }
+
+                // Add Events From Calendar (shown when no events yet)
+                if visibleEvents.isEmpty {
+                    Section {
+                        addEventsFromCalendarButton
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                     }
                 }
 
@@ -214,15 +316,20 @@ struct FamilyInboxView: View {
             .modifier(FamilyFilePickerModifiers(showPhotoPicker: $showPhotoPicker, showFilePicker: $showFilePicker, selectedPhoto: $selectedPhoto, onPhoto: handlePhotoSelection, onFile: handleFileSelection))
         }
         } // end Group
+        .trackScreen("FamilyInboxView")
         .task {
             await loadItems()
+            await loadCalendarEvents()
             await loadFamilyMembers()
             await loadActiveReminders()
         }
         .onAppear {
             // Refresh without resetting hasLoaded (no flicker)
             if hasLoaded {
-                Task { await refreshItems() }
+                Task {
+                    await refreshItems()
+                    await loadCalendarEvents()
+                }
             }
         }
         .alert("Delete this item?", isPresented: $showDeleteConfirm) {
@@ -232,6 +339,7 @@ struct FamilyInboxView: View {
                         try? await db.deleteInboxItem(id: item.id)
                         items.removeAll { $0.id == item.id }
                         Haptics.success()
+                        Analytics.track(.familyItemDeleted, ["item_id": item.id.uuidString, "category": item.familyCategory ?? "unknown"])
                     }
                 }
             }
@@ -241,18 +349,7 @@ struct FamilyInboxView: View {
         .sheet(isPresented: $showTagging) { taggingSheet }
         .sheet(isPresented: $showAllUpcoming) {
             NavigationStack {
-                List {
-                    ForEach(allUpcomingEvents) { event in
-                        Button { selectedItem = event; showAllUpcoming = false } label: {
-                            upcomingEventRow(event)
-                        }
-                        .buttonStyle(.plain)
-                        .listRowSeparator(.hidden)
-                        .listRowBackground(Color.clear)
-                    }
-                }
-                .listStyle(.plain)
-                .scrollContentBackground(.hidden)
+                upcomingEventsFullView
                 .background(HavenColors.background)
                 .navigationTitle("Upcoming Events")
                 .navigationBarTitleDisplayMode(.inline)
@@ -263,6 +360,45 @@ struct FamilyInboxView: View {
                     }
                 }
             }
+        }
+        .sheet(isPresented: $showCalendarSync) {
+            CalendarSyncSheet {
+                Task { await loadCalendarEvents() }
+            }
+        }
+        .onChange(of: selectedCalendarEvent) { _, newValue in
+            // Dismiss View More sheet first, then present detail
+            if newValue != nil && showAllUpcoming {
+                showAllUpcoming = false
+            }
+        }
+        .sheet(item: $selectedCalendarEvent) { event in
+            NavigationStack {
+                CalendarEventDetailView(
+                    event: event,
+                    familyMembers: familyMembers,
+                    onUpdate: { Task { await loadCalendarEvents() } },
+                    onDelete: {
+                        calendarEvents.removeAll { $0.id == event.id }
+                    }
+                )
+            }
+            .presentationDetents([.large])
+        }
+        .alert("Delete this event?", isPresented: $showDeleteCalendarEventConfirm) {
+            Button("Delete from Haven & Calendar", role: .destructive) {
+                if let event = calendarEventToDelete {
+                    Task {
+                        try? await CalendarSyncService.shared.deleteEvent(event)
+                        calendarEvents.removeAll { $0.id == event.id }
+                        Haptics.success()
+                        Analytics.track(.calendarEventDeleted, ["event_title": event.title, "source": event.source])
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will also remove the event from your iPhone calendar.")
         }
         .sheet(item: $selectedItem) { item in
             NavigationStack {
@@ -280,9 +416,12 @@ struct FamilyInboxView: View {
 
     // MARK: - Upcoming Event Row
 
-    private func upcomingEventRow(_ event: DatabaseService.InboxItemRow) -> some View {
+    private func upcomingEventRow(_ event: UnifiedEvent) -> some View {
         Button {
-            selectedItem = event
+            switch event {
+            case .inbox(let item): selectedItem = item
+            case .calendar(let calEvent): selectedCalendarEvent = calEvent
+            }
         } label: {
             HStack(spacing: 12) {
                 // Date badge
@@ -311,9 +450,35 @@ struct FamilyInboxView: View {
                         .lineLimit(1)
 
                     if let date = event.eventDate {
-                        Text(date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day().hour().minute()))
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textSecondary)
+                        HStack(spacing: 4) {
+                            if event.isAllDay {
+                                Text("\(date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day())) — All Day")
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            } else {
+                                Text(date.formatted(.dateTime.weekday(.wide).month(.abbreviated).day().hour().minute()))
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            // Show calendar source badge for synced events
+                            if event.isCalendarEvent {
+                                Image(systemName: "calendar.circle.fill")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(HavenColors.info)
+                            }
+                        }
+                    }
+
+                    // Location for calendar events
+                    if let location = event.location, !location.isEmpty {
+                        HStack(spacing: 3) {
+                            Image(systemName: "mappin")
+                                .font(.system(size: 9))
+                            Text(location)
+                                .lineLimit(1)
+                        }
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
                     }
 
                     // Tagged members (with avatar colors, oldest first)
@@ -402,6 +567,9 @@ struct FamilyInboxView: View {
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
             }
+
+            addEventsFromCalendarButton
+                .padding(.horizontal, HavenTheme.pageMargin)
 
             uploadButtons
 
@@ -853,6 +1021,20 @@ struct FamilyInboxView: View {
         }
     }
 
+    private func loadCalendarEvents() async {
+        do {
+            let user = try await db.fetchCurrentUser()
+            guard let householdId = user.householdId else { return }
+            calendarEvents = try await db.fetchUpcomingFamilyEvents(householdId: householdId)
+            // Also trigger background sync if calendars are linked
+            await CalendarSyncService.shared.syncAll()
+            // Reload after sync
+            calendarEvents = try await db.fetchUpcomingFamilyEvents(householdId: householdId)
+        } catch {
+            print("[FamilyInbox] Calendar events load failed: \(error)")
+        }
+    }
+
     private func loadFamilyMembers() async {
         familyMembers = (try? await db.fetchFamilyMembers()) ?? []
         print("[FamilyInbox] Loaded \(familyMembers.count) family members: \(familyMembers.map { $0.firstName })")
@@ -862,6 +1044,153 @@ struct FamilyInboxView: View {
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         activeReminders = Set(pending.filter { $0.identifier.hasPrefix("family-") }.map { $0.identifier })
+    }
+
+    // MARK: - Full Upcoming Events View (3-day swipable + list)
+
+    @State private var dayOffset = 0
+
+    private var upcomingEventsFullView: some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        return ScrollView {
+            VStack(spacing: 0) {
+                // 3-day swipable header
+                TabView(selection: $dayOffset) {
+                    ForEach(0..<30, id: \.self) { offset in
+                        dayColumnsView(startingOffset: offset)
+                            .tag(offset)
+                    }
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+                .frame(height: 140)
+                .padding(.bottom, 8)
+
+                Divider().padding(.horizontal)
+
+                // Full list below
+                LazyVStack(spacing: 8) {
+                    let eventsFromOffset = allUpcomingEvents.filter { event in
+                        guard let date = event.eventDate else { return false }
+                        let offsetDate = calendar.date(byAdding: .day, value: dayOffset, to: today)!
+                        return date >= offsetDate
+                    }
+
+                    ForEach(eventsFromOffset) { event in
+                        upcomingEventRow(event)
+                            .padding(.horizontal, HavenTheme.pageMargin)
+                    }
+                }
+                .padding(.top, 12)
+            }
+        }
+        .scrollContentBackground(.hidden)
+    }
+
+    private func dayColumnsView(startingOffset: Int) -> some View {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+
+        return HStack(spacing: 0) {
+            ForEach(0..<3, id: \.self) { col in
+                let dayDate = calendar.date(byAdding: .day, value: startingOffset + col, to: today)!
+                let dayEvents = allUpcomingEvents.filter { event in
+                    guard let date = event.eventDate else { return false }
+                    return calendar.isDate(date, inSameDayAs: dayDate)
+                }
+
+                VStack(spacing: 6) {
+                    // Day header
+                    VStack(spacing: 2) {
+                        Text(dayDate.formatted(.dateTime.weekday(.abbreviated)).uppercased())
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(calendar.isDateInToday(dayDate) ? HavenColors.critical : HavenColors.textTertiary)
+                        Text(dayDate.formatted(.dateTime.day()))
+                            .font(.system(size: 20, weight: .bold, design: .rounded))
+                            .foregroundStyle(calendar.isDateInToday(dayDate) ? HavenColors.navy800 : HavenColors.textPrimary)
+                    }
+
+                    // Event dots/previews
+                    if dayEvents.isEmpty {
+                        Text("No events")
+                            .font(.system(size: 9))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    } else {
+                        VStack(spacing: 3) {
+                            ForEach(dayEvents.prefix(3)) { event in
+                                Text(event.title)
+                                    .font(.system(size: 9, weight: .medium))
+                                    .foregroundStyle(HavenColors.navy700)
+                                    .lineLimit(1)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.horizontal, 4)
+                                    .padding(.vertical, 2)
+                                    .background(HavenColors.navy.opacity(0.06))
+                                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                            }
+                            if dayEvents.count > 3 {
+                                Text("+\(dayEvents.count - 3) more")
+                                    .font(.system(size: 8))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 8)
+                .background(calendar.isDateInToday(dayDate) ? HavenColors.navy.opacity(0.04) : Color.clear)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+            }
+        }
+        .padding(.horizontal, HavenTheme.pageMargin)
+    }
+
+    // MARK: - Add Events From Calendar
+
+    private var addEventsFromCalendarButton: some View {
+        Button {
+            Haptics.light()
+            showCalendarSync = true
+            Analytics.track(.calendarSyncOpened)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "calendar.badge.plus")
+                    .font(.system(size: 16, weight: .medium))
+                    .foregroundStyle(HavenColors.navy)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Add Events From Calendar")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.navy700)
+                    if !CalendarSyncService.shared.syncedCalendarIds.isEmpty {
+                        Text("\(CalendarSyncService.shared.syncedCalendarIds.count) calendar(s) synced")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    } else {
+                        Text("Sync your iPhone calendars")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing12)
+            .background(HavenColors.navy.opacity(0.04))
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.navy.opacity(0.12), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Upload Buttons

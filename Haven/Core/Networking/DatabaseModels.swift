@@ -438,7 +438,7 @@ struct PropertyUpdate: Codable {
 
 // MARK: - Home System
 
-struct HomeSystemRow: Codable, Identifiable {
+struct HomeSystemRow: Identifiable {
     let id: UUID
     let propertyId: UUID
     let householdId: UUID
@@ -457,6 +457,15 @@ struct HomeSystemRow: Codable, Identifiable {
     let lastServiceDate: String?
     let nextServiceDue: String?
     let totalSpent: Double?
+    // Cached catalog enrichment (avoids network calls on every page load)
+    let catalogSeries: String?
+    let catalogModelName: String?
+    let catalogFeatures: [String]?
+    let reliabilityScore: Int?
+    let scoreSummary: String?
+    let catalogFuelType: String?
+    let catalogEnrichedAt: Date?
+    let cachedManualLinks: [CachedManualLink]?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status
@@ -472,7 +481,56 @@ struct HomeSystemRow: Codable, Identifiable {
         case lastServiceDate = "last_service_date"
         case nextServiceDue = "next_service_due"
         case totalSpent = "total_spent"
+        case catalogSeries = "catalog_series"
+        case catalogModelName = "catalog_model_name"
+        case catalogFeatures = "catalog_features"
+        case reliabilityScore = "reliability_score"
+        case scoreSummary = "score_summary"
+        case catalogFuelType = "catalog_fuel_type"
+        case catalogEnrichedAt = "catalog_enriched_at"
+        case cachedManualLinks = "cached_manual_links"
     }
+}
+
+extension HomeSystemRow: Decodable {
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        name = try c.decode(String.self, forKey: .name)
+        category = try c.decode(String.self, forKey: .category)
+        manufacturer = try? c.decodeIfPresent(String.self, forKey: .manufacturer)
+        modelNumber = try? c.decodeIfPresent(String.self, forKey: .modelNumber)
+        serialNumber = try? c.decodeIfPresent(String.self, forKey: .serialNumber)
+        installDate = try? c.decodeIfPresent(String.self, forKey: .installDate)
+        expectedLifespanYears = try? c.decodeIfPresent(Int.self, forKey: .expectedLifespanYears)
+        status = try? c.decodeIfPresent(String.self, forKey: .status)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        preferredContractorId = try? c.decodeIfPresent(UUID.self, forKey: .preferredContractorId)
+        catalogEntryId = try? c.decodeIfPresent(UUID.self, forKey: .catalogEntryId)
+        lastServiceDate = try? c.decodeIfPresent(String.self, forKey: .lastServiceDate)
+        nextServiceDue = try? c.decodeIfPresent(String.self, forKey: .nextServiceDue)
+        totalSpent = try? c.decodeIfPresent(Double.self, forKey: .totalSpent)
+        // Cache fields — use try? so a decode failure never kills the row
+        catalogSeries = try? c.decodeIfPresent(String.self, forKey: .catalogSeries)
+        catalogModelName = try? c.decodeIfPresent(String.self, forKey: .catalogModelName)
+        catalogFeatures = try? c.decodeIfPresent([String].self, forKey: .catalogFeatures)
+        reliabilityScore = try? c.decodeIfPresent(Int.self, forKey: .reliabilityScore)
+        scoreSummary = try? c.decodeIfPresent(String.self, forKey: .scoreSummary)
+        catalogFuelType = try? c.decodeIfPresent(String.self, forKey: .catalogFuelType)
+        catalogEnrichedAt = try? c.decodeIfPresent(Date.self, forKey: .catalogEnrichedAt)
+        cachedManualLinks = try? c.decodeIfPresent([CachedManualLink].self, forKey: .cachedManualLinks)
+    }
+}
+
+extension HomeSystemRow: Encodable {}
+
+struct CachedManualLink: Codable {
+    let type: String
+    let url: String
+    let cached: Bool?
 }
 
 struct HomeSystemInsert: Codable {
@@ -516,6 +574,14 @@ struct HomeSystemUpdate: Codable {
     var lastServiceDate: String?
     var nextServiceDue: String?
     var totalSpent: Double?
+    // Catalog cache fields
+    var catalogSeries: String?
+    var catalogModelName: String?
+    var catalogFeatures: [String]?
+    var reliabilityScore: Int?
+    var scoreSummary: String?
+    var catalogFuelType: String?
+    var catalogEnrichedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status
@@ -528,6 +594,13 @@ struct HomeSystemUpdate: Codable {
         case lastServiceDate = "last_service_date"
         case nextServiceDue = "next_service_due"
         case totalSpent = "total_spent"
+        case catalogSeries = "catalog_series"
+        case catalogModelName = "catalog_model_name"
+        case catalogFeatures = "catalog_features"
+        case reliabilityScore = "reliability_score"
+        case scoreSummary = "score_summary"
+        case catalogFuelType = "catalog_fuel_type"
+        case catalogEnrichedAt = "catalog_enriched_at"
     }
 }
 
@@ -1397,6 +1470,8 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
     let aiResearchUpdatedAt: Date?
     let estimatedTotal: Double?
     let notes: String?
+    let parentProjectId: UUID?
+    let personalPropertyAmount: Double?
     let createdAt: Date?
     let updatedAt: Date?
     let createdBy: UUID?
@@ -1417,10 +1492,15 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
         case actualEndDate = "actual_end_date"
         case aiResearch = "ai_research"
         case aiResearchUpdatedAt = "ai_research_updated_at"
+        case parentProjectId = "parent_project_id"
+        case personalPropertyAmount = "personal_property_amount"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case createdBy = "created_by"
     }
+
+    var isInsuranceClaim: Bool { projectType == "insurance_claim" }
+    var isChildProject: Bool { parentProjectId != nil }
 }
 
 struct PropertyProjectInsert: Codable {
@@ -1436,6 +1516,7 @@ struct PropertyProjectInsert: Codable {
     var targetStartDate: String?
     var targetEndDate: String?
     var notes: String?
+    var parentProjectId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case name, description, category, status, priority, notes
@@ -1445,6 +1526,7 @@ struct PropertyProjectInsert: Codable {
         case estimatedBudget = "estimated_budget"
         case targetStartDate = "target_start_date"
         case targetEndDate = "target_end_date"
+        case parentProjectId = "parent_project_id"
     }
 }
 
@@ -1467,6 +1549,8 @@ struct PropertyProjectUpdate: Codable {
     var aiResearchUpdatedAt: Date?
     var estimatedTotal: Double?
     var notes: String?
+    var parentProjectId: UUID?
+    var personalPropertyAmount: Double?
 
     enum CodingKeys: String, CodingKey {
         case name, description, category, status, priority, notes
@@ -1482,6 +1566,8 @@ struct PropertyProjectUpdate: Codable {
         case actualEndDate = "actual_end_date"
         case aiResearch = "ai_research"
         case aiResearchUpdatedAt = "ai_research_updated_at"
+        case parentProjectId = "parent_project_id"
+        case personalPropertyAmount = "personal_property_amount"
     }
 }
 
@@ -1554,11 +1640,12 @@ struct ProjectQuoteRow: Codable, Identifiable {
     let analysis: QuoteAnalysis
     let filePath: String?
     let notes: String?
+    let trade: String?
     let createdAt: Date?
     let updatedAt: Date?
 
     enum CodingKeys: String, CodingKey {
-        case id, analysis, notes
+        case id, analysis, notes, trade
         case projectId = "project_id"
         case householdId = "household_id"
         case contractorId = "contractor_id"
@@ -1573,6 +1660,11 @@ struct ProjectQuoteRow: Codable, Identifiable {
 
     /// Vendor name from the quote analysis
     var vendorName: String? { analysis.vendor?.name }
+
+    /// Display name for the trade, falling back to analysis vendor trade or "General"
+    var tradeName: String {
+        trade ?? analysis.vendor?.trade ?? "General"
+    }
 }
 
 struct ProjectQuoteInsert: Codable {
@@ -1586,9 +1678,10 @@ struct ProjectQuoteInsert: Codable {
     let analysis: QuoteAnalysis
     var filePath: String?
     var notes: String?
+    var trade: String?
 
     enum CodingKeys: String, CodingKey {
-        case analysis, notes
+        case analysis, notes, trade
         case projectId = "project_id"
         case householdId = "household_id"
         case contractorId = "contractor_id"
@@ -1619,6 +1712,7 @@ struct QuoteVendor: Codable {
     let email: String?
     let address: String?
     let license: String?
+    let trade: String?
 }
 
 struct QuoteLineItem: Codable, Identifiable {
@@ -2009,5 +2103,240 @@ struct MergeResolutions: Codable {
         case homeSystems = "home_systems"
         case maintenanceTasks = "maintenance_tasks"
         case familyMembers = "family_members"
+    }
+}
+
+// MARK: - Family Events
+
+struct FamilyEventRow: Codable, Identifiable, Equatable, Hashable {
+    static func == (lhs: FamilyEventRow, rhs: FamilyEventRow) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+    let id: UUID
+    let householdId: UUID
+    let title: String
+    let startDate: Date
+    let endDate: Date?
+    let allDay: Bool
+    let location: String?
+    let notes: String?
+    let source: String
+    let externalCalendarId: String?
+    let externalEventId: String?
+    let sourceInboxItemId: UUID?
+    let taggedMemberIds: [UUID]?
+    let recurrenceRule: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, location, notes, source
+        case householdId = "household_id"
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case allDay = "all_day"
+        case externalCalendarId = "external_calendar_id"
+        case externalEventId = "external_event_id"
+        case sourceInboxItemId = "source_inbox_item_id"
+        case taggedMemberIds = "tagged_member_ids"
+        case recurrenceRule = "recurrence_rule"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct FamilyEventInsert: Encodable {
+    let householdId: UUID
+    let title: String
+    let startDate: Date
+    let endDate: Date?
+    let allDay: Bool?
+    let location: String?
+    let notes: String?
+    let source: String
+    let externalCalendarId: String?
+    let externalEventId: String?
+    let recurrenceRule: String?
+
+    enum CodingKeys: String, CodingKey {
+        case title, location, notes, source
+        case householdId = "household_id"
+        case startDate = "start_date"
+        case endDate = "end_date"
+        case allDay = "all_day"
+        case externalCalendarId = "external_calendar_id"
+        case externalEventId = "external_event_id"
+        case recurrenceRule = "recurrence_rule"
+    }
+}
+
+// MARK: - Synced Calendars
+
+struct SyncedCalendarRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let userId: UUID
+    let calendarIdentifier: String
+    let calendarTitle: String
+    let calendarColor: String?
+    let isActive: Bool
+    let lastSyncedAt: Date?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case householdId = "household_id"
+        case userId = "user_id"
+        case calendarIdentifier = "calendar_identifier"
+        case calendarTitle = "calendar_title"
+        case calendarColor = "calendar_color"
+        case isActive = "is_active"
+        case lastSyncedAt = "last_synced_at"
+        case createdAt = "created_at"
+    }
+}
+
+// MARK: - Project Contacts
+
+struct ProjectContactRow: Codable, Identifiable {
+    let id: UUID
+    let projectId: UUID
+    let householdId: UUID
+    let contractorId: UUID?
+    let contactName: String?
+    let contactEmail: String?
+    let contactPhone: String?
+    let role: String?
+    let addedFrom: String?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, notes, role
+        case projectId = "project_id"
+        case householdId = "household_id"
+        case contractorId = "contractor_id"
+        case contactName = "contact_name"
+        case contactEmail = "contact_email"
+        case contactPhone = "contact_phone"
+        case addedFrom = "added_from"
+        case createdAt = "created_at"
+    }
+
+    var displayName: String {
+        contactName ?? contactEmail ?? "Unknown Contact"
+    }
+
+    var roleLabel: String {
+        switch role {
+        case "adjuster": return "Insurance Adjuster"
+        case "inspector": return "Inspector"
+        case "architect": return "Architect"
+        default: return "Contractor"
+        }
+    }
+}
+
+// MARK: - Utility Accounts
+
+struct UtilityAccountRow: Codable, Identifiable {
+    let id: UUID
+    let propertyId: UUID
+    let householdId: UUID
+    let providerType: String
+    let providerName: String
+    let providerSlug: String?
+    let accountNumber: String?
+    let phone: String?
+    let website: String?
+    let monthlyCost: Double?
+    let planName: String?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, phone, website, notes
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case providerType = "provider_type"
+        case providerName = "provider_name"
+        case providerSlug = "provider_slug"
+        case accountNumber = "account_number"
+        case monthlyCost = "monthly_cost"
+        case planName = "plan_name"
+        case createdAt = "created_at"
+    }
+
+    var typeIcon: String {
+        switch providerType {
+        case "electric": return "bolt.fill"
+        case "internet_cable": return "wifi"
+        case "security": return "lock.shield.fill"
+        case "natural_gas": return "flame.fill"
+        case "water": return "drop.fill"
+        case "trash": return "trash.fill"
+        case "propane": return "fuelpump.fill"
+        case "oil": return "fuelpump.fill"
+        case "solar": return "sun.max.fill"
+        default: return "building.2.fill"
+        }
+    }
+
+    var typeLabel: String {
+        switch providerType {
+        case "electric": return "Electric"
+        case "internet_cable": return "Internet / Cable"
+        case "security": return "Security"
+        case "natural_gas": return "Natural Gas"
+        case "water": return "Water"
+        case "trash": return "Trash / Recycling"
+        case "propane": return "Propane"
+        case "oil": return "Oil"
+        case "solar": return "Solar"
+        default: return "Utility"
+        }
+    }
+}
+
+struct UtilityAccountInsert: Encodable {
+    let propertyId: UUID
+    let householdId: UUID
+    let providerType: String
+    let providerName: String
+    var providerSlug: String?
+    var accountNumber: String?
+    var phone: String?
+    var website: String?
+    var monthlyCost: Double?
+    var planName: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case phone, website, notes
+        case propertyId = "property_id"
+        case householdId = "household_id"
+        case providerType = "provider_type"
+        case providerName = "provider_name"
+        case providerSlug = "provider_slug"
+        case accountNumber = "account_number"
+        case monthlyCost = "monthly_cost"
+        case planName = "plan_name"
+    }
+}
+
+struct UtilityProviderRow: Codable, Identifiable {
+    let id: UUID
+    let name: String
+    let slug: String
+    let providerType: String
+    let logoUrl: String?
+    let brandColor: String?
+    let website: String?
+    let phone: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, slug, website, phone
+        case providerType = "provider_type"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
     }
 }

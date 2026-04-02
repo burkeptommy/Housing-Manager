@@ -1,5 +1,6 @@
 import SwiftUI
 import UserNotifications
+import Combine
 
 struct ExpirationItem: Identifiable {
     let id = UUID()
@@ -88,6 +89,8 @@ final class DashboardViewModel: ObservableObject {
     @Published var properties: [PropertyRow] = []
     @Published var hasActiveProjects = false
 
+    private var cancellables = Set<AnyCancellable>()
+
     var showGettingStarted: Bool {
         !hasProperty || !hasDocuments || !hasUsedAlfred
     }
@@ -158,7 +161,24 @@ final class DashboardViewModel: ObservableObject {
         return (completed, items.count)
     }
 
+    func subscribeToChanges() {
+        guard cancellables.isEmpty else { return }
+        let names: [Notification.Name] = [
+            .maintenanceTaskChanged, .homeSystemChanged, .contractorChanged,
+            .documentChanged, .propertyChanged, .projectChanged
+        ]
+        for name in names {
+            NotificationCenter.default.publisher(for: name)
+                .debounce(for: .milliseconds(300), scheduler: RunLoop.main)
+                .sink { [weak self] _ in
+                    Task { [weak self] in await self?.refresh() }
+                }
+                .store(in: &cancellables)
+        }
+    }
+
     func loadDashboard() async {
+        subscribeToChanges()
         loadDismissedRecommendations()
         loadDismissedEnrichmentCards()
         isLoading = true

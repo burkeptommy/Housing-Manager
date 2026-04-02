@@ -93,6 +93,8 @@ final class ProjectsViewModel: ObservableObject {
     func createProject(_ insert: PropertyProjectInsert) async throws -> PropertyProjectRow {
         let project = try await db.createProject(insert)
         projects.insert(project, at: 0)
+        NotificationCenter.default.post(name: .projectChanged, object: nil,
+            userInfo: ["action": "created", "id": project.id.uuidString])
         return project
     }
 
@@ -101,11 +103,107 @@ final class ProjectsViewModel: ObservableObject {
         if let idx = projects.firstIndex(where: { $0.id == id }) {
             projects[idx] = updated
         }
+        NotificationCenter.default.post(name: .projectChanged, object: nil,
+            userInfo: ["action": "updated", "id": id.uuidString])
     }
 
     func deleteProject(id: UUID) async throws {
-        try await db.deleteProject(id: id)
+        let snapshot = projects
         projects.removeAll { $0.id == id }
+        do {
+            try await db.deleteProject(id: id)
+            NotificationCenter.default.post(name: .projectChanged, object: nil,
+                userInfo: ["action": "deleted", "id": id.uuidString])
+        } catch {
+            projects = snapshot
+            throw error
+        }
+    }
+
+    // MARK: - Project Contacts
+
+    @Published var projectContacts: [ProjectContactRow] = []
+
+    func loadProjectContacts(projectId: UUID) async {
+        projectContacts = (try? await db.fetchProjectContacts(projectId: projectId)) ?? []
+    }
+
+    func removeProjectContact(id: UUID) async {
+        try? await db.deleteProjectContact(id: id)
+        projectContacts.removeAll { $0.id == id }
+    }
+
+    // MARK: - Sub-Projects (Insurance Claims)
+
+    @Published var subProjects: [PropertyProjectRow] = []
+
+    func loadSubProjects(parentId: UUID) async {
+        // Filter from already-loaded projects, or fetch all if needed
+        subProjects = projects.filter { $0.parentProjectId == parentId }
+    }
+
+    /// Available projects that can be linked to a claim (not already linked, not the claim itself)
+    func linkableProjects(excludingClaimId claimId: UUID) -> [PropertyProjectRow] {
+        projects.filter { $0.id != claimId && $0.parentProjectId == nil && !$0.isInsuranceClaim }
+    }
+
+    func linkProjectToClaim(projectId: UUID, claimId: UUID) async {
+        // Optimistic: move to sub-projects immediately
+        if let project = projects.first(where: { $0.id == projectId }) {
+            subProjects.append(project)
+        }
+        Haptics.success()
+
+        do {
+            var updates = PropertyProjectUpdate()
+            updates.parentProjectId = claimId
+            _ = try await db.updateProject(id: projectId, updates)
+            // Reload to get fresh data with parentProjectId set
+            if let idx = projects.firstIndex(where: { $0.id == projectId }) {
+                projects[idx] = try await db.fetchProject(id: projectId)
+            }
+            NotificationCenter.default.post(name: .projectChanged, object: nil,
+                userInfo: ["action": "updated", "id": projectId.uuidString])
+        } catch {
+            subProjects.removeAll { $0.id == projectId }
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    func unlinkProjectFromClaim(projectId: UUID) async {
+        let snapshot = subProjects
+        subProjects.removeAll { $0.id == projectId }
+        Haptics.success()
+
+        do {
+            try await db.clearParentProject(id: projectId)
+            if let idx = projects.firstIndex(where: { $0.id == projectId }) {
+                projects[idx] = try await db.fetchProject(id: projectId)
+            }
+            NotificationCenter.default.post(name: .projectChanged, object: nil,
+                userInfo: ["action": "updated", "id": projectId.uuidString])
+        } catch {
+            subProjects = snapshot
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Total claim amount from all sub-project quotes
+    /// Total claim = linked project costs + personal property amount
+    func claimTotal(for claim: PropertyProjectRow) -> Double {
+        let projectCosts = subProjects.compactMap { project in
+            project.aiEstimatedProCost ?? project.estimatedBudget ?? project.actualSpend
+        }.reduce(0, +)
+        return projectCosts + (claim.personalPropertyAmount ?? 0)
+    }
+
+    /// Legacy computed property for backward compatibility
+    var claimTotal: Double {
+        subProjects.compactMap { project in
+            project.aiEstimatedProCost ?? project.estimatedBudget ?? project.actualSpend
+        }.reduce(0, +)
     }
 
     // MARK: - Project Files (DIY)

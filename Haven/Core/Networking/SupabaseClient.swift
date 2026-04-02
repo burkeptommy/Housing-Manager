@@ -352,12 +352,14 @@ enum HavenSupabase {
         let propertyId: String?
         let action: String
         let documentCategory: String?
+        let targetProjectId: String?
 
         enum CodingKeys: String, CodingKey {
             case action
             case inboxItemId = "inbox_item_id"
             case propertyId = "property_id"
             case documentCategory = "document_category"
+            case targetProjectId = "target_project_id"
         }
     }
 
@@ -365,13 +367,15 @@ enum HavenSupabase {
         inboxItemId: String,
         propertyId: String? = nil,
         action: String,
-        documentCategory: String? = nil
+        documentCategory: String? = nil,
+        targetProjectId: String? = nil
     ) async throws -> Data {
         let body = ProcessInboxItemRequest(
             inboxItemId: inboxItemId,
             propertyId: propertyId,
             action: action,
-            documentCategory: documentCategory
+            documentCategory: documentCategory,
+            targetProjectId: targetProjectId
         )
         return try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 120)
     }
@@ -485,5 +489,36 @@ enum HavenSupabase {
             return [:]
         }
         return json
+    }
+
+    // MARK: - Catalog Request
+
+    struct CatalogRequestBody: Encodable {
+        let brand: String
+        let systemType: String
+        let modelNumber: String?
+        let notes: String?
+        let userId: String?
+        let householdId: String?
+    }
+
+    static func sendCatalogRequest(
+        brand: String,
+        systemType: String,
+        modelNumber: String? = nil,
+        notes: String? = nil
+    ) async throws {
+        let currentUserId = try? await client.auth.session.user.id.uuidString
+        let user = try? await DatabaseService.shared.fetchCurrentUser()
+
+        let body = CatalogRequestBody(
+            brand: brand,
+            systemType: systemType,
+            modelNumber: modelNumber,
+            notes: notes,
+            userId: currentUserId,
+            householdId: user?.householdId?.uuidString
+        )
+        _ = try await callEdgeFunction(name: "send-catalog-request", body: body, timeoutSeconds: 15)
     }
 }

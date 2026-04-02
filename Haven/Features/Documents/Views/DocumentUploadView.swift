@@ -144,7 +144,17 @@ struct DocumentUploadView: View {
         }
         .alert("Are You Sure?", isPresented: $viewModel.showIrrelevantWarning) {
             Button("Upload Anyway") {
-                Task { await viewModel.confirmUploadAnyway() }
+                guard let data = viewModel.selectedData else { return }
+                let file = PendingUploadFile(
+                    data: data,
+                    fileName: viewModel.selectedFileName,
+                    contentType: viewModel.selectedContentType,
+                    previewImage: viewModel.previewImage
+                )
+                DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId)
+                Haptics.success()
+                onComplete?()
+                dismiss()
             }
             Button("Cancel", role: .cancel) {
                 viewModel.cancelIrrelevantUpload()
@@ -721,9 +731,38 @@ struct DocumentUploadView: View {
     // MARK: - Auto Upload
 
     private func startAutoUpload() {
-        guard viewModel.selectedData != nil else { return }
+        guard let data = viewModel.selectedData else { return }
+
+        // Quick pre-screen for irrelevant content (non-blocking check)
         Task {
-            await viewModel.preScreenAndUpload()
+            // Run pre-screening first
+            var screenText = viewModel.selectedFileName.lowercased()
+            if let image = viewModel.previewImage {
+                if let ocrText = await DocumentAnalysisService.shared.extractText(from: image) {
+                    screenText += " " + ocrText.lowercased()
+                }
+            }
+
+            if let warning = viewModel.detectIrrelevantContent(screenText) {
+                viewModel.irrelevantWarningMessage = warning
+                viewModel.showIrrelevantWarning = true
+                viewModel.pendingUploadAfterWarning = true
+                return
+            }
+
+            // No issues — hand off to background manager and dismiss
+            let file = PendingUploadFile(
+                data: data,
+                fileName: viewModel.selectedFileName,
+                contentType: viewModel.selectedContentType,
+                previewImage: viewModel.previewImage
+            )
+            DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId)
+            Haptics.success()
+            NotificationCenter.default.post(name: .documentChanged, object: nil,
+                userInfo: ["action": "created", "id": "pending"])
+            onComplete?()
+            dismiss()
         }
     }
 

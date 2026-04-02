@@ -336,6 +336,7 @@ struct EquipmentIdentifySheet: View {
         let base64 = imageData.base64EncodedString()
         isIdentifying = true
         identifyError = nil
+        Analytics.track(.equipmentPhotoIdentifyStarted, ["category": systemCategory ?? "none"])
 
         Task {
             do {
@@ -346,6 +347,7 @@ struct EquipmentIdentifySheet: View {
                 await MainActor.run {
                     identifyResult = result
                     isIdentifying = false
+                    Analytics.track(.equipmentPhotoIdentifyCompleted, ["found_match": result.catalogMatch != nil])
                 }
             } catch {
                 await MainActor.run {

@@ -1200,6 +1200,20 @@ struct MarkCompleteForm: View {
             // 4. Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
 
+            // 5. Push notification to all household members
+            Task {
+                let users = try? await db.fetchHouseholdUsers()
+                let currentUser = try? await db.fetchCurrentUser()
+                let completedBy = currentUser?.fullName?.components(separatedBy: " ").first ?? "Someone"
+                let recipientIds = (users ?? []).map(\.id)
+                await PushNotificationService.shared.sendTaskCompletedNotification(
+                    taskTitle: task.title,
+                    completedByName: completedBy,
+                    recipientUserIds: recipientIds,
+                    taskId: task.id
+                )
+            }
+
             Haptics.success()
             dismiss()
             onComplete()

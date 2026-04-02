@@ -7,8 +7,8 @@ struct SystemGroupListView: View {
     let householdId: UUID
     @State private var showAddSystem = false
     @State private var brandScores: [String: Int] = [:]
-    @State private var catalogSeries: [UUID: String] = [:]
     @State private var systems: [HomeSystemRow]
+    @State private var hasLoadedExtras = false
 
     init(group: SystemGroup, propertyId: UUID, householdId: UUID) {
         self.group = group
@@ -89,63 +89,93 @@ struct SystemGroupListView: View {
         .background(HavenColors.background)
         .navigationTitle(group.name)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await loadBrandScores() }
+        .task {
+            if !hasLoadedExtras {
+                await loadBrandScores()
+                hasLoadedExtras = true
+            }
+        }
         .onAppear { Task { await reloadSystems() } }
         .sheet(isPresented: $showAddSystem) {
-            AddSystemView(propertyID: propertyId, onComplete: { Task { await reloadSystems() } })
+            AddSystemView(propertyID: propertyId, onComplete: { newSystem in
+                systems.append(newSystem)
+                Task { await reloadSystems() }
+            })
         }
     }
 
     private func systemRow(_ system: HomeSystemRow) -> some View {
-        let score = system.manufacturer.flatMap { brandScores[$0] }
+        // Use cached score from DB first, fall back to fetched brand scores
+        let score = system.reliabilityScore ?? system.manufacturer.flatMap { brandScores[$0] }
 
-        return HavenCard {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                // Top row: icon + name ... logo + score
-                HStack(spacing: 10) {
-                    Image(systemName: systemIcon(system))
-                        .font(.system(size: 18))
-                        .foregroundStyle(HavenColors.navy700)
-                        .frame(width: 36, height: 36)
-                        .background(HavenColors.navy.opacity(0.06))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
+        return HavenCard(padding: HavenTheme.spacing12) {
+            HStack(alignment: .top, spacing: 12) {
+                // Left: Logo + category icon
+                VStack(spacing: 4) {
+                    if let brand = system.manufacturer {
+                        AppliancesListView.brandLogoView(brand, size: 36)
+                    } else {
+                        Image(systemName: systemIcon(system))
+                            .font(.system(size: 18))
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(width: 36, height: 36)
+                            .background(HavenColors.navy.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
 
+                // Middle: Name, category, details
+                VStack(alignment: .leading, spacing: 4) {
                     Text(system.name)
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.navy800)
+                        .lineLimit(2)
 
-                    Spacer()
+                    Text(systemSubtype(system))
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
 
-                    // Logo + score on the right
-                    HStack(spacing: 8) {
-                        if let brand = system.manufacturer {
-                            AppliancesListView.brandLogoView(brand, size: 24)
+                    // Details: model, serial, lifespan
+                    HStack(spacing: 12) {
+                        if let model = system.modelNumber, !model.isEmpty {
+                            detailChip(label: "Model", value: model)
                         }
-                        if let score {
-                            AppliancesListView.miniScoreRing(score)
+                        if let serial = system.serialNumber, !serial.isEmpty {
+                            detailChip(label: "Serial", value: serial)
+                        }
+                        if let lifespan = system.expectedLifespanYears {
+                            detailChip(label: "Lifespan", value: "\(lifespan) yrs")
                         }
                     }
                 }
 
-                // Details row: Brand | Series | Model
-                HStack(spacing: 0) {
-                    if let mfr = system.manufacturer {
-                        detailChip(label: "Brand", value: mfr)
-                        Spacer()
-                    }
-                    if let seriesName = catalogSeries[system.id] {
-                        detailChip(label: "Series", value: seriesName)
-                        Spacer()
-                    }
-                    if let model = system.modelNumber {
-                        detailChip(label: "Model", value: model)
-                    }
-                    if system.manufacturer == nil, let installDate = system.installDate {
-                        Spacer()
-                        detailChip(label: "Installed", value: String(installDate.prefix(4)))
-                    }
+                Spacer(minLength: 0)
+
+                // Right: Reliability stars
+                if let score {
+                    reliabilityStars(score)
                 }
             }
+        }
+    }
+
+    /// 5-star reliability display — fills stars based on score (0-100 mapped to 0-5)
+    private func reliabilityStars(_ score: Int) -> some View {
+        let stars = Double(score) / 20.0  // 100 → 5 stars, 80 → 4 stars
+        let fullStars = Int(stars)
+        let hasHalf = stars - Double(fullStars) >= 0.5
+
+        return VStack(spacing: 3) {
+            HStack(spacing: 1) {
+                ForEach(0..<5, id: \.self) { i in
+                    Image(systemName: i < fullStars ? "star.fill" : (i == fullStars && hasHalf ? "star.leadinghalf.filled" : "star"))
+                        .font(.system(size: 9))
+                        .foregroundStyle(i < fullStars || (i == fullStars && hasHalf) ? HavenColors.warning : HavenColors.navy.opacity(0.15))
+                }
+            }
+            Text("Reliability")
+                .font(.system(size: 8, weight: .medium))
+                .foregroundStyle(HavenColors.textTertiary)
         }
     }
 
@@ -153,33 +183,42 @@ struct SystemGroupListView: View {
         do {
             let allSystems = try await DatabaseService.shared.fetchHomeSystems(propertyId: propertyId)
             let myGroupId = group.id
-            await MainActor.run {
-                systems = allSystems.filter { SystemGroup.groupId(for: $0.category) == myGroupId }
-            }
-            await loadBrandScores()
+            systems = allSystems.filter { SystemGroup.groupId(for: $0.category) == myGroupId }
         } catch { }
     }
 
+    /// Load scores for systems that don't have cached data.
+    /// Persists scores to DB so they load instantly next time.
     private func loadBrandScores() async {
-        let brands = Set(systems.compactMap(\.manufacturer))
-        for brand in brands {
+        let uncachedSystems = systems.filter { $0.reliabilityScore == nil && $0.manufacturer != nil }
+        let uncachedBrands = Set(uncachedSystems.compactMap(\.manufacturer))
+
+        guard !uncachedBrands.isEmpty else { return }
+
+        var newScores: [String: Int] = [:]
+
+        // Fetch scores for each uncached brand
+        for brand in uncachedBrands {
             do {
                 let result = try await HavenSupabase.searchEquipment(query: brand, limit: 1)
                 if let score = result.results.first?.scores?.reliability {
-                    await MainActor.run { brandScores[brand] = score }
+                    newScores[brand] = score
                 }
-            } catch { }
+            } catch {
+                print("[SystemGroup] Score fetch failed for \(brand): \(error)")
+            }
         }
-        // Fetch catalog series for each system with a model number
-        for system in systems {
-            guard let model = system.modelNumber, !model.isEmpty else { continue }
-            do {
-                let result = try await HavenSupabase.searchEquipment(query: model, limit: 1)
-                if let match = result.results.first(where: { $0.modelNumber == model }),
-                   let series = match.specs.series {
-                    await MainActor.run { catalogSeries[system.id] = series }
-                }
-            } catch { }
+
+        brandScores = newScores
+
+        // Persist scores to DB for instant load next time
+        let db = DatabaseService.shared
+        for system in uncachedSystems {
+            guard let brand = system.manufacturer, let score = newScores[brand] else { continue }
+            _ = try? await db.updateHomeSystem(
+                id: system.id,
+                HomeSystemUpdate(reliabilityScore: score, catalogEnrichedAt: Date())
+            )
         }
     }
 
@@ -193,6 +232,32 @@ struct SystemGroupListView: View {
                 .foregroundStyle(HavenColors.textSecondary)
                 .lineLimit(1)
         }
+    }
+
+    /// Derive a specific subtype label from the system name (e.g., "Dishwasher" instead of "Appliance")
+    private func systemSubtype(_ system: HomeSystemRow) -> String {
+        let name = system.name.lowercased()
+        let subtypes = [
+            "dishwasher", "refrigerator", "fridge", "oven", "range", "cooktop",
+            "microwave", "washer", "dryer", "freezer", "wine cooler", "ice maker",
+            "garbage disposal", "hood", "furnace", "boiler", "heat pump",
+            "air conditioner", "mini-split", "thermostat", "water heater",
+            "generator", "pool pump", "sump pump", "water softener",
+        ]
+        for subtype in subtypes {
+            if name.contains(subtype) {
+                return subtype.capitalized
+            }
+        }
+        // Check catalog model name if available
+        if let catalogName = system.catalogModelName?.lowercased() {
+            for subtype in subtypes {
+                if catalogName.contains(subtype) {
+                    return subtype.capitalized
+                }
+            }
+        }
+        return system.category
     }
 
     private func systemIcon(_ system: HomeSystemRow) -> String {

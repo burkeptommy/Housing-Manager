@@ -5,6 +5,14 @@ extension Notification.Name {
     static let openScenarioStudio = Notification.Name("openScenarioStudio")
     static let openAlfredWithContext = Notification.Name("openAlfredWithContext")
     static let popToRoot = Notification.Name("popToRoot")
+
+    // Cross-tab data sync notifications
+    static let maintenanceTaskChanged = Notification.Name("maintenanceTaskChanged")
+    static let homeSystemChanged = Notification.Name("homeSystemChanged")
+    static let contractorChanged = Notification.Name("contractorChanged")
+    static let documentChanged = Notification.Name("documentChanged")
+    static let propertyChanged = Notification.Name("propertyChanged")
+    static let projectChanged = Notification.Name("projectChanged")
 }
 
 struct MainTabView: View {

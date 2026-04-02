@@ -301,6 +301,30 @@ struct QuoteUploadEntryView: View {
             return
         }
 
+        // If attaching to an existing project, dismiss immediately and process in background
+        if let project = attachToProject {
+            Haptics.success()
+            dismiss()
+            Task {
+                do {
+                    let responseData = try await HavenSupabase.analyzeQuote(
+                        imageBase64: imageBase64,
+                        text: extractedText,
+                        propertyLocation: location
+                    )
+                    struct AnalyzeResponse: Decodable { let analysis: QuoteAnalysis? }
+                    if let response = try? JSONDecoder().decode(AnalyzeResponse.self, from: responseData),
+                       let analysis = response.analysis {
+                        await saveQuoteToProject(project, analysis: analysis, isNewProject: false)
+                    }
+                } catch {
+                    print("[QuoteUpload] Background analysis failed: \(error)")
+                }
+                onComplete()
+            }
+            return
+        }
+
         do {
             let responseData = try await HavenSupabase.analyzeQuote(
                 imageBase64: imageBase64,
@@ -327,12 +351,6 @@ struct QuoteUploadEntryView: View {
 
             analysisResult = analysis
             isAnalyzing = false
-
-            // If we already have a target project (from attachToProject), save directly
-            if let project = attachToProject {
-                await saveQuoteToProject(project, analysis: analysis, isNewProject: false)
-                return
-            }
 
             // Check for matching existing project
             let category = analysis.projectType ?? "Other"
@@ -404,7 +422,8 @@ struct QuoteUploadEntryView: View {
                 quoteTotal: analysis.overallAssessment?.totalQuoted ?? analysis.quoteTotal,
                 estimatedFairTotal: analysis.overallAssessment?.estimatedFairTotal,
                 overallRating: analysis.overallAssessment?.rating,
-                analysis: analysis
+                analysis: analysis,
+                trade: analysis.vendor?.trade
             )
             _ = try await viewModel.addQuote(quoteInsert)
 
