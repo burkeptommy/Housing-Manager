@@ -10,7 +10,8 @@ struct HouseQuizView: View {
     @State private var currencyText: String = ""
     @State private var multiSelectIds: Set<String> = []
     @State private var providerNameText: String = ""
-    @State private var showSkipMenu = false
+    @State private var showSaveAndExit = false
+    @State private var showSkipForeverConfirm = false
     @State private var showDocumentUpload = false
     @State private var pendingProviderForAnswer: String?
 
@@ -59,22 +60,17 @@ struct HouseQuizView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        showSkipMenu = true
+                        showSaveAndExit = true
                     } label: {
                         Image(systemName: "xmark")
                     }
-                    .confirmationDialog("Skip this question?", isPresented: $showSkipMenu, titleVisibility: .visible) {
-                        Button("Skip for now") {
-                            viewModel.saveForLater()
-                            resetEntryState()
-                        }
-                        Button("Skip forever", role: .destructive) {
-                            viewModel.skipForever()
-                            resetEntryState()
+                    .confirmationDialog("Save and exit?", isPresented: $showSaveAndExit, titleVisibility: .visible) {
+                        Button("Save and exit") {
+                            dismiss()
                         }
                         Button("Cancel", role: .cancel) {}
                     } message: {
-                        Text("Save for later resurfaces it next time. Skip forever means you'll add the data manually.")
+                        Text("Your place is saved. You can pick up where you left off anytime from the dashboard.")
                     }
                 }
             }
@@ -169,17 +165,47 @@ struct HouseQuizView: View {
                     .buttonStyle(.plain)
                 }
 
-                // Save for later link
-                Button {
-                    viewModel.saveForLater()
-                    resetEntryState()
-                } label: {
-                    Text("Save for later")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textTertiary)
+                // Save for later link + "..." menu with Skip forever.
+                HStack(spacing: HavenTheme.spacing12) {
+                    Spacer()
+                    Button {
+                        viewModel.saveForLater()
+                        resetEntryState()
+                    } label: {
+                        Text("Save for later")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    Menu {
+                        Button(role: .destructive) {
+                            showSkipForeverConfirm = true
+                        } label: {
+                            Label("Skip forever", systemImage: "xmark.circle")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .frame(width: 28, height: 28)
+                            .contentShape(Rectangle())
+                    }
+                    Spacer()
                 }
-                .frame(maxWidth: .infinity)
                 .padding(.top, HavenTheme.spacing8)
+                .confirmationDialog(
+                    "Skip this question forever?",
+                    isPresented: $showSkipForeverConfirm,
+                    titleVisibility: .visible
+                ) {
+                    Button("Skip forever", role: .destructive) {
+                        viewModel.skipForever()
+                        resetEntryState()
+                    }
+                    Button("Cancel", role: .cancel) {}
+                } message: {
+                    Text("It won't resurface. You can still add this info manually later.")
+                }
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.top, HavenTheme.spacing16)
@@ -512,9 +538,19 @@ struct HouseQuizView: View {
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, HavenTheme.pageMargin)
 
-            HavenButton(title: "Keep Going") {
-                viewModel.dismissMilestoneAndContinue()
-                resetEntryState()
+            VStack(spacing: HavenTheme.spacing12) {
+                HavenButton(title: "Keep Going") {
+                    viewModel.dismissMilestoneAndContinue()
+                    resetEntryState()
+                }
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Save for later")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .padding(.top, HavenTheme.spacing4)
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             Spacer()
