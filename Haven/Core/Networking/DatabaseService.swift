@@ -639,6 +639,90 @@ final class DatabaseService {
         return rows.first
     }
 
+    /// Phase 18e: Look up a single utility provider row by its ID. Used by
+    /// HouseQuizAnswerMapper to fetch the full record at apply time and
+    /// snapshot it onto the resulting utility_account row.
+    func fetchUtilityProvider(id: UUID) async throws -> UtilityProviderRow? {
+        let rows: [UtilityProviderRow] = try await from("utility_providers")
+            .select()
+            .eq("id", value: id.uuidString)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Phase 18e: Update a utility_account row with snapshotted provider info.
+    /// Used by the one-time backfill in AppState that walks existing rows and
+    /// fuzzy-matches their provider_name against the catalog so old accounts
+    /// pick up logos. Inline Encodable struct so the nil-omitting Codable
+    /// doesn't accidentally drop the field.
+    func updateUtilityAccountProviderSnapshot(
+        id: UUID,
+        providerId: UUID?,
+        providerSlug: String?,
+        logoUrl: String?,
+        brandColor: String?
+    ) async throws {
+        struct SnapshotPayload: Encodable {
+            let providerId: UUID?
+            let providerSlug: String?
+            let logoUrl: String?
+            let brandColor: String?
+            enum CodingKeys: String, CodingKey {
+                case providerId = "provider_id"
+                case providerSlug = "provider_slug"
+                case logoUrl = "logo_url"
+                case brandColor = "brand_color"
+            }
+        }
+        let payload = SnapshotPayload(
+            providerId: providerId,
+            providerSlug: providerSlug,
+            logoUrl: logoUrl,
+            brandColor: brandColor
+        )
+        try await from("utility_accounts")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    /// Phase 18e: Walk every utility_account on a property, fuzzy-match
+    /// each row's provider_name against the utility_providers catalog, and
+    /// patch logo_url/brand_color/provider_id where missing. Returns the
+    /// number of rows that were updated.
+    func backfillUtilityAccountSnapshots(propertyId: UUID) async throws -> Int {
+        let accounts = try await fetchUtilityAccounts(propertyId: propertyId)
+        let needsBackfill = accounts.filter { $0.logoUrl == nil && $0.providerName.isEmpty == false }
+        guard !needsBackfill.isEmpty else { return 0 }
+        var updated = 0
+        for account in needsBackfill {
+            // Try slug first (cheap exact match), then fuzzy name lookup.
+            var match: UtilityProviderRow?
+            if let slug = account.providerSlug {
+                match = try? await fetchUtilityProviderBySlug(slug)
+            }
+            if match == nil {
+                match = try? await findUtilityProviderByNameOrSlug(account.providerName)
+            }
+            // Only patch if the matched provider has at least a logo or brand
+            // color worth snapshotting — otherwise the row stays untouched and
+            // the next backfill pass can try again.
+            guard let provider = match,
+                  provider.logoUrl != nil || provider.brandColor != nil else { continue }
+            try? await updateUtilityAccountProviderSnapshot(
+                id: account.id,
+                providerId: provider.id,
+                providerSlug: provider.slug,
+                logoUrl: provider.logoUrl,
+                brandColor: provider.brandColor
+            )
+            updated += 1
+        }
+        return updated
+    }
+
     /// Fuzzy-find an existing utility provider by name (case-insensitive
     /// substring) or slug. Used by `UtilityProviderCustomAddSheet` to surface
     /// a "Did you mean?" suggestion before letting the user create a duplicate.

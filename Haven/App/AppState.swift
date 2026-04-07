@@ -80,6 +80,7 @@ final class AppState: ObservableObject {
                 Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
                 Task { await Self.migrateVehicleMaintenanceTasks() }
                 Task { await Self.reconcileAllPropertiesOnce() }
+                Task { await Self.backfillUtilityAccountSnapshotsOnce() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -93,6 +94,7 @@ final class AppState: ObservableObject {
                     Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
                     Task { await Self.migrateVehicleMaintenanceTasks() }
                     Task { await Self.reconcileAllPropertiesOnce() }
+                    Task { await Self.backfillUtilityAccountSnapshotsOnce() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -148,6 +150,37 @@ final class AppState: ObservableObject {
         }
         // Notify the rest of the app so any open task lists refresh.
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 18e: One-time backfill that walks every utility_account row on
+    /// every property and fuzzy-matches its provider_name against the
+    /// utility_providers catalog. Patches logo_url, brand_color, and
+    /// provider_id where missing so legacy rows from before the snapshot
+    /// columns existed pick up brand identity on next launch. Gated by a
+    /// UserDefaults flag so it only runs once per install. Always runs in a
+    /// detached Task so it never blocks first-screen render.
+    @MainActor
+    static func backfillUtilityAccountSnapshotsOnce() async {
+        let key = "utilityAccountSnapshotBackfillV1Done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            // Don't set the gate on failure — let the next launch retry.
+            return
+        }
+        var totalPatched = 0
+        for property in properties {
+            if let count = try? await db.backfillUtilityAccountSnapshots(propertyId: property.id) {
+                totalPatched += count
+            }
+        }
+        if totalPatched > 0 {
+            print("[utilityAccountSnapshotBackfillV1] patched \(totalPatched) utility_account row\(totalPatched == 1 ? "" : "s")")
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 

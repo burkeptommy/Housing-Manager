@@ -2561,6 +2561,13 @@ struct UtilityAccountRow: Codable, Identifiable {
     let planName: String?
     let notes: String?
     let createdAt: Date?
+    /// Phase 18e: Snapshot of the catalog provider record at write time so
+    /// the Property → Overview cards can render the brand logo and accent
+    /// without a runtime JOIN. Nil for custom-typed providers that aren't in
+    /// the catalog.
+    let providerId: UUID?
+    let logoUrl: String?
+    let brandColor: String?
 
     enum CodingKeys: String, CodingKey {
         case id, phone, website, notes
@@ -2573,6 +2580,31 @@ struct UtilityAccountRow: Codable, Identifiable {
         case monthlyCost = "monthly_cost"
         case planName = "plan_name"
         case createdAt = "created_at"
+        case providerId = "provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
+    }
+
+    /// Phase 18e: resilient init so older deploys (pre-snapshot columns)
+    /// still decode cleanly. The new columns default to nil when missing.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        propertyId = try c.decode(UUID.self, forKey: .propertyId)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        providerType = try c.decode(String.self, forKey: .providerType)
+        providerName = try c.decode(String.self, forKey: .providerName)
+        providerSlug = try? c.decodeIfPresent(String.self, forKey: .providerSlug)
+        accountNumber = try? c.decodeIfPresent(String.self, forKey: .accountNumber)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        website = try? c.decodeIfPresent(String.self, forKey: .website)
+        monthlyCost = try? c.decodeIfPresent(Double.self, forKey: .monthlyCost)
+        planName = try? c.decodeIfPresent(String.self, forKey: .planName)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        providerId = try? c.decodeIfPresent(UUID.self, forKey: .providerId)
+        logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
+        brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
     }
 
     var typeIcon: String {
@@ -2618,6 +2650,10 @@ struct UtilityAccountInsert: Encodable {
     var monthlyCost: Double?
     var planName: String?
     var notes: String?
+    /// Phase 18e: snapshot of catalog provider record (logo, brand color, ID).
+    var providerId: UUID?
+    var logoUrl: String?
+    var brandColor: String?
 
     enum CodingKeys: String, CodingKey {
         case phone, website, notes
@@ -2629,6 +2665,9 @@ struct UtilityAccountInsert: Encodable {
         case accountNumber = "account_number"
         case monthlyCost = "monthly_cost"
         case planName = "plan_name"
+        case providerId = "provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
     }
 }
 

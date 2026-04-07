@@ -109,6 +109,11 @@ final class HouseQuizViewModel: ObservableObject {
     /// Phase 16c — variant that captures the full provider row alongside the
     /// answer. Lets us inspect bundle flags for auto/home insurance questions
     /// so q27 (home) can pre-fill from a q26 (auto) selection and vice versa.
+    ///
+    /// Phase 18e — also persists the catalog `provider.id` on the answer so
+    /// the answer mapper can re-fetch the full record (logo, brand color,
+    /// website, phone) at apply time and snapshot it onto the resulting
+    /// utility_account row.
     func recordProviderAnswer(provider: UtilityProviderRow) async {
         guard let q = currentQuestion else { return }
         // Insurance bundle hint plumbing happens BEFORE persist so the q27
@@ -129,7 +134,22 @@ final class HouseQuizViewModel: ObservableObject {
         default:
             break
         }
-        await recordAnswer("selected", customText: provider.name)
+        let answer = HouseQuizAnswer(
+            answerId: "selected",
+            customText: provider.name,
+            selectedProviderId: provider.id,
+            answeredAt: Date()
+        )
+        await persist(answer: answer, for: q)
+        if let fb = HouseQuizFeedbackLibrary.feedback(for: q.id, answerId: "selected") {
+            pendingFeedback = fb
+            Analytics.track(.quizFeedbackShown, [
+                "question_id": q.id,
+                "answer_id": "selected",
+            ])
+        } else {
+            advance()
+        }
     }
 
     /// Phase 16c — user accepts the bundled suggestion at q27 (or q26 in the

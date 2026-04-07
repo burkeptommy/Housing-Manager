@@ -113,7 +113,11 @@ struct UtilityAccountsSection: View {
 
     private func utilityCard(type: String, account: UtilityAccountRow?) -> some View {
         let meta = UtilityTypeMeta(type)
-        let brandColor = providerColor(for: account?.providerSlug)
+        // Phase 18e: prefer the snapshotted brand color from the account row,
+        // then fall back to the catalog cache, then the deterministic per-slug
+        // fallback colors. Same precedence applies to the logo URL.
+        let snapshotColor = account?.brandColor.flatMap { Color(hex: $0) }
+        let brandColor = snapshotColor ?? providerColor(for: account?.providerSlug)
 
         return VStack(spacing: 5) {
             if let account {
@@ -124,8 +128,10 @@ struct UtilityAccountsSection: View {
 
                 Spacer(minLength: 2)
 
-                // Logo or fallback initial
-                if let logoUrl = providerLogoUrl(for: account.providerSlug),
+                // Phase 18e: try the snapshot logo first (set when the user
+                // picked from the quiz picker), then the cached catalog logo,
+                // then a one-off Brandfetch lookup for legacy custom rows.
+                if let logoUrl = account.logoUrl ?? providerLogoUrl(for: account.providerSlug),
                    let url = URL(string: logoUrl) {
                     AsyncImage(url: url) { phase in
                         switch phase {
@@ -557,7 +563,7 @@ struct AddUtilitySheet: View {
         isSaving = true
         Task {
             do {
-                let insert = UtilityAccountInsert(
+                var insert = UtilityAccountInsert(
                     propertyId: propertyId,
                     householdId: householdId,
                     providerType: preselectedType ?? providerType,
@@ -569,6 +575,14 @@ struct AddUtilitySheet: View {
                     monthlyCost: Double(monthlyCost),
                     planName: planName.isEmpty ? nil : planName
                 )
+                // Phase 18e: snapshot the catalog row's logo + brand color so
+                // the Property → Overview card renders the brand identity
+                // without a runtime JOIN.
+                if let provider = selectedProvider {
+                    insert.providerId = provider.id
+                    insert.logoUrl = provider.logoUrl
+                    insert.brandColor = provider.brandColor
+                }
                 let account = try await DatabaseService.shared.createUtilityAccount(insert)
                 onAdd(account)
                 Haptics.success()

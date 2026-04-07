@@ -285,37 +285,36 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q16_electric":
-                if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "electric")
-                }
+                // Phase 18e: picker selection threads selectedProviderId on the
+                // answer; the helper looks it up and snapshots logo + brand.
+                try await createUtilityAccount(from: answer, fallbackType: "electric")
 
             case "q17_internet":
-                if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "internet_cable")
-                }
+                try await createUtilityAccount(from: answer, fallbackType: "internet_cable")
 
             case "q18_trash":
                 try await persistAttribute("trash_service", value: answer.answerId)
                 if answer.answerId == "private", let provider = answer.customText, !provider.isEmpty {
+                    // q18 is a singleChoice with a free-text follow-up — no
+                    // catalog ID, so use the name-only path.
                     try await createUtilityAccount(name: provider, type: "trash")
                 }
 
             case "q19_heating_provider":
-                if let provider = answer.customText, !provider.isEmpty {
-                    // Use the heating fuel attribute (q3) as a hint when known so
-                    // the new utility account is filed under the right type.
-                    var providerType = "oil"
-                    if let property = try? await db.fetchProperty(id: propertyId),
-                       let fuel = property.attributes?["heating_fuel"]?.stringValue {
-                        switch fuel {
-                        case "natural_gas": providerType = "natural_gas"
-                        case "propane": providerType = "propane"
-                        case "oil": providerType = "oil"
-                        default: break
-                        }
+                // Use the heating fuel attribute (q3) as a hint when known so
+                // the new utility account is filed under the right type when
+                // the catalog row doesn't already supply it.
+                var fallbackType = "oil"
+                if let property = try? await db.fetchProperty(id: propertyId),
+                   let fuel = property.attributes?["heating_fuel"]?.stringValue {
+                    switch fuel {
+                    case "natural_gas": fallbackType = "natural_gas"
+                    case "propane": fallbackType = "propane"
+                    case "oil": fallbackType = "oil"
+                    default: break
                     }
-                    try await createUtilityAccount(name: provider, type: providerType)
                 }
+                try await createUtilityAccount(from: answer, fallbackType: fallbackType)
 
             case "q20_other_fuels":
                 if let selected = answer.selectedIds {
@@ -355,17 +354,16 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q26_auto_insurance":
-                if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "auto_insurance")
-                }
+                // Phase 18e: snapshot the carrier's logo + brand color from
+                // the catalog when the user picked from the search picker.
+                try await createUtilityAccount(from: answer, fallbackType: "auto_insurance")
 
             case "q27_homeowners_insurance":
-                if let provider = answer.customText, !provider.isEmpty {
-                    // Phase 16b: keep the utility_account row aligned with the
-                    // seeded "home_insurance" provider_type from Phase 16a so
-                    // search and write paths use the same vocabulary.
-                    try await createUtilityAccount(name: provider, type: "home_insurance")
-                }
+                // Phase 16b: keep the utility_account row aligned with the
+                // seeded "home_insurance" provider_type from Phase 16a so
+                // search and write paths use the same vocabulary.
+                // Phase 18e: snapshot the picker selection.
+                try await createUtilityAccount(from: answer, fallbackType: "home_insurance")
 
             case "q28_household":
                 if let id = answer.answerId {
@@ -555,17 +553,72 @@ final class HouseQuizAnswerMapper {
         _ = try await db.createHomeSystem(insert)
     }
 
-    private func createUtilityAccount(name: String, type: String) async throws {
+    /// Phase 18e: When the answer carries a `selectedProviderId` (set by the
+    /// quiz picker via `recordProviderAnswer`), look up the catalog row and
+    /// snapshot its logo, brand color, slug, website, and phone onto the new
+    /// utility_account row. Falls back to a name-only insert when the user
+    /// typed a custom provider in a follow-up text field (q11 pro lawn,
+    /// q12 pool, q13 pest, q14 irrigation, q15 security, q18 trash).
+    ///
+    /// `fallbackType` is the canonical provider_type to use if the catalog
+    /// row didn't supply one (or when the answer is name-only). For q19 the
+    /// caller threads in the heating fuel attribute so the new row is filed
+    /// under the right type.
+    private func createUtilityAccount(from answer: HouseQuizAnswer, fallbackType: String) async throws {
+        // Resolve the catalog provider record (if any) so we can snapshot it.
+        var catalogProvider: UtilityProviderRow?
+        if let providerId = answer.selectedProviderId {
+            catalogProvider = try? await db.fetchUtilityProvider(id: providerId)
+        }
+
+        let resolvedName: String
+        if let catalog = catalogProvider, !catalog.name.isEmpty {
+            resolvedName = catalog.name
+        } else if let typed = answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines), !typed.isEmpty {
+            resolvedName = typed
+        } else {
+            return
+        }
+
         // Avoid duplicates: skip if an account with this provider name already exists.
         let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
-        if existing.contains(where: { $0.providerName.lowercased() == name.lowercased() }) {
+        if existing.contains(where: { $0.providerName.lowercased() == resolvedName.lowercased() }) {
+            return
+        }
+
+        var insert = UtilityAccountInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            providerType: catalogProvider?.providerType ?? fallbackType,
+            providerName: resolvedName
+        )
+        if let catalog = catalogProvider {
+            insert.providerId = catalog.id
+            insert.providerSlug = catalog.slug
+            insert.logoUrl = catalog.logoUrl
+            insert.brandColor = catalog.brandColor
+            insert.website = catalog.website
+            insert.phone = catalog.phone
+        }
+        _ = try await db.createUtilityAccount(insert)
+    }
+
+    /// Phase 18e: Name-only convenience wrapper for the legacy follow-up path
+    /// (q11 lawn pro, q12 pool, q13 pest, q14 irrigation, q15 security,
+    /// q18 trash). These questions are .singleChoice, not .providerSearch, so
+    /// the user types a free-form name with no catalog ID.
+    private func createUtilityAccount(name: String, type: String) async throws {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+        if existing.contains(where: { $0.providerName.lowercased() == trimmed.lowercased() }) {
             return
         }
         let insert = UtilityAccountInsert(
             propertyId: propertyId,
             householdId: householdId,
             providerType: type,
-            providerName: name
+            providerName: trimmed
         )
         _ = try await db.createUtilityAccount(insert)
     }

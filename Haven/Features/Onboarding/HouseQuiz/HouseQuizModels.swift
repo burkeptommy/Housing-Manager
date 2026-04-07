@@ -52,6 +52,11 @@ struct HouseQuizAnswer: Codable, Equatable {
     var customEntries: [String]?
     var kids: [QuizKidEntry]?
     var expectingEntries: [QuizExpectingEntry]?
+    /// Phase 18e: When the user picks a provider from the search picker,
+    /// stash the catalog row's UUID here so the answer mapper can fetch
+    /// the full record (logo, brand color, slug, website, phone) at apply
+    /// time and snapshot it onto the resulting utility_account row.
+    var selectedProviderId: UUID?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -61,6 +66,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         case customEntries = "custom_entries"
         case kids
         case expectingEntries = "expecting_entries"
+        case selectedProviderId = "selected_provider_id"
         case answeredAt = "answered_at"
     }
 
@@ -71,6 +77,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         customEntries: [String]? = nil,
         kids: [QuizKidEntry]? = nil,
         expectingEntries: [QuizExpectingEntry]? = nil,
+        selectedProviderId: UUID? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
@@ -79,12 +86,13 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.customEntries = customEntries
         self.kids = kids
         self.expectingEntries = expectingEntries
+        self.selectedProviderId = selectedProviderId
         self.answeredAt = answeredAt
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
-    /// `kids`, or `expecting_entries` keys) still load cleanly after the
-    /// schema bump.
+    /// `kids`, `expecting_entries`, or `selected_provider_id` keys) still
+    /// load cleanly after the schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
@@ -93,6 +101,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.customEntries = try c.decodeIfPresent([String].self, forKey: .customEntries)
         self.kids = try? c.decodeIfPresent([QuizKidEntry].self, forKey: .kids)
         self.expectingEntries = try? c.decodeIfPresent([QuizExpectingEntry].self, forKey: .expectingEntries)
+        self.selectedProviderId = try? c.decodeIfPresent(UUID.self, forKey: .selectedProviderId)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }
