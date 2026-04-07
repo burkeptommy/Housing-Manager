@@ -317,8 +317,58 @@ final class HouseQuizAnswerMapper {
                 try await createUtilityAccount(from: answer, fallbackType: fallbackType)
 
             case "q20_other_fuels":
+                // Phase 18c: Q20 captures secondary fuel sources beyond the
+                // primary heating fuel from Q3. Each propane option creates
+                // a matching home_system row. The propane provider account
+                // is either reused from Q19 (when Q3 was already propane) or
+                // created fresh from the inline propane picker the user
+                // filled out. Wood creates a Fireplace system but no utility
+                // account (no recurring delivery contract).
                 if let selected = answer.selectedIds {
                     try await persistAttribute("other_fuel_sources", value: selected.joined(separator: ","))
+
+                    // Detect each propane variant and ensure the right system.
+                    if selected.contains("propane_generator") {
+                        try await ensureHomeSystem(name: "Backup Generator", category: "Generator")
+                    }
+                    if selected.contains("propane_fireplace") {
+                        try await ensureHomeSystem(name: "Propane Fireplace", category: "Fireplace")
+                    }
+                    if selected.contains("propane_stove") {
+                        try await ensureHomeSystem(name: "Propane Cooktop", category: "Appliance")
+                    }
+                    if selected.contains("wood") {
+                        try await ensureHomeSystem(name: "Wood Burning Fireplace", category: "Fireplace")
+                    }
+
+                    // Create a propane utility_account when any propane option
+                    // is selected. Two paths:
+                    //   1. Q3 was propane → Q19 already created the propane
+                    //      account, so we don't need to do anything (the
+                    //      generator/fireplace/stove are served by it).
+                    //   2. Q3 was NOT propane → use the inline picker
+                    //      selection (secondaryFuelProviderId) or, as a
+                    //      fallback for users who manually skipped the picker,
+                    //      do nothing and let them add it later from the
+                    //      Property → Utilities page.
+                    let hasPropaneSystem = selected.contains("propane_generator")
+                        || selected.contains("propane_fireplace")
+                        || selected.contains("propane_stove")
+                    if hasPropaneSystem {
+                        let q3Fuel = (try? await db.fetchProperty(id: propertyId))?
+                            .attributes?["heating_fuel"]?.stringValue
+                        if q3Fuel != "propane", let propaneId = answer.secondaryFuelProviderId {
+                            // Build a synthetic answer that the helper can read
+                            // so we get the same logo+brand snapshot path as q19.
+                            let propaneAnswer = HouseQuizAnswer(
+                                answerId: "selected",
+                                customText: answer.customText,
+                                selectedProviderId: propaneId,
+                                answeredAt: answer.answeredAt
+                            )
+                            try await createUtilityAccount(from: propaneAnswer, fallbackType: "propane")
+                        }
+                    }
                 }
 
             case "q21_solar":

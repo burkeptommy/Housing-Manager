@@ -57,6 +57,12 @@ struct HouseQuizAnswer: Codable, Equatable {
     /// the full record (logo, brand color, slug, website, phone) at apply
     /// time and snapshot it onto the resulting utility_account row.
     var selectedProviderId: UUID?
+    /// Phase 18c: Q20 (other fuel sources) inline propane provider picker.
+    /// When the user selects any propane option AND their primary heating
+    /// fuel from Q3 isn't propane, the picker captures the propane supplier
+    /// and stashes its catalog UUID here. The mapper reads this at apply
+    /// time to create a fresh propane utility_account row.
+    var secondaryFuelProviderId: UUID?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -67,6 +73,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         case kids
         case expectingEntries = "expecting_entries"
         case selectedProviderId = "selected_provider_id"
+        case secondaryFuelProviderId = "secondary_fuel_provider_id"
         case answeredAt = "answered_at"
     }
 
@@ -78,6 +85,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         kids: [QuizKidEntry]? = nil,
         expectingEntries: [QuizExpectingEntry]? = nil,
         selectedProviderId: UUID? = nil,
+        secondaryFuelProviderId: UUID? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
@@ -87,12 +95,14 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.kids = kids
         self.expectingEntries = expectingEntries
         self.selectedProviderId = selectedProviderId
+        self.secondaryFuelProviderId = secondaryFuelProviderId
         self.answeredAt = answeredAt
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
-    /// `kids`, `expecting_entries`, or `selected_provider_id` keys) still
-    /// load cleanly after the schema bump.
+    /// `kids`, `expecting_entries`, `selected_provider_id`, or
+    /// `secondary_fuel_provider_id` keys) still load cleanly after the
+    /// schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
@@ -102,6 +112,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.kids = try? c.decodeIfPresent([QuizKidEntry].self, forKey: .kids)
         self.expectingEntries = try? c.decodeIfPresent([QuizExpectingEntry].self, forKey: .expectingEntries)
         self.selectedProviderId = try? c.decodeIfPresent(UUID.self, forKey: .selectedProviderId)
+        self.secondaryFuelProviderId = try? c.decodeIfPresent(UUID.self, forKey: .secondaryFuelProviderId)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }

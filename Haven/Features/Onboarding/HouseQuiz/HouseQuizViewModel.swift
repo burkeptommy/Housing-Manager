@@ -187,13 +187,23 @@ final class HouseQuizViewModel: ObservableObject {
     /// Persist a multi-select answer and advance. `customEntries` carries any
     /// free-form values typed into an "Other"-style option (e.g. q10 appliances
     /// where users can add Sauna, Pellet stove, etc).
-    func recordMultiSelect(_ ids: [String], customEntries: [String]? = nil) async {
+    ///
+    /// Phase 18c: `secondaryFuelProvider` carries the propane supplier picked
+    /// inline on Q20 when the user selected any propane option AND their
+    /// primary heating fuel from Q3 isn't already propane. The mapper reads
+    /// this at apply time to create a fresh propane utility_account row.
+    func recordMultiSelect(
+        _ ids: [String],
+        customEntries: [String]? = nil,
+        secondaryFuelProvider: UtilityProviderRow? = nil
+    ) async {
         guard let q = currentQuestion else { return }
         let answer = HouseQuizAnswer(
             answerId: nil,
-            customText: nil,
+            customText: secondaryFuelProvider?.name,
             selectedIds: ids,
             customEntries: customEntries,
+            secondaryFuelProviderId: secondaryFuelProvider?.id,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)

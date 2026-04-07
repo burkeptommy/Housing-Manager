@@ -42,6 +42,11 @@ struct HouseQuizView: View {
     @State private var householdPendingKids: [QuizKidEntry] = []
     @State private var householdPendingExpecting: [QuizExpectingEntry] = []
 
+    /// Phase 18c — Q20 inline propane provider picker. Captured here so the
+    /// final `recordMultiSelect` call can pass the chosen carrier through to
+    /// the answer mapper. Cleared on every new question via resetEntryState().
+    @State private var q20PropaneProvider: UtilityProviderRow? = nil
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -342,16 +347,29 @@ struct HouseQuizView: View {
                 }
             }
 
+            // Phase 18c: Q20 inline propane supplier picker. Renders when the
+            // user picked any propane option AND their primary heating fuel
+            // from Q3 isn't already propane (in which case the existing Q19
+            // provider account is reused at apply time). Wood-only and "none"
+            // selections never trigger this — those don't have a delivery
+            // contract.
+            if q.id == "q20_other_fuels" && needsQ20PropaneFollowUp {
+                q20PropaneFollowUpCard
+                    .transition(.opacity)
+            }
+
             HavenButton(title: "Continue") {
                 Task {
                     let entries = multiSelectCustomEntriesForCommit()
                     await viewModel.recordMultiSelect(
                         Array(multiSelectIds),
-                        customEntries: entries.isEmpty ? nil : entries
+                        customEntries: entries.isEmpty ? nil : entries,
+                        secondaryFuelProvider: q20PropaneProvider
                     )
                     multiSelectIds.removeAll()
                     multiSelectCustomDraft = ""
                     multiSelectCustomEntries = []
+                    q20PropaneProvider = nil
                 }
             }
             .disabled(multiSelectIds.isEmpty || !canCommitMultiSelect)
@@ -359,11 +377,82 @@ struct HouseQuizView: View {
         }
     }
 
+    // MARK: - Q20 propane follow-up
+
+    /// Phase 18c — true when the multi-select for Q20 has at least one
+    /// propane option checked AND the user's primary heating fuel from Q3
+    /// isn't already propane (in which case the existing Q19 utility_account
+    /// row is reused at apply time, so no follow-up is needed).
+    private var needsQ20PropaneFollowUp: Bool {
+        guard hasAnyPropaneSelection else { return false }
+        return q3HeatingFuel != "propane"
+    }
+
+    private var hasAnyPropaneSelection: Bool {
+        multiSelectIds.contains("propane_generator")
+            || multiSelectIds.contains("propane_fireplace")
+            || multiSelectIds.contains("propane_stove")
+    }
+
+    private var q3HeatingFuel: String? {
+        viewModel.state.answers["q3_heating_fuel"]?.answerId
+    }
+
+    private var q20PropaneFollowUpCard: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("PROPANE PROVIDER")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("Who supplies your propane?")
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.textPrimary)
+            UtilityProviderSearchPicker(
+                providerTypes: ["propane"],
+                state: viewModel.property.state,
+                onSelect: { provider in
+                    Haptics.selection()
+                    q20PropaneProvider = provider
+                },
+                onCustomCreated: { provider in
+                    Haptics.success()
+                    q20PropaneProvider = provider
+                }
+            )
+            .id("q20_propane_picker")
+
+            if let picked = q20PropaneProvider {
+                HStack(spacing: HavenTheme.spacing8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.navy)
+                    Text("Selected: \(picked.name)")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                .padding(.top, HavenTheme.spacing8)
+            }
+        }
+        .padding(HavenTheme.spacing16)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
     /// True when any custom-input option is selected but the entries list is
     /// still empty AND the draft field is also empty. Prevents users from
     /// hitting Continue with "Other" checked but no value provided.
+    ///
+    /// Phase 18c: Also gates Q20 — when the user picks a propane option AND
+    /// Q3's heating fuel isn't already propane, the inline propane provider
+    /// picker must produce a selection before Continue unlocks. Wood-only and
+    /// "none" selections never block Continue (no delivery contract to capture).
     private var canCommitMultiSelect: Bool {
         guard let q = viewModel.currentQuestion else { return true }
+
+        // Phase 18c: Q20 propane follow-up gate.
+        if q.id == "q20_other_fuels" && needsQ20PropaneFollowUp && q20PropaneProvider == nil {
+            return false
+        }
+
         let needsCustom = q.answerOptions.contains { option in
             option.acceptsCustomInput && multiSelectIds.contains(option.id)
         }
@@ -1021,5 +1110,7 @@ struct HouseQuizView: View {
         householdShowKidsStep = false
         householdPendingKids = []
         householdPendingExpecting = []
+        // Phase 18c — clear the Q20 propane provider stash too.
+        q20PropaneProvider = nil
     }
 }
