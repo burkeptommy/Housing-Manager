@@ -9,6 +9,8 @@ struct HouseQuizView: View {
 
     @State private var currencyText: String = ""
     @State private var multiSelectIds: Set<String> = []
+    @State private var multiSelectCustomDraft: String = ""
+    @State private var multiSelectCustomEntries: [String] = []
     @State private var providerNameText: String = ""
     @State private var showSaveAndExit = false
     @State private var showSkipForeverConfirm = false
@@ -285,16 +287,21 @@ struct HouseQuizView: View {
 
     // MARK: - Multi select
 
+    /// Option ids that are mutually exclusive with all other selections in a
+    /// multi-select question. Tapping one of these clears the rest; tapping
+    /// any other option clears these. Used for "Not sure" / "None of these"
+    /// answers where it doesn't make sense to combine with siblings.
+    private static let exclusiveMultiSelectIds: Set<String> = [
+        "not_sure",
+        "none",
+    ]
+
     private func multiSelectBody(_ q: HouseQuizQuestion) -> some View {
         VStack(spacing: HavenTheme.spacing12) {
             ForEach(q.answerOptions) { option in
                 Button {
                     Haptics.selection()
-                    if multiSelectIds.contains(option.id) {
-                        multiSelectIds.remove(option.id)
-                    } else {
-                        multiSelectIds.insert(option.id)
-                    }
+                    toggleMultiSelectOption(option)
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: multiSelectIds.contains(option.id) ? "checkmark.square.fill" : "square")
@@ -311,17 +318,162 @@ struct HouseQuizView: View {
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
                 .buttonStyle(.plain)
+
+                // Inline custom-input field for options like "Other" that
+                // accept user-supplied values (e.g. q10 appliances).
+                if option.acceptsCustomInput && multiSelectIds.contains(option.id) {
+                    customMultiSelectInputField(for: option)
+                }
             }
 
             HavenButton(title: "Continue") {
                 Task {
-                    await viewModel.recordMultiSelect(Array(multiSelectIds))
+                    let entries = multiSelectCustomEntriesForCommit()
+                    await viewModel.recordMultiSelect(
+                        Array(multiSelectIds),
+                        customEntries: entries.isEmpty ? nil : entries
+                    )
                     multiSelectIds.removeAll()
+                    multiSelectCustomDraft = ""
+                    multiSelectCustomEntries = []
                 }
             }
-            .disabled(multiSelectIds.isEmpty)
+            .disabled(multiSelectIds.isEmpty || !canCommitMultiSelect)
             .padding(.top, HavenTheme.spacing8)
         }
+    }
+
+    /// True when any custom-input option is selected but the entries list is
+    /// still empty AND the draft field is also empty. Prevents users from
+    /// hitting Continue with "Other" checked but no value provided.
+    private var canCommitMultiSelect: Bool {
+        guard let q = viewModel.currentQuestion else { return true }
+        let needsCustom = q.answerOptions.contains { option in
+            option.acceptsCustomInput && multiSelectIds.contains(option.id)
+        }
+        if !needsCustom { return true }
+        if !multiSelectCustomEntries.isEmpty { return true }
+        return !multiSelectCustomDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    /// Toggle selection with mutual-exclusion handling for "Not sure"/"None"
+    /// style options. Selecting an exclusive option clears every other id;
+    /// selecting any other option clears the exclusive ones.
+    private func toggleMultiSelectOption(_ option: AnswerOption) {
+        let isExclusive = Self.exclusiveMultiSelectIds.contains(option.id)
+        if multiSelectIds.contains(option.id) {
+            multiSelectIds.remove(option.id)
+            if option.acceptsCustomInput {
+                multiSelectCustomEntries = []
+                multiSelectCustomDraft = ""
+            }
+            return
+        }
+        if isExclusive {
+            multiSelectIds.removeAll()
+            multiSelectCustomEntries = []
+            multiSelectCustomDraft = ""
+        } else {
+            for id in Self.exclusiveMultiSelectIds {
+                multiSelectIds.remove(id)
+            }
+        }
+        multiSelectIds.insert(option.id)
+    }
+
+    /// Inline custom-entry field rendered beneath an "Other"-style option.
+    /// Lets the user add multiple entries (e.g. "Sauna", "Pellet stove",
+    /// "Wine cellar"). Each entry becomes a row beneath the field with a
+    /// remove button.
+    private func customMultiSelectInputField(for option: AnswerOption) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(spacing: HavenTheme.spacing8) {
+                TextField("Sauna, freezer, pellet stove...", text: $multiSelectCustomDraft)
+                    .textInputAutocapitalization(.words)
+                    .autocorrectionDisabled(false)
+                    .padding(HavenTheme.spacing12)
+                    .background(HavenColors.surface)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                    )
+                    .submitLabel(.done)
+                    .onSubmit { commitCustomEntryDraft() }
+                Button {
+                    commitCustomEntryDraft()
+                } label: {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 24))
+                        .foregroundStyle(canCommitDraft ? HavenColors.navy : HavenColors.textTertiary)
+                }
+                .disabled(!canCommitDraft)
+                .buttonStyle(.plain)
+            }
+
+            if !multiSelectCustomEntries.isEmpty {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    ForEach(multiSelectCustomEntries, id: \.self) { entry in
+                        HStack {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundStyle(HavenColors.success)
+                            Text(entry)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.navy800)
+                            Spacer()
+                            Button {
+                                Haptics.light()
+                                multiSelectCustomEntries.removeAll { $0 == entry }
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(.horizontal, HavenTheme.spacing12)
+                        .padding(.vertical, HavenTheme.spacing8)
+                        .background(HavenColors.surface)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    }
+                }
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+    }
+
+    private var canCommitDraft: Bool {
+        !multiSelectCustomDraft
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .isEmpty
+    }
+
+    private func commitCustomEntryDraft() {
+        let trimmed = multiSelectCustomDraft
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        if !multiSelectCustomEntries.contains(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            multiSelectCustomEntries.append(trimmed)
+            Haptics.light()
+        }
+        multiSelectCustomDraft = ""
+    }
+
+    /// Final list of custom entries to commit alongside the multi-select
+    /// answer. Includes any text still sitting in the draft field so users
+    /// don't lose it if they tap Continue without first tapping +.
+    private func multiSelectCustomEntriesForCommit() -> [String] {
+        var combined = multiSelectCustomEntries
+        let trimmedDraft = multiSelectCustomDraft
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedDraft.isEmpty
+            && !combined.contains(where: { $0.caseInsensitiveCompare(trimmedDraft) == .orderedSame }) {
+            combined.append(trimmedDraft)
+        }
+        return combined
     }
 
     // MARK: - Currency input (purchase price)
@@ -590,6 +742,8 @@ struct HouseQuizView: View {
     private func resetEntryState() {
         currencyText = ""
         multiSelectIds = []
+        multiSelectCustomDraft = ""
+        multiSelectCustomEntries = []
         providerNameText = ""
         pendingProviderForAnswer = nil
     }

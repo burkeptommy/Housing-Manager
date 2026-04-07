@@ -137,12 +137,13 @@ enum HouseQuizQuestionLibrary {
             id: "q9_basement",
             section: .inside,
             title: "Do you have a basement or crawl space?",
-            kind: .singleChoice,
+            subtitle: "Pick all that apply.",
+            kind: .multiSelect,
             answerOptions: [
                 AnswerOption(id: "finished_basement", label: "Finished basement"),
                 AnswerOption(id: "unfinished_basement", label: "Unfinished basement"),
                 AnswerOption(id: "crawl_space", label: "Crawl space"),
-                AnswerOption(id: "slab", label: "Slab — none"),
+                AnswerOption(id: "slab", label: "Slab"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ]
         ),

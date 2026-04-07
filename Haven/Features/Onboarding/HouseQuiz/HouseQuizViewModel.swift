@@ -84,13 +84,16 @@ final class HouseQuizViewModel: ObservableObject {
         }
     }
 
-    /// Persist a multi-select answer and advance.
-    func recordMultiSelect(_ ids: [String]) async {
+    /// Persist a multi-select answer and advance. `customEntries` carries any
+    /// free-form values typed into an "Other"-style option (e.g. q10 appliances
+    /// where users can add Sauna, Pellet stove, etc).
+    func recordMultiSelect(_ ids: [String], customEntries: [String]? = nil) async {
         guard let q = currentQuestion else { return }
         let answer = HouseQuizAnswer(
             answerId: nil,
             customText: nil,
             selectedIds: ids,
+            customEntries: customEntries,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)

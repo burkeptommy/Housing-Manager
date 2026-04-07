@@ -126,11 +126,27 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q9_basement":
-                try await persistAttribute("basement_type", value: answer.answerId)
-                if answer.answerId == "finished_basement" || answer.answerId == "unfinished_basement" {
+                // Multi-select today; older quiz state may have a legacy
+                // single-choice answer with `answerId` set instead of
+                // `selectedIds`. Treat both shapes the same downstream.
+                let basementSelections: [String] = {
+                    if let ids = answer.selectedIds, !ids.isEmpty { return ids }
+                    if let id = answer.answerId { return [id] }
+                    return []
+                }()
+                if !basementSelections.isEmpty {
+                    try await persistAttribute(
+                        "basement_type",
+                        value: basementSelections.joined(separator: ",")
+                    )
+                }
+                // Sump pump only matters when there's an actual basement (not
+                // a crawl-space-only or slab home).
+                if basementSelections.contains("finished_basement")
+                    || basementSelections.contains("unfinished_basement") {
                     try await ensureHomeSystem(name: "Sump Pump", category: "Sump Pump")
                 }
-                if answer.answerId == "crawl_space" {
+                if basementSelections.contains("crawl_space") {
                     try await ensureHomeSystem(name: "Crawl Space", category: "Crawl Space")
                 }
 
