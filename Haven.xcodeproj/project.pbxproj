@@ -236,6 +236,7 @@
 		EB22EDA04BB6C850BE4DD36A /* InvoiceReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0972BEE391C1FC6F3F7291C7 /* InvoiceReviewSheet.swift */; };
 		EC6DD40732FFA00D1575701D /* Validators.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7272D05EEB647B08773166 /* Validators.swift */; };
 		EC92CC3B89ED33CA01D5F3DD /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
+		ECA9178D259E8FFFFAA28806 /* AddressConfirmationIntercept.swift in Sources */ = {isa = PBXBuildFile; fileRef = 415D276FDEB22BE1DD29FE06 /* AddressConfirmationIntercept.swift */; };
 		ED7DFA4BB375BE7F164F056B /* ScenarioResultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AA79530420E808F94383A4D /* ScenarioResultView.swift */; };
 		ED9002FF8167E9A1DBE83FDF /* DatabaseService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9B2A9169E8DF0AF4A26342 /* DatabaseService.swift */; };
 		EE1C365370EBE0A3147C8F0D /* SystemStatusIndicator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 883B4E8235B5D4DF18E7A4CC /* SystemStatusIndicator.swift */; };
@@ -314,6 +315,7 @@
 		408EBC448217751261BE45B5 /* GapAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GapAnalysisView.swift; sourceTree = "<group>"; };
 		40E00F0F3AD11F85F555462F /* InvoiceProcessingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceProcessingViewModel.swift; sourceTree = "<group>"; };
 		4133F95C44CFE69A35383806 /* EmptyStateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
+		415D276FDEB22BE1DD29FE06 /* AddressConfirmationIntercept.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressConfirmationIntercept.swift; sourceTree = "<group>"; };
 		426A351F90CA70BE3D0EF607 /* EditPropertyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditPropertyView.swift; sourceTree = "<group>"; };
 		43A0A0D08A5DF798B9BBADB8 /* EditDocumentDetailsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditDocumentDetailsView.swift; sourceTree = "<group>"; };
 		43BB895C4BB79B7E3A59CCDB /* ProjectTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectTypes.swift; sourceTree = "<group>"; };
@@ -557,6 +559,7 @@
 			isa = PBXGroup;
 			children = (
 				371100436C3E0DA4B5CA3D0E /* HouseQuiz */,
+				415D276FDEB22BE1DD29FE06 /* AddressConfirmationIntercept.swift */,
 			);
 			path = Onboarding;
 			sourceTree = "<group>";
@@ -1215,6 +1218,7 @@
 				5F3F067CC8644C727E1E5D11 /* AddWarrantySheet.swift in Sources */,
 				9E1BAF02B5A1152E991C1CC5 /* AddressAutocompleteField.swift in Sources */,
 				91AE516BAE40BA3EED92B9B6 /* AddressCompletionSheet.swift in Sources */,
+				ECA9178D259E8FFFFAA28806 /* AddressConfirmationIntercept.swift in Sources */,
 				AD005EAEACB25EDD6C4CFCD8 /* AddressHookView.swift in Sources */,
 				C5ADDE464B4578DE81C202FF /* AlfredLogoView.swift in Sources */,
 				C73500039ED9E2161F154F7C /* AnalyticsService.swift in Sources */,
