@@ -101,8 +101,11 @@ enum MaintenanceTemplates {
             case "geothermal":
                 s.formUnion(["has_ac", "has_furnace"])
             default:
-                // Unknown / unset — assume full HVAC to avoid hiding tasks
-                s.formUnion(["ducted", "has_ac", "has_furnace"])
+                // Unknown / unset — wait for the House Quiz to confirm what
+                // the user actually has. Assuming ducted HVAC up front meant
+                // tankless / ducted tasks leaked into homes that don't have
+                // them, breaking trust before the quiz could even run.
+                break
             }
         case "water heater":
             if sub == "tank" || sub.isEmpty { s.insert("tank") }
@@ -139,6 +142,11 @@ enum MaintenanceTemplates {
     /// Returns templates matching a system category string (case-insensitive partial match).
     /// `activeSubtypes` is the set of subtypes the user's home has (e.g. ["lawn", "ducted", "tank", "sump_pump"]).
     /// Templates whose `requiredSubtypes` are not a subset of `activeSubtypes` are excluded.
+    ///
+    /// Pre-quiz (empty activeSubtypes): only universal templates pass. This
+    /// prevents subtype-specific tasks like "Descale tankless heater" or
+    /// "Inspect ductwork for leaks" from showing up before the user confirms
+    /// what they actually have in the House Quiz.
     static func templates(for category: String, activeSubtypes: Set<String> = []) -> [MaintenanceTemplate] {
         let lower = category.lowercased()
         let matched = allTemplates.first { sectionName, _ in
@@ -146,10 +154,9 @@ enum MaintenanceTemplates {
             || lower.contains(sectionName.lowercased())
             || sectionName.lowercased().contains(lower)
         }?.1 ?? []
-        if activeSubtypes.isEmpty {
-            return matched
+        return matched.filter { template in
+            template.requiredSubtypes.isEmpty || template.requiredSubtypes.isSubset(of: activeSubtypes)
         }
-        return matched.filter { $0.requiredSubtypes.isEmpty || $0.requiredSubtypes.isSubset(of: activeSubtypes) }
     }
 
     // MARK: - Master Template Database

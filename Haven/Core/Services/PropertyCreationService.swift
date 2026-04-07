@@ -70,19 +70,20 @@ actor PropertyCreationService {
 
         let property = try await DatabaseService.shared.createProperty(insert)
 
-        // 3. Auto-create home systems from detected features.
+        // 3. Auto-create home systems. Universal systems (HVAC, Roof, Water
+        // Heater, Electrical Panel) are always created so the Maintenance tab
+        // never looks empty. Feature-detected systems (pool, garage, etc.)
+        // only appear when ATTOM confirmed them.
         var systemsCreated = 0
-        if let features = resolvedLookup?.features {
-            let systems = systemsFromFeatures(
-                features,
-                propertyId: property.id,
-                householdId: householdId,
-                yearBuilt: resolvedLookup?.yearBuilt
-            )
-            for system in systems {
-                if (try? await DatabaseService.shared.createHomeSystem(system)) != nil {
-                    systemsCreated += 1
-                }
+        let systems = systemsFromFeatures(
+            resolvedLookup?.features,
+            propertyId: property.id,
+            householdId: householdId,
+            yearBuilt: resolvedLookup?.yearBuilt
+        )
+        for system in systems {
+            if (try? await DatabaseService.shared.createHomeSystem(system)) != nil {
+                systemsCreated += 1
             }
         }
 
@@ -139,49 +140,57 @@ actor PropertyCreationService {
     }
 
     private func systemsFromFeatures(
-        _ features: PropertyLookupResult.PropertyFeatures,
+        _ features: PropertyLookupResult.PropertyFeatures?,
         propertyId: UUID,
         householdId: UUID,
         yearBuilt: Int?
     ) -> [HomeSystemInsert] {
         var systems: [HomeSystemInsert] = []
         let install = yearBuilt.map { "\($0)-01-01" }
+        let universalNotes = "Auto-created from address lookup. Update with details after the House Quiz."
 
-        if features.heatingType != nil || features.coolingType != nil {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: "HVAC System",
-                category: "HVAC",
-                installDate: install,
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        if let roof = features.roofType {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: "\(roof) Roof",
-                category: "Roofing",
-                installDate: install,
-                notes: "Auto-created from address lookup."
-            ))
-        }
+        // ── Universal systems: always created regardless of ATTOM result ──
+
+        systems.append(HomeSystemInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            name: "HVAC System",
+            category: "HVAC",
+            installDate: install,
+            notes: universalNotes
+        ))
+
+        let roofName = features?.roofType.map { "\($0) Roof" } ?? "Roof"
+        systems.append(HomeSystemInsert(
+            propertyId: propertyId,
+            householdId: householdId,
+            name: roofName,
+            category: "Roofing",
+            installDate: install,
+            notes: universalNotes
+        ))
+
         systems.append(HomeSystemInsert(
             propertyId: propertyId,
             householdId: householdId,
             name: "Water Heater",
             category: "Water Heater",
-            notes: "Auto-created. Update with type, brand, and age."
+            notes: universalNotes
         ))
+
         systems.append(HomeSystemInsert(
             propertyId: propertyId,
             householdId: householdId,
             name: "Electrical Panel",
             category: "Electrical",
             installDate: install,
-            notes: "Auto-created from address lookup."
+            notes: universalNotes
         ))
+
+        // ── Feature-detected systems: only when ATTOM confirmed them ──
+
+        guard let features else { return systems }
+
         if features.pool == true {
             systems.append(HomeSystemInsert(
                 propertyId: propertyId,
@@ -209,6 +218,34 @@ actor PropertyCreationService {
                 category: "Fire Protection",
                 notes: "Auto-created from address lookup."
             ))
+        }
+        if let foundation = features.foundationType, !foundation.isEmpty {
+            systems.append(HomeSystemInsert(
+                propertyId: propertyId,
+                householdId: householdId,
+                name: "\(foundation) Foundation",
+                category: "Foundation",
+                notes: "Auto-created from address lookup."
+            ))
+            let lowered = foundation.lowercased()
+            if lowered.contains("crawl") {
+                systems.append(HomeSystemInsert(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    name: "Crawl Space",
+                    category: "Crawl Space",
+                    notes: "Auto-created from address lookup."
+                ))
+            }
+            if lowered.contains("basement") {
+                systems.append(HomeSystemInsert(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    name: "Basement",
+                    category: "Basement",
+                    notes: "Auto-created from address lookup."
+                ))
+            }
         }
         return systems
     }

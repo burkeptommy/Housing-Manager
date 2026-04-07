@@ -24,8 +24,23 @@ final class HouseQuizAnswerMapper {
             switch question.id {
             case "q1_roof_material":
                 try await persistAttribute("roof_material", value: answer.answerId)
-                if let mat = answer.answerId {
-                    try await ensureHomeSystem(name: "\(mat.capitalized) Roof", category: "Roofing")
+                if let mat = answer.answerId, mat != "not_sure" {
+                    let subtype = Self.roofingSubtype(forQuizAnswer: mat)
+                    let systemId = try await ensureHomeSystem(
+                        name: "\(mat.replacingOccurrences(of: "_", with: " ").capitalized) Roof",
+                        category: "Roofing",
+                        subtype: subtype,
+                        matchByCategory: true
+                    )
+                    if let subtype {
+                        await MaintenanceTaskMigrator.addSubtypeTasks(
+                            propertyId: propertyId,
+                            householdId: householdId,
+                            systemCategory: "Roofing",
+                            systemId: systemId,
+                            newSubtype: subtype
+                        )
+                    }
                 }
 
             case "q2_siding":
@@ -33,7 +48,22 @@ final class HouseQuizAnswerMapper {
 
             case "q3_heating_fuel":
                 try await persistAttribute("heating_fuel", value: answer.answerId)
-                try await ensureHomeSystem(name: "HVAC System", category: "HVAC")
+                let hvacSubtype = Self.hvacSubtype(forFuel: answer.answerId)
+                let hvacSystemId = try await ensureHomeSystem(
+                    name: "HVAC System",
+                    category: "HVAC",
+                    subtype: hvacSubtype,
+                    matchByCategory: true
+                )
+                if let hvacSubtype {
+                    await MaintenanceTaskMigrator.addSubtypeTasks(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemCategory: "HVAC",
+                        systemId: hvacSystemId,
+                        newSubtype: hvacSubtype
+                    )
+                }
 
             case "q4_purchase":
                 if let custom = answer.customText, let price = Double(digitsOnly(custom)) {
@@ -63,13 +93,37 @@ final class HouseQuizAnswerMapper {
 
             case "q8_water_heater":
                 try await persistAttribute("water_heater_type", value: answer.answerId)
-                let name: String
+                let heaterName: String
+                let heaterSubtype: String?
                 switch answer.answerId {
-                case "tankless_gas", "tankless_electric": name = "Tankless Water Heater"
-                case "heat_pump": name = "Heat Pump Water Heater"
-                default: name = "Water Heater"
+                case "tank_gas", "tank_electric":
+                    heaterName = "Water Heater"
+                    heaterSubtype = "tank"
+                case "tankless_gas", "tankless_electric":
+                    heaterName = "Tankless Water Heater"
+                    heaterSubtype = "tankless"
+                case "heat_pump":
+                    heaterName = "Heat Pump Water Heater"
+                    heaterSubtype = "hybrid_heat_pump"
+                default:
+                    heaterName = "Water Heater"
+                    heaterSubtype = nil
                 }
-                try await ensureHomeSystem(name: name, category: "Water Heater")
+                let heaterSystemId = try await ensureHomeSystem(
+                    name: heaterName,
+                    category: "Water Heater",
+                    subtype: heaterSubtype,
+                    matchByCategory: true
+                )
+                if let heaterSubtype {
+                    await MaintenanceTaskMigrator.addSubtypeTasks(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemCategory: "Water Heater",
+                        systemId: heaterSystemId,
+                        newSubtype: heaterSubtype
+                    )
+                }
 
             case "q9_basement":
                 try await persistAttribute("basement_type", value: answer.answerId)
@@ -91,7 +145,19 @@ final class HouseQuizAnswerMapper {
             case "q11_lawn":
                 try await persistAttribute("lawn_status", value: answer.answerId)
                 if answer.answerId == "diy" || answer.answerId == "pro" {
-                    try await ensureHomeSystem(name: "Landscaping", category: "Landscaping")
+                    let lawnSystemId = try await ensureHomeSystem(
+                        name: "Landscaping",
+                        category: "Landscaping",
+                        subtype: "lawn",
+                        matchByCategory: true
+                    )
+                    await MaintenanceTaskMigrator.addSubtypeTasks(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemCategory: "Landscaping",
+                        systemId: lawnSystemId,
+                        newSubtype: "lawn"
+                    )
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "lawn_care")
                     }
@@ -248,24 +314,89 @@ final class HouseQuizAnswerMapper {
 
     /// Ensure a top-level home system row exists for the given name+category.
     /// Returns the row id (existing or new).
+    ///
+    /// - Parameters:
+    ///   - matchByCategory: When `true`, match the first top-level system of
+    ///     the given category and update it (used for singleton categories
+    ///     like HVAC, Roofing, Water Heater that `PropertyCreationService`
+    ///     already auto-created at address lookup time — we want to
+    ///     enhance that row, not create a duplicate).
+    ///   - subtype: Optional subtype token. When provided, writes it to the
+    ///     matched/created row so `MaintenanceTemplates.activeSubtypes`
+    ///     picks it up on subsequent reads.
     @discardableResult
-    private func ensureHomeSystem(name: String, category: String) async throws -> UUID? {
-        // Match by name + category to avoid duplicates if the user revisits a question.
+    private func ensureHomeSystem(
+        name: String,
+        category: String,
+        subtype: String? = nil,
+        matchByCategory: Bool = false
+    ) async throws -> UUID? {
         let existing = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
-        if let match = existing.first(where: {
-            $0.name.lowercased() == name.lowercased() && $0.category.lowercased() == category.lowercased()
-        }) {
+        let match: HomeSystemRow? = matchByCategory
+            ? existing.first(where: {
+                $0.category.lowercased() == category.lowercased() && $0.parentSystemId == nil
+            })
+            : existing.first(where: {
+                $0.name.lowercased() == name.lowercased()
+                && $0.category.lowercased() == category.lowercased()
+            })
+        if let match {
+            var update = HomeSystemUpdate()
+            var needsUpdate = false
+            if let subtype, match.subtype != subtype {
+                update.subtype = subtype
+                needsUpdate = true
+            }
+            if matchByCategory && match.name.lowercased() != name.lowercased() {
+                update.name = name
+                needsUpdate = true
+            }
+            if needsUpdate {
+                _ = try? await db.updateHomeSystem(id: match.id, update)
+            }
             return match.id
         }
-        let insert = HomeSystemInsert(
+        var insert = HomeSystemInsert(
             propertyId: propertyId,
             householdId: householdId,
             name: name,
             category: category,
             notes: "Created from House Quiz."
         )
+        insert.subtype = subtype
         let row = try await db.createHomeSystem(insert)
         return row.id
+    }
+
+    // MARK: - Quiz answer → subtype token mapping
+
+    /// Translate a `q1_roof_material` answer id into the subtype token
+    /// `MaintenanceTemplates.activeSubtypes` uses to unlock roof templates.
+    /// Metal, tile, and slate have no subtype-tagged templates, so they
+    /// return `nil` (universal templates still apply).
+    fileprivate static func roofingSubtype(forQuizAnswer id: String) -> String? {
+        switch id {
+        case "asphalt": return "asphalt_shingle"
+        case "flat_membrane": return "flat_membrane"
+        case "wood_shake": return "wood_shake"
+        default: return nil
+        }
+    }
+
+    /// Translate a `q3_heating_fuel` answer id into an HVAC system subtype.
+    /// Fuel type does not uniquely determine HVAC configuration, so this is
+    /// a pragmatic heuristic the user can correct from the system detail
+    /// screen if it's wrong. The goal is to surface relevant maintenance
+    /// tasks (e.g. furnace tune-up for gas, heat pump service for electric)
+    /// rather than nothing at all.
+    fileprivate static func hvacSubtype(forFuel fuel: String?) -> String? {
+        switch fuel {
+        case "natural_gas", "propane": return "central_ducted"
+        case "oil": return "boiler_radiant"
+        case "electric": return "heat_pump"
+        case "geothermal": return "geothermal"
+        default: return nil
+        }
     }
 
     private func ensureChildSystem(parentId: UUID, name: String, category: String) async throws {

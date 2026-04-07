@@ -55,6 +55,7 @@
 		294E2CEF29348B2B4696C6A3 /* PendingInvitationsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA28C5B48241D874518EC2A /* PendingInvitationsSection.swift */; };
 		2B225520A59F0E01640D17F4 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140FF755AC0C65534DBDFD63 /* AuthViewModel.swift */; };
 		2BA6D9D473C408FD57DEF781 /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
+		2C10C170E895F94CE48135BD /* MaintenanceTaskMigrator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 770AC05AB99562453F2C18CE /* MaintenanceTaskMigrator.swift */; };
 		2C255BAD0460F323FD6169A6 /* FlexibleValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915078B738003E23B34AE01 /* FlexibleValue.swift */; };
 		2CE8281F2200DD94324E595F /* TrustedContactFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32AFC6B8D05DF37593DD321 /* TrustedContactFormView.swift */; };
 		30A31977F96A68E07024A093 /* AppConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 216CE36DEDB939EEC1D458C2 /* AppConfig.swift */; };
@@ -398,6 +399,7 @@
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
 		74FA247DDBF39F4193808F43 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDocumentsView.swift; sourceTree = "<group>"; };
+		770AC05AB99562453F2C18CE /* MaintenanceTaskMigrator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskMigrator.swift; sourceTree = "<group>"; };
 		773266F6C8F5CDA962157D23 /* FamilyItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyItemDetailView.swift; sourceTree = "<group>"; };
 		7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenButton.swift; sourceTree = "<group>"; };
 		778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageSystemTasksSheet.swift; sourceTree = "<group>"; };
@@ -769,6 +771,7 @@
 			isa = PBXGroup;
 			children = (
 				F38C3FA8CB5030ACD24929E9 /* DefaultSystemsService.swift */,
+				770AC05AB99562453F2C18CE /* MaintenanceTaskMigrator.swift */,
 				232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */,
 				90723058FEB3AFEEA7917516 /* OnboardingScheduleGenerator.swift */,
 				9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */,
@@ -1430,6 +1433,7 @@
 				955995EC1C69BA5FA32F53DB /* MaintenanceTask.swift in Sources */,
 				026702FC665EE46F861C2F1B /* MaintenanceTaskDetailSheet.swift in Sources */,
 				F10D82D4294FDE17B11DE618 /* MaintenanceTaskIcon.swift in Sources */,
+				2C10C170E895F94CE48135BD /* MaintenanceTaskMigrator.swift in Sources */,
 				81EE6D934AAC2EDAAF568083 /* MaintenanceTaskRow.swift in Sources */,
 				2BA6D9D473C408FD57DEF781 /* MaintenanceTemplates.swift in Sources */,
 				C69AE322B13F1AD0B19B6799 /* MaintenanceViewModel.swift in Sources */,
