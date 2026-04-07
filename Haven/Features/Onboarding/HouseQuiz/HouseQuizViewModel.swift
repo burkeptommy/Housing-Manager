@@ -14,6 +14,16 @@ final class HouseQuizViewModel: ObservableObject {
     @Published var providerCaptureForAnswerId: String?
     @Published var providerCaptureText: String = ""
 
+    /// Phase 16c — when the user picks an auto carrier that also offers home
+    /// insurance (per `bundles_with_home`), we stash the row here so the q27
+    /// render can show a "Looks like {name} also does home" suggestion card
+    /// instead of forcing a duplicate search.
+    @Published var bundledHomeSuggestion: UtilityProviderRow?
+    /// Mirror flow for the reverse direction: if the user somehow answers q27
+    /// before q26, the home carrier with `bundles_with_auto` becomes the
+    /// suggestion shown above q26's auto picker.
+    @Published var bundledAutoSuggestion: UtilityProviderRow?
+
     private let mapper: HouseQuizAnswerMapper
     private let db = DatabaseService.shared
 
@@ -82,6 +92,59 @@ final class HouseQuizViewModel: ObservableObject {
         } else {
             advance()
         }
+    }
+
+    /// Phase 16c — variant that captures the full provider row alongside the
+    /// answer. Lets us inspect bundle flags for auto/home insurance questions
+    /// so q27 (home) can pre-fill from a q26 (auto) selection and vice versa.
+    func recordProviderAnswer(provider: UtilityProviderRow) async {
+        guard let q = currentQuestion else { return }
+        // Insurance bundle hint plumbing happens BEFORE persist so the q27
+        // render after persist's advance() can read the flag immediately.
+        switch q.id {
+        case "q26_auto_insurance":
+            if provider.bundlesWithHome == true {
+                bundledHomeSuggestion = provider
+            } else {
+                bundledHomeSuggestion = nil
+            }
+        case "q27_homeowners_insurance":
+            if provider.bundlesWithAuto == true {
+                bundledAutoSuggestion = provider
+            } else {
+                bundledAutoSuggestion = nil
+            }
+        default:
+            break
+        }
+        await recordAnswer("selected", customText: provider.name)
+    }
+
+    /// Phase 16c — user accepts the bundled suggestion at q27 (or q26 in the
+    /// reverse case). Records the answer with the suggested provider's name
+    /// and clears the suggestion so it doesn't bleed into a future quiz pass.
+    func acceptBundledSuggestion() async {
+        guard let q = currentQuestion else { return }
+        let suggestion: UtilityProviderRow?
+        switch q.id {
+        case "q27_homeowners_insurance":
+            suggestion = bundledHomeSuggestion
+        case "q26_auto_insurance":
+            suggestion = bundledAutoSuggestion
+        default:
+            suggestion = nil
+        }
+        guard let provider = suggestion else { return }
+        bundledHomeSuggestion = nil
+        bundledAutoSuggestion = nil
+        await recordAnswer("selected", customText: provider.name)
+    }
+
+    /// Phase 16c — user rejected the bundled suggestion. Clear it so the
+    /// regular search picker takes over without re-rendering the card.
+    func dismissBundledSuggestion() {
+        bundledHomeSuggestion = nil
+        bundledAutoSuggestion = nil
     }
 
     /// Persist a multi-select answer and advance. `customEntries` carries any

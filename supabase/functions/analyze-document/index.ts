@@ -154,6 +154,16 @@ serve(async (req: Request) => {
       "estimatedCost": "rough cost estimate or null"
     }
   ],
+  "insurance_policy": {
+    "type": "auto|home|umbrella|renters|flood|life|other or null",
+    "provider": "Carrier name or null",
+    "policy_number": "string or null",
+    "effective_date": "YYYY-MM-DD or null",
+    "expiration_date": "YYYY-MM-DD or null",
+    "coverage_amounts": {"dwelling": number, "liability": number, "deductible": number} or null,
+    "vehicles_covered": [{"vin": "string", "year": number, "make": "string", "model": "string"}] or [],
+    "bundled_policies": ["auto","home","umbrella","renters","flood"] or []
+  },
   "property_id": "UUID of the matching property if this document relates to a specific property (from the list below), or null"
 }${propertyContext}
 
@@ -161,6 +171,7 @@ EXTRACTION RULES:
 - vendor_info: Extract if the document is from a contractor, service company, vendor, or business. Include for: quotes, invoices, service reports, warranties, vendor contracts, repair estimates, inspection reports.
 - home_systems: Extract if the document mentions specific home systems, appliances, or equipment. Especially important for: inspection reports (extract ALL systems inspected), warranty cards (extract the covered system), appliance manuals, service reports, completion certificates.
 - maintenance_suggestions: Extract if the document recommends maintenance, repairs, or follow-up work. Especially from: inspection reports, service reports, warranty cards (maintenance requirements to keep warranty valid).
+- insurance_policy: Extract if this is a declarations page, policy summary, ID card, binder, or any insurance document. The "type" should be the PRIMARY policy type (auto/home/umbrella/etc). The "bundled_policies" list captures any OTHER policy types that appear on the same declaration (e.g. a State Farm dec page that lists both auto AND home gets "auto" as type and ["home"] in bundled_policies). When the user uploads such a declaration we surface both policies in the inbox so they can confirm both with one tap.
 - If none of these apply (e.g., a will or passport), return null/empty arrays for those fields.
 
 VEHICLE DETECTION:

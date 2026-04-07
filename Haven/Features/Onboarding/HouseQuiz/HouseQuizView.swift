@@ -585,18 +585,45 @@ struct HouseQuizView: View {
     @ViewBuilder
     private func providerSearchBody(_ q: HouseQuizQuestion) -> some View {
         if !q.providerTypes.isEmpty {
-            UtilityProviderSearchPicker(
-                providerTypes: q.providerTypes,
-                state: viewModel.property.state,
-                onSelect: { provider in
-                    Task {
-                        await viewModel.recordAnswer("selected", customText: provider.name)
-                    }
-                },
-                onCustomCreated: { _ in
-                    Haptics.success()
+            VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                // Phase 16c — bundled-insurance pre-fill card. Renders only
+                // when the partner question already captured a carrier whose
+                // bundle flag points at this question's line of business. The
+                // user can accept (skips the picker entirely), reject (drops
+                // the card and shows the picker), or just start typing in the
+                // picker below — selecting any other provider also clears the
+                // suggestion via recordProviderAnswer.
+                if let suggestion = bundledSuggestion(for: q) {
+                    BundledInsuranceSuggestionCard(
+                        provider: suggestion,
+                        partnerLineLabel: bundledPartnerLineLabel(for: q),
+                        onAccept: {
+                            Task {
+                                await viewModel.acceptBundledSuggestion()
+                            }
+                        },
+                        onReject: {
+                            withAnimation(HavenTheme.animationStandard) {
+                                viewModel.dismissBundledSuggestion()
+                            }
+                        }
+                    )
+                    .transition(.opacity)
                 }
-            )
+
+                UtilityProviderSearchPicker(
+                    providerTypes: q.providerTypes,
+                    state: viewModel.property.state,
+                    onSelect: { provider in
+                        Task {
+                            await viewModel.recordProviderAnswer(provider: provider)
+                        }
+                    },
+                    onCustomCreated: { _ in
+                        Haptics.success()
+                    }
+                )
+            }
         } else {
             // Defensive fallback for any provider-search question that doesn't
             // declare a providerType in the library.
@@ -611,6 +638,29 @@ struct HouseQuizView: View {
                 }
                 .disabled(providerNameText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+        }
+    }
+
+    /// Phase 16c — pull the right bundle suggestion (if any) for the current
+    /// insurance question.
+    private func bundledSuggestion(for q: HouseQuizQuestion) -> UtilityProviderRow? {
+        switch q.id {
+        case "q27_homeowners_insurance":
+            return viewModel.bundledHomeSuggestion
+        case "q26_auto_insurance":
+            return viewModel.bundledAutoSuggestion
+        default:
+            return nil
+        }
+    }
+
+    /// Phase 16c — human-readable label of the partner line of business for
+    /// the suggestion card prompt.
+    private func bundledPartnerLineLabel(for q: HouseQuizQuestion) -> String {
+        switch q.id {
+        case "q27_homeowners_insurance": return "home insurance provider"
+        case "q26_auto_insurance": return "auto insurance provider"
+        default: return "insurance provider"
         }
     }
 
