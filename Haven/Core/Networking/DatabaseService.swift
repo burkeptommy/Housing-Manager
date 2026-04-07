@@ -776,26 +776,30 @@ final class DatabaseService {
 
     // MARK: - Maintenance Tasks
 
-    func fetchMaintenanceTasks(propertyId: UUID? = nil, systemId: UUID? = nil, vehicleId: UUID? = nil) async throws -> [MaintenanceTaskDBRow] {
+    func fetchMaintenanceTasks(propertyId: UUID? = nil, systemId: UUID? = nil, vehicleId: UUID? = nil, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
         var query = from("maintenance_tasks").select()
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
         if let systemId { query = query.eq("system_id", value: systemId.uuidString) }
         if let vehicleId { query = query.eq("vehicle_id", value: vehicleId.uuidString) }
+        if !includeArchived { query = query.eq("is_archived", value: false) }
         return try await query.order("next_due_date").execute().value
     }
 
-    func fetchVehicleMaintenanceTasks(vehicleId: UUID) async throws -> [MaintenanceTaskDBRow] {
-        try await from("maintenance_tasks")
+    func fetchVehicleMaintenanceTasks(vehicleId: UUID, includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
+        var query = from("maintenance_tasks")
             .select()
             .eq("vehicle_id", value: vehicleId.uuidString)
+        if !includeArchived { query = query.eq("is_archived", value: false) }
+        return try await query
             .order("next_due_date")
             .execute()
             .value
     }
 
-    func fetchAllMaintenanceTasks() async throws -> [MaintenanceTaskDBRow] {
-        try await from("maintenance_tasks")
-            .select()
+    func fetchAllMaintenanceTasks(includeArchived: Bool = false) async throws -> [MaintenanceTaskDBRow] {
+        var query = from("maintenance_tasks").select()
+        if !includeArchived { query = query.eq("is_archived", value: false) }
+        return try await query
             .order("next_due_date")
             .execute()
             .value
@@ -886,6 +890,32 @@ final class DatabaseService {
         try await from("maintenance_tasks")
             .delete()
             .in("id", values: ids.map(\.uuidString))
+            .execute()
+    }
+
+    /// Soft-delete a maintenance task by setting `is_archived = true`.
+    /// Used by `MaintenanceTaskReconciler` (Phase 17b) so the post-quiz
+    /// task pruning never destroys history. The task stays in the DB and
+    /// is hidden from default fetches via the `is_archived = false` filter.
+    func archiveMaintenanceTask(id: UUID, reason: String? = nil) async throws {
+        struct ArchivePayload: Encodable {
+            let isArchived: Bool
+            let archivedAt: String
+            let archivedReason: String?
+            enum CodingKeys: String, CodingKey {
+                case isArchived = "is_archived"
+                case archivedAt = "archived_at"
+                case archivedReason = "archived_reason"
+            }
+        }
+        let payload = ArchivePayload(
+            isArchived: true,
+            archivedAt: ISO8601DateFormatter().string(from: Date()),
+            archivedReason: reason
+        )
+        try await from("maintenance_tasks")
+            .update(payload)
+            .eq("id", value: id.uuidString)
             .execute()
     }
 

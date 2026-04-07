@@ -14,6 +14,18 @@ final class HouseQuizViewModel: ObservableObject {
     @Published var providerCaptureForAnswerId: String?
     @Published var providerCaptureText: String = ""
 
+    /// Phase 17b — running totals from `MaintenanceTaskReconciler`. Each
+    /// answer that touches a system subtype merges its result into this; the
+    /// final `runFinalReconciliation()` pass after the last question merges
+    /// the orphan/whole-property cleanup. The completion view reads this to
+    /// show "we added X, removed Y" with REAL numbers, never fakes them.
+    @Published var reconciliationTotals: MaintenanceTaskReconciler.ReconciliationResult = .empty
+    /// Set to `true` after `runFinalReconciliation()` finishes so the
+    /// completion view can swap from a brief loading caption to the real
+    /// summary. Defaults to `false` so an unfinished quiz never shows stale
+    /// numbers.
+    @Published var finalReconciliationDidRun: Bool = false
+
     /// Phase 16c — when the user picks an auto carrier that also offers home
     /// insurance (per `bundles_with_home`), we stash the row here so the q27
     /// render can show a "Looks like {name} also does home" suggestion card
@@ -257,11 +269,26 @@ final class HouseQuizViewModel: ObservableObject {
         state.savedForLater.removeAll { $0 == question.id }
         state.skipped.removeAll { $0 == question.id }
 
-        // 2. Fire the answer mapper for DB side-effects.
-        await mapper.apply(question: question, answer: answer)
+        // 2. Fire the answer mapper for DB side-effects. Capture any
+        //    reconciler changes so the completion summary can show real
+        //    numbers without faking them.
+        let result = await mapper.apply(question: question, answer: answer)
+        if !result.isEmpty {
+            reconciliationTotals = reconciliationTotals.merging(result)
+        }
 
         // 3. Persist quiz state JSONB.
         await persistState()
+
+        // 4. Phase 17b — once the user has answered everything, run a
+        //    full-property reconcile pass to catch any system whose subtype
+        //    was inferred from sibling answers but never directly confirmed,
+        //    plus orphaned legacy tasks. Notification posts so the dashboard
+        //    refreshes its task counts.
+        if state.completedAt != nil && !finalReconciliationDidRun {
+            await runFinalReconciliation()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
 
         Analytics.track(.quizQuestionAnswered, [
             "question_id": question.id,
@@ -285,6 +312,22 @@ final class HouseQuizViewModel: ObservableObject {
         } catch {
             print("[HouseQuizViewModel] Failed to persist quiz state: \(error)")
         }
+    }
+
+    /// Phase 17b — runs `MaintenanceTaskReconciler.reconcileAll` on the
+    /// quiz's property, merges the result into `reconciliationTotals`, and
+    /// flips `finalReconciliationDidRun` so the completion view can render
+    /// its real-numbers summary. Idempotent: subsequent calls are no-ops
+    /// because of the flag check in `persist`.
+    private func runFinalReconciliation() async {
+        let result = await MaintenanceTaskReconciler.reconcileAll(
+            propertyId: property.id,
+            householdId: property.householdId
+        )
+        if !result.isEmpty {
+            reconciliationTotals = reconciliationTotals.merging(result)
+        }
+        finalReconciliationDidRun = true
     }
 
     private func advance() {

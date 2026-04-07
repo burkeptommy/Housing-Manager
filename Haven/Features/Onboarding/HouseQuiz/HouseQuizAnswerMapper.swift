@@ -6,6 +6,12 @@ import Foundation
 ///
 /// Real-time persistence: every question fires this immediately on tap so
 /// progress is durable even if the user force-quits mid-quiz.
+///
+/// Phase 17b: questions that confirm a system subtype now route through
+/// `MaintenanceTaskReconciler` instead of the one-way
+/// `MaintenanceTaskMigrator`. Each apply call returns a
+/// `ReconciliationResult` so the quiz view model can sum changes across the
+/// whole flow and surface a "we tailored your plan" summary at the end.
 @MainActor
 final class HouseQuizAnswerMapper {
     let householdId: UUID
@@ -17,9 +23,15 @@ final class HouseQuizAnswerMapper {
         self.propertyId = propertyId
     }
 
-    /// Persist the answer's side effects. Errors are logged and swallowed —
+    /// Persist the answer's side effects and return any task changes the
+    /// reconciler made on this answer. Errors are logged and swallowed —
     /// the quiz must keep moving even if a single side-effect write fails.
-    func apply(question: HouseQuizQuestion, answer: HouseQuizAnswer) async {
+    @discardableResult
+    func apply(
+        question: HouseQuizQuestion,
+        answer: HouseQuizAnswer
+    ) async -> MaintenanceTaskReconciler.ReconciliationResult {
+        var reconciliationResult: MaintenanceTaskReconciler.ReconciliationResult = .empty
         do {
             switch question.id {
             case "q1_roof_material":
@@ -32,15 +44,14 @@ final class HouseQuizAnswerMapper {
                         subtype: subtype,
                         matchByCategory: true
                     )
-                    if let subtype {
-                        await MaintenanceTaskMigrator.addSubtypeTasks(
-                            propertyId: propertyId,
-                            householdId: householdId,
-                            systemCategory: "Roofing",
-                            systemId: systemId,
-                            newSubtype: subtype
-                        )
-                    }
+                    let result = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: systemId,
+                        systemCategory: "Roofing",
+                        confirmedSubtype: subtype
+                    )
+                    reconciliationResult = reconciliationResult.merging(result)
                 }
 
             case "q2_siding":
@@ -55,15 +66,15 @@ final class HouseQuizAnswerMapper {
                     subtype: hvacSubtype,
                     matchByCategory: true
                 )
-                if let hvacSubtype {
-                    await MaintenanceTaskMigrator.addSubtypeTasks(
-                        propertyId: propertyId,
-                        householdId: householdId,
-                        systemCategory: "HVAC",
-                        systemId: hvacSystemId,
-                        newSubtype: hvacSubtype
-                    )
-                }
+                let hvacResult = await MaintenanceTaskReconciler.reconcile(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    systemId: hvacSystemId,
+                    systemCategory: "HVAC",
+                    confirmedSubtype: hvacSubtype,
+                    fuelType: answer.answerId
+                )
+                reconciliationResult = reconciliationResult.merging(hvacResult)
 
             case "q4_purchase":
                 if let custom = answer.customText, let price = Double(digitsOnly(custom)) {
@@ -82,13 +93,29 @@ final class HouseQuizAnswerMapper {
             case "q6_water_source":
                 try await persistAttribute("water_source", value: answer.answerId)
                 if answer.answerId == "private_well" || answer.answerId == "shared_well" {
-                    try await ensureHomeSystem(name: "Well System", category: "Well System")
+                    let wellId = try await ensureHomeSystem(name: "Well System", category: "Well System")
+                    let wellResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: wellId,
+                        systemCategory: "Well System",
+                        confirmedSubtype: nil
+                    )
+                    reconciliationResult = reconciliationResult.merging(wellResult)
                 }
 
             case "q7_sewer_septic":
                 try await persistAttribute("sewer_or_septic", value: answer.answerId)
                 if answer.answerId == "septic" {
-                    try await ensureHomeSystem(name: "Septic System", category: "Septic System")
+                    let septicId = try await ensureHomeSystem(name: "Septic System", category: "Septic System")
+                    let septicResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: septicId,
+                        systemCategory: "Septic System",
+                        confirmedSubtype: nil
+                    )
+                    reconciliationResult = reconciliationResult.merging(septicResult)
                 }
 
             case "q8_water_heater":
@@ -115,15 +142,14 @@ final class HouseQuizAnswerMapper {
                     subtype: heaterSubtype,
                     matchByCategory: true
                 )
-                if let heaterSubtype {
-                    await MaintenanceTaskMigrator.addSubtypeTasks(
-                        propertyId: propertyId,
-                        householdId: householdId,
-                        systemCategory: "Water Heater",
-                        systemId: heaterSystemId,
-                        newSubtype: heaterSubtype
-                    )
-                }
+                let heaterResult = await MaintenanceTaskReconciler.reconcile(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    systemId: heaterSystemId,
+                    systemCategory: "Water Heater",
+                    confirmedSubtype: heaterSubtype
+                )
+                reconciliationResult = reconciliationResult.merging(heaterResult)
 
             case "q9_basement":
                 // Multi-select today; older quiz state may have a legacy
@@ -189,13 +215,14 @@ final class HouseQuizAnswerMapper {
                         subtype: "lawn",
                         matchByCategory: true
                     )
-                    await MaintenanceTaskMigrator.addSubtypeTasks(
+                    let lawnResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
                         householdId: householdId,
-                        systemCategory: "Landscaping",
                         systemId: lawnSystemId,
-                        newSubtype: "lawn"
+                        systemCategory: "Landscaping",
+                        confirmedSubtype: "lawn"
                     )
+                    reconciliationResult = reconciliationResult.merging(lawnResult)
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "landscaping")
                     }
@@ -210,6 +237,20 @@ final class HouseQuizAnswerMapper {
                         try await ensureChildSystem(parentId: parentId, name: "Pool Filter", category: "Pool/Spa")
                         try await ensureChildSystem(parentId: parentId, name: "Pool Heater", category: "Pool/Spa")
                     }
+                    let poolSubtype: String?
+                    switch id {
+                    case "saltwater": poolSubtype = "saltwater"
+                    case "chlorine": poolSubtype = "chlorine"
+                    default: poolSubtype = nil
+                    }
+                    let poolResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: parentId,
+                        systemCategory: "Pool/Spa",
+                        confirmedSubtype: poolSubtype
+                    )
+                    reconciliationResult = reconciliationResult.merging(poolResult)
                     if let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "pool_service")
                     }
@@ -394,6 +435,7 @@ final class HouseQuizAnswerMapper {
         } catch {
             print("[HouseQuizAnswerMapper] Failed for \(question.id): \(error)")
         }
+        return reconciliationResult
     }
 
     // MARK: - Persistence helpers

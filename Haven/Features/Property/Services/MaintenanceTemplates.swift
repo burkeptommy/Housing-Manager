@@ -159,6 +159,27 @@ enum MaintenanceTemplates {
         }
     }
 
+    /// Returns ALL templates for a category, regardless of `requiredSubtypes`.
+    /// Used by `MaintenanceTaskReconciler` to recognise template-managed tasks
+    /// (so legacy "Descale tankless heater" rows can be matched and pruned even
+    /// when their subtype doesn't apply anymore). Do NOT use this for the
+    /// initial setup task list — that path must respect `activeSubtypes`.
+    static func allTemplates(forCategory category: String) -> [MaintenanceTemplate] {
+        let lower = category.lowercased()
+        return allTemplates.first { sectionName, _ in
+            sectionName.lowercased() == lower
+            || lower.contains(sectionName.lowercased())
+            || sectionName.lowercased().contains(lower)
+        }?.1 ?? []
+    }
+
+    /// Lowercased titles of every template Haven knows about for a category.
+    /// Used by the reconciler as a quick "is this a template-managed title?"
+    /// check before considering a task for soft-deletion.
+    static func knownTemplateTitles(forCategory category: String) -> Set<String> {
+        Set(allTemplates(forCategory: category).map { $0.title.lowercased() })
+    }
+
     // MARK: - Master Template Database
 
     static let allTemplates: [(String, [MaintenanceTemplate])] = [

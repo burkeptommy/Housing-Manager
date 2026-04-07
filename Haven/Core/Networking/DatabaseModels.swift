@@ -935,6 +935,11 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     let lastEmailSentAt: Date?
     let recurrenceRule: String?
     let scheduledDate: String?
+    /// Soft-delete flag (Phase 17b). Tasks the reconciler prunes are marked
+    /// archived rather than deleted so history is recoverable. Optional so
+    /// pre-migration responses still decode cleanly.
+    let isArchived: Bool?
+    let archivedAt: Date?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -957,6 +962,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case lastEmailSentAt = "last_email_sent_at"
         case recurrenceRule = "recurrence_rule"
         case scheduledDate = "scheduled_date"
+        case isArchived = "is_archived"
+        case archivedAt = "archived_at"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -1002,7 +1009,9 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             costRange: nil,
             lastEmailSentAt: nil,
             recurrenceRule: nil,
-            scheduledDate: nil
+            scheduledDate: nil,
+            isArchived: nil,
+            archivedAt: nil
         )
     }
 
@@ -1039,7 +1048,9 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             costRange: nil,
             lastEmailSentAt: nil,
             recurrenceRule: nil,
-            scheduledDate: nil
+            scheduledDate: nil,
+            isArchived: nil,
+            archivedAt: nil
         )
     }
 }
@@ -1103,6 +1114,9 @@ struct MaintenanceTaskUpdate: Codable {
     var notes: String?
     var lastEmailSentAt: Date?
     var scheduledDate: String?
+    var isArchived: Bool?
+    var archivedAt: Date?
+    var archivedReason: String?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1115,6 +1129,9 @@ struct MaintenanceTaskUpdate: Codable {
         case vehicleId = "vehicle_id"
         case lastEmailSentAt = "last_email_sent_at"
         case scheduledDate = "scheduled_date"
+        case isArchived = "is_archived"
+        case archivedAt = "archived_at"
+        case archivedReason = "archived_reason"
     }
 }
 
