@@ -30,6 +30,8 @@ struct DashboardView: View {
     @State private var activeQuizProperty: PropertyRow?
     @State private var showQuizSkipDialog = false
     @AppStorage("hasSkippedHouseQuizForever") private var hasSkippedHouseQuizForever = false
+    @AppStorage(PendingInviteKeys.needsPersonalQuiz) private var needsPersonalQuiz = false
+    @State private var showPersonalQuiz = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -70,6 +72,13 @@ struct DashboardView: View {
                                 showSettings = true
                             }
                         )
+
+                        // 3.5 "Make it Yours" hero card for invitees who joined an
+                        // existing household. Disappears once the personal quiz
+                        // completes (or the user dismisses with "Not now").
+                        if needsPersonalQuiz {
+                            makeItYoursHeroCard
+                        }
 
                         // 4. Expecting members
                         ForEach(viewModel.expectingMembers) { member in
@@ -365,6 +374,9 @@ struct DashboardView: View {
             }
             .fullScreenCover(item: $activeQuizProperty) { property in
                 HouseQuizView(property: property)
+            }
+            .sheet(isPresented: $showPersonalQuiz) {
+                PersonalQuizView()
             }
             .confirmationDialog("Skip the House Quiz?", isPresented: $showQuizSkipDialog, titleVisibility: .visible) {
                 Button("Skip for now") {
@@ -834,6 +846,58 @@ struct DashboardView: View {
 
                     Image(systemName: "chevron.right")
                         .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Make it Yours (personal quiz hero for invitees)
+
+    private var makeItYoursHeroCard: some View {
+        Button {
+            Haptics.medium()
+            showPersonalQuiz = true
+        } label: {
+            HavenCard {
+                HStack(alignment: .top, spacing: HavenTheme.spacing12) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 22, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy)
+                        .frame(width: 44, height: 44)
+                        .background(HavenColors.creamLight)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("MAKE IT YOURS")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.2)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("Add your profile (optional)")
+                            .font(HavenTypography.title3)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Text("5 quick questions about you and your vehicles. Takes about 2 minutes.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+
+                HStack(spacing: HavenTheme.spacing8) {
+                    HavenButton(title: "Start", action: {
+                        Haptics.medium()
+                        showPersonalQuiz = true
+                    })
+                    HavenButton(
+                        title: "Not now",
+                        action: {
+                            UserDefaults.standard.set(false, forKey: PendingInviteKeys.needsPersonalQuiz)
+                            needsPersonalQuiz = false
+                        },
+                        style: .secondary
+                    )
                 }
             }
         }
