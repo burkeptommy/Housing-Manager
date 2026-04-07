@@ -431,6 +431,25 @@ async function buildSystemPrompt(
     })
     .join("\n");
 
+  // Phase 18f: Surface the user's stated priorities from Q30 of the House
+  // Quiz so Alfred biases recommendations toward those goals. The quiz
+  // persists priorities as a comma-separated string in
+  // properties.attributes.priorities; we union across all properties so
+  // multi-property households get a single coherent goals list.
+  const allPriorities = new Set<string>();
+  for (const p of properties as Array<Record<string, unknown>>) {
+    const attrs = (p.attributes ?? {}) as Record<string, unknown>;
+    const list = (attrs.priorities as string | undefined) ?? "";
+    list
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .forEach((id) => allPriorities.add(id));
+  }
+  const prioritiesSection = allPriorities.size > 0
+    ? `\nHOUSEHOLD GOALS: This household has told us their priorities are: ${Array.from(allPriorities).map(formatPriorityLabel).join(", ")}. Bias every recommendation toward these goals. When suggesting actions, lead with the angle that matches these priorities. For example, if "saving money" is a priority, frame recommendations around cost savings; if "avoiding emergencies" is a priority, lead with prevention angles; if "resale value" is a priority, mention how the action affects the home's market value.\n`
+    : "";
+
   // Build document status by section group
   const docsByCategory = groupDocumentsBySection(documents);
   const documentStatus = Object.entries(docsByCategory)
@@ -645,7 +664,7 @@ You are named after the archetype of the trusted family butler — discreet, kno
 
 HOUSEHOLD CONTEXT:
 Current User: ${currentUserName ?? "Unknown"} (this is the person you are speaking with right now — address them by their first name)
-Household: ${household?.name ?? "Unknown"}
+Household: ${household?.name ?? "Unknown"}${prioritiesSection}
 Family Members:
 ${membersList || "No family members added yet."}
 Properties:
@@ -771,6 +790,24 @@ function calculateAge(dateOfBirth: string): number {
     age--;
   }
   return age;
+}
+
+// Phase 18f: Convert Q30 priority option ids into human-readable labels
+// for the HOUSEHOLD GOALS section of the system prompt. Falls back to a
+// snake_case→space cleanup for any id we haven't mapped yet so a future
+// new option always renders something readable.
+function formatPriorityLabel(id: string): string {
+  const map: Record<string, string> = {
+    save_money: "saving money",
+    avoid_emergencies: "avoiding emergencies",
+    resale: "resale value",
+    sustainability: "sustainability",
+    family_safety: "family safety",
+    hidden_problems: "catching hidden problems",
+    surprise_costs: "avoiding surprise costs",
+    good_contractors: "finding trustworthy contractors",
+  };
+  return map[id] ?? id.replace(/_/g, " ");
 }
 
 function groupDocumentsBySection(
