@@ -449,6 +449,128 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "merge-households", body: body)
     }
 
+    /// Typed wrapper around the merge-households "check_user" action used by the
+    /// HouseholdInviteCoordinator. Returns nil when no Haven user exists for the
+    /// given email; returns a populated record when a Haven user is already on file.
+    struct CheckUserResult: Decodable {
+        let exists: Bool
+        let userId: String?
+        let name: String?
+        let householdId: String?
+        let householdName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case exists
+            case userId = "user_id"
+            case name
+            case householdId = "household_id"
+            case householdName = "household_name"
+        }
+    }
+
+    static func mergeHouseholdsCheckUser(email: String) async throws -> CheckUserResult? {
+        let data = try await mergeHouseholds(action: "check_user", email: email)
+        let decoded = try JSONDecoder().decode(CheckUserResult.self, from: data)
+        return decoded.exists ? decoded : nil
+    }
+
+    // MARK: - Household Invite (SendGrid)
+
+    struct SendHouseholdInviteRequest: Encodable {
+        let to: String
+        let inviteCode: String
+        let inviteUrl: String
+        let inviterName: String
+        let inviterAvatarUrl: String?
+        let householdName: String?
+        let householdAddress: String?
+        let systemCount: Int?
+        let taskCount: Int?
+        let memberCount: Int?
+        let personalMessage: String?
+        let inviteeFirstName: String?
+
+        enum CodingKeys: String, CodingKey {
+            case to
+            case inviteCode = "invite_code"
+            case inviteUrl = "invite_url"
+            case inviterName = "inviter_name"
+            case inviterAvatarUrl = "inviter_avatar_url"
+            case householdName = "household_name"
+            case householdAddress = "household_address"
+            case systemCount = "system_count"
+            case taskCount = "task_count"
+            case memberCount = "member_count"
+            case personalMessage = "personal_message"
+            case inviteeFirstName = "invitee_first_name"
+        }
+    }
+
+    static func sendHouseholdInvite(_ payload: SendHouseholdInviteRequest) async throws {
+        _ = try await callEdgeFunction(name: "send-household-invite", body: payload, timeoutSeconds: 30)
+    }
+
+    struct ResendHouseholdInviteRequest: Encodable {
+        let invitationId: String
+        enum CodingKeys: String, CodingKey { case invitationId = "invitation_id" }
+    }
+
+    static func resendHouseholdInvite(invitationId: UUID) async throws {
+        _ = try await callEdgeFunction(
+            name: "resend-household-invite",
+            body: ResendHouseholdInviteRequest(invitationId: invitationId.uuidString),
+            timeoutSeconds: 30
+        )
+    }
+
+    struct GetInvitationPreviewRequest: Encodable {
+        let inviteCode: String
+        enum CodingKeys: String, CodingKey { case inviteCode = "invite_code" }
+    }
+
+    struct InvitationPreview: Decodable {
+        let inviteCode: String
+        let inviterName: String?
+        let inviterAvatarUrl: String?
+        let householdName: String?
+        let householdAddress: String?
+        let inviteeFirstName: String?
+        let inviteeEmail: String?
+        let personalMessage: String?
+        let systemCount: Int?
+        let taskCount: Int?
+        let memberCount: Int?
+        let propertyCount: Int?
+        let expiresAt: String?
+        let status: String?
+
+        enum CodingKeys: String, CodingKey {
+            case inviteCode = "invite_code"
+            case inviterName = "inviter_name"
+            case inviterAvatarUrl = "inviter_avatar_url"
+            case householdName = "household_name"
+            case householdAddress = "household_address"
+            case inviteeFirstName = "invitee_first_name"
+            case inviteeEmail = "invitee_email"
+            case personalMessage = "personal_message"
+            case systemCount = "system_count"
+            case taskCount = "task_count"
+            case memberCount = "member_count"
+            case propertyCount = "property_count"
+            case expiresAt = "expires_at"
+            case status
+        }
+    }
+
+    static func getInvitationPreview(inviteCode: String) async throws -> InvitationPreview {
+        let data = try await callEdgeFunction(
+            name: "get-invitation-preview",
+            body: GetInvitationPreviewRequest(inviteCode: inviteCode),
+            timeoutSeconds: 30
+        )
+        return try JSONDecoder().decode(InvitationPreview.self, from: data)
+    }
+
     // MARK: - Vehicle Value (Estimated current market value)
 
     struct VehicleValueRequest: Encodable {

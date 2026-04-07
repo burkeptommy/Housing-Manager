@@ -1559,6 +1559,9 @@ struct HouseholdInvitationRow: Codable, Identifiable {
     let role: String
     let familyMemberId: UUID?
     let status: String
+    let personalMessage: String?
+    let reminderSentAt: Date?
+    let reminderCount: Int?
     let createdAt: Date?
     let expiresAt: Date?
     let acceptedAt: Date?
@@ -1571,6 +1574,9 @@ struct HouseholdInvitationRow: Codable, Identifiable {
         case invitedEmail = "invited_email"
         case inviteCode = "invite_code"
         case familyMemberId = "family_member_id"
+        case personalMessage = "personal_message"
+        case reminderSentAt = "reminder_sent_at"
+        case reminderCount = "reminder_count"
         case createdAt = "created_at"
         case expiresAt = "expires_at"
         case acceptedAt = "accepted_at"
@@ -1585,6 +1591,7 @@ struct HouseholdInvitationInsert: Codable {
     let inviteCode: String
     var role: String = "member"
     var familyMemberId: UUID?
+    var personalMessage: String?
 
     enum CodingKeys: String, CodingKey {
         case role
@@ -1593,6 +1600,32 @@ struct HouseholdInvitationInsert: Codable {
         case invitedEmail = "invited_email"
         case inviteCode = "invite_code"
         case familyMemberId = "family_member_id"
+        case personalMessage = "personal_message"
+    }
+}
+
+// MARK: - Household Merge Request
+
+/// Lightweight row representation of a household_merge_requests record. The
+/// merge-households edge function owns the full lifecycle (preview, accept,
+/// execute); iOS only needs enough fields to display "request sent" trust
+/// moments and surface inbound merge requests in the household access view.
+struct HouseholdMergeRequestRow: Codable, Identifiable {
+    let id: UUID
+    let requesterUserId: UUID?
+    let requesterHouseholdId: UUID?
+    let targetUserId: UUID?
+    let targetHouseholdId: UUID?
+    let status: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, status
+        case requesterUserId = "requester_user_id"
+        case requesterHouseholdId = "requester_household_id"
+        case targetUserId = "target_user_id"
+        case targetHouseholdId = "target_household_id"
+        case createdAt = "created_at"
     }
 }
 

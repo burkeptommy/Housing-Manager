@@ -1174,6 +1174,38 @@ final class DatabaseService {
             .value
     }
 
+    /// Fetch only pending (not accepted, not revoked, not expired) invitations for the
+    /// settings pending invitations section. Sorted oldest-first so the most-overdue
+    /// ones surface first.
+    func fetchPendingInvitationsForHousehold() async throws -> [HouseholdInvitationRow] {
+        let rows: [HouseholdInvitationRow] = try await from("household_invitations")
+            .select()
+            .eq("status", value: "pending")
+            .order("created_at", ascending: true)
+            .execute()
+            .value
+        let now = Date()
+        return rows.filter { row in
+            guard let expiresAt = row.expiresAt else { return true }
+            return expiresAt > now
+        }
+    }
+
+    /// Mark the timestamp on an invitation when a manual or scheduled resend fires.
+    /// Cooldown enforcement happens client-side: 10-minute cooldown for the manual
+    /// resend button in the settings pending invitations row.
+    func touchInvitationResent(id: UUID) async throws {
+        let isoString = ISO8601DateFormatter().string(from: Date())
+        struct ResentUpdate: Encodable {
+            let reminderSentAt: String
+            enum CodingKeys: String, CodingKey { case reminderSentAt = "reminder_sent_at" }
+        }
+        try await from("household_invitations")
+            .update(ResentUpdate(reminderSentAt: isoString))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Check if there's a pending invitation for the current user's email
     /// Check if a user with this email already has a Haven account
     func checkExistingUser(email: String) async throws -> UserRow? {

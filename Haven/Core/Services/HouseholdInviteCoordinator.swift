@@ -1,0 +1,395 @@
+import Foundation
+
+/// Single source of truth for adding people to a household, sending invitations,
+/// and routing existing-Haven-user detection through the merge-request flow.
+///
+/// Every entry point in the app (Q28 spouse step, settings + button, household
+/// strip + button, vehicle covered drivers, task assignment, document parties,
+/// child profile add) calls `addPersonToHousehold(_:)`. This guarantees the
+/// trust moments stay consistent and the network plumbing only lives in one
+/// place.
+///
+/// Internal flow:
+///   1. Always create the family_member row first so the avatar appears
+///      immediately in any UI listening for refreshes.
+///   2. If no email or sendInvite is false, return `.added(name)`.
+///   3. Call `merge-households` with action `check_user`. If a Haven user is
+///      already on file, create a merge request and return
+///      `.mergeRequestSent`.
+///   4. Otherwise generate a unique 6-character code, create the
+///      household_invitations row, then call `send-household-invite`.
+///   5. If SendGrid succeeds return `.inviteSent`. If it fails, the
+///      family_member row is still committed and we return
+///      `.addedButInviteFailed` so the caller can offer a retry.
+actor HouseholdInviteCoordinator {
+    static let shared = HouseholdInviteCoordinator()
+
+    private init() {}
+
+    // MARK: - Public types
+
+    /// Source of an invite request, used purely for analytics tagging. Each
+    /// entry point passes its own value so we can measure funnel drop-off per
+    /// surface.
+    enum InviteSource: String, Sendable {
+        case quizSpouseStep = "quiz_spouse_step"
+        case quizCaretakerStep = "quiz_caretaker_step"
+        case familyTabAddButton = "family_tab_add_button"
+        case householdStripPlusButton = "household_strip_plus_button"
+        case vehicleCoveredDriver = "vehicle_covered_driver"
+        case taskAssignment = "task_assignment"
+        case documentPartyExtraction = "document_party_extraction"
+        case manualFromSettings = "manual_from_settings"
+        case childProfileAdd = "child_profile_add"
+    }
+
+    struct AddPersonRequest: Sendable {
+        var householdId: UUID
+        var firstName: String
+        var lastName: String?
+        var relationship: String
+        var email: String?
+        var phone: String?
+        var dateOfBirth: String?
+        var gender: String?
+        var isMinor: Bool
+        var sendInvite: Bool
+        var personalMessage: String?
+        var source: InviteSource
+
+        public init(
+            householdId: UUID,
+            firstName: String,
+            lastName: String? = nil,
+            relationship: String,
+            email: String? = nil,
+            phone: String? = nil,
+            dateOfBirth: String? = nil,
+            gender: String? = nil,
+            isMinor: Bool = false,
+            sendInvite: Bool = true,
+            personalMessage: String? = nil,
+            source: InviteSource
+        ) {
+            self.householdId = householdId
+            self.firstName = firstName
+            self.lastName = lastName
+            self.relationship = relationship
+            self.email = email
+            self.phone = phone
+            self.dateOfBirth = dateOfBirth
+            self.gender = gender
+            self.isMinor = isMinor
+            self.sendInvite = sendInvite
+            self.personalMessage = personalMessage
+            self.source = source
+        }
+    }
+
+    struct ExistingUserInfo: Sendable {
+        let userId: String
+        let fullName: String
+        let householdName: String?
+    }
+
+    struct AddPersonResult: Sendable {
+        let familyMember: FamilyMemberRow
+        let invitation: HouseholdInvitationRow?
+        let inviteCode: String?
+        let existingUser: ExistingUserInfo?
+        let trustMoment: TrustMoment
+    }
+
+    /// What the UI should display to the user once the call returns. Every
+    /// caller renders the same `InviteResultConfirmationCard` for these.
+    enum TrustMoment: Sendable, Equatable {
+        case added(name: String)
+        case inviteSent(name: String, email: String, code: String)
+        case mergeRequestSent(name: String, email: String)
+        case addedButInviteFailed(name: String, reason: String)
+    }
+
+    enum CoordinatorError: LocalizedError {
+        case missingHousehold
+        case invalidEmail
+        case codeGenerationExhausted
+
+        var errorDescription: String? {
+            switch self {
+            case .missingHousehold:
+                return "Could not find your household."
+            case .invalidEmail:
+                return "That email address looks invalid."
+            case .codeGenerationExhausted:
+                return "Could not allocate a unique invite code. Try again."
+            }
+        }
+    }
+
+    // MARK: - Public API
+
+    /// The single call every entry point uses. Returns once the family member is
+    /// committed AND any invitation/merge-request side effects have settled.
+    func addPersonToHousehold(_ request: AddPersonRequest) async throws -> AddPersonResult {
+        let trimmedFirstName = request.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedLastName = request.lastName?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedEmail = request.email
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() }
+            .flatMap { $0.isEmpty ? nil : $0 }
+
+        if let candidate = normalizedEmail, !Self.isLikelyValidEmail(candidate) {
+            throw CoordinatorError.invalidEmail
+        }
+
+        let db = DatabaseService.shared
+
+        // Step 1 — always create the family_member row so the avatar lights up.
+        let insert = FamilyMemberInsert(
+            householdId: request.householdId,
+            firstName: trimmedFirstName,
+            lastName: trimmedLastName ?? "",
+            relationship: request.relationship,
+            dateOfBirth: request.dateOfBirth,
+            email: normalizedEmail,
+            phone: request.phone?.trimmingCharacters(in: .whitespacesAndNewlines),
+            isMinor: request.isMinor,
+            gender: request.gender
+        )
+
+        let familyMember = try await db.createFamilyMember(insert)
+
+        Analytics.track(.familyMemberCreated, [
+            "source": request.source.rawValue,
+            "relationship": request.relationship,
+            "has_email": (normalizedEmail != nil),
+        ])
+
+        // Step 2 — short circuit when no invite is requested.
+        guard request.sendInvite, let inviteEmail = normalizedEmail else {
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: nil,
+                trustMoment: .added(name: trimmedFirstName)
+            )
+        }
+
+        // Step 3 — does this email already belong to a Haven user? If so route
+        // to the merge-request flow instead of creating a fresh invitation.
+        if let existing = try? await HavenSupabase.mergeHouseholdsCheckUser(email: inviteEmail) {
+            Analytics.track(.householdMergeStarted, ["source": request.source.rawValue])
+            do {
+                _ = try await HavenSupabase.mergeHouseholds(
+                    action: "create_merge_request",
+                    email: inviteEmail
+                )
+            } catch {
+                // Even if the merge request creation fails, the family member is
+                // still committed. Surface a soft failure to the UI.
+                return AddPersonResult(
+                    familyMember: familyMember,
+                    invitation: nil,
+                    inviteCode: nil,
+                    existingUser: ExistingUserInfo(
+                        userId: existing.userId ?? "",
+                        fullName: existing.name ?? trimmedFirstName,
+                        householdName: existing.householdName
+                    ),
+                    trustMoment: .addedButInviteFailed(
+                        name: trimmedFirstName,
+                        reason: error.localizedDescription
+                    )
+                )
+            }
+
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: ExistingUserInfo(
+                    userId: existing.userId ?? "",
+                    fullName: existing.name ?? trimmedFirstName,
+                    householdName: existing.householdName
+                ),
+                trustMoment: .mergeRequestSent(name: trimmedFirstName, email: inviteEmail)
+            )
+        }
+
+        // Step 4 — generate a code (retry on collision), create the invitation row.
+        let currentUser: UserRow
+        do {
+            currentUser = try await db.fetchCurrentUser()
+        } catch {
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(name: trimmedFirstName, reason: error.localizedDescription)
+            )
+        }
+
+        var inviteCode: String? = nil
+        var invitation: HouseholdInvitationRow? = nil
+        for attempt in 0..<3 {
+            let candidate = DatabaseService.generateInviteCode()
+            let invitationInsert = HouseholdInvitationInsert(
+                householdId: request.householdId,
+                invitedBy: currentUser.id,
+                invitedEmail: inviteEmail,
+                inviteCode: candidate,
+                familyMemberId: familyMember.id,
+                personalMessage: request.personalMessage?.trimmedNonEmpty
+            )
+            do {
+                invitation = try await db.createInvitation(invitationInsert)
+                inviteCode = candidate
+                break
+            } catch {
+                // Likely a unique-constraint collision on invite_code. Retry up to 3 times.
+                if attempt == 2 {
+                    return AddPersonResult(
+                        familyMember: familyMember,
+                        invitation: nil,
+                        inviteCode: nil,
+                        existingUser: nil,
+                        trustMoment: .addedButInviteFailed(name: trimmedFirstName, reason: error.localizedDescription)
+                    )
+                }
+            }
+        }
+
+        guard let createdInvitation = invitation, let createdCode = inviteCode else {
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(
+                    name: trimmedFirstName,
+                    reason: CoordinatorError.codeGenerationExhausted.localizedDescription
+                )
+            )
+        }
+
+        // Step 5 — actually send the email. Failures here keep the invitation
+        // row but flip the trust moment so the caller can offer a retry.
+        do {
+            try await sendInviteEmail(
+                inviteCode: createdCode,
+                inviteEmail: inviteEmail,
+                request: request,
+                householdId: request.householdId,
+                inviterUser: currentUser
+            )
+            Analytics.track(.householdInviteSent, [
+                "source": request.source.rawValue,
+                "is_spouse": request.relationship.lowercased().contains("spouse")
+                    || request.relationship.lowercased().contains("partner"),
+                "has_personal_message": request.personalMessage?.trimmedNonEmpty != nil,
+            ])
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: createdInvitation,
+                inviteCode: createdCode,
+                existingUser: nil,
+                trustMoment: .inviteSent(
+                    name: trimmedFirstName,
+                    email: inviteEmail,
+                    code: createdCode
+                )
+            )
+        } catch {
+            return AddPersonResult(
+                familyMember: familyMember,
+                invitation: createdInvitation,
+                inviteCode: createdCode,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(
+                    name: trimmedFirstName,
+                    reason: error.localizedDescription
+                )
+            )
+        }
+    }
+
+    /// Trigger a manual resend of an existing invitation. Used by the pending
+    /// invitations section in settings; the cooldown is enforced by the caller.
+    func resendInvitation(_ invitation: HouseholdInvitationRow) async throws {
+        try await HavenSupabase.resendHouseholdInvite(invitationId: invitation.id)
+        try? await DatabaseService.shared.touchInvitationResent(id: invitation.id)
+    }
+
+    // MARK: - Internals
+
+    private func sendInviteEmail(
+        inviteCode: String,
+        inviteEmail: String,
+        request: AddPersonRequest,
+        householdId: UUID,
+        inviterUser: UserRow
+    ) async throws {
+        let db = DatabaseService.shared
+
+        // Best-effort enrichment for the email payload. None of these are
+        // required by the edge function, but they make the email feel less
+        // generic. Each call is wrapped in `try?` so a failure on any one of
+        // them collapses to nil rather than aborting the email send.
+        async let propertiesTask = (try? await db.fetchProperties()) ?? []
+        async let systemsTask = (try? await db.fetchHomeSystems()) ?? []
+        async let tasksTask = (try? await db.fetchMaintenanceTasks()) ?? []
+        async let membersTask = (try? await db.fetchFamilyMembers()) ?? []
+        async let householdTask = (try? await db.fetchHousehold(id: householdId))
+
+        let properties: [PropertyRow] = await propertiesTask
+        let systems: [HomeSystemRow] = await systemsTask
+        let maintenanceTasks: [MaintenanceTaskDBRow] = await tasksTask
+        let members: [FamilyMemberRow] = await membersTask
+        let household: HouseholdRow? = await householdTask
+
+        let primaryProperty = properties.first { ($0.street?.isEmpty ?? true) == false } ?? properties.first
+        let address = primaryProperty.flatMap { Self.formatAddress($0) }
+
+        let payload = HavenSupabase.SendHouseholdInviteRequest(
+            to: inviteEmail,
+            inviteCode: inviteCode,
+            inviteUrl: "https://havenhome.dev/join/\(inviteCode)",
+            inviterName: inviterUser.fullName ?? "Someone on Haven",
+            inviterAvatarUrl: nil,
+            householdName: household?.name,
+            householdAddress: address,
+            systemCount: systems.count,
+            taskCount: maintenanceTasks.count,
+            memberCount: members.count,
+            personalMessage: request.personalMessage?.trimmedNonEmpty,
+            inviteeFirstName: request.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        )
+
+        try await HavenSupabase.sendHouseholdInvite(payload)
+    }
+
+    private static func formatAddress(_ property: PropertyRow) -> String? {
+        let parts = [property.street, property.city, property.state]
+            .compactMap { $0 }
+            .filter { !$0.isEmpty }
+        return parts.isEmpty ? nil : parts.joined(separator: ", ")
+    }
+
+    private static func isLikelyValidEmail(_ email: String) -> Bool {
+        // Cheap, intentionally permissive RFC-shaped sanity check. Real
+        // verification happens server-side at delivery time.
+        let pattern = #"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$"#
+        return email.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+}
+
+// MARK: - String trimming helper
+
+private extension String {
+    /// Returns the trimmed string, or nil if it's empty after trimming.
+    var trimmedNonEmpty: String? {
+        let trimmed = self.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+}
