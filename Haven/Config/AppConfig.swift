@@ -4,7 +4,9 @@ enum AppConfig {
     // MARK: - App Identity
     static let appName = "Haven"
     static let bundleID = "com.havenhome.app"
-    static let version = "1.0.0"
+    /// Pulled live from `CFBundleShortVersionString` instead of being
+    /// hardcoded so the value never drifts from project.yml.
+    static var version: String { Bundle.main.appVersion }
 
     // MARK: - API URLs
     static let supportEmail = "support@havenhome.dev"

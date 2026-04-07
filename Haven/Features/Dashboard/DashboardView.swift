@@ -45,6 +45,23 @@ struct DashboardView: View {
                         SkeletonCard(lineCount: 2)
                         SkeletonCard(lineCount: 3)
                     } else {
+                        // 0. Optional update banner (Phase 13). Session-only
+                        // dismissal so it reappears on next launch until the
+                        // user actually updates.
+                        if !appState.optionalUpdateDismissedThisSession,
+                           let latest = appState.optionalUpdateLatestVersion,
+                           let message = appState.optionalUpdateMessage {
+                            OptionalUpdateBanner(
+                                latestVersion: latest,
+                                message: message,
+                                appStoreURL: appState.forceUpdateAppStoreURL
+                                    ?? URL(string: "https://apps.apple.com/app/id6757167606")!,
+                                onDismiss: {
+                                    appState.optionalUpdateDismissedThisSession = true
+                                }
+                            )
+                        }
+
                         // 1. Greeting
                         greetingView
 

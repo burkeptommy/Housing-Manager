@@ -2300,4 +2300,18 @@ final class DatabaseService {
     func fetchVehicleDocuments(vehicleId: UUID) async throws -> [DocumentRow] {
         try await from("documents").select().eq("vehicle_id", value: vehicleId.uuidString).is("deleted_at", value: nil).order("uploaded_at", ascending: false).execute().value
     }
+
+    // MARK: - App Config (force-update gate)
+
+    /// Fetches the public `app_config` row for iOS. The table has a public
+    /// SELECT policy so this works for both authenticated and unauthenticated
+    /// callers. Used by `VersionCheckService` on every launch.
+    func fetchAppConfig() async throws -> AppConfigRow {
+        try await from("app_config")
+            .select()
+            .eq("id", value: "ios")
+            .single()
+            .execute()
+            .value
+    }
 }

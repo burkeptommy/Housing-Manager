@@ -8,6 +8,20 @@ final class AppState: ObservableObject {
     @Published var primaryProperty: PropertyRow?
     @Published var hasCheckedPrimaryProperty = false
 
+    // Force-update gate (Phase 13). When `requiresUpdate` is true, ContentView
+    // renders ForceUpdateView before any other routing. The optional fields
+    // hold the message and App Store URL for the blocking screen and the
+    // dashboard banner respectively.
+    @Published var requiresUpdate = false
+    @Published var forceUpdateMessage: String?
+    @Published var forceUpdateAppStoreURL: URL?
+    @Published var optionalUpdateLatestVersion: String?
+    @Published var optionalUpdateMessage: String?
+    /// Session-only dismissal flag for the OptionalUpdateBanner. Reset on
+    /// every relaunch on purpose so the banner reappears until the user
+    /// updates.
+    @Published var optionalUpdateDismissedThisSession = false
+
     let authService = AuthService()
     let sessionManager = SessionManager()
 
@@ -24,8 +38,30 @@ final class AppState: ObservableObject {
         hasCheckedPrimaryProperty = true
     }
 
+    /// Asks `app_config` whether the running build is at or above the
+    /// minimum required version. Runs in parallel with auth resolution so
+    /// even unauthenticated users get the force-update gate.
+    func checkAppVersion() async {
+        let result = await VersionCheckService.shared.check()
+        switch result {
+        case .forceUpdate(_, _, let message, let url):
+            forceUpdateMessage = message
+            forceUpdateAppStoreURL = url
+            requiresUpdate = true
+        case .optionalUpdate(let latest, _, let message):
+            optionalUpdateLatestVersion = latest
+            optionalUpdateMessage = message
+        case .upToDate, .checkFailed:
+            break
+        }
+    }
+
     func initialize() {
         authService.startListening()
+
+        // Force-update gate runs in parallel with auth resolution. The DB
+        // table is publicly readable so it doesn't depend on a session.
+        Task { await checkAppVersion() }
 
         Task {
             // Wait for the initial session to be fully resolved before showing any UI.

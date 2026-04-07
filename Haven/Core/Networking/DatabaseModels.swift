@@ -2960,3 +2960,31 @@ struct VehicleRecallInsert: Codable {
         case isResolved = "is_resolved"
     }
 }
+
+// MARK: - App Config (force-update gate)
+
+/// Mirrors the `app_config` table. One row per platform (today only `ios`).
+/// Read on every launch via `DatabaseService.fetchAppConfig()`.
+struct AppConfigRow: Codable {
+    let id: String
+    let minimumRequiredVersion: String
+    let minimumRequiredBuild: Int
+    let latestVersion: String
+    let latestBuild: Int
+    let forceUpdateMessage: String?
+    let optionalUpdateMessage: String?
+    let appStoreURL: String
+    let updatedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case minimumRequiredVersion = "minimum_required_version"
+        case minimumRequiredBuild = "minimum_required_build"
+        case latestVersion = "latest_version"
+        case latestBuild = "latest_build"
+        case forceUpdateMessage = "force_update_message"
+        case optionalUpdateMessage = "optional_update_message"
+        case appStoreURL = "app_store_url"
+        case updatedAt = "updated_at"
+    }
+}

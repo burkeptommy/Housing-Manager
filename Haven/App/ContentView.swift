@@ -10,7 +10,15 @@ struct ContentView: View {
 
     var body: some View {
         Group {
-            if appState.isLoading {
+            // Phase 13: force-update gate runs ahead of every other route.
+            // Even the splash screen is bypassed — if the user is below the
+            // minimum allowed version they only see ForceUpdateView.
+            if appState.requiresUpdate,
+               let message = appState.forceUpdateMessage,
+               let url = appState.forceUpdateAppStoreURL {
+                ForceUpdateView(message: message, appStoreURL: url)
+
+            } else if appState.isLoading {
                 LoadingView(message: "")
 
             } else if appState.isAuthenticated && appState.sessionManager.isLocked {
@@ -45,6 +53,7 @@ struct ContentView: View {
                 )
             }
         }
+        .animation(.easeInOut(duration: 0.3), value: appState.requiresUpdate)
         .animation(.easeInOut(duration: 0.3), value: appState.isAuthenticated)
         .animation(.easeInOut(duration: 0.3), value: appState.sessionManager.isLocked)
         .animation(.easeInOut(duration: 0.3), value: appState.needsOnboarding)
