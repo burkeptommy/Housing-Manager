@@ -59,12 +59,32 @@ final class HouseQuizAnswerMapper {
                 try await persistAttribute("siding_material", value: answer.answerId)
 
             case "q3_heating_fuel":
+                // Phase 19b: HVAC subtype is now driven by q3b_hvac_type, not
+                // by a fuel heuristic. We still persist the fuel attribute for
+                // Alfred's chat context and for q19's heating fuel provider
+                // filtering. The HVAC system row + reconcile happens in q3b.
                 try await persistAttribute("heating_fuel", value: answer.answerId)
-                let hvacSubtype = Self.hvacSubtype(forFuel: answer.answerId)
+
+            case "q3b_hvac_type":
+                // Phase 19b: dedicated HVAC type question. The user picks their
+                // actual HVAC configuration so we don't have to guess from the
+                // fuel type. "Not sure" persists the marker but creates no
+                // system row, so the user only gets universal HVAC tasks until
+                // they confirm later from Property → Maintenance.
+                guard let typeId = answer.answerId, typeId != "not_sure" else {
+                    try await persistAttribute("hvac_type", value: "not_sure")
+                    break
+                }
+                try await persistAttribute("hvac_type", value: typeId)
+                // Read the heating fuel from the previous question so the
+                // reconciler has both pieces of context for templates that key
+                // off `fuelType` (none today, but the field is plumbed).
+                let hvacFuel = (try? await db.fetchProperty(id: propertyId))?
+                    .attributes?["heating_fuel"]?.stringValue
                 let hvacSystemId = try await ensureHomeSystem(
-                    name: "HVAC System",
+                    name: Self.hvacSystemName(for: typeId),
                     category: "HVAC",
-                    subtype: hvacSubtype,
+                    subtype: typeId,
                     matchByCategory: true
                 )
                 let hvacResult = await MaintenanceTaskReconciler.reconcile(
@@ -72,8 +92,8 @@ final class HouseQuizAnswerMapper {
                     householdId: householdId,
                     systemId: hvacSystemId,
                     systemCategory: "HVAC",
-                    confirmedSubtype: hvacSubtype,
-                    fuelType: answer.answerId
+                    confirmedSubtype: typeId,
+                    fuelType: hvacFuel
                 )
                 reconciliationResult = reconciliationResult.merging(hvacResult)
 
@@ -569,19 +589,20 @@ final class HouseQuizAnswerMapper {
         }
     }
 
-    /// Translate a `q3_heating_fuel` answer id into an HVAC system subtype.
-    /// Fuel type does not uniquely determine HVAC configuration, so this is
-    /// a pragmatic heuristic the user can correct from the system detail
-    /// screen if it's wrong. The goal is to surface relevant maintenance
-    /// tasks (e.g. furnace tune-up for gas, heat pump service for electric)
-    /// rather than nothing at all.
-    fileprivate static func hvacSubtype(forFuel fuel: String?) -> String? {
-        switch fuel {
-        case "natural_gas", "propane": return "central_ducted"
-        case "oil": return "boiler_radiant"
-        case "electric": return "heat_pump"
-        case "geothermal": return "geothermal"
-        default: return nil
+    /// Phase 19b: Friendly system name for the HVAC type the user picked in
+    /// q3b. Used when the answer mapper creates or updates the HVAC system row
+    /// so the Property → Maintenance list shows something more specific than
+    /// "HVAC System" (e.g. "Boiler + Window AC", "Mini-Split HVAC").
+    fileprivate static func hvacSystemName(for typeId: String) -> String {
+        switch typeId {
+        case "central_ducted":          return "Central HVAC"
+        case "mini_split":              return "Mini-Split HVAC"
+        case "boiler_with_central_ac":  return "Boiler + Central AC"
+        case "boiler_radiant":          return "Boiler / Radiators"
+        case "boiler_with_window_ac":   return "Boiler + Window AC"
+        case "heat_pump":               return "Heat Pump"
+        case "geothermal":              return "Geothermal HVAC"
+        default:                        return "HVAC System"
         }
     }
 

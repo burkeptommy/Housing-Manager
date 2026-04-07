@@ -1,6 +1,8 @@
 import Foundation
 
-/// The 30-question House Quiz library, organized into 6 sections of 5.
+/// The 31-question House Quiz library, organized into 6 sections (the first
+/// section has 6 questions after Phase 19b inserted q3b_hvac_type; the other
+/// five sections still have 5 questions each).
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
 
@@ -11,8 +13,10 @@ enum HouseQuizQuestionLibrary {
     }
 
     /// Indices in `allQuestions` after which a milestone fun-fact card should appear.
-    /// Triggered after questions 5, 10, 15, 20, 25, 30 — the section boundaries.
-    static let milestoneIndices: Set<Int> = [4, 9, 14, 19, 24, 29]
+    /// Triggered after questions 6, 11, 16, 21, 26, 31 — the section boundaries.
+    /// Phase 19b: shifted by one to account for the new q3b_hvac_type question
+    /// inserted between q3 and q4 in section 1.
+    static let milestoneIndices: Set<Int> = [5, 10, 15, 20, 25, 30]
 
     // MARK: - Section 1 — Your Home Basics
 
@@ -61,6 +65,28 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "electric", label: "Electric", icon: "bolt.fill"),
                 AnswerOption(id: "propane", label: "Propane", icon: "flame"),
                 AnswerOption(id: "geothermal", label: "Geothermal", icon: "thermometer.sun.fill"),
+                AnswerOption(id: "not_sure", label: "Not sure"),
+            ]
+        ),
+        // Phase 19b: dedicated HVAC system-type question. The fuel answer in q3
+        // does not uniquely determine HVAC configuration (a gas home can have
+        // central + mini-split, an oil home can have boiler + window units),
+        // so we ask directly here and let the answer drive the maintenance
+        // template selection instead of guessing from the fuel.
+        HouseQuizQuestion(
+            id: "q3b_hvac_type",
+            section: .homeBasics,
+            title: "What kind of HVAC system?",
+            subtitle: "We use this to set the right maintenance schedule for your specific setup.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "central_ducted", label: "Central AC + furnace", icon: "wind"),
+                AnswerOption(id: "mini_split", label: "Mini-split / ductless", icon: "fan"),
+                AnswerOption(id: "boiler_with_central_ac", label: "Boiler + central AC", icon: "thermometer.snowflake"),
+                AnswerOption(id: "boiler_radiant", label: "Boiler / radiators (no AC)", icon: "drop.degreesign"),
+                AnswerOption(id: "boiler_with_window_ac", label: "Boiler + window AC units", icon: "wind"),
+                AnswerOption(id: "heat_pump", label: "Heat pump (one system)", icon: "thermometer.medium"),
+                AnswerOption(id: "geothermal", label: "Geothermal", icon: "leaf"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ]
         ),

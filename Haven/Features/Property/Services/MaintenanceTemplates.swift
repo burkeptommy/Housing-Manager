@@ -87,19 +87,29 @@ enum MaintenanceTemplates {
             if sub == "lawn" { s.insert("lawn") }
             // turf / xeriscape / none → no subtype-tagged templates apply
         case "hvac":
+            // Phase 19b: HVAC subtypes are now driven by q3b_hvac_type which
+            // captures the user's actual configuration directly. The new flags
+            // (`central_ac`, `window_ac`, `boiler`, `mini_split`, `heat_pump`,
+            // `geothermal`) let templates target a specific configuration
+            // without overlapping with the older `ducted` / `has_ac` / `has_furnace`
+            // flags that universal templates rely on.
             switch sub {
             case "central_ducted", "ducted":
-                s.formUnion(["ducted", "has_ac", "has_furnace"])
+                s.formUnion(["ducted", "has_ac", "has_furnace", "central_ac"])
             case "mini_split", "ductless_mini_split":
-                s.formUnion(["has_ac", "has_furnace"])
+                s.formUnion(["has_ac", "has_furnace", "mini_split"])
             case "boiler_radiant":
-                s.insert("has_furnace")
+                s.formUnion(["has_furnace", "boiler"])
+            case "boiler_with_central_ac":
+                s.formUnion(["has_furnace", "boiler", "has_ac", "central_ac", "ducted"])
+            case "boiler_with_window_ac":
+                s.formUnion(["has_furnace", "boiler", "has_ac", "window_ac"])
             case "window_units":
-                s.insert("has_ac")
+                s.formUnion(["has_ac", "window_ac"])
             case "heat_pump":
-                s.formUnion(["has_ac", "has_furnace"])
+                s.formUnion(["has_ac", "has_furnace", "heat_pump"])
             case "geothermal":
-                s.formUnion(["has_ac", "has_furnace"])
+                s.formUnion(["has_ac", "has_furnace", "geothermal"])
             default:
                 // Unknown / unset — wait for the House Quiz to confirm what
                 // the user actually has. Assuming ducted HVAC up front meant
@@ -219,6 +229,15 @@ enum MaintenanceTemplates {
             MaintenanceTemplate(systemCategory: "HVAC", title: "Check thermostat calibration", description: "Verify thermostat reads accurate temperature and programs are correct.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, isEssential: false),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect ductwork for leaks", description: "Professional inspection of ductwork for air leaks that reduce efficiency.", frequency: "Every 2-3 years", priority: "Medium", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, requiredSubtypes: ["ducted"], isEssential: false),
             MaintenanceTemplate(systemCategory: "HVAC", title: "Clean condensate drain line", description: "Flush AC condensate drain with vinegar to prevent clogs and water damage.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Especially important in humid climates", requiredSubtypes: ["has_ac"], isEssential: false),
+            // Phase 19b: subtype-specific templates for the new q3b HVAC types.
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Clean mini-split indoor unit filters", description: "Pop the filters out of each indoor head and rinse with warm water. Skip dust buildup or you'll lose 20% of cooling efficiency.", frequency: "Every 2 months", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, requiredSubtypes: ["mini_split"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Inspect mini-split outdoor unit", description: "Clear leaves and debris from the condenser, check for refrigerant line damage, hose down the coil.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: nil, requiredSubtypes: ["mini_split"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Clean window AC filters", description: "Remove the front grille and slide the filter out. Vacuum dust, then rinse and air dry. Reinstall.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Summer", professionalRequired: false, notes: "Monthly during cooling season", requiredSubtypes: ["window_ac"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Store window AC units for winter", description: "Pull units out of windows, clean coils, store covered. Or if leaving in place, install an exterior cover to prevent cold drafts.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, requiredSubtypes: ["window_ac"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Bleed radiators", description: "Open the bleed valve on each radiator to release trapped air. Catch the drip with a small towel. Boiler performance drops if any radiator has air in it.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Fall", professionalRequired: false, notes: nil, requiredSubtypes: ["boiler"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Annual boiler service", description: "Combustion check, clean burners, inspect heat exchanger, check pressure relief valve, verify exhaust draft.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: "Required for warranty on most boilers", requiredSubtypes: ["boiler"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Heat pump defrost cycle check", description: "In cold weather, listen for the defrost cycle (about every 30-90 min when icy). If you don't hear it cycling, schedule service before the coil freezes solid.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: "Winter", professionalRequired: false, notes: nil, requiredSubtypes: ["heat_pump"]),
+            MaintenanceTemplate(systemCategory: "HVAC", title: "Geothermal loop pressure check", description: "Have your installer verify the ground loop pressure and antifreeze concentration. A drop of more than 5 PSI/year indicates a leak.", frequency: "Annually", priority: "High", estimatedCostRange: "$150–$300", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: nil, requiredSubtypes: ["geothermal"]),
         ]),
 
         // ──────────────────────────────────────────────
