@@ -165,9 +165,9 @@ struct OnboardingSchedulePreviewStep: View {
                     value: propertyResult?.bathrooms.map { "\($0)" } ?? "—"
                 )
             }
-            if propertyResult?.estimatedValue != nil {
+            if let estimatedValue = propertyResult?.estimatedValue {
                 VStack(spacing: 2) {
-                    Text("$\(Int((propertyResult?.estimatedValue ?? 0) / 1000))K")
+                    Text(estimatedValue.formattedCompactCurrency())
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.navy800)
                     Text("Est. Value")
