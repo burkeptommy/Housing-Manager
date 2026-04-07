@@ -181,7 +181,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "garden", label: "Mostly garden"),
             ],
             providerFollowUpAnswerIds: ["pro"],
-            providerType: "lawn_care"
+            providerTypes: ["landscaping"]
         ),
         HouseQuizQuestion(
             id: "q12_pool",
@@ -196,7 +196,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["in_ground", "above_ground", "hot_tub", "both"],
-            providerType: "pool_service"
+            providerTypes: ["pool_service"]
         ),
         HouseQuizQuestion(
             id: "q13_pest",
@@ -210,7 +210,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["quarterly_pro", "termite_bond"],
-            providerType: "pest_control"
+            providerTypes: ["pest_control"]
         ),
         HouseQuizQuestion(
             id: "q14_irrigation",
@@ -223,7 +223,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "no", label: "No"),
             ],
             providerFollowUpAnswerIds: ["full", "drip"],
-            providerType: "irrigation"
+            providerTypes: ["irrigation"]
         ),
         HouseQuizQuestion(
             id: "q15_security",
@@ -237,7 +237,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["monitored"],
-            providerType: "security"
+            providerTypes: ["security"]
         ),
     ]
 
@@ -250,7 +250,7 @@ enum HouseQuizQuestionLibrary {
             title: "Who's your electric provider?",
             kind: .providerSearch,
             documentUploadCategory: .utilityBill,
-            providerType: "electricity"
+            providerTypes: ["electric"]
         ),
         HouseQuizQuestion(
             id: "q17_internet",
@@ -258,7 +258,7 @@ enum HouseQuizQuestionLibrary {
             title: "Internet provider?",
             kind: .providerSearch,
             documentUploadCategory: .utilityBill,
-            providerType: "internet"
+            providerTypes: ["internet_cable"]
         ),
         HouseQuizQuestion(
             id: "q18_trash",
@@ -271,7 +271,7 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ],
             providerFollowUpAnswerIds: ["private"],
-            providerType: "trash_recycling"
+            providerTypes: ["trash"]
         ),
         HouseQuizQuestion(
             id: "q19_heating_provider",
@@ -280,7 +280,7 @@ enum HouseQuizQuestionLibrary {
             subtitle: "We'll match this to your refill cadence.",
             kind: .providerSearch,
             documentUploadCategory: .utilityBill,
-            providerType: "heating_fuel"
+            providerTypes: ["oil", "propane", "natural_gas"]
         ),
         HouseQuizQuestion(
             id: "q20_other_fuels",
@@ -370,7 +370,7 @@ enum HouseQuizQuestionLibrary {
             title: "Auto insurance provider?",
             kind: .providerSearch,
             documentUploadCategory: .autoInsurance,
-            providerType: "auto_insurance"
+            providerTypes: ["auto_insurance"]
         ),
         HouseQuizQuestion(
             id: "q27_homeowners_insurance",
@@ -378,7 +378,7 @@ enum HouseQuizQuestionLibrary {
             title: "Homeowners insurance provider?",
             kind: .providerSearch,
             documentUploadCategory: .homeownersInsurance,
-            providerType: "homeowners_insurance"
+            providerTypes: ["homeowners_insurance"]
         ),
         HouseQuizQuestion(
             id: "q28_household",

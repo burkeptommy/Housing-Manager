@@ -607,23 +607,80 @@ final class DatabaseService {
             .execute()
     }
 
-    func fetchUtilityProviders(type: String? = nil) async throws -> [UtilityProviderRow] {
+    /// Fetch utility providers, optionally filtered by one or more provider_type
+    /// values. The DB enum has fixed strings ("electric", "internet_cable",
+    /// "oil", "propane", etc) — callers should pass these exact tokens. Some
+    /// quiz questions cover multiple types (e.g. heating fuel covers oil +
+    /// propane + natural_gas) so the array variant is the canonical form.
+    func fetchUtilityProviders(types: [String]? = nil) async throws -> [UtilityProviderRow] {
         var query = from("utility_providers").select()
-        if let type { query = query.eq("provider_type", value: type) }
+        if let types, !types.isEmpty {
+            query = query.in("provider_type", values: types)
+        }
         return try await query.order("name", ascending: true).execute().value
+    }
+
+    /// Single-type convenience wrapper for `fetchUtilityProviders(types:)`.
+    /// Note: there is no default value here so the no-arg call sites bind
+    /// unambiguously to the array variant above.
+    func fetchUtilityProviders(type: String) async throws -> [UtilityProviderRow] {
+        try await fetchUtilityProviders(types: [type])
+    }
+
+    /// Look up a single utility provider row by its slug. Used to recover from
+    /// unique-constraint races in `createUtilityProvider`.
+    func fetchUtilityProviderBySlug(_ slug: String) async throws -> UtilityProviderRow? {
+        let rows: [UtilityProviderRow] = try await from("utility_providers")
+            .select()
+            .eq("slug", value: slug)
+            .limit(1)
+            .execute()
+            .value
+        return rows.first
+    }
+
+    /// Fuzzy-find an existing utility provider by name (case-insensitive
+    /// substring) or slug. Used by `UtilityProviderCustomAddSheet` to surface
+    /// a "Did you mean?" suggestion before letting the user create a duplicate.
+    func findUtilityProviderByNameOrSlug(_ name: String) async throws -> UtilityProviderRow? {
+        let needle = name
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        guard !needle.isEmpty else { return nil }
+        let slug = needle.replacingOccurrences(of: " ", with: "-")
+        let byName: [UtilityProviderRow] = try await from("utility_providers")
+            .select()
+            .ilike("name", pattern: "%\(needle)%")
+            .limit(1)
+            .execute()
+            .value
+        if let first = byName.first { return first }
+        return try await fetchUtilityProviderBySlug(slug)
     }
 
     /// Insert a user-supplied utility provider into the global catalog. Used
     /// by UtilityProviderCustomAddSheet for the "didn't find yours? Add it"
-    /// path. Slug is derived from the name; collisions silently retry by
-    /// appending a short suffix.
+    /// path. Slug is derived from the name; if the insert hits a unique
+    /// constraint violation (slug collision from a concurrent write), the
+    /// existing row is fetched and returned instead so the caller still gets
+    /// a usable provider.
     func createUtilityProvider(_ insert: UtilityProviderInsert) async throws -> UtilityProviderRow {
-        try await from("utility_providers")
-            .insert(insert)
-            .select()
-            .single()
-            .execute()
-            .value
+        do {
+            return try await from("utility_providers")
+                .insert(insert)
+                .select()
+                .single()
+                .execute()
+                .value
+        } catch {
+            // Postgres unique constraint violation (code 23505) — fall back to
+            // returning the existing row keyed by slug. Any other error
+            // propagates so the UI can surface it.
+            if let existing = try? await fetchUtilityProviderBySlug(insert.slug) {
+                return existing
+            }
+            throw error
+        }
     }
 
     /// Update home system manual links cache

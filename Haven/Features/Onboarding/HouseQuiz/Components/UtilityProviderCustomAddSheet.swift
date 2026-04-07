@@ -5,13 +5,26 @@ import SwiftUI
 /// they type the website (debounced 500ms via the `brand-logo` edge function).
 ///
 /// On Save:
+///   - Looks for an existing provider with the same name or slug. If one is
+///     found, surfaces a "Did you mean?" suggestion before any insert.
 ///   - Generates a slug from the name (lowercase, alphanumeric + hyphens).
 ///   - Calls DatabaseService.createUtilityProvider with the captured fields
 ///     and any logo URL / brand color the brand-logo lookup returned.
 ///   - Hands the new row back to the parent picker via `onAdded`.
 struct UtilityProviderCustomAddSheet: View {
     let providerType: String
+    let initialName: String
     let onAdded: (UtilityProviderRow) -> Void
+
+    init(
+        providerType: String,
+        initialName: String = "",
+        onAdded: @escaping (UtilityProviderRow) -> Void
+    ) {
+        self.providerType = providerType
+        self.initialName = initialName
+        self.onAdded = onAdded
+    }
 
     @Environment(\.dismiss) private var dismiss
     @State private var name: String = ""
@@ -23,6 +36,9 @@ struct UtilityProviderCustomAddSheet: View {
     @State private var isSaving: Bool = false
     @State private var saveError: String? = nil
     @State private var brandFetchTask: Task<Void, Never>? = nil
+    @State private var possibleDuplicate: UtilityProviderRow? = nil
+    @State private var didCheckForDuplicate: Bool = false
+    @State private var nameCheckTask: Task<Void, Never>? = nil
 
     var body: some View {
         NavigationStack {
@@ -30,6 +46,9 @@ struct UtilityProviderCustomAddSheet: View {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
                     headerCard
                     nameField
+                    if let possibleDuplicate {
+                        duplicateSuggestionCard(possibleDuplicate)
+                    }
                     websiteField
                     phoneField
                     if let saveError {
@@ -37,9 +56,14 @@ struct UtilityProviderCustomAddSheet: View {
                             .font(HavenTypography.caption)
                             .foregroundStyle(HavenColors.critical)
                     }
-                    HavenButton(title: isSaving ? "Adding..." : "Add provider", action: {
-                        Task { await save() }
-                    })
+                    HavenButton(
+                        title: isSaving
+                            ? "Adding..."
+                            : (possibleDuplicate == nil ? "Add provider" : "Add anyway"),
+                        action: {
+                            Task { await save() }
+                        }
+                    )
                     .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
                 }
                 .padding(HavenTheme.spacing20)
@@ -50,6 +74,12 @@ struct UtilityProviderCustomAddSheet: View {
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear {
+                if name.isEmpty && !initialName.isEmpty {
+                    name = initialName
+                    scheduleDuplicateCheck(for: initialName)
                 }
             }
         }
@@ -123,6 +153,68 @@ struct UtilityProviderCustomAddSheet: View {
                 .foregroundStyle(HavenColors.textTertiary)
             HavenTextField(title: "Green Mountain Power", text: $name)
                 .textInputAutocapitalization(.words)
+                .onChange(of: name) { _, newValue in
+                    scheduleDuplicateCheck(for: newValue)
+                }
+        }
+    }
+
+    private func duplicateSuggestionCard(_ provider: UtilityProviderRow) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            HStack(spacing: HavenTheme.spacing12) {
+                duplicateLogo(for: provider)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Did you mean?")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text(provider.name)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if let website = provider.website, !website.isEmpty {
+                        Text(website)
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+                Spacer(minLength: 0)
+            }
+            HavenButton(title: "Use this one") {
+                Haptics.success()
+                onAdded(provider)
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                .strokeBorder(HavenColors.success.opacity(0.4), lineWidth: 1)
+        )
+    }
+
+    @ViewBuilder
+    private func duplicateLogo(for provider: UtilityProviderRow) -> some View {
+        if let urlString = provider.logoUrl, let url = URL(string: urlString) {
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let image):
+                    image.resizable().aspectRatio(contentMode: .fit).padding(6)
+                default:
+                    Image(systemName: "bolt.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .frame(width: 48, height: 48)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        } else {
+            Image(systemName: "bolt.fill")
+                .font(.system(size: 20))
+                .foregroundStyle(HavenColors.textTertiary)
+                .frame(width: 48, height: 48)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         }
     }
 
@@ -153,6 +245,31 @@ struct UtilityProviderCustomAddSheet: View {
                 .foregroundStyle(HavenColors.textTertiary)
             HavenTextField(title: "(555) 555-5555", text: $phone)
                 .keyboardType(.phonePad)
+        }
+    }
+
+    // MARK: - Duplicate check
+
+    /// Debounced fuzzy lookup for an existing provider matching the typed
+    /// name. Triggered on every keystroke; the most recent task wins.
+    private func scheduleDuplicateCheck(for newValue: String) {
+        nameCheckTask?.cancel()
+        let trimmed = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 3 else {
+            possibleDuplicate = nil
+            didCheckForDuplicate = false
+            return
+        }
+        nameCheckTask = Task {
+            try? await Task.sleep(nanoseconds: 350_000_000)
+            if Task.isCancelled { return }
+            let match = try? await DatabaseService.shared
+                .findUtilityProviderByNameOrSlug(trimmed)
+            if Task.isCancelled { return }
+            await MainActor.run {
+                self.possibleDuplicate = match
+                self.didCheckForDuplicate = true
+            }
         }
     }
 

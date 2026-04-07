@@ -38,18 +38,47 @@ struct HouseQuizState: Codable, Equatable {
 
 /// A single recorded answer. `answerId` is the option key the user picked;
 /// `customText` is filled in when the user uses a free-form input or "Other";
-/// `selectedIds` is filled in for multi-select questions.
+/// `selectedIds` is filled in for multi-select questions; `customEntries` is
+/// filled in when a multi-select question has an "Other" option that accepts
+/// one or more user-supplied free-form values (e.g. q10 appliances).
 struct HouseQuizAnswer: Codable, Equatable {
     var answerId: String?
     var customText: String?
     var selectedIds: [String]?
+    var customEntries: [String]?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
         case answerId = "answer_id"
         case customText = "custom_text"
         case selectedIds = "selected_ids"
+        case customEntries = "custom_entries"
         case answeredAt = "answered_at"
+    }
+
+    init(
+        answerId: String? = nil,
+        customText: String? = nil,
+        selectedIds: [String]? = nil,
+        customEntries: [String]? = nil,
+        answeredAt: Date = Date()
+    ) {
+        self.answerId = answerId
+        self.customText = customText
+        self.selectedIds = selectedIds
+        self.customEntries = customEntries
+        self.answeredAt = answeredAt
+    }
+
+    /// Resilient decoding so old persisted answers (no `custom_entries` key)
+    /// still load cleanly after the schema bump.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
+        self.customText = try c.decodeIfPresent(String.self, forKey: .customText)
+        self.selectedIds = try c.decodeIfPresent([String].self, forKey: .selectedIds)
+        self.customEntries = try c.decodeIfPresent([String].self, forKey: .customEntries)
+        self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }
 
@@ -104,9 +133,10 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// Whether this question expects a follow-up provider capture step
     /// when the user picks a "yes — pro service" answer.
     let providerFollowUpAnswerIds: Set<String>
-    /// Optional utility provider type fed into the search picker
-    /// (e.g. "electricity", "internet", "lawn_care").
-    let providerType: String?
+    /// One or more utility provider_type tokens fed into the search picker.
+    /// These must match the values in `utility_providers.provider_type`
+    /// (e.g. "electric", "internet_cable", ["oil","propane","natural_gas"]).
+    let providerTypes: [String]
 
     init(
         id: String,
@@ -117,7 +147,7 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         answerOptions: [AnswerOption] = [],
         documentUploadCategory: DocumentCategory? = nil,
         providerFollowUpAnswerIds: Set<String> = [],
-        providerType: String? = nil
+        providerTypes: [String] = []
     ) {
         self.id = id
         self.section = section
@@ -127,8 +157,12 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.answerOptions = answerOptions
         self.documentUploadCategory = documentUploadCategory
         self.providerFollowUpAnswerIds = providerFollowUpAnswerIds
-        self.providerType = providerType
+        self.providerTypes = providerTypes
     }
+
+    /// Convenience for picker code that wants the canonical "primary" type
+    /// for create/update writes (the first entry, falling back to nil).
+    var primaryProviderType: String? { providerTypes.first }
 
     static func == (lhs: HouseQuizQuestion, rhs: HouseQuizQuestion) -> Bool {
         lhs.id == rhs.id
@@ -143,11 +177,16 @@ struct AnswerOption: Identifiable, Hashable {
     let id: String
     let label: String
     let icon: String?
+    /// When `true`, selecting this option in a multi-select question reveals
+    /// an inline text field where the user can type one or more custom
+    /// values (e.g. "Sauna", "Pellet stove" for the appliances question).
+    let acceptsCustomInput: Bool
 
-    init(id: String, label: String, icon: String? = nil) {
+    init(id: String, label: String, icon: String? = nil, acceptsCustomInput: Bool = false) {
         self.id = id
         self.label = label
         self.icon = icon
+        self.acceptsCustomInput = acceptsCustomInput
     }
 }
 

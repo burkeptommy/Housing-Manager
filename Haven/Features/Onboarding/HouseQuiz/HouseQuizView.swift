@@ -379,9 +379,9 @@ struct HouseQuizView: View {
 
     @ViewBuilder
     private func providerSearchBody(_ q: HouseQuizQuestion) -> some View {
-        if let providerType = q.providerType {
+        if !q.providerTypes.isEmpty {
             UtilityProviderSearchPicker(
-                providerType: providerType,
+                providerTypes: q.providerTypes,
                 state: viewModel.property.state,
                 onSelect: { provider in
                     Task {

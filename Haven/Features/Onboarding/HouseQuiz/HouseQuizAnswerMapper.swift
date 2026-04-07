@@ -159,7 +159,7 @@ final class HouseQuizAnswerMapper {
                         newSubtype: "lawn"
                     )
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "lawn_care")
+                        try await createUtilityAccount(name: provider, type: "landscaping")
                     }
                 }
 
@@ -206,23 +206,35 @@ final class HouseQuizAnswerMapper {
 
             case "q16_electric":
                 if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "electricity")
+                    try await createUtilityAccount(name: provider, type: "electric")
                 }
 
             case "q17_internet":
                 if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "internet")
+                    try await createUtilityAccount(name: provider, type: "internet_cable")
                 }
 
             case "q18_trash":
                 try await persistAttribute("trash_service", value: answer.answerId)
                 if answer.answerId == "private", let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "trash_recycling")
+                    try await createUtilityAccount(name: provider, type: "trash")
                 }
 
             case "q19_heating_provider":
                 if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "heating_fuel")
+                    // Use the heating fuel attribute (q3) as a hint when known so
+                    // the new utility account is filed under the right type.
+                    var providerType = "oil"
+                    if let property = try? await db.fetchProperty(id: propertyId),
+                       let fuel = property.attributes?["heating_fuel"]?.stringValue {
+                        switch fuel {
+                        case "natural_gas": providerType = "natural_gas"
+                        case "propane": providerType = "propane"
+                        case "oil": providerType = "oil"
+                        default: break
+                        }
+                    }
+                    try await createUtilityAccount(name: provider, type: providerType)
                 }
 
             case "q20_other_fuels":

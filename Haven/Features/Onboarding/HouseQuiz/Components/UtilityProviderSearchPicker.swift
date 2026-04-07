@@ -7,31 +7,43 @@ import SwiftUI
 /// yours? Add it" path that creates a custom utility provider with a live
 /// Brandfetch logo preview.
 ///
+/// `providerTypes` is an array because some questions span multiple
+/// provider_type values in the catalog (e.g. heating fuel covers oil +
+/// propane + natural_gas). The first entry is treated as the canonical
+/// type written when the user creates a brand-new provider.
+///
 /// Caller usage:
 ///
 ///     UtilityProviderSearchPicker(
-///         providerType: "electricity",
+///         providerTypes: ["electric"],
 ///         state: viewModel.property.state,
 ///         onSelect: { provider in
 ///             Task { await viewModel.recordAnswer("entered", customText: provider.name) }
 ///         }
 ///     )
 struct UtilityProviderSearchPicker: View {
-    let providerType: String
+    let providerTypes: [String]
     let state: String?
     let onSelect: (UtilityProviderRow) -> Void
     let onCustomCreated: ((UtilityProviderRow) -> Void)?
 
     init(
-        providerType: String,
+        providerTypes: [String],
         state: String?,
         onSelect: @escaping (UtilityProviderRow) -> Void,
         onCustomCreated: ((UtilityProviderRow) -> Void)? = nil
     ) {
-        self.providerType = providerType
+        self.providerTypes = providerTypes
         self.state = state
         self.onSelect = onSelect
         self.onCustomCreated = onCustomCreated
+    }
+
+    /// Canonical "primary" type the custom-add sheet uses when persisting a
+    /// brand-new provider. Defaults to the first declared type, or "other"
+    /// when none was provided (defensive fallback).
+    private var primaryProviderType: String {
+        providerTypes.first ?? "other"
     }
 
     @State private var allProviders: [UtilityProviderRow] = []
@@ -65,7 +77,8 @@ struct UtilityProviderSearchPicker: View {
         }
         .sheet(isPresented: $showCustomAdd) {
             UtilityProviderCustomAddSheet(
-                providerType: providerType,
+                providerType: primaryProviderType,
+                initialName: searchText,
                 onAdded: { provider in
                     showCustomAdd = false
                     allProviders.insert(provider, at: 0)
@@ -196,9 +209,13 @@ struct UtilityProviderSearchPicker: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 28))
                 .foregroundStyle(HavenColors.textTertiary)
-            Text("No matches for \"\(searchText)\"")
-                .font(HavenTypography.bodySmall)
+            Text("No matches yet")
+                .font(HavenTypography.bodySmall.weight(.semibold))
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("Try a shorter spelling, or scroll down to add it.")
+                .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textSecondary)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, HavenTheme.spacing16)
@@ -255,7 +272,7 @@ struct UtilityProviderSearchPicker: View {
         isLoading = true
         defer { isLoading = false }
         do {
-            let providers = try await DatabaseService.shared.fetchUtilityProviders(type: providerType)
+            let providers = try await DatabaseService.shared.fetchUtilityProviders(types: providerTypes)
             allProviders = providers
         } catch {
             loadError = error.localizedDescription
