@@ -97,6 +97,22 @@ Two trust-restoring fixes after Tom's TestFlight testing exposed places where th
 
 **Files added:** `Haven/Features/Property/Services/MaintenanceTaskReconciler.swift`, `supabase/migrations/20260425_maintenance_task_archive.sql`. **Files deleted:** `Haven/Features/Property/Services/MaintenanceTaskMigrator.swift` (replaced).
 
+## Phase 52: Bulletproof Quiz State Persistence and Resume (Phase 19)
+
+Tom answered several quiz questions, hit X → "Save and exit", returned later, and his answers were gone — back to Q1. Root cause was a stack of four bugs at the persistence edges: the X dialog only called `dismiss()` (no save at all), `saveForLater()` fire-and-forgot its persist, `firstUnresolvedIndex()` ignored `savedForLater` so deferred questions resurfaced immediately on resume, and `persistState`'s catch silently swallowed errors so failed saves vanished into the Xcode console where TestFlight users will never see them. Single bundled commit, no new features.
+
+**The fix (one commit):**
+- `HouseQuizViewModel`: new `@Published savedAndReady` and `saveErrorMessage`. New `saveAndExit()` async function awaits a throwing `persistStateThrowing()` and only flips `savedAndReady = true` on success — on failure it sets the error message and leaves in-memory answers untouched so the user can retry without losing anything. Added `persistStateThrowing()` (the throwing variant) and rewrote `persistState()` as a wrapper that catches and logs to `quizPersistFailed` for the per-answer auto-save path.
+- `firstUnresolvedIndex()` now skips `savedForLater` AND `skipped` (was only skipped). Save-for-later now actually defers the question instead of bouncing the user right back to it on resume.
+- `init` kicks off a defensive `refreshPropertyStateFromDB()` background Task that re-fetches the property and adopts its quiz state if the DB has more answers than the in-memory copy. Covers stale dashboard caches and the multi-device case (Scenario E).
+- `HouseQuizView`: X button confirmation dialog's "Save and exit" button now `await viewModel.saveAndExit()` then checks `savedAndReady` before dismissing. On failure the dismiss never happens — instead an inline red error banner pinned to the top of the ZStack appears with the failure message and a Retry button that re-runs `saveAndExit()`. On success a brief "Your place is saved." toast renders for ~900ms before dismissing.
+- The milestone "Save for later" button on the section-complete card was also just calling `dismiss()` — now it goes through `saveAndExit()` and only dismisses on success.
+- Added `quizSavedAndExited`, `quizSaveAndExitFailed`, `quizPersistFailed` analytics events.
+
+**Why this matters:** Tom's exact symptom was "I saved and my answers were gone." The dialog message used to literally say "Your place is saved" while the button only called `dismiss()`. Worse, even the per-answer auto-save could silently fail with no UI surface, so a flaky network would lose work without the user ever knowing. After Phase 19 the X button is the only path that needs to succeed for state to persist, and if it fails the user sees the error and can retry — and crucially their in-memory answers stay put through the retry loop.
+
+**Files modified:** `Haven/Features/Onboarding/HouseQuiz/HouseQuizViewModel.swift`, `Haven/Features/Onboarding/HouseQuiz/HouseQuizView.swift`, `Haven/Core/Services/AnalyticsService.swift`.
+
 ## Phase 51: Quiz Personalization, Data Quality, and Provider Snapshots (Phase 18 — TestFlight Bug Fixes)
 
 Seven targeted fixes after Tom's continued TestFlight testing exposed places where utility-question state bled across questions, where Q19's heating fuel provider showed all three fuel types regardless of Q3, where utility accounts created from the picker lost their brand identity, where Alfred ignored the priorities the quiz had captured, and where the property valuation for 146 Putnam Park Road was either nil or in the $670K range despite Zillow / Redfin / Compass agreeing the place is worth $850K-$1M.

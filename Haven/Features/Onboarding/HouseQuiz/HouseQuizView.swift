@@ -18,6 +18,7 @@ struct HouseQuizView: View {
     @State private var multiSelectCustomEntries: [String] = []
     @State private var providerNameText: String = ""
     @State private var showSaveAndExit = false
+    @State private var showSavedToast = false
     @State private var showSkipForeverConfirm = false
     @State private var showDocumentUpload = false
     @State private var pendingProviderForAnswer: String?
@@ -65,7 +66,65 @@ struct HouseQuizView: View {
                 } else {
                     completionView
                 }
+
+                // Phase 19 — inline save error banner. Pinned to the top so
+                // it's visible regardless of which screen is up.
+                if let error = viewModel.saveErrorMessage {
+                    VStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .foregroundStyle(HavenColors.critical)
+                            Text(error)
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.critical)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                            Button("Retry") {
+                                Task {
+                                    await viewModel.saveAndExit()
+                                    if viewModel.savedAndReady {
+                                        showSavedToast = true
+                                        try? await Task.sleep(nanoseconds: 900_000_000)
+                                        dismiss()
+                                    }
+                                }
+                            }
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(HavenColors.navy800)
+                        }
+                        .padding(HavenTheme.spacing12)
+                        .background(HavenColors.critical.opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        .padding(.horizontal, HavenTheme.pageMargin)
+                        .padding(.top, HavenTheme.spacing8)
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                // Phase 19 — brief "saved" toast on successful save-and-exit.
+                if showSavedToast {
+                    VStack {
+                        HStack(spacing: 8) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(HavenColors.success)
+                            Text("Your place is saved.")
+                                .font(HavenTypography.uiLabel.weight(.semibold))
+                                .foregroundStyle(HavenColors.navy800)
+                        }
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.vertical, HavenTheme.spacing12)
+                        .background(HavenColors.creamLight)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        .havenShadow()
+                        .padding(.top, HavenTheme.spacing16)
+                        Spacer()
+                    }
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
+            .animation(HavenTheme.animationStandard, value: viewModel.saveErrorMessage)
+            .animation(HavenTheme.animationStandard, value: showSavedToast)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
@@ -89,11 +148,21 @@ struct HouseQuizView: View {
                     }
                     .confirmationDialog("Save and exit?", isPresented: $showSaveAndExit, titleVisibility: .visible) {
                         Button("Save and exit") {
-                            dismiss()
+                            Task {
+                                await viewModel.saveAndExit()
+                                if viewModel.savedAndReady {
+                                    showSavedToast = true
+                                    try? await Task.sleep(nanoseconds: 900_000_000)
+                                    dismiss()
+                                }
+                                // On failure the inline error banner takes
+                                // over and the user can retry without losing
+                                // any in-memory answers.
+                            }
                         }
                         Button("Cancel", role: .cancel) {}
                     } message: {
-                        Text("Your place is saved. You can pick up where you left off anytime from the dashboard.")
+                        Text("We'll save your place. You can pick up where you left off anytime.")
                     }
                 }
             }
@@ -942,7 +1011,14 @@ struct HouseQuizView: View {
                     resetEntryState()
                 }
                 Button {
-                    dismiss()
+                    Task {
+                        await viewModel.saveAndExit()
+                        if viewModel.savedAndReady {
+                            showSavedToast = true
+                            try? await Task.sleep(nanoseconds: 900_000_000)
+                            dismiss()
+                        }
+                    }
                 } label: {
                     Text("Save for later")
                         .font(HavenTypography.uiLabel)

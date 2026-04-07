@@ -14,6 +14,14 @@ final class HouseQuizViewModel: ObservableObject {
     @Published var providerCaptureForAnswerId: String?
     @Published var providerCaptureText: String = ""
 
+    /// Phase 19 — set to true after `saveAndExit()` successfully persists state
+    /// to Supabase. The view's confirmation dialog watches this to decide
+    /// whether to dismiss. Reset to false at the start of each save.
+    @Published var savedAndReady: Bool = false
+    /// Phase 19 — populated when `saveAndExit()` fails so the view can render
+    /// an inline error banner with a Retry action. Cleared on retry success.
+    @Published var saveErrorMessage: String?
+
     /// Phase 17b — running totals from `MaintenanceTaskReconciler`. Each
     /// answer that touches a system subtype merges its result into this; the
     /// final `runFinalReconciliation()` pass after the last question merges
@@ -52,6 +60,29 @@ final class HouseQuizViewModel: ObservableObject {
         // Mark it skipped and advance immediately so the user never sees a
         // dead picker.
         skipDynamicallyUnreachableQuestion()
+
+        // Phase 19 — defensive background refresh: the dashboard's cached
+        // PropertyRow may be stale (e.g. multi-device, fast resume). If the
+        // DB has more answers than our in-memory state, adopt the DB state
+        // and re-resolve our cursor.
+        Task { @MainActor [weak self] in
+            await self?.refreshPropertyStateFromDB()
+        }
+    }
+
+    private func refreshPropertyStateFromDB() async {
+        do {
+            let fresh = try await db.fetchProperty(id: property.id)
+            guard let freshState = fresh.houseQuizState else { return }
+            if freshState.answers.count > state.answers.count {
+                state = freshState
+                currentIndex = firstUnresolvedIndex()
+                skipDynamicallyUnreachableQuestion()
+                print("[HouseQuiz] Refreshed state from DB: \(freshState.answers.count) answers, resume index \(currentIndex)")
+            }
+        } catch {
+            print("[HouseQuiz] Background state refresh failed: \(error)")
+        }
     }
 
     // MARK: - Derived
@@ -350,8 +381,10 @@ final class HouseQuizViewModel: ObservableObject {
         ])
     }
 
-    private func persistState() async {
-        // Mark complete if every non-skipped question has an answer.
+    /// Phase 19 — throwing variant so callers (saveAndExit) can react to
+    /// failures and surface them in the UI rather than silently dropping
+    /// state on the floor.
+    private func persistStateThrowing() async throws {
         let total = allQuestions.count - state.skipped.count
         if state.answers.count >= total, total > 0, state.completedAt == nil {
             state.completedAt = Date()
@@ -360,11 +393,41 @@ final class HouseQuizViewModel: ObservableObject {
 
         var update = PropertyUpdate()
         update.houseQuizState = state
+        _ = try await db.updateProperty(id: property.id, update)
+        NotificationCenter.default.post(name: .propertyChanged, object: nil)
+    }
+
+    /// Backwards-compatible wrapper used by the per-answer auto-save path.
+    /// Logs failures but never throws.
+    private func persistState() async {
         do {
-            _ = try await db.updateProperty(id: property.id, update)
-            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+            try await persistStateThrowing()
         } catch {
-            print("[HouseQuizViewModel] Failed to persist quiz state: \(error)")
+            print("[HouseQuizViewModel] persistState failed: \(error)")
+            Analytics.track(.quizPersistFailed, ["error": "\(error)"])
+        }
+    }
+
+    /// Phase 19 — explicit save the X button confirmation dialog awaits
+    /// before dismissing. On success sets `savedAndReady = true`. On failure
+    /// sets `saveErrorMessage` so the view can show a Retry banner. The
+    /// in-memory `state` is left intact either way so the user never loses
+    /// their answers in front of them.
+    func saveAndExit() async {
+        isSaving = true
+        savedAndReady = false
+        saveErrorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await persistStateThrowing()
+            savedAndReady = true
+            Analytics.track(.quizSavedAndExited, [
+                "answered": state.answers.count,
+                "saved_for_later": state.savedForLater.count,
+            ])
+        } catch {
+            saveErrorMessage = "Couldn't save your progress. Check your connection and try again."
+            Analytics.track(.quizSaveAndExitFailed, ["error": "\(error)"])
         }
     }
 
@@ -407,9 +470,12 @@ final class HouseQuizViewModel: ObservableObject {
     }
 
     private func firstUnresolvedIndex() -> Int {
+        // Phase 19 — also skip savedForLater questions, otherwise resume
+        // lands the user back on the question they explicitly chose to defer.
         for (index, q) in allQuestions.enumerated() {
             if state.answers[q.id] == nil
-                && !state.skipped.contains(q.id) {
+                && !state.skipped.contains(q.id)
+                && !state.savedForLater.contains(q.id) {
                 return index
             }
         }
