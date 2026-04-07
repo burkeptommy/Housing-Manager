@@ -110,6 +110,14 @@ enum MaintenanceTemplates {
                 s.formUnion(["has_ac", "has_furnace", "heat_pump"])
             case "geothermal":
                 s.formUnion(["has_ac", "has_furnace", "geothermal"])
+            case "not_sure":
+                // Phase 19c: user picked "Not sure" in q3b. Assume the most
+                // common US configuration (some form of heating + some form
+                // of cooling) so universal tune-up templates land. Do NOT
+                // add topology-specific flags like `ducted` / `mini_split` /
+                // `boiler` / `window_ac` — those stay hidden until the user
+                // confirms a real type from Property → Maintenance.
+                s.formUnion(["has_ac", "has_furnace"])
             default:
                 // Unknown / unset — wait for the House Quiz to confirm what
                 // the user actually has. Assuming ducted HVAC up front meant

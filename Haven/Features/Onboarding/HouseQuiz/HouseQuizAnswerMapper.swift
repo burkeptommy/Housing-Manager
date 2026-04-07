@@ -66,15 +66,18 @@ final class HouseQuizAnswerMapper {
                 try await persistAttribute("heating_fuel", value: answer.answerId)
 
             case "q3b_hvac_type":
-                // Phase 19b: dedicated HVAC type question. The user picks their
-                // actual HVAC configuration so we don't have to guess from the
-                // fuel type. "Not sure" persists the marker but creates no
-                // system row, so the user only gets universal HVAC tasks until
-                // they confirm later from Property → Maintenance.
-                guard let typeId = answer.answerId, typeId != "not_sure" else {
-                    try await persistAttribute("hvac_type", value: "not_sure")
-                    break
-                }
+                // Phase 19b/19c: dedicated HVAC type question. The user picks
+                // their actual HVAC configuration so we don't have to guess
+                // from the fuel type. "Not sure" flows through the same path
+                // as every other answer — we still ensure the HVAC system row
+                // and run the reconciler — but the stored subtype is
+                // "not_sure" which `MaintenanceTemplates.activeSubtypes` maps
+                // to `["has_ac", "has_furnace"]`. That activates universal
+                // tune-up templates without unlocking topology-specific tasks
+                // (bleed radiators, mini-split filter cleaning, etc.). The
+                // user can confirm a real type later from Property →
+                // Maintenance and the reconciler will swap tasks then.
+                guard let typeId = answer.answerId else { break }
                 try await persistAttribute("hvac_type", value: typeId)
                 // Read the heating fuel from the previous question so the
                 // reconciler has both pieces of context for templates that key
@@ -589,10 +592,12 @@ final class HouseQuizAnswerMapper {
         }
     }
 
-    /// Phase 19b: Friendly system name for the HVAC type the user picked in
-    /// q3b. Used when the answer mapper creates or updates the HVAC system row
-    /// so the Property → Maintenance list shows something more specific than
-    /// "HVAC System" (e.g. "Boiler + Window AC", "Mini-Split HVAC").
+    /// Phase 19b/19c: Friendly system name for the HVAC type the user picked
+    /// in q3b. Used when the answer mapper creates or updates the HVAC system
+    /// row so the Property → Maintenance list shows something more specific
+    /// than "HVAC System" (e.g. "Boiler + Window AC", "Mini-Split HVAC"). The
+    /// "not_sure" path lands on "HVAC System (unconfirmed)" so the user can
+    /// see at a glance that they still need to confirm their configuration.
     fileprivate static func hvacSystemName(for typeId: String) -> String {
         switch typeId {
         case "central_ducted":          return "Central HVAC"
@@ -602,6 +607,7 @@ final class HouseQuizAnswerMapper {
         case "boiler_with_window_ac":   return "Boiler + Window AC"
         case "heat_pump":               return "Heat Pump"
         case "geothermal":              return "Geothermal HVAC"
+        case "not_sure":                return "HVAC System (unconfirmed)"
         default:                        return "HVAC System"
         }
     }
