@@ -33,12 +33,79 @@ struct HavenApp: App {
                         PushNotificationService.shared.registerForPushNotifications()
                     }
                     Analytics.track(.appLaunched)
+                    // Deferred deep link fallback: when the user installed
+                    // Haven from a havenhome.dev/join/<code> tap that opened
+                    // the App Store, iOS doesn't carry the URL through. We
+                    // peek at the system pasteboard ONCE on first launch and
+                    // pull a 6-char code out if it's there.
+                    handleDeferredInviteCodeFromClipboard()
+                }
+                .onOpenURL { url in
+                    handleIncomingURL(url)
                 }
                 .alert("Security Warning", isPresented: $showJailbreakAlert) {
                     Button("I Understand", role: .cancel) {}
                 } message: {
                     Text("This device may be jailbroken. Your sensitive documents and data could be at risk. We recommend using Haven on a non-jailbroken device for maximum security.")
                 }
+        }
+    }
+
+    // MARK: - Universal links
+
+    /// Handle a universal link or custom-scheme URL. The only path we care
+    /// about today is `https://havenhome.dev/join/<6-char-code>`. The code
+    /// gets stashed in UserDefaults and a notification fires so AddressHookView
+    /// (or any other listening view) can present the InviteCodeEntrySheet
+    /// pre-filled.
+    private func handleIncomingURL(_ url: URL) {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              components.host?.lowercased() == "havenhome.dev" else { return }
+        let pathComponents = url.pathComponents.filter { $0 != "/" }
+        guard pathComponents.count >= 2, pathComponents[0].lowercased() == "join" else { return }
+
+        let cleaned = pathComponents[1]
+            .uppercased()
+            .filter { $0.isLetter || $0.isNumber }
+        guard cleaned.count == 6 else { return }
+
+        UserDefaults.standard.set(cleaned, forKey: PendingInviteKeys.code)
+        UserDefaults.standard.set(true, forKey: PendingInviteKeys.hasPendingInvite)
+        NotificationCenter.default.post(name: .inviteCodeReceived, object: cleaned)
+    }
+
+    /// First-launch clipboard fallback. Runs exactly once per install (gated
+    /// by `hasCheckedDeferredInvite` in UserDefaults). iOS will surface a
+    /// "Haven pasted from Safari" banner to the user when we read; that's
+    /// the trade-off for catching the App Store install round-trip without
+    /// Branch.io / Firebase Dynamic Links. Only acts when the pasted text
+    /// looks like a Haven invite URL or a bare 6-character code.
+    private func handleDeferredInviteCodeFromClipboard() {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: "hasCheckedDeferredInvite") else { return }
+        defaults.set(true, forKey: "hasCheckedDeferredInvite")
+
+        // detectPatterns avoids triggering the paste banner when there's
+        // nothing matching to act on. The async overload isn't currently
+        // bridged into Swift, so we use the completion-handler form. This
+        // emits a deprecation warning we accept until Apple ships the async
+        // bridge.
+        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
+            DispatchQueue.main.async {
+                guard case .success(let patterns) = result,
+                      patterns.contains(.probableWebURL) else { return }
+                guard UIPasteboard.general.hasStrings, let raw = UIPasteboard.general.string else { return }
+                if let url = URL(string: raw), url.host?.lowercased() == "havenhome.dev" {
+                    handleIncomingURL(url)
+                    return
+                }
+                let cleaned = raw.uppercased().filter { $0.isLetter || $0.isNumber }
+                if cleaned.count == 6 {
+                    defaults.set(cleaned, forKey: PendingInviteKeys.code)
+                    defaults.set(true, forKey: PendingInviteKeys.hasPendingInvite)
+                    NotificationCenter.default.post(name: .inviteCodeReceived, object: cleaned)
+                }
+            }
         }
     }
 

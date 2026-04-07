@@ -1,0 +1,19 @@
+{
+  "applinks": {
+    "apps": [],
+    "details": [
+      {
+        "appIDs": ["RW9CWCAWGQ.com.havenhome.app"],
+        "components": [
+          {
+            "/": "/join/*",
+            "comment": "Haven household invite codes — opens InviteCodeEntrySheet pre-filled."
+          }
+        ]
+      }
+    ]
+  },
+  "webcredentials": {
+    "apps": ["RW9CWCAWGQ.com.havenhome.app"]
+  }
+}

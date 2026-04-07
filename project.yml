@@ -46,3 +46,6 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
     entitlements:
       path: Haven/Config/Haven.entitlements
+      properties:
+        com.apple.developer.associated-domains:
+          - applinks:havenhome.dev
