@@ -154,7 +154,7 @@ struct DocumentVaultView: View {
                 }
             }
             .trackScreen("DocumentVaultView")
-            .searchable(text: $viewModel.searchText, prompt: "Search documents...")
+            .modifier(ConditionalSearchable(isActive: lifeTab == .documents, text: $viewModel.searchText))
             .onChange(of: viewModel.searchText) { _, newValue in
                 if !newValue.isEmpty {
                     Analytics.track(.documentSearched, ["query_length": newValue.count])
@@ -1124,6 +1124,23 @@ private struct ExpiringDocumentsSheet: View {
             ToolbarItem(placement: .topBarTrailing) {
                 Button("Done") { dismiss() }
             }
+        }
+    }
+}
+
+/// Applies `.searchable` only when `isActive` is true. Used so the Family
+/// sub-tab of `DocumentVaultView` doesn't render a "Search documents..." bar
+/// (which competes with the Family hub's content for vertical space and is
+/// irrelevant on that tab).
+private struct ConditionalSearchable: ViewModifier {
+    let isActive: Bool
+    @Binding var text: String
+
+    func body(content: Content) -> some View {
+        if isActive {
+            content.searchable(text: $text, prompt: "Search documents...")
+        } else {
+            content
         }
     }
 }

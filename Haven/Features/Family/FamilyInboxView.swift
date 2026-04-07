@@ -553,29 +553,37 @@ struct FamilyInboxView: View {
     // MARK: - Empty State
 
     private var emptyState: some View {
-        VStack(spacing: HavenTheme.spacing16) {
-            Spacer().frame(height: 24)
-            Image(systemName: "person.2.fill")
-                .font(.system(size: 44))
-                .foregroundStyle(HavenColors.textTertiary)
-            VStack(spacing: HavenTheme.spacing8) {
-                Text("Your family hub")
-                    .font(HavenTypography.title2)
-                    .foregroundStyle(HavenColors.textPrimary)
-                Text("Forward emails or upload documents for anything family-related. Haven keeps it all organized.")
-                    .font(HavenTypography.body)
-                    .foregroundStyle(HavenColors.textSecondary)
-                    .multilineTextAlignment(.center)
-            }
-
-            addEventsFromCalendarButton
+        ScrollView {
+            VStack(spacing: HavenTheme.spacing16) {
+                Spacer().frame(height: 24)
+                Image(systemName: "person.2.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(HavenColors.textTertiary)
+                VStack(spacing: HavenTheme.spacing8) {
+                    Text("Your family hub")
+                        .font(HavenTypography.title2)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Forward emails or upload documents for anything family-related. Haven keeps it all organized.")
+                        .font(HavenTypography.body)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                    Text("Switch to Documents above to see estate and home paperwork.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .multilineTextAlignment(.center)
+                }
                 .padding(.horizontal, HavenTheme.pageMargin)
 
-            uploadButtons
+                addEventsFromCalendarButton
+                    .padding(.horizontal, HavenTheme.pageMargin)
 
-            suggestedForwardsCard
+                uploadButtons
 
-            Spacer()
+                suggestedForwardsCard
+
+                Spacer().frame(height: 80)
+            }
+            .frame(maxWidth: .infinity)
         }
     }
 
