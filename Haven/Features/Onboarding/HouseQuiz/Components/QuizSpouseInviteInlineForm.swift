@@ -43,6 +43,9 @@ struct QuizSpouseInviteInlineForm: View {
             }
         }
         .animation(HavenTheme.animationStandard, value: trustMoment)
+        .task {
+            Analytics.track(.inviteFormStarted, ["source": "quiz_spouse_step"])
+        }
     }
 
     // MARK: - Input card
@@ -146,6 +149,7 @@ struct QuizSpouseInviteInlineForm: View {
             existingUserName = nil
             return
         }
+        Analytics.track(.inviteEmailEntered, ["source": "quiz_spouse_step"])
         emailCheckTask = Task {
             try? await Task.sleep(nanoseconds: 500_000_000)
             if Task.isCancelled { return }
@@ -153,6 +157,7 @@ struct QuizSpouseInviteInlineForm: View {
                 if let result = try await HavenSupabase.mergeHouseholdsCheckUser(email: trimmed) {
                     await MainActor.run {
                         self.existingUserName = result.name ?? trimmed
+                        Analytics.track(.inviteExistingUserDetected, ["source": "quiz_spouse_step"])
                     }
                 } else {
                     await MainActor.run { self.existingUserName = nil }

@@ -59,6 +59,9 @@ struct InviteCodeEntrySheet: View {
             }
         }
         .task {
+            Analytics.track(.inviteCodeEntryOpened, [
+                "from_universal_link": initialCode != nil,
+            ])
             if let initial = initialCode {
                 viewModel.code = initial.uppercased().filter { $0.isLetter || $0.isNumber }
                 if viewModel.code.count == 6 {
@@ -377,27 +380,32 @@ final class InviteCodeEntryViewModel: ObservableObject {
             let preview = try await HavenSupabase.getInvitationPreview(inviteCode: cleaned)
             verifiedInvitationCode = preview.inviteCode
             state = .verified(preview)
-            Analytics.track(.householdInviteAccepted, [
-                "phase": "verified",
-            ])
+            Analytics.track(.inviteCodeVerified)
         } catch let error as NSError {
             // Map common edge function error codes to friendly messages.
             let message: String
+            let errorType: String
             switch error.code {
             case 404:
                 message = "We couldn't find an invite with that code. Double-check and try again."
+                errorType = "not_found"
             case 410:
                 if error.localizedDescription.contains("expired") {
                     message = "That invite expired. Ask the person who sent it for a new one."
+                    errorType = "expired"
                 } else if error.localizedDescription.contains("revoked") {
                     message = "That invite is no longer active. Contact the sender for a new one."
+                    errorType = "revoked"
                 } else {
                     message = "That invite isn't available anymore."
+                    errorType = "gone"
                 }
             default:
                 message = "Something went wrong. Try again in a moment."
+                errorType = "unknown_\(error.code)"
             }
             state = .error(message)
+            Analytics.track(.inviteCodeInvalid, ["error_type": errorType])
             Haptics.error()
         }
     }

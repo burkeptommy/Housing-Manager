@@ -301,6 +301,10 @@ actor HouseholdInviteCoordinator {
                 )
             )
         } catch {
+            Analytics.track(.inviteEmailFailed, [
+                "source": request.source.rawValue,
+                "error": error.localizedDescription,
+            ])
             return AddPersonResult(
                 familyMember: familyMember,
                 invitation: createdInvitation,
@@ -319,6 +323,7 @@ actor HouseholdInviteCoordinator {
     func resendInvitation(_ invitation: HouseholdInvitationRow) async throws {
         try await HavenSupabase.resendHouseholdInvite(invitationId: invitation.id)
         try? await DatabaseService.shared.touchInvitationResent(id: invitation.id)
+        Analytics.track(.inviteResent, ["invitation_id": invitation.id.uuidString])
     }
 
     /// Invite a family member that already has a row in the database. Used

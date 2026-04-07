@@ -12,6 +12,7 @@ final class PersonalQuizViewModel: ObservableObject {
 
     init() {
         self.questions = PersonalQuizQuestionLibrary.allQuestions
+        Analytics.track(.personalQuizStarted)
     }
 
     var currentQuestion: PersonalQuizQuestion? {
@@ -70,6 +71,10 @@ final class PersonalQuizViewModel: ObservableObject {
         isComplete = true
         // Clear the flag so the dashboard "Make it Yours" hero card hides on next refresh.
         UserDefaults.standard.set(false, forKey: PendingInviteKeys.needsPersonalQuiz)
+        Analytics.track(.personalQuizCompleted, [
+            "answered_count": answers.count,
+            "total_questions": questions.count,
+        ])
         Analytics.track(.onboardingCompleted, ["context": "personal_quiz"])
     }
 

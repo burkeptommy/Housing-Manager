@@ -194,9 +194,17 @@ final class OnboardingViewModel: ObservableObject {
             defaults.removeObject(forKey: PendingInviteKeys.code)
             defaults.set(false, forKey: PendingInviteKeys.hasPendingInvite)
 
+            // The invitation timeline matters for funnel analysis: how long
+            // does it take a recipient to go from "code arrived" to "joined"?
+            let timeFromInviteSeconds: TimeInterval = invitation.createdAt
+                .map { Date().timeIntervalSince($0) } ?? 0
             Analytics.track(.householdInviteAccepted, [
                 "invitation_id": invitation.id.uuidString,
                 "via_cached_code": defaults.string(forKey: PendingInviteKeys.code) != nil,
+            ])
+            Analytics.track(.householdJoined, [
+                "had_personal_quiz": true,
+                "time_from_invite_to_join_seconds": Int(timeFromInviteSeconds),
             ])
 
             // Complete — skip all onboarding

@@ -198,6 +198,20 @@ enum AnalyticsEvent: String {
     case householdMergeStarted = "household_merge_started"
     case householdMergeCompleted = "household_merge_completed"
 
+    // MARK: - Household Invite Funnel (Phase 2 onboarding revamp)
+    case inviteFormStarted = "invite_form_started"
+    case inviteEmailEntered = "invite_email_entered"
+    case inviteExistingUserDetected = "invite_existing_user_detected"
+    case inviteEmailFailed = "invite_email_failed"
+    case inviteCodeEntryOpened = "invite_code_entry_opened"
+    case inviteCodeVerified = "invite_code_verified"
+    case inviteCodeInvalid = "invite_code_invalid"
+    case inviteRevoked = "invite_revoked"
+    case inviteResent = "invite_resent"
+    case personalQuizStarted = "personal_quiz_started"
+    case personalQuizCompleted = "personal_quiz_completed"
+    case householdJoined = "household_joined"
+
     // MARK: - Security
     case securityDashboardViewed = "security_dashboard_viewed"
     case securitySettingsViewed = "security_settings_viewed"

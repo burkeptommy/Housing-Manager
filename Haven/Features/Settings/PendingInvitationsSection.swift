@@ -170,7 +170,11 @@ struct PendingInvitationsSection: View {
                 try? await DatabaseService.shared.deleteFamilyMember(id: familyMemberId)
             }
             await onRefreshNeeded()
-            Analytics.track(.familyMemberDeleted, ["source": "revoke_invite"])
+            let daysPending = invitation.createdAt.map { Int(Date().timeIntervalSince($0) / 86400) } ?? 0
+            Analytics.track(.inviteRevoked, [
+                "days_pending": daysPending,
+                "invitation_id": invitation.id.uuidString,
+            ])
             Haptics.success()
         } catch {
             transientError = "Couldn't revoke that invite. Try again."
