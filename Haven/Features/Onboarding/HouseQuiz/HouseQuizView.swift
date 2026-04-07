@@ -14,6 +14,11 @@ struct HouseQuizView: View {
     @State private var showDocumentUpload = false
     @State private var pendingProviderForAnswer: String?
 
+    /// Q28 expanded household-type selection. nil until the user picks couple
+    /// / family-with-kids / multi-generational, at which point the inline
+    /// spouse-add form expands beneath the chips.
+    @State private var householdInviteAnswerId: String? = nil
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -399,25 +404,79 @@ struct HouseQuizView: View {
                 ForEach(q.answerOptions) { option in
                     Button {
                         Haptics.selection()
-                        Task { await viewModel.recordAnswer(option.id) }
+                        if Self.householdTypesNeedingInvite.contains(option.id) {
+                            // Expand the inline spouse/partner form. The
+                            // quiz answer is recorded once the form completes
+                            // (or skips).
+                            withAnimation(HavenTheme.animationStandard) {
+                                householdInviteAnswerId = option.id
+                            }
+                        } else {
+                            // Just-me / other → record immediately and advance.
+                            householdInviteAnswerId = nil
+                            Task { await viewModel.recordAnswer(option.id) }
+                        }
                     } label: {
                         HStack {
                             Text(option.label)
                                 .font(HavenTypography.body)
                                 .foregroundStyle(HavenColors.navy800)
                             Spacer()
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(HavenColors.textTertiary)
+                            if householdInviteAnswerId == option.id {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 16, weight: .semibold))
+                                    .foregroundStyle(HavenColors.success)
+                            } else {
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
                         }
                         .padding(HavenTheme.spacing16)
                         .frame(minHeight: 56)
-                        .background(HavenColors.creamLight)
+                        .background(
+                            householdInviteAnswerId == option.id
+                                ? HavenColors.navy.opacity(0.06)
+                                : HavenColors.creamLight
+                        )
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                     }
                     .buttonStyle(.plain)
                 }
             }
+
+            if let answerId = householdInviteAnswerId {
+                QuizSpouseInviteInlineForm(
+                    householdId: viewModel.property.householdId,
+                    relationshipLabel: Self.relationshipLabel(for: answerId),
+                    onComplete: {
+                        let pendingId = answerId
+                        withAnimation(HavenTheme.animationStandard) {
+                            householdInviteAnswerId = nil
+                        }
+                        Task { await viewModel.recordAnswer(pendingId) }
+                    }
+                )
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+    }
+
+    /// Q28 answer ids that should expand the inline spouse/partner add form.
+    private static let householdTypesNeedingInvite: Set<String> = [
+        "couple",
+        "family_with_kids",
+        "multi_generational",
+    ]
+
+    /// Map a Q28 household-type answer id to the human relationship label
+    /// the inline form will record on the family_member row.
+    private static func relationshipLabel(for answerId: String) -> String {
+        switch answerId {
+        case "couple": return "Spouse/Partner"
+        case "family_with_kids": return "Spouse/Partner"
+        case "multi_generational": return "Spouse/Partner"
+        default: return "Spouse/Partner"
         }
     }
 

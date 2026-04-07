@@ -236,6 +236,7 @@
 		E5ADF621540D07767ED5ABD1 /* CompletionScorecard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6A5A84E462EB2DE11154E8 /* CompletionScorecard.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
 		E9D74841D67AEA6E14554262 /* HavenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32EA73709C3E322D4BD3954 /* HavenApp.swift */; };
+		EAE3E85AFEBB4D7982CFDB69 /* QuizSpouseInviteInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */; };
 		EB22EDA04BB6C850BE4DD36A /* InvoiceReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0972BEE391C1FC6F3F7291C7 /* InvoiceReviewSheet.swift */; };
 		EC6DD40732FFA00D1575701D /* Validators.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC7272D05EEB647B08773166 /* Validators.swift */; };
 		EC92CC3B89ED33CA01D5F3DD /* HavenColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC9AA43272E274ADD62E2592 /* HavenColors.swift */; };
@@ -441,6 +442,7 @@
 		CA4AA2E5E444D624BF0A4601 /* ErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorView.swift; sourceTree = "<group>"; };
 		CA76304D2996344500376B8D /* VaultLockService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VaultLockService.swift; sourceTree = "<group>"; };
 		CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntroExplainerView.swift; sourceTree = "<group>"; };
+		CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizSpouseInviteInlineForm.swift; sourceTree = "<group>"; };
 		CBEB808723C90E545D5F2F65 /* Contractor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Contractor.swift; sourceTree = "<group>"; };
 		CC48B643D7B2E4D11B2A7853 /* View+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "View+Extensions.swift"; sourceTree = "<group>"; };
 		CEEB86217778DF5F0F55AB58 /* SecureStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureStorageService.swift; sourceTree = "<group>"; };
@@ -915,6 +917,7 @@
 			children = (
 				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
+				CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1401,6 +1404,7 @@
 				4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */,
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
+				EAE3E85AFEBB4D7982CFDB69 /* QuizSpouseInviteInlineForm.swift in Sources */,
 				28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */,
 				6EA0E5FC7D3DA704C7EFDA09 /* QuoteComparisonView.swift in Sources */,
 				4C44F16712BB5B3D126F98D4 /* QuoteDetailView.swift in Sources */,
