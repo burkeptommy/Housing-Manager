@@ -319,7 +319,10 @@ final class HouseQuizAnswerMapper {
 
             case "q27_homeowners_insurance":
                 if let provider = answer.customText, !provider.isEmpty {
-                    try await createUtilityAccount(name: provider, type: "homeowners_insurance")
+                    // Phase 16b: keep the utility_account row aligned with the
+                    // seeded "home_insurance" provider_type from Phase 16a so
+                    // search and write paths use the same vocabulary.
+                    try await createUtilityAccount(name: provider, type: "home_insurance")
                 }
 
             case "q28_household":

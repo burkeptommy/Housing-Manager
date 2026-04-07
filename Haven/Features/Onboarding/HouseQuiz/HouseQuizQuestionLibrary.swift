@@ -381,7 +381,9 @@ enum HouseQuizQuestionLibrary {
             title: "Homeowners insurance provider?",
             kind: .providerSearch,
             documentUploadCategory: .homeownersInsurance,
-            providerTypes: ["homeowners_insurance"]
+            // Phase 16b: standardize on "home_insurance" so the token lines up
+            // with the seeded utility_providers rows from Phase 16a.
+            providerTypes: ["home_insurance"]
         ),
         HouseQuizQuestion(
             id: "q28_household",

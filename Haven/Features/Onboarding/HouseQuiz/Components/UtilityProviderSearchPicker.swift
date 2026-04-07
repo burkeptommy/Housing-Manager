@@ -186,21 +186,35 @@ struct UtilityProviderSearchPicker: View {
                         .aspectRatio(contentMode: .fit)
                         .padding(4)
                 default:
-                    Image(systemName: "bolt.fill")
-                        .font(.system(size: 16))
-                        .foregroundStyle(HavenColors.textTertiary)
+                    fallbackIcon(for: provider.providerType)
                 }
             }
             .frame(width: 40, height: 40)
             .background(HavenColors.creamLight)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         } else {
-            Image(systemName: "bolt.fill")
-                .font(.system(size: 16))
-                .foregroundStyle(HavenColors.navy)
+            fallbackIcon(for: provider.providerType)
                 .frame(width: 40, height: 40)
                 .background(HavenColors.creamLight)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        }
+    }
+
+    /// Phase 16b: pick a category-appropriate SF Symbol when there's no logo
+    /// available yet. Insurance categories used to share the default power-plug
+    /// icon, which made the picker look like Tom was searching for an electric
+    /// company instead of a carrier.
+    private func fallbackIcon(for providerType: String) -> some View {
+        Image(systemName: Self.fallbackIconName(for: providerType))
+            .font(.system(size: 16))
+            .foregroundStyle(HavenColors.navy)
+    }
+
+    private static func fallbackIconName(for providerType: String) -> String {
+        switch providerType {
+        case "auto_insurance": return "car.fill"
+        case "home_insurance": return "house.fill"
+        default: return "bolt.fill"
         }
     }
 
