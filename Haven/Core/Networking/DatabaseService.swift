@@ -110,6 +110,18 @@ final class DatabaseService {
             .value
     }
 
+    /// Fetch all family members for a specific household. Used by
+    /// `PropertyCreationService` to check if a primary family member already
+    /// exists before auto-creating one for the current user.
+    func fetchFamilyMembers(householdId: UUID) async throws -> [FamilyMemberRow] {
+        try await from("family_members")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .order("first_name")
+            .execute()
+            .value
+    }
+
     func createFamilyMember(_ member: FamilyMemberInsert) async throws -> FamilyMemberRow {
         try await from("family_members")
             .insert(member)

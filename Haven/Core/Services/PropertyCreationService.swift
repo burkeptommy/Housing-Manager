@@ -87,7 +87,14 @@ actor PropertyCreationService {
             }
         }
 
-        // 4. Generate the 12-month maintenance plan.
+        // 4. Make sure the current user has a "Primary Client" family_member
+        // row so the dashboard HouseholdStrip isn't empty. OnboardingViewModel
+        // creates this for fresh signups, but soft-purged users who add their
+        // first property via AddPropertyFlow / AddressConfirmationIntercept
+        // never hit that path. Failures here don't block property creation.
+        try? await ensurePrimaryFamilyMember(householdId: householdId)
+
+        // 5. Generate the 12-month maintenance plan.
         var tasksCreated = 0
         let schedule = OnboardingScheduleGenerator.generate(
             from: resolvedLookup,
@@ -123,6 +130,80 @@ actor PropertyCreationService {
     }
 
     // MARK: - Helpers
+
+    /// Ensure a `family_members` row exists for the currently-signed-in user.
+    /// Checks both `linked_user_id == currentUserId` and (for unlinked rows)
+    /// a `Primary Client` relationship that matches the user's email. When
+    /// neither match is found, creates a new "Primary Client" row with
+    /// first/last name pulled from the auth session's user metadata.
+    private func ensurePrimaryFamilyMember(householdId: UUID) async throws {
+        let session = try await HavenSupabase.auth.session
+        let currentUserId = session.user.id
+        let currentEmail = session.user.email?.trimmingCharacters(in: .whitespaces).lowercased()
+
+        let existing = (try? await DatabaseService.shared.fetchFamilyMembers(householdId: householdId)) ?? []
+
+        // Already linked to this user — nothing to do.
+        if existing.contains(where: { $0.linkedUserId == currentUserId }) {
+            return
+        }
+
+        // Unlinked Primary Client row whose email matches — trust that row.
+        if let email = currentEmail, !email.isEmpty,
+           existing.contains(where: {
+               $0.linkedUserId == nil
+               && $0.relationship.lowercased() == "primary client"
+               && ($0.email?.lowercased() == email)
+           }) {
+            return
+        }
+
+        // Resolve first / last name from user metadata, preferring the
+        // explicit first_name / last_name set at signup, then Apple's
+        // given_name / family_name, finally parsing full_name / name.
+        let metaFirst = session.user.userMetadata["first_name"]?.value as? String
+        let metaLast = session.user.userMetadata["last_name"]?.value as? String
+        let appleFirst = session.user.userMetadata["given_name"]?.value as? String
+        let appleLast = session.user.userMetadata["family_name"]?.value as? String
+        let fullNameString = (session.user.userMetadata["full_name"]?.value as? String)
+            ?? (session.user.userMetadata["name"]?.value as? String)
+            ?? ""
+
+        var firstName = (metaFirst?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? (appleFirst?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? ""
+        var lastName = (metaLast?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? (appleLast?.trimmingCharacters(in: .whitespaces)).flatMap { $0.isEmpty ? nil : $0 }
+            ?? ""
+
+        if firstName.isEmpty && lastName.isEmpty && !fullNameString.isEmpty {
+            let parts = fullNameString
+                .trimmingCharacters(in: .whitespaces)
+                .split(separator: " ", maxSplits: 1, omittingEmptySubsequences: true)
+                .map(String.init)
+            firstName = parts.first ?? ""
+            lastName = parts.count > 1 ? parts[1] : ""
+        }
+
+        // Last resort: derive a first name from the email local part so the
+        // avatar isn't blank. The user can always rename from Settings.
+        if firstName.isEmpty, let email = currentEmail, let localPart = email.split(separator: "@").first {
+            firstName = String(localPart).capitalized
+        }
+        if firstName.isEmpty { firstName = "Me" }
+
+        var insert = FamilyMemberInsert(
+            householdId: householdId,
+            firstName: firstName,
+            lastName: lastName,
+            relationship: "Primary Client"
+        )
+        insert.email = currentEmail
+        insert.avatarColor = "navy"
+        insert.linkedUserId = currentUserId
+
+        _ = try await DatabaseService.shared.createFamilyMember(insert)
+    }
 
     private func nextDueDate(forMonth month: Int, formatter: DateFormatter) -> String {
         let calendar = Calendar.current

@@ -168,6 +168,7 @@ struct FamilyMemberInsert: Codable {
     var legalName: String?
     var school: String?
     var notes: String?
+    var linkedUserId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case relationship, email, phone, notes, gender, school
@@ -180,6 +181,7 @@ struct FamilyMemberInsert: Codable {
         case expectedDate = "expected_date"
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
+        case linkedUserId = "linked_user_id"
     }
 }
 
