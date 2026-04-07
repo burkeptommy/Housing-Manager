@@ -862,28 +862,138 @@ struct HouseQuizView: View {
     // MARK: - Completion view
 
     private var completionView: some View {
-        VStack(spacing: HavenTheme.spacing20) {
-            Spacer()
-            Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 72))
-                .foregroundStyle(HavenColors.success)
+        ScrollView {
+            VStack(spacing: HavenTheme.spacing20) {
+                Spacer().frame(height: HavenTheme.spacing24)
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 64))
+                    .foregroundStyle(HavenColors.success)
 
-            Text("Quiz complete")
-                .font(.custom("Georgia", size: 28).weight(.bold))
-                .foregroundStyle(HavenColors.navy800)
+                Text("Quiz complete")
+                    .font(.custom("Georgia", size: 28).weight(.bold))
+                    .foregroundStyle(HavenColors.navy800)
 
-            Text("You're more prepared than 87% of homeowners. We've tailored everything to your home.")
-                .font(HavenTypography.bodySmall)
-                .foregroundStyle(HavenColors.textSecondary)
-                .multilineTextAlignment(.center)
+                completionSummaryCard
+
+                Text("You're more prepared than 87% of homeowners.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, HavenTheme.pageMargin)
+
+                VStack(spacing: HavenTheme.spacing12) {
+                    HavenButton(title: "View my maintenance plan") {
+                        navigateToMaintenancePlan()
+                    }
+                    Button {
+                        dismiss()
+                    } label: {
+                        Text("Done")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .padding(.top, HavenTheme.spacing4)
+                }
                 .padding(.horizontal, HavenTheme.pageMargin)
 
-            HavenButton(title: "Done") {
-                dismiss()
+                Spacer().frame(height: HavenTheme.spacing24)
             }
-            .padding(.horizontal, HavenTheme.pageMargin)
+            .frame(maxWidth: .infinity)
+        }
+    }
 
-            Spacer()
+    /// Summary card that reads REAL counts from
+    /// `viewModel.reconciliationTotals`. Three states:
+    ///   - Reconciliation hasn't finished yet → brief "tailoring" status
+    ///   - Reconciliation finished and changed nothing → "well-tuned" copy
+    ///     so we never claim work we didn't do
+    ///   - Reconciliation finished and changed something → real bullet list
+    @ViewBuilder
+    private var completionSummaryCard: some View {
+        let totals = viewModel.reconciliationTotals
+        let didRun = viewModel.finalReconciliationDidRun
+        HavenCard(padding: HavenTheme.spacing20) {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                if !didRun {
+                    HStack(spacing: HavenTheme.spacing8) {
+                        ProgressView()
+                            .controlSize(.small)
+                        Text("Tailoring your maintenance plan...")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                } else if totals.totalChanged == 0 {
+                    Text("Your home is already well-tuned.")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Your maintenance plan already matches what the quiz confirmed. We'll keep it in sync as you add documents and update systems.")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                } else {
+                    Text("We tailored your plan based on your answers")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    if totals.added.count > 0 {
+                        summaryRow(
+                            icon: "plus.circle.fill",
+                            tint: HavenColors.success,
+                            text: "Added \(totals.added.count) \(totals.added.count == 1 ? "task" : "tasks") that match your home"
+                        )
+                    }
+                    if totals.removed.count > 0 {
+                        summaryRow(
+                            icon: "minus.circle.fill",
+                            tint: HavenColors.warning,
+                            text: "Removed \(totals.removed.count) \(totals.removed.count == 1 ? "task" : "tasks") that didn't apply"
+                        )
+                    }
+                    if totals.preserved.count > 0 {
+                        summaryRow(
+                            icon: "checkmark.circle.fill",
+                            tint: HavenColors.navy700,
+                            text: "Kept \(totals.preserved.count) \(totals.preserved.count == 1 ? "task" : "tasks") you've already touched"
+                        )
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, HavenTheme.pageMargin)
+    }
+
+    private func summaryRow(icon: String, tint: Color, text: String) -> some View {
+        HStack(alignment: .top, spacing: HavenTheme.spacing8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(tint)
+                .padding(.top, 2)
+            Text(text)
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textPrimary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    /// Dismiss the quiz and route the user to Property -> Maintenance for
+    /// the property they just completed the quiz for. Switch tab first,
+    /// then post the section notification on a short delay so the property
+    /// detail view has time to mount.
+    private func navigateToMaintenancePlan() {
+        Haptics.medium()
+        Analytics.track(.quizCompletionViewMaintenanceTapped)
+        dismiss()
+        NotificationCenter.default.post(
+            name: .switchToTab,
+            object: nil,
+            userInfo: ["tab": 1]
+        )
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+            NotificationCenter.default.post(
+                name: .navigateToPropertySection,
+                object: nil,
+                userInfo: ["section": "maintenance"]
+            )
         }
     }
 

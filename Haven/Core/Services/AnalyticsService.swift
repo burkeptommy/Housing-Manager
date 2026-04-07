@@ -39,6 +39,7 @@ enum AnalyticsEvent: String {
     case quizMilestoneReached = "quiz_milestone_reached"
     case quizCompleted = "quiz_completed"
     case quizDismissed = "quiz_dismissed"
+    case quizCompletionViewMaintenanceTapped = "quiz_completion_view_maintenance_tapped"
 
     // MARK: - Tab Navigation
     case tabSelected = "tab_selected"
