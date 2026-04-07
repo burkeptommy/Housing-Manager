@@ -8,6 +8,11 @@ struct HouseQuizView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var currencyText: String = ""
+    /// Phase 16f: tracks whether we've already populated `currencyText` from
+    /// the property's existing purchase price. We only want to do this once
+    /// per question render so user edits don't get overwritten on every state
+    /// publish.
+    @State private var currencyPrefilledForPropertyId: UUID? = nil
     @State private var multiSelectIds: Set<String> = []
     @State private var multiSelectCustomDraft: String = ""
     @State private var multiSelectCustomEntries: [String] = []
@@ -479,20 +484,37 @@ struct HouseQuizView: View {
     // MARK: - Currency input (purchase price)
 
     private func currencyBody(_ q: HouseQuizQuestion) -> some View {
-        VStack(spacing: HavenTheme.spacing12) {
+        // Phase 16f — pre-fill from ATTOM if we have a sale price on file.
+        // Done in onAppear instead of init so subsequent question advances
+        // (where currencyText was already cleared by resetEntryState) don't
+        // accidentally re-populate the next question's input.
+        let attomPrice = viewModel.property.purchasePrice
+        let inferredOwnership = Self.inferredPurchaseKind(for: viewModel.property)
+        return VStack(spacing: HavenTheme.spacing12) {
             // Allow user to pick the entry type first
             ForEach(q.answerOptions) { option in
+                let isSuggested = inferredOwnership == option.id
                 Button {
                     Haptics.selection()
                     Task {
                         let amount = Double(currencyText.filter { $0.isNumber }) ?? 0
                         await viewModel.recordCurrencyAnswer(answerId: option.id, amount: amount)
                         currencyText = ""
+                        currencyPrefilledForPropertyId = nil
                     }
                 } label: {
                     HStack {
                         Text(option.label)
                             .font(HavenTypography.body)
+                        if isSuggested {
+                            Text("Suggested")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.navy)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 3)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(Capsule())
+                        }
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.system(size: 12, weight: .semibold))
@@ -523,8 +545,39 @@ struct HouseQuizView: View {
                 .padding(HavenTheme.spacing12)
                 .background(HavenColors.creamLight)
                 .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+
+                if attomPrice != nil && currencyPrefilledForPropertyId == viewModel.property.id {
+                    Text("We found this from public records. Edit if it's wrong.")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
             }
         }
+        .onAppear {
+            guard currencyPrefilledForPropertyId != viewModel.property.id else { return }
+            if let price = attomPrice, price > 0, currencyText.isEmpty {
+                currencyText = String(Int(price))
+                currencyPrefilledForPropertyId = viewModel.property.id
+            }
+        }
+    }
+
+    /// Phase 16f: derive a sensible default for the "How did you get this home?"
+    /// chip when ATTOM gives us enough signal to make an educated guess.
+    /// - Recent sale on record → "Bought existing".
+    /// - No sale + year built within the last 5 years → "Custom build".
+    /// - Otherwise nil so the chips render with no suggestion badge.
+    private static func inferredPurchaseKind(for property: PropertyRow) -> String? {
+        if property.purchasePrice != nil {
+            return "bought"
+        }
+        if let yearBuilt = property.yearBuilt {
+            let currentYear = Calendar.current.component(.year, from: Date())
+            if currentYear - yearBuilt <= 5 {
+                return "custom_build"
+            }
+        }
+        return nil
     }
 
     // MARK: - Provider search (utility lookup)
