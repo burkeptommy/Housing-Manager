@@ -9,9 +9,12 @@ final class AuthService: ObservableObject {
     @Published var isAuthenticated = false
     @Published var needsOnboarding = false
     @Published var pendingConfirmation = false
+    @Published var hasResolvedInitialSession = false
 
     private var authStateTask: Task<Void, Never>?
     private var pendingFullName: String?
+    private var pendingFirstName: String?
+    private var pendingLastName: String?
 
     /// Start listening for auth state changes. Call once on app launch.
     func startListening() {
@@ -21,6 +24,7 @@ final class AuthService: ObservableObject {
                 case .initialSession:
                     guard session != nil else {
                         clearAuthState()
+                        hasResolvedInitialSession = true
                         break
                     }
                     // Validate the restored session is still valid (token refresh).
@@ -36,9 +40,11 @@ final class AuthService: ObservableObject {
                         // Identify user for analytics on session restore
                         let user = try? await DatabaseService.shared.fetchCurrentUser()
                         Analytics.identify(userId: refreshed.user.id, householdId: user?.householdId)
+                        hasResolvedInitialSession = true
                     } catch {
                         print("[Auth] Session restore failed (user likely deleted): \(error)")
                         await forceLocalSignOut()
+                        hasResolvedInitialSession = true
                     }
 
                 case .signedIn:
@@ -70,9 +76,21 @@ final class AuthService: ObservableObject {
         try await HavenSupabase.auth.signIn(email: email, password: password)
     }
 
-    func signUp(email: String, password: String, fullName: String?) async throws {
+    func signUp(email: String, password: String, firstName: String, lastName: String) async throws {
         Analytics.track(.authSignupStarted)
+        let trimmedFirst = firstName.trimmingCharacters(in: .whitespaces)
+        let trimmedLast = lastName.trimmingCharacters(in: .whitespaces)
+        let fullName = [trimmedFirst, trimmedLast].filter { !$0.isEmpty }.joined(separator: " ")
+
         let result = try await HavenSupabase.auth.signUp(email: email, password: password)
+
+        // Persist first/last/full name to Supabase auth user metadata so future
+        // session boots can prefill without re-prompting.
+        _ = try? await HavenSupabase.auth.update(user: UserAttributes(data: [
+            "first_name": .string(trimmedFirst),
+            "last_name": .string(trimmedLast),
+            "full_name": .string(fullName),
+        ]))
 
         // Check if the user has a session (email confirmation disabled)
         // or if they need to confirm their email first
@@ -83,14 +101,19 @@ final class AuthService: ObservableObject {
                 id: userId,
                 householdId: nil,
                 email: email,
-                fullName: fullName,
+                fullName: fullName.isEmpty ? nil : fullName,
                 role: "member"
             )
             _ = try await DatabaseService.shared.createUser(userInsert)
+            pendingFirstName = trimmedFirst
+            pendingLastName = trimmedLast
+            pendingFullName = fullName.isEmpty ? nil : fullName
             needsOnboarding = true
         } else {
             // Email confirmation required — store name for later, show confirmation UI
-            pendingFullName = fullName
+            pendingFirstName = trimmedFirst
+            pendingLastName = trimmedLast
+            pendingFullName = fullName.isEmpty ? nil : fullName
             pendingConfirmation = true
         }
     }
@@ -108,12 +131,18 @@ final class AuthService: ObservableObject {
 
         // Apple only provides the user's name on the FIRST sign-in.
         // Capture it now — we'll use it in onboarding or to update the profile.
+        var capturedFirst: String?
+        var capturedLast: String?
         if let fullName = credential.fullName {
             let first = fullName.givenName ?? ""
             let last = fullName.familyName ?? ""
             let name = [first, last].filter { !$0.isEmpty }.joined(separator: " ")
+            if !first.isEmpty { capturedFirst = first }
+            if !last.isEmpty { capturedLast = last }
             if !name.isEmpty {
                 pendingFullName = name
+                pendingFirstName = capturedFirst
+                pendingLastName = capturedLast
             }
         }
 
@@ -125,6 +154,18 @@ final class AuthService: ObservableObject {
                 nonce: nil
             )
         )
+
+        // After successful Apple sign in (first-time only), persist names to user metadata.
+        if capturedFirst != nil || capturedLast != nil {
+            let fullName = [capturedFirst ?? "", capturedLast ?? ""]
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            _ = try? await HavenSupabase.auth.update(user: UserAttributes(data: [
+                "first_name": .string(capturedFirst ?? ""),
+                "last_name": .string(capturedLast ?? ""),
+                "full_name": .string(fullName),
+            ]))
+        }
     }
 
     func signOut() {

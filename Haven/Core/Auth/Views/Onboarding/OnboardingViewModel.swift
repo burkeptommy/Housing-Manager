@@ -8,12 +8,15 @@ struct AdditionalMember: Identifiable {
 }
 
 /// Post-auth onboarding: user already saw the address hook and value preview.
-/// This view just collects their name and creates everything.
+/// This is now a brief setup splash — first/last name come from auth metadata
+/// (set during sign-up or Apple Sign In), so we auto-call `complete()` on appear.
 @MainActor
 final class OnboardingViewModel: ObservableObject {
     @Published var isLoading = false
     @Published var errorMessage: String?
     @Published var setupProgress: String = ""
+    @Published var hasAutoCompleted = false
+    @Published var hasFinishedPrefill = false
 
     // Household invitation
     @Published var pendingInvitation: HouseholdInvitationRow?
@@ -63,6 +66,14 @@ final class OnboardingViewModel: ObservableObject {
         do {
             let session = try await HavenSupabase.auth.session
             let email = session.user.email ?? ""
+
+            // Prefer the explicit first/last we set during sign-up.
+            let metadataFirst = session.user.userMetadata["first_name"]?.value as? String
+            let metadataLast = session.user.userMetadata["last_name"]?.value as? String
+            // Apple's variant for first-time Apple Sign In.
+            let appleFirst = session.user.userMetadata["given_name"]?.value as? String
+            let appleLast = session.user.userMetadata["family_name"]?.value as? String
+            // Legacy / fallback full name string.
             let fullName = session.user.userMetadata["full_name"]?.value as? String
                 ?? session.user.userMetadata["name"]?.value as? String
                 ?? ""
@@ -71,24 +82,40 @@ final class OnboardingViewModel: ObservableObject {
                 primaryEmail = email
             }
 
+            if primaryFirstName.isEmpty, let f = metadataFirst, !f.isEmpty {
+                primaryFirstName = f
+            }
+            if primaryLastName.isEmpty, let l = metadataLast, !l.isEmpty {
+                primaryLastName = l
+            }
+            if primaryFirstName.isEmpty, let f = appleFirst, !f.isEmpty {
+                primaryFirstName = f
+            }
+            if primaryLastName.isEmpty, let l = appleLast, !l.isEmpty {
+                primaryLastName = l
+            }
+
+            // Last-resort: parse the joined fullName.
             if primaryFirstName.isEmpty, !fullName.isEmpty {
                 let parts = fullName.split(separator: " ", maxSplits: 1)
                 if parts.count >= 1 { primaryFirstName = String(parts[0]) }
                 if parts.count >= 2 { primaryLastName = String(parts[1]) }
             }
-
-            // Also try Apple's name format (given_name / family_name)
-            if primaryFirstName.isEmpty {
-                if let appleFirstName = session.user.userMetadata["given_name"]?.value as? String {
-                    primaryFirstName = appleFirstName
-                }
-                if let appleLastName = session.user.userMetadata["family_name"]?.value as? String {
-                    primaryLastName = appleLastName
-                }
-            }
         } catch {
             print("[Onboarding] Could not prefill from auth: \(error)")
         }
+        hasFinishedPrefill = true
+    }
+
+    /// Auto-call from `OnboardingView.task` once prefill + invitation check finish.
+    /// Only fires once per view appearance and skips when an invitation is pending
+    /// (the invited flow has its own button).
+    func autoCompleteIfReady(authService: AuthService) async {
+        guard !hasAutoCompleted else { return }
+        guard pendingInvitation == nil else { return }
+        guard canProceed else { return }
+        hasAutoCompleted = true
+        await complete(authService: authService)
     }
 
     var canProceed: Bool {

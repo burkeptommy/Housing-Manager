@@ -1,18 +1,31 @@
 import SwiftUI
 
-/// Post-auth onboarding: the user already saw the address hook and maintenance preview.
-/// This screen collects their name, then creates household + property + systems + tasks.
+/// Post-auth onboarding splash. The user has already entered their address (cached
+/// in UserDefaults) and their first/last name (already in Supabase auth metadata
+/// from sign-up or Apple Sign In). This view auto-runs household + property +
+/// systems + tasks setup, showing a brief progress label, then drops the user on
+/// the dashboard. No name re-prompt unless we genuinely have nothing.
 struct OnboardingView: View {
     @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = OnboardingViewModel()
 
+    @State private var animatePulse = false
+
     var body: some View {
         NavigationStack {
-            if viewModel.pendingInvitation != nil {
-                invitedView
-            } else {
-                nameEntryView
+            Group {
+                if viewModel.pendingInvitation != nil {
+                    invitedView
+                } else if viewModel.errorMessage != nil {
+                    errorView
+                } else if viewModel.hasFinishedPrefill && !viewModel.canProceed {
+                    nameFallbackView
+                } else {
+                    setupSplash
+                }
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(HavenColors.background.ignoresSafeArea())
         }
         .trackScreen("OnboardingView")
         .task {
@@ -20,6 +33,151 @@ struct OnboardingView: View {
             viewModel.loadCachedAddress()
             await viewModel.prefillFromAuth()
             await viewModel.checkForInvitation()
+            await viewModel.autoCompleteIfReady(authService: appState.authService)
+        }
+    }
+
+    // MARK: - Setup Splash
+
+    private var setupSplash: some View {
+        VStack(spacing: HavenTheme.spacing24) {
+            Spacer()
+
+            // Logo monogram
+            Text("H")
+                .font(Font.custom("Georgia-Bold", size: 56))
+                .foregroundStyle(HavenColors.creamLight)
+                .frame(width: 96, height: 96)
+                .background(
+                    RoundedRectangle(cornerRadius: 22)
+                        .fill(HavenColors.navy800)
+                )
+                .scaleEffect(animatePulse ? 1.04 : 1.0)
+                .animation(
+                    .easeInOut(duration: 1.2).repeatForever(autoreverses: true),
+                    value: animatePulse
+                )
+
+            VStack(spacing: HavenTheme.spacing8) {
+                Text(progressTitle)
+                    .font(HavenTypography.title2)
+                    .foregroundStyle(HavenColors.navy800)
+                    .multilineTextAlignment(.center)
+                    .transition(.opacity)
+                    .id(progressTitle) // forces fade between label changes
+
+                Text(progressSubtitle)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .animation(.easeInOut(duration: 0.3), value: viewModel.setupProgress)
+
+            ProgressView()
+                .controlSize(.regular)
+                .tint(HavenColors.navy800)
+
+            Spacer()
+        }
+        .onAppear { animatePulse = true }
+    }
+
+    private var progressTitle: String {
+        if !viewModel.setupProgress.isEmpty {
+            return viewModel.setupProgress
+        }
+        return "Setting up your home..."
+    }
+
+    private var progressSubtitle: String {
+        if viewModel.setupProgress.contains("All done") {
+            return "Welcome to Haven."
+        }
+        return "This only takes a few seconds."
+    }
+
+    // MARK: - Error View (auto-complete failed)
+
+    private var errorView: some View {
+        VStack(spacing: HavenTheme.spacing24) {
+            Spacer()
+
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 48))
+                .foregroundStyle(HavenColors.warning)
+
+            VStack(spacing: HavenTheme.spacing8) {
+                Text("We hit a snag")
+                    .font(HavenTypography.title2)
+                    .foregroundStyle(HavenColors.navy800)
+                if let error = viewModel.errorMessage {
+                    Text(error)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, HavenTheme.pageMargin)
+                }
+            }
+
+            HavenButton(title: "Try Again") {
+                Task {
+                    viewModel.errorMessage = nil
+                    viewModel.hasAutoCompleted = false
+                    await viewModel.autoCompleteIfReady(authService: appState.authService)
+                }
+            }
+            .padding(.horizontal, HavenTheme.padding)
+
+            Spacer()
+        }
+    }
+
+    // MARK: - Name Fallback (rare edge case for orphaned auth users)
+
+    private var nameFallbackView: some View {
+        VStack(spacing: 0) {
+            ScrollView {
+                VStack(spacing: HavenTheme.spacing24) {
+                    VStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: 48))
+                            .foregroundStyle(HavenColors.navy800)
+                        Text("One last detail")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.navy800)
+                        Text("Add your name to finish setting up your household.")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding(.top, 40)
+
+                    HStack(spacing: 12) {
+                        HavenTextField(title: "First Name", text: $viewModel.primaryFirstName)
+                            .textContentType(.givenName)
+                            .textInputAutocapitalization(.words)
+                        HavenTextField(title: "Last Name", text: $viewModel.primaryLastName)
+                            .textContentType(.familyName)
+                            .textInputAutocapitalization(.words)
+                    }
+
+                    Spacer()
+                }
+                .padding(.horizontal, HavenTheme.pageMargin)
+            }
+
+            VStack(spacing: 12) {
+                HavenButton(title: viewModel.isLoading ? viewModel.setupProgress : "Get Started") {
+                    Task {
+                        viewModel.hasAutoCompleted = false
+                        await viewModel.autoCompleteIfReady(authService: appState.authService)
+                    }
+                }
+                .disabled(viewModel.isLoading || !viewModel.canProceed)
+            }
+            .padding(.horizontal, HavenTheme.padding)
+            .padding(.bottom, 24)
         }
     }
 
@@ -54,6 +212,9 @@ struct OnboardingView: View {
 
             Button("Set up a new household instead") {
                 viewModel.pendingInvitation = nil
+                Task {
+                    await viewModel.autoCompleteIfReady(authService: appState.authService)
+                }
             }
             .font(HavenTypography.bodySmall)
             .foregroundStyle(HavenColors.textSecondary)
@@ -61,166 +222,5 @@ struct OnboardingView: View {
             Spacer()
         }
         .padding()
-    }
-
-    // MARK: - Name Entry (post-auth, post-address-hook)
-
-    private var nameEntryView: some View {
-        VStack(spacing: 0) {
-            ScrollView {
-                VStack(spacing: HavenTheme.spacing24) {
-                    VStack(spacing: HavenTheme.spacing8) {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 48))
-                            .foregroundStyle(HavenColors.success)
-                        Text("Account created!")
-                            .font(HavenTypography.title2)
-                            .foregroundStyle(HavenColors.navy800)
-
-                        if !viewModel.street.isEmpty {
-                            Text("We'll save your home plan for \(viewModel.street). Just add your name to get started.")
-                                .font(HavenTypography.bodySmall)
-                                .foregroundStyle(HavenColors.textSecondary)
-                                .multilineTextAlignment(.center)
-                        } else {
-                            Text("Add your name to personalize your experience.")
-                                .font(HavenTypography.bodySmall)
-                                .foregroundStyle(HavenColors.textSecondary)
-                                .multilineTextAlignment(.center)
-                        }
-                    }
-                    .padding(.top, 32)
-
-                    VStack(spacing: HavenTheme.spacing16) {
-                        HStack(spacing: 12) {
-                            HavenTextField(title: "First Name", text: $viewModel.primaryFirstName)
-                                .textContentType(.givenName)
-                                .textInputAutocapitalization(.words)
-                            HavenTextField(title: "Last Name", text: $viewModel.primaryLastName)
-                                .textContentType(.familyName)
-                                .textInputAutocapitalization(.words)
-                        }
-
-                        if !viewModel.primaryEmail.isEmpty {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text("Email")
-                                        .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textTertiary)
-                                    Text(viewModel.primaryEmail)
-                                        .font(HavenTypography.bodySmall)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                }
-                                Spacer()
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(HavenColors.success)
-                                    .font(.caption)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 10)
-                            .background(HavenColors.creamLight)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                    }
-
-                    // Show what will be saved
-                    if !viewModel.street.isEmpty {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("What we'll set up for you")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textTertiary)
-
-                            HStack(spacing: 8) {
-                                Image(systemName: "house.fill")
-                                    .foregroundStyle(HavenColors.navy700)
-                                Text("\(viewModel.street), \(viewModel.city)")
-                                    .font(HavenTypography.bodySmall)
-                                    .foregroundStyle(HavenColors.textPrimary)
-                            }
-
-                            if viewModel.propertyLookupResult != nil {
-                                HStack(spacing: 8) {
-                                    Image(systemName: "wrench.fill")
-                                        .foregroundStyle(HavenColors.navy700)
-                                    Text("Home systems + 12-month maintenance plan")
-                                        .font(HavenTypography.bodySmall)
-                                        .foregroundStyle(HavenColors.textPrimary)
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(HavenTheme.spacing12)
-                        .background(HavenColors.navy.opacity(0.04))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                    }
-
-                    Spacer()
-                }
-                .padding(.horizontal, HavenTheme.pageMargin)
-            }
-
-            // Bottom buttons
-            VStack(spacing: 12) {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                        .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.critical)
-                }
-
-                HavenButton(
-                    title: viewModel.isLoading ? viewModel.setupProgress : "Get Started"
-                ) {
-                    Task { await viewModel.complete(authService: appState.authService) }
-                }
-                .disabled(viewModel.isLoading || !viewModel.canProceed)
-
-                // Invite code
-                inviteCodeSection
-            }
-            .padding(.horizontal, HavenTheme.padding)
-            .padding(.bottom, 24)
-        }
-    }
-
-    // MARK: - Invite Code Section
-
-    private var inviteCodeSection: some View {
-        VStack(spacing: 8) {
-            Divider()
-                .padding(.vertical, 8)
-
-            Text("Have an invite code?")
-                .font(HavenTypography.bodySmall)
-                .foregroundStyle(HavenColors.textSecondary)
-
-            HStack(spacing: 8) {
-                TextField("Enter 6-character code", text: $viewModel.inviteCode)
-                    .textInputAutocapitalization(.characters)
-                    .font(HavenTypography.body)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background(HavenColors.inputBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                Button {
-                    Task { await viewModel.lookupInviteCode() }
-                } label: {
-                    Text(viewModel.isCheckingInvite ? "..." : "Join")
-                        .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.textOnNavy)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(HavenColors.navy)
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-                .disabled(viewModel.inviteCode.count < 6 || viewModel.isCheckingInvite)
-            }
-
-            if let inviteError = viewModel.inviteError {
-                Text(inviteError)
-                    .font(HavenTypography.caption)
-                    .foregroundStyle(HavenColors.critical)
-            }
-        }
     }
 }

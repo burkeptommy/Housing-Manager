@@ -36,9 +36,14 @@ struct SignUpView: View {
             .padding(.top, 20)
 
             VStack(spacing: HavenTheme.spacing16) {
-                HavenTextField(title: "Full Name", text: $viewModel.fullName)
-                    .textContentType(.name)
-                    .textInputAutocapitalization(.words)
+                HStack(spacing: 12) {
+                    HavenTextField(title: "First Name", text: $viewModel.firstName)
+                        .textContentType(.givenName)
+                        .textInputAutocapitalization(.words)
+                    HavenTextField(title: "Last Name", text: $viewModel.lastName)
+                        .textContentType(.familyName)
+                        .textInputAutocapitalization(.words)
+                }
 
                 HavenTextField(title: "Email", text: $viewModel.email)
                     .textContentType(.emailAddress)

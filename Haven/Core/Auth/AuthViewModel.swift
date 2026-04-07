@@ -4,7 +4,8 @@ import SwiftUI
 final class AuthViewModel: ObservableObject {
     @Published var email = ""
     @Published var password = ""
-    @Published var fullName = ""
+    @Published var firstName = ""
+    @Published var lastName = ""
     @Published var confirmPassword = ""
     @Published var isLoading = false
     @Published var errorMessage: String?
@@ -34,7 +35,8 @@ final class AuthViewModel: ObservableObject {
             try await authService.signUp(
                 email: email.trimmingCharacters(in: .whitespaces),
                 password: password,
-                fullName: fullName.trimmingCharacters(in: .whitespaces)
+                firstName: firstName.trimmingCharacters(in: .whitespaces),
+                lastName: lastName.trimmingCharacters(in: .whitespaces)
             )
             // If email confirmation is required, authService sets pendingConfirmation
             if authService.pendingConfirmation {
@@ -77,8 +79,12 @@ final class AuthViewModel: ObservableObject {
             return false
         }
         if forSignUp {
-            if fullName.trimmingCharacters(in: .whitespaces).isEmpty {
-                errorMessage = "Please enter your name."
+            if firstName.trimmingCharacters(in: .whitespaces).isEmpty {
+                errorMessage = "Please enter your first name."
+                return false
+            }
+            if lastName.trimmingCharacters(in: .whitespaces).isEmpty {
+                errorMessage = "Please enter your last name."
                 return false
             }
             if password != confirmPassword {
