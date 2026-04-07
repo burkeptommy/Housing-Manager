@@ -24,6 +24,11 @@ struct EditSystemSheet: View {
     @State private var pendingOrphanTaskIds: [UUID] = []
     @State private var pendingOrphanTitles: [String] = []
     @State private var showOrphanConfirm = false
+    // Phase 19d: non-zero when an .addOnly reconcile pass just landed new
+    // template-managed tasks. Drives the brief confirmation toast and an
+    // ~1.2s dismissal delay so the user sees the change before the sheet
+    // disappears.
+    @State private var addedTaskCount: Int = 0
 
     private let categories = SystemCategory.allCases.map(\.rawValue)
     private let statuses = ["Good", "Needs Maintenance", "Needs Repair", "Replace Soon"]
@@ -178,6 +183,31 @@ struct EditSystemSheet: View {
                     }
                 }
             }
+            // Phase 19d: brief confirmation toast after an .addOnly reconcile
+            // lands new template-managed tasks on a subtype change. Sits at
+            // the bottom of the sheet and dismisses along with the sheet
+            // after a short delay in `commitSave`.
+            .overlay(alignment: .bottom) {
+                if addedTaskCount > 0 {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HavenColors.success)
+                        Text(addedTaskCount == 1
+                            ? "Added 1 new maintenance task"
+                            : "Added \(addedTaskCount) new maintenance tasks")
+                            .font(HavenTypography.uiLabel.weight(.semibold))
+                            .foregroundStyle(HavenColors.navy800)
+                    }
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .havenShadow()
+                    .padding(.bottom, HavenTheme.spacing24)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(HavenTheme.animationStandard, value: addedTaskCount)
         }
     }
 
@@ -243,13 +273,49 @@ struct EditSystemSheet: View {
                 NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
             }
 
+            // Phase 19d: run an add-only reconcile pass so templates that
+            // became newly applicable under the new subtype / category
+            // land as real tasks. `.addOnly` guarantees we don't stomp the
+            // user's explicit keep/delete choices on existing tasks from
+            // the orphan dialog above — the reconciler only inserts, never
+            // archives. Runs only when subtype or category actually changed
+            // so no-op saves stay snappy.
+            var newlyAddedCount = 0
+            if updated.subtype != system.subtype || updated.category != system.category {
+                let result = await MaintenanceTaskReconciler.reconcile(
+                    propertyId: updated.propertyId,
+                    householdId: updated.householdId,
+                    systemId: updated.id,
+                    systemCategory: updated.category,
+                    confirmedSubtype: updated.subtype,
+                    fuelType: updated.catalogFuelType,
+                    mode: .addOnly
+                )
+                newlyAddedCount = result.added.count
+                if newlyAddedCount > 0 {
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                }
+            }
+
             await MainActor.run {
                 Haptics.success()
                 NotificationCenter.default.post(name: .homeSystemChanged, object: nil,
                     userInfo: ["action": "updated", "id": system.id.uuidString])
                 onComplete?(updated)
-                dismiss()
+                if newlyAddedCount > 0 {
+                    withAnimation(HavenTheme.animationStandard) {
+                        addedTaskCount = newlyAddedCount
+                    }
+                }
             }
+
+            // Delay dismissal briefly so the toast is visible. Skip the
+            // sleep entirely when nothing was added to keep the no-change
+            // save path snappy.
+            if newlyAddedCount > 0 {
+                try? await Task.sleep(nanoseconds: 1_200_000_000)
+            }
+            await MainActor.run { dismiss() }
         } catch {
             self.error = error.localizedDescription
             isSaving = false

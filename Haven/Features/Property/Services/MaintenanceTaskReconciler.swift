@@ -22,6 +22,24 @@ import Foundation
 @MainActor
 enum MaintenanceTaskReconciler {
 
+    /// Phase 19d: controls which half of the reconcile pass runs. `EditSystemSheet`
+    /// uses `.addOnly` after its existing orphan-confirmation dialog completes so
+    /// the reconciler inserts newly-applicable templates without stomping the
+    /// user's explicit "keep these tasks" choices.
+    enum ReconcileMode {
+        /// Add newly-applicable templates AND soft-delete orphans (preserving
+        /// user-touched tasks). The default, used by the House Quiz path.
+        case full
+        /// Only insert templates that became newly applicable. Existing tasks
+        /// are never touched. Used by `EditSystemSheet` after its own orphan
+        /// dialog decides the removal half.
+        case addOnly
+        /// Only soft-delete orphans, never add. Rarely needed; included for
+        /// symmetry so callers that already inserted templates via another
+        /// path can still run a cleanup pass.
+        case removeOnly
+    }
+
     /// Result of a single reconciliation pass. Each list contains the human
     /// titles of the affected tasks. Use `merging(_:)` to accumulate results
     /// across multiple `reconcile` calls (e.g. inside `reconcileAll`).
@@ -55,7 +73,8 @@ enum MaintenanceTaskReconciler {
         systemCategory: String,
         confirmedSubtype: String?,
         fuelType: String? = nil,
-        flags: [String: Bool] = [:]
+        flags: [String: Bool] = [:],
+        mode: ReconcileMode = .full
     ) async -> ReconciliationResult {
         // 1. Compute the correct set of templates for the confirmed subtype.
         let activeSubtypes = MaintenanceTemplates.activeSubtypes(
@@ -107,59 +126,67 @@ enum MaintenanceTaskReconciler {
         let existingTitles = Set(existing.map { $0.title.lowercased() })
 
         // 3. Templates to ADD: in the correct set but not yet present.
+        //    Gated on mode — `.removeOnly` skips this half entirely.
         var added: [String] = []
-        let calendar = Calendar.current
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        for template in correctTemplates where !existingTitles.contains(template.title.lowercased()) {
-            let nextDue = calendar.date(byAdding: template.interval, to: Date()) ?? Date()
-            var insert = MaintenanceTaskInsert(
-                householdId: householdId,
-                title: template.title,
-                frequency: template.frequency,
-                nextDueDate: formatter.string(from: nextDue)
-            )
-            insert.propertyId = propertyId
-            insert.systemId = systemId
-            insert.description = template.description
-            insert.priority = template.priority
-            insert.isTemplateBased = true
-            insert.templateId = "\(template.systemCategory):\(template.title)"
-            insert.seasonalTiming = template.seasonalTiming
-            insert.isDiy = template.isDIY
-            insert.professionalRequired = template.professionalRequired
-            insert.costRange = template.estimatedCostRange
-            if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
-                added.append(template.title)
+        if mode != .removeOnly {
+            let calendar = Calendar.current
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            for template in correctTemplates where !existingTitles.contains(template.title.lowercased()) {
+                let nextDue = calendar.date(byAdding: template.interval, to: Date()) ?? Date()
+                var insert = MaintenanceTaskInsert(
+                    householdId: householdId,
+                    title: template.title,
+                    frequency: template.frequency,
+                    nextDueDate: formatter.string(from: nextDue)
+                )
+                insert.propertyId = propertyId
+                insert.systemId = systemId
+                insert.description = template.description
+                insert.priority = template.priority
+                insert.isTemplateBased = true
+                insert.templateId = "\(template.systemCategory):\(template.title)"
+                insert.seasonalTiming = template.seasonalTiming
+                insert.isDiy = template.isDIY
+                insert.professionalRequired = template.professionalRequired
+                insert.costRange = template.estimatedCostRange
+                if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
+                    added.append(template.title)
+                }
             }
         }
 
         // 4. Tasks to REMOVE: existing rows that no longer match `correctTitles`.
         //    Soft-delete only — and only when we're confident the task is
-        //    template-managed and the user hasn't touched it.
+        //    template-managed and the user hasn't touched it. Gated on mode —
+        //    `.addOnly` skips this half entirely so callers that have their
+        //    own removal UX (e.g. EditSystemSheet's orphan dialog) keep
+        //    authority over what gets deleted.
         var removed: [String] = []
         var preserved: [String] = []
-        for task in existing where !correctTitles.contains(task.title.lowercased()) {
-            // Skip rows that aren't template-managed at all (custom user task
-            // whose title doesn't match anything Haven knows about).
-            let isKnownTemplate = knownTitlesForCategory.contains(task.title.lowercased())
-            guard isKnownTemplate else {
-                preserved.append(task.title)
-                continue
-            }
-            // Preserve any task the user has clearly engaged with.
-            if isUserTouched(task) {
-                preserved.append(task.title)
-                continue
-            }
-            do {
-                try await DatabaseService.shared.archiveMaintenanceTask(
-                    id: task.id,
-                    reason: "subtype_mismatch:\(systemCategory):\(confirmedSubtype ?? "nil")"
-                )
-                removed.append(task.title)
-            } catch {
-                preserved.append(task.title)
+        if mode != .addOnly {
+            for task in existing where !correctTitles.contains(task.title.lowercased()) {
+                // Skip rows that aren't template-managed at all (custom user task
+                // whose title doesn't match anything Haven knows about).
+                let isKnownTemplate = knownTitlesForCategory.contains(task.title.lowercased())
+                guard isKnownTemplate else {
+                    preserved.append(task.title)
+                    continue
+                }
+                // Preserve any task the user has clearly engaged with.
+                if isUserTouched(task) {
+                    preserved.append(task.title)
+                    continue
+                }
+                do {
+                    try await DatabaseService.shared.archiveMaintenanceTask(
+                        id: task.id,
+                        reason: "subtype_mismatch:\(systemCategory):\(confirmedSubtype ?? "nil")"
+                    )
+                    removed.append(task.title)
+                } catch {
+                    preserved.append(task.title)
+                }
             }
         }
 
