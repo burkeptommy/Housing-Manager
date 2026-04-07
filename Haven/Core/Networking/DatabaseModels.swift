@@ -411,8 +411,15 @@ struct PropertyRow: Codable, Identifiable {
     /// InvestmentSummaryCard to render a transparency caption beneath the value.
     let estimatedValueSource: String?
     /// 0-100 confidence score that pairs with the source. ATTOM ships its own
-    /// AVM scr; computed/estimated paths use 40 / 25 respectively.
+    /// AVM scr; ai_comps uses 60-80 depending on comp count; computed uses 40;
+    /// estimated uses 25.
     let estimatedValueConfidence: Int?
+    /// Phase 18g: When `estimatedValueSource == "ai_comps"`, this carries the
+    /// short paragraph Claude returned explaining its methodology
+    /// (comp count, range observed, key adjustments). InvestmentSummaryCard
+    /// shows it in a tappable info modal so users understand where the
+    /// number came from. Nil for every other source.
+    let estimatedValueReasoning: String?
     let squareFootage: Int?
     let yearBuilt: Int?
     let ownershipEntity: String?
@@ -432,6 +439,7 @@ struct PropertyRow: Codable, Identifiable {
         case currentEstimatedValue = "current_estimated_value"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
+        case estimatedValueReasoning = "estimated_value_reasoning"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
@@ -456,6 +464,7 @@ struct PropertyRow: Codable, Identifiable {
         currentEstimatedValue = try? c.decode(Double.self, forKey: .currentEstimatedValue)
         estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
         estimatedValueConfidence = try? c.decodeIfPresent(Int.self, forKey: .estimatedValueConfidence)
+        estimatedValueReasoning = try? c.decodeIfPresent(String.self, forKey: .estimatedValueReasoning)
         squareFootage = try? c.decode(Int.self, forKey: .squareFootage)
         yearBuilt = try? c.decode(Int.self, forKey: .yearBuilt)
         ownershipEntity = try? c.decode(String.self, forKey: .ownershipEntity)
@@ -481,6 +490,8 @@ struct PropertyInsert: Codable {
     var currentEstimatedValue: Double?
     var estimatedValueSource: String?
     var estimatedValueConfidence: Int?
+    /// Phase 18g: AI-derived value reasoning paragraph (only set when source = "ai_comps").
+    var estimatedValueReasoning: String?
     var squareFootage: Int?
     var yearBuilt: Int?
     var ownershipEntity: String?
@@ -496,6 +507,7 @@ struct PropertyInsert: Codable {
         case currentEstimatedValue = "current_estimated_value"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
+        case estimatedValueReasoning = "estimated_value_reasoning"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
@@ -515,6 +527,8 @@ struct PropertyUpdate: Codable {
     var currentEstimatedValue: Double?
     var estimatedValueSource: String?
     var estimatedValueConfidence: Int?
+    /// Phase 18g: AI-derived value reasoning paragraph (only set when source = "ai_comps").
+    var estimatedValueReasoning: String?
     var squareFootage: Int?
     var yearBuilt: Int?
     var ownershipEntity: String?
@@ -531,6 +545,7 @@ struct PropertyUpdate: Codable {
         case currentEstimatedValue = "current_estimated_value"
         case estimatedValueSource = "estimated_value_source"
         case estimatedValueConfidence = "estimated_value_confidence"
+        case estimatedValueReasoning = "estimated_value_reasoning"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"

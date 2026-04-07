@@ -12,6 +12,9 @@ struct InvestmentSummaryCard: View {
     @State private var showBreakdown = false
     @State private var showSaleSimulator = false
     @State private var sheetMode: PurchasePriceInputSheet.Mode?
+    /// Phase 18g — when the source is `ai_comps`, tapping the info icon
+    /// beneath the value reveals Claude's reasoning paragraph in a sheet.
+    @State private var showAIReasoning = false
 
     // Computed values
     private var purchasePrice: Double { property.purchasePrice ?? 0 }
@@ -24,12 +27,16 @@ struct InvestmentSummaryCard: View {
     private var hasEstimatedValue: Bool { property.currentEstimatedValue != nil && estimatedValue > 0 }
     private var hasPurchasePrice: Bool { property.purchasePrice != nil && purchasePrice > 0 }
 
-    /// Phase 16e — surface *why* the estimated value looks the way it does for
-    /// the lower-confidence fallback paths. ATTOM/RentCast values speak for
-    /// themselves; the computed and square-footage paths need a soft reminder
-    /// so the user knows it's a directional number, not an appraisal.
+    /// Phase 16e + 18g — surface *why* the estimated value looks the way it
+    /// does for the fallback paths. ATTOM values speak for themselves; the
+    /// other paths need a soft reminder so the user knows it's a
+    /// directional number, not an appraisal. The AI comps path also gets a
+    /// tappable info icon next to the caption that reveals Claude's full
+    /// reasoning paragraph.
     private var estimatedValueSourceCaption: String? {
         switch property.estimatedValueSource {
+        case "ai_comps":
+            return "AI estimate from recent comps"
         case "computed":
             return "Estimated from last sale, adjusted for time"
         case "estimated":
@@ -41,6 +48,11 @@ struct InvestmentSummaryCard: View {
         default:
             return nil
         }
+    }
+
+    private var hasAIReasoning: Bool {
+        property.estimatedValueSource == "ai_comps"
+            && (property.estimatedValueReasoning?.isEmpty == false)
     }
 
     var body: some View {
@@ -79,6 +91,63 @@ struct InvestmentSummaryCard: View {
                 await onValuesUpdated?(update)
             }
         }
+        // Phase 18g — Claude reasoning detail sheet for the ai_comps source.
+        .sheet(isPresented: $showAIReasoning) {
+            aiReasoningSheet
+        }
+    }
+
+    // Phase 18g — sheet that explains how the AI value was derived. Shows
+    // the value, range, confidence, and Claude's full methodology paragraph.
+    private var aiReasoningSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing4) {
+                        Text("Estimated value")
+                            .font(HavenTypography.uiLabelMedium)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text(estimatedValue.formattedCompactCurrency())
+                            .font(.custom("Georgia", size: 28).weight(.bold))
+                            .foregroundStyle(HavenColors.textPrimary)
+                        if let confidence = property.estimatedValueConfidence {
+                            Text("Confidence: \(confidence)/100")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+
+                    Divider().overlay(HavenColors.beige300)
+
+                    VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                        Text("HOW WE GOT THIS NUMBER")
+                            .font(HavenTypography.uiSectionHeader)
+                            .tracking(1.5)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text(property.estimatedValueReasoning ?? "")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+
+                    Text("This is an AI estimate based on recent comparable sales in your area. It is not an appraisal and should not be used for legal, tax, or insurance purposes. For an exact value, consult a licensed real estate appraiser.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(.top, HavenTheme.spacing8)
+                }
+                .padding(HavenTheme.pageMargin)
+            }
+            .background(HavenColors.background)
+            .navigationTitle("AI Estimate")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { showAIReasoning = false }
+                        .foregroundStyle(HavenColors.navy)
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     // MARK: - Hero Section
@@ -109,10 +178,27 @@ struct InvestmentSummaryCard: View {
                     .foregroundStyle(HavenColors.textPrimary)
 
                 if let caption = estimatedValueSourceCaption {
-                    Text(caption)
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
-                        .multilineTextAlignment(.center)
+                    HStack(spacing: 4) {
+                        Text(caption)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                            .multilineTextAlignment(.center)
+                        // Phase 18g — info icon reveals Claude's reasoning
+                        // paragraph for the ai_comps source. Other sources
+                        // don't need it because their captions speak for
+                        // themselves.
+                        if hasAIReasoning {
+                            Button {
+                                Haptics.light()
+                                showAIReasoning = true
+                            } label: {
+                                Image(systemName: "info.circle")
+                                    .font(.system(size: 11))
+                                    .foregroundStyle(HavenColors.navy700)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
                 }
 
                 if totalInvested > 0 {

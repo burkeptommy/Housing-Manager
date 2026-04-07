@@ -14,11 +14,19 @@ struct PropertyLookupResult: Codable {
     var estimatedValue: Double?
     let estimatedValueLow: Double?
     let estimatedValueHigh: Double?
-    let estimatedValueConfidence: Int?  // 0-100 (ATTOM AVM scr; computed=40; estimated=25)
-    /// Phase 16e: which fallback layer produced `estimatedValue`. One of
-    /// "attom" | "rentcast" | "computed" | "estimated". The Investment Summary
-    /// surfaces this so users see *why* a number is what it is.
+    let estimatedValueConfidence: Int?  // 0-100 (ATTOM AVM scr; ai_comps=60-80; computed=40; estimated=25)
+    /// Phase 16e + 18g: which fallback layer produced `estimatedValue`. One of
+    /// "attom" | "rentcast" | "ai_comps" | "computed" | "estimated". The
+    /// Investment Summary surfaces this so users see *why* a number is what
+    /// it is.
     let estimatedValueSource: String?
+    /// Phase 18g: When `estimatedValueSource == "ai_comps"`, this carries
+    /// the short paragraph Claude returned explaining its methodology
+    /// (comp count, range observed, key adjustments). Surfaced in iOS via
+    /// a tappable info modal beneath the value. Optional with `try?`
+    /// resilient decoding so older cached lookups (from before Phase 18g)
+    /// still load cleanly.
+    let estimatedValueReasoning: String?
     let features: PropertyFeatures?
     let taxAssessment: TaxAssessment?
     let ownerInfo: OwnerInfo?

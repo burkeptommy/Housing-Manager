@@ -76,6 +76,9 @@ actor PropertyCreationService {
         insert.currentEstimatedValue = resolvedLookup?.estimatedValue
         insert.estimatedValueSource = resolvedLookup?.estimatedValueSource
         insert.estimatedValueConfidence = resolvedLookup?.estimatedValueConfidence
+        // Phase 18g — surface the AI reasoning paragraph when the lookup
+        // chain fell through to Claude's web search comps layer.
+        insert.estimatedValueReasoning = resolvedLookup?.estimatedValueReasoning
 
         let property = try await DatabaseService.shared.createProperty(insert)
 

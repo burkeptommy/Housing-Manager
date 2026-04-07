@@ -81,6 +81,7 @@ final class AppState: ObservableObject {
                 Task { await Self.migrateVehicleMaintenanceTasks() }
                 Task { await Self.reconcileAllPropertiesOnce() }
                 Task { await Self.backfillUtilityAccountSnapshotsOnce() }
+                Task { await Self.refreshPropertyValuesOnce() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -95,6 +96,7 @@ final class AppState: ObservableObject {
                     Task { await Self.migrateVehicleMaintenanceTasks() }
                     Task { await Self.reconcileAllPropertiesOnce() }
                     Task { await Self.backfillUtilityAccountSnapshotsOnce() }
+                    Task { await Self.refreshPropertyValuesOnce() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -150,6 +152,63 @@ final class AppState: ObservableObject {
         }
         // Notify the rest of the app so any open task lists refresh.
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Phase 18g: One-time backfill that re-runs property-lookup against
+    /// every property whose `currentEstimatedValue` is nil OR whose source
+    /// is unknown (pre-Phase-16e rows). Picks up the new Claude web-search
+    /// fallback layer so existing properties stop showing "Add estimated
+    /// value" on the Investment Summary card. Gated by a UserDefaults
+    /// flag so it only runs once per install. Detached Task so it never
+    /// blocks first-screen render.
+    @MainActor
+    static func refreshPropertyValuesOnce() async {
+        let key = "refreshPropertyValuesV1Done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        var refreshed = 0
+        for property in properties where property.currentEstimatedValue == nil {
+            let parts = [property.street, property.city, property.state, property.zipCode]
+                .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            guard !parts.isEmpty else { continue }
+            let address = parts.joined(separator: ", ")
+            do {
+                let lookupData = try await HavenSupabase.propertyLookup(address: address)
+                struct LookupResponse: Decodable {
+                    let success: Bool
+                    let property: PropertyLookupResult?
+                }
+                let response = try JSONDecoder().decode(LookupResponse.self, from: lookupData)
+                guard response.success, let lookup = response.property,
+                      let value = lookup.estimatedValue else { continue }
+                var update = PropertyUpdate()
+                update.currentEstimatedValue = value
+                update.estimatedValueSource = lookup.estimatedValueSource
+                update.estimatedValueConfidence = lookup.estimatedValueConfidence
+                update.estimatedValueReasoning = lookup.estimatedValueReasoning
+                _ = try? await db.updateProperty(id: property.id, update)
+                refreshed += 1
+            } catch {
+                // Skip silently — don't gate the rest of the backfill on
+                // a single lookup failure.
+            }
+        }
+        if refreshed > 0 {
+            print("[refreshPropertyValuesV1] refreshed \(refreshed) propert\(refreshed == 1 ? "y" : "ies")")
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+        }
         UserDefaults.standard.set(true, forKey: key)
     }
 

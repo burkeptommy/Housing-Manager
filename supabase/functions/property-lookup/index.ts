@@ -31,11 +31,16 @@ interface PropertyResult {
   estimatedValue: number | null;
   estimatedValueLow: number | null;
   estimatedValueHigh: number | null;
-  estimatedValueConfidence: number | null; // 0-100 confidence (ATTOM AVM scr, computed: 40, estimated: 25)
-  /// Phase 16e: which fallback layer produced `estimatedValue`. One of
-  /// "attom" | "rentcast" | "computed" | "estimated". Surfaced in iOS as a
-  /// caption beneath the value to build trust ("estimated from last sale").
-  estimatedValueSource: "attom" | "rentcast" | "computed" | "estimated" | null;
+  estimatedValueConfidence: number | null; // 0-100 confidence (ATTOM AVM scr, ai_comps: 70, computed: 40, estimated: 25)
+  /// Phase 16e + 18g: which fallback layer produced `estimatedValue`. One of
+  /// "attom" | "rentcast" | "ai_comps" | "computed" | "estimated". Surfaced
+  /// in iOS as a caption beneath the value to build trust.
+  estimatedValueSource: "attom" | "rentcast" | "ai_comps" | "computed" | "estimated" | null;
+  /// Phase 18g: When `estimatedValueSource = "ai_comps"`, this carries the
+  /// short paragraph Claude returned explaining its methodology. iOS shows
+  /// it in a tappable info modal so users understand where the number came
+  /// from. NULL for every other source.
+  estimatedValueReasoning?: string | null;
   features: {
     roofType: string | null;
     heatingType: string | null;
@@ -168,6 +173,48 @@ serve(async (req: Request) => {
             }
           }
         }
+      }
+    }
+
+    // --- CLAUDE WEB SEARCH FALLBACK (Phase 18g) ---
+    // The case that broke 146 Putnam Park Road in Bethel CT: ATTOM had
+    // rich data but no AVM, RentCast returned $673K (2% above the 2021
+    // sale price of $660K), and Zillow / Redfin / Compass agree the place
+    // is worth $850K-$1M. RentCast's AVM is materially undervaluing rural
+    // / luxury markets. When RentCast disagrees with last-sale appreciation
+    // by more than ~10%, ask Claude with web search to estimate from
+    // recent comparable sales. Claude is a *better* fallback than the
+    // arithmetic computed layer below for these markets.
+    const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (anthropicKey && result && shouldUseClaudeFallback(result)) {
+      try {
+        console.log("[property-lookup] Trying Claude web-search fallback");
+        const claudeEstimate = await estimateValueViaClaude(
+          {
+            address: trimmedAddress,
+            yearBuilt: result.yearBuilt,
+            squareFootage: result.squareFootage,
+            bedrooms: result.bedrooms,
+            bathrooms: result.bathrooms,
+            lastSalePrice: result.lastSalePrice,
+            lastSaleDate: result.lastSaleDate,
+            propertyType: result.propertyType,
+          },
+          anthropicKey
+        );
+        if (claudeEstimate?.value) {
+          console.log(
+            `[property-lookup] Claude estimate: $${claudeEstimate.value} (${claudeEstimate.lowValue}-${claudeEstimate.highValue}, conf=${claudeEstimate.confidence})`
+          );
+          result.estimatedValue = claudeEstimate.value;
+          result.estimatedValueLow = claudeEstimate.lowValue ?? null;
+          result.estimatedValueHigh = claudeEstimate.highValue ?? null;
+          result.estimatedValueConfidence = claudeEstimate.confidence ?? 70;
+          result.estimatedValueSource = "ai_comps";
+          result.estimatedValueReasoning = claudeEstimate.reasoning ?? null;
+        }
+      } catch (err) {
+        console.warn("[property-lookup] Claude fallback failed:", err);
       }
     }
 
@@ -477,6 +524,181 @@ async function tryRentcast(address: string, apiKey: string): Promise<PropertyRes
 }
 
 // --- Phase 16e: square footage × state median fallback ---
+
+// --- Phase 18g: Claude web-search fallback ---
+
+interface ClaudeValueInput {
+  address: string;
+  yearBuilt: number | null;
+  squareFootage: number | null;
+  bedrooms: number | null;
+  bathrooms: number | null;
+  lastSalePrice: number | null;
+  lastSaleDate: string | null;
+  propertyType: string | null;
+}
+
+interface ClaudeEstimate {
+  value: number | null;
+  lowValue: number | null;
+  highValue: number | null;
+  confidence: number | null;
+  reasoning: string | null;
+}
+
+/// Phase 18g: When ATTOM has no AVM AND RentCast either failed or returned
+/// a value that disagrees materially with the last-sale appreciation curve,
+/// fall back to Claude with web search. The arithmetic computed layer below
+/// is the next fallback after Claude — Claude is preferred because it can
+/// see actual recent comps in the neighborhood, which matters in rural /
+/// luxury markets where RentCast undervalues by 20-30%.
+function shouldUseClaudeFallback(result: PropertyResult): boolean {
+  // Always try Claude when there's still no estimated value at all.
+  if (result.estimatedValue == null) return true;
+  // Try Claude when RentCast came back but the value is suspiciously low
+  // relative to a known sale price (less than 5% appreciation since the
+  // sale, even though many years may have passed). This catches the 146
+  // Putnam Park Road case directly.
+  if (
+    result.estimatedValueSource === "rentcast" &&
+    result.lastSalePrice != null &&
+    result.lastSaleDate != null
+  ) {
+    try {
+      const lastSaleDate = new Date(result.lastSaleDate);
+      const yearsSinceSale =
+        (Date.now() - lastSaleDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+      // If at least 2 years have passed but RentCast says less than 5%
+      // appreciation total, it's almost certainly undervaluing.
+      if (yearsSinceSale >= 2) {
+        const minExpected = Number(result.lastSalePrice) * 1.05;
+        if (result.estimatedValue < minExpected) {
+          return true;
+        }
+      }
+    } catch {
+      // Date parse failure — let Claude try anyway.
+      return true;
+    }
+  }
+  return false;
+}
+
+async function estimateValueViaClaude(
+  input: ClaudeValueInput,
+  apiKey: string
+): Promise<ClaudeEstimate | null> {
+  const facts = [
+    `Address: ${input.address}`,
+    input.yearBuilt ? `Year built: ${input.yearBuilt}` : null,
+    input.squareFootage ? `Square footage: ${input.squareFootage.toLocaleString()}` : null,
+    input.bedrooms ? `Bedrooms: ${input.bedrooms}` : null,
+    input.bathrooms ? `Bathrooms: ${input.bathrooms}` : null,
+    input.propertyType ? `Property type: ${input.propertyType}` : null,
+    input.lastSalePrice && input.lastSaleDate
+      ? `Last sale: $${Number(input.lastSalePrice).toLocaleString()} on ${input.lastSaleDate}`
+      : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const prompt = `You are a residential real estate valuation expert. Estimate the current 2026 market value for this single-family home.
+
+Property facts:
+${facts}
+
+Methodology:
+1. Use the web search tool to find recent (last 6 months) comparable sales in the same neighborhood / town / school district. Aim for 5-10 comps within 0.5 miles, similar size and age.
+2. Cross-reference with public Zillow / Redfin / Compass / Realtor.com listings or estimates for this exact address if available.
+3. Adjust for size, age, condition, lot size, and recent market appreciation in the area.
+4. Provide a tight low/mid/high range with a confidence level reflecting how many comps you found.
+
+Return ONLY a JSON object with these exact keys, no markdown fences:
+{
+  "value": <integer mid estimate>,
+  "lowValue": <integer low end of range>,
+  "highValue": <integer high end of range>,
+  "confidence": <integer 0-100 — 80+ when 5+ recent comps exist, 60 when scarce>,
+  "reasoning": "<one paragraph 2-4 sentences: how many comps you found, the range you saw, the key adjustments you made>"
+}`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 2048,
+      tools: [
+        {
+          type: "web_search_20250305",
+          name: "web_search",
+          max_uses: 5,
+        },
+      ],
+      system:
+        "You are a real estate valuation expert. Use web search to find recent comparable sales. Return only valid JSON, no markdown fences, no preamble.",
+      messages: [{ role: "user", content: prompt }],
+    }),
+    signal: AbortSignal.timeout(60000),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    console.error(
+      `[property-lookup] Claude API error: ${response.status} ${errText.substring(0, 300)}`
+    );
+    return null;
+  }
+
+  const data = await response.json();
+  // Tool-use responses come back as an array of content blocks. The final
+  // text block contains the JSON we want; intermediate blocks are tool_use
+  // / tool_result pairs that we ignore.
+  const blocks = (data.content as Array<{ type: string; text?: string }>) ?? [];
+  const textBlocks = blocks.filter((b) => b.type === "text" && b.text);
+  // Take the LAST text block, which is Claude's final answer after all
+  // tool calls completed.
+  const finalText = textBlocks[textBlocks.length - 1]?.text;
+  if (!finalText) {
+    console.warn("[property-lookup] Claude returned no text block");
+    return null;
+  }
+
+  try {
+    // Strip any markdown fences just in case (system prompt asks for none).
+    const cleaned = finalText.replace(/```json\s*|\s*```/g, "").trim();
+    // If Claude wrapped the JSON in extra prose, find the first {...} block.
+    const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+    const payload = jsonMatch ? jsonMatch[0] : cleaned;
+    const parsed = JSON.parse(payload);
+    if (typeof parsed.value !== "number") {
+      console.warn(
+        "[property-lookup] Claude estimate missing 'value':",
+        finalText.substring(0, 300)
+      );
+      return null;
+    }
+    return {
+      value: Math.round(parsed.value),
+      lowValue: typeof parsed.lowValue === "number" ? Math.round(parsed.lowValue) : null,
+      highValue: typeof parsed.highValue === "number" ? Math.round(parsed.highValue) : null,
+      confidence: typeof parsed.confidence === "number" ? Math.round(parsed.confidence) : null,
+      reasoning: typeof parsed.reasoning === "string" ? parsed.reasoning : null,
+    };
+  } catch (err) {
+    console.warn(
+      "[property-lookup] Failed to parse Claude estimate:",
+      err,
+      "raw:",
+      finalText.substring(0, 300)
+    );
+    return null;
+  }
+}
 
 /// Pull the two-letter state abbreviation out of the original address string.
 /// Robust to "City, ST 12345" and "City ST 12345" shapes.
