@@ -21,6 +21,7 @@ final class ChatViewModel: ObservableObject {
     // Context for opening chat from a specific document/property
     var contextType: String?
     var contextId: UUID?
+    var systemContext: String?
 
     private let db = DatabaseService.shared
     private var householdId: UUID?
@@ -84,7 +85,8 @@ final class ChatViewModel: ObservableObject {
                 contextType: contextType,
                 contextId: contextId?.uuidString,
                 householdId: householdId.uuidString,
-                encryptionKey: encKey
+                encryptionKey: encKey,
+                systemContext: systemContext
             )
 
             let responseText: String
@@ -506,7 +508,18 @@ final class ChatViewModel: ObservableObject {
         pendingNewDocId = nil
     }
 
-    func keepBothDocuments() {
+    func saveBoth() async {
+        duplicateExistingDoc = nil
+        pendingNewDocId = nil
+    }
+
+    func discardDuplicate() {
+        // Delete the newly uploaded document
+        if let newDocId = pendingNewDocId {
+            Task {
+                try? await db.deleteDocument(id: newDocId)
+            }
+        }
         duplicateExistingDoc = nil
         pendingNewDocId = nil
     }

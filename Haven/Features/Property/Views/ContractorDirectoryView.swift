@@ -199,10 +199,17 @@ struct ContractorDirectoryView: View {
 // MARK: - Contractor Detail
 
 struct ContractorDetailView: View {
-    let contractor: ContractorRow
+    let initialContractor: ContractorRow
+    @State private var contractor: ContractorRow
     @State private var serviceRecords: [ServiceRecordRow] = []
     @State private var showDeleteConfirmation = false
+    @State private var showEditSheet = false
     @Environment(\.dismiss) private var dismiss
+
+    init(contractor: ContractorRow) {
+        self.initialContractor = contractor
+        _contractor = State(initialValue: contractor)
+    }
 
     var body: some View {
         ScrollView {
@@ -225,6 +232,9 @@ struct ContractorDetailView: View {
                         }
                         if let license = contractor.licenseNumber {
                             infoRow("License", value: license)
+                        }
+                        if let specialties = contractor.specialties, !specialties.isEmpty {
+                            infoRow("Categories", value: specialties.joined(separator: ", "))
                         }
                         if contractor.insuranceVerified == true {
                             HStack {
@@ -299,13 +309,26 @@ struct ContractorDetailView: View {
         .navigationTitle(contractor.companyName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .destructiveAction) {
-                Button(role: .destructive) {
-                    showDeleteConfirmation = true
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showEditSheet = true } label: {
+                        Label("Edit", systemImage: "pencil")
+                    }
+                    Divider()
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
                 } label: {
-                    Image(systemName: "trash")
-                        .foregroundStyle(HavenColors.critical)
+                    Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(HavenColors.navy700)
                 }
+            }
+        }
+        .sheet(isPresented: $showEditSheet) {
+            EditContractorSheet(contractor: contractor) { updated in
+                contractor = updated
             }
         }
         .confirmationDialog("Delete \(contractor.companyName)?", isPresented: $showDeleteConfirmation) {
@@ -337,6 +360,26 @@ struct ContractorDetailView: View {
                 .foregroundStyle(HavenColors.textPrimary)
         }
     }
+}
+
+// MARK: - Vendor Categories
+
+/// Combined category list for vendor/contact specialty pickers.
+/// Includes all home system categories plus vehicle/auto service categories.
+enum VendorCategories {
+    static let vehicleCategories: [String] = [
+        "Auto Mechanic",
+        "Tire Shop",
+        "Auto Body",
+        "Auto Glass",
+        "Auto Detailing",
+        "Auto Dealership",
+        "Towing",
+        "Car Wash"
+    ]
+
+    static let all: [String] = (SystemCategory.allCases.map(\.rawValue) + vehicleCategories)
+        .sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
 }
 
 // MARK: - Add Contractor
@@ -393,19 +436,19 @@ struct AddContractorView: View {
 
                 if contactType == "Contractor / Service Provider" {
                     Section("Specialties") {
-                        ForEach(SystemCategory.allCases, id: \.self) { cat in
+                        ForEach(VendorCategories.all, id: \.self) { cat in
                             Button {
-                                if selectedSpecialties.contains(cat.rawValue) {
-                                    selectedSpecialties.remove(cat.rawValue)
+                                if selectedSpecialties.contains(cat) {
+                                    selectedSpecialties.remove(cat)
                                 } else {
-                                    selectedSpecialties.insert(cat.rawValue)
+                                    selectedSpecialties.insert(cat)
                                 }
                             } label: {
                                 HStack {
-                                    Text(cat.rawValue)
+                                    Text(cat)
                                         .foregroundStyle(HavenColors.textPrimary)
                                     Spacer()
-                                    if selectedSpecialties.contains(cat.rawValue) {
+                                    if selectedSpecialties.contains(cat) {
                                         Image(systemName: "checkmark")
                                             .foregroundStyle(HavenColors.navy)
                                     }
@@ -489,6 +532,179 @@ private func sanitizedPhoneURL(_ phone: String) -> URL? {
 
 private func sanitizedEmailURL(_ email: String) -> URL? {
     URL(string: "mailto:\(email.trimmingCharacters(in: .whitespaces))")
+}
+
+// MARK: - Edit Contractor Sheet
+
+/// Edits an existing contractor/contact. Lets the user fix categories
+/// (e.g. when AI mismatches an auto vendor as HVAC) plus all other fields.
+struct EditContractorSheet: View {
+    let contractor: ContractorRow
+    var onSave: ((ContractorRow) -> Void)?
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var companyName: String
+    @State private var contactName: String
+    @State private var phone: String
+    @State private var email: String
+    @State private var address: String
+    @State private var licenseNumber: String
+    @State private var contactType: String
+    @State private var selectedSpecialties: Set<String>
+    @State private var isSaving = false
+    @State private var error: String?
+
+    private let contactTypes = [
+        "Contractor / Service Provider",
+        "Attorney",
+        "Financial Advisor / CPA",
+        "Insurance Agent",
+        "Property Manager",
+        "Other"
+    ]
+
+    init(contractor: ContractorRow, onSave: ((ContractorRow) -> Void)? = nil) {
+        self.contractor = contractor
+        self.onSave = onSave
+
+        // Recover the original contactType (which the add flow stores as the
+        // first element of `specialties` for non-contractor types).
+        let raw = contractor.specialties ?? []
+        let known = [
+            "Contractor / Service Provider",
+            "Attorney",
+            "Financial Advisor / CPA",
+            "Insurance Agent",
+            "Property Manager",
+            "Other"
+        ]
+        let detectedType = raw.first.flatMap { first in known.contains(first) ? first : nil }
+        let resolvedType = detectedType ?? "Contractor / Service Provider"
+        let categoryValues: Set<String> = {
+            if let detected = detectedType {
+                return Set(raw.dropFirst().filter { $0 != detected })
+            }
+            return Set(raw)
+        }()
+
+        _companyName = State(initialValue: contractor.companyName)
+        _contactName = State(initialValue: contractor.contactName ?? "")
+        _phone = State(initialValue: contractor.phone)
+        _email = State(initialValue: contractor.email ?? "")
+        _address = State(initialValue: contractor.address ?? "")
+        _licenseNumber = State(initialValue: contractor.licenseNumber ?? "")
+        _contactType = State(initialValue: resolvedType)
+        _selectedSpecialties = State(initialValue: categoryValues)
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Contact Type") {
+                    Picker("Type", selection: $contactType) {
+                        ForEach(contactTypes, id: \.self) { type in
+                            Text(type).tag(type)
+                        }
+                    }
+                }
+
+                Section(contactType == "Contractor / Service Provider" ? "Company Info" : "Contact Info") {
+                    TextField(contactType == "Contractor / Service Provider" ? "Company Name" : "Name / Firm", text: $companyName)
+                    TextField("Contact Name", text: $contactName)
+                    TextField("Phone", text: $phone)
+                        .keyboardType(.phonePad)
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .textInputAutocapitalization(.never)
+                }
+
+                Section("Address") {
+                    TextField("Address", text: $address)
+                }
+
+                if contactType == "Contractor / Service Provider" {
+                    Section("Categories") {
+                        ForEach(VendorCategories.all, id: \.self) { cat in
+                            Button {
+                                if selectedSpecialties.contains(cat) {
+                                    selectedSpecialties.remove(cat)
+                                } else {
+                                    selectedSpecialties.insert(cat)
+                                }
+                            } label: {
+                                HStack {
+                                    Text(cat)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Spacer()
+                                    if selectedSpecialties.contains(cat) {
+                                        Image(systemName: "checkmark")
+                                            .foregroundStyle(HavenColors.navy)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Section("License") {
+                    TextField("License Number", text: $licenseNumber)
+                }
+
+                if let error {
+                    Section {
+                        Text(error)
+                            .foregroundStyle(HavenColors.critical)
+                            .font(HavenTypography.caption)
+                    }
+                }
+            }
+            .scrollContentBackground(.hidden)
+            .background(HavenColors.cream)
+            .navigationTitle("Edit Contact")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") { Task { await save() } }
+                        .disabled(companyName.isEmpty || phone.isEmpty || isSaving)
+                }
+            }
+            .tint(HavenColors.navy)
+        }
+    }
+
+    private func save() async {
+        isSaving = true
+        error = nil
+        do {
+            var allSpecialties = Array(selectedSpecialties)
+            if contactType != "Contractor / Service Provider" {
+                allSpecialties.insert(contactType, at: 0)
+            }
+
+            var update = ContractorUpdate()
+            update.companyName = companyName
+            update.contactName = contactName.isEmpty ? nil : contactName
+            update.phone = phone
+            update.email = email.isEmpty ? nil : email
+            update.address = address.isEmpty ? nil : address
+            update.licenseNumber = licenseNumber.isEmpty ? nil : licenseNumber
+            update.specialties = allSpecialties.isEmpty ? nil : allSpecialties
+
+            let updated = try await DatabaseService.shared.updateContractor(id: contractor.id, update)
+            Haptics.success()
+            NotificationCenter.default.post(name: .contractorChanged, object: nil,
+                userInfo: ["action": "updated", "id": contractor.id.uuidString])
+            onSave?(updated)
+            dismiss()
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+        isSaving = false
+    }
 }
 
 #Preview {

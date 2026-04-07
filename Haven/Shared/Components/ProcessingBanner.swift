@@ -3,50 +3,57 @@ import SwiftUI
 struct ProcessingBanner: View {
     @ObservedObject var manager = DocumentUploadManager.shared
     @State private var showDetails = false
+    var onNavigateToItem: ((UUID) -> Void)? = nil
 
     var body: some View {
         if manager.showBanner {
             VStack(spacing: 0) {
-                Button {
-                    withAnimation { showDetails.toggle() }
-                } label: {
-                    HStack(spacing: 10) {
-                        if manager.isProcessing {
-                            ProgressView()
-                                .controlSize(.small)
-                                .tint(HavenColors.navy)
-                        } else if manager.failedCount > 0 {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .foregroundStyle(HavenColors.warning)
-                        } else {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(HavenColors.success)
-                        }
+                HStack(spacing: 10) {
+                    if manager.isProcessing {
+                        ProgressView()
+                            .controlSize(.small)
+                            .tint(HavenColors.navy)
+                    } else if manager.failedCount > 0 {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(HavenColors.warning)
+                    } else {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HavenColors.success)
+                    }
 
-                        Text(manager.bannerText)
-                            .font(HavenTypography.uiLabel)
-                            .foregroundStyle(HavenColors.textPrimary)
+                    Text(manager.bannerText)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
 
-                        Spacer()
+                    Spacer()
 
-                        if manager.isProcessing {
-                            Text("\(Int(manager.progress * 100))%")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textSecondary)
-                        } else {
-                            Button {
-                                withAnimation { manager.dismissBanner() }
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.caption2)
-                                    .foregroundStyle(HavenColors.textTertiary)
-                            }
+                    if manager.isProcessing {
+                        Text("\(Int(manager.progress * 100))%")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    } else {
+                        Button {
+                            withAnimation { manager.dismissBanner() }
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.caption2)
+                                .foregroundStyle(HavenColors.textTertiary)
                         }
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
                 }
-                .buttonStyle(.plain)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    if manager.isProcessing {
+                        withAnimation { showDetails.toggle() }
+                    } else if let firstDocId = manager.queue.first(where: { $0.isComplete && $0.error == nil })?.documentId {
+                        onNavigateToItem?(firstDocId)
+                        withAnimation { manager.dismissBanner() }
+                    } else {
+                        withAnimation { showDetails.toggle() }
+                    }
+                }
 
                 if manager.isProcessing {
                     ProgressView(value: manager.progress)
@@ -79,9 +86,22 @@ struct ProcessingBanner: View {
 
                                 Spacer()
 
-                                Text(item.status)
-                                    .font(.system(size: 10))
-                                    .foregroundStyle(HavenColors.textTertiary)
+                                if !manager.isProcessing && item.isComplete && item.error == nil {
+                                    Text("Review")
+                                        .font(.system(size: 10, weight: .medium))
+                                        .foregroundStyle(HavenColors.navy700)
+                                } else {
+                                    Text(item.status)
+                                        .font(.system(size: 10))
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                if !manager.isProcessing, item.isComplete, item.error == nil, let docId = item.documentId {
+                                    onNavigateToItem?(docId)
+                                    withAnimation { manager.dismissBanner() }
+                                }
                             }
                         }
                     }

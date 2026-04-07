@@ -7,12 +7,16 @@ struct InboxItemDetailView: View {
     let item: DatabaseService.InboxItemRow
     let properties: [PropertyRow]
     var projects: [PropertyProjectRow] = []
-    let onProcess: (UUID?, String, String?) -> Void
+    var vehicles: [VehicleRow] = []
+    let onProcess: (UUID?, String, String?, UUID?) -> Void  // propertyId, action, category, vehicleId
     let onDismiss: () -> Void
+    var onDelete: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedPropertyId: UUID?
+    @State private var selectedVehicleId: UUID?
     @State private var selectedCategory: String = "Other"
+    @State private var showDeleteConfirm = false
     @State private var isProcessing = false
     @State private var quickLookURL: URL?
     @State private var isLoadingAttachment = false
@@ -20,15 +24,14 @@ struct InboxItemDetailView: View {
     @State private var senderSaved = false
     @State private var isSavingSender = false
     @State private var showProjectPicker = false
-
-    private let documentCategories = [
-        "Contractor Quote", "Warranty Card", "Inspection Report",
-        "Home Inspection/Test Report", "Homeowners Insurance",
-        "Vehicle Title", "Deed", "Mortgage", "Property Tax Records",
-        "Utility Bill", "Vendor Contract", "Appliance Manual",
-        "Permit", "Home Bill/Invoice", "Home Document",
-        "Other Personal Documents"
-    ]
+    @State private var showInvoiceChoiceSheet = false
+    @State private var invoiceDismissed = false
+    @State private var hasAutoShownInvoiceChoice = false
+    @State private var showAddUtilitySheet = false
+    @State private var utilityAdded = false
+    @State private var showCategoryPicker = false
+    @State private var showLinkToProject = false
+    @State private var linkedToProject = false
 
     var body: some View {
         ScrollView {
@@ -80,6 +83,20 @@ struct InboxItemDetailView: View {
         .navigationTitle(item.title)
         .navigationBarTitleDisplayMode(.inline)
         .quickLookPreview($quickLookURL)
+        .sheet(isPresented: $showInvoiceChoiceSheet) {
+            if let docId = item.relatedDocumentId {
+                InvoiceChoiceSheet(
+                    review: PendingInvoiceReview(
+                        documentId: docId,
+                        documentTitle: item.title,
+                        category: "Home Bill/Invoice",
+                        householdId: item.householdId
+                    )
+                ) {
+                    invoiceDismissed = true
+                }
+            }
+        }
         .sheet(isPresented: $showProjectPicker) {
             NavigationStack {
                 List {
@@ -87,7 +104,7 @@ struct InboxItemDetailView: View {
                         Button {
                             Haptics.medium()
                             let propId = selectedPropertyId ?? properties.first?.id
-                            onProcess(propId, "add_to_project", project.id.uuidString)
+                            onProcess(propId, "add_to_project", project.id.uuidString, nil)
                             showProjectPicker = false
                             dismiss()
                         } label: {
@@ -118,22 +135,97 @@ struct InboxItemDetailView: View {
             }
             .presentationDetents([.medium, .large])
         }
-        .toolbar {
-            if !item.isPending {
-                ToolbarItem(placement: .destructiveAction) {
-                    Button {
-                        onDismiss()
-                        dismiss()
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundStyle(HavenColors.critical)
+        .sheet(isPresented: $showCategoryPicker) {
+            DocumentCategoryPicker(selectedCategory: $selectedCategory)
+                .presentationDetents([.large])
+        }
+        .sheet(isPresented: $showLinkToProject) {
+            NavigationStack {
+                List {
+                    ForEach(projects) { project in
+                        Button {
+                            guard let docId = item.relatedDocumentId else { return }
+                            Task {
+                                try? await DatabaseService.shared.linkDocumentToProject(documentId: docId, projectId: project.id)
+                                linkedToProject = true
+                                Haptics.success()
+                                showLinkToProject = false
+                            }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "folder.fill")
+                                    .foregroundStyle(HavenColors.navy)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(project.name)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    Text(project.category)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                                Spacer()
+                                Text(project.status.capitalized)
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+                }
+                .listStyle(.plain)
+                .navigationTitle("Link to Project")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("Cancel") { showLinkToProject = false }
                     }
                 }
             }
+            .presentationDetents([.medium, .large])
+        }
+        .sheet(isPresented: $showAddUtilitySheet) {
+            utilityAddSheet
+        }
+        .toolbar {
+            ToolbarItem(placement: .destructiveAction) {
+                Button {
+                    showDeleteConfirm = true
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(HavenColors.critical)
+                }
+            }
+        }
+        .alert("Delete this item?", isPresented: $showDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let onDelete {
+                    onDelete()
+                } else {
+                    onDismiss()
+                }
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("This will permanently remove this inbox item.")
         }
         .onAppear {
             if properties.count == 1 {
                 selectedPropertyId = properties.first?.id
+            }
+            // Pre-select the AI-suggested category
+            if let suggested = item.metadata?.suggestedCategory, !suggested.isEmpty {
+                selectedCategory = suggested
+            }
+        }
+        .task {
+            // Auto-present invoice choice for bills with a linked document
+            if item.relatedDocumentId != nil,
+               item.familyCategory == "bills",
+               !hasAutoShownInvoiceChoice,
+               !invoiceDismissed {
+                hasAutoShownInvoiceChoice = true
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                showInvoiceChoiceSheet = true
             }
         }
     }
@@ -249,7 +341,7 @@ struct InboxItemDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(HavenTheme.spacing16)
-        .background(Color.white)
+        .background(HavenColors.creamWhite)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -322,7 +414,7 @@ struct InboxItemDetailView: View {
                     .foregroundStyle(HavenColors.navy700)
             }
             .padding(HavenTheme.spacing12)
-            .background(Color.white)
+            .background(HavenColors.creamWhite)
             .clipShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
@@ -427,6 +519,26 @@ struct InboxItemDetailView: View {
                 }
                 if item.relatedDocumentId != nil {
                     relatedRow(icon: "doc.fill", label: "Document saved", color: HavenColors.navy)
+
+                    if !linkedToProject {
+                        Button {
+                            showLinkToProject = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "link.badge.plus")
+                                    .font(.system(size: 12))
+                                Text("Link to Project")
+                                    .font(HavenTypography.uiLabel)
+                            }
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(HavenColors.navy.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                    } else {
+                        relatedRow(icon: "folder.fill", label: "Linked to project", color: HavenColors.success)
+                    }
                 }
                 if item.relatedContractorId != nil {
                     relatedRow(icon: "person.crop.circle.badge.plus", label: "Vendor added", color: HavenColors.success)
@@ -494,7 +606,7 @@ struct InboxItemDetailView: View {
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
                         .padding(HavenTheme.spacing12)
-                        .background(Color.white)
+                        .background(HavenColors.creamWhite)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                 }
@@ -507,43 +619,143 @@ struct InboxItemDetailView: View {
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
 
-                    Menu {
-                        ForEach(documentCategories, id: \.self) { cat in
-                            Button { selectedCategory = cat } label: {
-                                HStack {
-                                    Text(cat)
-                                    if selectedCategory == cat { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
-                    } label: {
+                    Button { showCategoryPicker = true } label: {
                         HStack {
                             Text(selectedCategory)
                                 .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
                             Spacer()
                             Image(systemName: "chevron.up.chevron.down")
                                 .font(.system(size: 11))
                                 .foregroundStyle(HavenColors.textTertiary)
                         }
                         .padding(HavenTheme.spacing12)
-                        .background(Color.white)
+                        .background(HavenColors.creamWhite)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
-            // Action buttons
+            // Action buttons -- all use HavenButton for uniform sizing
             VStack(spacing: HavenTheme.spacing8) {
-                if isQuoteAction {
-                    // Quote actions: New Project, Add to Project, Save as Document
-                    HStack(spacing: HavenTheme.spacing8) {
+                if item.actionType == "add_utility_provider" && !utilityAdded {
+                    utilityProviderPrompt
+                } else if item.actionType == "resolve_duplicate" {
+                    HavenButton(
+                        title: "Replace Existing",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            onProcess(nil, "resolve_duplicate", "replace", nil)
+                            dismiss()
+                        },
+                        icon: "arrow.triangle.swap",
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing
+                    )
+
+                    HavenButton(
+                        title: "Save Both Copies",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            onProcess(nil, "resolve_duplicate", "save_both", nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "doc.on.doc",
+                        isDisabled: isProcessing
+                    )
+
+                    HavenButton(
+                        title: "Delete This Document",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            onProcess(nil, "resolve_duplicate", "delete", nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "trash",
+                        isDisabled: isProcessing
+                    )
+                } else if item.actionType == "review_insurance_claim" {
+                    HavenButton(
+                        title: "Create Claim Project",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "create_claim_project", nil, nil)
+                            dismiss()
+                        },
+                        icon: "shield.fill",
+                        isLoading: isProcessing,
+                        isDisabled: isProcessing || (selectedPropertyId == nil && properties.count > 1)
+                    )
+
+                    HavenButton(
+                        title: "Save as Document",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_document", "Homeowners Insurance", nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "doc.fill",
+                        isDisabled: isProcessing
+                    )
+                } else if isQuoteAction {
+                    let matchingProject = findMatchingProject()
+
+                    if let match = matchingProject {
+                        HStack(spacing: 6) {
+                            Image(systemName: "arrow.triangle.merge")
+                                .font(.system(size: 12))
+                                .foregroundStyle(HavenColors.info)
+                            Text("A project for this vendor already exists")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(HavenColors.info)
+                        }
+
+                        HavenButton(
+                            title: "Add to \(match.name)",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                let propId = selectedPropertyId ?? properties.first?.id
+                                onProcess(propId, "add_to_project", match.id.uuidString, nil)
+                                dismiss()
+                            },
+                            icon: "folder.badge.plus",
+                            isLoading: isProcessing,
+                            isDisabled: isProcessing
+                        )
+
+                        HavenButton(
+                            title: "New Project Instead",
+                            action: {
+                                guard !isProcessing else { return }
+                                isProcessing = true
+                                let propId = selectedPropertyId ?? properties.first?.id
+                                onProcess(propId, "process_quote", nil, nil)
+                                dismiss()
+                            },
+                            style: .secondary,
+                            icon: "hammer.fill",
+                            isDisabled: isProcessing
+                        )
+                    } else {
                         HavenButton(
                             title: "New Project",
                             action: {
                                 guard !isProcessing else { return }
                                 isProcessing = true
                                 let propId = selectedPropertyId ?? properties.first?.id
-                                onProcess(propId, "process_quote", nil)
+                                onProcess(propId, "process_quote", nil, nil)
                                 dismiss()
                             },
                             icon: "hammer.fill",
@@ -552,39 +764,29 @@ struct InboxItemDetailView: View {
                         )
 
                         if !projects.isEmpty {
-                            Button {
-                                showProjectPicker = true
-                            } label: {
-                                HStack(spacing: 6) {
-                                    Image(systemName: "folder.badge.plus")
-                                    Text("Add to Project")
-                                }
-                                .font(HavenTypography.uiButton)
-                                .foregroundStyle(HavenColors.navy)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(HavenColors.navy.opacity(0.08))
-                                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
-                            }
-                            .disabled(isProcessing)
+                            HavenButton(
+                                title: "Add to Project",
+                                action: { showProjectPicker = true },
+                                style: .secondary,
+                                icon: "folder.badge.plus",
+                                isDisabled: isProcessing
+                            )
                         }
                     }
 
-                    Button {
-                        guard !isProcessing else { return }
-                        isProcessing = true
-                        let propId = selectedPropertyId ?? properties.first?.id
-                        onProcess(propId, "process_document", "Contractor Quote")
-                        dismiss()
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "doc.fill").font(.caption)
-                            Text("Just Save Document")
-                                .font(HavenTypography.uiLabel)
-                        }
-                        .foregroundStyle(HavenColors.textTertiary)
-                    }
-                    .disabled(isProcessing)
+                    HavenButton(
+                        title: "Just Save Document",
+                        action: {
+                            guard !isProcessing else { return }
+                            isProcessing = true
+                            let propId = selectedPropertyId ?? properties.first?.id
+                            onProcess(propId, "process_document", "Contractor Quote", nil)
+                            dismiss()
+                        },
+                        style: .secondary,
+                        icon: "doc.fill",
+                        isDisabled: isProcessing
+                    )
                 } else {
                     HavenButton(
                         title: isProcessing ? "Processing..." : primaryActionTitle,
@@ -593,7 +795,7 @@ struct InboxItemDetailView: View {
                             isProcessing = true
                             let propId = selectedPropertyId ?? properties.first?.id
                             let category = (item.actionType == "classify_document" || item.actionType == "review") ? selectedCategory : nil
-                            onProcess(propId, primaryActionType, category)
+                            onProcess(propId, primaryActionType, category, nil)
                         },
                         icon: primaryActionIcon,
                         isLoading: isProcessing,
@@ -612,6 +814,143 @@ struct InboxItemDetailView: View {
         .padding(HavenTheme.spacing16)
         .background(HavenColors.navy.opacity(0.04))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Utility Provider Prompt
+
+    private var utilityProviderPrompt: some View {
+        let meta = item.metadata
+        let providerName = meta?.utilityProvider?.providerName ?? meta?.utilityProviderSuggestion?.vendorName ?? "this vendor"
+        let providerType = meta?.utilityProvider?.providerType
+        let typeLabel = providerType.flatMap { type in
+            [
+                "electric": "Electric", "internet_cable": "Internet", "security": "Security",
+                "natural_gas": "Natural Gas", "water": "Water", "trash": "Trash/Recycling",
+                "propane": "Propane", "oil": "Oil", "solar": "Solar",
+                "pest_control": "Pest Control", "landscaping": "Landscaping"
+            ][type]
+        }
+
+        return VStack(spacing: HavenTheme.spacing12) {
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    HStack(spacing: 10) {
+                        if let logoUrl = meta?.utilityProvider?.logoUrl, let url = URL(string: logoUrl) {
+                            AsyncImage(url: url) { image in
+                                image.resizable().aspectRatio(contentMode: .fit)
+                            } placeholder: {
+                                Image(systemName: "bolt.fill")
+                                    .foregroundStyle(HavenColors.navy800)
+                            }
+                            .frame(width: 32, height: 32)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        } else {
+                            Image(systemName: "bolt.fill")
+                                .font(.system(size: 18))
+                                .foregroundStyle(HavenColors.navy800)
+                                .frame(width: 32, height: 32)
+                        }
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Add \(providerName) as a utility provider?")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            if let typeLabel {
+                                Text(typeLabel)
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+
+                    if let amount = meta?.billAmount {
+                        HStack(spacing: 4) {
+                            Text("Bill amount:")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                            Text("$\(Int(amount))")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                    }
+                }
+            }
+
+            HavenButton(
+                title: "Add \(typeLabel ?? "Utility") Provider",
+                action: {
+                    Haptics.light()
+                    showAddUtilitySheet = true
+                },
+                icon: "plus.circle.fill"
+            )
+
+            Button("Not a utility") {
+                utilityAdded = true
+                onDismiss()
+                dismiss()
+            }
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textTertiary)
+        }
+    }
+
+    @ViewBuilder
+    private var utilityAddSheet: some View {
+        let propId = selectedPropertyId ?? properties.first?.id ?? UUID()
+        let meta = item.metadata
+        let up = meta?.utilityProvider
+        let sug = meta?.utilityProviderSuggestion
+        let costStr: String? = meta?.billAmount.map { String(Int($0)) }
+
+        AddUtilitySheet(
+            propertyId: propId,
+            householdId: item.householdId,
+            preselectedType: up?.providerType,
+            onAdd: { _ in
+                utilityAdded = true
+                Haptics.success()
+                struct InboxActionComplete: Encodable {
+                    let action_completed: Bool
+                    let needs_action: Bool
+                }
+                Task {
+                    _ = try? await HavenSupabase.from("inbox_items")
+                        .update(InboxActionComplete(action_completed: true, needs_action: false))
+                        .eq("id", value: item.id.uuidString)
+                        .execute()
+                }
+            },
+            prefillProviderName: up?.providerName ?? sug?.vendorName,
+            prefillProviderSlug: up?.providerSlug,
+            prefillProviderType: up?.providerType,
+            prefillAccountNumber: meta?.billAccountNumber,
+            prefillMonthlyCost: costStr,
+            prefillPhone: up?.phone ?? sug?.vendorPhone,
+            prefillWebsite: up?.website
+        )
+    }
+
+    /// Find an existing project that matches this quote's vendor or category
+    private func findMatchingProject() -> PropertyProjectRow? {
+        let vendorName = item.metadata?.vendorName?.lowercased() ?? ""
+        let summary = (item.summary ?? "").lowercased()
+        let title = item.title.lowercased()
+
+        return projects.first { project in
+            let projName = project.name.lowercased()
+            let projCategory = project.category.lowercased()
+
+            // Match by vendor name in project name
+            if !vendorName.isEmpty && (projName.contains(vendorName) || vendorName.contains(projName)) { return true }
+
+            // Match by category keywords in project name/category
+            let searchText = "\(title) \(summary) \(vendorName)"
+            if projCategory.split(separator: " ").contains(where: { searchText.contains($0.lowercased()) }) { return true }
+            if projName.split(separator: " ").filter({ $0.count > 3 }).contains(where: { searchText.contains($0.lowercased()) }) { return true }
+
+            return false
+        }
     }
 
     private var isQuoteAction: Bool {
@@ -640,7 +979,7 @@ struct InboxItemDetailView: View {
             if item.actionType == "classify_document" || item.actionType == "review" {
                 return "process_document"
             }
-            return "process_quote"
+            return "process_document"
         }
     }
 

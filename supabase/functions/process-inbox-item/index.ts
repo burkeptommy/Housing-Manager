@@ -38,8 +38,9 @@ serve(async (req: Request) => {
     const {
       inbox_item_id,
       property_id,
-      action,        // 'process_quote', 'process_document', 'dismiss'
+      action,        // 'process_quote', 'process_document', 'dismiss', 'process_vehicle_document'
       document_category,
+      vehicle_id,
     } = body;
 
     if (!inbox_item_id) {
@@ -237,13 +238,37 @@ serve(async (req: Request) => {
           if (analyzeRes.ok) {
             const analyzeData = await analyzeRes.json();
             if (analyzeData.analysis) {
+              const quoteTotal = analyzeData.analysis.overallAssessment?.totalQuoted ?? analyzeData.analysis.quoteTotal ?? null;
+              const fairTotal = analyzeData.analysis.overallAssessment?.estimatedFairTotal ?? null;
               await supabase
                 .from("property_projects")
                 .update({
                   ai_research: { quoteAnalysis: analyzeData.analysis },
                   ai_research_updated_at: new Date().toISOString(),
+                  ...(quoteTotal ? { estimated_budget: quoteTotal, ai_estimated_pro_cost: fairTotal } : {}),
                 })
                 .eq("id", project.id);
+
+              // Save as project_quote and auto-activate
+              const { data: savedQuote } = await supabase.from("project_quotes").insert({
+                project_id: project.id,
+                household_id: householdId,
+                contractor_id: contractorId,
+                quote_date: analyzeData.analysis.quoteDate || null,
+                quote_total: quoteTotal,
+                estimated_fair_total: fairTotal,
+                overall_rating: analyzeData.analysis.overallAssessment?.rating ?? null,
+                analysis: analyzeData.analysis,
+                file_path: item.attachment_path || null,
+              }).select("id").single();
+
+              // Auto-activate this quote on the project
+              if (savedQuote) {
+                await supabase.from("property_projects")
+                  .update({ active_quote_id: savedQuote.id })
+                  .eq("id", project.id);
+              }
+
               actions.push("analyzed_quote");
               result.analysis = analyzeData.analysis;
             }
@@ -362,18 +387,49 @@ serve(async (req: Request) => {
           if (analyzeRes.ok) {
             const analyzeData = await analyzeRes.json();
             if (analyzeData.analysis) {
+              const quoteTotal = analyzeData.analysis.overallAssessment?.totalQuoted ?? analyzeData.analysis.quoteTotal ?? null;
+              const fairTotal = analyzeData.analysis.overallAssessment?.estimatedFairTotal ?? null;
+
               // Save as project_quote on the target project
-              await supabase.from("project_quotes").insert({
+              const { data: savedQuote } = await supabase.from("project_quotes").insert({
                 project_id: target_project_id,
                 household_id: householdId,
                 contractor_id: contractorId,
                 quote_date: analyzeData.analysis.quoteDate || null,
-                quote_total: analyzeData.analysis.overallAssessment?.totalQuoted ?? analyzeData.analysis.quoteTotal ?? null,
-                estimated_fair_total: analyzeData.analysis.overallAssessment?.estimatedFairTotal ?? null,
+                quote_total: quoteTotal,
+                estimated_fair_total: fairTotal,
                 overall_rating: analyzeData.analysis.overallAssessment?.rating ?? null,
                 analysis: analyzeData.analysis,
                 file_path: item.attachment_path || null,
-              });
+              }).select("id").single();
+
+              // Update project budget from quote and auto-activate if first quote
+              if (quoteTotal && savedQuote) {
+                const { data: existingProject } = await supabase
+                  .from("property_projects")
+                  .select("active_quote_id")
+                  .eq("id", target_project_id)
+                  .single();
+
+                const projectUpdate: Record<string, unknown> = {};
+                // Set budget from quote total
+                if (!existingProject?.active_quote_id) {
+                  // First quote: auto-activate and set budget
+                  projectUpdate.active_quote_id = savedQuote.id;
+                  projectUpdate.estimated_budget = quoteTotal;
+                  if (fairTotal) projectUpdate.ai_estimated_pro_cost = fairTotal;
+                } else {
+                  // Additional quote: don't change active, but update budget if this is now active
+                  // (active quote stays the same unless user changes it)
+                }
+
+                if (Object.keys(projectUpdate).length > 0) {
+                  await supabase.from("property_projects")
+                    .update(projectUpdate)
+                    .eq("id", target_project_id);
+                }
+              }
+
               actions.push("analyzed_quote");
               result.analysis = analyzeData.analysis;
             }
@@ -458,6 +514,7 @@ serve(async (req: Request) => {
         ai_summary: item.summary,
       };
       if (property_id) docInsert.property_id = property_id;
+      if (vehicle_id) docInsert.vehicle_id = vehicle_id;
       if (filePath) docInsert.file_path = filePath;
 
       const { data: doc, error: docErr } = await supabase
@@ -476,6 +533,33 @@ serve(async (req: Request) => {
 
       actions.push(`stored_document:${docTitle}`);
       result.document_id = doc.id;
+
+      // Try to match document to a vehicle (by VIN, plate, or year/make/model in title/summary)
+      try {
+        const { data: vehicles } = await supabase
+          .from("vehicles")
+          .select("id, vin, license_plate, year, make, model")
+          .eq("household_id", householdId);
+
+        if (vehicles && vehicles.length > 0) {
+          const searchText = `${docTitle} ${item.summary ?? ""} ${emailBody ?? ""}`.toLowerCase();
+          const matchedVehicle = vehicles.find((v: any) => {
+            if (v.vin && searchText.includes(v.vin.toLowerCase())) return true;
+            if (v.license_plate && searchText.includes(v.license_plate.toLowerCase())) return true;
+            const ymm = [v.year, v.make, v.model].filter(Boolean).join(" ").toLowerCase();
+            if (ymm.length > 5 && searchText.includes(ymm)) return true;
+            return false;
+          });
+
+          if (matchedVehicle) {
+            await supabase.from("documents").update({ vehicle_id: matchedVehicle.id }).eq("id", doc.id);
+            actions.push(`linked_to_vehicle:${matchedVehicle.id}`);
+            console.log(`[process-inbox] Linked document to vehicle: ${matchedVehicle.id}`);
+          }
+        }
+      } catch (vErr) {
+        console.warn("[process-inbox] Vehicle matching failed (non-blocking):", vErr);
+      }
 
       // Trigger AI analysis
       if (attachmentBase64 || emailBody) {
@@ -583,6 +667,274 @@ serve(async (req: Request) => {
           .update({ category: document_category })
           .eq("id", item.related_document_id);
         actions.push(`changed_category:${document_category}`);
+      }
+
+      await supabase
+        .from("inbox_items")
+        .update({ action_completed: true, needs_action: false })
+        .eq("id", inbox_item_id);
+    }
+
+    // --- PROCESS VEHICLE DOCUMENT ---
+    else if (action === "process_vehicle_document") {
+      const docTitle =
+        (classification?.documentTitle as string) || subject || "Vehicle Document";
+      const docCategory = document_category ||
+        (classification?.documentCategory as string) || "Vehicle Title";
+
+      // Upload attachment to documents bucket if we have one
+      let filePath: string | null = null;
+      if (attachmentBase64) {
+        filePath = `${householdId}/${crypto.randomUUID()}`;
+        const fileBuffer = Uint8Array.from(atob(attachmentBase64), (c) =>
+          c.charCodeAt(0)
+        );
+        const { error: upErr } = await supabase.storage
+          .from("documents")
+          .upload(filePath, fileBuffer, {
+            contentType: item.attachment_content_type || "application/pdf",
+          });
+        if (upErr) {
+          console.error(`[process-inbox] Vehicle doc upload failed: ${upErr.message}`);
+        }
+      }
+
+      // Create document record with vehicle_id
+      const docInsert: Record<string, unknown> = {
+        household_id: householdId,
+        title: docTitle,
+        category: docCategory,
+        status: "active",
+        notes: `Stored from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}\n\n${item.summary || ""}`,
+        ai_summary: item.summary,
+      };
+      if (filePath) docInsert.file_path = filePath;
+      if (vehicle_id) docInsert.vehicle_id = vehicle_id;
+      if (property_id) docInsert.property_id = property_id;
+
+      const { data: doc, error: docErr } = await supabase
+        .from("documents")
+        .insert(docInsert)
+        .select("id")
+        .single();
+
+      if (!doc) {
+        console.error(`[process-inbox] Vehicle doc creation failed: ${docErr?.message}`);
+        return new Response(
+          JSON.stringify({ error: "Failed to create document", detail: docErr?.message }),
+          { status: 500, headers }
+        );
+      }
+
+      actions.push(`stored_vehicle_document:${docTitle}`);
+      result.document_id = doc.id;
+
+      // Trigger AI analysis (will detect VINs and enrich)
+      if (attachmentBase64 || emailBody) {
+        try {
+          await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${serviceRoleKey}`,
+            },
+            body: JSON.stringify({
+              document_id: doc.id,
+              household_id: householdId,
+              image_base64: attachmentBase64 ?? undefined,
+              text: !attachmentBase64 ? emailBody : undefined,
+              document_title: docTitle,
+              category: docCategory,
+            }),
+          });
+          actions.push("triggered_document_analysis");
+        } catch {
+          console.error("[process-inbox] Vehicle doc analysis trigger failed");
+        }
+      }
+
+      // Update inbox item
+      await supabase
+        .from("inbox_items")
+        .update({
+          action_completed: true,
+          type: "document_stored",
+          related_document_id: doc.id,
+        })
+        .eq("id", inbox_item_id);
+    }
+
+    // --- CREATE INSURANCE CLAIM PROJECT ---
+    else if (action === "create_claim_project") {
+      if (!property_id) {
+        return new Response(
+          JSON.stringify({ error: "property_id required for claim project" }),
+          { status: 400, headers }
+        );
+      }
+
+      const claimInfo = classification ?? {};
+      const claimNumber = (claimInfo as any).claimNumber ?? null;
+      const claimType = (claimInfo as any).claimType ?? null;
+      const insuranceCompany = (claimInfo as any).insuranceCompany ?? null;
+      const adjusterName = (claimInfo as any).adjusterName ?? null;
+      const adjusterPhone = (claimInfo as any).adjusterPhone ?? null;
+      const adjusterEmail = (claimInfo as any).adjusterEmail ?? null;
+      const policyNumber = (claimInfo as any).policyNumber ?? null;
+
+      const claimLabel = claimNumber
+        ? `Insurance Claim #${claimNumber}`
+        : `Insurance Claim: ${claimType || subject || "New Claim"}`;
+
+      const { data: project, error: projErr } = await supabase
+        .from("property_projects")
+        .insert({
+          household_id: householdId,
+          property_id,
+          name: claimLabel,
+          category: "Insurance Claim",
+          status: "in_progress",
+          project_type: "insurance_claim",
+          priority: "high",
+          notes: [
+            claimNumber ? `Claim #: ${claimNumber}` : null,
+            policyNumber ? `Policy #: ${policyNumber}` : null,
+            insuranceCompany ? `Insurance: ${insuranceCompany}` : null,
+            adjusterName ? `Adjuster: ${adjusterName}` : null,
+            adjusterPhone ? `Adjuster Phone: ${adjusterPhone}` : null,
+            adjusterEmail ? `Adjuster Email: ${adjusterEmail}` : null,
+            `\nCreated from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
+          ].filter(Boolean).join("\n"),
+          ai_research: {
+            claimNumber,
+            claimType,
+            policyNumber,
+            insuranceCompany,
+            adjuster: adjusterName ? { name: adjusterName, phone: adjusterPhone, email: adjusterEmail } : null,
+            emailSummaries: [{ date: new Date().toISOString(), summary: item.summary, subject }],
+          },
+        })
+        .select("id")
+        .single();
+
+      if (!project) {
+        console.error(`[process-inbox] Claim project creation failed: ${projErr?.message}`);
+        return new Response(
+          JSON.stringify({ error: "Failed to create claim project", detail: projErr?.message }),
+          { status: 500, headers }
+        );
+      }
+
+      result.project_id = project.id;
+      actions.push(`created_insurance_claim:${claimLabel}`);
+
+      // Attach file if we have one
+      if (item.attachment_path) {
+        try {
+          await supabase.from("project_files").insert({
+            project_id: project.id,
+            household_id: householdId,
+            file_path: item.attachment_path,
+            filename: item.attachment_filename || "claim_document",
+            content_type: item.attachment_content_type,
+            notes: `From email: ${subject}`,
+          });
+          actions.push("claim_file_attached");
+        } catch (_e) { /* non-blocking */ }
+      }
+
+      // Add adjuster as contact if info available
+      if (adjusterName && (adjusterPhone || adjusterEmail)) {
+        try {
+          const adjCompany = insuranceCompany
+            ? `${adjusterName} (${insuranceCompany})`
+            : adjusterName;
+          const { data: newAdj } = await supabase
+            .from("contractors")
+            .upsert({
+              household_id: householdId,
+              company_name: adjCompany,
+              contact_name: adjusterName,
+              phone: adjusterPhone || "Not provided",
+              email: adjusterEmail || null,
+              specialties: ["Insurance Claims"],
+              notes: `Claims adjuster. Added from insurance claim email: ${subject}`,
+            }, { onConflict: "household_id,company_name" })
+            .select("id")
+            .single();
+          if (newAdj) {
+            actions.push(`created_vendor:${adjCompany}`);
+          }
+        } catch (_e) { /* non-blocking */ }
+      }
+
+      await supabase
+        .from("inbox_items")
+        .update({
+          action_completed: true,
+          type: "project_created",
+          related_project_id: project.id,
+        })
+        .eq("id", inbox_item_id);
+    }
+
+    // --- RESOLVE DUPLICATE ---
+    else if (action === "resolve_duplicate") {
+      const resolution = document_category; // "replace", "save_both", or "delete"
+      const duplicateOfTitle = (metadata?.duplicate_of_title as string) || "Unknown";
+
+      if (resolution === "replace") {
+        // Delete the EXISTING document (keep the new one from this email)
+        // Find existing doc by matching content_hash
+        if (item.related_document_id) {
+          const { data: newDoc } = await supabase
+            .from("documents")
+            .select("content_hash")
+            .eq("id", item.related_document_id)
+            .single();
+
+          if (newDoc?.content_hash) {
+            const { data: existingDocs } = await supabase
+              .from("documents")
+              .select("id, file_path")
+              .eq("household_id", householdId)
+              .eq("content_hash", newDoc.content_hash)
+              .is("deleted_at", null)
+              .neq("id", item.related_document_id);
+
+            for (const existing of existingDocs || []) {
+              // Delete storage file
+              if (existing.file_path) {
+                await supabase.storage.from("documents").remove([existing.file_path]);
+              }
+              // Soft-delete DB record
+              await supabase.from("documents")
+                .update({ deleted_at: new Date().toISOString() })
+                .eq("id", existing.id);
+            }
+            actions.push("replaced_existing_document");
+          }
+        }
+      } else if (resolution === "delete") {
+        // Delete the NEW document (the one from this email)
+        if (item.related_document_id) {
+          const { data: newDoc } = await supabase
+            .from("documents")
+            .select("file_path")
+            .eq("id", item.related_document_id)
+            .single();
+
+          if (newDoc?.file_path) {
+            await supabase.storage.from("documents").remove([newDoc.file_path]);
+          }
+          await supabase.from("documents")
+            .update({ deleted_at: new Date().toISOString() })
+            .eq("id", item.related_document_id);
+          actions.push("deleted_new_document");
+        }
+      } else {
+        // save_both: just mark as resolved, keep both
+        actions.push("saved_both_copies");
       }
 
       await supabase

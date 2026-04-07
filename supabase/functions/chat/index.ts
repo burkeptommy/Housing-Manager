@@ -34,11 +34,12 @@ interface ChatRequest {
     role: "user" | "assistant";
     content: string;
   }>;
-  context_type?: "general" | "document" | "property" | "project" | "maintenance";
+  context_type?: "general" | "document" | "property" | "project" | "maintenance" | "vehicle";
   context_id?: string;
   household_id: string;
   user_id?: string;
   encryption_key?: string; // Base64-encoded AES-256 key from client for at-rest encryption
+  system_context?: string; // Equipment-specific context from system detail view
 }
 
 interface ChatResponse {
@@ -134,6 +135,12 @@ serve(async (req: Request) => {
       userId
     );
 
+    // Append system-specific context if provided (e.g., from system detail "Ask Alfred")
+    let finalSystemPrompt = systemPrompt;
+    if (body.system_context) {
+      finalSystemPrompt += `\n\nSYSTEM-SPECIFIC CONTEXT:\n${body.system_context}\nAnswer questions specific to this exact equipment model. If the user asks about maintenance or troubleshooting, give model-specific advice, not generic.`;
+    }
+
     // Build messages array
     const messages = [
       ...body.conversation_history.map((msg) => ({
@@ -158,7 +165,7 @@ serve(async (req: Request) => {
         body: JSON.stringify({
           model: "claude-sonnet-4-6",
           max_tokens: 2048,
-          system: systemPrompt,
+          system: finalSystemPrompt,
           messages,
         }),
         signal: AbortSignal.timeout(60000),
@@ -307,6 +314,9 @@ async function buildSystemPrompt(
     serviceContractsResult,
     projectsResult,
     currentUserResult,
+    vehiclesResult,
+    vehicleServiceRecordsResult,
+    vehicleRecallsResult,
   ] = await Promise.all([
     supabase.from("households").select("*").eq("id", householdId).single(),
     supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -318,6 +328,9 @@ async function buildSystemPrompt(
     supabase.from("service_contracts").select("*").eq("household_id", householdId),
     supabase.from("property_projects").select("*").eq("household_id", householdId),
     userId ? supabase.from("users").select("full_name").eq("id", userId).single() : Promise.resolve({ data: null }),
+    supabase.from("vehicles").select("id, name, year, make, model, current_mileage, ownership_type, registration_expiry, inspection_expiry").eq("household_id", householdId),
+    supabase.from("vehicle_service_records").select("vehicle_id, service_type, service_date").eq("household_id", householdId).order("service_date", { ascending: false }).limit(10),
+    supabase.from("vehicle_recalls").select("vehicle_id, component, summary").eq("household_id", householdId).eq("is_resolved", false),
   ]);
 
   const household = householdResult.data;
@@ -330,6 +343,9 @@ async function buildSystemPrompt(
   const serviceContracts = (serviceContractsResult.data ?? []) as Record<string, unknown>[];
   const projects = projectsResult.data ?? [];
   const currentUserName = currentUserResult.data?.full_name ?? null;
+  const vehicles = vehiclesResult.data ?? [];
+  const vehicleServiceRecords = vehicleServiceRecordsResult.data ?? [];
+  const vehicleRecalls = vehicleRecallsResult.data ?? [];
 
   // Fetch document content for context-specific or keyword-matched documents
   let documentContentSection = "";
@@ -513,6 +529,34 @@ async function buildSystemPrompt(
       }).join("\n")
     : "No active projects";
 
+  // Build vehicles section
+  const vehiclesList = vehicles.length > 0
+    ? vehicles.map((v: any) => {
+        const yearMakeModel = [v.year, v.make, v.model].filter(Boolean).join(" ");
+        const displayName = v.name ? `${v.name} (${yearMakeModel})` : yearMakeModel;
+        const mileage = v.current_mileage ? `${Number(v.current_mileage).toLocaleString()} mi` : "mileage unknown";
+        const ownership = v.ownership_type ? `, ${v.ownership_type}` : "";
+        const regExpiry = v.registration_expiry ? `, Reg expires: ${v.registration_expiry}` : "";
+        const inspExpiry = v.inspection_expiry ? `, Inspection expires: ${v.inspection_expiry}` : "";
+
+        // Recent service records for this vehicle
+        const recentServices = vehicleServiceRecords
+          .filter((sr: any) => sr.vehicle_id === v.id)
+          .slice(0, 3)
+          .map((sr: any) => `${sr.service_type} (${sr.service_date})`)
+          .join(", ");
+        const serviceStr = recentServices ? `\n    Recent service: ${recentServices}` : "";
+
+        // Unresolved recalls for this vehicle
+        const recalls = vehicleRecalls.filter((r: any) => r.vehicle_id === v.id);
+        const recallStr = recalls.length > 0
+          ? `\n    ⚠ OPEN RECALLS: ${recalls.map((r: any) => `${r.component} - ${r.summary}`).join("; ")}`
+          : "";
+
+        return `- ${displayName}: ${mileage}${ownership}${regExpiry}${inspExpiry}${serviceStr}${recallStr}`;
+      }).join("\n")
+    : "No vehicles added yet.";
+
   // Build equipment catalog context for the user's home systems
   let equipmentContext = "";
   const systemsWithCatalog = systems.filter((s: any) => s.catalog_entry_id);
@@ -568,6 +612,31 @@ async function buildSystemPrompt(
       const notes = proj.notes ? `\nProject notes: ${proj.notes}` : "";
       contextPrefix = `\nCONTEXT: The user is currently viewing project: "${proj.name}" (${proj.category}${propName}, Status: ${proj.status}${budget}${spent}).${notes}\nPrioritize answering questions about this specific project, but you can reference other household data as needed.\n`;
     }
+  } else if (body.context_type === "vehicle" && body.context_id) {
+    const vehicle = vehicles.find((v: any) => v.id === body.context_id);
+    if (vehicle) {
+      const yearMakeModel = [vehicle.year, vehicle.make, vehicle.model].filter(Boolean).join(" ");
+      const displayName = vehicle.name ? `${vehicle.name} (${yearMakeModel})` : yearMakeModel;
+      const mileage = vehicle.current_mileage ? `${Number(vehicle.current_mileage).toLocaleString()} miles` : "mileage unknown";
+      const ownership = vehicle.ownership_type ? `, ${vehicle.ownership_type}` : "";
+      const regExpiry = vehicle.registration_expiry ? `, Registration expires: ${vehicle.registration_expiry}` : "";
+      const inspExpiry = vehicle.inspection_expiry ? `, Inspection expires: ${vehicle.inspection_expiry}` : "";
+
+      // All service records for this vehicle
+      const vServiceRecords = vehicleServiceRecords
+        .filter((sr: any) => sr.vehicle_id === vehicle.id)
+        .map((sr: any) => `${sr.service_type} on ${sr.service_date}`)
+        .join(", ");
+      const serviceInfo = vServiceRecords ? `\nRecent service history: ${vServiceRecords}` : "\nNo service records on file.";
+
+      // Unresolved recalls for this vehicle
+      const vRecalls = vehicleRecalls.filter((r: any) => r.vehicle_id === vehicle.id);
+      const recallInfo = vRecalls.length > 0
+        ? `\nOPEN RECALLS: ${vRecalls.map((r: any) => `${r.component} - ${r.summary}`).join("; ")}`
+        : "\nNo open recalls.";
+
+      contextPrefix = `\nCONTEXT: The user is currently viewing vehicle: "${displayName}" (${mileage}${ownership}${regExpiry}${inspExpiry}).${serviceInfo}${recallInfo}\nPrioritize answering questions about this specific vehicle, but you can reference other household data as needed.\n`;
+    }
   }
 
   const systemPrompt = `You are Alfred, the intelligent concierge built into Haven — a premium estate document organization and home management platform for high-net-worth families.
@@ -593,6 +662,9 @@ ${propertyStatus || "No properties added yet."}
 
 ACTIVE HOME PROJECTS:
 ${projectsList}
+
+VEHICLES:
+${vehiclesList}
 ${contextPrefix}${documentContentSection}${equipmentContext}
 EQUIPMENT REFERENCE DATABASE:
 Haven has an extensive equipment catalog with 2,800+ models across 219 brands covering kitchen appliances, HVAC, water heaters, laundry, generators, sump pumps, well water systems, bathroom fixtures, irrigation, and pool systems. When users ask about specific equipment:

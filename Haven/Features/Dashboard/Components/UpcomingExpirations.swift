@@ -92,6 +92,9 @@ struct RequiresAttentionSection: View {
                                     attentionRow(item)
                                 }
                                 .buttonStyle(.plain)
+
+                            case .vehicleAlert, .estateNudge:
+                                attentionRow(item)
                             }
                         }
 
@@ -159,20 +162,4 @@ struct RequiresAttentionSection: View {
     }
 }
 
-// MARK: - Attention Item Model
-
-private struct AttentionItem: Identifiable {
-    let id: UUID
-    let sourceId: UUID?
-    let title: String
-    let subtitle: String
-    let icon: String
-    let urgencyColor: Color
-    let daysRemaining: Int
-    let kind: AttentionKind
-}
-
-private enum AttentionKind {
-    case expiration(String)  // carries the type: "document" or "warranty"
-    case maintenance(MaintenanceTaskDBRow)
-}
+// AttentionItem and AttentionKind are defined in UnifiedAttentionList.swift

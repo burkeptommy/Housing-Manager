@@ -15,6 +15,16 @@ final class DocumentUploadManager: ObservableObject {
     @Published var failedCount = 0
     @Published var totalCount = 0
 
+    // Invoice detection — surfaces to UI for user choice
+    @Published var pendingInvoiceReviews: [PendingInvoiceReview] = []
+    @Published var showInvoiceChoiceSheet = false
+    @Published var currentInvoiceReview: PendingInvoiceReview?
+
+    // Duplicate detection — surfaces to UI for user choice
+    @Published var pendingDuplicateResolutions: [DuplicateResolution] = []
+    @Published var showDuplicateSheet = false
+    @Published var currentDuplicateResolution: DuplicateResolution?
+
     /// True when there are items being processed or recently completed
     var showBanner: Bool {
         isProcessing || (!queue.isEmpty && queue.allSatisfy(\.isComplete))
@@ -47,14 +57,15 @@ final class DocumentUploadManager: ObservableObject {
 
     /// Add files to the processing queue and start background processing.
     /// Returns immediately — caller can dismiss their UI.
-    func enqueueFiles(_ files: [PendingUploadFile], propertyId: UUID? = nil) {
+    func enqueueFiles(_ files: [PendingUploadFile], propertyId: UUID? = nil, projectId: UUID? = nil) {
         let items = files.map { file in
             BackgroundUploadItem(
                 data: file.data,
                 fileName: file.fileName,
                 contentType: file.contentType,
                 previewImage: file.previewImage,
-                propertyId: propertyId
+                propertyId: propertyId,
+                projectId: projectId
             )
         }
 
@@ -110,15 +121,44 @@ final class DocumentUploadManager: ObservableObject {
         completedCount = queue.filter { $0.isComplete && $0.error == nil }.count
         failedCount = queue.filter { $0.error != nil }.count
 
+        // Surface duplicate resolutions first, then invoice reviews
+        presentNextDuplicateResolution()
+        if currentDuplicateResolution == nil {
+            presentNextInvoiceReview()
+        }
+
         // Send notification
         await sendCompletionNotification()
     }
 
     private func processItem(at index: Int, householdId: UUID, familyMembers: [FamilyMemberRow], properties: [PropertyRow]) async {
         let item = queue[index]
-        queue[index].status = "Uploading..."
+        queue[index].status = "Checking for duplicates..."
 
         do {
+            // Step 0: Duplicate detection by content hash
+            let contentHash = DuplicateDetectionService.sha256Hash(of: item.data)
+            if let existingDoc = await DuplicateDetectionService.shared.checkForDuplicate(hash: contentHash) {
+                // Duplicate found -- queue for user decision instead of silently blocking
+                queue[index].status = "Duplicate detected"
+                queue[index].duplicateOf = existingDoc
+                queue[index].contentHash = contentHash
+                queue[index].isComplete = true
+                queue[index].needsDuplicateResolution = true
+                Analytics.track(.documentDuplicateDetected, ["existing_title": existingDoc.title])
+                print("[UploadManager] Duplicate detected: \(existingDoc.title)")
+                pendingDuplicateResolutions.append(DuplicateResolution(
+                    queueIndex: index,
+                    existingDocument: existingDoc,
+                    newFileName: item.fileName,
+                    contentHash: contentHash
+                ))
+                return
+            }
+
+            queue[index].status = "Uploading..."
+            queue[index].contentHash = contentHash
+
             // Step 1: Encrypt and upload file to storage
             let encryptedData = try DocumentEncryption.shared.encrypt(data: item.data, householdId: householdId)
             let filePath = try await db.uploadDocumentFile(
@@ -138,7 +178,7 @@ final class DocumentUploadManager: ObservableObject {
                 .replacingOccurrences(of: ".jpeg", with: "")
                 .replacingOccurrences(of: ".png", with: "")
 
-            let insert = DocumentInsert(
+            var insert = DocumentInsert(
                 householdId: householdId,
                 title: titleFromFile,
                 category: "Unknown",
@@ -146,8 +186,15 @@ final class DocumentUploadManager: ObservableObject {
                 status: "active",
                 propertyId: item.propertyId
             )
+            insert.contentHash = item.contentHash ?? contentHash
+            insert.fileSize = item.data.count
             let doc = try await db.createDocument(insert)
             queue[index].documentId = doc.id
+
+            // Link to project if context was provided
+            if let projId = item.projectId {
+                try? await db.linkDocumentToProject(documentId: doc.id, projectId: projId)
+            }
 
             queue[index].status = "AI analyzing..."
 
@@ -249,6 +296,58 @@ final class DocumentUploadManager: ObservableObject {
             queue[index].isComplete = true
             queue[index].status = "Done"
 
+            // Detect invoices (COMPLETED work only) for smart task completion
+            let invoiceCategories = ["Home Bill/Invoice", "Project Invoice"]
+            let isInvoice = invoiceCategories.contains(categoryValue)
+            if isInvoice {
+                queue[index].isInvoice = true
+                if let docId = queue[index].documentId {
+                    pendingInvoiceReviews.append(PendingInvoiceReview(
+                        documentId: docId,
+                        documentTitle: aiTitle,
+                        category: categoryValue,
+                        householdId: householdId
+                    ))
+                }
+            }
+
+            // Detect quotes/estimates (FUTURE work) for project linking
+            let quoteCategories = ["Contractor Quote", "Repair Estimate"]
+            let isQuote = quoteCategories.contains(categoryValue)
+
+            // Step 7: Create inbox item for the activity feed
+            let vehicleCategories = ["Auto Insurance", "Vehicle Title"]
+            let isVehicleDoc = vehicleCategories.contains(categoryValue)
+            let needsAction = isInvoice || isVehicleDoc || isQuote
+
+            var inboxSummary = analysis.summary
+            var inboxType = "document_stored"
+            var actionType: String? = nil
+
+            if isQuote {
+                inboxSummary = "Contractor quote detected. Create a project or add to an existing one."
+                inboxType = "contractor_quote"
+                actionType = "quote_received"
+            } else if isVehicleDoc {
+                inboxSummary = "Vehicle document detected. Review to link to your vehicles."
+                actionType = "review_vehicle_doc"
+            } else if isInvoice {
+                inboxSummary = "Invoice detected. Scan to update maintenance tasks and systems."
+                actionType = "review_invoice"
+            }
+
+            try? await db.createInboxItem(
+                householdId: householdId,
+                type: inboxType,
+                title: aiTitle,
+                summary: inboxSummary,
+                relatedDocumentId: doc.id,
+                needsAction: needsAction,
+                actionType: actionType,
+                attachmentFilename: item.fileName
+            )
+            NotificationCenter.default.post(name: .inboxItemUpdated, object: nil)
+
         } catch {
             queue[index].error = error.localizedDescription
             queue[index].isComplete = true
@@ -285,6 +384,101 @@ final class DocumentUploadManager: ObservableObject {
             print("[UploadManager] Completion notification scheduled")
         } catch {
             print("[UploadManager] Failed to schedule notification: \(error)")
+        }
+    }
+
+    // MARK: - Invoice Review
+
+    /// Present the next pending invoice review to the user
+    func presentNextInvoiceReview() {
+        guard !pendingInvoiceReviews.isEmpty else { return }
+        currentInvoiceReview = pendingInvoiceReviews.removeFirst()
+        showInvoiceChoiceSheet = true
+    }
+
+    /// Called when user dismisses or completes an invoice review
+    func dismissCurrentInvoiceReview() {
+        currentInvoiceReview = nil
+        showInvoiceChoiceSheet = false
+        // Present next one if available
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.presentNextInvoiceReview()
+        }
+    }
+
+    // MARK: - Duplicate Resolution
+
+    func presentNextDuplicateResolution() {
+        guard !pendingDuplicateResolutions.isEmpty else { return }
+        currentDuplicateResolution = pendingDuplicateResolutions.removeFirst()
+        showDuplicateSheet = true
+    }
+
+    /// User chose "Replace Existing" -- delete old doc, proceed with new upload
+    func resolveReplace() {
+        guard let resolution = currentDuplicateResolution else { return }
+        let idx = resolution.queueIndex
+        Task {
+            // Delete old storage file + DB record
+            let oldFilePath = resolution.existingDocument.filePath
+            _ = try? await HavenSupabase.storage.from("documents").remove(paths: [oldFilePath])
+            try? await db.deleteDocument(id: resolution.existingDocument.id)
+            // Re-process the queued item (it was marked complete, reset it)
+            queue[idx].isComplete = false
+            queue[idx].needsDuplicateResolution = false
+            queue[idx].duplicateOf = nil
+            queue[idx].status = "Uploading..."
+            queue[idx].error = nil
+
+            let user = try? await db.fetchCurrentUser()
+            if let householdId = user?.householdId {
+                let familyMembers = (try? await db.fetchFamilyMembers()) ?? []
+                let properties = (try? await db.fetchProperties()) ?? []
+                await processItem(at: idx, householdId: householdId, familyMembers: familyMembers, properties: properties)
+            }
+            dismissCurrentDuplicateResolution()
+        }
+    }
+
+    /// User chose "Delete This Document" -- discard the new upload
+    func resolveDelete() {
+        guard let resolution = currentDuplicateResolution else { return }
+        queue[resolution.queueIndex].status = "Skipped (duplicate)"
+        queue[resolution.queueIndex].error = nil
+        queue[resolution.queueIndex].needsDuplicateResolution = false
+        dismissCurrentDuplicateResolution()
+    }
+
+    /// User chose "Save Both" -- proceed with upload despite duplicate
+    func resolveSaveBoth() {
+        guard let resolution = currentDuplicateResolution else { return }
+        let idx = resolution.queueIndex
+        Task {
+            queue[idx].isComplete = false
+            queue[idx].needsDuplicateResolution = false
+            queue[idx].duplicateOf = nil
+            queue[idx].status = "Uploading..."
+            queue[idx].error = nil
+
+            let user = try? await db.fetchCurrentUser()
+            if let householdId = user?.householdId {
+                let familyMembers = (try? await db.fetchFamilyMembers()) ?? []
+                let properties = (try? await db.fetchProperties()) ?? []
+                await processItem(at: idx, householdId: householdId, familyMembers: familyMembers, properties: properties)
+            }
+            dismissCurrentDuplicateResolution()
+        }
+    }
+
+    func dismissCurrentDuplicateResolution() {
+        currentDuplicateResolution = nil
+        showDuplicateSheet = false
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if !self.pendingDuplicateResolutions.isEmpty {
+                self.presentNextDuplicateResolution()
+            } else {
+                self.presentNextInvoiceReview()
+            }
         }
     }
 
@@ -331,13 +525,36 @@ struct BackgroundUploadItem: Identifiable {
     let contentType: String
     var previewImage: UIImage?
     var propertyId: UUID?
+    var projectId: UUID?
 
     // Populated during processing
     var documentId: UUID?
     var title: String = ""
     var category: String = ""
+    var contentHash: String?
     var analysisResult: DocumentAnalysisResult?
     var status: String = "Queued"
     var error: String?
     var isComplete: Bool = false
+    var isInvoice: Bool = false
+    var needsDuplicateResolution: Bool = false
+    var duplicateOf: DocumentRow?
+}
+
+/// A pending duplicate resolution that needs user input.
+struct DuplicateResolution: Identifiable {
+    let id = UUID()
+    let queueIndex: Int
+    let existingDocument: DocumentRow
+    let newFileName: String
+    let contentHash: String
+}
+
+/// Represents a completed upload that was detected as an invoice, pending user review.
+struct PendingInvoiceReview: Identifiable {
+    let id = UUID()
+    let documentId: UUID
+    let documentTitle: String
+    let category: String
+    let householdId: UUID
 }

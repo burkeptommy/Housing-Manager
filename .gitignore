@@ -29,3 +29,12 @@ Package.resolved
 *.key
 *.mobileprovision
 *.pem
+
+# Apify scraper artifacts
+apify/manual-scraper/node_modules/
+apify/manual-scraper/storage/key_value_stores/default/debug-*.png
+apify/manual-scraper/storage/key_value_stores/default/SDK_*.json
+apify/manual-scraper/storage/request_queues/
+
+# Plan artifacts (local only)
+.claude/plans/

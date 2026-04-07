@@ -25,4 +25,15 @@ extension String {
         guard let date = f.date(from: self) else { return self }
         return date.havenShort
     }
+
+    /// Truncate to a max character length, cutting at the last word boundary.
+    func summarized(maxLength: Int) -> String {
+        guard count > maxLength else { return self }
+        let trimmed = prefix(maxLength)
+        // Cut at last space so we don't chop mid-word
+        if let lastSpace = trimmed.lastIndex(of: " ") {
+            return String(trimmed[trimmed.startIndex..<lastSpace]).appending("...")
+        }
+        return String(trimmed).appending("...")
+    }
 }

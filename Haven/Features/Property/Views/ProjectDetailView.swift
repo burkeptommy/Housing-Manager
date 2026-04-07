@@ -43,29 +43,42 @@ struct ProjectDetailView: View {
         liveProject.projectType == "insurance_claim"
     }
 
+    private var isHistorical: Bool {
+        liveProject.isHistorical
+    }
+
+    @State private var showDocumentUpload = false
+    @State private var showLinkDocument = false
+
     var body: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: HavenTheme.spacing16) {
-                statusCard
-                if isInsuranceClaim {
-                    claimInfoCard
-                    subProjectsSection
-                    quotesSection
-                    filesSection
+                if isHistorical {
+                    historicalHeader
+                    projectDocumentsSection
+                    notesSection
                 } else {
-                    roiCard
-                    if isDIY {
-                        diyOverviewCard
+                    statusCard
+                    if isInsuranceClaim {
+                        claimInfoCard
+                        subProjectsSection
+                        quotesSection
                         filesSection
                     } else {
-                        quotesSection
+                        roiCard
+                        if isDIY {
+                            diyOverviewCard
+                            filesSection
+                        } else {
+                            quotesSection
+                        }
                     }
+                    if !viewModel.projectContacts.isEmpty {
+                        projectContactsSection
+                    }
+                    askAlfredButton
+                    notesSection
                 }
-                if !viewModel.projectContacts.isEmpty {
-                    projectContactsSection
-                }
-                askAlfredButton
-                notesSection
             }
             .padding(HavenTheme.pageMargin)
         }
@@ -99,20 +112,24 @@ struct ProjectDetailView: View {
         }
         .trackScreen("ProjectDetailView", properties: ["project_id": project.id.uuidString])
         .task {
-            if isDIY || isInsuranceClaim {
-                await viewModel.loadProjectFiles(projectId: project.id)
-                await loadThumbnailURLs()
+            if isHistorical {
+                await viewModel.loadProjectDocuments(projectId: project.id)
+            } else {
+                if isDIY || isInsuranceClaim {
+                    await viewModel.loadProjectFiles(projectId: project.id)
+                    await loadThumbnailURLs()
+                }
+                if !isDIY {
+                    await viewModel.loadQuotes(projectId: project.id)
+                }
+                if isInsuranceClaim {
+                    await viewModel.loadSubProjects(parentId: project.id, propertyId: liveProject.propertyId)
+                }
+                if !isInsuranceClaim && viewModel.feasibilityByProject[project.id] == nil {
+                    await viewModel.loadFeasibility(projectId: project.id, projectName: liveProject.name, category: liveProject.category, description: liveProject.description, location: nil)
+                }
+                await viewModel.loadProjectContacts(projectId: project.id)
             }
-            if !isDIY {
-                await viewModel.loadQuotes(projectId: project.id)
-            }
-            if isInsuranceClaim {
-                await viewModel.loadSubProjects(parentId: project.id)
-            }
-            if !isInsuranceClaim && viewModel.feasibility == nil {
-                await viewModel.loadFeasibility(projectName: liveProject.name, category: liveProject.category, description: liveProject.description, location: nil)
-            }
-            await viewModel.loadProjectContacts(projectId: project.id)
         }
         .alert("Preview Unavailable", isPresented: .init(
             get: { fileLoadError != nil },
@@ -232,7 +249,7 @@ struct ProjectDetailView: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, HavenTheme.spacing8)
-            } else if let f = viewModel.feasibility {
+            } else if let f = viewModel.feasibilityByProject[project.id] {
                 VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                     HStack(spacing: 8) {
                         Image(systemName: "chart.line.uptrend.xyaxis")
@@ -499,7 +516,7 @@ struct ProjectDetailView: View {
 
     private var diyOverviewCard: some View {
         Group {
-            if let f = viewModel.feasibility {
+            if let f = viewModel.feasibilityByProject[project.id] {
                 HavenCard {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                         HStack(spacing: 8) {
@@ -668,7 +685,7 @@ struct ProjectDetailView: View {
                     .buttonStyle(.plain)
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) {
-                            Task { await viewModel.unlinkProjectFromClaim(projectId: subProject.id) }
+                            Task { await viewModel.unlinkProjectFromClaim(projectId: subProject.id, claimId: project.id) }
                         } label: {
                             Label("Unlink", systemImage: "link.badge.minus")
                         }
@@ -716,6 +733,14 @@ struct ProjectDetailView: View {
         }
     }
 
+    /// Best available cost for a project: prefers actual spend (if >0), then budget, then AI estimate.
+    private func projectDisplayCost(_ project: PropertyProjectRow) -> Double? {
+        if let s = project.actualSpend, s > 0 { return s }
+        if let b = project.estimatedBudget, b > 0 { return b }
+        if let a = project.aiEstimatedProCost, a > 0 { return a }
+        return nil
+    }
+
     private func subProjectCard(_ project: PropertyProjectRow) -> some View {
         HavenCard(padding: HavenTheme.spacing12) {
             HStack {
@@ -732,7 +757,7 @@ struct ProjectDetailView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    if let cost = project.aiEstimatedProCost ?? project.estimatedBudget {
+                    if let cost = projectDisplayCost(project) {
                         Text("$\(Int(cost).formatted())")
                             .font(HavenTypography.headline)
                             .foregroundStyle(HavenColors.navy800)
@@ -788,7 +813,7 @@ struct ProjectDetailView: View {
                                     }
                                 }
                                 Spacer()
-                                if let cost = proj.aiEstimatedProCost ?? proj.estimatedBudget {
+                                if let cost = projectDisplayCost(proj) {
                                     Text("$\(Int(cost).formatted())")
                                         .font(HavenTypography.uiLabel)
                                         .foregroundStyle(HavenColors.navy800)
@@ -1161,13 +1186,26 @@ struct ProjectDetailView: View {
     }
 
     private func quoteCard(_ quote: ProjectQuoteRow) -> some View {
-        HavenCard(padding: HavenTheme.spacing12) {
+        let isActive = liveProject.activeQuoteId == quote.id
+
+        return HavenCard(padding: HavenTheme.spacing12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(quote.vendorName ?? "Contractor Quote")
-                        .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.textPrimary)
-                        .lineLimit(2)
+                    HStack(spacing: 6) {
+                        Text(quote.vendorName ?? "Contractor Quote")
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                            .lineLimit(2)
+                        if isActive {
+                            Text("Active")
+                                .font(.system(size: 9, weight: .bold))
+                                .foregroundStyle(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(HavenColors.success)
+                                .cornerRadius(4)
+                        }
+                    }
                     HStack(spacing: 8) {
                         if let date = quote.quoteDate {
                             Text(date)
@@ -1195,6 +1233,17 @@ struct ProjectDetailView: View {
                 Image(systemName: "chevron.right")
                     .font(.caption)
                     .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .contextMenu {
+            if !isActive {
+                Button {
+                    Task { try? await viewModel.activateQuote(quote, for: liveProject.id) }
+                } label: {
+                    Label("Make Active Quote", systemImage: "checkmark.circle")
+                }
+            } else {
+                Text("Currently Active")
             }
         }
     }
@@ -1465,6 +1514,150 @@ struct ProjectDetailView: View {
             }
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Historical Project Header
+
+    private var historicalHeader: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                HStack {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(HavenColors.success)
+                    Text("Completed")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.success)
+                    Spacer()
+                    if let dateStr = liveProject.actualEndDate {
+                        Text(dateStr.prefix(4) == dateStr ? dateStr : (dateStr.havenDateShort))
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                if let spend = liveProject.actualSpend, spend > 0 {
+                    HStack {
+                        Text("Total Spent")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Spacer()
+                        Text("$\(Int(spend).formatted())")
+                            .font(HavenTypography.title2)
+                            .foregroundStyle(HavenColors.navy800)
+                    }
+                }
+
+                HStack(spacing: 6) {
+                    Text(liveProject.category)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+    }
+
+    // MARK: - Project Documents
+
+    private var projectDocumentsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("DOCUMENTS")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            if viewModel.projectDocuments.isEmpty {
+                HavenCard {
+                    VStack(spacing: HavenTheme.spacing8) {
+                        Image(systemName: "doc.text")
+                            .font(.system(size: 24))
+                            .foregroundStyle(HavenColors.textTertiary)
+                        Text("No documents linked yet")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text("Add invoices, receipts, photos, or permits.")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, HavenTheme.spacing8)
+                }
+            } else {
+                ForEach(viewModel.projectDocuments) { doc in
+                    NavigationLink {
+                        DocumentDetailView(documentID: doc.id)
+                    } label: {
+                        HavenCard(padding: HavenTheme.spacing12) {
+                            HStack(spacing: 10) {
+                                Image(systemName: "doc.fill")
+                                    .font(.system(size: 16))
+                                    .foregroundStyle(HavenColors.navy)
+                                    .frame(width: 28)
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(doc.title)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                        .lineLimit(1)
+                                    Text(doc.category)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing) {
+                        Button(role: .destructive) {
+                            Task {
+                                await viewModel.unlinkDocumentFromProject(documentId: doc.id, projectId: project.id)
+                            }
+                        } label: {
+                            Label("Unlink", systemImage: "link.badge.plus")
+                        }
+                        .tint(HavenColors.warning)
+                    }
+                }
+            }
+
+            HStack(spacing: HavenTheme.spacing8) {
+                HavenButton(
+                    title: "Add Document",
+                    action: { showDocumentUpload = true },
+                    icon: "doc.badge.plus"
+                )
+
+                HavenButton(
+                    title: "Link Existing",
+                    action: { showLinkDocument = true },
+                    style: .secondary,
+                    icon: "link"
+                )
+            }
+        }
+        .sheet(isPresented: $showDocumentUpload) {
+            DocumentUploadView(
+                preselectedPropertyId: liveProject.propertyId,
+                preselectedProjectId: project.id,
+                onComplete: {
+                    Task { await viewModel.loadProjectDocuments(projectId: project.id) }
+                }
+            )
+        }
+        .sheet(isPresented: $showLinkDocument) {
+            linkDocumentSheet
+        }
+    }
+
+    private var linkDocumentSheet: some View {
+        NavigationStack {
+            LinkDocumentToProjectSheet(projectId: project.id, viewModel: viewModel)
+        }
     }
 
     // MARK: - Notes

@@ -5,7 +5,8 @@ final class ProjectsViewModel: ObservableObject {
     @Published var projects: [PropertyProjectRow] = []
     @Published var quotes: [ProjectQuoteRow] = []
     @Published var projectFiles: [ProjectFileRow] = []
-    @Published var feasibility: ProjectFeasibility?
+    @Published var feasibilityByProject: [UUID: ProjectFeasibility] = [:]
+    @Published var projectDocuments: [DocumentRow] = []
     @Published var isLoading = false
     @Published var isLoadingFeasibility = false
     @Published var error: String?
@@ -18,6 +19,11 @@ final class ProjectsViewModel: ObservableObject {
     }
     var completedProjects: [PropertyProjectRow] {
         projects.filter { $0.status == "completed" }
+            .sorted { ($0.actualEndDate ?? "") > ($1.actualEndDate ?? "") }
+    }
+
+    var completedProjectsTotal: Double {
+        completedProjects.compactMap(\.actualSpend).filter { $0 > 0 }.reduce(0, +)
     }
     var onHoldProjects: [PropertyProjectRow] {
         projects.filter { $0.status == "on_hold" }
@@ -38,12 +44,38 @@ final class ProjectsViewModel: ObservableObject {
 
     func loadQuotes(projectId: UUID) async {
         quotes = (try? await db.fetchProjectQuotes(projectId: projectId)) ?? []
+
+        // Auto-activate first quote if none is active
+        if let project = projects.first(where: { $0.id == projectId }),
+           project.activeQuoteId == nil,
+           let firstQuote = quotes.first,
+           firstQuote.quoteTotal != nil {
+            try? await activateQuote(firstQuote, for: projectId)
+        }
     }
 
     func addQuote(_ insert: ProjectQuoteInsert) async throws -> ProjectQuoteRow {
         let quote = try await db.createProjectQuote(insert)
         quotes.insert(quote, at: 0)
+
+        // Auto-activate if it's the only quote with a total
+        let quotesWithTotal = quotes.filter { $0.quoteTotal != nil }
+        if quotesWithTotal.count == 1, let only = quotesWithTotal.first {
+            try? await activateQuote(only, for: insert.projectId)
+        }
+
         return quote
+    }
+
+    func activateQuote(_ quote: ProjectQuoteRow, for projectId: UUID) async throws {
+        _ = try await db.updateProject(id: projectId, PropertyProjectUpdate(
+            estimatedBudget: quote.quoteTotal,
+            activeQuoteId: quote.id
+        ))
+        if let idx = projects.firstIndex(where: { $0.id == projectId }) {
+            await loadProjects(propertyId: projects[idx].propertyId)
+        }
+        NotificationCenter.default.post(name: .projectChanged, object: nil)
     }
 
     func deleteQuote(id: UUID) async throws {
@@ -137,9 +169,50 @@ final class ProjectsViewModel: ObservableObject {
 
     @Published var subProjects: [PropertyProjectRow] = []
 
-    func loadSubProjects(parentId: UUID) async {
-        // Filter from already-loaded projects, or fetch all if needed
-        subProjects = projects.filter { $0.parentProjectId == parentId }
+    func loadSubProjects(parentId: UUID, propertyId: UUID? = nil) async {
+        // Fetch fresh from DB to get up-to-date estimatedBudget values
+        do {
+            let freshProjects: [PropertyProjectRow]
+            if let propertyId {
+                freshProjects = try await db.fetchProjects(propertyId: propertyId)
+            } else if let firstProject = projects.first {
+                freshProjects = try await db.fetchProjects(propertyId: firstProject.propertyId)
+            } else {
+                subProjects = []
+                return
+            }
+            // Update our local projects array with fresh data
+            for fresh in freshProjects {
+                if let idx = projects.firstIndex(where: { $0.id == fresh.id }) {
+                    projects[idx] = fresh
+                }
+            }
+            var subs = freshProjects.filter { $0.parentProjectId == parentId }
+
+            // Backfill: if a sub-project has an active quote but no estimatedBudget,
+            // fetch the quote total and write it to the project so this only happens once.
+            for i in subs.indices {
+                let sub = subs[i]
+                if sub.activeQuoteId != nil && sub.estimatedBudget == nil {
+                    if let quoteRows = try? await db.fetchProjectQuotes(projectId: sub.id),
+                       let activeQuote = quoteRows.first(where: { $0.id == sub.activeQuoteId }),
+                       let total = activeQuote.quoteTotal {
+                        let updated = try? await db.updateProject(id: sub.id, PropertyProjectUpdate(estimatedBudget: total))
+                        if let updated {
+                            subs[i] = updated
+                            if let idx = projects.firstIndex(where: { $0.id == sub.id }) {
+                                projects[idx] = updated
+                            }
+                        }
+                    }
+                }
+            }
+
+            subProjects = subs
+        } catch {
+            // Fallback to in-memory filter
+            subProjects = projects.filter { $0.parentProjectId == parentId }
+        }
     }
 
     /// Available projects that can be linked to a claim (not already linked, not the claim itself)
@@ -158,10 +231,8 @@ final class ProjectsViewModel: ObservableObject {
             var updates = PropertyProjectUpdate()
             updates.parentProjectId = claimId
             _ = try await db.updateProject(id: projectId, updates)
-            // Reload to get fresh data with parentProjectId set
-            if let idx = projects.firstIndex(where: { $0.id == projectId }) {
-                projects[idx] = try await db.fetchProject(id: projectId)
-            }
+            // Reload all sub-projects fresh from DB to get accurate costs
+            await loadSubProjects(parentId: claimId)
             NotificationCenter.default.post(name: .projectChanged, object: nil,
                 userInfo: ["action": "updated", "id": projectId.uuidString])
         } catch {
@@ -171,16 +242,15 @@ final class ProjectsViewModel: ObservableObject {
         }
     }
 
-    func unlinkProjectFromClaim(projectId: UUID) async {
+    func unlinkProjectFromClaim(projectId: UUID, claimId: UUID) async {
         let snapshot = subProjects
         subProjects.removeAll { $0.id == projectId }
         Haptics.success()
 
         do {
             try await db.clearParentProject(id: projectId)
-            if let idx = projects.firstIndex(where: { $0.id == projectId }) {
-                projects[idx] = try await db.fetchProject(id: projectId)
-            }
+            // Refresh sub-projects and main projects list from DB
+            await loadSubProjects(parentId: claimId)
             NotificationCenter.default.post(name: .projectChanged, object: nil,
                 userInfo: ["action": "updated", "id": projectId.uuidString])
         } catch {
@@ -192,18 +262,22 @@ final class ProjectsViewModel: ObservableObject {
 
     /// Total claim amount from all sub-project quotes
     /// Total claim = linked project costs + personal property amount
+    /// Best available cost for a project: prefers actual spend (if >0), then budget, then AI estimate.
+    private func projectCost(_ project: PropertyProjectRow) -> Double? {
+        if let s = project.actualSpend, s > 0 { return s }
+        if let b = project.estimatedBudget, b > 0 { return b }
+        if let a = project.aiEstimatedProCost, a > 0 { return a }
+        return nil
+    }
+
     func claimTotal(for claim: PropertyProjectRow) -> Double {
-        let projectCosts = subProjects.compactMap { project in
-            project.aiEstimatedProCost ?? project.estimatedBudget ?? project.actualSpend
-        }.reduce(0, +)
+        let projectCosts = subProjects.compactMap { projectCost($0) }.reduce(0, +)
         return projectCosts + (claim.personalPropertyAmount ?? 0)
     }
 
     /// Legacy computed property for backward compatibility
     var claimTotal: Double {
-        subProjects.compactMap { project in
-            project.aiEstimatedProCost ?? project.estimatedBudget ?? project.actualSpend
-        }.reduce(0, +)
+        subProjects.compactMap { projectCost($0) }.reduce(0, +)
     }
 
     // MARK: - Project Files (DIY)
@@ -233,9 +307,35 @@ final class ProjectsViewModel: ObservableObject {
         projectFiles.removeAll { $0.id == id }
     }
 
+    // MARK: - Project Documents
+
+    func loadProjectDocuments(projectId: UUID) async {
+        projectDocuments = (try? await db.fetchDocuments(projectId: projectId)) ?? []
+    }
+
+    func linkDocumentToProject(documentId: UUID, projectId: UUID) async {
+        do {
+            try await db.linkDocumentToProject(documentId: documentId, projectId: projectId)
+            await loadProjectDocuments(projectId: projectId)
+            Haptics.success()
+        } catch {
+            print("[ProjectsVM] Link document failed: \(error)")
+        }
+    }
+
+    func unlinkDocumentFromProject(documentId: UUID, projectId: UUID) async {
+        do {
+            try await db.unlinkDocumentFromProject(documentId: documentId)
+            projectDocuments.removeAll { $0.id == documentId }
+            Haptics.success()
+        } catch {
+            print("[ProjectsVM] Unlink document failed: \(error)")
+        }
+    }
+
     // MARK: - Feasibility / ROI
 
-    func loadFeasibility(projectName: String, category: String, description: String?, location: String?) async {
+    func loadFeasibility(projectId: UUID, projectName: String, category: String, description: String?, location: String?) async {
         isLoadingFeasibility = true
         defer { isLoadingFeasibility = false }
 
@@ -260,7 +360,7 @@ final class ProjectsViewModel: ObservableObject {
             }
 
             let response = try JSONDecoder().decode(FeasibilityResponse.self, from: data)
-            feasibility = response.feasibility
+            feasibilityByProject[projectId] = response.feasibility
         } catch {
             print("[ProjectsVM] Feasibility error: \(error)")
         }

@@ -70,9 +70,15 @@ final class DashboardViewModel: ObservableObject {
     @Published var hasRemindersEnabled = false
     @Published var overBudgetProjectCount = 0
     @Published var approachingDeadlineProjectCount = 0
+    @Published var seasonalTasksIncomplete = 0
+    @Published var seasonalTasksTotal = 0
+    @Published var currentSeasonName = ""
+    @Published var systemsNeedingServiceCount = 0
+    @Published var hasIncompleteProperty = false
     @Published var dismissedRecommendationIds: Set<String> = []
 
-    // Expecting members
+    // Family members
+    @Published var familyMembers: [FamilyMemberRow] = []
     @Published var expectingMembers: [FamilyMemberRow] = []
     @Published var allDocuments: [DocumentRow] = []
 
@@ -88,8 +94,17 @@ final class DashboardViewModel: ObservableObject {
     @Published var inboxItems: [DatabaseService.InboxItemRow] = []
     @Published var properties: [PropertyRow] = []
     @Published var hasActiveProjects = false
+    @Published var vehicles: [VehicleRow] = []
+    @Published var unresolvedVehicleRecalls: Int = 0
+    @Published var propertyNeedsAddress: PropertyRow?
 
     private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        // Subscribe immediately so push notifications trigger inbox refresh
+        // even before loadDashboard() completes
+        subscribeToChanges()
+    }
 
     var showGettingStarted: Bool {
         !hasProperty || !hasDocuments || !hasUsedAlfred
@@ -111,6 +126,11 @@ final class DashboardViewModel: ObservableObject {
             hasRemindersEnabled: hasRemindersEnabled,
             overBudgetProjectCount: overBudgetProjectCount,
             approachingDeadlineProjectCount: approachingDeadlineProjectCount,
+            seasonalTasksIncomplete: seasonalTasksIncomplete,
+            seasonalTasksTotal: seasonalTasksTotal,
+            currentSeasonName: currentSeasonName,
+            systemsNeedingServiceCount: systemsNeedingServiceCount,
+            hasIncompleteProperty: hasIncompleteProperty,
             dismissedIds: dismissedRecommendationIds
         )
     }
@@ -161,6 +181,212 @@ final class DashboardViewModel: ObservableObject {
         return (completed, items.count)
     }
 
+    /// Resolve assignee name from user ID by checking family members with linked accounts
+    private func assigneeName(for userId: UUID?) -> String? {
+        guard let userId else { return nil }
+        return familyMembers.first { $0.linkedUserId == userId }?.firstName
+    }
+
+    var unifiedAttentionItems: [AttentionItem] {
+        var items: [AttentionItem] = []
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let now = Date.now
+
+        // Exclude the task shown in the hero card ("Next: ...")
+        let heroTaskId = nextUpcomingTask?.id
+
+        // 1. Overdue maintenance tasks (highest priority)
+        for task in overdueMaintenanceTasks where task.id != heroTaskId {
+            let days = formatter.date(from: task.nextDueDate).flatMap {
+                Calendar.current.dateComponents([.day], from: now, to: $0).day
+            } ?? -1
+            items.append(AttentionItem(
+                id: UUID(),
+                sourceId: nil,
+                title: task.title,
+                subtitle: "Overdue",
+                icon: "wrench.and.screwdriver.fill",
+                urgencyColor: HavenColors.critical,
+                daysRemaining: days,
+                kind: .maintenance(task),
+                priority: task.priority,
+                assignedName: assigneeName(for: task.assignedToUserId)
+            ))
+        }
+
+        // 2. Vehicle alerts (recalls, registration, inspection)
+        if unresolvedVehicleRecalls > 0 {
+            items.append(AttentionItem(
+                id: UUID(),
+                sourceId: nil,
+                title: "\(unresolvedVehicleRecalls) Open Recall\(unresolvedVehicleRecalls == 1 ? "" : "s")",
+                subtitle: "Vehicle safety",
+                icon: "car.fill",
+                urgencyColor: HavenColors.critical,
+                daysRemaining: 0,
+                kind: .vehicleAlert
+            ))
+        }
+        let vehicleLabel: (VehicleRow) -> String = { v in
+            "\(v.year.map { String($0) } ?? "") \(v.make ?? "")".trimmed
+        }
+        // Collect all task IDs we've already added (overdue) to avoid duplicates
+        var addedTaskIds = Set(overdueMaintenanceTasks.map(\.id))
+
+        for vehicle in vehicles {
+            // Registration expiry (within 60 days)
+            if let exp = vehicle.registrationExpiry, let date = formatter.date(from: exp) {
+                let days = Calendar.current.dateComponents([.day], from: now, to: date).day ?? 99
+                if days <= 60 {
+                    // Try to find a matching stored task for this vehicle
+                    if let task = allUpcomingTasks.first(where: { $0.vehicleId == vehicle.id && ($0.templateId == "registration_renewal" || $0.title.lowercased().contains("registration")) }) {
+                        if !addedTaskIds.contains(task.id) {
+                            addedTaskIds.insert(task.id)
+                            items.append(AttentionItem(
+                                id: UUID(), sourceId: nil,
+                                title: "\(vehicleLabel(vehicle)) Registration",
+                                subtitle: days < 0 ? "Expired" : "Renewal coming up",
+                                icon: "doc.badge.clock.fill",
+                                urgencyColor: days < 0 ? HavenColors.critical : days <= 30 ? HavenColors.warning : HavenColors.info,
+                                daysRemaining: days,
+                                kind: .maintenance(task),
+                                priority: task.priority,
+                                assignedName: assigneeName(for: task.assignedToUserId)
+                            ))
+                        }
+                    } else {
+                        // No stored task - create a synthetic one so the detail sheet can still open
+                        let syntheticTask = MaintenanceTaskDBRow.synthetic(
+                            title: "\(vehicleLabel(vehicle)) Registration Renewal",
+                            nextDueDate: exp,
+                            vehicleId: vehicle.id,
+                            householdId: vehicle.householdId,
+                            priority: days <= 30 ? "high" : "medium",
+                            templateId: "registration_renewal"
+                        )
+                        items.append(AttentionItem(
+                            id: UUID(), sourceId: nil,
+                            title: "\(vehicleLabel(vehicle)) Registration",
+                            subtitle: days < 0 ? "Expired" : "Renewal coming up",
+                            icon: "doc.badge.clock.fill",
+                            urgencyColor: days < 0 ? HavenColors.critical : days <= 30 ? HavenColors.warning : HavenColors.info,
+                            daysRemaining: days,
+                            kind: .maintenance(syntheticTask),
+                            priority: syntheticTask.priority
+                        ))
+                    }
+                }
+            }
+            // Inspection expiry (within 60 days)
+            if let exp = vehicle.inspectionExpiry, let date = formatter.date(from: exp) {
+                let days = Calendar.current.dateComponents([.day], from: now, to: date).day ?? 99
+                if days <= 60 {
+                    if let task = allUpcomingTasks.first(where: { $0.vehicleId == vehicle.id && ($0.templateId == "inspection" || $0.title.lowercased().contains("inspection")) }) {
+                        if !addedTaskIds.contains(task.id) {
+                            addedTaskIds.insert(task.id)
+                            items.append(AttentionItem(
+                                id: UUID(), sourceId: nil,
+                                title: "\(vehicleLabel(vehicle)) Inspection",
+                                subtitle: days < 0 ? "Expired" : "Due soon",
+                                icon: "checkmark.shield.fill",
+                                urgencyColor: days < 0 ? HavenColors.critical : days <= 30 ? HavenColors.warning : HavenColors.info,
+                                daysRemaining: days,
+                                kind: .maintenance(task),
+                                priority: task.priority,
+                                assignedName: assigneeName(for: task.assignedToUserId)
+                            ))
+                        }
+                    } else {
+                        let syntheticTask = MaintenanceTaskDBRow.synthetic(
+                            title: "\(vehicleLabel(vehicle)) Inspection",
+                            nextDueDate: exp,
+                            vehicleId: vehicle.id,
+                            householdId: vehicle.householdId,
+                            priority: days <= 30 ? "high" : "medium",
+                            templateId: "inspection"
+                        )
+                        items.append(AttentionItem(
+                            id: UUID(), sourceId: nil,
+                            title: "\(vehicleLabel(vehicle)) Inspection",
+                            subtitle: days < 0 ? "Expired" : "Due soon",
+                            icon: "checkmark.shield.fill",
+                            urgencyColor: days < 0 ? HavenColors.critical : days <= 30 ? HavenColors.warning : HavenColors.info,
+                            daysRemaining: days,
+                            kind: .maintenance(syntheticTask),
+                            priority: syntheticTask.priority
+                        ))
+                    }
+                }
+            }
+        }
+
+        // 3. Expiring documents (within 30 days)
+        for exp in upcomingExpirations where exp.daysRemaining <= 30 && exp.type == "document" {
+            items.append(AttentionItem(
+                id: exp.id,
+                sourceId: exp.sourceId,
+                title: exp.title,
+                subtitle: "Document expiring",
+                icon: "doc.text.fill",
+                urgencyColor: exp.urgencyColor,
+                daysRemaining: exp.daysRemaining,
+                kind: .expiration("document")
+            ))
+        }
+
+        // 4. Expiring warranties (within 30 days)
+        for exp in upcomingExpirations where exp.daysRemaining <= 30 && exp.type == "warranty" {
+            items.append(AttentionItem(
+                id: exp.id,
+                sourceId: exp.sourceId,
+                title: exp.title,
+                subtitle: "Warranty expiring",
+                icon: "shield.fill",
+                urgencyColor: exp.urgencyColor,
+                daysRemaining: exp.daysRemaining,
+                kind: .expiration("warranty")
+            ))
+        }
+
+        // 5. Upcoming maintenance tasks (not already shown as overdue, vehicle alerts, or hero card)
+        for task in allUpcomingTasks {
+            guard task.id != heroTaskId,
+                  !addedTaskIds.contains(task.id),
+                  let date = formatter.date(from: task.nextDueDate),
+                  date >= now else { continue }
+            let days = Calendar.current.dateComponents([.day], from: now, to: date).day ?? 0
+            items.append(AttentionItem(
+                id: UUID(),
+                sourceId: nil,
+                title: task.title,
+                subtitle: "Upcoming maintenance",
+                icon: "wrench.and.screwdriver.fill",
+                urgencyColor: days <= 3 ? HavenColors.critical : days <= 7 ? HavenColors.warning : days <= 30 ? HavenColors.info : Color(red: 0.40, green: 0.55, blue: 0.42),
+                daysRemaining: days,
+                kind: .maintenance(task),
+                priority: task.priority,
+                assignedName: assigneeName(for: task.assignedToUserId)
+            ))
+        }
+
+        // 6. Estate readiness nudge (if score < 20% and getting started is complete)
+        if !showGettingStarted && overallReadiness < 20 {
+            items.append(AttentionItem(
+                id: UUID(),
+                sourceId: nil,
+                title: "Upload estate documents",
+                subtitle: "Protect your family's future",
+                icon: "doc.badge.plus",
+                urgencyColor: HavenColors.navy800,
+                daysRemaining: 999,
+                kind: .estateNudge
+            ))
+        }
+
+        return items.sorted { $0.daysRemaining < $1.daysRemaining }
+    }
+
     func subscribeToChanges() {
         guard cancellables.isEmpty else { return }
         let names: [Notification.Name] = [
@@ -175,6 +401,13 @@ final class DashboardViewModel: ObservableObject {
                 }
                 .store(in: &cancellables)
         }
+        // Inbox updates only refresh inbox items, not the whole dashboard
+        NotificationCenter.default.publisher(for: .inboxItemUpdated)
+            .debounce(for: .milliseconds(500), scheduler: RunLoop.main)
+            .sink { [weak self] _ in
+                Task { [weak self] in await self?.loadInboxItems() }
+            }
+            .store(in: &cancellables)
     }
 
     func loadDashboard() async {
@@ -187,23 +420,33 @@ final class DashboardViewModel: ObservableObject {
         Analytics.track(.dashboardRefreshed, ["type": "initial_load", "overdue_count": overdueMaintenanceTasks.count, "document_count": documentCount])
     }
 
+    private var isRefreshingInternal = false
+
     func refresh() async {
+        guard !isRefreshingInternal else { return }
+        isRefreshingInternal = true
         isRefreshing = true
-        defer { isRefreshing = false }
+        defer { isRefreshing = false; isRefreshingInternal = false }
         await fetchAll()
     }
 
     private func fetchAll() async {
-        async let scoresTask: Void = loadCompletionScores()
-        async let expirationsTask: Void = loadExpirations()
-        async let maintenanceTask: Void = loadOverdueMaintenance()
-        async let recentTask: Void = loadRecentDocuments()
-        async let userTask: Void = loadUserName()
-        async let gettingStartedTask: Void = loadGettingStartedState()
-        async let recommendationTask: Void = loadRecommendationData()
-        async let enrichmentTask: Void = loadEnrichmentData()
-        async let inboxTask: Void = loadInboxItems()
-        _ = await (scoresTask, expirationsTask, maintenanceTask, recentTask, userTask, gettingStartedTask, recommendationTask, enrichmentTask, inboxTask)
+        // Fire each load in its own unstructured Task so SwiftUI task cancellation
+        // (from pull-to-refresh or view lifecycle) doesn't cascade-cancel all requests.
+        // Each task updates @Published properties on MainActor independently.
+        await withTaskGroup(of: Void.self) { group in
+            let methods: [() async -> Void] = [
+                loadCompletionScores, loadExpirations, loadOverdueMaintenance,
+                loadRecentDocuments, loadUserName, loadGettingStartedState,
+                loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts
+            ]
+            for method in methods {
+                group.addTask { @MainActor in
+                    // Ignore cancellation — we want these to complete
+                    await Task { await method() }.value
+                }
+            }
+        }
     }
 
     private func loadUserName() async {
@@ -361,8 +604,9 @@ final class DashboardViewModel: ObservableObject {
         systemCount = systems?.count ?? 0
 
         let members = try? await DatabaseService.shared.fetchFamilyMembers()
-        familyMemberCount = members?.count ?? 0
-        expectingMembers = (members ?? []).filter { $0.isExpecting == true }
+        familyMembers = members ?? []
+        familyMemberCount = familyMembers.count
+        expectingMembers = familyMembers.filter { $0.isExpecting == true }
 
         // Check if user has ever run scenarios
         struct IdRow: Codable { let id: UUID }
@@ -393,21 +637,101 @@ final class DashboardViewModel: ObservableObject {
             let daysLeft = Calendar.current.dateComponents([.day], from: .now, to: date).day ?? 99
             return daysLeft <= 7 && daysLeft >= 0
         }.count
+
+        // Seasonal tasks for current season
+        let month = Calendar.current.component(.month, from: .now)
+        let season: String = switch month {
+        case 3...5: "Spring"
+        case 6...8: "Summer"
+        case 9...11: "Fall"
+        default: "Winter"
+        }
+        currentSeasonName = season
+
+        let allTasks = try? await DatabaseService.shared.fetchAllMaintenanceTasks()
+        let seasonTasks = (allTasks ?? []).filter { task in
+            guard let timing = task.seasonalTiming?.lowercased() else { return false }
+            return timing.contains(season.lowercased())
+        }
+        if !seasonTasks.isEmpty {
+            let groups = SeasonalTaskGrouper.group(seasonTasks, systemNameLookup: { _ in nil })
+            seasonalTasksTotal = groups.count
+            seasonalTasksIncomplete = groups.filter { !$0.isComplete }.count
+        }
+
+        // Systems without recent service (lastServiceDate nil or > 12 months ago)
+        let allSystems = (systems ?? []).filter { $0.parentSystemId == nil } // top-level only
+        let oneYearAgo = Calendar.current.date(byAdding: .year, value: -1, to: .now) ?? .now
+        let sdf = DateFormatter()
+        sdf.dateFormat = "yyyy-MM-dd"
+        systemsNeedingServiceCount = allSystems.filter { sys in
+            guard let dateStr = sys.lastServiceDate, let date = sdf.date(from: dateStr) else {
+                return true // no service date at all
+            }
+            return date < oneYearAgo
+        }.count
+
+        // Incomplete property data
+        if let props = try? await DatabaseService.shared.fetchProperties(), let first = props.first {
+            hasIncompleteProperty = first.squareFootage == nil || first.yearBuilt == nil || first.purchasePrice == nil
+        }
     }
 
-    private func loadInboxItems() async {
+    private var inboxPollingTask: Task<Void, Never>?
+
+    private func loadVehicleAlerts() async {
+        do {
+            vehicles = try await DatabaseService.shared.fetchVehicles()
+            // Count unresolved recalls across all vehicles
+            var totalRecalls = 0
+            for vehicle in vehicles {
+                let recalls = try await DatabaseService.shared.fetchVehicleRecalls(vehicleId: vehicle.id)
+                totalRecalls += recalls.filter { !$0.isResolved }.count
+            }
+            unresolvedVehicleRecalls = totalRecalls
+        } catch {
+            print("[Dashboard] Failed to load vehicle alerts: \(error)")
+        }
+    }
+
+    func loadInboxItems() async {
         do {
             let items = try await DatabaseService.shared.fetchUnseenInboxItems()
             inboxItems = items
+            startInboxPollingIfNeeded()
         } catch {
             print("[Dashboard] Failed to load inbox items: \(error)")
         }
+    }
+
+    private func startInboxPollingIfNeeded() {
+        let hasProcessing = inboxItems.contains { $0.status == "processing" }
+        guard hasProcessing, inboxPollingTask == nil else { return }
+
+        inboxPollingTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                do {
+                    let items = try await DatabaseService.shared.fetchUnseenInboxItems()
+                    await MainActor.run { inboxItems = items }
+                    let stillProcessing = items.contains { $0.status == "processing" }
+                    if !stillProcessing { break }
+                } catch { break }
+            }
+            await MainActor.run { inboxPollingTask = nil }
+        }
+    }
+
+    func stopPolling() {
+        inboxPollingTask?.cancel()
+        inboxPollingTask = nil
     }
 
     func dismissInboxItem(_ item: DatabaseService.InboxItemRow) {
         inboxItems.removeAll { $0.id == item.id }
         Task {
             try? await DatabaseService.shared.markInboxItemsSeen(ids: [item.id])
+            await loadInboxItems()
         }
     }
 
@@ -430,6 +754,13 @@ final class DashboardViewModel: ObservableObject {
         do {
             let fetchedProperties = try await DatabaseService.shared.fetchProperties()
             properties = fetchedProperties
+
+            // Check for properties with incomplete addresses
+            propertyNeedsAddress = fetchedProperties.first { p in
+                (p.street == nil || p.street?.isEmpty == true) &&
+                (p.city == nil || p.city?.isEmpty == true)
+            }
+
             if let primary = fetchedProperties.first {
                 primaryPropertyId = primary.id
                 primaryHouseholdId = primary.householdId

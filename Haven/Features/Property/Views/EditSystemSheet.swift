@@ -16,9 +16,14 @@ struct EditSystemSheet: View {
     @State private var status: String
     @State private var notes: String
     @State private var catalogEntryId: UUID?
+    @State private var subtype: String?
+    @State private var customCategoryName: String
     @State private var isSaving = false
     @State private var error: String?
     @State private var showEquipmentSearch = false
+    @State private var pendingOrphanTaskIds: [UUID] = []
+    @State private var pendingOrphanTitles: [String] = []
+    @State private var showOrphanConfirm = false
 
     private let categories = SystemCategory.allCases.map(\.rawValue)
     private let statuses = ["Good", "Needs Maintenance", "Needs Repair", "Replace Soon"]
@@ -42,6 +47,8 @@ struct EditSystemSheet: View {
         _status = State(initialValue: system.status ?? "Good")
         _expectedLifespan = State(initialValue: system.expectedLifespanYears.map { "\($0)" } ?? "")
         _catalogEntryId = State(initialValue: system.catalogEntryId)
+        _subtype = State(initialValue: system.subtype)
+        _customCategoryName = State(initialValue: system.customCategoryName ?? "")
 
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd"
@@ -90,6 +97,10 @@ struct EditSystemSheet: View {
                             Text(s).tag(s)
                         }
                     }
+                    SystemSubtypePicker(category: category, subtype: $subtype)
+                    if category == "Other" {
+                        TextField("Custom category name", text: $customCategoryName)
+                    }
                 }
 
                 Section("Details") {
@@ -134,6 +145,27 @@ struct EditSystemSheet: View {
                 }
             }
             .tint(HavenColors.navy)
+            .confirmationDialog(
+                pendingOrphanTitles.isEmpty
+                    ? "Subtype changed"
+                    : "Remove \(pendingOrphanTitles.count) task\(pendingOrphanTitles.count == 1 ? "" : "s") that no longer apply?",
+                isPresented: $showOrphanConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Remove tasks", role: .destructive) {
+                    Task { await commitSave(deleteOrphanIds: pendingOrphanTaskIds) }
+                }
+                Button("Keep tasks") {
+                    Task { await commitSave(deleteOrphanIds: []) }
+                }
+                Button("Cancel", role: .cancel) {
+                    isSaving = false
+                }
+            } message: {
+                if !pendingOrphanTitles.isEmpty {
+                    Text(pendingOrphanTitles.prefix(6).joined(separator: "\n"))
+                }
+            }
             .sheet(isPresented: $showEquipmentSearch) {
                 EquipmentIdentifySheet(systemCategory: category) { result, detectedSerial in
                     catalogEntryId = result.id
@@ -152,6 +184,38 @@ struct EditSystemSheet: View {
     private func save() async {
         isSaving = true
         error = nil
+
+        // If subtype changed, find template-based tasks that no longer match the new subtype
+        // and ask the user whether to delete them.
+        if subtype != system.subtype {
+            let oldSubs = MaintenanceTemplates.activeSubtypes(category: system.category, subtype: system.subtype, fuelType: system.catalogFuelType)
+            let newSubs = MaintenanceTemplates.activeSubtypes(category: category, subtype: subtype, fuelType: system.catalogFuelType)
+            let removedTags = oldSubs.subtracting(newSubs)
+            if !removedTags.isEmpty {
+                let allTemplates = MaintenanceTemplates.allTemplates.flatMap(\.1)
+                let nowOrphanedIds: Set<String> = Set(
+                    allTemplates
+                        .filter { !$0.requiredSubtypes.isEmpty && !$0.requiredSubtypes.isSubset(of: newSubs) }
+                        .map { $0.systemCategory + ":" + $0.title }
+                )
+                let tasks = (try? await db.fetchMaintenanceTasks(systemId: system.id)) ?? []
+                let orphans = tasks.filter { t in
+                    guard let tid = t.templateId else { return false }
+                    return nowOrphanedIds.contains(tid)
+                }
+                if !orphans.isEmpty {
+                    pendingOrphanTaskIds = orphans.map(\.id)
+                    pendingOrphanTitles = orphans.map(\.title)
+                    showOrphanConfirm = true
+                    return // wait for user choice
+                }
+            }
+        }
+
+        await commitSave(deleteOrphanIds: [])
+    }
+
+    private func commitSave(deleteOrphanIds: [UUID]) async {
         do {
             var updates = HomeSystemUpdate()
             updates.name = name
@@ -164,8 +228,21 @@ struct EditSystemSheet: View {
             updates.expectedLifespanYears = Int(expectedLifespan)
             updates.notes = notes.isEmpty ? nil : notes
             updates.catalogEntryId = catalogEntryId
+            updates.subtype = subtype
+            if category == "Other" {
+                let trimmed = customCategoryName.trimmingCharacters(in: .whitespaces)
+                updates.customCategoryName = trimmed.isEmpty ? nil : trimmed
+            } else {
+                updates.customCategoryName = nil
+            }
 
             let updated = try await db.updateHomeSystem(id: system.id, updates)
+
+            if !deleteOrphanIds.isEmpty {
+                try? await db.deleteMaintenanceTasks(ids: deleteOrphanIds)
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            }
+
             await MainActor.run {
                 Haptics.success()
                 NotificationCenter.default.post(name: .homeSystemChanged, object: nil,

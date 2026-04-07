@@ -73,6 +73,8 @@ serve(async (req: Request) => {
       maintenanceResult,
       warrantiesResult,
       systemsResult,
+      vehiclesResult,
+      vehicleRecallsResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", household_id).single(),
       supabase.from("family_members").select("*").eq("household_id", household_id),
@@ -81,6 +83,8 @@ serve(async (req: Request) => {
       supabase.from("maintenance_tasks").select("*").eq("household_id", household_id),
       supabase.from("warranties").select("*").eq("household_id", household_id),
       supabase.from("home_systems").select("*").eq("household_id", household_id),
+      supabase.from("vehicles").select("id, name, year, make, model, current_mileage, ownership_type, purchase_price, current_value, registration_expiry").eq("household_id", household_id),
+      supabase.from("vehicle_recalls").select("vehicle_id, component, summary").eq("household_id", household_id).eq("is_resolved", false),
     ]);
 
     const household = householdResult.data;
@@ -90,6 +94,8 @@ serve(async (req: Request) => {
     const maintenance = maintenanceResult.data ?? [];
     const warranties = warrantiesResult.data ?? [];
     const systems = systemsResult.data ?? [];
+    const vehicles = vehiclesResult.data ?? [];
+    const vehicleRecalls = vehicleRecallsResult.data ?? [];
 
     // Fetch document content (summaries + extracted text) for key documents
     const { data: documentContent } = await supabase
@@ -220,6 +226,23 @@ ${
         .join("\n")
     : "No maintenance tasks"
 }
+
+VEHICLES:
+${
+  vehicles.length > 0
+    ? vehicles
+        .map((v: Record<string, unknown>) => {
+          const recalls = vehicleRecalls.filter(
+            (r: Record<string, unknown>) => r.vehicle_id === v.id
+          );
+          const recallStr = recalls.length > 0
+            ? `\n    Unresolved Recalls: ${recalls.map((r: Record<string, unknown>) => `${r.component} - ${r.summary}`).join("; ")}`
+            : "";
+          return `- ${v.name || "Unnamed"}: ${v.year || "?"} ${v.make || ""} ${v.model || ""} (${v.ownership_type || "unknown"} ownership, Mileage: ${v.current_mileage ? v.current_mileage.toLocaleString() : "unknown"}, Purchase Price: ${v.purchase_price ? "$" + v.purchase_price : "unknown"}, Current Value: ${v.current_value ? "$" + v.current_value : "unknown"}, Registration Expires: ${v.registration_expiry || "unknown"})${recallStr}`;
+        })
+        .join("\n")
+    : "No vehicles tracked"
+}
 `.trim();
 
     // --- BUILD SCENARIO PROMPT ---
@@ -230,7 +253,7 @@ ${
     // --- CALL CLAUDE ---
     console.log(`[simulate-scenario] Calling Claude for: ${isCustom ? "custom query" : scenario_id}`);
 
-    const hasAnyData = members.length > 0 || properties.length > 0 || documents.length > 0;
+    const hasAnyData = members.length > 0 || properties.length > 0 || documents.length > 0 || vehicles.length > 0;
 
     let claudeResponse: Response;
     try {

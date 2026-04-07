@@ -2,6 +2,7 @@ import SwiftUI
 
 struct QuickActions: View {
     var onUploadDocument: () -> Void = {}
+    // Retained for binary compatibility with existing call sites; unused.
     var onAddProperty: () -> Void = {}
     var onAskAI: () -> Void = {}
     var onViewOverdue: () -> Void = {}
@@ -10,35 +11,14 @@ struct QuickActions: View {
     var hasProperty: Bool = false
 
     var body: some View {
-        HStack(spacing: HavenTheme.spacing12) {
-            // Upload document
-            quickActionButton(
-                "Upload",
-                icon: "doc.badge.plus",
-                action: onUploadDocument
-            )
-
-            // Contextual: overdue, maintenance, or add home
-            if overdueCount > 0 {
-                quickActionButton(
-                    "Overdue (\(overdueCount))",
-                    icon: "exclamationmark.triangle.fill",
-                    action: onViewOverdue
-                )
-            } else if !hasProperty {
-                quickActionButton(
-                    "Add Home",
-                    icon: "house.fill",
-                    action: onAddProperty
-                )
-            } else {
-                quickActionButton(
-                    "Maintenance",
-                    icon: "wrench.fill",
-                    action: onViewMaintenance
-                )
-            }
-        }
+        // Single full-width Upload button. Maintenance is reachable from
+        // the green hero and the "See all" link in Needs Your Attention,
+        // so a third entry point here was redundant.
+        quickActionButton(
+            "Upload",
+            icon: "doc.badge.plus",
+            action: onUploadDocument
+        )
     }
 
     private func quickActionButton(_ title: String, icon: String, action: @escaping () -> Void) -> some View {

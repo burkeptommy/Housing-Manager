@@ -5,6 +5,7 @@ import UniformTypeIdentifiers
 struct DocumentUploadView: View {
     var preselectedCategory: DocumentCategory?
     var preselectedPropertyId: UUID?
+    var preselectedProjectId: UUID?
     var onComplete: (() -> Void)?
 
     @StateObject private var viewModel = DocumentUploadViewModel()
@@ -48,6 +49,9 @@ struct DocumentUploadView: View {
                 if let propId = preselectedPropertyId {
                     viewModel.selectedPropertyId = propId
                 }
+                if let projId = preselectedProjectId {
+                    viewModel.selectedProjectId = projId
+                }
             }
             .sheet(isPresented: $viewModel.showScanner) {
                 DocumentScannerView { images in
@@ -90,7 +94,7 @@ struct DocumentUploadView: View {
                             }
                         }
                         if !files.isEmpty {
-                            DocumentUploadManager.shared.enqueueFiles(files, propertyId: viewModel.selectedPropertyId)
+                            DocumentUploadManager.shared.enqueueFiles(files, propertyId: viewModel.selectedPropertyId, projectId: viewModel.selectedProjectId)
                             Haptics.success()
                             onComplete?()
                             dismiss()
@@ -123,17 +127,21 @@ struct DocumentUploadView: View {
                 }
             }
             .alert("Duplicate Document", isPresented: $viewModel.showDuplicateAlert) {
-                Button("Replace", role: .destructive) {
+                Button("Replace Existing", role: .destructive) {
                     Analytics.track(.documentDuplicateResolved, ["resolution": "replace"])
                     Task { await viewModel.replaceDuplicate() }
                 }
-                Button("Keep Both", role: .cancel) {
-                    Analytics.track(.documentDuplicateResolved, ["resolution": "keep_both"])
-                    viewModel.keepBoth()
+                Button("Save Both Copies") {
+                    Analytics.track(.documentDuplicateResolved, ["resolution": "save_both"])
+                    Task { await viewModel.saveBoth() }
+                }
+                Button("Delete This Document", role: .cancel) {
+                    Analytics.track(.documentDuplicateResolved, ["resolution": "delete"])
+                    viewModel.discardDuplicate()
                 }
             } message: {
                 if let existing = viewModel.duplicateExistingDoc {
-                    Text("You already have a \"\(existing.category)\" document (\(existing.title)). Replace it or keep both?")
+                    Text("This document already exists as \"\(existing.title)\" (\(existing.category)).")
                 }
             }
         }
@@ -151,7 +159,7 @@ struct DocumentUploadView: View {
                     contentType: viewModel.selectedContentType,
                     previewImage: viewModel.previewImage
                 )
-                DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId)
+                DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId, projectId: viewModel.selectedProjectId)
                 Haptics.success()
                 onComplete?()
                 dismiss()
@@ -757,7 +765,7 @@ struct DocumentUploadView: View {
                 contentType: viewModel.selectedContentType,
                 previewImage: viewModel.previewImage
             )
-            DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId)
+            DocumentUploadManager.shared.enqueueFiles([file], propertyId: viewModel.selectedPropertyId, projectId: viewModel.selectedProjectId)
             Haptics.success()
             NotificationCenter.default.post(name: .documentChanged, object: nil,
                 userInfo: ["action": "created", "id": "pending"])
@@ -817,7 +825,8 @@ struct DocumentUploadView: View {
                     // Hand off to background manager
                     DocumentUploadManager.shared.enqueueFiles(
                         files,
-                        propertyId: viewModel.selectedPropertyId
+                        propertyId: viewModel.selectedPropertyId,
+                        projectId: viewModel.selectedProjectId
                     )
 
                     Haptics.success()

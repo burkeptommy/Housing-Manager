@@ -1,4 +1,5 @@
 import SwiftUI
+import PhotosUI
 
 struct FamilyMemberFormView: View {
     var existingMember: FamilyMemberRow?
@@ -17,6 +18,7 @@ struct FamilyMemberFormView: View {
     @State private var isExpecting = false
     @State private var expectedDate = Date()
     @State private var legalName = ""
+    @State private var school = ""
     @State private var notes = ""
     @State private var isSaving = false
     @State private var error: String?
@@ -28,6 +30,10 @@ struct FamilyMemberFormView: View {
     @State private var emailCheckTask: Task<Void, Never>?
     @State private var showInviteAfterSave = false
     @State private var showLinkedDeleteWarning = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var avatarImage: UIImage?
+    @State private var currentAvatarUrl: String?
+    @State private var isUploadingPhoto = false
 
     private let relationships = ["Primary Client", "Spouse/Partner", "Child", "Grandchild", "Parent", "Sibling", "Guardian", "Trustee", "Executor", "Beneficiary", "Other"]
     private let genders = ["male", "female", "other", "prefer_not_to_say"]
@@ -37,10 +43,63 @@ struct FamilyMemberFormView: View {
 
     var body: some View {
         Form {
-            // Avatar preview
+            // Avatar preview with photo picker
             Section {
-                HStack { Spacer(); avatarPreview; Spacer() }
-                    .listRowBackground(Color.clear)
+                VStack(spacing: 12) {
+                    avatarPreview
+                        .overlay(alignment: .bottomTrailing) {
+                            if !isUploadingPhoto {
+                                Image(systemName: "camera.fill")
+                                    .font(.system(size: 12, weight: .semibold))
+                                    .foregroundStyle(.white)
+                                    .padding(6)
+                                    .background(Circle().fill(HavenColors.navy800))
+                                    .offset(x: 4, y: 4)
+                            }
+                        }
+
+                    PhotosPicker(
+                        selection: $selectedPhotoItem,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        Text(avatarImage != nil || currentAvatarUrl != nil ? "Change Photo" : "Add Photo")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy500)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUploadingPhoto)
+
+                    if isUploadingPhoto {
+                        HStack(spacing: 8) {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                                .tint(HavenColors.navy800)
+                            Text("Uploading...")
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+
+                    if avatarImage != nil || currentAvatarUrl != nil {
+                        Button {
+                            Haptics.light()
+                            Task { await removePhoto() }
+                        } label: {
+                            Text("Remove Photo")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.critical)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isUploadingPhoto)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+            }
+            .onChange(of: selectedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                Task { await loadAndUploadPhoto(item: newItem) }
             }
 
             // EXPECTING — first toggle, drives the form
@@ -134,6 +193,18 @@ struct FamilyMemberFormView: View {
                         .foregroundStyle(HavenColors.textTertiary)
                 } header: {
                     Text("LEGAL / FORMAL NAME").font(HavenTypography.uiSectionHeader).tracking(1.5)
+                }
+
+                if ["Child", "Grandchild"].contains(relationship) {
+                    Section {
+                        TextField("e.g. Fraser Woods Montessori", text: $school)
+                            .textInputAutocapitalization(.words)
+                        Text("School, daycare, or educational institution. Helps organize school-related documents.")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    } header: {
+                        Text("SCHOOL / DAYCARE").font(HavenTypography.uiSectionHeader).tracking(1.5)
+                    }
                 }
 
                 Section {
@@ -329,6 +400,7 @@ struct FamilyMemberFormView: View {
                 phone = m.phone ?? ""
                 notes = m.notes ?? ""
                 legalName = m.legalName ?? ""
+                school = m.school ?? ""
                 avatarColor = AvatarColor(rawValue: m.avatarColor ?? "navy") ?? .navy
                 isExpecting = m.isExpecting ?? false
                 if let dob = m.dateOfBirth {
@@ -340,6 +412,7 @@ struct FamilyMemberFormView: View {
                     let f = DateFormatter(); f.dateFormat = "yyyy-MM-dd"
                     expectedDate = f.date(from: ed) ?? Date()
                 }
+                currentAvatarUrl = m.avatarUrl
             }
         }
     }
@@ -350,14 +423,57 @@ struct FamilyMemberFormView: View {
         let dobStr = hasDateOfBirth ? formatter.string(from: dateOfBirth) : nil
 
         return VStack(spacing: 8) {
-            AvatarPreview(
-                relationship: relationship,
-                gender: gender,
-                dateOfBirth: dobStr,
-                isExpecting: isExpecting,
-                avatarColor: avatarColor,
-                size: 88
-            )
+            ZStack {
+                if let avatarImage {
+                    // Show locally selected photo
+                    Image(uiImage: avatarImage)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 88, height: 88)
+                        .clipShape(Circle())
+                        .overlay(
+                            Circle()
+                                .stroke(avatarColor.color, lineWidth: 3)
+                                .frame(width: 88, height: 88)
+                        )
+                } else if let urlString = currentAvatarUrl, !urlString.isEmpty, let url = URL(string: urlString) {
+                    // Show remote photo
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 88, height: 88)
+                                .clipShape(Circle())
+                        default:
+                            AvatarPreview(
+                                relationship: relationship,
+                                gender: gender,
+                                dateOfBirth: dobStr,
+                                isExpecting: isExpecting,
+                                avatarColor: avatarColor,
+                                size: 88
+                            )
+                        }
+                    }
+                    .overlay(
+                        Circle()
+                            .stroke(avatarColor.color, lineWidth: 3)
+                            .frame(width: 88, height: 88)
+                    )
+                } else {
+                    // SF Symbol fallback
+                    AvatarPreview(
+                        relationship: relationship,
+                        gender: gender,
+                        dateOfBirth: dobStr,
+                        isExpecting: isExpecting,
+                        avatarColor: avatarColor,
+                        size: 88
+                    )
+                }
+            }
             Text(firstName.isEmpty ? (isExpecting ? "Baby" : "Preview") : firstName)
                 .font(HavenTypography.uiLabel)
                 .foregroundStyle(HavenColors.textPrimary)
@@ -402,12 +518,12 @@ struct FamilyMemberFormView: View {
                     gender: gender, avatarColor: avatarColor.rawValue,
                     expectedDate: isExpecting ? formatter.string(from: expectedDate) : nil,
                     isExpecting: isExpecting, legalName: legalName.isEmpty ? nil : legalName,
-                    notes: notes.isEmpty ? nil : notes
+                    school: school.isEmpty ? nil : school, notes: notes.isEmpty ? nil : notes
                 ))
             } else {
                 let user = try await db.fetchCurrentUser()
                 guard let householdId = user.householdId else { error = "No household found"; isSaving = false; return }
-                _ = try await db.createFamilyMember(FamilyMemberInsert(
+                let newMember = try await db.createFamilyMember(FamilyMemberInsert(
                     householdId: householdId, firstName: saveName, lastName: saveLastName, relationship: relationship,
                     dateOfBirth: hasDateOfBirth ? formatter.string(from: dateOfBirth) : nil,
                     email: email.isEmpty ? nil : email, phone: phone.isEmpty ? nil : phone,
@@ -415,8 +531,18 @@ struct FamilyMemberFormView: View {
                     gender: gender, avatarColor: avatarColor.rawValue,
                     expectedDate: isExpecting ? formatter.string(from: expectedDate) : nil,
                     isExpecting: isExpecting, legalName: legalName.isEmpty ? nil : legalName,
-                    notes: notes.isEmpty ? nil : notes
+                    school: school.isEmpty ? nil : school, notes: notes.isEmpty ? nil : notes
                 ))
+
+                // Upload photo for new member if one was selected
+                if let avatarImage {
+                    _ = try? await AvatarPhotoService.shared.uploadAvatar(
+                        image: avatarImage,
+                        memberId: newMember.id,
+                        householdId: householdId
+                    )
+                    Analytics.track(.avatarPhotoUploaded, ["member_id": newMember.id.uuidString])
+                }
             }
             Haptics.success()
             Analytics.track(isEditing ? .familyMemberEdited : .familyMemberCreated, ["relationship": relationship])
@@ -464,6 +590,60 @@ struct FamilyMemberFormView: View {
             }
         } catch {
             print("[FamilyMemberForm] Email check failed: \(error)")
+        }
+    }
+
+    private func loadAndUploadPhoto(item: PhotosPickerItem) async {
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                error = "Could not load selected photo"
+                return
+            }
+
+            avatarImage = image
+
+            // If editing an existing member, upload immediately
+            if let member = existingMember {
+                let url = try await AvatarPhotoService.shared.uploadAvatar(
+                    image: image,
+                    memberId: member.id,
+                    householdId: member.householdId
+                )
+                currentAvatarUrl = url
+                Haptics.success()
+                Analytics.track(.avatarPhotoUploaded, ["member_id": member.id.uuidString])
+            }
+            // For new members, the photo will be uploaded after save (member ID needed)
+        } catch {
+            self.error = "Photo upload failed: \(error.localizedDescription)"
+            avatarImage = nil
+            Haptics.error()
+        }
+    }
+
+    private func removePhoto() async {
+        isUploadingPhoto = true
+        defer { isUploadingPhoto = false }
+
+        do {
+            if let member = existingMember {
+                try await AvatarPhotoService.shared.deleteAvatar(
+                    memberId: member.id,
+                    householdId: member.householdId
+                )
+                Analytics.track(.avatarPhotoRemoved, ["member_id": member.id.uuidString])
+            }
+            avatarImage = nil
+            currentAvatarUrl = nil
+            selectedPhotoItem = nil
+            Haptics.success()
+        } catch {
+            self.error = "Failed to remove photo: \(error.localizedDescription)"
+            Haptics.error()
         }
     }
 

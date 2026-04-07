@@ -1,7 +1,7 @@
 import SwiftUI
 
-/// Displays all forwarded emails and their processing status.
-/// Items that need user action (property assignment, classification) show inline action cards.
+/// Unified activity feed for all document activity -- uploads, forwarded emails, invoice processing.
+/// Items that need user action (VIN linking, invoice scan, classification) show inline action cards.
 struct InboxView: View {
     @StateObject private var viewModel = InboxViewModel()
     @State private var filter: InboxFilter = .needsAction
@@ -54,15 +54,23 @@ struct InboxView: View {
                                 item: item,
                                 properties: viewModel.properties,
                                 projects: viewModel.projects,
-                                onProcess: { propertyId, action, category in
+                                vehicles: viewModel.vehicles,
+                                onProcess: { propertyId, action, category, vehicleId in
                                     if action == "add_to_project", let projectIdStr = category, let projectId = UUID(uuidString: projectIdStr) {
                                         viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: nil, targetProjectId: projectId)
                                     } else {
-                                        viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category)
+                                        viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, vehicleId: vehicleId)
                                     }
                                 },
                                 onDismiss: {
                                     withAnimation { viewModel.dismissItem(item) }
+                                },
+                                onDelete: {
+                                    viewModel.items.removeAll { $0.id == item.id }
+                                    Haptics.success()
+                                    Task {
+                                        try? await DatabaseService.shared.deleteInboxItem(id: item.id)
+                                    }
                                 }
                             )
                             .onAppear {
@@ -76,8 +84,9 @@ struct InboxView: View {
                                 item: item,
                                 properties: viewModel.properties,
                                 projects: viewModel.projects,
-                                onProcess: { propertyId, action, category, targetProjectId in
-                                    viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, targetProjectId: targetProjectId)
+                                vehicles: viewModel.vehicles,
+                                onProcess: { propertyId, action, category, targetProjectId, vehicleId in
+                                    viewModel.processItem(item, propertyId: propertyId, action: action, documentCategory: category, targetProjectId: targetProjectId, vehicleId: vehicleId)
                                 },
                                 onDismiss: {
                                     withAnimation { viewModel.dismissItem(item) }
@@ -168,10 +177,12 @@ struct InboxView: View {
                 .foregroundStyle(HavenColors.textTertiary)
 
             VStack(spacing: HavenTheme.spacing8) {
-                Text("No emails yet")
+                Text(filter == .needsAction ? "All caught up!" : "No activity yet")
                     .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.textPrimary)
-                Text("Forward contractor quotes, documents, or vendor info to your Haven email address. Alfred will process everything automatically.")
+                Text(filter == .needsAction
+                     ? "Nothing needs your attention right now. Upload a document or forward an email to get started."
+                     : "Upload documents, forward emails, or scan invoices. Everything you add shows up here.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
@@ -194,6 +205,8 @@ struct InboxView: View {
 
             Spacer()
         }
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, HavenTheme.pageMargin)
     }
 }
 
@@ -204,6 +217,7 @@ final class InboxViewModel: ObservableObject {
     @Published var items: [DatabaseService.InboxItemRow] = []
     @Published var properties: [PropertyRow] = []
     @Published var projects: [PropertyProjectRow] = []
+    @Published var vehicles: [VehicleRow] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -212,14 +226,19 @@ final class InboxViewModel: ObservableObject {
         do {
             async let itemsReq = DatabaseService.shared.fetchAllInboxItems()
             async let propsReq = DatabaseService.shared.fetchProperties()
+            async let vehiclesReq = DatabaseService.shared.fetchVehicles()
             let (loadedItems, loadedProps) = try await (itemsReq, propsReq)
             items = loadedItems
             properties = loadedProps
-            // Load active projects for "Add to Project" option
-            if let propId = loadedProps.first?.id {
-                projects = (try? await DatabaseService.shared.fetchProjects(propertyId: propId)) ?? []
-                projects = projects.filter { $0.status == "planning" || $0.status == "in_progress" }
+            vehicles = (try? await vehiclesReq) ?? []
+            // Load active projects across ALL properties for "Add to Project" option
+            var allProjects: [PropertyProjectRow] = []
+            for prop in loadedProps {
+                if let propProjects = try? await DatabaseService.shared.fetchProjects(propertyId: prop.id) {
+                    allProjects.append(contentsOf: propProjects)
+                }
             }
+            projects = allProjects.filter { $0.status == "planning" || $0.status == "in_progress" }
         } catch {
             print("[InboxVM] Load failed: \(error)")
         }
@@ -231,7 +250,8 @@ final class InboxViewModel: ObservableObject {
         propertyId: UUID?,
         action: String,
         documentCategory: String?,
-        targetProjectId: UUID? = nil
+        targetProjectId: UUID? = nil,
+        vehicleId: UUID? = nil
     ) {
         // Remove the item from the list immediately — processing happens in background
         if let idx = items.firstIndex(where: { $0.id == item.id }) {
@@ -247,7 +267,8 @@ final class InboxViewModel: ObservableObject {
                     propertyId: propertyId?.uuidString,
                     action: action,
                     documentCategory: documentCategory,
-                    targetProjectId: targetProjectId?.uuidString
+                    targetProjectId: targetProjectId?.uuidString,
+                    vehicleId: vehicleId?.uuidString
                 )
                 // Reload to reflect final state
                 await load()

@@ -85,7 +85,7 @@ struct DocumentVaultView: View {
 
                         if !viewModel.familyMembers.isEmpty {
                             Menu("By Family Member") {
-                                ForEach(viewModel.familyMembers) { member in
+                                ForEach(viewModel.familyMembers.sortedByAge()) { member in
                                     Button("\(member.firstName) \(member.lastName)") {
                                         viewModel.filterFamilyMemberId = member.id
                                     }
@@ -261,7 +261,7 @@ struct DocumentVaultView: View {
                 }
                 .buttonStyle(.plain)
 
-                ForEach(viewModel.familyMembers) { member in
+                ForEach(viewModel.familyMembers.sortedByAge()) { member in
                     Button {
                         Haptics.light()
                         withAnimation(.easeInOut(duration: 0.2)) {

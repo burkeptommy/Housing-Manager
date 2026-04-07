@@ -58,15 +58,15 @@ struct AddressHookView: View {
                 // Branding
                 VStack(spacing: 8) {
                     Text("H")
-                        .font(Font.custom("Georgia", size: 64))
+                        .font(Font.custom("Georgia-Bold", size: 48))
                         .foregroundStyle(HavenColors.navy800)
                         .frame(width: 80, height: 80)
                         .background(
-                            RoundedRectangle(cornerRadius: 18)
-                                .fill(HavenColors.creamLight)
+                            RoundedRectangle(cornerRadius: 20)
+                                .fill(HavenColors.cream)
                                 .overlay(
-                                    RoundedRectangle(cornerRadius: 18)
-                                        .stroke(HavenColors.beige300, lineWidth: 1)
+                                    RoundedRectangle(cornerRadius: 20)
+                                        .stroke(HavenColors.beige300, lineWidth: 1.5)
                                 )
                         )
                     Text("Haven")

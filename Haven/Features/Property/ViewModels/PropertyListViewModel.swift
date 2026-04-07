@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 final class PropertyListViewModel: ObservableObject {
     @Published var properties: [PropertyRow] = []
+    @Published var vehicles: [VehicleRow] = []
     @Published var isLoading = false
     @Published var error: String?
 
@@ -11,7 +12,10 @@ final class PropertyListViewModel: ObservableObject {
     func loadProperties() async {
         isLoading = true
         do {
-            properties = try await db.fetchProperties()
+            async let propsTask = db.fetchProperties()
+            async let vehiclesTask = db.fetchVehicles()
+            properties = try await propsTask
+            vehicles = (try? await vehiclesTask) ?? []
         } catch {
             self.error = error.localizedDescription
         }

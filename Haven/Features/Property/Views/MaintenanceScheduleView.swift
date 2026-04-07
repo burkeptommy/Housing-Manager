@@ -13,11 +13,11 @@ struct MaintenanceScheduleView: View {
         self.prefilterPropertyId = filterPropertyId
     }
 
-    @StateObject private var viewModel = MaintenanceViewModel()
+    @StateObject private var viewModel = MaintenanceViewModel.shared
     @State private var viewMode: MaintenanceViewMode = .timeline
+    @State private var taskToDelete: MaintenanceTaskDBRow?
     @State private var selectedTask: MaintenanceTaskDBRow?
     @State private var showDeleteConfirm = false
-    @State private var taskToDelete: MaintenanceTaskDBRow?
     @State private var showSnooze = false
     @State private var taskToSnooze: MaintenanceTaskDBRow?
     @State private var snoozeDate = Date()
@@ -328,9 +328,14 @@ struct MaintenanceScheduleView: View {
             .presentationDetents([.medium])
         }
         .sheet(isPresented: $showAddTask) {
-            AddMaintenanceTaskSheet(properties: viewModel.properties, systems: viewModel.systems) {
-                Task { await viewModel.loadTasks() }
-            }
+            AddMaintenanceTaskSheet(
+                properties: viewModel.properties,
+                systems: viewModel.systems,
+                vehicles: viewModel.vehicles,
+                contractors: viewModel.contractors,
+                householdUsers: viewModel.users,
+                viewModel: viewModel
+            )
         }
     }
 
@@ -347,6 +352,14 @@ struct MaintenanceScheduleView: View {
             Section {
                 ForEach(viewModel.filteredTasks) { task in
                     maintenanceRow(task)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                taskToDelete = task
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -363,6 +376,14 @@ struct MaintenanceScheduleView: View {
             Section {
                 ForEach(group.tasks) { task in
                     maintenanceRow(task)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                taskToDelete = task
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -378,13 +399,13 @@ struct MaintenanceScheduleView: View {
                         .textCase(.uppercase)
                         .tracking(1.5)
 
-                    if viewModel.properties.count > 1, let firstTask = group.tasks.first {
+                    if viewModel.properties.count > 1, let firstTask = group.tasks.first, let propId = firstTask.propertyId {
                         Circle()
-                            .fill(viewModel.propertyColor(for: firstTask.propertyId))
+                            .fill(viewModel.propertyColor(for: propId))
                             .frame(width: 6, height: 6)
-                        Text(viewModel.propertyName(for: firstTask.propertyId))
+                        Text(viewModel.propertyName(for: propId))
                             .font(.system(size: 10))
-                            .foregroundStyle(viewModel.propertyColor(for: firstTask.propertyId))
+                            .foregroundStyle(viewModel.propertyColor(for: propId))
                     }
 
                     Spacer()
@@ -404,6 +425,14 @@ struct MaintenanceScheduleView: View {
             Section {
                 ForEach(group.tasks) { task in
                     maintenanceRow(task)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                taskToDelete = task
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -527,6 +556,14 @@ struct MaintenanceScheduleView: View {
             Section {
                 ForEach(tasks) { task in
                     maintenanceRow(task)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                taskToDelete = task
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
                         .listRowSeparator(.hidden)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
@@ -551,107 +588,19 @@ struct MaintenanceScheduleView: View {
     // MARK: - Task Row
 
     private func maintenanceRow(_ task: MaintenanceTaskDBRow) -> some View {
-        let isOverdue: Bool = {
-            let f = DateFormatter()
-            f.dateFormat = "yyyy-MM-dd"
-            guard let date = f.date(from: task.nextDueDate) else { return false }
-            return date < .now
-        }()
-
-        let propColor = viewModel.propertyColor(for: task.propertyId)
-        let showPropertyLabel = viewModel.properties.count > 1
-
-        return Button {
+        Button {
             Analytics.track(.maintenanceTaskViewed, ["task_id": task.id.uuidString, "task_title": task.title])
             selectedTask = task
         } label: {
-            HavenCard {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 12) {
-                        // Status indicator
-                        Circle()
-                            .fill(isOverdue ? HavenColors.critical : HavenColors.warning)
-                            .frame(width: 8, height: 8)
-
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(task.title)
-                                .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.textPrimary)
-
-                            HStack(spacing: 6) {
-                                // Property name (always shown; color dot only for multi-property)
-                                HStack(spacing: 4) {
-                                    if showPropertyLabel {
-                                        Circle()
-                                            .fill(propColor)
-                                            .frame(width: 6, height: 6)
-                                    }
-                                    Text(viewModel.propertyName(for: task.propertyId))
-                                        .foregroundStyle(showPropertyLabel ? propColor : HavenColors.textSecondary)
-                                }
-
-                                if let sysName = viewModel.systemName(for: task.systemId) {
-                                    Text("\u{00B7}")
-                                        .foregroundStyle(HavenColors.textTertiary)
-                                    Text(sysName)
-                                        .foregroundStyle(HavenColors.textSecondary)
-                                }
-                            }
-                            .font(HavenTypography.uiLabelSmall)
-                        }
-
-                        Spacer()
-
-                        VStack(alignment: .trailing, spacing: 4) {
-                            if let priority = task.priority {
-                                Text(priority)
-                                    .font(HavenTypography.uiCaption)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 2)
-                                    .background(HavenColors.priorityColor(priority).opacity(0.12))
-                                    .foregroundStyle(HavenColors.priorityColor(priority))
-                                    .clipShape(Capsule())
-                            }
-
-                            Text(task.nextDueDate.havenDateShort)
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textSecondary)
-                        }
-                    }
-
-                    // Metadata row
-                    HStack(spacing: 12) {
-                        if let userName = viewModel.assignedUserName(for: task) {
-                            metadataBadge(userName, icon: "person.fill", color: HavenColors.navy)
-                        }
-                        if let vendorName = viewModel.assignedContractorName(for: task) {
-                            metadataBadge(vendorName, icon: "wrench.and.screwdriver", color: HavenColors.info)
-                        }
-                        if task.isDiy == true {
-                            metadataBadge("DIY", icon: "hand.raised.fill", color: HavenColors.success)
-                        }
-                        if task.professionalRequired == true {
-                            metadataBadge("Professional", icon: "person.badge.key.fill", color: HavenColors.info)
-                        }
-                        if let costRange = task.costRange, !costRange.isEmpty {
-                            metadataBadge(costRange, icon: "dollarsign.circle", color: HavenColors.textSecondary)
-                        }
-                        if let season = task.seasonalTiming, !season.isEmpty {
-                            metadataBadge(season, icon: "leaf", color: HavenColors.textSecondary)
-                        }
-                        Spacer()
-                    }
-                }
-            }
-            // Color accent bar on the left edge
-            .overlay(alignment: .leading) {
-                if showPropertyLabel {
-                    RoundedRectangle(cornerRadius: 2)
-                        .fill(propColor)
-                        .frame(width: 3)
-                        .padding(.vertical, 6)
-                }
-            }
+            UnifiedTaskCard(
+                task: task,
+                propertyName: task.propertyId.map { viewModel.propertyName(for: $0) },
+                vehicleName: viewModel.vehicleName(for: task.vehicleId),
+                systemName: viewModel.systemName(for: task.systemId),
+                assigneeName: viewModel.assignedUserName(for: task),
+                assigneeAvatarColor: viewModel.assignedUserAvatarColor(for: task),
+                contractorName: viewModel.assignedContractorName(for: task)
+            )
         }
         .buttonStyle(.plain)
         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
@@ -705,7 +654,7 @@ struct MaintenanceScheduleView: View {
                 taskToDelete = task
                 showDeleteConfirm = true
             } label: {
-                Label("Not Applicable", systemImage: "xmark.circle")
+                Label("Delete Task", systemImage: "trash")
             }
         }
     }

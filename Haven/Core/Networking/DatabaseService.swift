@@ -515,18 +515,28 @@ final class DatabaseService {
 
     // MARK: - Home Systems
 
-    func fetchHomeSystems(propertyId: UUID) async throws -> [HomeSystemRow] {
-        try await from("home_systems")
+    func fetchHomeSystems(propertyId: UUID, topLevelOnly: Bool = false) async throws -> [HomeSystemRow] {
+        var query = from("home_systems")
             .select()
             .eq("property_id", value: propertyId.uuidString)
-            .order("name")
-            .execute()
-            .value
+        if topLevelOnly {
+            query = query.is("parent_system_id", value: nil)
+        }
+        return try await query.order("name").execute().value
     }
 
     func fetchHomeSystems() async throws -> [HomeSystemRow] {
         try await from("home_systems")
             .select()
+            .order("name")
+            .execute()
+            .value
+    }
+
+    func fetchChildSystems(parentId: UUID) async throws -> [HomeSystemRow] {
+        try await from("home_systems")
+            .select()
+            .eq("parent_system_id", value: parentId.uuidString)
             .order("name")
             .execute()
             .value
@@ -684,14 +694,62 @@ final class DatabaseService {
 
     // MARK: - Maintenance Tasks
 
-    func fetchMaintenanceTasks(propertyId: UUID? = nil) async throws -> [MaintenanceTaskDBRow] {
+    func fetchMaintenanceTasks(propertyId: UUID? = nil, systemId: UUID? = nil, vehicleId: UUID? = nil) async throws -> [MaintenanceTaskDBRow] {
         var query = from("maintenance_tasks").select()
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
+        if let systemId { query = query.eq("system_id", value: systemId.uuidString) }
+        if let vehicleId { query = query.eq("vehicle_id", value: vehicleId.uuidString) }
         return try await query.order("next_due_date").execute().value
     }
 
-    func createMaintenanceTask(_ task: MaintenanceTaskInsert) async throws -> MaintenanceTaskDBRow {
+    func fetchVehicleMaintenanceTasks(vehicleId: UUID) async throws -> [MaintenanceTaskDBRow] {
         try await from("maintenance_tasks")
+            .select()
+            .eq("vehicle_id", value: vehicleId.uuidString)
+            .order("next_due_date")
+            .execute()
+            .value
+    }
+
+    func fetchAllMaintenanceTasks() async throws -> [MaintenanceTaskDBRow] {
+        try await from("maintenance_tasks")
+            .select()
+            .order("next_due_date")
+            .execute()
+            .value
+    }
+
+    func createMaintenanceTask(_ task: MaintenanceTaskInsert) async throws -> MaintenanceTaskDBRow {
+        // Dedup check: skip if a task with the same title already exists for this property/vehicle/system
+        var query = from("maintenance_tasks")
+            .select("id")
+            .eq("household_id", value: task.householdId.uuidString)
+            .ilike("title", pattern: task.title)
+
+        if let propertyId = task.propertyId {
+            query = query.eq("property_id", value: propertyId.uuidString)
+        }
+        if let vehicleId = task.vehicleId {
+            query = query.eq("vehicle_id", value: vehicleId.uuidString)
+        }
+        if let systemId = task.systemId {
+            query = query.eq("system_id", value: systemId.uuidString)
+        }
+
+        struct IdRow: Codable { let id: UUID }
+        let existing: [IdRow] = (try? await query.limit(1).execute().value) ?? []
+        if let existingId = existing.first?.id {
+            // Return the existing task instead of creating a duplicate
+            print("[DatabaseService] Skipping duplicate task: \(task.title)")
+            return try await from("maintenance_tasks")
+                .select()
+                .eq("id", value: existingId.uuidString)
+                .single()
+                .execute()
+                .value
+        }
+
+        return try await from("maintenance_tasks")
             .insert(task)
             .select()
             .single()
@@ -740,6 +798,15 @@ final class DatabaseService {
             .execute()
     }
 
+    /// Batch-delete maintenance tasks in a single round-trip.
+    func deleteMaintenanceTasks(ids: [UUID]) async throws {
+        guard !ids.isEmpty else { return }
+        try await from("maintenance_tasks")
+            .delete()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+    }
+
     // MARK: - Device Tokens
 
     func upsertDeviceToken(userId: UUID, token: String) async throws {
@@ -773,6 +840,14 @@ final class DatabaseService {
         if let systemId { query = query.eq("system_id", value: systemId.uuidString) }
         if let propertyId { query = query.eq("property_id", value: propertyId.uuidString) }
         return try await query.order("service_date", ascending: false).execute().value
+    }
+
+    func fetchServiceRecordsForDocument(documentId: UUID) async throws -> [ServiceRecordRow] {
+        try await from("service_records")
+            .select()
+            .eq("invoice_document_id", value: documentId.uuidString)
+            .execute()
+            .value
     }
 
     func createServiceRecord(_ record: ServiceRecordInsert) async throws -> ServiceRecordRow {
@@ -1235,6 +1310,38 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Document-Project Linking
+
+    func fetchDocuments(projectId: UUID) async throws -> [DocumentRow] {
+        try await from("documents")
+            .select()
+            .eq("project_id", value: projectId.uuidString)
+            .is("deleted_at", value: nil)
+            .order("uploaded_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func linkDocumentToProject(documentId: UUID, projectId: UUID) async throws {
+        _ = try await from("documents")
+            .update(["project_id": projectId.uuidString])
+            .eq("id", value: documentId.uuidString)
+            .execute()
+    }
+
+    func unlinkDocumentFromProject(documentId: UUID) async throws {
+        struct NullProject: Codable {
+            let projectId: String? = nil
+            enum CodingKeys: String, CodingKey {
+                case projectId = "project_id"
+            }
+        }
+        try await from("documents")
+            .update(NullProject())
+            .eq("id", value: documentId.uuidString)
+            .execute()
+    }
+
     func fetchAllProjects() async throws -> [PropertyProjectRow] {
         try await from("property_projects")
             .select()
@@ -1340,6 +1447,7 @@ final class DatabaseService {
             case "document_stored": return "doc.fill"
             case "vendor_added": return "person.crop.circle.badge.plus"
             case "contractor_quote": return "doc.text.magnifyingglass"
+            case "insurance_claim": return "shield.fill"
             case "family": return "person.2.fill"
             default: return "envelope.fill"
             }
@@ -1361,6 +1469,39 @@ final class DatabaseService {
     }
 
     /// Metadata JSONB stored on inbox items by the receive-email edge function
+    struct UtilityProviderInfo: Decodable {
+        let providerId: UUID?
+        let providerName: String?
+        let providerSlug: String?
+        let providerType: String?
+        let logoUrl: String?
+        let brandColor: String?
+        let website: String?
+        let phone: String?
+
+        enum CodingKeys: String, CodingKey {
+            case website, phone
+            case providerId = "provider_id"
+            case providerName = "provider_name"
+            case providerSlug = "provider_slug"
+            case providerType = "provider_type"
+            case logoUrl = "logo_url"
+            case brandColor = "brand_color"
+        }
+    }
+
+    struct UtilityProviderSuggestion: Decodable {
+        let vendorName: String?
+        let vendorPhone: String?
+        let vendorEmail: String?
+
+        enum CodingKeys: String, CodingKey {
+            case vendorName = "vendor_name"
+            case vendorPhone = "vendor_phone"
+            case vendorEmail = "vendor_email"
+        }
+    }
+
     struct InboxMetadata: Decodable {
         let emailBody: String?
         let subject: String?
@@ -1369,11 +1510,35 @@ final class DatabaseService {
         let vendorName: String?
         let vendorEmail: String?
         let vendorPhone: String?
+        // Utility provider matching (for bill_invoice items)
+        let utilityProvider: UtilityProviderInfo?
+        let utilityProviderSuggestion: UtilityProviderSuggestion?
+        let billAccountNumber: String?
+        let billAmount: Double?
+        // Document classification confidence
+        let highConfidence: Bool?
+        let suggestedCategory: String?
+        let documentTitle: String?
+        // Vehicle context
+        let vehicleInvoice: Bool?
+        // Analysis status
+        let analysisSkipped: Bool?
+        let analysisSkipReason: String?
 
         enum CodingKeys: String, CodingKey {
             case subject, classification
             case emailBody = "email_body"
             case emailHash = "email_hash"
+            case utilityProvider = "utility_provider"
+            case utilityProviderSuggestion = "utility_provider_suggestion"
+            case billAccountNumber = "bill_account_number"
+            case billAmount = "bill_amount"
+            case highConfidence = "high_confidence"
+            case suggestedCategory = "suggested_category"
+            case documentTitle = "document_title"
+            case vehicleInvoice = "vehicle_invoice"
+            case analysisSkipped = "analysis_skipped"
+            case analysisSkipReason = "analysis_skip_reason"
         }
 
         // The classification is nested inside metadata
@@ -1386,6 +1551,16 @@ final class DatabaseService {
             emailBody = try? c.decodeIfPresent(String.self, forKey: .emailBody)
             subject = try? c.decodeIfPresent(String.self, forKey: .subject)
             emailHash = try? c.decodeIfPresent(String.self, forKey: .emailHash)
+            utilityProvider = try? c.decodeIfPresent(UtilityProviderInfo.self, forKey: .utilityProvider)
+            utilityProviderSuggestion = try? c.decodeIfPresent(UtilityProviderSuggestion.self, forKey: .utilityProviderSuggestion)
+            billAccountNumber = try? c.decodeIfPresent(String.self, forKey: .billAccountNumber)
+            billAmount = try? c.decodeIfPresent(Double.self, forKey: .billAmount)
+            highConfidence = try? c.decodeIfPresent(Bool.self, forKey: .highConfidence)
+            suggestedCategory = try? c.decodeIfPresent(String.self, forKey: .suggestedCategory)
+            documentTitle = try? c.decodeIfPresent(String.self, forKey: .documentTitle)
+            vehicleInvoice = try? c.decodeIfPresent(Bool.self, forKey: .vehicleInvoice)
+            analysisSkipped = try? c.decodeIfPresent(Bool.self, forKey: .analysisSkipped)
+            analysisSkipReason = try? c.decodeIfPresent(String.self, forKey: .analysisSkipReason)
             // Extract vendor info from nested classification object
             if let classContainer = try? c.nestedContainer(keyedBy: ClassificationKeys.self, forKey: .classification) {
                 vendorName = try? classContainer.decodeIfPresent(String.self, forKey: .vendorName)
@@ -1428,10 +1603,48 @@ final class DatabaseService {
             .value
     }
 
+    func createInboxItem(
+        householdId: UUID,
+        type: String,
+        title: String,
+        summary: String? = nil,
+        relatedDocumentId: UUID? = nil,
+        needsAction: Bool = false,
+        actionType: String? = nil,
+        status: String = "ready",
+        attachmentFilename: String? = nil
+    ) async throws {
+        var row: [String: String?] = [
+            "household_id": householdId.uuidString,
+            "type": type,
+            "title": title,
+            "status": status,
+        ]
+        if let summary { row["summary"] = summary }
+        if let relatedDocumentId { row["related_document_id"] = relatedDocumentId.uuidString }
+        if let actionType { row["action_type"] = actionType }
+        if let attachmentFilename { row["attachment_filename"] = attachmentFilename }
+
+        try await from("inbox_items")
+            .insert(row)
+            .execute()
+
+        // Set needs_action separately (bool vs string issue)
+        if needsAction {
+            // Get the most recent item for this document
+            if let docId = relatedDocumentId {
+                _ = try? await from("inbox_items")
+                    .update(["needs_action": true])
+                    .eq("related_document_id", value: docId.uuidString)
+                    .execute()
+            }
+        }
+    }
+
     func markInboxItemsSeen(ids: [UUID]) async throws {
         for id in ids {
             try await from("inbox_items")
-                .update(["seen": true])
+                .update(["seen": true, "needs_action": false])
                 .eq("id", value: id.uuidString)
                 .execute()
         }
@@ -1977,5 +2190,69 @@ final class DatabaseService {
             .update(Update(lastSyncedAt: Date()))
             .eq("id", value: id.uuidString)
             .execute()
+    }
+
+    // MARK: - Vehicles
+
+    func fetchVehicles() async throws -> [VehicleRow] {
+        try await from("vehicles").select().order("name").execute().value
+    }
+
+    func fetchVehicle(id: UUID) async throws -> VehicleRow {
+        try await from("vehicles").select().eq("id", value: id.uuidString).single().execute().value
+    }
+
+    func createVehicle(_ vehicle: VehicleInsert) async throws -> VehicleRow {
+        try await from("vehicles").insert(vehicle).select().single().execute().value
+    }
+
+    func updateVehicle(id: UUID, _ updates: VehicleUpdate) async throws -> VehicleRow {
+        try await from("vehicles").update(updates).eq("id", value: id.uuidString).select().single().execute().value
+    }
+
+    func deleteVehicle(id: UUID) async throws {
+        try await from("vehicles").delete().eq("id", value: id.uuidString).execute()
+    }
+
+    // MARK: - Vehicle Service Records
+
+    func fetchVehicleServiceRecords(vehicleId: UUID) async throws -> [VehicleServiceRecordRow] {
+        try await from("vehicle_service_records").select().eq("vehicle_id", value: vehicleId.uuidString).order("service_date", ascending: false).execute().value
+    }
+
+    func createVehicleServiceRecord(_ record: VehicleServiceRecordInsert) async throws -> VehicleServiceRecordRow {
+        try await from("vehicle_service_records").insert(record).select().single().execute().value
+    }
+
+    func deleteVehicleServiceRecord(id: UUID) async throws {
+        try await from("vehicle_service_records").delete().eq("id", value: id.uuidString).execute()
+    }
+
+    // MARK: - Vehicle Recalls
+
+    func fetchVehicleRecalls(vehicleId: UUID) async throws -> [VehicleRecallRow] {
+        try await from("vehicle_recalls").select().eq("vehicle_id", value: vehicleId.uuidString).order("recall_date", ascending: false).execute().value
+    }
+
+    func createVehicleRecall(_ recall: VehicleRecallInsert) async throws -> VehicleRecallRow {
+        try await from("vehicle_recalls").insert(recall).select().single().execute().value
+    }
+
+    func updateVehicleRecall(id: UUID, isResolved: Bool, resolvedDate: String?) async throws {
+        struct RecallUpdate: Codable {
+            let isResolved: Bool
+            let resolvedDate: String?
+            enum CodingKeys: String, CodingKey {
+                case isResolved = "is_resolved"
+                case resolvedDate = "resolved_date"
+            }
+        }
+        try await from("vehicle_recalls").update(RecallUpdate(isResolved: isResolved, resolvedDate: resolvedDate)).eq("id", value: id.uuidString).execute()
+    }
+
+    // MARK: - Vehicle Documents
+
+    func fetchVehicleDocuments(vehicleId: UUID) async throws -> [DocumentRow] {
+        try await from("documents").select().eq("vehicle_id", value: vehicleId.uuidString).is("deleted_at", value: nil).order("uploaded_at", ascending: false).execute().value
     }
 }

@@ -20,6 +20,8 @@ struct AddSystemView: View {
     @State private var showEquipmentSearch = false
     @State private var catalogEntryId: UUID?
     @State private var selectedCatalogResult: EquipmentSearchResult?
+    @State private var subtype: String? = nil
+    @State private var customCategoryName: String = ""
 
     // Warranty fields
     @State private var addWarranty = false
@@ -42,6 +44,10 @@ struct AddSystemView: View {
                         ForEach(categories, id: \.self) { cat in
                             Text(cat).tag(cat)
                         }
+                    }
+                    SystemSubtypePicker(category: category, subtype: $subtype)
+                    if category == "Other" {
+                        TextField("Custom category name (e.g. Wine Cellar Cooling)", text: $customCategoryName)
                     }
                 }
 
@@ -205,6 +211,11 @@ struct AddSystemView: View {
                 notes: notes.isEmpty ? nil : notes
             )
             insert.catalogEntryId = catalogEntryId
+            insert.subtype = subtype
+            if category == "Other" {
+                let trimmed = customCategoryName.trimmingCharacters(in: .whitespaces)
+                insert.customCategoryName = trimmed.isEmpty ? nil : trimmed
+            }
 
             let system = try await DatabaseService.shared.createHomeSystem(insert)
 
@@ -242,7 +253,12 @@ struct AddSystemView: View {
 
             // Add maintenance templates
             if addMaintenanceTemplates {
-                let templates = MaintenanceTemplates.templates(for: category)
+                let activeSubs = MaintenanceTemplates.activeSubtypes(
+                    category: category,
+                    subtype: subtype,
+                    fuelType: selectedCatalogResult?.specs.fuelType
+                )
+                let templates = MaintenanceTemplates.templates(for: category, activeSubtypes: activeSubs)
                 for template in templates {
                     let nextDue = Calendar.current.date(byAdding: template.interval, to: .now)!
                     let taskInsert = MaintenanceTaskInsert(
@@ -263,6 +279,26 @@ struct AddSystemView: View {
                         recurrenceRule: template.frequency
                     )
                     _ = try await DatabaseService.shared.createMaintenanceTask(taskInsert)
+                }
+            }
+
+            // Migrate equipment-specific tasks from parent to this new child system
+            if let parentId = insert.parentSystemId {
+                let parentTasks = (try? await DatabaseService.shared.fetchMaintenanceTasks(systemId: parentId)) ?? []
+                let systemNameLower = name.lowercased()
+                let kwMatch: (String, String) -> Bool = { n, kw in
+                    let lower = kw.lowercased()
+                    if lower.contains(" ") { return n.contains(lower) }
+                    return Set(n.components(separatedBy: CharacterSet.alphanumerics.inverted)).contains(lower)
+                }
+                let allTemplates = MaintenanceTemplates.allTemplates.flatMap(\.1)
+                let matchingTemplateIds = Set(allTemplates
+                    .filter { t in !t.equipmentKeywords.isEmpty && t.equipmentKeywords.contains { kwMatch(systemNameLower, $0) } }
+                    .map { $0.systemCategory + ":" + $0.title })
+                for task in parentTasks {
+                    if let templateId = task.templateId, matchingTemplateIds.contains(templateId) {
+                        _ = try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, MaintenanceTaskUpdate(systemId: system.id))
+                    }
                 }
             }
 

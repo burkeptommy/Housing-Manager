@@ -12,6 +12,7 @@ struct Recommendation: Identifiable {
 
 enum RecommendationAction {
     case navigate(tab: Int)
+    case navigateToProperty(section: String) // "maintenance", "projects", "systems", "contacts"
     case addProperty
     case uploadDocument
     case addVendor
@@ -23,6 +24,7 @@ enum RecommendationAction {
 }
 
 /// Evaluates the user's data and returns prioritized recommendations.
+/// Priority order: Home management first, estate second.
 struct RecommendationEngine {
 
     static func evaluate(
@@ -40,74 +42,34 @@ struct RecommendationEngine {
         hasRemindersEnabled: Bool,
         overBudgetProjectCount: Int = 0,
         approachingDeadlineProjectCount: Int = 0,
+        seasonalTasksIncomplete: Int = 0,
+        seasonalTasksTotal: Int = 0,
+        currentSeasonName: String = "",
+        systemsNeedingServiceCount: Int = 0,
+        hasIncompleteProperty: Bool = false,
         dismissedIds: Set<String>
     ) -> [Recommendation] {
         var recs: [Recommendation] = []
 
-        // --- SECURITY & COVERAGE (highest priority) ---
+        // ============================================================
+        // HOME MANAGEMENT (highest priority -- this is Haven's core)
+        // ============================================================
 
-        if documentCount > 0 && estateReadiness < 30 {
+        // Seasonal tasks -- most timely, changes with the season
+        if seasonalTasksIncomplete > 0 && seasonalTasksTotal > 0 {
+            let done = seasonalTasksTotal - seasonalTasksIncomplete
             recs.append(Recommendation(
-                id: "low_readiness",
-                title: "Improve your estate readiness",
-                subtitle: "You're at \(Int(estateReadiness))% — upload key documents to protect your family",
-                icon: "shield.lefthalf.filled",
-                iconColor: HavenColors.critical,
-                priority: 10,
-                action: .navigate(tab: 2)
-            ))
-        }
-
-        if expiringCount > 0 {
-            recs.append(Recommendation(
-                id: "expiring_docs",
-                title: "\(expiringCount) document\(expiringCount == 1 ? "" : "s") expiring soon",
-                subtitle: "Review and upload renewals before they expire",
-                icon: "clock.badge.exclamationmark",
-                iconColor: HavenColors.warning,
-                priority: 15,
-                action: .navigate(tab: 2)
-            ))
-        }
-
-        // --- HOME MANAGEMENT ---
-
-        if hasProperty && systemCount == 0 {
-            recs.append(Recommendation(
-                id: "add_systems",
-                title: "Add home systems",
-                subtitle: "HVAC, plumbing, electrical — Haven tracks maintenance for you",
-                icon: "gearshape.2.fill",
+                id: "seasonal_tasks",
+                title: "\(currentSeasonName) tasks: \(done) of \(seasonalTasksTotal) groups done",
+                subtitle: "Review seasonal maintenance before the season ends",
+                icon: "leaf.fill",
                 iconColor: HavenColors.navy700,
-                priority: 20,
-                action: .navigate(tab: 1)
+                priority: 8,
+                action: .navigateToProperty(section: "maintenance")
             ))
         }
 
-        if hasProperty && vendorCount == 0 {
-            recs.append(Recommendation(
-                id: "add_vendor",
-                title: "Add your first vendor",
-                subtitle: "Build your trusted contractor network",
-                icon: "person.crop.rectangle.badge.plus",
-                iconColor: HavenColors.navy700,
-                priority: 30,
-                action: .addVendor
-            ))
-        }
-
-        if overdueCount > 0 {
-            recs.append(Recommendation(
-                id: "overdue_maintenance",
-                title: "\(overdueCount) overdue maintenance task\(overdueCount == 1 ? "" : "s")",
-                subtitle: "Don't let small issues become expensive repairs",
-                icon: "wrench.and.screwdriver.fill",
-                iconColor: HavenColors.critical,
-                priority: 12,
-                action: .navigate(tab: 1)
-            ))
-        }
-
+        // Active project alerts
         if overBudgetProjectCount > 0 {
             recs.append(Recommendation(
                 id: "over_budget_projects",
@@ -115,8 +77,8 @@ struct RecommendationEngine {
                 subtitle: "Review your spending to stay on track",
                 icon: "exclamationmark.triangle.fill",
                 iconColor: HavenColors.critical,
-                priority: 18,
-                action: .navigate(tab: 1)
+                priority: 10,
+                action: .navigateToProperty(section: "projects")
             ))
         }
 
@@ -127,13 +89,76 @@ struct RecommendationEngine {
                 subtitle: "Check your timeline and remaining tasks",
                 icon: "calendar.badge.exclamationmark",
                 iconColor: HavenColors.warning,
-                priority: 22,
-                action: .navigate(tab: 1)
+                priority: 12,
+                action: .navigateToProperty(section: "projects")
             ))
         }
 
-        // --- FAMILY & ESTATE ---
+        // Core home setup
+        if hasProperty && systemCount == 0 {
+            recs.append(Recommendation(
+                id: "add_systems",
+                title: "Add home systems",
+                subtitle: "HVAC, plumbing, electrical -- Haven tracks maintenance for you",
+                icon: "gearshape.2.fill",
+                iconColor: HavenColors.navy700,
+                priority: 15,
+                action: .navigateToProperty(section: "overview")
+            ))
+        }
 
+        // Systems needing service
+        if systemsNeedingServiceCount > 0 {
+            recs.append(Recommendation(
+                id: "systems_need_service",
+                title: "\(systemsNeedingServiceCount) system\(systemsNeedingServiceCount == 1 ? " hasn't" : "s haven't") been serviced recently",
+                subtitle: "Schedule maintenance to avoid costly repairs",
+                icon: "exclamationmark.triangle",
+                iconColor: HavenColors.warning,
+                priority: 18,
+                action: .navigateToProperty(section: "maintenance")
+            ))
+        }
+
+        if hasProperty && vendorCount == 0 {
+            recs.append(Recommendation(
+                id: "add_vendor",
+                title: "Add your first vendor",
+                subtitle: "Build your trusted contractor network",
+                icon: "person.crop.rectangle.badge.plus",
+                iconColor: HavenColors.navy700,
+                priority: 20,
+                action: .navigateToProperty(section: "contacts")
+            ))
+        }
+
+        // Expiring documents (warranties, insurance, registrations)
+        if expiringCount > 0 {
+            recs.append(Recommendation(
+                id: "expiring_docs",
+                title: "\(expiringCount) document\(expiringCount == 1 ? "" : "s") expiring soon",
+                subtitle: "Review and upload renewals before they expire",
+                icon: "clock.badge.exclamationmark",
+                iconColor: HavenColors.warning,
+                priority: 25,
+                action: .navigate(tab: 2)
+            ))
+        }
+
+        // Incomplete property details
+        if hasIncompleteProperty {
+            recs.append(Recommendation(
+                id: "incomplete_property",
+                title: "Complete your property details",
+                subtitle: "Add square footage, year built, and purchase price for better insights",
+                icon: "house.fill",
+                iconColor: HavenColors.navy700,
+                priority: 28,
+                action: .navigateToProperty(section: "overview")
+            ))
+        }
+
+        // Family setup
         if familyMemberCount <= 1 {
             recs.append(Recommendation(
                 id: "add_family",
@@ -141,8 +166,37 @@ struct RecommendationEngine {
                 subtitle: "Track documents and coverage for each person",
                 icon: "person.3.fill",
                 iconColor: HavenColors.navy700,
-                priority: 25,
+                priority: 30,
                 action: .addFamilyMember
+            ))
+        }
+
+        // Reminders
+        if propertyCount > 0 && documentCount >= 3 && !hasRemindersEnabled {
+            recs.append(Recommendation(
+                id: "enable_reminders",
+                title: "Set up reminders",
+                subtitle: "Get notified before documents expire and maintenance is due",
+                icon: "bell.badge.fill",
+                iconColor: HavenColors.warning,
+                priority: 35,
+                action: .openSettings
+            ))
+        }
+
+        // ============================================================
+        // ESTATE (lower priority -- shown after home management is handled)
+        // ============================================================
+
+        if documentCount > 0 && estateReadiness < 30 {
+            recs.append(Recommendation(
+                id: "low_readiness",
+                title: "Improve your estate readiness",
+                subtitle: "You're at \(Int(estateReadiness))% -- upload key documents to protect your family",
+                icon: "shield.lefthalf.filled",
+                iconColor: HavenColors.info,
+                priority: 70,
+                action: .navigate(tab: 2)
             ))
         }
 
@@ -153,7 +207,7 @@ struct RecommendationEngine {
                 subtitle: "Let Alfred find blind spots in your estate plan",
                 icon: "chart.bar.doc.horizontal.fill",
                 iconColor: HavenColors.info,
-                priority: 35,
+                priority: 75,
                 action: .runGapAnalysis
             ))
         }
@@ -165,22 +219,8 @@ struct RecommendationEngine {
                 subtitle: "Ask \"What if?\" questions with your real data",
                 icon: "sparkles",
                 iconColor: HavenColors.navy700,
-                priority: 40,
+                priority: 80,
                 action: .runScenario
-            ))
-        }
-
-        // --- OPTIMIZATION ---
-
-        if propertyCount > 0 && documentCount >= 3 && !hasRemindersEnabled {
-            recs.append(Recommendation(
-                id: "enable_reminders",
-                title: "Set up reminders",
-                subtitle: "Get notified before documents expire and maintenance is due",
-                icon: "bell.badge.fill",
-                iconColor: HavenColors.warning,
-                priority: 45,
-                action: .openSettings
             ))
         }
 
@@ -191,7 +231,7 @@ struct RecommendationEngine {
                 subtitle: "Upload a few more key documents to reach 80% readiness",
                 icon: "arrow.up.circle.fill",
                 iconColor: HavenColors.success,
-                priority: 50,
+                priority: 85,
                 action: .navigate(tab: 2)
             ))
         }

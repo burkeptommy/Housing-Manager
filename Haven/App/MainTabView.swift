@@ -13,10 +13,15 @@ extension Notification.Name {
     static let documentChanged = Notification.Name("documentChanged")
     static let propertyChanged = Notification.Name("propertyChanged")
     static let projectChanged = Notification.Name("projectChanged")
+    static let inboxItemUpdated = Notification.Name("inboxItemUpdated")
+    static let navigateToVehicle = Notification.Name("navigateToVehicle")
+    static let navigateToInboxItem = Notification.Name("navigateToInboxItem")
+    static let navigateToPropertySection = Notification.Name("navigateToPropertySection")
 }
 
 struct MainTabView: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject private var uploadManager = DocumentUploadManager.shared
     @State private var selectedTab = 0
     @State private var showScenarioStudio = false
     @State private var scenarioInitialQuery: String?
@@ -27,7 +32,14 @@ struct MainTabView: View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
                 // Processing banner — visible across all tabs
-                ProcessingBanner()
+                ProcessingBanner { documentId in
+                    selectedTab = 0
+                    NotificationCenter.default.post(
+                        name: .navigateToInboxItem,
+                        object: nil,
+                        userInfo: ["documentId": documentId]
+                    )
+                }
 
                 TabView(selection: $selectedTab) {
                 DashboardView()
@@ -115,6 +127,18 @@ struct MainTabView: View {
             scenarioInitialQuery = nil
         } content: {
             ScenarioStudioView(initialQuery: scenarioInitialQuery)
+        }
+        .sheet(isPresented: $uploadManager.showInvoiceChoiceSheet) {
+            if let review = uploadManager.currentInvoiceReview {
+                InvoiceChoiceSheet(review: review) {
+                    uploadManager.dismissCurrentInvoiceReview()
+                }
+            }
+        }
+        .sheet(isPresented: $uploadManager.showDuplicateSheet) {
+            if let resolution = uploadManager.currentDuplicateResolution {
+                DuplicateResolutionSheet(resolution: resolution, manager: uploadManager)
+            }
         }
         .onAppear {
             startPulse()

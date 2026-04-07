@@ -12,7 +12,7 @@ struct UtilityAccountsSection: View {
     private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 3)
 
     // Default utility types to always show (even if not set up yet)
-    private let defaultTypes = ["internet_cable", "electric", "security"]
+    private let defaultTypes = ["internet_cable", "electric"]
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
@@ -61,7 +61,8 @@ struct UtilityAccountsSection: View {
             }
         }
         .task {
-            // Load provider data for logos and colors
+            guard !providerCacheLoaded else { return }
+            providerCacheLoaded = true
             let allProviders = (try? await DatabaseService.shared.fetchUtilityProviders()) ?? []
             for p in allProviders {
                 providerCache[p.slug] = p
@@ -135,8 +136,16 @@ struct UtilityAccountsSection: View {
                         }
                     }
                     .frame(width: 30, height: 30)
+                } else if account.providerSlug != nil {
+                    // No cached logo — try fetching from Brandfetch
+                    BrandfetchLogoView(
+                        providerName: account.providerName,
+                        fallbackColor: brandColor,
+                        fallbackIcon: meta.icon
+                    )
+                    .frame(width: 30, height: 30)
                 } else {
-                    brandInitial(account.providerName, color: brandColor)
+                    typeIconFallback(meta.icon, color: brandColor)
                 }
 
                 Text(account.providerName)
@@ -187,9 +196,20 @@ struct UtilityAccountsSection: View {
             .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 
+    /// Shows the utility type icon (trash, leaf, bolt, etc.) as fallback when no brand logo exists
+    private func typeIconFallback(_ icon: String, color: Color) -> some View {
+        Image(systemName: icon)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 30, height: 30)
+            .background(color)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+
     // MARK: - Provider Data Lookup
 
     @State private var providerCache: [String: UtilityProviderRow] = [:]
+    @State private var providerCacheLoaded = false
 
     private func providerColor(for slug: String?) -> Color {
         guard let slug else { return Color(hex: "#1B3A5C") }
@@ -207,31 +227,119 @@ struct UtilityAccountsSection: View {
     private func brandColorFallback(_ slug: String) -> String {
         let colors: [String: String] = [
             // Electric
-            "eversource": "#00ae42", "national-grid": "#003DA5", "conedison": "#0092cf",
-            "duke-energy": "#00789E", "fpl": "#005DAA", "pge": "#004B87",
-            "sce": "#E31837", "dominion-energy": "#1B365D", "entergy": "#FF1A58",
-            "comed": "#0059A4", "pseg": "#f37121", "xcel-energy": "#DA1020",
-            "georgia-power": "#003057", "centerpoint": "#2a8dd4",
+            "eversource": "#00ae42", "national-grid": "#1CBFFF", "conedison": "#0092cf",
+            "duke-energy": "#26bcd7", "fpl": "#2f97da", "pge": "#fbbb36",
+            "sce": "#fed141", "dominion-energy": "#FEDB00", "entergy": "#FF1A58",
+            "comed": "#180D67", "pseg": "#f37121", "xcel-energy": "#DA1020",
+            "georgia-power": "#555555", "centerpoint": "#2a8dd4",
             // Internet
-            "xfinity": "#6138F5", "spectrum": "#0050AA", "att": "#009FDB",
+            "xfinity": "#6138F5", "spectrum": "#0073D1", "att": "#00a8e0",
             "verizon-fios": "#EE0000", "tmobile-home": "#E20074", "google-fiber": "#4285F4",
-            "frontier": "#FF0037", "cox": "#F36F21", "optimum": "#F66608",
-            "starlink": "#000000",
+            "frontier": "#FF0037", "cox": "#00aaf4", "optimum": "#F66608",
+            "starlink": "#ba9d63",
             // Security
-            "adt": "#003DA5", "vivint": "#282A3B", "simplisafe": "#1A2C5B",
-            "ring": "#1C9AD6", "brinks-home": "#002855",
+            "adt": "#0061aa", "vivint": "#05E5AF", "simplisafe": "#008cc1",
+            "ring": "#1c9ad6", "brinks-home": "#17824a",
             // Gas
-            "national-grid-gas": "#003DA5", "southern-ct-gas": "#005A9C",
-            "ct-natural-gas": "#003B5C", "socalgas": "#003057",
+            "national-grid-gas": "#1CBFFF", "southern-ct-gas": "#005A9C",
+            "ct-natural-gas": "#003B5C", "socalgas": "#93ADFF",
             // Water
-            "aquarion": "#0077C0", "american-water": "#0072CE",
+            "aquarion": "#00457c", "american-water": "#2fa2fb",
             // Trash
-            "waste-management": "#007749", "republic-services": "#004B87", "casella": "#00263e",
+            "waste-management": "#E8F733", "republic-services": "#D80125", "casella": "#00263e",
             // Fuel
-            "suburban-propane": "#E31837", "amerigas": "#003DA5",
-            "ferrellgas": "#00599b", "petro-home": "#003B5C", "sippin-energy": "#1B3A5C",
+            "suburban-propane": "#e41e2d", "amerigas": "#1e4ca1",
+            "ferrellgas": "#00599b", "petro-home": "#fdb924", "sippin-energy": "#1B3A5C",
         ]
-        return colors[slug] ?? "#1B3A5C"
+        if let known = colors[slug] { return known }
+        // Deterministic unique color per unknown slug
+        let hash = slug.utf8.reduce(UInt32(0)) { ($0 &+ UInt32($1)) &* 31 }
+        let hues = ["#C94435", "#2E7D6D", "#8B5E3C", "#5B4FA0", "#C47D2A",
+                     "#3B7DD8", "#9B3A6E", "#2A8F5D", "#D4693B", "#4D7B9A"]
+        return hues[Int(hash) % hues.count]
+    }
+}
+
+// MARK: - Brand Logo Cache
+
+/// In-memory cache for brand logo URLs — persists for the app session
+actor BrandLogoCache {
+    static let shared = BrandLogoCache()
+    private var cache: [String: URL?] = [:]
+    private var infoCache: [String: HavenSupabase.BrandLogoResponse] = [:]
+
+    func get(_ key: String) -> URL?? {
+        cache.keys.contains(key) ? cache[key] : nil
+    }
+
+    func set(_ key: String, url: URL?) {
+        cache[key] = url
+    }
+
+    func getInfo(_ key: String) -> HavenSupabase.BrandLogoResponse? {
+        infoCache[key]
+    }
+
+    func setInfo(_ key: String, info: HavenSupabase.BrandLogoResponse) {
+        infoCache[key] = info
+    }
+}
+
+// MARK: - Brandfetch Logo View (dynamic fallback)
+
+/// Fetches a brand logo from the Brandfetch API when no logo_url exists in the provider cache.
+private struct BrandfetchLogoView: View {
+    let providerName: String
+    let fallbackColor: Color
+    var fallbackIcon: String = "building.2.fill"
+    @State private var logoURL: URL?
+    @State private var loaded = false
+
+    var body: some View {
+        Group {
+            if let logoURL {
+                AsyncImage(url: logoURL) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image.resizable().scaledToFit()
+                    default:
+                        iconFallback
+                    }
+                }
+            } else {
+                iconFallback
+            }
+        }
+        .task {
+            guard !loaded else { return }
+            loaded = true
+
+            if let cached = await BrandLogoCache.shared.get(providerName) {
+                logoURL = cached
+                return
+            }
+
+            do {
+                let result = try await HavenSupabase.fetchBrandLogo(query: providerName)
+                if let urlStr = result.iconUrl ?? result.logoUrl, let url = URL(string: urlStr) {
+                    logoURL = url
+                    await BrandLogoCache.shared.set(providerName, url: url)
+                } else {
+                    await BrandLogoCache.shared.set(providerName, url: nil)
+                }
+            } catch {
+                await BrandLogoCache.shared.set(providerName, url: nil)
+            }
+        }
+    }
+
+    private var iconFallback: some View {
+        Image(systemName: fallbackIcon)
+            .font(.system(size: 16, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: 30, height: 30)
+            .background(fallbackColor)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
     }
 }
 
@@ -264,6 +372,10 @@ struct UtilityTypeMeta {
             icon = "fuelpump.fill"; label = "Oil"; defaultColor = "#8B572A"
         case "solar":
             icon = "sun.max.fill"; label = "Solar"; defaultColor = "#F5A623"
+        case "pest_control":
+            icon = "ant.fill"; label = "Pest Control"; defaultColor = "#417505"
+        case "landscaping":
+            icon = "leaf.fill"; label = "Landscaping"; defaultColor = "#2D8C3C"
         default:
             icon = "building.2.fill"; label = type.capitalized; defaultColor = "#1B3A5C"
         }
@@ -277,6 +389,15 @@ struct AddUtilitySheet: View {
     let householdId: UUID
     let preselectedType: String?
     let onAdd: (UtilityAccountRow) -> Void
+    // Optional prefill from inbox bill detection
+    var prefillProviderName: String? = nil
+    var prefillProviderSlug: String? = nil
+    var prefillProviderType: String? = nil
+    var prefillAccountNumber: String? = nil
+    var prefillMonthlyCost: String? = nil
+    var prefillPhone: String? = nil
+    var prefillWebsite: String? = nil
+
     @Environment(\.dismiss) private var dismiss
 
     @State private var providerType: String = ""
@@ -302,6 +423,8 @@ struct AddUtilitySheet: View {
         ("propane", "Propane"),
         ("oil", "Oil"),
         ("solar", "Solar"),
+        ("pest_control", "Pest Control"),
+        ("landscaping", "Landscaping"),
         ("other", "Other"),
     ]
 
@@ -389,17 +512,42 @@ struct AddUtilitySheet: View {
                 }
             }
             .onAppear {
-                providerType = preselectedType ?? ""
+                providerType = prefillProviderType ?? preselectedType ?? ""
+                // Apply prefill values from inbox bill detection
+                if let name = prefillProviderName, providerName.isEmpty { providerName = name }
+                if let acct = prefillAccountNumber, accountNumber.isEmpty { accountNumber = acct }
+                if let cost = prefillMonthlyCost, monthlyCost.isEmpty { monthlyCost = cost }
+                if let ph = prefillPhone, phone.isEmpty { phone = ph }
+                if let ws = prefillWebsite, website.isEmpty { website = ws }
             }
             .onChange(of: providerType) { _, newType in
                 guard !newType.isEmpty else { return }
                 Task {
                     providers = (try? await DatabaseService.shared.fetchUtilityProviders(type: newType)) ?? []
+                    // Auto-select matching provider by slug
+                    if let slug = prefillProviderSlug, selectedProvider == nil {
+                        if let match = providers.first(where: { $0.slug == slug }) {
+                            selectedProvider = match
+                            providerName = match.name
+                            if phone.isEmpty { phone = match.phone ?? "" }
+                            if website.isEmpty { website = match.website ?? "" }
+                        }
+                    }
                 }
             }
             .task {
-                if let type = preselectedType, !type.isEmpty {
+                let type = prefillProviderType ?? preselectedType
+                if let type, !type.isEmpty {
                     providers = (try? await DatabaseService.shared.fetchUtilityProviders(type: type)) ?? []
+                    // Auto-select matching provider by slug
+                    if let slug = prefillProviderSlug, selectedProvider == nil {
+                        if let match = providers.first(where: { $0.slug == slug }) {
+                            selectedProvider = match
+                            providerName = match.name
+                            if phone.isEmpty { phone = match.phone ?? "" }
+                            if website.isEmpty { website = match.website ?? "" }
+                        }
+                    }
                 }
             }
         }
@@ -424,6 +572,33 @@ struct AddUtilitySheet: View {
                 let account = try await DatabaseService.shared.createUtilityAccount(insert)
                 onAdd(account)
                 Haptics.success()
+
+                // Persist brand info for custom providers (not from pre-populated list)
+                if selectedProvider == nil && !providerName.isEmpty {
+                    Task {
+                        do {
+                            let brandResult = try await HavenSupabase.fetchBrandLogo(query: providerName)
+                            if let logoUrl = brandResult.iconUrl ?? brandResult.logoUrl {
+                                let slug = providerName.lowercased()
+                                    .replacingOccurrences(of: " ", with: "-")
+                                    .replacingOccurrences(of: "'", with: "")
+                                try await HavenSupabase.from("utility_providers")
+                                    .upsert([
+                                        "name": providerName,
+                                        "slug": slug,
+                                        "provider_type": preselectedType ?? providerType,
+                                        "logo_url": logoUrl,
+                                        "brand_color": brandResult.brandColor ?? "",
+                                        "website": website.isEmpty ? (brandResult.domain ?? "") : website,
+                                    ] as [String: String], onConflict: "slug")
+                                    .execute()
+                            }
+                        } catch {
+                            print("[BrandFetch] Persist failed for \(providerName): \(error)")
+                        }
+                    }
+                }
+
                 dismiss()
             } catch {
                 print("[Utility] Save failed: \(error)")

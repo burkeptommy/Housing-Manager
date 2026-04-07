@@ -22,6 +22,8 @@ final class DocumentDetailViewModel: ObservableObject {
     @Published var showShareSheet = false
     @Published var relatedDocuments: [DocumentRow] = []
     @Published var missingCrossReferences: [String] = []
+    @Published var hasLinkedServiceRecords = false
+    @Published var properties: [PropertyRow] = []
 
     private let db = DatabaseService.shared
 
@@ -43,6 +45,18 @@ final class DocumentDetailViewModel: ObservableObject {
 
             // Load cross-reference related documents
             await loadRelatedDocuments()
+
+            // Load properties for invoice property picker
+            properties = (try? await db.fetchProperties()) ?? []
+
+            // Check if this invoice has already been processed (has linked service records)
+            if let doc = document {
+                let invoiceCategories = ["Home Bill/Invoice", "Project Invoice", "Repair Estimate"]
+                if invoiceCategories.contains(doc.category) {
+                    let records = (try? await db.fetchServiceRecordsForDocument(documentId: doc.id)) ?? []
+                    hasLinkedServiceRecords = !records.isEmpty
+                }
+            }
         } catch {
             self.error = error.localizedDescription
             isLoading = false

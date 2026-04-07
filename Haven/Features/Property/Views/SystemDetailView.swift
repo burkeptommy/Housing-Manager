@@ -17,6 +17,7 @@ struct SystemDetailRowView: View {
     @State private var selectedTask: MaintenanceTaskDBRow?
     @State private var showContractorPicker = false
     @State private var showAlfredChat = false
+    @State private var showAlfredSystemChat = false
     @State private var isAddingQuickTask = false
     @State private var linkedDocuments: [DocumentRow] = []
     @State private var showDocumentUpload = false
@@ -25,7 +26,10 @@ struct SystemDetailRowView: View {
     @State private var catalogLinked = false
     @State private var showEditSystem = false
     @State private var showDeleteConfirm = false
+    @State private var showManageTasks = false
+    @State private var showResetTemplatesConfirm = false
     @State private var manualLinks: [ManualLink] = []
+    @State private var childSystems: [HomeSystemRow] = []
     @State private var equipmentScore: EquipmentDetailScore?
     @State private var catalogDetails: CatalogDetails?
     @Environment(\.dismiss) private var dismiss
@@ -56,7 +60,9 @@ struct SystemDetailRowView: View {
                 }
                 if equipmentScore != nil && system.manufacturer == nil { reliabilityCard }
                 if !manualLinks.isEmpty { manualsCard }
+                componentsCard
                 preferredVendorCard
+                askAlfredCard
                 maintenanceCard
                 warrantiesCard
                 serviceRecordsCard
@@ -66,13 +72,19 @@ struct SystemDetailRowView: View {
             .padding(.vertical, HavenTheme.spacing16)
         }
         .background(HavenColors.background)
-        .navigationTitle(system.name)
+        .navigationTitle(system.displayName)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     Button { showEditSystem = true } label: {
                         Label("Edit System", systemImage: "pencil")
+                    }
+                    Button { showManageTasks = true } label: {
+                        Label("Manage Tasks", systemImage: "checklist")
+                    }
+                    Button { showResetTemplatesConfirm = true } label: {
+                        Label("Reset Templates", systemImage: "arrow.clockwise")
                     }
                     Divider()
                     Button(role: .destructive) { showDeleteConfirm = true } label: {
@@ -91,6 +103,23 @@ struct SystemDetailRowView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("This will permanently delete \"\(system.name)\" and all its maintenance tasks, warranties, and service records.")
+        }
+        .sheet(isPresented: $showManageTasks) {
+            ManageSystemTasksSheet(system: system, tasks: tasks) { ids in
+                await bulkDeleteTasks(ids: ids)
+            }
+        }
+        .confirmationDialog(
+            "Reset templates for this system?",
+            isPresented: $showResetTemplatesConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Reset", role: .destructive) {
+                Task { await resetTemplates() }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Removes template-based tasks and re-creates them from the catalog using this system's current settings. Custom tasks are kept.")
         }
         .trackScreen("SystemDetailView", properties: ["system_id": system.id.uuidString, "category": system.category])
         .task {
@@ -113,6 +142,15 @@ struct SystemDetailRowView: View {
                     contextType: "property",
                     contextId: system.propertyId,
                     initialPrompt: "I need a \(system.category) contractor. Can you help me find one?"
+                )
+            }
+        }
+        .sheet(isPresented: $showAlfredSystemChat) {
+            NavigationStack {
+                ChatView(
+                    contextType: "system",
+                    contextId: system.id,
+                    systemContext: buildSystemContext()
                 )
             }
         }
@@ -680,6 +718,69 @@ struct SystemDetailRowView: View {
             .clipShape(Capsule())
     }
 
+    // MARK: - Components (Sub-Systems)
+
+    @ViewBuilder
+    private var componentsCard: some View {
+        if !childSystems.isEmpty {
+            HavenCard {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                    HStack {
+                        Label("Components", systemImage: "square.stack.3d.up")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                        Spacer()
+                        Text("\(childSystems.count)")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+
+                    ForEach(childSystems) { child in
+                        NavigationLink {
+                            SystemDetailRowView(system: child)
+                        } label: {
+                            HStack(spacing: 10) {
+                                Image(systemName: "circle.fill")
+                                    .font(.system(size: 6))
+                                    .foregroundStyle(HavenColors.navy.opacity(0.3))
+
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(child.name)
+                                        .font(HavenTypography.body)
+                                        .foregroundStyle(HavenColors.textPrimary)
+
+                                    HStack(spacing: 8) {
+                                        if let mfr = child.manufacturer {
+                                            Text(mfr)
+                                                .font(HavenTypography.uiCaption)
+                                                .foregroundStyle(HavenColors.textTertiary)
+                                        }
+                                        if let model = child.modelNumber {
+                                            Text(model)
+                                                .font(HavenTypography.uiCaption)
+                                                .foregroundStyle(HavenColors.textTertiary)
+                                        }
+                                    }
+                                }
+
+                                Spacer()
+
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10))
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                        .buttonStyle(.plain)
+
+                        if child.id != childSystems.last?.id {
+                            Divider()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Documents
 
     private var documentsCard: some View {
@@ -810,6 +911,60 @@ struct SystemDetailRowView: View {
     }
 
     // MARK: - Maintenance
+
+    // MARK: - Ask Alfred
+
+    private var askAlfredCard: some View {
+        Button {
+            Haptics.light()
+            showAlfredSystemChat = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 20))
+                    .foregroundStyle(HavenColors.navy700)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Ask Alfred")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("Questions about your \(system.name)")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing16)
+            .background(HavenColors.surface)
+            .cornerRadius(HavenTheme.radiusMedium)
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func buildSystemContext() -> String {
+        var context = "The user is viewing their \(system.name)."
+        if let mfr = system.manufacturer { context += " Manufacturer: \(mfr)." }
+        if let model = system.modelNumber { context += " Model: \(model)." }
+        if let serial = system.serialNumber { context += " Serial: \(serial)." }
+        if let installDate = system.installDate { context += " Installed: \(installDate)." }
+        if let notes = system.notes, !notes.isEmpty { context += " Notes: \(notes)." }
+        if !linkedDocuments.isEmpty {
+            let manuals = linkedDocuments.filter { $0.category.lowercased().contains("manual") || $0.title.lowercased().contains("manual") }
+            if !manuals.isEmpty {
+                context += " Owner's manual(s) available: \(manuals.map(\.title).joined(separator: ", "))."
+            }
+        }
+        if !manualLinks.isEmpty {
+            context += " Online manuals: \(manualLinks.map(\.url).joined(separator: ", "))."
+        }
+        if !warranties.isEmpty {
+            for w in warranties { context += " Warranty: \(w.provider), expires \(w.endDate)." }
+        }
+        context += " Reference this specific make and model in answers. If an owner's manual is linked, reference it."
+        return context
+    }
 
     private var maintenanceCard: some View {
         HavenCard {
@@ -1182,6 +1337,69 @@ struct SystemDetailRowView: View {
         return Calendar.current.dateComponents([.day], from: .now, to: date).day ?? 0
     }
 
+    private func bulkDeleteTasks(ids: [UUID]) async {
+        let snapshot = tasks
+        let idSet = Set(ids)
+        tasks.removeAll { idSet.contains($0.id) }
+        Haptics.success()
+        do {
+            try await db.deleteMaintenanceTasks(ids: ids)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "bulk_deleted", "count": ids.count])
+        } catch {
+            tasks = snapshot
+            Haptics.error()
+        }
+    }
+
+    private func resetTemplates() async {
+        let activeSubs = MaintenanceTemplates.activeSubtypes(
+            category: system.category,
+            subtype: system.subtype,
+            fuelType: system.catalogFuelType
+        )
+        let templates = MaintenanceTemplates.templates(for: system.category, activeSubtypes: activeSubs)
+        let templateTaskIds = tasks.filter { $0.systemId == system.id && $0.isTemplateBased == true }.map(\.id)
+
+        do {
+            if !templateTaskIds.isEmpty {
+                try await db.deleteMaintenanceTasks(ids: templateTaskIds)
+                let removeSet = Set(templateTaskIds)
+                tasks.removeAll { removeSet.contains($0.id) }
+            }
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            for t in templates {
+                let nextDue = Calendar.current.date(byAdding: t.interval, to: .now) ?? .now
+                let insert = MaintenanceTaskInsert(
+                    propertyId: system.propertyId,
+                    householdId: system.householdId,
+                    title: t.title,
+                    frequency: t.frequency,
+                    nextDueDate: formatter.string(from: nextDue),
+                    systemId: system.id,
+                    description: t.description,
+                    priority: t.priority,
+                    notes: t.notes,
+                    isTemplateBased: true,
+                    templateId: t.systemCategory + ":" + t.title,
+                    seasonalTiming: t.seasonalTiming,
+                    isDiy: t.isDIY,
+                    professionalRequired: t.professionalRequired,
+                    costRange: t.estimatedCostRange,
+                    recurrenceRule: t.frequency
+                )
+                if let saved = try? await db.createMaintenanceTask(insert) {
+                    tasks.append(saved)
+                }
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        } catch {
+            Haptics.error()
+        }
+    }
+
     private func quickAddTask(_ template: MaintenanceTemplate) async {
         isAddingQuickTask = true
         let formatter = DateFormatter()
@@ -1203,6 +1421,7 @@ struct SystemDetailRowView: View {
                 priority: template.priority,
                 notes: template.notes,
                 isTemplateBased: true,
+                templateId: template.systemCategory + ":" + template.title,
                 seasonalTiming: template.seasonalTiming,
                 isDiy: template.isDIY,
                 professionalRequired: template.professionalRequired,
@@ -1243,11 +1462,13 @@ struct SystemDetailRowView: View {
             async let contractors: [ContractorRow] = system.preferredContractorId != nil
                 ? db.fetchContractors() : []
 
-            let (wResult, tResult, rResult, allDocs, contractorList) = try await (w, t, r, docs, contractors)
+            async let children = db.fetchChildSystems(parentId: system.id)
+            let (wResult, tResult, rResult, allDocs, contractorList, childResult) = try await (w, t, r, docs, contractors, children)
             await MainActor.run {
                 warranties = wResult
                 tasks = tResult.filter { $0.systemId == system.id }
                 records = rResult
+                childSystems = childResult
                 if let contractorId = system.preferredContractorId {
                     preferredContractor = contractorList.first { $0.id == contractorId }
                 }

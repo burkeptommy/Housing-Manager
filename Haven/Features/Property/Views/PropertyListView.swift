@@ -1,8 +1,13 @@
 import SwiftUI
 
+struct VehicleNavDestination: Hashable {
+    let id: UUID
+}
+
 struct PropertyListView: View {
     @StateObject private var viewModel = PropertyListViewModel()
     @State private var showAddProperty = false
+    @State private var showAddVehicle = false
     @State private var navigationPath = NavigationPath()
 
     var body: some View {
@@ -62,8 +67,10 @@ struct PropertyListView: View {
                     }
                     .padding(.horizontal, HavenTheme.spacing16)
                     .padding(.top, HavenTheme.spacing8)
-                    .padding(.bottom, HavenTheme.spacing32)
                 }
+
+                // Your Garage section
+                garageSection
             }
             .background(HavenColors.background)
             .navigationTitle("Properties")
@@ -100,14 +107,187 @@ struct PropertyListView: View {
                     Task { await viewModel.loadProperties() }
                 })
             }
+            .sheet(isPresented: $showAddVehicle) {
+                AddVehicleView { _ in
+                    Task { await viewModel.loadProperties() }
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in
                 if let tab = notification.userInfo?["tab"] as? Int, tab == 1 {
                     navigationPath = NavigationPath()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToPropertySection)) { _ in
+                // Auto-navigate to first property so the section notification is received by PropertyDetailView
+                if navigationPath.isEmpty, let first = viewModel.properties.first {
+                    navigationPath.append(first.id)
+                }
+            }
+            .navigationDestination(for: UUID.self) { propertyId in
+                PropertyDetailView(propertyID: propertyId)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToVehicle)) { notification in
+                if let idStr = notification.userInfo?["vehicle_id"] as? String,
+                   let vehicleId = UUID(uuidString: idStr) {
+                    navigationPath = NavigationPath()
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                        navigationPath.append(VehicleNavDestination(id: vehicleId))
+                    }
+                }
+            }
+            .navigationDestination(for: VehicleNavDestination.self) { dest in
+                VehicleDetailView(vehicleID: dest.id)
+            }
         }
     }
 
+    // MARK: - Garage Section
+
+    private var garageSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("Your Garage")
+                    .font(HavenTypography.title3)
+                    .foregroundStyle(HavenColors.navy800)
+                Spacer()
+                Button {
+                    Haptics.light()
+                    showAddVehicle = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14))
+                        Text("Add")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                }
+            }
+            .padding(.horizontal, HavenTheme.spacing16)
+
+            if viewModel.vehicles.isEmpty {
+                Button {
+                    showAddVehicle = true
+                } label: {
+                    HavenCard {
+                        HStack(spacing: 14) {
+                            Image(systemName: "car.fill")
+                                .font(.system(size: 28))
+                                .foregroundStyle(HavenColors.textSecondary)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Add Your Vehicles")
+                                    .font(HavenTypography.headline)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                Text("Track maintenance, inspections, registrations, and recalls.")
+                                    .font(HavenTypography.caption)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                    }
+                }
+                .buttonStyle(.plain)
+                .padding(.horizontal, HavenTheme.spacing16)
+            } else {
+                LazyVStack(spacing: HavenTheme.spacing12) {
+                    ForEach(viewModel.vehicles) { vehicle in
+                        NavigationLink {
+                            VehicleDetailView(vehicleID: vehicle.id)
+                        } label: {
+                            VehicleCardRow(vehicle: vehicle)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, HavenTheme.spacing16)
+            }
+        }
+        .padding(.top, HavenTheme.spacing16)
+        .padding(.bottom, HavenTheme.spacing32)
+    }
+}
+
+// MARK: - Vehicle Card Row
+
+struct VehicleCardRow: View {
+    let vehicle: VehicleRow
+    @State private var brandLogoURL: URL?
+
+    var body: some View {
+        HavenCard {
+            HStack(spacing: 14) {
+                if let logoURL = brandLogoURL {
+                    AsyncImage(url: logoURL) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFit()
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                        default:
+                            vehicleIconFallback
+                        }
+                    }
+                } else {
+                    vehicleIconFallback
+                }
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(vehicle.name)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.navy800)
+                    if !vehicle.displayName.isEmpty && vehicle.displayName != vehicle.name {
+                        Text(vehicle.displayName)
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                    if let plate = vehicle.licensePlate, !plate.isEmpty {
+                        Text(plate)
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .task {
+            if let make = vehicle.make, !make.isEmpty {
+                if let cached = await BrandLogoCache.shared.get(make) {
+                    brandLogoURL = cached
+                } else {
+                    do {
+                        let result = try await HavenSupabase.fetchBrandLogo(query: make)
+                        if let urlStr = result.iconUrl ?? result.logoUrl, let url = URL(string: urlStr) {
+                            brandLogoURL = url
+                            await BrandLogoCache.shared.set(make, url: url)
+                        } else {
+                            await BrandLogoCache.shared.set(make, url: nil)
+                        }
+                    } catch {
+                        await BrandLogoCache.shared.set(make, url: nil)
+                    }
+                }
+            }
+        }
+    }
+
+    private var vehicleIconFallback: some View {
+        Image(systemName: "car.fill")
+            .font(.system(size: 24))
+            .foregroundStyle(HavenColors.navy)
+            .frame(width: 44, height: 44)
+            .background(HavenColors.navy.opacity(0.08))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
 }
 
 struct PropertyCardRow: View {

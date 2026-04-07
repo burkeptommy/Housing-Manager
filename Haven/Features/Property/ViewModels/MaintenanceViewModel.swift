@@ -3,11 +3,17 @@ import Combine
 
 @MainActor
 final class MaintenanceViewModel: ObservableObject {
+    /// Shared singleton so tasks remain cached across navigation.
+    /// Pull-to-refresh and explicit reloads still hit the network.
+    static let shared = MaintenanceViewModel()
+
     @Published var tasks: [MaintenanceTaskDBRow] = []
     @Published var properties: [PropertyRow] = []
     @Published var systems: [HomeSystemRow] = []
     @Published var contractors: [ContractorRow] = []
     @Published var users: [UserRow] = []
+    @Published var vehicles: [VehicleRow] = []
+    @Published var familyMembers: [FamilyMemberRow] = []
     @Published var isLoading = false
     @Published var error: String?
     @Published var filterPropertyId: UUID?
@@ -195,6 +201,8 @@ final class MaintenanceViewModel: ObservableObject {
             properties = p
             contractors = c
             users = (try? await db.fetchHouseholdUsers()) ?? []
+            vehicles = (try? await db.fetchVehicles()) ?? []
+            familyMembers = (try? await db.fetchFamilyMembers()) ?? []
 
             // Fetch systems for all properties
             var allSystems: [HomeSystemRow] = []
@@ -246,10 +254,21 @@ final class MaintenanceViewModel: ObservableObject {
         return systems.first { $0.id == id }?.name
     }
 
+    func vehicleName(for id: UUID?) -> String? {
+        guard let id else { return nil }
+        return vehicles.first { $0.id == id }?.displayName
+    }
+
     func assignedUserName(for task: MaintenanceTaskDBRow) -> String? {
         guard let userId = task.assignedToUserId else { return nil }
         guard let user = users.first(where: { $0.id == userId }) else { return nil }
         return user.fullName?.components(separatedBy: " ").first ?? user.fullName
+    }
+
+    func assignedUserAvatarColor(for task: MaintenanceTaskDBRow) -> AvatarColor? {
+        guard let userId = task.assignedToUserId else { return nil }
+        guard let member = familyMembers.first(where: { $0.linkedUserId == userId }) else { return nil }
+        return member.avatarColor.flatMap { AvatarColor(rawValue: $0) }
     }
 
     func assignedContractorName(for task: MaintenanceTaskDBRow) -> String? {
@@ -309,15 +328,17 @@ final class MaintenanceViewModel: ObservableObject {
                 )
             }
 
-            // Log service record
-            _ = try await db.createServiceRecord(ServiceRecordInsert(
-                propertyId: task.propertyId,
-                householdId: task.householdId,
-                serviceDate: formatter.string(from: .now),
-                serviceType: "maintenance",
-                description: task.title,
-                systemId: task.systemId
-            ))
+            // Log service record (only for property-linked tasks)
+            if let propertyId = task.propertyId {
+                _ = try await db.createServiceRecord(ServiceRecordInsert(
+                    propertyId: propertyId,
+                    householdId: task.householdId,
+                    serviceDate: formatter.string(from: .now),
+                    serviceType: "maintenance",
+                    description: task.title,
+                    systemId: task.systemId
+                ))
+            }
 
             // Reschedule notifications
             Task { await NotificationScheduler.shared.rescheduleAll() }
@@ -343,6 +364,123 @@ final class MaintenanceViewModel: ObservableObject {
             // Rollback: show the task again
             recentlyCompletedIds.remove(task.id)
             completionToast = nil
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Optimistically create a custom maintenance task. Inserts a placeholder into
+    /// `tasks` immediately, then writes to the database. On success, the placeholder
+    /// is replaced with the real row. On failure, the placeholder is removed.
+    func createTask(_ insert: MaintenanceTaskInsert) async {
+        // Build a synthetic row for immediate display
+        let placeholderId = UUID()
+        let placeholder = MaintenanceTaskDBRow.synthetic(
+            id: placeholderId,
+            title: insert.title,
+            nextDueDate: insert.nextDueDate,
+            propertyId: insert.propertyId,
+            vehicleId: insert.vehicleId,
+            systemId: insert.systemId,
+            householdId: insert.householdId,
+            priority: insert.priority,
+            assignedToUserId: insert.assignedToUserId,
+            assignedContractorId: insert.assignedContractorId,
+            frequency: insert.frequency,
+            notes: insert.notes
+        )
+        tasks.insert(placeholder, at: 0)
+        Haptics.success()
+
+        do {
+            let saved = try await db.createMaintenanceTask(insert)
+            // Replace placeholder with real row
+            if let idx = tasks.firstIndex(where: { $0.id == placeholderId }) {
+                tasks[idx] = saved
+            }
+            Task { await NotificationScheduler.shared.rescheduleAll() }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "created", "id": saved.id.uuidString])
+        } catch {
+            // Rollback
+            tasks.removeAll { $0.id == placeholderId }
+            self.error = "Failed to create task: \(error.localizedDescription)"
+            Haptics.error()
+        }
+    }
+
+    /// Optimistically batch-delete a set of tasks. Rolls back on failure.
+    func bulkDelete(ids: [UUID]) async {
+        guard !ids.isEmpty else { return }
+        let snapshot = tasks
+        let idSet = Set(ids)
+        tasks.removeAll { idSet.contains($0.id) }
+        Haptics.success()
+        do {
+            try await db.deleteMaintenanceTasks(ids: ids)
+            Task { await NotificationScheduler.shared.rescheduleAll() }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "bulk_deleted", "count": ids.count])
+        } catch {
+            tasks = snapshot
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Delete all template-based tasks for a system, then re-create from `MaintenanceTemplates`
+    /// using the system's stored subtype. Custom (non-template) tasks are preserved.
+    func resetTemplates(for system: HomeSystemRow) async {
+        let activeSubs = MaintenanceTemplates.activeSubtypes(
+            category: system.category,
+            subtype: system.subtype,
+            fuelType: system.catalogFuelType
+        )
+        let templates = MaintenanceTemplates.templates(for: system.category, activeSubtypes: activeSubs)
+
+        let systemTasks = tasks.filter { $0.systemId == system.id }
+        let templateTaskIds = systemTasks.filter { $0.isTemplateBased == true }.map(\.id)
+
+        // Optimistic delete
+        let snapshot = tasks
+        let removeSet = Set(templateTaskIds)
+        tasks.removeAll { removeSet.contains($0.id) }
+
+        do {
+            try await db.deleteMaintenanceTasks(ids: templateTaskIds)
+
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            for t in templates {
+                let nextDue = Calendar.current.date(byAdding: t.interval, to: .now) ?? .now
+                let insert = MaintenanceTaskInsert(
+                    propertyId: system.propertyId,
+                    householdId: system.householdId,
+                    title: t.title,
+                    frequency: t.frequency,
+                    nextDueDate: formatter.string(from: nextDue),
+                    systemId: system.id,
+                    description: t.description,
+                    priority: t.priority,
+                    notes: t.notes,
+                    isTemplateBased: true,
+                    templateId: t.systemCategory + ":" + t.title,
+                    seasonalTiming: t.seasonalTiming,
+                    isDiy: t.isDIY,
+                    professionalRequired: t.professionalRequired,
+                    costRange: t.estimatedCostRange,
+                    recurrenceRule: t.frequency
+                )
+                if let saved = try? await db.createMaintenanceTask(insert) {
+                    tasks.append(saved)
+                }
+            }
+            Haptics.success()
+            Task { await NotificationScheduler.shared.rescheduleAll() }
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "reset_templates", "system_id": system.id.uuidString])
+        } catch {
+            tasks = snapshot
             self.error = error.localizedDescription
             Haptics.error()
         }

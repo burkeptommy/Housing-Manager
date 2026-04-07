@@ -9,6 +9,8 @@ struct SystemGroupListView: View {
     @State private var brandScores: [String: Int] = [:]
     @State private var systems: [HomeSystemRow]
     @State private var hasLoadedExtras = false
+    @State private var systemToDelete: HomeSystemRow?
+    @State private var showSystemDeleteConfirm = false
 
     init(group: SystemGroup, propertyId: UUID, householdId: UUID) {
         self.group = group
@@ -31,7 +33,8 @@ struct SystemGroupListView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 12))
 
                         VStack(alignment: .leading, spacing: 4) {
-                            Text("\(systems.count) System\(systems.count == 1 ? "" : "s")")
+                            let topLevel = topLevelSystems
+                            Text("\(topLevel.count) System\(topLevel.count == 1 ? "" : "s")")
                                 .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.navy800)
 
@@ -54,14 +57,22 @@ struct SystemGroupListView: View {
                     }
                 }
 
-                // System list
-                ForEach(systems) { system in
+                // System list — only top-level systems (children shown under their parent)
+                ForEach(topLevelSystems) { system in
                     NavigationLink {
                         SystemDetailRowView(system: system)
                     } label: {
                         systemRow(system)
                     }
                     .buttonStyle(.plain)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        Button(role: .destructive) {
+                            systemToDelete = system
+                            showSystemDeleteConfirm = true
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                 }
 
                 // Add system button
@@ -102,6 +113,23 @@ struct SystemGroupListView: View {
                 Task { await reloadSystems() }
             })
         }
+        .alert("Delete System?", isPresented: $showSystemDeleteConfirm) {
+            Button("Delete", role: .destructive) {
+                if let system = systemToDelete {
+                    systems.removeAll { $0.id == system.id }
+                    Haptics.success()
+                    Task {
+                        try? await DatabaseService.shared.deleteHomeSystem(id: system.id)
+                        NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let system = systemToDelete {
+                Text("Delete \"\(system.name)\"? This will also remove its maintenance tasks and warranties.")
+            }
+        }
     }
 
     private func systemRow(_ system: HomeSystemRow) -> some View {
@@ -126,14 +154,42 @@ struct SystemGroupListView: View {
 
                 // Middle: Name, category, details
                 VStack(alignment: .leading, spacing: 4) {
-                    Text(system.name)
+                    Text(system.displayName)
                         .font(HavenTypography.headline)
                         .foregroundStyle(HavenColors.navy800)
                         .lineLimit(2)
 
-                    Text(systemSubtype(system))
-                        .font(HavenTypography.uiCaption)
-                        .foregroundStyle(HavenColors.textTertiary)
+                    if system.manufacturer != nil || system.modelNumber != nil {
+                        HStack(spacing: 4) {
+                            if let mfr = system.manufacturer {
+                                Text(mfr)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textSecondary)
+                            }
+                            if let model = system.modelNumber {
+                                Text(model)
+                                    .font(HavenTypography.uiLabelSmall)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        }
+                    }
+
+                    HStack(spacing: 6) {
+                        Text(systemSubtype(system))
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+
+                        let children = childCount(for: system.id)
+                        if children > 0 {
+                            Text("\(children) component\(children == 1 ? "" : "s")")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.navy700)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(HavenColors.navy.opacity(0.08))
+                                .clipShape(Capsule())
+                        }
+                    }
 
                     // Details: model, serial, lifespan
                     HStack(spacing: 12) {
@@ -177,6 +233,16 @@ struct SystemGroupListView: View {
                 .font(.system(size: 8, weight: .medium))
                 .foregroundStyle(HavenColors.textTertiary)
         }
+    }
+
+    /// Top-level systems (no parent) — children are shown inside their parent's detail view
+    private var topLevelSystems: [HomeSystemRow] {
+        systems.filter { $0.parentSystemId == nil }
+    }
+
+    /// Count of child systems for a given parent
+    private func childCount(for parentId: UUID) -> Int {
+        systems.filter { $0.parentSystemId == parentId }.count
     }
 
     private func reloadSystems() async {

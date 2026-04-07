@@ -531,6 +531,26 @@ serve(async (req: Request) => {
       // 6. Family members
       await resolveDuplicates("family_members", preview.family_members, userResolutions.family_members);
 
+      // 6.5 Move vehicles (deduplicate by VIN if both households have the same car)
+      {
+        const { data: sourceVehicles } = await supabase.from("vehicles").select("*").eq("household_id", sourceId);
+        const { data: targetVehicles } = await supabase.from("vehicles").select("vin").eq("household_id", targetId);
+        const targetVins = new Set((targetVehicles ?? []).map((v: any) => v.vin).filter(Boolean));
+
+        for (const v of sourceVehicles ?? []) {
+          if (v.vin && targetVins.has(v.vin)) {
+            // Duplicate VIN — delete source vehicle (cascade deletes service records + recalls)
+            await supabase.from("vehicles").delete().eq("id", v.id);
+          } else {
+            // Unique — move to target household
+            await supabase.from("vehicles").update({ household_id: targetId }).eq("id", v.id);
+          }
+        }
+        // Move orphaned service records and recalls
+        await supabase.from("vehicle_service_records").update({ household_id: targetId }).eq("household_id", sourceId);
+        await supabase.from("vehicle_recalls").update({ household_id: targetId }).eq("household_id", sourceId);
+      }
+
       // 7. Move remaining non-preview entities (no dedup needed)
       const bulkMigrateTables = [
         "warranties", "service_records", "chat_messages", "document_content",

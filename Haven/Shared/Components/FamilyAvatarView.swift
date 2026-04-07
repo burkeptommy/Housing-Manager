@@ -216,25 +216,51 @@ struct FamilyAvatarView: View {
         return style.defaultColor.color
     }
 
+    private var hasPhoto: Bool {
+        if let url = member.avatarUrl, !url.isEmpty { return true }
+        return false
+    }
+
     var body: some View {
         VStack(spacing: 6) {
             ZStack {
-                // Background circle
-                Circle()
-                    .fill(isSelected ? accentColor : accentColor.opacity(0.12))
-                    .frame(width: size, height: size)
+                if hasPhoto, let urlString = member.avatarUrl, let url = URL(string: urlString) {
+                    // Photo avatar
+                    AsyncImage(url: url) { phase in
+                        switch phase {
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: size, height: size)
+                                .clipShape(Circle())
+                        case .failure:
+                            fallbackIcon
+                        default:
+                            Circle()
+                                .fill(accentColor.opacity(0.12))
+                                .frame(width: size, height: size)
+                        }
+                    }
 
-                // Border ring
-                Circle()
-                    .stroke(accentColor, lineWidth: isSelected ? 3 : 2)
-                    .frame(width: size, height: size)
+                    // Border ring (always shown over photo)
+                    Circle()
+                        .stroke(accentColor, lineWidth: isSelected ? 3 : 2)
+                        .frame(width: size, height: size)
+                } else {
+                    // SF Symbol fallback
+                    Circle()
+                        .fill(isSelected ? accentColor : accentColor.opacity(0.12))
+                        .frame(width: size, height: size)
 
-                // Main icon (large, face-level)
-                Image(systemName: style.icon)
-                    .font(.system(size: size * 0.42, weight: .medium))
-                    .foregroundStyle(isSelected ? .white : accentColor)
+                    Circle()
+                        .stroke(accentColor, lineWidth: isSelected ? 3 : 2)
+                        .frame(width: size, height: size)
 
-                // Role badge (top-right corner)
+                    fallbackIcon
+                }
+
+                // Role badge (top-right corner) -- shown over both photo and fallback
                 if let badge = style.badge {
                     Image(systemName: badge)
                         .font(.system(size: size * 0.2, weight: .bold))
@@ -260,6 +286,12 @@ struct FamilyAvatarView: View {
             }
         }
         .frame(width: size + 12)
+    }
+
+    private var fallbackIcon: some View {
+        Image(systemName: style.icon)
+            .font(.system(size: size * 0.42, weight: .medium))
+            .foregroundStyle(isSelected ? .white : accentColor)
     }
 }
 

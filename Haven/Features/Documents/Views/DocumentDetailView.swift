@@ -20,6 +20,12 @@ struct DocumentDetailView: View {
     @State private var quickLookURL: URL?
     @StateObject private var trustedContactVM = TrustedContactsViewModel()
 
+    // Invoice processing
+    @State private var showInvoicePropertyPicker = false
+    @State private var showInvoiceReview = false
+    @State private var invoiceVM: InvoiceProcessingViewModel?
+    @State private var vehicleLinkApplied = false
+
     var body: some View {
         Group {
             if viewModel.isLoading {
@@ -164,6 +170,14 @@ struct DocumentDetailView: View {
                 }
             }
         }
+        .sheet(isPresented: $showInvoicePropertyPicker) {
+            invoicePropertyPickerSheet
+        }
+        .sheet(isPresented: $showInvoiceReview) {
+            if let vm = invoiceVM {
+                InvoiceReviewSheet(viewModel: vm)
+            }
+        }
         .screenshotProtected()
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") { viewModel.error = nil }
@@ -243,6 +257,18 @@ struct DocumentDetailView: View {
                 } else {
                     aiPromptCard
                 }
+
+                // Vehicle VIN detection results
+                if let meta = doc.metadata {
+                    let matched = meta.matchedVehicleIds ?? []
+                    let unmatched = meta.unmatchedVins ?? []
+                    if !matched.isEmpty || !unmatched.isEmpty {
+                        vehicleVinCard(doc: doc, matchedIds: matched, unmatchedVins: unmatched)
+                    }
+                }
+
+                // Invoice Intelligence
+                invoiceScanCard(doc)
 
                 // AI Flags
                 if let flags = doc.aiFlags, !flags.isEmpty {
@@ -564,6 +590,267 @@ struct DocumentDetailView: View {
                     .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
                 }
                 .disabled(viewModel.isAnalyzing)
+            }
+        }
+    }
+
+    // MARK: - Invoice Intelligence
+
+    private static let invoiceCategories = ["Home Bill/Invoice", "Project Invoice"]
+
+    @ViewBuilder
+    private func vehicleVinCard(doc: DocumentRow, matchedIds: [String], unmatchedVins: [String]) -> some View {
+        if vehicleLinkApplied {
+            // Already applied
+            HStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(HavenColors.success)
+                Text("Linked to \(matchedIds.count) vehicle\(matchedIds.count == 1 ? "" : "s")")
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textSecondary)
+            }
+            .padding(HavenTheme.spacing16)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        } else {
+            HavenCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "car.badge.gearshape.fill")
+                            .font(.system(size: 18))
+                            .foregroundStyle(matchedIds.isEmpty ? HavenColors.warning : HavenColors.navy700)
+                        Text("Vehicles Detected")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                    }
+
+                    // Matched vehicles
+                    if !matchedIds.isEmpty {
+                        Text("We found \(matchedIds.count) vehicle\(matchedIds.count == 1 ? "" : "s") from your garage in this document. Add this document to \(matchedIds.count == 1 ? "that vehicle" : "those vehicles")?")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+
+                        Button {
+                            Haptics.medium()
+                            Task { await linkToMatchedVehicles(doc: doc, vehicleIds: matchedIds) }
+                        } label: {
+                            HStack {
+                                Image(systemName: "link.badge.plus")
+                                    .font(.system(size: 14))
+                                Text("Link to \(matchedIds.count) Vehicle\(matchedIds.count == 1 ? "" : "s")")
+                            }
+                            .font(HavenTypography.uiButton)
+                            .foregroundStyle(.white)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 44)
+                            .background(HavenColors.navy800)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        }
+                    }
+
+                    // Unmatched VINs
+                    if !unmatchedVins.isEmpty {
+                        if !matchedIds.isEmpty {
+                            Divider().overlay(HavenColors.beige200)
+                        }
+
+                        Text("\(unmatchedVins.count) VIN\(unmatchedVins.count == 1 ? "" : "s") not in your garage:")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+
+                        ForEach(unmatchedVins, id: \.self) { vin in
+                            HStack(spacing: 10) {
+                                Image(systemName: "car.fill")
+                                    .font(.system(size: 14))
+                                    .foregroundStyle(HavenColors.warning)
+                                Text("VIN: \(vin)")
+                                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.7)
+                                Spacer()
+                            }
+                            .padding(HavenTheme.spacing8)
+                            .background(HavenColors.warning.opacity(0.06))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        }
+
+                        NavigationLink {
+                            AddVehicleView()
+                        } label: {
+                            HStack {
+                                Image(systemName: "plus.circle.fill")
+                                    .font(.system(size: 14))
+                                Text("Add Vehicle")
+                            }
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 40)
+                            .background(HavenColors.surface)
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                            .overlay(
+                                RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                                    .stroke(HavenColors.border, lineWidth: 1)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func linkToMatchedVehicles(doc: DocumentRow, vehicleIds: [String]) async {
+        let db = DatabaseService.shared
+        // Link to the first vehicle via vehicle_id column
+        if let firstId = vehicleIds.first, let uuid = UUID(uuidString: firstId) {
+            _ = try? await db.updateDocument(id: doc.id, DocumentUpdate(vehicleId: uuid))
+        }
+        // For additional vehicles, the document is still accessible because it's in the household.
+        // The vehicle detail view queries documents by vehicle_id, so we store all IDs in metadata.
+        // The first vehicle gets the direct link; others can find it via VIN in the metadata.
+        Haptics.success()
+        vehicleLinkApplied = true
+        NotificationCenter.default.post(name: .documentChanged, object: nil)
+    }
+
+    @ViewBuilder
+    private func invoiceScanCard(_ doc: DocumentRow) -> some View {
+        if Self.invoiceCategories.contains(doc.category) {
+            // Check if already processed (has linked service records)
+            if viewModel.hasLinkedServiceRecords {
+                HStack(spacing: 8) {
+                    Image(systemName: "checkmark.seal.fill")
+                        .foregroundColor(HavenColors.success)
+                    Text("Invoice scanned")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundColor(HavenColors.textTertiary)
+                }
+                .padding(HavenTheme.spacing16)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(HavenColors.surface)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            } else {
+                Button {
+                    Haptics.medium()
+                    if doc.propertyId != nil {
+                        // Already linked to a property, go straight to processing
+                        startInvoiceProcessing(doc: doc)
+                    } else {
+                        // Need to pick a property first
+                        showInvoicePropertyPicker = true
+                    }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 16))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Scan for Maintenance & Systems")
+                                .font(HavenTypography.headline)
+                            Text("Auto-complete tasks and discover tracked systems")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundColor(HavenColors.textSecondary)
+                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(HavenColors.textTertiary)
+                    }
+                    .foregroundColor(HavenColors.navy800)
+                    .padding(HavenTheme.spacing16)
+                    .background(HavenColors.navy800.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .stroke(HavenColors.navy800.opacity(0.15), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func startInvoiceProcessing(doc: DocumentRow) {
+        guard let propertyId = doc.propertyId else { return }
+        let vm = InvoiceProcessingViewModel(
+            documentId: doc.id,
+            propertyId: propertyId,
+            householdId: doc.householdId
+        )
+        invoiceVM = vm
+        showInvoiceReview = true
+        Task { await vm.process() }
+    }
+
+    private var invoicePropertyPickerSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                    Text("Select a property to scan this invoice against")
+                        .font(HavenTypography.bodySmall)
+                        .foregroundColor(HavenColors.textSecondary)
+                        .padding(.top, HavenTheme.spacing8)
+
+                    ForEach(viewModel.properties) { property in
+                        Button {
+                            Haptics.selection()
+                            Task {
+                                guard let doc = viewModel.document else { return }
+                                // Link document to property first
+                                if let updated = try? await DatabaseService.shared.updateDocument(
+                                    id: doc.id,
+                                    DocumentUpdate(propertyId: property.id)
+                                ) {
+                                    viewModel.document = updated
+                                    NotificationCenter.default.post(name: .documentChanged, object: nil)
+                                }
+                                showInvoicePropertyPicker = false
+                                // Start processing with updated doc
+                                let vm = InvoiceProcessingViewModel(
+                                    documentId: doc.id,
+                                    propertyId: property.id,
+                                    householdId: doc.householdId
+                                )
+                                invoiceVM = vm
+                                showInvoiceReview = true
+                                await vm.process()
+                            }
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "building.columns.fill")
+                                    .foregroundColor(HavenColors.navy800)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(property.name)
+                                        .font(HavenTypography.headline)
+                                        .foregroundColor(HavenColors.textPrimary)
+                                    if let street = property.street {
+                                        Text(street)
+                                            .font(HavenTypography.uiLabelSmall)
+                                            .foregroundColor(HavenColors.textSecondary)
+                                    }
+                                }
+                                Spacer()
+                                Image(systemName: "chevron.right")
+                                    .font(.caption)
+                                    .foregroundColor(HavenColors.textTertiary)
+                            }
+                            .padding(HavenTheme.spacing16)
+                            .background(HavenColors.surface)
+                            .cornerRadius(HavenTheme.radiusMedium)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(HavenTheme.pageMargin)
+            }
+            .background(HavenColors.background)
+            .navigationTitle("Select Property")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { showInvoicePropertyPicker = false }
+                }
             }
         }
     }

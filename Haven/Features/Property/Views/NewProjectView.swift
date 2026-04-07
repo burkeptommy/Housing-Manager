@@ -191,7 +191,7 @@ struct NewProjectView: View {
 
                 // Trigger feasibility analysis in background
                 Task {
-                    await viewModel.loadFeasibility(projectName: project.name, category: project.category, description: project.description, location: nil)
+                    await viewModel.loadFeasibility(projectId: project.id, projectName: project.name, category: project.category, description: project.description, location: nil)
                 }
 
                 Haptics.success()

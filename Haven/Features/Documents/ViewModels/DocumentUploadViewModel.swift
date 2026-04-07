@@ -47,6 +47,7 @@ final class DocumentUploadViewModel: ObservableObject {
     // Associations
     @Published var selectedFamilyMemberIds: Set<UUID> = []
     @Published var selectedPropertyId: UUID?
+    @Published var selectedProjectId: UUID?
 
     // Reference data
     @Published var familyMembers: [FamilyMemberRow] = []
@@ -74,6 +75,8 @@ final class DocumentUploadViewModel: ObservableObject {
     @Published var duplicateExistingDoc: DocumentRow?
     @Published var pendingDocumentId: UUID?
     @Published var pendingCategory: String?
+    var pendingContentHash: String?
+    var pendingFileSize: Int?
 
     // Batch upload
     @Published var uploadItems: [UploadItem] = []
@@ -287,13 +290,15 @@ final class DocumentUploadViewModel: ObservableObject {
             let contentHash = DuplicateDetectionService.sha256Hash(of: data)
             let fileSize = data.count
 
-            // Check for existing duplicate by content hash
+            // Check for existing duplicate by content hash -- BLOCK upload until user decides
             if let existingDup = await DuplicateDetectionService.shared.checkForDuplicate(hash: contentHash) {
                 Analytics.track(.documentDuplicateDetected, ["existing_category": existingDup.category])
                 pendingCategory = existingDup.category
                 duplicateExistingDoc = existingDup
+                pendingContentHash = contentHash
+                pendingFileSize = fileSize
                 showDuplicateAlert = true
-                // Don't block upload — user can resolve after
+                return // Stop -- user must choose Replace/Save Both/Delete
             }
 
             uploadProgress = 0.2
@@ -745,27 +750,37 @@ final class DocumentUploadViewModel: ObservableObject {
         return pdfData as Data
     }
 
-    /// Replace the existing duplicate document (delete old, keep new)
+    /// Replace the existing duplicate document (delete old, upload new)
     func replaceDuplicate() async {
         guard let oldDoc = duplicateExistingDoc else { return }
-        do {
-            _ = try? await HavenSupabase.storage
-                .from("documents")
-                .remove(paths: [oldDoc.filePath])
-            try await db.deleteDocument(id: oldDoc.id)
-        } catch {
-            self.error = "Failed to remove old document: \(error.localizedDescription)"
-        }
-        duplicateExistingDoc = nil
-        pendingDocumentId = nil
-        pendingCategory = nil
+        // Delete old storage file + DB record
+        _ = try? await HavenSupabase.storage.from("documents").remove(paths: [oldDoc.filePath])
+        try? await db.deleteDocument(id: oldDoc.id)
+        clearDuplicateState()
+        // Resume upload
+        try? await autoUploadAndAnalyze()
     }
 
-    /// Keep both documents (dismiss the duplicate alert)
-    func keepBoth() {
+    /// Keep both documents (upload the new one anyway)
+    func saveBoth() async {
+        clearDuplicateState()
+        // Resume upload
+        try? await autoUploadAndAnalyze()
+    }
+
+    /// Discard the new upload entirely
+    func discardDuplicate() {
+        clearDuplicateState()
+        selectedData = nil
+        selectedFileName = ""
+    }
+
+    private func clearDuplicateState() {
         duplicateExistingDoc = nil
         pendingDocumentId = nil
         pendingCategory = nil
+        pendingContentHash = nil
+        pendingFileSize = nil
     }
 
     // MARK: - Cleanup & Error Handling

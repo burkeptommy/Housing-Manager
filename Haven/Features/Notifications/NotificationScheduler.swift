@@ -76,7 +76,7 @@ final class NotificationScheduler {
                     let formatter = DateFormatter()
                     formatter.dateFormat = "yyyy-MM-dd"
                     guard let dueDate = formatter.date(from: task.nextDueDate) else { continue }
-                    let propertyName = propNames[task.propertyId] ?? "Your Property"
+                    let propertyName = task.propertyId.flatMap { propNames[$0] } ?? "Your Property"
 
                     if dueDate > .now {
                         // Schedule reminders based on frequency

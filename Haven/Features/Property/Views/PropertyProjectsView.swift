@@ -7,6 +7,8 @@ struct PropertyProjectsView: View {
     var propertyLocation: String?
     @StateObject private var viewModel = ProjectsViewModel()
     @State private var showNewProject = false
+    @State private var showLogHistorical = false
+    @State private var showAddOptions = false
     @State private var projectToDelete: PropertyProjectRow?
 
     var body: some View {
@@ -17,15 +19,15 @@ struct PropertyProjectsView: View {
             } else if viewModel.projects.isEmpty {
                 EmptyStateView(
                     title: "No projects yet",
-                    message: "Upload contractor quotes for deal analysis, or plan your next DIY project.",
+                    message: "Plan a renovation or log past improvements to build your home's project history.",
                     icon: "hammer.fill",
-                    actionTitle: "Start a Project",
-                    action: { showNewProject = true }
+                    actionTitle: "Add Project",
+                    action: { showAddOptions = true }
                 )
                 .frame(minHeight: 300)
             } else {
-                HavenButton(title: "New Project", action: {
-                    showNewProject = true
+                HavenButton(title: "Add Project", action: {
+                    showAddOptions = true
                 }, icon: "plus")
 
                 if !viewModel.activeProjects.isEmpty {
@@ -33,6 +35,15 @@ struct PropertyProjectsView: View {
                 }
                 if !viewModel.completedProjects.isEmpty {
                     projectSection("COMPLETED", projects: viewModel.completedProjects)
+
+                    // Total spend for completed projects
+                    if viewModel.completedProjectsTotal > 0 {
+                        Text("Total: $\(Int(viewModel.completedProjectsTotal).formatted())")
+                            .font(HavenTypography.headline)
+                            .foregroundStyle(HavenColors.navy800)
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.vertical, HavenTheme.spacing8)
+                    }
                 }
                 if !viewModel.onHoldProjects.isEmpty {
                     projectSection("ON HOLD", projects: viewModel.onHoldProjects)
@@ -46,6 +57,16 @@ struct PropertyProjectsView: View {
             if let hhId = householdId {
                 NewProjectView(propertyID: propertyID, householdId: hhId, viewModel: viewModel)
             }
+        }
+        .sheet(isPresented: $showLogHistorical) {
+            if let hhId = householdId {
+                LogHistoricalProjectView(propertyID: propertyID, householdId: hhId, viewModel: viewModel)
+            }
+        }
+        .confirmationDialog("Add Project", isPresented: $showAddOptions) {
+            Button("Plan New Project") { showNewProject = true }
+            Button("Log Completed Project") { showLogHistorical = true }
+            Button("Cancel", role: .cancel) {}
         }
         .confirmationDialog("Delete Project?", isPresented: .init(
             get: { projectToDelete != nil },
@@ -106,7 +127,15 @@ struct PropertyProjectsView: View {
                             .foregroundStyle(HavenColors.textPrimary)
                             .lineLimit(1)
                         Spacer()
-                        statusBadge(project.status)
+                        if project.isHistorical {
+                            if let spend = project.actualSpend, spend > 0 {
+                                Text("$\(Int(spend).formatted())")
+                                    .font(HavenTypography.uiLabel)
+                                    .foregroundStyle(HavenColors.navy800)
+                            }
+                        } else {
+                            statusBadge(project.status)
+                        }
                     }
 
                     HStack(spacing: 8) {
@@ -114,7 +143,15 @@ struct PropertyProjectsView: View {
                             .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
 
-                        approachBadge(project.projectType)
+                        if project.isHistorical {
+                            if let dateStr = project.actualEndDate {
+                                Text(formatProjectDate(dateStr))
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(HavenColors.textTertiary)
+                            }
+                        } else {
+                            approachBadge(project.projectType)
+                        }
                     }
                 }
             }
@@ -130,6 +167,18 @@ struct PropertyProjectsView: View {
             .padding(.vertical, 3)
             .background(ps.color.opacity(0.12))
             .clipShape(Capsule())
+    }
+
+    /// Formats "2023-06-15" as "Jun 2023", or "2023" if only year available
+    private func formatProjectDate(_ dateStr: String) -> String {
+        let df = DateFormatter()
+        df.dateFormat = "yyyy-MM-dd"
+        if let date = df.date(from: dateStr) {
+            let out = DateFormatter()
+            out.dateFormat = "MMM yyyy"
+            return out.string(from: date)
+        }
+        return String(dateStr.prefix(4)) // fallback to year
     }
 
     private func approachBadge(_ type: String) -> some View {

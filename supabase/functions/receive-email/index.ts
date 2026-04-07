@@ -17,7 +17,7 @@ const corsHeaders = {
 };
 
 interface EmailClassification {
-  type: "contractor_quote" | "estate_document" | "vendor_contact" | "home_document" | "family" | "insurance_claim" | "bill_invoice" | "other";
+  type: "contractor_quote" | "estate_document" | "vendor_contact" | "home_document" | "vehicle_document" | "family" | "insurance_claim" | "bill_invoice" | "other";
   confidence: "high" | "medium" | "low";
   vendorName: string | null;
   vendorPhone: string | null;
@@ -29,6 +29,7 @@ interface EmailClassification {
   documentCategory: string | null;
   documentTitle: string | null;
   summary: string;
+  vehicleContext?: boolean;
 }
 
 // --- iCal PARSER ---
@@ -140,6 +141,57 @@ function unescapeIcal(value: string): string {
     .replace(/\\,/g, ",")
     .replace(/\\;/g, ";")
     .replace(/\\\\/g, "\\");
+}
+
+// Compute SHA-256 content hash from base64-encoded file data
+async function computeContentHash(base64Data: string): Promise<string | null> {
+  try {
+    const rawBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+    const hashBuffer = await crypto.subtle.digest("SHA-256", rawBytes);
+    return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, "0")).join("");
+  } catch { return null; }
+}
+
+// Check if a document with this content hash already exists in the household
+async function checkDocumentDuplicate(
+  supabase: any, householdId: string, contentHash: string
+): Promise<{ id: string; title: string } | null> {
+  try {
+    const { data } = await supabase
+      .from("documents")
+      .select("id, title")
+      .eq("household_id", householdId)
+      .eq("content_hash", contentHash)
+      .is("deleted_at", null)
+      .limit(1);
+    return data && data.length > 0 ? data[0] : null;
+  } catch { return null; }
+}
+
+// Content types that analyze-document can process (Claude Vision supports these)
+const ANALYZABLE_CONTENT_TYPES = [
+  "application/pdf",
+  "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp",
+  "text/plain", "text/html",
+];
+
+function isAnalyzableContentType(contentType: string | null): boolean {
+  if (!contentType) return false;
+  const ct = contentType.toLowerCase().split(";")[0].trim();
+  return ANALYZABLE_CONTENT_TYPES.some(t => ct.includes(t));
+}
+
+function getFileExtension(filename: string | null, contentType: string | null): string {
+  if (filename) {
+    const ext = filename.split(".").pop()?.toLowerCase();
+    if (ext) return `.${ext}`;
+  }
+  if (contentType?.includes("word") || contentType?.includes("docx")) return ".docx";
+  if (contentType?.includes("spreadsheet") || contentType?.includes("xlsx")) return ".xlsx";
+  if (contentType?.includes("csv")) return ".csv";
+  if (contentType?.includes("zip")) return ".zip";
+  if (contentType?.includes("heic") || contentType?.includes("heif")) return ".heic";
+  return "";
 }
 
 serve(async (req: Request) => {
@@ -544,7 +596,8 @@ serve(async (req: Request) => {
     // Determine if this is likely a forwarded attachment with minimal body text
     const bodyIsMinimal = emailBody.trim().length < 50;
     const subjectLower = (subject || "").toLowerCase();
-    const hasQuoteSignals = subjectLower.includes("quote") || subjectLower.includes("estimate") || subjectLower.includes("proposal") || subjectLower.includes("bid") || subjectLower.includes("invoice");
+    const hasQuoteSignals = subjectLower.includes("quote") || subjectLower.includes("estimate") || subjectLower.includes("proposal") || subjectLower.includes("bid");
+    // NOTE: "invoice" deliberately excluded — invoices are for completed work (bill_invoice), not future quotes
     const hasPdfAttachment = attachmentContentType?.includes("pdf") || attachmentFilename?.toLowerCase().endsWith(".pdf");
 
     // Detect forwarded email patterns and extract original sender
@@ -580,20 +633,27 @@ ${bodyIsMinimal && attachmentBase64 ? `\n[IMPORTANT: The email body is minimal/e
 ${hasQuoteSignals ? `\n[NOTE: The subject line contains quote/estimate/proposal keywords — this is very likely a contractor_quote even if the body is empty.]` : ""}
 
 Classify this email into ONE of these types:
-- "contractor_quote": A quote, estimate, proposal, or bid from a contractor/vendor for home work
+- "contractor_quote": A quote, estimate, proposal, or bid for FUTURE work that has NOT been done yet. The key distinction: if the document describes work to be done and asks for approval/acceptance, it's a quote. If the work has ALREADY been completed and the document is billing for it, it's a bill_invoice.
 - "insurance_claim": An insurance claim, claim update, adjuster communication, damage assessment, claim number reference, repair authorization, or any correspondence about an active insurance claim process. This is different from a policy document — this is about an ACTIVE CLAIM (damage, loss, incident).
-- "bill_invoice": A bill, invoice, statement, payment notice, membership dues, or recurring charge NOT related to home renovation/repair. Examples: club memberships, subscriptions, utility bills, tuition, medical bills. If it could be a contractor invoice for home work, classify as "contractor_quote" instead.
-- "estate_document": A legal document, HOMEOWNERS insurance policy, property tax, deed, mortgage, trust, will, or financial planning document. IMPORTANT: health/medical insurance cards, medical records, prescriptions, and doctor correspondence are NOT estate documents — classify those as "family" with familyCategory "medical".
+- "bill_invoice": An invoice, bill, or statement for work ALREADY completed or services ALREADY rendered. This includes: contractor invoices for completed home repairs/maintenance (plumber, electrician, HVAC, well service, etc.), club memberships, subscriptions, utility bills, tuition, medical bills, payment notices, recurring charges, AND vehicle service invoices (oil change, tire rotation, brake service, body work, car wash). The key distinction from contractor_quote: if the work was ALREADY DONE and this is the bill, it's bill_invoice. If the work hasn't started and this is asking for approval, it's contractor_quote. For vehicle service bills, also set vehicleContext: true.
+- "estate_document": A legal document, HOMEOWNERS insurance policy, property tax, deed, mortgage, trust, will, or financial planning document. Also includes auto/vehicle insurance policies (category "Auto Insurance"). IMPORTANT: health/medical insurance cards, medical records, prescriptions, and doctor correspondence are NOT estate documents — classify those as "family" with familyCategory "medical".
+- "vehicle_document": A document specifically about a vehicle — vehicle title, registration, purchase/lease agreement, loan statement, emissions inspection certificate, vehicle recall notice. NOT vehicle insurance (that's estate_document with "Auto Insurance" category). NOT a vehicle service invoice/bill (that's bill_invoice with vehicleContext: true).
 - "vendor_contact": Contact information for a service provider, contractor, or vendor (not a quote)
 - "home_document": A home-related document — warranty, receipt, manual, permit, inspection report, test report (radon, water quality, mold, lead, asbestos, air quality, termite, pest), home inspection, appraisal, survey, property assessment, environmental report, energy audit, or any document about the physical property/home itself
 - "family": Personal/family email — school communications, event invitations, birthday/party info, kids' activities, sports/extracurriculars, family travel, personal appointments, work/school schedules, newsletters, permission slips, report cards, medical/dental appointments, health insurance cards, medical records, prescriptions, or any personal/family life content. Also use for health/medical insurance documents.
 - "other": Anything that doesn't fit the above categories
 
+VEHICLE vs HOME DISTINCTION:
+- If an invoice/bill mentions a VIN, vehicle make/model, or vehicle-specific services (oil change, tire rotation, brake pads, transmission, body work, car wash, emissions test, state inspection), set vehicleContext: true.
+- If an invoice/bill mentions a property address, home systems (HVAC, plumbing, electrical, roofing, landscaping, pool, pest control), set vehicleContext: false.
+- Vehicle insurance policies (auto insurance) should be classified as estate_document with category "Auto Insurance", NOT as vehicle_document.
+- Vehicle service invoices are bill_invoice with vehicleContext: true.
+
 For ALL types, extract vendor/contact information if present in the email.
 
 Respond with ONLY valid JSON:
 {
-  "type": "contractor_quote" | "insurance_claim" | "bill_invoice" | "estate_document" | "vendor_contact" | "home_document" | "family" | "other",
+  "type": "contractor_quote" | "insurance_claim" | "bill_invoice" | "estate_document" | "vehicle_document" | "vendor_contact" | "home_document" | "family" | "other",
   "confidence": "high" | "medium" | "low",
   "vendorName": "company/business name or null",
   "vendorPhone": "phone number or null",
@@ -612,6 +672,7 @@ Respond with ONLY valid JSON:
   "billVendor": "Name of billing company/vendor if type is bill_invoice, or null",
   "billAmount": "Dollar amount of the bill if present (number, not string), or null",
   "billDueDate": "Due date in ISO 8601 if present, or null",
+  "billAccountNumber": "Account number from the bill if visible, or null",
   "claimNumber": "Insurance claim number if present, or null",
   "claimType": "Type of claim: water_damage | fire | storm | theft | liability | vehicle | other — only if insurance_claim, otherwise null",
   "adjusterName": "Name of claims adjuster/advisor if mentioned, or null",
@@ -619,7 +680,8 @@ Respond with ONLY valid JSON:
   "adjusterEmail": "Email of adjuster if mentioned, or null",
   "insuranceCompany": "Name of insurance company if mentioned, or null",
   "policyNumber": "Policy number if mentioned, or null",
-  "propertyAddress": "Street address of the property this document relates to, if mentioned anywhere in the email or document (e.g. '123 Main St', '456 Oak Ave, Springfield'), or null"
+  "propertyAddress": "Street address of the property this document relates to, if mentioned anywhere in the email or document (e.g. '123 Main St', '456 Oak Ave, Springfield'), or null",
+  "vehicleContext": "true if this is a vehicle-related bill/invoice (oil change, tire rotation, brake service, body work, car wash, emissions test, state inspection, any vehicle service), false otherwise. Only applies to bill_invoice type."
 }`;
 
     // Build classification message — include PDF content when body is minimal
@@ -1175,6 +1237,14 @@ Respond with ONLY valid JSON:
             });
 
           if (!uploadError) {
+            // Compute content hash and check for duplicates
+            const docContentHash = await computeContentHash(attachmentBase64);
+            const duplicateDoc = docContentHash ? await checkDocumentDuplicate(supabase, householdId, docContentHash) : null;
+            if (duplicateDoc) {
+              console.log(`[receive-email] Duplicate detected: "${duplicateDoc.title}" (${duplicateDoc.id})`);
+              actions.push(`duplicate_detected:${duplicateDoc.title}`);
+            }
+
             // Create document record (property_id is optional)
             const docInsert: Record<string, unknown> = {
               household_id: householdId,
@@ -1184,6 +1254,7 @@ Respond with ONLY valid JSON:
               file_path: filePath,
               notes: `Auto-stored from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}\n\n${classification.summary}`,
               ai_summary: classification.summary,
+              ...(docContentHash ? { content_hash: docContentHash } : {}),
             };
             if (property) {
               docInsert.property_id = property.id;
@@ -1200,26 +1271,33 @@ Respond with ONLY valid JSON:
               actions.push(`stored_document:${docTitle}`);
               console.log(`[receive-email] Stored document: ${doc.id} (${docTitle})`);
 
-              // Trigger AI analysis on the document
-              try {
-                const analyzeDocUrl = `${supabaseUrl}/functions/v1/analyze-document`;
-                await fetch(analyzeDocUrl, {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${serviceRoleKey}`,
-                  },
-                  body: JSON.stringify({
-                    document_id: doc.id,
-                    household_id: householdId,
-                    image_base64: attachmentBase64,
-                    document_title: docTitle,
-                    category: docCategory,
-                  }),
-                });
-                actions.push("triggered_document_analysis");
-              } catch {
-                console.error("[receive-email] Document analysis trigger failed (non-blocking)");
+              // Trigger AI analysis (only for analyzable file types)
+              if (isAnalyzableContentType(attachmentContentType)) {
+                try {
+                  const analyzeDocUrl = `${supabaseUrl}/functions/v1/analyze-document`;
+                  await fetch(analyzeDocUrl, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${serviceRoleKey}`,
+                    },
+                    body: JSON.stringify({
+                      document_id: doc.id,
+                      household_id: householdId,
+                      image_base64: attachmentBase64,
+                      document_title: docTitle,
+                      category: docCategory,
+                    }),
+                  });
+                  actions.push("triggered_document_analysis");
+                } catch {
+                  console.error("[receive-email] Document analysis trigger failed (non-blocking)");
+                }
+              } else {
+                const ext = getFileExtension(attachmentFilename, attachmentContentType);
+                console.log(`[receive-email] Skipping analysis for unsupported file type: ${ext} (${attachmentContentType})`);
+                actions.push(`analysis_skipped:${ext}`);
+                // analysis_skipped flag is set on baseMetadata in Step 3 based on actions array
               }
             } else {
               console.error(`[receive-email] Document record creation failed: ${docError?.message}`);
@@ -1238,6 +1316,90 @@ Respond with ONLY valid JSON:
         actions.push("document_detected_no_attachment");
       }
 
+    } else if (classification.type === "vehicle_document") {
+      // VEHICLE DOCUMENTS: titles, registrations, purchase agreements, recall notices.
+      // Same as estate_document but with vehicle-specific metadata.
+      if (attachmentBase64) {
+        try {
+          const docTitle = classification.documentTitle || subject || "Vehicle Document";
+          const docCategory = classification.documentCategory || "Vehicle Title";
+          const filePath = `${householdId}/${crypto.randomUUID()}`;
+
+          const fileBuffer = Uint8Array.from(atob(attachmentBase64), c => c.charCodeAt(0));
+          const { error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(filePath, fileBuffer, {
+              contentType: attachmentContentType || "application/pdf",
+            });
+
+          if (!uploadError) {
+            // Compute content hash and check for duplicates
+            const vehContentHash = await computeContentHash(attachmentBase64);
+            const vehDuplicate = vehContentHash ? await checkDocumentDuplicate(supabase, householdId, vehContentHash) : null;
+            if (vehDuplicate) {
+              console.log(`[receive-email] Duplicate vehicle doc detected: "${vehDuplicate.title}" (${vehDuplicate.id})`);
+              actions.push(`duplicate_detected:${vehDuplicate.title}`);
+            }
+
+            const { data: doc, error: docError } = await supabase
+              .from("documents")
+              .insert({
+                household_id: householdId,
+                title: docTitle,
+                category: docCategory,
+                status: "active",
+                file_path: filePath,
+                notes: `Auto-stored from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}\n\n${classification.summary}`,
+                ai_summary: classification.summary,
+                ...(vehContentHash ? { content_hash: vehContentHash } : {}),
+              })
+              .select("id")
+              .single();
+
+            if (doc) {
+              createdDocumentId = doc.id;
+              actions.push(`stored_vehicle_document:${docTitle}`);
+              console.log(`[receive-email] Stored vehicle document: ${doc.id} (${docTitle})`);
+
+              // Trigger AI analysis (only for analyzable file types)
+              if (isAnalyzableContentType(attachmentContentType)) {
+                try {
+                  await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${serviceRoleKey}`,
+                    },
+                    body: JSON.stringify({
+                      document_id: doc.id,
+                      household_id: householdId,
+                      image_base64: attachmentBase64,
+                      document_title: docTitle,
+                      category: docCategory,
+                    }),
+                  });
+                  actions.push("triggered_document_analysis");
+                } catch {
+                  console.error("[receive-email] Vehicle document analysis trigger failed");
+                }
+              } else {
+                const ext = getFileExtension(attachmentFilename, attachmentContentType);
+                actions.push(`analysis_skipped:${ext}`);
+                // analysis_skipped flag is set on baseMetadata in Step 3 based on actions array
+              }
+            } else {
+              console.error(`[receive-email] Vehicle document creation failed: ${docError?.message}`);
+            }
+          } else {
+            console.error(`[receive-email] Vehicle document upload failed: ${uploadError.message}`);
+          }
+        } catch (docErr) {
+          console.error(`[receive-email] Vehicle document storage failed: ${docErr}`);
+        }
+      } else {
+        actions.push("vehicle_document_detected_no_attachment");
+      }
+
     } else if (classification.type === "vendor_contact") {
       // Vendor was already created in Step 1 if info was present
       if (!createdContractorId) {
@@ -1245,228 +1407,104 @@ Respond with ONLY valid JSON:
       }
 
     } else if (classification.type === "insurance_claim") {
-      // Insurance claim — auto-create or attach to existing insurance_claim project
+      // Insurance claim — store attachment and prompt user to decide.
+      // Do NOT auto-create a project. User chooses: Create Claim Project, Save as Document, or Dismiss.
       const claimInfo = classification as any;
       const claimLabel = claimInfo.claimNumber
         ? `Insurance Claim #${claimInfo.claimNumber}`
         : `Insurance Claim: ${claimInfo.claimType || classification.documentTitle || subject || "New Claim"}`;
 
-      if (property) {
-        // Check for existing insurance claim project on this property
-        const { data: existingProjects } = await supabase
-          .from("property_projects")
-          .select("id, name")
-          .eq("household_id", householdId)
-          .eq("property_id", property.id)
-          .eq("project_type", "insurance_claim")
-          .in("status", ["planning", "in_progress"])
-          .limit(5);
-
-        let claimProject = existingProjects?.find((p: any) => {
-          if (claimInfo.claimNumber && p.name.includes(claimInfo.claimNumber)) return true;
-          return false;
-        }) ?? null;
-
-        if (!claimProject) {
-          // Create new insurance claim project
-          const { data: newProject } = await supabase
-            .from("property_projects")
-            .insert({
-              household_id: householdId,
-              property_id: property.id,
-              name: claimLabel,
-              category: "Insurance Claim",
-              status: "in_progress",
-              project_type: "insurance_claim",
-              priority: "high",
-              notes: [
-                claimInfo.claimNumber ? `Claim #: ${claimInfo.claimNumber}` : null,
-                claimInfo.policyNumber ? `Policy #: ${claimInfo.policyNumber}` : null,
-                claimInfo.insuranceCompany ? `Insurance: ${claimInfo.insuranceCompany}` : null,
-                claimInfo.adjusterName ? `Adjuster: ${claimInfo.adjusterName}` : null,
-                claimInfo.adjusterPhone ? `Adjuster Phone: ${claimInfo.adjusterPhone}` : null,
-                claimInfo.adjusterEmail ? `Adjuster Email: ${claimInfo.adjusterEmail}` : null,
-                `\nCreated from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
-              ].filter(Boolean).join("\n"),
-              ai_research: {
-                claimNumber: claimInfo.claimNumber,
-                claimType: claimInfo.claimType,
-                policyNumber: claimInfo.policyNumber,
-                insuranceCompany: claimInfo.insuranceCompany,
-                adjuster: claimInfo.adjusterName ? {
-                  name: claimInfo.adjusterName,
-                  phone: claimInfo.adjusterPhone,
-                  email: claimInfo.adjusterEmail,
-                } : null,
-                emailSummaries: [{ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: fullRawEmail.substring(0, 15000) }],
-              },
-            })
-            .select("id")
-            .single();
-
-          if (newProject) {
-            claimProject = newProject;
-            actions.push(`created_insurance_claim:${claimLabel}`);
-          }
-        } else {
-          // Append this email summary to existing claim's ai_research
-          const { data: existingData } = await supabase
-            .from("property_projects")
-            .select("ai_research, notes")
-            .eq("id", claimProject.id)
-            .single();
-
-          const existingResearch = (existingData?.ai_research as any) || {};
-          const emailSummaries = existingResearch.emailSummaries || [];
-          emailSummaries.push({ date: new Date().toISOString(), summary: classification.summary, subject, rawBody: fullRawEmail.substring(0, 15000) });
-
-          // Merge any new info (adjuster, policy number, etc.)
-          const merged = {
-            ...existingResearch,
-            emailSummaries,
-            claimNumber: existingResearch.claimNumber || claimInfo.claimNumber,
-            policyNumber: existingResearch.policyNumber || claimInfo.policyNumber,
-            insuranceCompany: existingResearch.insuranceCompany || claimInfo.insuranceCompany,
-          };
-          if (claimInfo.adjusterName && !existingResearch.adjuster?.name) {
-            merged.adjuster = { name: claimInfo.adjusterName, phone: claimInfo.adjusterPhone, email: claimInfo.adjusterEmail };
-          }
-
-          await supabase
-            .from("property_projects")
-            .update({ ai_research: merged })
-            .eq("id", claimProject.id);
-
-          actions.push(`updated_insurance_claim:${(claimProject as any).name}`);
-        }
-
-        if (claimProject) {
-          createdProjectId = claimProject.id;
-
-          // Store primary attachment as a project file
-          if (attachmentStoragePath) {
-            try {
-              const { error: pfErr } = await supabase.from("project_files").insert({
-                project_id: claimProject.id,
-                household_id: householdId,
-                file_path: attachmentStoragePath,
-                filename: attachmentFilename || "claim_document",
-                content_type: attachmentContentType,
-                notes: `From email: ${subject}`,
-              });
-              if (pfErr) {
-                console.error(`[receive-email] project_files insert failed: ${pfErr.message}`);
-              } else {
-                actions.push("claim_file_attached");
-              }
-            } catch (err) {
-              console.error(`[receive-email] Failed to attach claim file: ${err}`);
-            }
-          } else {
-            console.log(`[receive-email] Insurance claim has no primary attachment to store`);
-          }
-
-          // Store additional attachments as project files too
-          for (const att of additionalAttachments) {
-            try {
-              const filePath = `${householdId}/${crypto.randomUUID()}`;
-              const fileBuffer = Uint8Array.from(atob(att.base64), c => c.charCodeAt(0));
-              const { error: upErr } = await supabase.storage
-                .from("inbox-attachments")
-                .upload(filePath, fileBuffer, { contentType: att.contentType || "application/octet-stream" });
-              if (!upErr) {
-                const { error: pfErr } = await supabase.from("project_files").insert({
-                  project_id: claimProject.id,
-                  household_id: householdId,
-                  file_path: filePath,
-                  filename: att.filename || "claim_document",
-                  content_type: att.contentType,
-                  notes: `From email: ${subject}`,
-                });
-                if (pfErr) {
-                  console.error(`[receive-email] Additional claim file insert failed: ${pfErr.message}`);
-                } else {
-                  actions.push(`claim_file_attached:${att.filename}`);
-                }
-              } else {
-                console.error(`[receive-email] Additional claim file upload failed: ${upErr.message}`);
-              }
-            } catch (err) {
-              console.error(`[receive-email] Failed to attach additional claim file: ${err}`);
-            }
-          }
-
-          // Raw email body is stored in ai_research.emailSummaries[].rawBody
-          // No separate file upload needed — viewable via "Show Original Email" in the app
-
-          // --- Add adjuster as a home contact ---
-          if (claimInfo.adjusterName && (claimInfo.adjusterPhone || claimInfo.adjusterEmail)) {
-            try {
-              // Check if adjuster already exists
-              const { data: existingAdj } = await supabase
-                .from("contractors")
-                .select("id")
-                .eq("household_id", householdId)
-                .ilike("company_name", `%${claimInfo.adjusterName}%`)
-                .limit(1);
-
-              if (!existingAdj || existingAdj.length === 0) {
-                const adjCompany = claimInfo.insuranceCompany
-                  ? `${claimInfo.adjusterName} (${claimInfo.insuranceCompany})`
-                  : claimInfo.adjusterName;
-                const { data: newAdj } = await supabase
-                  .from("contractors")
-                  .insert({
-                    household_id: householdId,
-                    company_name: adjCompany,
-                    contact_name: claimInfo.adjusterName,
-                    phone: claimInfo.adjusterPhone || "Not provided",
-                    email: claimInfo.adjusterEmail || null,
-                    specialties: ["Insurance Claims"],
-                    notes: `Claims adjuster${claimInfo.insuranceCompany ? ` at ${claimInfo.insuranceCompany}` : ""}.\nAdded from insurance claim email: ${subject}`,
-                  })
-                  .select("id")
-                  .single();
-                if (newAdj) {
-                  createdContractorId = newAdj.id;
-                  actions.push(`created_vendor:${adjCompany}`);
-                  console.log(`[receive-email] Added adjuster as contact: ${adjCompany}`);
-                }
-              } else {
-                createdContractorId = existingAdj[0].id;
-                actions.push(`matched_existing_vendor:${claimInfo.adjusterName}`);
-              }
-            } catch (err) {
-              console.error(`[receive-email] Failed to add adjuster as contact: ${err}`);
-            }
-          }
-
-          // Add adjuster/sender to project_contacts for future email matching
-          if (createdContractorId) {
-            try {
-              await supabase.from("project_contacts").upsert({
-                project_id: claimProject.id,
-                household_id: householdId,
-                contractor_id: createdContractorId,
-                contact_name: claimInfo.adjusterName || classification.vendorName || null,
-                contact_email: (claimInfo.adjusterEmail || senderEmail || null)?.toLowerCase(),
-                contact_phone: claimInfo.adjusterPhone || classification.vendorPhone || null,
-                role: "adjuster",
-                added_from: "email",
-              }, { onConflict: "project_id,contractor_id" });
-            } catch (_pcErr) { /* non-blocking */ }
-          }
-        }
-      } else {
-        actions.push("insurance_claim_no_property");
-      }
-
-      console.log(`[receive-email] Insurance claim: ${claimLabel}`);
+      actions.push("insurance_claim_received");
+      console.log(`[receive-email] Insurance claim detected — awaiting user action: ${claimLabel}`);
 
     } else if (classification.type === "bill_invoice") {
-      // Bills/invoices — save as family item with "bills" category
+      // Bills/invoices — create a proper document record so invoice intelligence can process them
       actions.push("bill_saved");
       console.log(`[receive-email] Bill/invoice: ${(classification as any).billVendor || "Unknown vendor"}`);
+
+      if (attachmentBase64) {
+        try {
+          const billInfo = classification as any;
+          const docTitle = billInfo.billVendor
+            ? `Bill: ${billInfo.billVendor}${billInfo.billAmount ? ` — $${billInfo.billAmount}` : ""}`
+            : classification.documentTitle || subject || "Bill/Invoice";
+          const docCategory = "Home Bill/Invoice";
+          const filePath = `${householdId}/${crypto.randomUUID()}`;
+
+          // Upload to documents storage bucket
+          const fileBuffer = Uint8Array.from(atob(attachmentBase64), c => c.charCodeAt(0));
+          const { error: uploadError } = await supabase.storage
+            .from("documents")
+            .upload(filePath, fileBuffer, {
+              contentType: attachmentContentType || "application/pdf",
+            });
+
+          if (!uploadError) {
+            // Compute content hash and check for duplicates
+            const billContentHash = await computeContentHash(attachmentBase64);
+            const billDuplicate = billContentHash ? await checkDocumentDuplicate(supabase, householdId, billContentHash) : null;
+            if (billDuplicate) {
+              console.log(`[receive-email] Duplicate bill detected: "${billDuplicate.title}" (${billDuplicate.id})`);
+              actions.push(`duplicate_detected:${billDuplicate.title}`);
+            }
+
+            // Create document record — do NOT set property_id yet.
+            const { data: doc, error: docError } = await supabase
+              .from("documents")
+              .insert({
+                household_id: householdId,
+                title: docTitle,
+                category: docCategory,
+                status: "active",
+                file_path: filePath,
+                notes: `From forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}`,
+                ai_summary: classification.summary,
+                ...(billContentHash ? { content_hash: billContentHash } : {}),
+              })
+              .select("id")
+              .single();
+
+            if (doc) {
+              createdDocumentId = doc.id;
+              actions.push(`stored_bill_document:${docTitle}`);
+              console.log(`[receive-email] Stored bill document: ${doc.id} (${docTitle})`);
+
+              // Trigger AI analysis (only for analyzable file types)
+              if (isAnalyzableContentType(attachmentContentType)) {
+                try {
+                  await fetch(`${supabaseUrl}/functions/v1/analyze-document`, {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${serviceRoleKey}`,
+                    },
+                    body: JSON.stringify({
+                      document_id: doc.id,
+                      household_id: householdId,
+                      image_base64: attachmentBase64,
+                      document_title: docTitle,
+                      category: docCategory,
+                    }),
+                  });
+                  actions.push("triggered_document_analysis");
+                } catch {
+                  console.error("[receive-email] Bill document analysis trigger failed (non-blocking)");
+                }
+              } else {
+                const ext = getFileExtension(attachmentFilename, attachmentContentType);
+                actions.push(`analysis_skipped:${ext}`);
+                // analysis_skipped flag is set on baseMetadata in Step 3 based on actions array
+              }
+            } else {
+              console.error(`[receive-email] Bill document record creation failed: ${docError?.message}`);
+            }
+          } else {
+            console.error(`[receive-email] Bill document upload failed: ${uploadError.message}`);
+          }
+        } catch (docErr) {
+          console.error(`[receive-email] Bill document storage failed: ${docErr}`);
+        }
+      }
 
     } else if (classification.type === "family") {
       // Family emails (school, events, invitations, etc.) — just save them
@@ -1553,12 +1591,23 @@ Respond with ONLY valid JSON:
     // --- STEP 3: CREATE INBOX ITEMS (smart prompts + notifications) ---
     // We create the main notification PLUS any confirmation prompts needed.
     {
+      const analysisWasSkipped = actions.some(a => a.startsWith("analysis_skipped:"));
+      const skippedExt = analysisWasSkipped ? actions.find(a => a.startsWith("analysis_skipped:"))?.split(":")[1] || "" : "";
+      const isDuplicateDoc = actions.some(a => a.startsWith("duplicate_detected:"));
+      const duplicateOfTitle = isDuplicateDoc ? actions.find(a => a.startsWith("duplicate_detected:"))?.split(":").slice(1).join(":") || "" : "";
       const baseMetadata: Record<string, unknown> = {
         classification,
         subject,
         email_body: emailBody.substring(0, 5000),
         original_actions: actions.filter(a => a !== "inbox_item_created"),
         email_hash: emailHash,
+        high_confidence: classification.confidence === "high",
+        suggested_category: classification.documentCategory || null,
+        document_title: classification.documentTitle || null,
+        ...(analysisWasSkipped ? {
+          analysis_skipped: true,
+          analysis_skip_reason: `Unsupported file format (${skippedExt}). Document saved but could not be analyzed automatically.`,
+        } : {}),
       };
 
       const failedActions = actions.filter(a => a.includes("failed"));
@@ -1573,12 +1622,14 @@ Respond with ONLY valid JSON:
       let mainNeedsAction = false;
       let mainActionType: string | null = null;
 
-      if (createdProjectId && classification.type === "insurance_claim") {
-        const isUpdate = actions.some(a => a.startsWith("updated_insurance_claim:"));
+      if (actions.includes("insurance_claim_received")) {
+        // Insurance claim — user decides whether to create a claim project
         const claimInfo = classification as any;
         const claimLabel = claimInfo.claimNumber ? `Claim #${claimInfo.claimNumber}` : (claimInfo.insuranceCompany || "Insurance Claim");
-        mainType = "project_created";
-        mainTitle = isUpdate ? `Claim update: ${claimLabel}` : `New insurance claim: ${claimLabel}`;
+        mainType = "insurance_claim";
+        mainTitle = `Insurance claim: ${claimLabel}`;
+        mainNeedsAction = true;
+        mainActionType = "review_insurance_claim";
       } else if (createdProjectId) {
         const matchedExisting = actions.some(a => a.startsWith("matched_existing_project:"));
         const projectLabel = classification.projectType || classification.vendorName || "Contractor Quote";
@@ -1586,16 +1637,24 @@ Respond with ONLY valid JSON:
         mainTitle = matchedExisting
           ? `Quote added to ${projectLabel}`
           : `New project: ${projectLabel}`;
-      } else if (createdDocumentId) {
+      } else if (createdDocumentId && classification.type === "vehicle_document") {
+        // Vehicle document: user confirms and picks which vehicle
         mainType = "document_stored";
+        mainNeedsAction = true;
+        mainActionType = "confirm_vehicle_document";
+        mainTitle = `Vehicle document: ${classification.documentTitle || subject}`;
+      } else if (createdDocumentId && classification.type !== "bill_invoice") {
+        mainType = "document_stored";
+        // ALL documents get a confirmation prompt so users can always reclassify.
+        // High-confidence docs get a low-friction "Looks Good" UI; low/medium get picker-first.
+        mainNeedsAction = true;
+        mainActionType = "confirm_document_category";
         if (addressMatched && property) {
-          mainTitle = `Document saved to ${property.name}: ${classification.documentTitle || subject}`;
+          mainTitle = `Saved as ${classification.documentCategory || "Document"}: ${classification.documentTitle || subject}`;
         } else if (addressUnmatched) {
-          mainTitle = `Document saved: ${classification.documentTitle || subject}`;
-          mainNeedsAction = true;
-          mainActionType = "review";
+          mainTitle = `Saved as ${classification.documentCategory || "Document"}: ${classification.documentTitle || subject}`;
         } else {
-          mainTitle = `Document saved: ${classification.documentTitle || subject}`;
+          mainTitle = `Saved as ${classification.documentCategory || "Document"}: ${classification.documentTitle || subject}`;
         }
       } else if (actions.includes("quote_received")) {
         // Quote received — user chooses: New Project, Existing Project, or Save as Document
@@ -1617,6 +1676,88 @@ Respond with ONLY valid JSON:
         const amount = billInfo.billAmount ? ` — $${billInfo.billAmount}` : "";
         mainTitle = `Bill: ${vendor}${amount}`;
         mainNeedsAction = false;
+
+        // --- Utility provider matching ---
+        const billVendorName = billInfo.billVendor || classification.vendorName;
+        if (billVendorName) {
+          try {
+            const normalizedVendor = billVendorName.toLowerCase()
+              .replace(/\b(inc|llc|corp|corporation|company|co|ltd|limited)\b\.?/gi, "")
+              .replace(/[^a-z0-9\s]/g, "")
+              .trim();
+
+            const { data: allProviders } = await supabase.from("utility_providers").select("*");
+
+            let matchedProvider: any = null;
+            if (allProviders) {
+              matchedProvider = allProviders.find((p: any) => {
+                const np = p.name.toLowerCase().replace(/[^a-z0-9\s]/g, "").trim();
+                return np.includes(normalizedVendor) || normalizedVendor.includes(np)
+                  || p.slug === normalizedVendor.replace(/\s+/g, "-");
+              });
+            }
+
+            // Check if user already has this provider linked
+            let alreadyLinked = false;
+            if (matchedProvider) {
+              const { data: existing } = await supabase
+                .from("utility_accounts")
+                .select("id")
+                .eq("household_id", householdId)
+                .ilike("provider_name", `%${matchedProvider.name}%`)
+                .limit(1);
+              alreadyLinked = (existing && existing.length > 0);
+            } else {
+              // Check by raw vendor name for custom providers
+              const { data: existing } = await supabase
+                .from("utility_accounts")
+                .select("id")
+                .eq("household_id", householdId)
+                .ilike("provider_name", `%${billVendorName}%`)
+                .limit(1);
+              alreadyLinked = (existing && existing.length > 0);
+            }
+
+            if (!alreadyLinked) {
+              mainNeedsAction = true;
+              mainActionType = "add_utility_provider";
+
+              if (matchedProvider) {
+                baseMetadata.utility_provider = {
+                  provider_id: matchedProvider.id,
+                  provider_name: matchedProvider.name,
+                  provider_slug: matchedProvider.slug,
+                  provider_type: matchedProvider.provider_type,
+                  logo_url: matchedProvider.logo_url,
+                  brand_color: matchedProvider.brand_color,
+                  website: matchedProvider.website,
+                  phone: matchedProvider.phone,
+                };
+              } else {
+                baseMetadata.utility_provider_suggestion = {
+                  vendor_name: billVendorName,
+                  vendor_phone: classification.vendorPhone || null,
+                  vendor_email: classification.vendorEmail || null,
+                };
+              }
+              baseMetadata.bill_account_number = billInfo.billAccountNumber || null;
+              baseMetadata.bill_amount = billInfo.billAmount || null;
+              console.log(`[receive-email] Utility provider match: ${matchedProvider?.name || billVendorName} (catalog: ${!!matchedProvider})`);
+            }
+          } catch (utilErr) {
+            console.error(`[receive-email] Utility provider matching failed (non-blocking): ${utilErr}`);
+          }
+        }
+
+        // Vehicle invoice detection: if Claude flagged this as vehicle-related
+        const isVehicleInvoice = (classification as any).vehicleContext === true;
+        if (isVehicleInvoice) {
+          baseMetadata.vehicle_invoice = true;
+          mainNeedsAction = true;
+          mainActionType = "review_vehicle_invoice";
+          mainTitle = `Vehicle service: ${vendor}${amount}`;
+          console.log(`[receive-email] Vehicle invoice detected: ${vendor}`);
+        }
       } else if (classification.type === "family") {
         mainType = "family";
         const familyCat = (classification as any).familyCategory;
@@ -1636,6 +1777,14 @@ Respond with ONLY valid JSON:
         mainTitle = `Email needs review: ${subject || "No subject"}`;
         mainNeedsAction = true;
         mainActionType = "review";
+      }
+
+      // Override for duplicate documents -- force user to resolve
+      if (isDuplicateDoc && createdDocumentId) {
+        mainNeedsAction = true;
+        mainActionType = "resolve_duplicate";
+        mainTitle = `Duplicate: ${classification.documentTitle || subject || "Document"}`;
+        baseMetadata.duplicate_of_title = duplicateOfTitle;
       }
 
       // Insert the final inbox item FIRST, then delete placeholder only on success
@@ -1815,26 +1964,9 @@ Respond with ONLY valid JSON:
         actions.push("project_match_confirmation_created");
       }
 
-      // --- Confirmation prompt: document classification (medium/low confidence) ---
-      if (createdDocumentId && classification.confidence !== "high") {
-        await supabase.from("inbox_items").insert({
-          household_id: householdId,
-          type: "document_stored",
-          title: `Confirm: Save as "${classification.documentCategory || "Other"}"?`,
-          summary: `We saved "${classification.documentTitle || subject}" as ${classification.documentCategory || "Other"}. Is this the right category?`,
-          from_email: fromAddress,
-          related_document_id: createdDocumentId,
-          needs_action: true,
-          action_type: "confirm_document_category",
-          metadata: {
-            ...baseMetadata,
-            proposed_action: "confirm_document_category",
-            suggested_category: classification.documentCategory,
-            document_title: classification.documentTitle,
-          },
-        });
-        actions.push("document_category_confirmation_created");
-      }
+      // NOTE: Document category confirmation is now built into the main inbox item
+      // (all documents get needs_action: true with action_type: confirm_document_category).
+      // No separate confirmation prompt needed.
 
       // --- Confirmation prompt: unrecognized property address ---
       if (addressUnmatched && extractedAddress) {

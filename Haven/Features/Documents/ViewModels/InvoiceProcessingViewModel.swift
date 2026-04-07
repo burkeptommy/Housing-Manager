@@ -1,0 +1,633 @@
+import Foundation
+import SwiftUI
+
+/// Represents a new system with its resolved parent assignment
+struct ResolvedNewSystem: Identifiable {
+    var id: String { original.id }
+    let original: InvoiceNewSystem
+    var resolvedParentName: String?
+    var resolvedParentCategory: String?
+    var isAutoMatched: Bool
+    var userChoice: ParentChoice = .autoOrNone
+
+    enum ParentChoice {
+        case autoOrNone
+        case existingParent(UUID, String)
+        case newParent(String)
+        case independent
+    }
+}
+
+@MainActor
+class InvoiceProcessingViewModel: ObservableObject {
+    let documentId: UUID
+    let propertyId: UUID?
+    let vehicleId: UUID?
+    let householdId: UUID
+
+    @Published var result: InvoiceProcessingResult?
+    @Published var isProcessing = false
+    @Published var isApplying = false
+    @Published var error: String?
+    @Published var applySuccess = false
+
+    // Selection state
+    @Published var selectedTaskIds: Set<String> = []
+    @Published var selectedNewSystemIds: Set<String> = []
+    @Published var createServiceRecord = true
+
+    // Resolved parent grouping for new systems
+    @Published var resolvedSystems: [ResolvedNewSystem] = []
+    @Published var existingTopLevelSystems: [HomeSystemRow] = []
+    @Published var resolvedParentDisplayNames: [String: String] = [:]
+
+    init(documentId: UUID, propertyId: UUID, householdId: UUID) {
+        self.documentId = documentId
+        self.propertyId = propertyId
+        self.vehicleId = nil
+        self.householdId = householdId
+    }
+
+    init(documentId: UUID, vehicleId: UUID, householdId: UUID) {
+        self.documentId = documentId
+        self.propertyId = nil
+        self.vehicleId = vehicleId
+        self.householdId = householdId
+    }
+
+    func process() async {
+        isProcessing = true
+        error = nil
+
+        do {
+            let response: InvoiceProcessingResult
+            if let vehicleId {
+                response = try await HavenSupabase.processVehicleInvoice(
+                    documentId: documentId.uuidString,
+                    vehicleId: vehicleId.uuidString,
+                    householdId: householdId.uuidString
+                )
+            } else if let propertyId {
+                response = try await HavenSupabase.processInvoice(
+                    documentId: documentId.uuidString,
+                    propertyId: propertyId.uuidString,
+                    householdId: householdId.uuidString
+                )
+            } else {
+                error = "No property or vehicle selected"
+                isProcessing = false
+                return
+            }
+            result = response
+
+            // Pre-select high and medium confidence tasks
+            selectedTaskIds = Set(
+                response.completedTasks
+                    .filter { $0.confidence == "high" || $0.confidence == "medium" }
+                    .map(\.id)
+            )
+
+            // Pre-select all new systems
+            selectedNewSystemIds = Set(response.newSystemsDiscovered.map(\.id))
+
+            // Resolve parent groups deterministically via keyword table
+            resolvedSystems = response.newSystemsDiscovered.map { system in
+                let parentGroup = Self.findParentGroup(for: system.name, category: system.suggestedCategory)
+                return ResolvedNewSystem(
+                    original: system,
+                    resolvedParentName: parentGroup?.parentName ?? system.parentSystemName,
+                    resolvedParentCategory: parentGroup?.parentCategory,
+                    isAutoMatched: parentGroup != nil
+                )
+            }
+
+            // Fetch existing top-level systems for user picker (unmatched systems) -- home invoices only
+            if let propertyId {
+                existingTopLevelSystems = (try? await DatabaseService.shared.fetchHomeSystems(propertyId: propertyId, topLevelOnly: true)) ?? []
+            }
+
+            // Resolve what each parent name will actually map to (alias matching)
+            resolvedParentDisplayNames = [:]
+            for parentName in Set(resolvedSystems.compactMap(\.resolvedParentName)) {
+                var searchNames = [parentName]
+                if let aliases = Self.parentAliases[parentName] {
+                    searchNames.append(contentsOf: aliases)
+                }
+                let existingMatch = existingTopLevelSystems.first { sys in
+                    searchNames.contains { searchName in
+                        sys.name.localizedCaseInsensitiveContains(searchName) ||
+                        searchName.localizedCaseInsensitiveContains(sys.name)
+                    }
+                }
+                if let existingMatch, existingMatch.name != parentName {
+                    resolvedParentDisplayNames[parentName] = "\(existingMatch.name) (existing)"
+                }
+            }
+        } catch {
+            self.error = error.localizedDescription
+            print("[InvoiceProcessing] Error: \(error)")
+        }
+
+        isProcessing = false
+    }
+
+    func applyChanges() async {
+        guard let result else { return }
+        isApplying = true
+        error = nil
+
+        let db = DatabaseService.shared
+        let invoiceDateStr = result.invoiceDate ?? ISO8601DateFormatter().string(from: Date()).prefix(10).description
+
+        do {
+            // 1. Complete matched maintenance tasks
+            for task in result.completedTasks where selectedTaskIds.contains(task.id) {
+                guard let taskIdStr = task.matchedMaintenanceTaskId,
+                      let taskId = UUID(uuidString: taskIdStr) else { continue }
+
+                _ = try await db.updateMaintenanceTask(id: taskId, MaintenanceTaskUpdate(
+                    lastCompletedDate: invoiceDateStr
+                ))
+            }
+
+            // For vehicle invoices, the server already handled task completion, mileage,
+            // and service records. Skip home-system-specific operations.
+            let isVehicleInvoice = vehicleId != nil
+
+            // 1.5 Update last_service_date for ALL systems referenced in the invoice (home only)
+            if !isVehicleInvoice {
+                var updatedSystemIds: Set<UUID> = []
+                for task in result.completedTasks where selectedTaskIds.contains(task.id) {
+                    if let systemIdStr = task.matchedSystemId,
+                       let systemId = UUID(uuidString: systemIdStr),
+                       !updatedSystemIds.contains(systemId) {
+                        _ = try await db.updateHomeSystem(id: systemId, HomeSystemUpdate(
+                            lastServiceDate: invoiceDateStr
+                        ))
+                        updatedSystemIds.insert(systemId)
+                    }
+                }
+            }
+
+            // 2. Create new discovered systems using resolved parent assignments (home only)
+            guard let propertyId, !isVehicleInvoice else {
+                // Vehicle invoices: just post notifications and finish
+                NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                NotificationCenter.default.post(name: .documentChanged, object: nil)
+                applySuccess = true
+                isApplying = false
+                return
+            }
+            var existingSystems = try await db.fetchHomeSystems(propertyId: propertyId)
+            var parentSystemCache: [String: UUID] = [:]
+
+            for resolved in resolvedSystems where selectedNewSystemIds.contains(resolved.id) {
+                let system = resolved.original
+
+                // Duplicate check with fuzzy matching
+                let isDuplicate = existingSystems.contains { existing in
+                    Self.isLikelyDuplicate(
+                        newName: system.name, newManufacturer: system.manufacturer, newModel: system.modelNumber,
+                        existingName: existing.name, existingManufacturer: existing.manufacturer, existingModel: existing.modelNumber
+                    )
+                }
+                if isDuplicate {
+                    print("[InvoiceProcessing] Skipping duplicate: \(system.name)")
+                    continue
+                }
+
+                // Resolve parent based on deterministic match or user choice
+                var parentId: UUID?
+                switch resolved.userChoice {
+                case .autoOrNone:
+                    if let parentName = resolved.resolvedParentName, !parentName.isEmpty, parentName != "Independent" {
+                        parentId = try await resolveOrCreateParent(
+                            name: parentName,
+                            category: resolved.resolvedParentCategory ?? system.suggestedCategory ?? "Other",
+                            existingSystems: &existingSystems,
+                            cache: &parentSystemCache,
+                            db: db
+                        )
+                    }
+                case .existingParent(let existingId, _):
+                    parentId = existingId
+                case .newParent(let newParentName):
+                    // User explicitly chose this name — don't alias-resolve to a different system
+                    parentId = try await resolveOrCreateParent(
+                        name: newParentName,
+                        category: system.suggestedCategory ?? "Other",
+                        existingSystems: &existingSystems,
+                        cache: &parentSystemCache,
+                        db: db,
+                        useAliases: false
+                    )
+                case .independent:
+                    parentId = nil
+                }
+
+                let newSystem = try await db.createHomeSystem(HomeSystemInsert(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    name: system.name,
+                    category: system.suggestedCategory ?? "Other",
+                    manufacturer: system.manufacturer,
+                    modelNumber: system.modelNumber,
+                    installDate: system.installDate,
+                    status: "good",
+                    notes: system.details,
+                    parentSystemId: parentId
+                ))
+                existingSystems.append(newSystem)
+
+                // Migrate equipment-specific tasks from parent to this new child system
+                if let parentId {
+                    await migrateMatchingTasks(newSystem: newSystem, parentId: parentId, db: db)
+                }
+            }
+
+            // 3. Create service records — one per distinct system referenced in completed tasks
+            if createServiceRecord {
+                var contractorId: UUID?
+                if let matchedId = result.vendor?.matchedContractorId {
+                    contractorId = UUID(uuidString: matchedId)
+                }
+
+                // Collect all unique systems referenced in selected tasks
+                var systemTaskDescriptions: [UUID: [String]] = [:]
+                var noSystemDescriptions: [String] = []
+                for task in result.completedTasks where selectedTaskIds.contains(task.id) {
+                    if let sysIdStr = task.matchedSystemId, let sysId = UUID(uuidString: sysIdStr) {
+                        systemTaskDescriptions[sysId, default: []].append(task.description)
+                    } else {
+                        noSystemDescriptions.append(task.description)
+                    }
+                }
+
+                if systemTaskDescriptions.isEmpty {
+                    // No system matches — create one general service record
+                    _ = try await db.createServiceRecord(ServiceRecordInsert(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        serviceDate: invoiceDateStr,
+                        serviceType: "Maintenance",
+                        description: result.serviceSummary ?? "Service performed per invoice",
+                        contractorId: contractorId,
+                        cost: result.totalAmount,
+                        invoiceDocumentId: documentId
+                    ))
+                } else {
+                    // Create one service record per system, split cost proportionally
+                    var isFirst = true
+                    for (systemId, descriptions) in systemTaskDescriptions {
+                        let summary = descriptions.joined(separator: "; ")
+                        let truncated = summary.count > 200 ? String(summary.prefix(197)) + "..." : summary
+                        _ = try await db.createServiceRecord(ServiceRecordInsert(
+                            propertyId: propertyId,
+                            householdId: householdId,
+                            serviceDate: invoiceDateStr,
+                            serviceType: "Maintenance",
+                            description: truncated,
+                            systemId: systemId,
+                            contractorId: contractorId,
+                            cost: isFirst ? result.totalAmount : nil,
+                            invoiceDocumentId: isFirst ? documentId : nil
+                        ))
+                        isFirst = false
+                    }
+                }
+            }
+
+            // 4. Create new contractor if vendor didn't match
+            if let vendor = result.vendor,
+               vendor.matchedContractorId == nil,
+               let companyName = vendor.companyName,
+               !companyName.isEmpty {
+                _ = try await db.createContractor(ContractorInsert(
+                    householdId: householdId,
+                    companyName: companyName,
+                    phone: vendor.phone ?? "Not provided",
+                    email: vendor.email,
+                    address: vendor.address,
+                    notes: "Auto-added from invoice processing"
+                ))
+            }
+
+            // 5. Create follow-up maintenance tasks
+            if let followUps = result.followUpNeeded {
+                for followUp in followUps {
+                    let dueDate = followUp.suggestedDueDate ?? {
+                        let dateFormatter = DateFormatter()
+                        dateFormatter.dateFormat = "yyyy-MM-dd"
+                        let fallback = Calendar.current.date(byAdding: .month, value: 1, to: Date()) ?? Date()
+                        return dateFormatter.string(from: fallback)
+                    }()
+
+                    let priority: String = {
+                        switch followUp.urgency {
+                        case "soon": return "high"
+                        case "routine": return "medium"
+                        default: return "low"
+                        }
+                    }()
+
+                    _ = try await db.createMaintenanceTask(MaintenanceTaskInsert(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        title: followUp.description,
+                        frequency: "once",
+                        nextDueDate: dueDate,
+                        priority: priority,
+                        notes: "Auto-created from invoice follow-up recommendation"
+                    ))
+                }
+            }
+
+            // 6. Reschedule notifications
+            await NotificationScheduler.shared.rescheduleAll()
+
+            // 7. Post data sync notifications
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+            NotificationCenter.default.post(name: .contractorChanged, object: nil)
+
+            applySuccess = true
+            Haptics.success()
+            Analytics.track(.invoiceProcessed, [
+                "tasks_completed": selectedTaskIds.count,
+                "systems_added": selectedNewSystemIds.count,
+                "service_record_created": createServiceRecord,
+                "follow_ups_created": result.followUpNeeded?.count ?? 0
+            ])
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+            print("[InvoiceProcessing] Apply error: \(error)")
+        }
+
+        isApplying = false
+    }
+
+    // MARK: - Task Migration
+
+    /// When a new child system is added, migrate equipment-specific tasks from the parent.
+    private func migrateMatchingTasks(newSystem: HomeSystemRow, parentId: UUID, db: DatabaseService) async {
+        let parentTasks = (try? await db.fetchMaintenanceTasks(systemId: parentId)) ?? []
+        guard !parentTasks.isEmpty else { return }
+
+        let systemNameLower = newSystem.name.lowercased()
+        let allTemplates = MaintenanceTemplates.allTemplates.flatMap(\.1)
+
+        // Word-boundary keyword match
+        let kwMatch: (String, String) -> Bool = { name, kw in
+            let lower = kw.lowercased()
+            if lower.contains(" ") { return name.contains(lower) }
+            return Set(name.components(separatedBy: CharacterSet.alphanumerics.inverted)).contains(lower)
+        }
+
+        // Find template IDs that have equipmentKeywords matching this new system
+        let matchingTemplateIds = Set(allTemplates
+            .filter { template in
+                !template.equipmentKeywords.isEmpty &&
+                template.equipmentKeywords.contains { kwMatch(systemNameLower, $0) }
+            }
+            .map { $0.systemCategory + ":" + $0.title })
+
+        for task in parentTasks {
+            if let templateId = task.templateId, matchingTemplateIds.contains(templateId) {
+                _ = try? await db.updateMaintenanceTask(id: task.id, MaintenanceTaskUpdate(systemId: newSystem.id))
+            }
+        }
+    }
+
+    // MARK: - Parent Resolution
+
+    /// Aliases for parent system matching — kept minimal.
+    /// Most matching should work via exact name since DefaultSystemsService
+    /// creates standard parent systems during property onboarding.
+    private static let parentAliases: [String: [String]] = [:]
+
+    private func resolveOrCreateParent(
+        name: String, category: String,
+        existingSystems: inout [HomeSystemRow],
+        cache: inout [String: UUID],
+        db: DatabaseService,
+        useAliases: Bool = true
+    ) async throws -> UUID {
+        if let cachedId = cache[name] { return cachedId }
+
+        // Build list of names to search for
+        // Only use aliases for auto-matched systems, NOT for explicit user choices
+        var searchNames = [name]
+        if useAliases, let aliases = Self.parentAliases[name] {
+            searchNames.append(contentsOf: aliases)
+        }
+
+        // Exact name match first (case-insensitive)
+        let exactMatch = existingSystems.first { sys in
+            sys.parentSystemId == nil && sys.name.lowercased() == name.lowercased()
+        }
+        if let exactMatch {
+            cache[name] = exactMatch.id
+            return exactMatch.id
+        }
+
+        // Fuzzy match (contains)
+        let existing = existingSystems.first { sys in
+            sys.parentSystemId == nil && searchNames.contains { searchName in
+                sys.name.localizedCaseInsensitiveContains(searchName) ||
+                searchName.localizedCaseInsensitiveContains(sys.name)
+            }
+        }
+        if let existing {
+            cache[name] = existing.id
+            return existing.id
+        }
+
+        // Final DB check before creating (race condition prevention)
+        let dbCheck = try await db.fetchHomeSystems(propertyId: propertyId!)
+        let dbMatch = dbCheck.first { $0.parentSystemId == nil && $0.name.lowercased() == name.lowercased() }
+        if let dbMatch {
+            cache[name] = dbMatch.id
+            existingSystems = dbCheck
+            return dbMatch.id
+        }
+
+        // Create new parent
+        let newParent = try await db.createHomeSystem(HomeSystemInsert(
+            propertyId: propertyId!,
+            householdId: householdId,
+            name: name,
+            category: category,
+            status: "good",
+            notes: "Auto-created as parent system during invoice processing"
+        ))
+        cache[name] = newParent.id
+        existingSystems.append(newParent)
+        return newParent.id
+    }
+
+    // MARK: - Parent Grouping Keyword Table
+
+    private static let parentGroupings: [(keywords: [String], parentName: String, parentCategory: String)] = [
+        // Well / Water Treatment
+        (["well pump", "well tank", "pressure tank", "acid neutralizer", "water softener",
+          "carbon filter", "radon filter", "radon carbon", "uv water", "uv purification",
+          "uv treatment", "uv filter", "uv bulb", "cartridge filter", "sediment filter",
+          "calcite", "water treatment", "neutralizing media", "iron filter", "manganese filter",
+          "water purification"],
+         "Well System", "Well System"),
+        // HVAC
+        (["air handler", "condenser unit", "compressor", "thermostat", "heat pump", "furnace",
+          "evaporator coil", "blower motor", "capacitor", "contactor", "refrigerant",
+          "expansion valve", "ductwork", "damper", "zone valve", "mini split", "hvac filter"],
+         "Central HVAC", "HVAC"),
+        // Pool / Spa
+        (["pool pump", "pool filter", "pool heater", "chlorinator", "salt cell",
+          "pool light", "skimmer", "pool valve", "spa pump", "spa heater", "hot tub",
+          "pool cleaner", "pool cover"],
+         "Pool/Spa System", "Pool/Spa"),
+        // Electrical
+        (["circuit breaker", "electrical panel", "subpanel", "gfci", "arc fault",
+          "transfer switch", "surge protector", "whole house surge", "wiring"],
+         "Electrical System", "Electrical"),
+        // Septic
+        (["septic tank", "septic pump", "distribution box", "leach field", "drain field",
+          "septic baffle", "septic filter", "effluent filter", "septic aerator"],
+         "Septic System", "Septic System"),
+        // Security
+        (["security camera", "alarm panel", "motion sensor", "door sensor",
+          "security keypad", "doorbell camera", "nvr", "dvr", "security sensor"],
+         "Security System", "Security System"),
+        // Solar
+        (["solar panel", "inverter", "solar battery", "microinverter", "power optimizer",
+          "solar monitoring"],
+         "Solar System", "Solar"),
+        // Irrigation
+        (["sprinkler head", "irrigation valve", "drip line", "irrigation controller",
+          "rain sensor", "backflow preventer irrigation", "sprinkler zone"],
+         "Irrigation System", "Irrigation"),
+        // Generator
+        (["generator transfer", "generator battery", "generator controller",
+          "automatic transfer switch", "generator oil", "generator coolant"],
+         "Backup Generator", "Generator"),
+        // Garage Door
+        (["garage door opener", "garage door spring", "garage door sensor",
+          "garage door track", "garage door panel", "garage door roller"],
+         "Garage Door", "Garage Door"),
+        // Fire Protection
+        (["smoke detector", "carbon monoxide detector", "fire extinguisher",
+          "fire sprinkler"],
+         "Smoke & Fire Protection", "Fire Protection"),
+        // Roofing
+        (["roof shingle", "roof flashing", "gutter", "downspout", "soffit", "fascia",
+          "roof vent", "ridge vent", "ice dam", "roof membrane"],
+         "Roof", "Roofing"),
+    ]
+
+    private static func findParentGroup(for systemName: String, category: String? = nil) -> (parentName: String, parentCategory: String)? {
+        let lower = systemName.lowercased()
+        let catLower = (category ?? "").lowercased()
+        for group in parentGroupings {
+            if group.keywords.contains(where: { lower.contains($0) || catLower.contains($0) }) {
+                return (group.parentName, group.parentCategory)
+            }
+        }
+        return nil
+    }
+
+    // MARK: - Duplicate Detection
+
+    /// Check if two system names likely refer to the same physical system using fuzzy word matching.
+    static func isLikelyDuplicate(newName: String, newManufacturer: String?, newModel: String?,
+                                   existingName: String, existingManufacturer: String?, existingModel: String?) -> Bool {
+        let stopWords: Set<String> = ["the", "and", "for", "with", "system", "unit", "model", "series", "water", "air", "home", "house"]
+        let normalize: (String) -> Set<String> = { s in
+            Set(s.lowercased()
+                .replacingOccurrences(of: "-", with: " ")
+                .replacingOccurrences(of: "/", with: " ")
+                .components(separatedBy: .whitespaces)
+                .filter { $0.count > 2 && !stopWords.contains($0) })
+        }
+
+        let newWords = normalize(newName)
+        let existingWords = normalize(existingName)
+
+        // Significant word overlap — require at least 2 matching words AND >= 60% of shorter set
+        // BUT check for conflicting qualifiers first (left vs right = different units)
+        let qualifiers = ["left", "right", "primary", "backup", "secondary", "upstairs", "downstairs", "front", "rear", "master", "guest"]
+        let newQual = qualifiers.first { newWords.contains($0) }
+        let existQual = qualifiers.first { existingWords.contains($0) }
+        if let nq = newQual, let eq = existQual, nq != eq {
+            return false // Different qualifiers = different units, never a duplicate
+        }
+
+        let overlap = newWords.intersection(existingWords).count
+        let minCount = min(newWords.count, existingWords.count)
+        if overlap >= 2 && minCount > 0 && Double(overlap) / Double(minCount) >= 0.6 {
+            return true
+        }
+
+        // Model number match (strongest signal)
+        if let newModel, !newModel.isEmpty,
+           let existingModel, !existingModel.isEmpty {
+            let nm = newModel.lowercased().replacingOccurrences(of: "-", with: "")
+            let em = existingModel.lowercased().replacingOccurrences(of: "-", with: "")
+            if nm == em || nm.contains(em) || em.contains(nm) {
+                return true
+            }
+        }
+
+        // Manufacturer + functional type match
+        if let mfr = newManufacturer, !mfr.isEmpty {
+            let mfrLower = mfr.lowercased()
+            if existingName.lowercased().contains(mfrLower) ||
+               existingManufacturer?.lowercased().contains(mfrLower) == true {
+                let functionalWords = ["pump", "tank", "filter", "valve", "softener", "heater",
+                                       "neutralizer", "purification", "treatment"]
+                let newFunc = functionalWords.first { newName.lowercased().contains($0) }
+                let existFunc = functionalWords.first { existingName.lowercased().contains($0) }
+                if let nf = newFunc, let ef = existFunc, nf == ef {
+                    return true
+                }
+            }
+        }
+
+        // Functional type matching — catches different names for the same system type
+        let functionalTypes: [(keywords: [String], function: String)] = [
+            (["sump pump", "sump", "submersible pump", "submersible"], "sump_pump"),
+            (["well pump", "jet pump", "deep well pump"], "well_pump"),
+            (["water heater", "hot water heater", "tankless water"], "water_heater"),
+            (["softener", "water softener"], "water_softener"),
+            (["neutralizer", "acid neutralizer", "calcite"], "acid_neutralizer"),
+            (["carbon filter", "radon filter", "radon carbon"], "carbon_filter"),
+            (["uv", "ultraviolet", "purification", "germicidal"], "uv_system"),
+            (["pressure tank", "well tank", "bladder tank"], "pressure_tank"),
+            (["furnace", "gas furnace", "oil furnace"], "furnace"),
+            (["air conditioner", "central air", "condenser unit"], "ac_unit"),
+            (["pool pump", "pool filter"], "pool_equipment"),
+            (["garage door opener", "garage opener"], "garage_opener"),
+        ]
+
+        let getFunction: (String) -> String? = { name in
+            let lower = name.lowercased()
+            return functionalTypes.first { type in type.keywords.contains { lower.contains($0) } }?.function
+        }
+
+        let newFunc = getFunction(newName)
+        let existingFunc = getFunction(existingName)
+
+        if let nf = newFunc, let ef = existingFunc, nf == ef {
+            // Same functional type — check qualifiers (left/right = different units)
+            let qualifiers = ["left", "right", "primary", "backup", "secondary",
+                              "upstairs", "downstairs", "front", "rear", "master", "guest"]
+            let newLower = newName.lowercased()
+            let existingLower = existingName.lowercased()
+            let newQ = qualifiers.first { newLower.contains($0) }
+            let existQ = qualifiers.first { existingLower.contains($0) }
+            if let nq = newQ, let eq = existQ, nq != eq { return false }
+            return true
+        }
+
+        return false
+    }
+}

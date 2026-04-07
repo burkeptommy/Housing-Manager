@@ -131,6 +131,8 @@ struct MaintenanceTaskDetailSheet: View {
                             )
                         }
                     }
+                    // Notify parent views to refresh task data
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
                     dismiss()
                 }
                     .foregroundStyle(HavenColors.navy)
@@ -183,8 +185,8 @@ struct MaintenanceTaskDetailSheet: View {
             }
 
             // If no direct assignment, check the system's preferred contractor
-            if assignedContractor == nil, let systemId = task.systemId {
-                let systems = try await db.fetchHomeSystems(propertyId: task.propertyId)
+            if assignedContractor == nil, let systemId = task.systemId, let propertyId = task.propertyId {
+                let systems = try await db.fetchHomeSystems(propertyId: propertyId)
                 if let system = systems.first(where: { $0.id == systemId }) {
                     systemCategory = system.category
                     if let prefId = system.preferredContractorId {
@@ -293,6 +295,7 @@ struct MaintenanceTaskDetailSheet: View {
             Text(task.title)
                 .font(HavenTypography.title2)
                 .foregroundStyle(HavenColors.textPrimary)
+                .lineLimit(3)
 
             HStack(spacing: HavenTheme.spacing12) {
                 Button {
@@ -903,12 +906,27 @@ struct MaintenanceTaskDetailSheet: View {
 
     private func updateAssignment(userId: UUID?, previousUserId: UUID?) async {
         do {
-            _ = try await db.clearMaintenanceTaskAssignment(id: task.id, userId: userId)
+            // If this is a synthetic task (not yet in DB), create it first
+            if task.createdAt == nil {
+                _ = try await db.createMaintenanceTask(MaintenanceTaskInsert(
+                    vehicleId: task.vehicleId,
+                    householdId: task.householdId,
+                    title: task.title,
+                    frequency: task.frequency,
+                    nextDueDate: task.nextDueDate,
+                    description: task.description,
+                    priority: task.priority,
+                    assignedToUserId: userId,
+                    templateId: task.templateId
+                ))
+            } else {
+                _ = try await db.clearMaintenanceTaskAssignment(id: task.id, userId: userId)
+            }
             Haptics.success()
             Analytics.track(.maintenanceTaskAssigned, ["task_id": task.id.uuidString, "assigned_user_id": userId?.uuidString ?? "unassigned"])
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         } catch {
             print("[TaskDetail] Failed to update assignment: \(error)")
-            // Revert UI to previous state on failure
             await MainActor.run { assignedUserId = previousUserId }
             Haptics.error()
         }
@@ -986,11 +1004,11 @@ struct MaintenanceTaskDetailSheet: View {
                 dismiss()
             } label: {
                 HStack {
-                    Image(systemName: "xmark.circle")
-                    Text("Not Relevant to My Home")
+                    Image(systemName: "trash")
+                    Text("Delete Task")
                 }
                 .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.textTertiary)
+                .foregroundStyle(HavenColors.critical.opacity(0.8))
                 .frame(maxWidth: .infinity)
                 .frame(height: HavenTheme.buttonHeight)
             }
@@ -1174,17 +1192,19 @@ struct MarkCompleteForm: View {
                 )
             )
 
-            // 2. Create service record
-            _ = try await db.createServiceRecord(ServiceRecordInsert(
-                propertyId: task.propertyId,
-                householdId: task.householdId,
-                serviceDate: formatter.string(from: completionDate),
-                serviceType: "maintenance",
-                description: task.title,
-                systemId: task.systemId,
-                cost: Double(cost),
-                notes: notes.isEmpty ? nil : notes
-            ))
+            // 2. Create service record (only for property-linked tasks)
+            if let propertyId = task.propertyId {
+                _ = try await db.createServiceRecord(ServiceRecordInsert(
+                    propertyId: propertyId,
+                    householdId: task.householdId,
+                    serviceDate: formatter.string(from: completionDate),
+                    serviceType: "maintenance",
+                    description: task.title,
+                    systemId: task.systemId,
+                    cost: Double(cost),
+                    notes: notes.isEmpty ? nil : notes
+                ))
+            }
 
             // 3. Update parent system dates
             if let systemId = task.systemId {

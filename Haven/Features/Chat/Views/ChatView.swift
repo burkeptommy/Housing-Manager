@@ -9,6 +9,7 @@ struct ChatView: View {
     var contextType: String?
     var contextId: UUID?
     var initialPrompt: String?
+    var systemContext: String?
 
     @State private var contextName: String?
     @State private var scrollProxy: ScrollViewProxy?
@@ -52,6 +53,7 @@ struct ChatView: View {
             .task {
                 viewModel.contextType = contextType
                 viewModel.contextId = contextId
+                viewModel.systemContext = systemContext
                 await viewModel.loadHistory()
                 if let contextId, let contextType {
                     await loadContextName(type: contextType, id: contextId)
@@ -111,15 +113,18 @@ struct ChatView: View {
                 handleFileImport(result)
             }
             .alert("Duplicate Document", isPresented: $viewModel.showDuplicateAlert) {
-                Button("Replace", role: .destructive) {
+                Button("Replace Existing", role: .destructive) {
                     Task { await viewModel.replaceDuplicate() }
                 }
-                Button("Keep Both", role: .cancel) {
-                    viewModel.keepBothDocuments()
+                Button("Save Both Copies") {
+                    Task { await viewModel.saveBoth() }
+                }
+                Button("Delete This Document", role: .cancel) {
+                    viewModel.discardDuplicate()
                 }
             } message: {
                 if let existing = viewModel.duplicateExistingDoc {
-                    Text("You already have a \"\(existing.category)\" document (\(existing.title)). Replace it or keep both?")
+                    Text("This document already exists as \"\(existing.title)\" (\(existing.category)).")
                 }
             }
         }

@@ -128,10 +128,14 @@ serve(async (req: Request) => {
       }
     }
 
+    // --- Vehicle Recall Checks ---
+    const recallResults = await checkVehicleRecalls(serviceClient);
+
     return new Response(
       JSON.stringify({
         households_scanned: results.length,
         results,
+        vehicle_recalls: recallResults,
       }),
       { status: 200, headers: { "Content-Type": "application/json" } }
     );
@@ -316,5 +320,137 @@ async function scanHousehold(
   return {
     summary: scanResults.summary ?? "Scan complete.",
     newFlagsCount: newFlags.length,
+  };
+}
+
+// --- Vehicle Recall Checking ---
+
+async function checkVehicleRecalls(
+  serviceClient: ReturnType<typeof createClient>
+): Promise<{ vehicles_checked: number; households_checked: number; new_recalls: number }> {
+  // Fetch all vehicles with VINs
+  const { data: vehicles } = await serviceClient
+    .from("vehicles")
+    .select("id, vin, name, household_id")
+    .not("vin", "is", null);
+
+  if (!vehicles || vehicles.length === 0) {
+    console.log("[proactive-scan] Vehicle recalls: no vehicles with VINs found");
+    return { vehicles_checked: 0, households_checked: 0, new_recalls: 0 };
+  }
+
+  // Group by household
+  const byHousehold = new Map<string, typeof vehicles>();
+  for (const v of vehicles) {
+    const list = byHousehold.get(v.household_id) ?? [];
+    list.push(v);
+    byHousehold.set(v.household_id, list);
+  }
+
+  let totalNewRecalls = 0;
+  let vehiclesChecked = 0;
+  const householdsWithNewRecalls = new Map<string, Array<{ vehicleId: string; vehicleName: string; component: string }>>();
+
+  for (const vehicle of vehicles) {
+    if (!vehicle.vin || vehicle.vin.length !== 17) continue;
+
+    try {
+      const recallRes = await fetch(`https://api.nhtsa.dot.gov/recalls/recallsByVin?vin=${vehicle.vin}`);
+      if (!recallRes.ok) {
+        console.warn(`[proactive-scan] NHTSA failed for ${vehicle.name}: ${recallRes.status}`);
+        continue;
+      }
+
+      const recallData = await recallRes.json();
+      const nhtsaRecalls = recallData.results ?? [];
+
+      // Get existing recalls
+      const { data: existingRecalls } = await serviceClient
+        .from("vehicle_recalls")
+        .select("nhtsa_campaign_number")
+        .eq("vehicle_id", vehicle.id);
+
+      const existingCampaigns = new Set(
+        (existingRecalls ?? []).map((r: any) => r.nhtsa_campaign_number).filter(Boolean)
+      );
+
+      for (const recall of nhtsaRecalls) {
+        const campaignNum = recall.NHTSACampaignNumber;
+        if (!campaignNum || existingCampaigns.has(campaignNum)) continue;
+
+        await serviceClient.from("vehicle_recalls").insert({
+          vehicle_id: vehicle.id,
+          household_id: vehicle.household_id,
+          nhtsa_campaign_number: campaignNum,
+          component: recall.Component,
+          summary: recall.Summary,
+          consequence: recall.Consequence,
+          remedy: recall.Remedy,
+          recall_date: recall.ReportReceivedDate,
+        });
+        totalNewRecalls++;
+
+        // Track for push notifications
+        const hhRecalls = householdsWithNewRecalls.get(vehicle.household_id) ?? [];
+        hhRecalls.push({ vehicleId: vehicle.id, vehicleName: vehicle.name, component: recall.Component ?? "Unknown" });
+        householdsWithNewRecalls.set(vehicle.household_id, hhRecalls);
+      }
+
+      vehiclesChecked++;
+
+      // Rate limit: 500ms between vehicles
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      console.warn(`[proactive-scan] Recall check failed for ${vehicle.name}: ${err}`);
+    }
+  }
+
+  // Send push notifications for new recalls
+  for (const [hhId, recallList] of householdsWithNewRecalls) {
+    try {
+      // Get user IDs for this household
+      const { data: hhUsers } = await serviceClient
+        .from("users")
+        .select("id")
+        .eq("household_id", hhId);
+      const userIds = (hhUsers ?? []).map((u: any) => u.id);
+
+      const { data: tokens } = await serviceClient
+        .from("device_tokens")
+        .select("token")
+        .in("user_id", userIds);
+
+      if (tokens && tokens.length > 0) {
+        for (const recall of recallList) {
+          for (const { token } of tokens) {
+            try {
+              await serviceClient.functions.invoke("send-push-notification", {
+                body: {
+                  token,
+                  title: `New Recall: ${recall.vehicleName}`,
+                  body: `${recall.component} - Contact your dealer for details`,
+                  data: {
+                    type: "vehicle_recall",
+                    vehicle_id: recall.vehicleId,
+                  },
+                },
+              });
+            } catch (pushErr) {
+              console.warn(`[proactive-scan] Push failed for token: ${pushErr}`);
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn(`[proactive-scan] Push notification error for household ${hhId}: ${err}`);
+    }
+  }
+
+  console.log(`[proactive-scan] Vehicle recalls: checked ${vehiclesChecked} vehicles across ${byHousehold.size} households, found ${totalNewRecalls} new recalls`);
+
+  return {
+    vehicles_checked: vehiclesChecked,
+    households_checked: byHousehold.size,
+    new_recalls: totalNewRecalls,
   };
 }

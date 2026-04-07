@@ -109,13 +109,26 @@ class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDele
     // Show notification even when app is in foreground
     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
         completionHandler([.banner, .sound])
+        // Trigger dashboard inbox refresh when push arrives in foreground
+        NotificationCenter.default.post(name: .inboxItemUpdated, object: nil)
     }
 
     // Handle notification tap — navigate based on notification type
     func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
         let userInfo = response.notification.request.content.userInfo
-        if let type = userInfo["type"] as? String, type == "task_assignment" {
-            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+        if let type = userInfo["type"] as? String {
+            switch type {
+            case "task_assignment":
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+            case "vehicle_recall":
+                // Navigate to Property tab where vehicles are shown
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+                if let vehicleId = userInfo["vehicle_id"] as? String {
+                    NotificationCenter.default.post(name: .navigateToVehicle, object: nil, userInfo: ["vehicle_id": vehicleId])
+                }
+            default:
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+            }
         } else {
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
         }

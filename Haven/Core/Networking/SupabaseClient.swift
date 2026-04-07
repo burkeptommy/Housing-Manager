@@ -158,6 +158,7 @@ enum HavenSupabase {
         let contextId: String?
         let householdId: String
         let encryptionKey: String?
+        let systemContext: String?
 
         enum CodingKeys: String, CodingKey {
             case message
@@ -166,6 +167,7 @@ enum HavenSupabase {
             case contextId = "context_id"
             case householdId = "household_id"
             case encryptionKey = "encryption_key"
+            case systemContext = "system_context"
         }
     }
 
@@ -199,14 +201,15 @@ enum HavenSupabase {
         return try await callEdgeFunction(name: "analyze-document", body: body)
     }
 
-    static func chat(message: String, history: [[String: String]], contextType: String?, contextId: String?, householdId: String, encryptionKey: String? = nil) async throws -> Data {
+    static func chat(message: String, history: [[String: String]], contextType: String?, contextId: String?, householdId: String, encryptionKey: String? = nil, systemContext: String? = nil) async throws -> Data {
         let body = ChatRequest(
             message: message,
             conversationHistory: history,
             contextType: contextType,
             contextId: contextId,
             householdId: householdId,
-            encryptionKey: encryptionKey
+            encryptionKey: encryptionKey,
+            systemContext: systemContext
         )
         return try await callEdgeFunction(name: "chat", body: body)
     }
@@ -353,6 +356,7 @@ enum HavenSupabase {
         let action: String
         let documentCategory: String?
         let targetProjectId: String?
+        let vehicleId: String?
 
         enum CodingKeys: String, CodingKey {
             case action
@@ -360,6 +364,7 @@ enum HavenSupabase {
             case propertyId = "property_id"
             case documentCategory = "document_category"
             case targetProjectId = "target_project_id"
+            case vehicleId = "vehicle_id"
         }
     }
 
@@ -368,14 +373,16 @@ enum HavenSupabase {
         propertyId: String? = nil,
         action: String,
         documentCategory: String? = nil,
-        targetProjectId: String? = nil
+        targetProjectId: String? = nil,
+        vehicleId: String? = nil
     ) async throws -> Data {
         let body = ProcessInboxItemRequest(
             inboxItemId: inboxItemId,
             propertyId: propertyId,
             action: action,
             documentCategory: documentCategory,
-            targetProjectId: targetProjectId
+            targetProjectId: targetProjectId,
+            vehicleId: vehicleId
         )
         return try await callEdgeFunction(name: "process-inbox-item", body: body, timeoutSeconds: 120)
     }
@@ -440,6 +447,40 @@ enum HavenSupabase {
             resolutions: resolutions
         )
         return try await callEdgeFunction(name: "merge-households", body: body)
+    }
+
+    // MARK: - Vehicle Value (Estimated current market value)
+
+    struct VehicleValueRequest: Encodable {
+        let year: Int
+        let make: String
+        let model: String
+        let trim: String?
+        let mileage: Int?
+        let condition: String?
+    }
+
+    struct VehicleValueResponse: Decodable {
+        let low: Double
+        let mid: Double
+        let high: Double
+        let currency: String
+        let confidence: Double
+        let notes: String?
+        let source: String
+    }
+
+    static func vehicleValue(
+        year: Int,
+        make: String,
+        model: String,
+        trim: String? = nil,
+        mileage: Int? = nil,
+        condition: String? = nil
+    ) async throws -> VehicleValueResponse {
+        let body = VehicleValueRequest(year: year, make: make, model: model, trim: trim, mileage: mileage, condition: condition)
+        let data = try await callEdgeFunction(name: "vehicle-value", body: body, timeoutSeconds: 30)
+        return try JSONDecoder().decode(VehicleValueResponse.self, from: data)
     }
 
     // MARK: - Equipment Catalog Search
@@ -520,5 +561,87 @@ enum HavenSupabase {
             householdId: user?.householdId?.uuidString
         )
         _ = try await callEdgeFunction(name: "send-catalog-request", body: body, timeoutSeconds: 15)
+    }
+
+    // MARK: - Process Invoice
+
+    struct ProcessInvoiceRequest: Encodable {
+        let documentId: String
+        let propertyId: String?
+        let householdId: String
+        let vehicleId: String?
+
+        enum CodingKeys: String, CodingKey {
+            case documentId = "document_id"
+            case propertyId = "property_id"
+            case householdId = "household_id"
+            case vehicleId = "vehicle_id"
+        }
+    }
+
+    /// Process a home service invoice via AI to extract completed tasks, new systems, and service details.
+    static func processInvoice(documentId: String, propertyId: String, householdId: String) async throws -> InvoiceProcessingResult {
+        let body = ProcessInvoiceRequest(
+            documentId: documentId,
+            propertyId: propertyId,
+            householdId: householdId,
+            vehicleId: nil
+        )
+        let data = try await callEdgeFunction(name: "process-invoice", body: body, timeoutSeconds: 120)
+        return try JSONDecoder().decode(InvoiceProcessingResult.self, from: data)
+    }
+
+    /// Process a vehicle service invoice via AI to extract completed tasks, mileage, and service details.
+    static func processVehicleInvoice(documentId: String, vehicleId: String, householdId: String) async throws -> InvoiceProcessingResult {
+        let body = ProcessInvoiceRequest(
+            documentId: documentId,
+            propertyId: nil,
+            householdId: householdId,
+            vehicleId: vehicleId
+        )
+        let data = try await callEdgeFunction(name: "process-invoice", body: body, timeoutSeconds: 120)
+        return try JSONDecoder().decode(InvoiceProcessingResult.self, from: data)
+    }
+
+    // MARK: - Brand Logo (Brandfetch)
+
+    struct BrandLogoRequest: Encodable {
+        let query: String?
+        let domain: String?
+    }
+
+    struct BrandLogoResponse: Decodable {
+        let name: String?
+        let domain: String?
+        let brandId: String?
+        let logoUrl: String?
+        let iconUrl: String?
+        let brandColor: String?
+        let logos: [BrandAsset]?
+        let icons: [BrandAsset]?
+        let colors: [BrandColor]?
+
+        struct BrandAsset: Decodable {
+            let url: String
+            let format: String?
+            let theme: String?
+            let type: String?
+        }
+
+        struct BrandColor: Decodable {
+            let hex: String
+            let type: String?
+        }
+    }
+
+    /// Fetch brand logo/colors by company name (search) or domain (direct lookup).
+    /// Use `domain` when you have a website URL, `query` when searching by name.
+    static func fetchBrandLogo(query: String? = nil, domain: String? = nil) async throws -> BrandLogoResponse {
+        let data = try await callEdgeFunction(
+            name: "brand-logo",
+            body: BrandLogoRequest(query: query, domain: domain),
+            timeoutSeconds: 15
+        )
+        return try JSONDecoder().decode(BrandLogoResponse.self, from: data)
     }
 }

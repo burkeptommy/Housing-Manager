@@ -11,13 +11,15 @@ const VALID_CATEGORIES = [
   "Will","Trust","Power of Attorney","Healthcare Directive","Guardianship Designation","Letter of Intent",
   "LLC Operating Agreement","LP Agreement","S-Corp Documents","EIN Documentation","Annual Filings","Bylaws",
   "Deed","Mortgage","Title Insurance","Survey","HOA Documents","Lease Agreement","Property Tax Records",
-  "Life Insurance","Umbrella Insurance","Homeowners Insurance","Auto Insurance","Jewelry/Art Rider",
-  "Long-Term Care Insurance","Disability Insurance","Directors & Officers Insurance",
+  "Appraisal Report","Home Inspection Report",
+  "Life Insurance","Umbrella Insurance","Homeowners Insurance","Auto Insurance","Flood Insurance",
+  "Jewelry/Art Rider","Long-Term Care Insurance","Disability Insurance","Directors & Officers Insurance",
   "Brokerage Account","Retirement Account (IRA/401k)","Bank Account","529 Plan",
-  "Beneficiary Designation","Stock Options/RSUs","Crypto Wallet","Alternative Investments",
+  "Beneficiary Designation","Stock Options/RSUs","Crypto Wallet","Alternative Investments","Vehicle Loan Statement",
   "Federal Tax Return","State Tax Return","Gift Tax Return (Form 709)","Property Tax Record",
-  "Estate & Trust Return (Form 1041)",
-  "Vehicle Title","Art Appraisal","Jewelry Appraisal","Collectibles Documentation","Boat/Aircraft Registration",
+  "Estate & Trust Return (Form 1041)","K-1 Partnership Return",
+  "Vehicle Title","Vehicle Registration","Vehicle Purchase/Lease Agreement","Emissions Inspection",
+  "Art Appraisal","Jewelry Appraisal","Collectibles Documentation","Boat/Aircraft Registration",
   "Domain Names","Digital Account Inventory","Social Media Accounts","Intellectual Property",
   "Passport","Birth Certificate","Marriage Certificate","Divorce Decree","Social Security Card",
   "Citizenship/Immigration","Death Certificate",
@@ -86,11 +88,15 @@ serve(async (req: Request) => {
         text: `Category hint: ${category ?? "Unknown"}\nTitle: ${document_title ?? "Unknown"}\n\nDocument text:\n${text}`,
       });
     } else {
-      // Detect media type — PDFs must use "document" type, images use "image" type
-      let mediaType = "image/jpeg";
+      // Detect media type — PDFs use "document" type, images use "image" type
+      // Also accept content_type hint from the caller
+      const contentTypeHint = body.content_type as string | undefined;
+      let mediaType = contentTypeHint || "image/jpeg";
       if (image_base64.startsWith("/9j/")) mediaType = "image/jpeg";
       else if (image_base64.startsWith("iVBOR")) mediaType = "image/png";
       else if (image_base64.startsWith("JVBER")) mediaType = "application/pdf";
+      else if (image_base64.startsWith("R0lG")) mediaType = "image/gif";
+      else if (image_base64.startsWith("UklG")) mediaType = "image/webp";
 
       const isPdf = mediaType === "application/pdf";
       messages_content.push(
@@ -156,6 +162,12 @@ EXTRACTION RULES:
 - home_systems: Extract if the document mentions specific home systems, appliances, or equipment. Especially important for: inspection reports (extract ALL systems inspected), warranty cards (extract the covered system), appliance manuals, service reports, completion certificates.
 - maintenance_suggestions: Extract if the document recommends maintenance, repairs, or follow-up work. Especially from: inspection reports, service reports, warranty cards (maintenance requirements to keep warranty valid).
 - If none of these apply (e.g., a will or passport), return null/empty arrays for those fields.
+
+VEHICLE DETECTION:
+- If this document is auto insurance, vehicle title, registration, inspection report, or any vehicle-related document, set category_suggestion to "Auto Insurance" or "Vehicle Title" as appropriate.
+- Extract ALL VINs (17-character Vehicle Identification Numbers) found anywhere in the document and include them in extracted_metadata as "detected_vins": ["VIN1", "VIN2"].
+- Also extract vehicle details (year, make, model) if mentioned and include as "detected_vehicles": [{"vin": "...", "year": 2024, "make": "Tesla", "model": "Model Y"}].
+- For auto insurance documents that list multiple vehicles, extract ALL vehicles listed on the policy.
 
 CLASSIFICATION RULES (follow strictly):
 - "Employment Agreement" means a SIGNED CONTRACT between employer and employee with terms of employment, compensation, termination clauses, etc. Do NOT use this for resumes, CVs, cover letters, or job descriptions.
@@ -254,6 +266,9 @@ Return ONLY JSON. No markdown. No explanation.`,
     if (supabaseUrl && serviceRoleKey) {
       const svc = createClient(supabaseUrl, serviceRoleKey);
 
+      // NOTE: content_hash is now set at document creation time (receive-email, process-inbox-item,
+      // DocumentUploadManager). No longer computed here to avoid race conditions or hash mismatches.
+
       // Update document record (including property_id if AI matched a property)
       const docUpdate: Record<string, unknown> = {
         ai_summary: analysis.summary,
@@ -319,9 +334,104 @@ Return ONLY JSON. No markdown. No explanation.`,
           });
       }
 
+      // --- AUTO-DETECT VINs AND LINK TO VEHICLES ---
+      // Extract VINs from the document text and auto-link to matching vehicles.
+      // If unmatched VINs are found, store them in metadata for iOS to prompt "Add vehicle?"
+      const fullText = `${analysis.summary ?? ""} ${(analysis.extracted_text as string) ?? text ?? ""}`;
+      const vinRegex = /\b[A-HJ-NPR-Z0-9]{17}\b/g;
+      const detectedVins = [...new Set((fullText.match(vinRegex) ?? []).map((v: string) => v.toUpperCase()))];
+
+      // Also check if the category is auto/vehicle related
+      const vehicleCategories = ["Auto Insurance", "Vehicle Title", "Boat/Aircraft Registration"];
+      const isVehicleDoc = vehicleCategories.some(c => (analysis.category_suggestion as string)?.includes(c));
+
+      if (detectedVins.length > 0 || isVehicleDoc) {
+        console.log(`[analyze] Detected ${detectedVins.length} VIN(s): ${detectedVins.join(", ")}${isVehicleDoc ? " (vehicle-related category)" : ""}`);
+
+        const { data: vehicles } = await svc
+          .from("vehicles")
+          .select("id, vin, year, make, model")
+          .eq("household_id", household_id);
+
+        const matchedVehicleIds: string[] = [];
+        const unmatchedVins: string[] = [];
+
+        for (const vin of detectedVins) {
+          const match = (vehicles ?? []).find((v: any) => v.vin && v.vin.toUpperCase() === vin);
+          if (match) {
+            matchedVehicleIds.push(match.id);
+            console.log(`[analyze] VIN ${vin} matched vehicle: ${match.year} ${match.make} ${match.model}`);
+          } else {
+            unmatchedVins.push(vin);
+            console.log(`[analyze] VIN ${vin} has no matching vehicle - will prompt user to add`);
+          }
+        }
+
+        // Link document to the first matched vehicle (documents.vehicle_id is singular)
+        if (matchedVehicleIds.length > 0) {
+          await svc.from("documents")
+            .update({ vehicle_id: matchedVehicleIds[0] })
+            .eq("id", document_id);
+          console.log(`[analyze] Auto-linked document to vehicle ${matchedVehicleIds[0]}`);
+        }
+
+        // Store unmatched VINs and all detected VINs in document metadata for iOS prompt
+        if (unmatchedVins.length > 0 || matchedVehicleIds.length > 0) {
+          const existingMeta = (docUpdate.metadata as Record<string, unknown>) ?? {};
+          docUpdate.metadata = {
+            ...existingMeta,
+            detected_vins: detectedVins,
+            matched_vehicle_ids: matchedVehicleIds,
+            unmatched_vins: unmatchedVins,
+          };
+          // Re-update the document with VIN metadata
+          svc.from("documents").update({ metadata: docUpdate.metadata }).eq("id", document_id).then(({ error }) => {
+            if (error) console.error("[analyze] VIN metadata update failed:", error.message);
+          });
+        }
+      }
+
+      // Auto-link family members from key_parties
+      const keyParties = analysis.key_parties as Array<{ name: string; role: string }> | null;
+      if (keyParties && keyParties.length > 0) {
+        svc.from("family_members")
+          .select("id, first_name, last_name")
+          .eq("household_id", household_id)
+          .then(async ({ data: members }) => {
+            if (!members || members.length === 0) return;
+            for (const party of keyParties) {
+              const partyName = (party.name || "").toLowerCase();
+              if (!partyName || partyName.length < 3) continue;
+              const matched = members.find((m: any) => {
+                const first = (m.first_name || "").toLowerCase();
+                const last = (m.last_name || "").toLowerCase();
+                return first.length > 1 && last.length > 1
+                  && partyName.includes(first) && partyName.includes(last);
+              });
+              if (matched) {
+                const { error: linkErr } = await svc.from("document_family_members").upsert({
+                  document_id,
+                  family_member_id: matched.id,
+                }, { onConflict: "document_id,family_member_id" });
+                if (linkErr) {
+                  console.warn(`[analyze] Family member link failed for ${matched.first_name}: ${linkErr.message}`);
+                } else {
+                  console.log(`[analyze] Linked document to family member: ${matched.first_name} ${matched.last_name}`);
+                }
+              }
+            }
+          });
+      }
+
       // Auto-create home systems if extracted (for inspection reports, warranty cards, etc.)
+      // SKIP auto-creating systems/tasks for invoices, quotes, and bills.
+      // Invoices go through process-invoice for task completion.
+      // Quotes go through project flow for quote analysis.
+      const invoiceAndQuoteCategories = ["Home Bill/Invoice", "Project Invoice", "Repair Estimate", "Contractor Quote", "Utility Bill"];
+      const docCategory = (analysis.category_suggestion as string) ?? category ?? "";
+      const isInvoice = invoiceAndQuoteCategories.some(c => docCategory.toLowerCase().includes(c.toLowerCase()));
       const homeSystems = analysis.home_systems as Array<Record<string, unknown>> | null;
-      if (homeSystems && homeSystems.length > 0) {
+      if (homeSystems && homeSystems.length > 0 && !isInvoice) {
         // Get property for this household
         svc.from("properties")
           .select("id")
@@ -362,8 +472,9 @@ Return ONLY JSON. No markdown. No explanation.`,
       }
 
       // Auto-create maintenance tasks from suggestions
+      // Also skip auto-creating maintenance tasks for invoices (invoice intelligence handles this)
       const maintSuggestions = analysis.maintenance_suggestions as Array<Record<string, unknown>> | null;
-      if (maintSuggestions && maintSuggestions.length > 0) {
+      if (maintSuggestions && maintSuggestions.length > 0 && !isInvoice) {
         svc.from("properties")
           .select("id")
           .eq("household_id", household_id)

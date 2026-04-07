@@ -6,7 +6,8 @@ struct InboxItemCard: View {
     let item: DatabaseService.InboxItemRow
     let properties: [PropertyRow]
     let projects: [PropertyProjectRow]
-    let onProcess: (UUID?, String, String?, UUID?) -> Void  // propertyId, action, category, targetProjectId
+    var vehicles: [VehicleRow] = []
+    let onProcess: (UUID?, String, String?, UUID?, UUID?) -> Void  // propertyId, action, category, targetProjectId, vehicleId
     let onDismiss: () -> Void
 
     @State private var selectedPropertyId: UUID?
@@ -15,15 +16,9 @@ struct InboxItemCard: View {
     @State private var expanded = false
     @State private var showProjectPicker = false
     @State private var selectedProjectId: UUID?
-
-    private let documentCategories = [
-        "Contractor Quote", "Warranty Card", "Inspection Report",
-        "Home Inspection/Test Report", "Homeowners Insurance",
-        "Vehicle Title", "Deed", "Mortgage", "Property Tax Records",
-        "Utility Bill", "Vendor Contract", "Appliance Manual",
-        "Permit", "Home Bill/Invoice", "Home Document",
-        "Other Personal Documents"
-    ]
+    @State private var showCategoryChange = false
+    @State private var showCategoryPicker = false
+    @State private var selectedVehicleId: UUID?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -48,6 +43,14 @@ struct InboxItemCard: View {
             if properties.count == 1 {
                 selectedPropertyId = properties.first?.id
             }
+            // Pre-select the AI-suggested category
+            if let suggested = item.metadata?.suggestedCategory, !suggested.isEmpty {
+                selectedCategory = suggested
+            }
+        }
+        .sheet(isPresented: $showCategoryPicker) {
+            DocumentCategoryPicker(selectedCategory: $selectedCategory)
+                .presentationDetents([.large])
         }
     }
 
@@ -138,6 +141,21 @@ struct InboxItemCard: View {
                     .lineLimit(4)
             }
 
+            // Unsupported file type banner
+            if item.metadata?.analysisSkipped == true {
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 12))
+                    Text("This file type couldn't be analyzed automatically. Please review and categorize.")
+                        .font(HavenTypography.uiCaption)
+                }
+                .foregroundStyle(HavenColors.navy800)
+                .padding(HavenTheme.spacing8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(HavenColors.navy.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+            }
+
             // Attachment indicator
             if let filename = item.attachmentFilename {
                 HStack(spacing: 6) {
@@ -171,6 +189,12 @@ struct InboxItemCard: View {
             confirmProjectMatchArea
         } else if item.actionType == "confirm_document_category" {
             confirmDocumentCategoryArea
+        } else if item.actionType == "review_insurance_claim" {
+            insuranceClaimActionArea
+        } else if item.actionType == "resolve_duplicate" {
+            duplicateResolutionArea
+        } else if item.actionType == "confirm_vehicle_document" || item.actionType == "review_vehicle_invoice" {
+            vehicleDocumentActionArea
         } else {
             standardActionArea
         }
@@ -183,12 +207,11 @@ struct InboxItemCard: View {
             HStack(spacing: HavenTheme.spacing8) {
                 HavenButton(title: "Yes, that's right", action: {
                     Haptics.medium()
-                    onProcess(nil, "confirm_project_match", nil, nil)
+                    onProcess(nil, "confirm_project_match", nil, nil, nil)
                 }, icon: "checkmark.circle.fill")
 
                 Button {
-                    // TODO: show project picker to move quote
-                    onDismiss()
+                    showProjectPicker = true
                 } label: {
                     Text("Different project")
                         .font(HavenTypography.uiLabel)
@@ -199,6 +222,19 @@ struct InboxItemCard: View {
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
             }
+
+            Button {
+                Haptics.medium()
+                let propId = selectedPropertyId ?? properties.first?.id
+                onProcess(propId, "process_document", "Contractor Quote", nil, nil)
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "doc.fill").font(.caption)
+                    Text("Just Save as Document")
+                        .font(HavenTypography.uiLabel)
+                }
+                .foregroundStyle(HavenColors.textTertiary)
+            }
         }
         .padding(HavenTheme.spacing12)
         .background(HavenColors.navy.opacity(0.04))
@@ -208,48 +244,283 @@ struct InboxItemCard: View {
     // MARK: - Confirm Document Category
 
     private var confirmDocumentCategoryArea: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            // Category picker to change if needed
-            Menu {
-                ForEach(documentCategories, id: \.self) { cat in
-                    Button { selectedCategory = cat } label: {
-                        HStack {
-                            Text(cat)
-                            if selectedCategory == cat { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            } label: {
-                HStack {
-                    Text(selectedCategory)
-                        .font(HavenTypography.body)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 11))
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-                .padding(HavenTheme.spacing8)
-                .background(HavenColors.background)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
-            }
+        let isHighConfidence = item.metadata?.highConfidence == true
 
-            HStack(spacing: HavenTheme.spacing8) {
-                HavenButton(title: "Confirm", action: {
+        return VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            if isHighConfidence {
+                // High confidence: 1-tap "Looks Good" with subtle change option
+                HavenButton(title: "Looks Good", action: {
                     Haptics.medium()
-                    onProcess(nil, "confirm_document_category", nil, nil)
+                    onProcess(nil, "confirm_document_category", nil, nil, nil)
                 }, icon: "checkmark.circle.fill")
 
                 Button {
-                    Haptics.medium()
-                    onProcess(nil, "change_document_category", selectedCategory, nil)
+                    Haptics.light()
+                    showCategoryPicker = true
                 } label: {
-                    Text("Change Category")
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.2.circlepath").font(.caption)
+                        Text("Change Category")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.textTertiary)
+                }
+            } else {
+                // Low/medium confidence: show current category, tap to search & change
+                Button { showCategoryPicker = true } label: {
+                    HStack {
+                        Text(selectedCategory)
+                            .font(HavenTypography.body)
+                            .foregroundStyle(HavenColors.textPrimary)
+                        Spacer()
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 11))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .padding(HavenTheme.spacing8)
+                    .background(HavenColors.background)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                }
+                .buttonStyle(.plain)
+
+                HStack(spacing: HavenTheme.spacing8) {
+                    HavenButton(title: "Confirm", action: {
+                        Haptics.medium()
+                        onProcess(nil, "confirm_document_category", nil, nil, nil)
+                    }, icon: "checkmark.circle.fill")
+
+                    Button {
+                        Haptics.medium()
+                        onProcess(nil, "change_document_category", selectedCategory, nil, nil)
+                    } label: {
+                        Text("Save as \(selectedCategory)")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy700)
+                            .lineLimit(1)
+                            .padding(.horizontal, HavenTheme.spacing12)
+                            .padding(.vertical, 8)
+                            .background(HavenColors.navy.opacity(0.08))
+                            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    }
+                }
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.navy.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+    }
+
+    // MARK: - Vehicle Document / Invoice Action Area
+
+    private var vehicleDocumentActionArea: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            if vehicles.count > 1 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Which vehicle?")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    Menu {
+                        ForEach(vehicles) { vehicle in
+                            Button {
+                                selectedVehicleId = vehicle.id
+                            } label: {
+                                HStack {
+                                    Text(vehicle.displayName)
+                                    if selectedVehicleId == vehicle.id { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(vehicles.first(where: { $0.id == selectedVehicleId })?.displayName ?? "Select a vehicle")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(selectedVehicleId != nil ? HavenColors.textPrimary : HavenColors.textTertiary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        .padding(HavenTheme.spacing8)
+                        .background(HavenColors.background)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                    }
+                }
+            }
+
+            HStack(spacing: HavenTheme.spacing8) {
+                Button {
+                    guard !isProcessing else { return }
+                    isProcessing = true
+                    Haptics.medium()
+                    let vid = selectedVehicleId ?? vehicles.first?.id
+                    onProcess(nil, "process_vehicle_document", nil, nil, vid)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "car.fill")
+                        Text("Save to Vehicle")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(HavenColors.navy)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .disabled(isProcessing)
+            }
+
+            HStack(spacing: HavenTheme.spacing12) {
+                Button {
+                    guard !isProcessing else { return }
+                    isProcessing = true
+                    Haptics.medium()
+                    let propId = selectedPropertyId ?? properties.first?.id
+                    onProcess(propId, "process_document", selectedCategory, nil, nil)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.fill").font(.caption)
+                        Text("Save as Document")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.textTertiary)
+                }
+                .disabled(isProcessing)
+
+                Spacer()
+
+                Button { onDismiss() } label: {
+                    Text("Dismiss")
                         .font(HavenTypography.uiLabel)
-                        .foregroundStyle(HavenColors.navy700)
-                        .padding(.horizontal, HavenTheme.spacing12)
-                        .padding(.vertical, 8)
-                        .background(HavenColors.navy.opacity(0.08))
-                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.navy.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+        .onAppear {
+            if vehicles.count == 1 {
+                selectedVehicleId = vehicles.first?.id
+            }
+        }
+    }
+
+    // MARK: - Duplicate Resolution Action Area
+
+    private var duplicateResolutionArea: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(spacing: 6) {
+                Image(systemName: "doc.on.doc")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.warning)
+                Text("This document may already exist in your vault.")
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.warning)
+            }
+
+            HavenButton(title: "Replace Existing", action: {
+                Haptics.medium()
+                onProcess(nil, "resolve_duplicate", "replace", nil, nil)
+            }, icon: "arrow.triangle.swap")
+
+            HavenButton(title: "Save Both Copies", action: {
+                Haptics.medium()
+                onProcess(nil, "resolve_duplicate", "save_both", nil, nil)
+            }, style: .secondary, icon: "doc.on.doc")
+
+            HavenButton(title: "Delete This Document", action: {
+                Haptics.medium()
+                onProcess(nil, "resolve_duplicate", "delete", nil, nil)
+            }, style: .secondary, icon: "trash")
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.navy.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+    }
+
+    // MARK: - Insurance Claim Action Area
+
+    private var insuranceClaimActionArea: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            // Property picker (show when multiple properties)
+            if properties.count > 1 {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Which property?")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    Menu {
+                        ForEach(properties) { prop in
+                            Button { selectedPropertyId = prop.id } label: {
+                                HStack {
+                                    Text(prop.name)
+                                    if selectedPropertyId == prop.id { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(selectedPropertyName ?? "Select a property")
+                                .font(HavenTypography.body)
+                                .foregroundStyle(selectedPropertyId != nil ? HavenColors.textPrimary : HavenColors.textTertiary)
+                            Spacer()
+                            Image(systemName: "chevron.up.chevron.down")
+                                .font(.system(size: 11))
+                                .foregroundStyle(HavenColors.textTertiary)
+                        }
+                        .padding(HavenTheme.spacing8)
+                        .background(HavenColors.background)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+                    }
+                }
+            }
+
+            HStack(spacing: HavenTheme.spacing8) {
+                Button {
+                    guard !isProcessing else { return }
+                    isProcessing = true
+                    Haptics.medium()
+                    let propId = selectedPropertyId ?? properties.first?.id
+                    onProcess(propId, "create_claim_project", nil, nil, nil)
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "shield.fill")
+                        Text("Create Claim Project")
+                    }
+                    .font(HavenTypography.uiButton)
+                    .foregroundStyle(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(selectedPropertyId != nil || properties.count <= 1 ? HavenColors.navy : HavenColors.navy.opacity(0.4))
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                }
+                .disabled((selectedPropertyId == nil && properties.count > 1) || isProcessing)
+            }
+
+            HStack(spacing: HavenTheme.spacing12) {
+                Button {
+                    guard !isProcessing else { return }
+                    isProcessing = true
+                    Haptics.medium()
+                    let propId = selectedPropertyId ?? properties.first?.id
+                    onProcess(propId, "process_document", "Homeowners Insurance", nil, nil)
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.fill").font(.caption)
+                        Text("Save as Document")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.textTertiary)
+                }
+                .disabled(isProcessing)
+
+                Spacer()
+
+                Button { onDismiss() } label: {
+                    Text("Dismiss")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
             }
         }
@@ -307,20 +578,7 @@ struct InboxItemCard: View {
                         .font(HavenTypography.uiCaption)
                         .foregroundStyle(HavenColors.textSecondary)
 
-                    Menu {
-                        ForEach(documentCategories, id: \.self) { cat in
-                            Button {
-                                selectedCategory = cat
-                            } label: {
-                                HStack {
-                                    Text(cat)
-                                    if selectedCategory == cat {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
+                    Button { showCategoryPicker = true } label: {
                         HStack {
                             Text(selectedCategory)
                                 .font(HavenTypography.body)
@@ -334,6 +592,7 @@ struct InboxItemCard: View {
                         .background(HavenColors.background)
                         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
                     }
+                    .buttonStyle(.plain)
                 }
             }
 
@@ -348,7 +607,7 @@ struct InboxItemCard: View {
                             isProcessing = true
                             Haptics.medium()
                             let propId = selectedPropertyId ?? properties.first?.id
-                            onProcess(propId, "process_quote", nil, nil)
+                            onProcess(propId, "process_quote", nil, nil, nil)
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "hammer.fill")
@@ -388,7 +647,7 @@ struct InboxItemCard: View {
                             isProcessing = true
                             Haptics.medium()
                             let propId = selectedPropertyId ?? properties.first?.id
-                            onProcess(propId, "process_document", "Contractor Quote", nil)
+                            onProcess(propId, "process_document", "Contractor Quote", nil, nil)
                         } label: {
                             HStack(spacing: 4) {
                                 Image(systemName: "doc.fill")
@@ -422,7 +681,7 @@ struct InboxItemCard: View {
                             isProcessing = true
                             Haptics.medium()
                             let propId = selectedPropertyId ?? properties.first?.id
-                            onProcess(propId, "process_document", selectedCategory, nil)
+                            onProcess(propId, "process_document", selectedCategory, nil, nil)
                         } label: {
                             HStack(spacing: 6) {
                                 Image(systemName: "doc.fill")
@@ -456,13 +715,14 @@ struct InboxItemCard: View {
     // MARK: - Project Picker Sheet
 
     private var projectPickerSheet: some View {
-        NavigationStack {
+        let action = item.actionType == "confirm_project_match" ? "move_to_project" : "add_to_project"
+        return NavigationStack {
             List {
                 ForEach(projects) { project in
                     Button {
                         Haptics.medium()
                         let propId = selectedPropertyId ?? properties.first?.id
-                        onProcess(propId, "add_to_project", nil, project.id)
+                        onProcess(propId, action, nil, project.id, nil)
                         showProjectPicker = false
                     } label: {
                         HStack(spacing: 10) {
@@ -485,7 +745,7 @@ struct InboxItemCard: View {
                 }
             }
             .listStyle(.plain)
-            .navigationTitle("Add to Project")
+            .navigationTitle(item.actionType == "confirm_project_match" ? "Move to Project" : "Add to Project")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -508,13 +768,31 @@ struct InboxItemCard: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.success)
             } else if item.relatedDocumentId != nil {
-                Text("Document saved")
+                let cat = item.metadata?.suggestedCategory
+                Text(cat != nil ? "Saved as \(cat!)" : "Document saved")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.success)
             } else if item.relatedContractorId != nil {
-                Text("Vendor added")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.success)
+                HStack(spacing: 0) {
+                    Text("Vendor added")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.success)
+
+                    Spacer()
+
+                    Button {
+                        Haptics.medium()
+                        onProcess(nil, "remove_vendor", nil, nil, nil)
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "trash")
+                                .font(.system(size: 11))
+                            Text("Remove")
+                                .font(HavenTypography.uiCaption)
+                        }
+                        .foregroundStyle(HavenColors.critical.opacity(0.7))
+                    }
+                }
             }
         }
     }

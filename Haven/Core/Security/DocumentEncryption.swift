@@ -57,12 +57,22 @@ final class DocumentEncryption {
         return symmetricKey.withUnsafeBytes { Data($0).base64EncodedString() }
     }
 
+    /// Placeholder shown when a message was clearly encrypted with a key we
+    /// no longer have (e.g. simulator Keychain wipe, fresh install on new device).
+    static let undecryptableMessagePlaceholder =
+        "🔒 This message was encrypted with a key that's no longer on this device. It may have been written from another device or before this app was reinstalled."
+
     /// Decrypt a base64-encoded AES-256-GCM string (IV + ciphertext combined).
     /// Used for chat messages encrypted by the Edge Function.
-    /// Returns the original string, or the input as-is if it's not encrypted (backwards compat).
+    /// Returns the decrypted plaintext, the input as-is if it's plain text
+    /// (backwards-compat for legacy unencrypted rows), or a friendly placeholder
+    /// if the value is clearly encrypted but we can't decrypt it.
     func decryptString(_ base64String: String, householdId: UUID) -> String {
-        guard let combined = Data(base64Encoded: base64String) else {
-            return base64String // Not base64 — treat as plaintext
+        // Heuristic: legitimate plaintext chat messages are very unlikely to be
+        // long, valid base64 strings. Only treat as "maybe encrypted" if it
+        // decodes to a buffer large enough to contain GCM nonce(12) + tag(16).
+        guard let combined = Data(base64Encoded: base64String), combined.count >= 28 else {
+            return base64String // Plain text or too short to be ciphertext
         }
         do {
             let encryptionKey = key(for: householdId)
@@ -70,8 +80,9 @@ final class DocumentEncryption {
             let decrypted = try AES.GCM.open(sealedBox, using: encryptionKey)
             return String(data: decrypted, encoding: .utf8) ?? base64String
         } catch {
-            // Not encrypted or wrong key — return as-is (backwards compat with old plaintext messages)
-            return base64String
+            // Decryption failed but the input looked like ciphertext — show a
+            // placeholder instead of dumping the raw base64 into the UI.
+            return Self.undecryptableMessagePlaceholder
         }
     }
 
