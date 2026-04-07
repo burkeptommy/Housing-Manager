@@ -433,7 +433,7 @@ final class OnboardingViewModel: ObservableObject {
                 propertyId: propertyId,
                 householdId: householdId,
                 name: "\(foundationType) Foundation",
-                category: "Other",
+                category: "Foundation",
                 notes: "Auto-detected from property records."
             ))
         }

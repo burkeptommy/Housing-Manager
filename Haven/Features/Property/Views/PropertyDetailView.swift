@@ -825,30 +825,23 @@ struct PropertyDetailView: View {
                     .padding(.vertical, 8)
                 }
             } else {
+                // Always show groups as group cards (no single-system shortcut),
+                // so the user sees a clear category breakdown matching their mental model.
                 let groups = SystemGroup.group(viewModel.systems).sorted { $0.systems.count > $1.systems.count }
 
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(groups) { group in
-                            if group.systems.count == 1, group.id != "other" {
-                                NavigationLink {
-                                    SystemDetailRowView(system: group.systems[0])
-                                } label: {
-                                    compactSystemChip(icon: group.icon, name: shortGroupName(group.name), count: group.systems.count)
-                                }
-                                .buttonStyle(.plain)
-                            } else if !group.systems.isEmpty {
-                                NavigationLink {
-                                    SystemGroupListView(
-                                        group: group,
-                                        propertyId: propertyID,
-                                        householdId: viewModel.property?.householdId ?? UUID()
-                                    )
-                                } label: {
-                                    compactSystemChip(icon: group.icon, name: shortGroupName(group.name), count: group.systems.count)
-                                }
-                                .buttonStyle(.plain)
+                            NavigationLink {
+                                SystemGroupListView(
+                                    group: group,
+                                    propertyId: propertyID,
+                                    householdId: viewModel.property?.householdId ?? UUID()
+                                )
+                            } label: {
+                                compactSystemChip(icon: group.icon, name: shortGroupName(group.name), count: group.systems.count)
                             }
+                            .buttonStyle(.plain)
                         }
                     }
                     .padding(.horizontal, 2)
