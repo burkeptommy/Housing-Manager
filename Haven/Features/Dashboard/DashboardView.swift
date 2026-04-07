@@ -11,6 +11,7 @@ struct DashboardView: View {
     @State private var navigationPath = NavigationPath()
     @State private var showScenarioStudio = false
     @State private var hasAppeared = false
+    @State private var selectedDashboardTask: MaintenanceTaskDBRow?
     @AppStorage("hasSeenSecurityBadge") private var hasSeenSecurityBadge = false
     @State private var gettingStartedExpanded = false
     @State private var showServiceContractSheet = false
@@ -23,6 +24,12 @@ struct DashboardView: View {
     @State private var showQuickProjectEntry = false
     @State private var quickProjectPrefill: String = ""
     @AppStorage("hasSeenEmailCallout") private var hasSeenEmailCallout = false
+    @State private var showFamilyMemberForm = false
+    @State private var selectedMemberForProfile: FamilyMemberRow?
+    @State private var showAddressCompletion = false
+    @State private var activeQuizProperty: PropertyRow?
+    @State private var showQuizSkipDialog = false
+    @AppStorage("hasSkippedHouseQuizForever") private var hasSkippedHouseQuizForever = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -36,10 +43,43 @@ struct DashboardView: View {
                         SkeletonCard(lineCount: 2)
                         SkeletonCard(lineCount: 3)
                     } else {
-                        // Greeting
+                        // 1. Greeting
                         greetingView
 
-                        // Inbox items from forwarded emails
+                        // 1.5 Incomplete address banner
+                        if let property = viewModel.propertyNeedsAddress {
+                            incompleteAddressBanner(property)
+                        }
+
+                        // 2. Pending merge request banner
+                        if let merge = pendingMergeRequest {
+                            mergeRequestBanner(merge)
+                        }
+
+                        // 3. Household strip
+                        HouseholdStrip(
+                            members: viewModel.familyMembers,
+                            currentUserName: viewModel.userFirstName,
+                            onMemberTapped: { member in
+                                selectedMemberForProfile = member
+                            },
+                            onAddTapped: {
+                                showFamilyMemberForm = true
+                            },
+                            onManageTapped: {
+                                showSettings = true
+                            }
+                        )
+
+                        // 4. Expecting members
+                        ForEach(viewModel.expectingMembers) { member in
+                            NavigationLink(value: "expecting_\(member.id.uuidString)") {
+                                expectingCard(member: member)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        // 5. Incoming items (inbox banners)
                         if !viewModel.inboxItems.isEmpty {
                             inboxSection
                         }
@@ -49,42 +89,39 @@ struct DashboardView: View {
                             emailForwardingCallout
                         }
 
-                        // Pending merge request banner
-                        if let merge = pendingMergeRequest {
-                            mergeRequestBanner(merge)
-                        }
-
-                        // Expecting members — preparation cards
-                        ForEach(viewModel.expectingMembers) { member in
-                            NavigationLink(value: "expecting_\(member.id.uuidString)") {
-                                expectingCard(member: member)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        // Getting Started Guide — shows when user is new
+                        // 6. Getting Started OR Recommendations
                         if viewModel.showGettingStarted {
                             gettingStartedCard
                         } else if !viewModel.recommendations.isEmpty {
                             recommendationsCard
                         }
 
-                        // Home profile enrichment cards
-                        enrichmentCardsSection
+                        // 7. (House Quiz hero card replaces the legacy "Tell Us More" enrichment cards.)
 
-                        // HOME MAINTENANCE — hero card, first priority
+                        // 8. HOME MAINTENANCE hero card
                         homeMaintenanceCard
 
-                        // "What If?" Scenario Card — high visibility
-                        whatIfCard
-
-                        // REQUIRES ATTENTION — unified, max 3 items, all tappable
-                        RequiresAttentionSection(
-                            expirations: viewModel.upcomingExpirations,
-                            upcomingTasks: viewModel.allUpcomingTasks
+                        // 9. Unified "Needs Your Attention" list
+                        UnifiedAttentionList(
+                            items: viewModel.unifiedAttentionItems,
+                            onItemTapped: { item in
+                                if case .vehicleAlert = item.kind {
+                                    navigationPath.append("vehicles")
+                                }
+                            },
+                            onSeeAll: {
+                                navigationPath.append("maintenance")
+                            },
+                            onDeleteTask: { task in
+                                Task {
+                                    try? await DatabaseService.shared.deleteMaintenanceTask(id: task.id)
+                                    Haptics.success()
+                                    await viewModel.refresh()
+                                }
+                            }
                         )
 
-                        // Quick Actions
+                        // 10. Quick Actions
                         QuickActions(
                             onUploadDocument: { showUploadDocument = true },
                             onAddProperty: { showAddProperty = true },
@@ -101,13 +138,16 @@ struct DashboardView: View {
                             hasProperty: viewModel.hasProperty
                         )
 
-                        // ESTATE READINESS (uses shared vault view model for consistent levels)
+                        // 11. Estate readiness (compact)
                         NavigationLink(value: "estate_readiness") {
-                            CompletionScorecard(vaultViewModel: vaultViewModel)
+                            compactEstateScorecard
                         }
                         .buttonStyle(.plain)
 
-                        // Security trust badge — dismissible
+                        // 12. Scenario Planning (slim single-row)
+                        compactScenarioCard
+
+                        // 13. Security trust badge
                         if !hasSeenSecurityBadge {
                             securityBadge
                                 .overlay(alignment: .topTrailing) {
@@ -148,6 +188,25 @@ struct DashboardView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
+                        Menu {
+                            Button {
+                                Haptics.light()
+                                showUploadDocument = true
+                            } label: {
+                                Label("Upload Document", systemImage: "doc.badge.plus")
+                            }
+                            Button {
+                                Haptics.light()
+                                navigationPath.append("maintenance")
+                            } label: {
+                                Label("View Tasks", systemImage: "checklist")
+                            }
+                        } label: {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 20, weight: .semibold))
+                                .foregroundStyle(HavenColors.navy800)
+                        }
+
                         NavigationLink(value: "inbox") {
                             ZStack(alignment: .topTrailing) {
                                 Image(systemName: "tray.fill")
@@ -201,6 +260,14 @@ struct DashboardView: View {
                     Task { await viewModel.refresh() }
                 })
             }
+            .sheet(item: $selectedDashboardTask) { task in
+                NavigationStack {
+                    MaintenanceTaskDetailSheet(task: task, onTaskCompleted: {
+                        Task { await viewModel.refresh() }
+                    })
+                }
+                .presentationDetents([.medium, .large])
+            }
             .navigationDestination(for: String.self) { destination in
                 if destination == "inbox" {
                     InboxView()
@@ -213,19 +280,32 @@ struct DashboardView: View {
                         .environmentObject(vaultViewModel)
                 } else if destination == "email_forwarding" {
                     ProjectEmailView()
+                } else if destination == "vehicles" {
+                    if let firstVehicle = viewModel.vehicles.first {
+                        VehicleDetailView(vehicleID: firstVehicle.id)
+                    } else {
+                        PropertyListView()
+                    }
                 } else if destination.hasPrefix("inbox_item_"),
                           let itemId = UUID(uuidString: String(destination.dropFirst("inbox_item_".count))),
                           let item = viewModel.inboxItems.first(where: { $0.id == itemId }) {
                     InboxItemDetailView(
                         item: item,
                         properties: viewModel.properties,
-                        onProcess: { propertyId, action, category in
+                        onProcess: { propertyId, action, category, vehicleId in
                             Task {
                                 await viewModel.processInboxItem(item, propertyId: propertyId, action: action, category: category)
                             }
                         },
                         onDismiss: {
                             viewModel.dismissInboxItem(item)
+                        },
+                        onDelete: {
+                            viewModel.inboxItems.removeAll { $0.id == item.id }
+                            Haptics.success()
+                            Task {
+                                try? await DatabaseService.shared.deleteInboxItem(id: item.id)
+                            }
                         }
                     )
                 } else if destination.hasPrefix("expecting_"),
@@ -267,8 +347,36 @@ struct DashboardView: View {
                     )
                 }
             }
+            .sheet(isPresented: $showFamilyMemberForm) {
+                NavigationStack {
+                    FamilyMemberFormView(onSave: {
+                        Task { await viewModel.refresh() }
+                    })
+                }
+            }
+            .sheet(item: $selectedMemberForProfile) { member in
+                NavigationStack {
+                    FamilyMemberProfileView(member: member)
+                }
+                .presentationDetents([.large])
+            }
             .fullScreenCover(isPresented: $showScenarioStudio) {
                 ScenarioStudioView()
+            }
+            .fullScreenCover(item: $activeQuizProperty) { property in
+                HouseQuizView(property: property)
+            }
+            .confirmationDialog("Skip the House Quiz?", isPresented: $showQuizSkipDialog, titleVisibility: .visible) {
+                Button("Skip for now") {
+                    // Just dismisses the card for this session — re-shows next launch.
+                }
+                Button("Skip forever", role: .destructive) {
+                    hasSkippedHouseQuizForever = true
+                    Analytics.track(.quizDismissed, ["scope": "forever"])
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("Skip for now will resurface the quiz on next launch. Skip forever means you'll add this data manually.")
             }
             .trackScreen("Dashboard")
             .refreshable {
@@ -297,6 +405,23 @@ struct DashboardView: View {
                     navigationPath = NavigationPath()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: .navigateToInboxItem)) { notification in
+                if let documentId = notification.userInfo?["documentId"] as? UUID {
+                    // Find the inbox item for this document
+                    if let item = viewModel.inboxItems.first(where: { $0.relatedDocumentId == documentId }) {
+                        navigationPath.append("inbox_item_\(item.id.uuidString)")
+                    } else {
+                        // Item may not be loaded yet -- reload and retry
+                        Task {
+                            await viewModel.loadInboxItems()
+                            try? await Task.sleep(nanoseconds: 300_000_000)
+                            if let item = viewModel.inboxItems.first(where: { $0.relatedDocumentId == documentId }) {
+                                navigationPath.append("inbox_item_\(item.id.uuidString)")
+                            }
+                        }
+                    }
+                }
+            }
             .fullScreenCover(isPresented: $showMergeResolution) {
                 if let preview = mergePreviewResponse,
                    let requestId = pendingMergeRequest?["id"] as? String {
@@ -319,6 +444,43 @@ struct DashboardView: View {
     // MARK: - Greeting
 
     // MARK: - Inbox Section
+
+    private var vehicleAlertsCard: some View {
+        NavigationLink(value: "vehicles") {
+            HavenCard {
+                HStack(spacing: 12) {
+                    Image(systemName: "car.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(viewModel.unresolvedVehicleRecalls > 0 ? HavenColors.critical : HavenColors.warning)
+                        .frame(width: 36, height: 36)
+                        .background((viewModel.unresolvedVehicleRecalls > 0 ? HavenColors.critical : HavenColors.warning).opacity(0.1))
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                    VStack(alignment: .leading, spacing: 2) {
+                        if viewModel.unresolvedVehicleRecalls > 0 {
+                            Text("\(viewModel.unresolvedVehicleRecalls) Open Vehicle Recall\(viewModel.unresolvedVehicleRecalls == 1 ? "" : "s")")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        } else {
+                            Text("Vehicle Attention Needed")
+                                .font(HavenTypography.headline)
+                                .foregroundStyle(HavenColors.textPrimary)
+                        }
+                        Text("Tap to view details")
+                            .font(HavenTypography.caption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    Spacer()
+
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 12))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .buttonStyle(.plain)
+    }
 
     private var inboxSection: some View {
         VStack(spacing: HavenTheme.spacing8) {
@@ -470,16 +632,12 @@ struct DashboardView: View {
     private var homeMaintenanceCard: some View {
         NavigationLink(value: "maintenance") {
             VStack(spacing: HavenTheme.spacing16) {
-                HStack(spacing: HavenTheme.spacing24) {
+                HStack {
                     VStack(alignment: .leading, spacing: 4) {
-                        Text("PROPERTY")
+                        Text("YOUR HOME")
                             .font(.system(size: 10, weight: .semibold))
                             .tracking(1.5)
                             .foregroundStyle(Color.white.opacity(0.35))
-
-                        Text("TO DO")
-                            .font(HavenTypography.uiLabelSmall)
-                            .foregroundStyle(Color.white.opacity(0.7))
 
                         if viewModel.overdueMaintenanceTasks.isEmpty && viewModel.allUpcomingTasks.isEmpty {
                             Text("All caught up!")
@@ -487,14 +645,8 @@ struct DashboardView: View {
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
-                        } else if !viewModel.overdueMaintenanceTasks.isEmpty {
-                            Text("\(viewModel.overdueMaintenanceTasks.count) overdue")
-                                .font(Font.custom("Georgia-Bold", size: 20))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
                         } else {
-                            Text("\(viewModel.allUpcomingTasks.count) upcoming")
+                            Text("\(viewModel.dueThisMonthTasks.count) tasks this month")
                                 .font(Font.custom("Georgia-Bold", size: 20))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
@@ -505,37 +657,50 @@ struct DashboardView: View {
                     Spacer()
 
                     HStack(spacing: 10) {
-                        maintenanceHeroPill(
-                            count: viewModel.overdueMaintenanceTasks.count,
-                            label: "Overdue",
-                            color: viewModel.overdueMaintenanceTasks.count > 0 ? Color.red.opacity(0.9) : Color.white.opacity(0.2)
-                        )
-                        maintenanceHeroPill(
-                            count: viewModel.dueThisMonthTasks.count,
-                            label: "This Month",
-                            color: Color.white.opacity(0.2)
-                        )
+                        // Only show overdue pill when count > 0
+                        if viewModel.overdueMaintenanceTasks.count > 0 {
+                            maintenanceHeroPill(
+                                count: viewModel.overdueMaintenanceTasks.count,
+                                label: "Overdue",
+                                color: Color.red.opacity(0.9)
+                            )
+                        }
+                        // Total count as subtle pill
+                        let totalCount = viewModel.allUpcomingTasks.count + viewModel.overdueMaintenanceTasks.count
+                        if totalCount > 0 {
+                            maintenanceHeroPill(
+                                count: totalCount,
+                                label: "Total",
+                                color: Color.white.opacity(0.2)
+                            )
+                        }
                     }
                 }
 
                 if let next = viewModel.nextUpcomingTask {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.right.circle")
-                            .font(.caption)
-                            .foregroundStyle(Color.white.opacity(0.6))
-                        Text("Next: \(next.title)")
-                            .font(HavenTypography.uiLabelSmall)
-                            .foregroundStyle(Color.white.opacity(0.8))
-                        Spacer()
-                        HStack(spacing: 4) {
-                            Text(next.nextDueDate.havenDateShort)
-                                .font(HavenTypography.uiCaption)
+                    Button {
+                        selectedDashboardTask = next
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.right.circle")
+                                .font(.caption)
                                 .foregroundStyle(Color.white.opacity(0.6))
-                            Image(systemName: "chevron.right")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(Color.white.opacity(0.5))
+                            Text("Next: \(next.title.summarized(maxLength: 40))")
+                                .font(HavenTypography.uiLabelSmall)
+                                .foregroundStyle(Color.white.opacity(0.8))
+                                .lineLimit(1)
+                            Spacer()
+                            HStack(spacing: 4) {
+                                Text(next.nextDueDate.havenDateShort)
+                                    .font(HavenTypography.uiCaption)
+                                    .foregroundStyle(Color.white.opacity(0.6))
+                                Image(systemName: "chevron.right")
+                                    .font(.system(size: 10, weight: .semibold))
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                            }
                         }
                     }
+                    .buttonStyle(.plain)
                 }
             }
             .padding(HavenTheme.spacing20)
@@ -549,7 +714,6 @@ struct DashboardView: View {
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
-                    // House silhouette — branded property motif
                     Image(systemName: "house.fill")
                         .resizable()
                         .aspectRatio(contentMode: .fit)
@@ -678,31 +842,23 @@ struct DashboardView: View {
 
     // MARK: - Getting Started
 
-    /// The name of the top missing document for Alfred's micro-action prompt
-    private var topMissingDocumentName: String {
-        vaultViewModel.highestImpactMissing.first?.category ?? "Homeowners Insurance"
-    }
-
-    /// Contextual copy for Alfred's micro-action prompt based on the missing document
-    private var alfredPromptCopy: String {
-        let docName = topMissingDocumentName
-        if vaultViewModel.documents.isEmpty {
-            return "Your property baseline is set. To unlock your financial gap analysis, tap here to scan your \(docName)."
-        } else {
-            return "Great progress! Upload your \(docName) to strengthen your estate protection."
-        }
-    }
-
     @ViewBuilder
     private var gettingStartedCard: some View {
         if viewModel.hasProperty && !viewModel.hasDocuments {
-            // Alfred's personalized "one thing" prompt — replaces generic checklist
-            alfredNextActionCard
+            // House Quiz hero (replaces the old Alfred Scan-Will prompt) — one
+            // card per property that hasn't completed the quiz yet.
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                gettingStartedHeader(completed: 1)
+                houseQuizHeroCardStack
+            }
         } else if viewModel.hasProperty && viewModel.hasDocuments && !viewModel.hasUsedAlfred {
             // Only Alfred left — simple nudge
-            HavenCard {
-                VStack(alignment: .leading, spacing: 12) {
-                    gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: false, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                gettingStartedHeader(completed: 2)
+                HavenCard {
+                    VStack(alignment: .leading, spacing: 12) {
+                        gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: false, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
+                    }
                 }
             }
         } else {
@@ -751,41 +907,89 @@ struct DashboardView: View {
         }
     }
 
-    /// Alfred's personalized micro-action card — asks for one specific high-value document
-    private var alfredNextActionCard: some View {
-        HavenCard {
-            VStack(alignment: .leading, spacing: 12) {
+    /// One House Quiz hero card per property that hasn't completed the quiz.
+    /// Cards stack vertically; each property's progress is tracked independently.
+    @ViewBuilder
+    private var houseQuizHeroCardStack: some View {
+        let incomplete = viewModel.properties.filter { property in
+            (property.houseQuizState?.completedAt) == nil
+        }
+        ForEach(incomplete) { property in
+            houseQuizHeroCard(for: property)
+        }
+    }
+
+    private func houseQuizHeroCard(for property: PropertyRow) -> some View {
+        let state = property.houseQuizState ?? HouseQuizState()
+        let total = HouseQuizQuestionLibrary.allQuestions.count
+        let answered = state.answers.count
+        let saved = state.savedForLater.count
+        let completion = total > 0 ? Double(answered) / Double(total) : 0
+        let isResume = answered > 0
+        let title = "Start Quiz for \(property.name)"
+        let progressLabel = isResume
+            ? "\(answered) of \(total) done · \(saved) saved for later"
+            : "30 quick questions, about 4 minutes."
+
+        return HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
                 HStack(spacing: 8) {
-                    Image(systemName: "sparkles")
-                        .font(.system(size: 18))
-                        .foregroundStyle(HavenColors.navy700)
-                    Text("Alfred")
-                        .font(Font.custom("Georgia-Bold", size: 15))
+                    AlfredLogoView(size: 24)
+                    Text(title)
+                        .font(HavenTypography.title2)
                         .foregroundStyle(HavenColors.navy800)
+                        .lineLimit(2)
                 }
 
-                Text(alfredPromptCopy)
+                Text("Help us tailor your maintenance plan, systems, and recommendations to your home.")
                     .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textPrimary)
+                    .foregroundStyle(HavenColors.textSecondary)
 
-                Button {
-                    Haptics.light()
-                    Analytics.track(.dashboardGettingStartedItemTapped, ["step": "alfred_next_action", "document": topMissingDocumentName])
-                    showUploadDocument = true
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "doc.badge.plus")
-                            .font(.system(size: 13))
-                        Text("Scan \(topMissingDocumentName)")
-                            .font(HavenTypography.uiLabel)
+                Text(progressLabel)
+                    .font(HavenTypography.uiLabelMedium)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(HavenColors.beige200)
+                        .frame(height: 6)
+                    GeometryReader { geo in
+                        RoundedRectangle(cornerRadius: 3)
+                            .fill(HavenColors.navy800)
+                            .frame(width: max(0, geo.size.width * completion), height: 6)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(HavenColors.navy)
-                    .clipShape(Capsule())
+                    .frame(height: 6)
                 }
+
+                HavenButton(title: isResume ? "Continue Quiz" : "Start Quiz") {
+                    activeQuizProperty = property
+                }
+
+                Button("Skip for now") {
+                    showQuizSkipDialog = true
+                }
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.textTertiary)
+                .frame(maxWidth: .infinity)
             }
+        }
+        .havenShadow()
+    }
+
+    private func gettingStartedHeader(completed: Int) -> some View {
+        HStack(spacing: 8) {
+            Text("GETTING STARTED")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("\(completed)/3")
+                .font(.system(size: 10, weight: .bold, design: .rounded))
+                .foregroundStyle(HavenColors.textTertiary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(HavenColors.beige200)
+                .clipShape(Capsule())
+            Spacer()
         }
     }
 
@@ -989,84 +1193,18 @@ struct DashboardView: View {
         }
     }
 
-    // MARK: - Enrichment Cards
-
-    @ViewBuilder
-    private var enrichmentCardsSection: some View {
-        let questions = viewModel.enrichmentQuestions
-        if !questions.isEmpty {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                Text("TELL US MORE")
-                    .font(HavenTypography.uiSectionHeader)
-                    .tracking(1.5)
-                    .foregroundStyle(HavenColors.textTertiary)
-
-                ForEach(questions) { question in
-                    EnrichmentCardView(
-                        question: question,
-                        onAnswer: { answer in
-                            handleEnrichmentAnswer(questionId: question.id, answer: answer, attributeKey: question.attributeKey)
-                        },
-                        onDismiss: {
-                            viewModel.dismissEnrichmentCard(question.id)
-                        },
-                        onServiceSetup: { serviceType in
-                            Analytics.track(.dashboardEnrichmentCardTapped, ["card_id": question.id, "action": "service_setup", "service_type": serviceType])
-                            serviceContractType = serviceType
-                            showServiceContractSheet = true
-                        },
-                        onApplianceSetup: {
-                            Analytics.track(.dashboardEnrichmentCardTapped, ["card_id": question.id, "action": "appliance_setup"])
-                            showApplianceSetup = true
-                        },
-                        onProjectExplore: { title in
-                            quickProjectPrefill = title
-                            showQuickProjectEntry = true
-                        }
-                    )
-                }
-            }
-        }
-    }
-
-    private func handleEnrichmentAnswer(questionId: String, answer: String, attributeKey: String?) {
-        Analytics.track(.dashboardEnrichmentCardSubmitted, ["question_id": questionId, "answer": answer])
-        guard let propertyId = viewModel.primaryPropertyId else { return }
-        let key = attributeKey ?? questionId
-
-        // "not_sure" and "none" values still get saved so the question doesn't reappear
-        let value: FlexibleValue = (answer == "true" || answer == "false")
-            ? .bool(answer == "true")
-            : .string(answer)
-
-        Task {
-            do {
-                _ = try await DatabaseService.shared.updatePropertyAttribute(
-                    propertyId: propertyId,
-                    key: key,
-                    value: value
-                )
-                // Apply post-answer maintenance adjustments
-                await EnrichmentActions.applyEnrichment(
-                    questionId: questionId,
-                    answer: answer,
-                    propertyId: propertyId,
-                    householdId: viewModel.primaryHouseholdId ?? propertyId,
-                    homeSystems: viewModel.homeSystems
-                )
-                // Delay refresh so card dismiss animation completes before view recreation
-                try? await Task.sleep(for: .seconds(0.5))
-                await viewModel.refresh()
-            } catch {
-                print("[Enrichment] Failed to save \(key): \(error)")
-            }
-        }
-    }
+    // (Enrichment cards section removed — replaced by the House Quiz hero card.)
 
     private func handleRecommendationAction(_ action: RecommendationAction) {
         switch action {
         case .navigate(let tab):
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": tab])
+        case .navigateToProperty(let section):
+            // Switch to Property tab and tell PropertyDetailView which section to open
+            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                NotificationCenter.default.post(name: .navigateToPropertySection, object: nil, userInfo: ["section": section])
+            }
         case .addProperty:
             showAddProperty = true
         case .uploadDocument:
@@ -1078,7 +1216,7 @@ struct DashboardView: View {
         case .runGapAnalysis:
             NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
         case .setReminders:
-            NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+            showSettings = true
         case .runScenario:
             showScenarioStudio = true
         case .openSettings:
@@ -1168,6 +1306,159 @@ struct DashboardView: View {
         } catch {
             print("[Dashboard] Decline failed: \(error)")
         }
+    }
+
+    // MARK: - Incomplete Address Banner
+
+    private func incompleteAddressBanner(_ property: PropertyRow) -> some View {
+        Button {
+            Haptics.light()
+            showAddressCompletion = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "location.fill")
+                    .font(.system(size: 18))
+                    .foregroundStyle(HavenColors.warning)
+                    .frame(width: 36, height: 36)
+                    .background(HavenColors.warning.opacity(0.1))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Complete your address")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text("\(property.name) needs a street address for property data and maintenance tracking.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .lineLimit(2)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing12)
+            .background(HavenColors.warning.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.warning.opacity(0.2), lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showAddressCompletion) {
+            NavigationStack {
+                AddressCompletionSheet(property: property, onComplete: {
+                    Task { await viewModel.refresh() }
+                })
+            }
+        }
+    }
+
+    // MARK: - Compact Estate Scorecard
+
+    private var compactEstateScorecard: some View {
+        let level = vaultViewModel.currentLevel
+        let progress = vaultViewModel.levelProgress
+        let levelColor: Color = level.id == 1 ? HavenColors.beige300 : level.color.color
+
+        return HStack(spacing: 12) {
+            Image(systemName: level.icon)
+                .font(.system(size: 18))
+                .foregroundStyle(levelColor)
+                .frame(width: 36, height: 36)
+                .background(levelColor.opacity(0.15))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(level.name)
+                    .font(HavenTypography.uiLabel)
+                    .foregroundStyle(HavenColors.textOnNavy)
+                if let next = vaultViewModel.nextLevel {
+                    Text("\(Int(progress * 100))% to \(next.name)")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.beige300)
+                } else {
+                    Text("Max Level!")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.beige300)
+                }
+            }
+
+            Spacer()
+
+            // Compact progress bar
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color.white.opacity(0.12))
+                        .frame(height: 6)
+                    Capsule()
+                        .fill(levelColor)
+                        .frame(width: geo.size.width * progress, height: 6)
+                }
+            }
+            .frame(width: 60, height: 6)
+
+            Image(systemName: "chevron.right")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(HavenColors.beige300)
+        }
+        .padding(.horizontal, HavenTheme.spacing16)
+        .padding(.vertical, 14)
+        .background(HavenColors.navy)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+    }
+
+    // MARK: - Compact Scenario Card
+
+    private var compactScenarioCard: some View {
+        Button {
+            Haptics.light()
+            Analytics.track(.scenarioStudioOpened, ["source": "dashboard_compact_card"])
+            showScenarioStudio = true
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "sparkles")
+                    .font(.system(size: 16))
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(width: 32, height: 32)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Scenario Planning")
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    if viewModel.documentCount < 3 {
+                        Text("Upload more documents to unlock simulations")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    } else {
+                        Text("Explore what-if questions with your real data")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(.horizontal, HavenTheme.spacing16)
+            .padding(.vertical, 12)
+            .background(HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.beige200, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Security Trust Badge
