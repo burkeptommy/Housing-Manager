@@ -295,8 +295,73 @@ struct UtilityProviderSearchPicker: View {
         do {
             let providers = try await DatabaseService.shared.fetchUtilityProviders(types: providerTypes)
             allProviders = providers
+            // Phase 18d: lazy logo enrichment. Any provider in this category
+            // that's still missing a logo gets a background Brandfetch lookup
+            // so the next picker render shows it. Capped at 6 concurrent
+            // lookups to be polite to Brandfetch's rate limit; one fire-and
+            // -forget pass per .task(id:) load is more than enough since the
+            // server-side enrich-provider-logos function handles bulk catch
+            // up via ops.
+            Task.detached { [providers] in
+                await Self.enrichMissingLogos(providers: providers)
+            }
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    /// Phase 18d: Background enrichment for any provider in the loaded list
+    /// that's missing a logo. Runs detached so it doesn't block the picker
+    /// from rendering. Patches the catalog row directly so subsequent users
+    /// (and the next render of this picker) see the brand identity. Failures
+    /// are silent — Brandfetch downtime should never break the quiz.
+    private static func enrichMissingLogos(providers: [UtilityProviderRow]) async {
+        let needsLogo = providers.filter { $0.logoUrl == nil && $0.website != nil }
+        guard !needsLogo.isEmpty else { return }
+
+        // Cap concurrency at 6 so we don't drown Brandfetch's rate limit.
+        // Take the first 20 to bound work per render — repeat picker visits
+        // gradually backfill the rest.
+        let batch = Array(needsLogo.prefix(20))
+        await withTaskGroup(of: Void.self) { group in
+            var inFlight = 0
+            for provider in batch {
+                if inFlight >= 6 {
+                    await group.next()
+                    inFlight -= 1
+                }
+                group.addTask {
+                    await enrichOne(provider)
+                }
+                inFlight += 1
+            }
+        }
+    }
+
+    private static func enrichOne(_ provider: UtilityProviderRow) async {
+        guard let website = provider.website else { return }
+        let domain = website
+            .replacingOccurrences(of: "https://", with: "")
+            .replacingOccurrences(of: "http://", with: "")
+            .components(separatedBy: "/")
+            .first?
+            .replacingOccurrences(of: "www.", with: "") ?? ""
+        guard !domain.isEmpty else { return }
+
+        do {
+            let response = try await HavenSupabase.fetchBrandLogo(domain: domain)
+            let resolvedLogo = response.logoUrl ?? response.iconUrl
+            // Only patch when Brandfetch returned at least one signal worth
+            // snapshotting; otherwise leave the row alone so the next pass
+            // can try again later.
+            guard resolvedLogo != nil || response.brandColor != nil else { return }
+            try await DatabaseService.shared.updateUtilityProviderLogo(
+                id: provider.id,
+                logoUrl: resolvedLogo,
+                brandColor: response.brandColor
+            )
+        } catch {
+            // Silent failure — never block the quiz on Brandfetch downtime.
         }
     }
 }

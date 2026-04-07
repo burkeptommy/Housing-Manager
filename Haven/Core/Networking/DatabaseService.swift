@@ -742,6 +742,32 @@ final class DatabaseService {
         return try await fetchUtilityProviderBySlug(slug)
     }
 
+    /// Phase 18d: Patch a utility_providers row with a fresh logo URL and
+    /// brand color. Used by the picker's lazy enrichment path so visiting
+    /// the picker for a category triggers Brandfetch backfills for any rows
+    /// still missing logos. Server-side enrich-provider-logos handles bulk
+    /// catch-up; this client-side path keeps the picker self-healing for
+    /// new providers added after the bulk run.
+    func updateUtilityProviderLogo(
+        id: UUID,
+        logoUrl: String?,
+        brandColor: String?
+    ) async throws {
+        struct LogoPayload: Encodable {
+            let logoUrl: String?
+            let brandColor: String?
+            enum CodingKeys: String, CodingKey {
+                case logoUrl = "logo_url"
+                case brandColor = "brand_color"
+            }
+        }
+        let payload = LogoPayload(logoUrl: logoUrl, brandColor: brandColor)
+        try await from("utility_providers")
+            .update(payload)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     /// Insert a user-supplied utility provider into the global catalog. Used
     /// by UtilityProviderCustomAddSheet for the "didn't find yours? Add it"
     /// path. Slug is derived from the name; if the insert hits a unique
