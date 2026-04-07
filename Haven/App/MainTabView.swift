@@ -17,6 +17,9 @@ extension Notification.Name {
     static let navigateToVehicle = Notification.Name("navigateToVehicle")
     static let navigateToInboxItem = Notification.Name("navigateToInboxItem")
     static let navigateToPropertySection = Notification.Name("navigateToPropertySection")
+
+    // Invite + onboarding
+    static let inviteCodeReceived = Notification.Name("inviteCodeReceived")
 }
 
 struct MainTabView: View {

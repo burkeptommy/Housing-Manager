@@ -125,8 +125,33 @@ final class OnboardingViewModel: ObservableObject {
 
     // MARK: - Invitation Handling
 
-    /// Check if the current user's email has a pending invitation
+    /// Resolve any pending invitation that should auto-link this newly-signed-up
+    /// user to an existing household.
+    ///
+    /// Resolution order:
+    ///   1. UserDefaults `pending_invite_code` — set when the user verified
+    ///      a code in the InviteCodeEntrySheet OR a universal link delivered
+    ///      one before sign-up.
+    ///   2. Email match against the household_invitations table — covers the
+    ///      case where Tom invited Sarah but she signed up with the same email
+    ///      without ever opening the invite link.
     func checkForInvitation() async {
+        let defaults = UserDefaults.standard
+
+        // Path 1: cached, verified invite code wins.
+        if defaults.bool(forKey: PendingInviteKeys.hasPendingInvite),
+           let cachedCode = defaults.string(forKey: PendingInviteKeys.code), !cachedCode.isEmpty {
+            do {
+                if let invitation = try await DatabaseService.shared.lookupInviteCode(cachedCode) {
+                    pendingInvitation = invitation
+                    return
+                }
+            } catch {
+                print("[Onboarding] Cached invite code lookup failed: \(error)")
+            }
+        }
+
+        // Path 2: email match fallback.
         do {
             let session = try await HavenSupabase.auth.session
             let email = session.user.email ?? ""
@@ -159,6 +184,20 @@ final class OnboardingViewModel: ObservableObject {
                 invitationId: invitation.id,
                 userId: userId
             )
+
+            // Phase 9 will read this flag from UserDefaults to surface the
+            // 5-question personal quiz on the dashboard. We set it here at
+            // accept time and Phase 9 will provide the migration that copies
+            // it onto the users row server-side.
+            let defaults = UserDefaults.standard
+            defaults.set(true, forKey: PendingInviteKeys.needsPersonalQuiz)
+            defaults.removeObject(forKey: PendingInviteKeys.code)
+            defaults.set(false, forKey: PendingInviteKeys.hasPendingInvite)
+
+            Analytics.track(.householdInviteAccepted, [
+                "invitation_id": invitation.id.uuidString,
+                "via_cached_code": defaults.string(forKey: PendingInviteKeys.code) != nil,
+            ])
 
             // Complete — skip all onboarding
             authService.needsOnboarding = false

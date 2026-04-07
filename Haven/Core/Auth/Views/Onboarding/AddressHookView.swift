@@ -8,6 +8,8 @@ struct AddressHookView: View {
     let onSignIn: () -> Void
 
     @StateObject private var viewModel = AddressHookViewModel()
+    @State private var showInviteCodeSheet: Bool = false
+    @State private var inviteCodePrefill: String? = nil
 
     var body: some View {
         NavigationStack {
@@ -46,6 +48,34 @@ struct AddressHookView: View {
             .background(HavenColors.background)
         }
         .trackScreen("AddressHookView")
+        .sheet(isPresented: $showInviteCodeSheet) {
+            InviteCodeEntrySheet(
+                onAcceptInvitation: {
+                    showInviteCodeSheet = false
+                    onCreateAccount()
+                },
+                initialCode: inviteCodePrefill
+            )
+            .presentationDetents([.medium, .large])
+        }
+        .task {
+            // If a universal-link or app-launch handler stashed a code in
+            // UserDefaults before this view appeared, surface the sheet right
+            // away with the code pre-filled.
+            let defaults = UserDefaults.standard
+            if defaults.bool(forKey: PendingInviteKeys.hasPendingInvite),
+               let code = defaults.string(forKey: PendingInviteKeys.code),
+               !code.isEmpty {
+                inviteCodePrefill = code
+                showInviteCodeSheet = true
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .inviteCodeReceived)) { note in
+            if let code = note.object as? String, !code.isEmpty {
+                inviteCodePrefill = code
+                showInviteCodeSheet = true
+            }
+        }
     }
 
     // MARK: - Address Step
@@ -101,6 +131,30 @@ struct AddressHookView: View {
         }
     }
 
+    // MARK: - Tertiary Link Row
+
+    private var tertiaryLinks: some View {
+        HStack(spacing: HavenTheme.spacing16) {
+            Button("I already have an account") {
+                viewModel.cacheToUserDefaults()
+                onSignIn()
+            }
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textSecondary)
+
+            Text("·")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            Button("I have an invite code") {
+                inviteCodePrefill = nil
+                showInviteCodeSheet = true
+            }
+            .font(HavenTypography.bodySmall)
+            .foregroundStyle(HavenColors.textSecondary)
+        }
+    }
+
     // MARK: - Bottom Buttons
 
     private var bottomButtons: some View {
@@ -121,11 +175,8 @@ struct AddressHookView: View {
                 }
                 .disabled(!viewModel.canProceed)
 
-                Button("I already have an account") {
-                    onSignIn()
-                }
-                .font(HavenTypography.bodySmall)
-                .foregroundStyle(HavenColors.textSecondary)
+                tertiaryLinks
+                    .padding(.top, 4)
 
             case .preview:
                 if !viewModel.isLookingUpProperty {
@@ -134,12 +185,8 @@ struct AddressHookView: View {
                         onCreateAccount()
                     }, icon: "arrow.right")
 
-                    Button("I already have an account") {
-                        viewModel.cacheToUserDefaults()
-                        onSignIn()
-                    }
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textSecondary)
+                    tertiaryLinks
+                        .padding(.top, 4)
 
                     Button("Back") {
                         viewModel.currentStep = .address

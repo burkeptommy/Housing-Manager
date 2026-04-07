@@ -195,6 +195,7 @@
 		C00E1EE90D914C08E76A9115 /* SmartRecommendations.swift in Sources */ = {isa = PBXBuildFile; fileRef = F69721BE038945C484C8A8DF /* SmartRecommendations.swift */; };
 		C05BFF1A06A535C280008996 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 46905EFC24FB1AD4C663EE7E /* APIClient.swift */; };
 		C1AFB2AF089C79FAAB1733DA /* HomeSystemsSetupView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80D7EC16E721771162A2470F /* HomeSystemsSetupView.swift */; };
+		C2412C3698DE827CA4FC9B9E /* InviteCodeEntrySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */; };
 		C24F925295C3C5E8BD186CE5 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 49A386B96B48E7C9344912AC /* Supabase */; };
 		C2F088E42D4171836E3A2D2B /* ProcessingBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = B31B7C57764591968933F9EF /* ProcessingBanner.swift */; };
 		C524CCA7C80E5C5AA342836E /* DuplicateResolutionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 575CB0AF41CFC5F58F8CD3D8 /* DuplicateResolutionSheet.swift */; };
@@ -333,6 +334,7 @@
 		4B06503ADB172DFB9879D8B8 /* BiometricAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthView.swift; sourceTree = "<group>"; };
 		4C55BD89D3FF9E725F8E5B37 /* ScenarioStudioViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioViewModel.swift; sourceTree = "<group>"; };
 		4CEEF4793EF037DC223ABD08 /* EditProjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProjectSheet.swift; sourceTree = "<group>"; };
+		4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeEntrySheet.swift; sourceTree = "<group>"; };
 		4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCategoryGroups.swift; sourceTree = "<group>"; };
 		4E7A7A395DB576CBE9BA310F /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		518F88EE5413D96632C93167 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
@@ -521,6 +523,7 @@
 			children = (
 				43F5571589E414F74E0C5700 /* AddressHookView.swift */,
 				03BFF144BC77F27E46ABFFFB /* FeatureValueLibrary.swift */,
+				4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */,
 				8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */,
 				ED31080548558D40FC07ED45 /* OnboardingSchedulePreviewStep.swift */,
 				0D0451B033C02044D1EDA105 /* OnboardingSteps.swift */,
@@ -1343,6 +1346,7 @@
 				6C046691D730EF83B0A6166C /* InboxView.swift in Sources */,
 				4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */,
 				4F635BA08AD5878571AA4CF8 /* InvestmentSummaryCard.swift in Sources */,
+				C2412C3698DE827CA4FC9B9E /* InviteCodeEntrySheet.swift in Sources */,
 				B27900B15FE1C8EEA2335D58 /* InviteResultConfirmationCard.swift in Sources */,
 				106EA91F8D805228449E1591 /* InviteToHavenSheet.swift in Sources */,
 				9FB69D7603495A6876AD7FEE /* InvoiceChoiceSheet.swift in Sources */,
