@@ -157,10 +157,12 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "refrigerator", label: "Refrigerator", icon: "refrigerator.fill"),
                 AnswerOption(id: "dishwasher", label: "Dishwasher"),
                 AnswerOption(id: "range", label: "Range / cooktop"),
+                AnswerOption(id: "wall_oven", label: "Wall oven", icon: "oven.fill"),
                 AnswerOption(id: "washer", label: "Washer", icon: "washer.fill"),
                 AnswerOption(id: "dryer", label: "Dryer"),
                 AnswerOption(id: "microwave", label: "Microwave"),
                 AnswerOption(id: "wine_fridge", label: "Wine fridge"),
+                AnswerOption(id: "other", label: "Other", icon: "plus.circle", acceptsCustomInput: true),
                 AnswerOption(id: "none", label: "None of these"),
             ],
             documentUploadCategory: .applianceManual

@@ -152,9 +152,31 @@ final class HouseQuizAnswerMapper {
 
             case "q10_appliances":
                 if let selected = answer.selectedIds {
-                    try await persistAttribute("appliances_under_5_years", value: selected.joined(separator: ","))
-                    for appliance in selected where appliance != "none" {
-                        try await ensureHomeSystem(name: appliance.replacingOccurrences(of: "_", with: " ").capitalized, category: "Appliance")
+                    // The "other" id is just a placeholder that triggers the
+                    // free-form text input — never persist it as an appliance.
+                    let realSelections = selected.filter { $0 != "other" }
+                    let customEntries = answer.customEntries ?? []
+                    let combined = realSelections + customEntries
+                    if !combined.isEmpty {
+                        try await persistAttribute(
+                            "appliances_under_5_years",
+                            value: combined.joined(separator: ",")
+                        )
+                    }
+                    for appliance in realSelections where appliance != "none" {
+                        try await ensureHomeSystem(
+                            name: appliance.replacingOccurrences(of: "_", with: " ").capitalized,
+                            category: "Appliance"
+                        )
+                    }
+                    // Each custom appliance ("Sauna", "Pellet stove", ...) gets
+                    // its own home_system row in the Appliances group so it
+                    // shows up alongside the picker-based ones in the Property
+                    // -> Maintenance tab.
+                    for custom in customEntries {
+                        let trimmed = custom.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { continue }
+                        try await ensureHomeSystem(name: trimmed, category: "Appliance")
                     }
                 }
 
