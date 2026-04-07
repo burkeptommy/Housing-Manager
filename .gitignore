@@ -38,3 +38,6 @@ apify/manual-scraper/storage/request_queues/
 
 # Plan artifacts (local only)
 .claude/plans/
+
+# Local pg_dump backups — contain user data, never commit
+backups/

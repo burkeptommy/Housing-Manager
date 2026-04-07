@@ -97,6 +97,54 @@ Two trust-restoring fixes after Tom's TestFlight testing exposed places where th
 
 **Files added:** `Haven/Features/Property/Services/MaintenanceTaskReconciler.swift`, `supabase/migrations/20260425_maintenance_task_archive.sql`. **Files deleted:** `Haven/Features/Property/Services/MaintenanceTaskMigrator.swift` (replaced).
 
+## Phase 53: TestFlight Database Reset (Users Start Fresh)
+
+Wiped all user-generated data so every TestFlight tester has to sign up again, create a new household, add their property, and re-do the quiz on the new Phase 19/19b flow. Pure data operation — zero code change, zero functionality lost. Full audit + managed backup + local pg_dump + reset + verification, all executed in one session.
+
+**Why:** After phases 16-19 reshaped the onboarding quiz, household model, and property valuation flow several times, the existing TestFlight household data didn't cleanly map onto the new schemas. Cleaner to have the ~14 testers re-onboard than to try to migrate stale state into the new flows.
+
+**Audit** (before touching anything, verified against every CREATE TABLE / from() / REFERENCES in the repo):
+- 44 user-data tables classified as WIPE (users, households, properties, documents, home_systems, maintenance_tasks, vehicles, all project_*, all vehicle_*, inbox_items, chat_messages, concierge_messages, task_reminders, analytics_events, access_log, scenario_history, synced_calendars, family_events, utility_accounts, device_tokens, etc.)
+- 10 catalog/seed/system tables classified as KEEP (equipment_manufacturers, equipment_categories, equipment_catalog, equipment_manuals, equipment_common_issues, equipment_service_schedules, equipment_scores, utility_providers, app_config, property_lookups)
+- 6 user-content storage buckets classified as WIPE (documents, property-images, service-records, avatars, room-visualizations, inbox-attachments)
+- 1 storage bucket classified as KEEP (equipment-manuals — 656 cached PDFs)
+- Every edge function deploy, every migration, every RLS policy, every index, every pg_cron job (send-reminder-batch continues to fire as a no-op until users return): PRESERVED
+
+**Backup:** Supabase daily managed backup (7 hours old at time of reset) as the primary rollback path, plus fresh local `pg_dump` of public + auth + storage schemas via session pooler (port 5432 not 6543, since the transaction pooler doesn't support pg_dump's prepared statements). Three files written to `./backups/` (gitignored): full (6.2 MB), public-data (5.1 MB), auth-data (474 KB). Spot-checked row counts match the baseline query.
+
+**Baseline → post-reset counts:**
+- auth.users: 14 → 0
+- public.users: 14 → 0
+- households: 13 → 0
+- properties: 1 → 0
+- family_members: 1 → 0
+- home_systems: 16 → 0
+- maintenance_tasks: 15 → 0
+- analytics_events: 258 → 0
+- equipment_catalog: 3,536 → 3,536 (preserved)
+- equipment_manuals: 9,822 → 9,822 (preserved)
+- utility_providers: 870 → 870 (preserved)
+- app_config: 1 → 1 (preserved)
+- property_lookups: 5 → 5 (address-keyed cache, not user-scoped)
+
+**Script: `scripts/reset-testflight.sql`** — single file runnable via `psql -f`. Structure:
+1. `SET LOCAL storage.allow_delete_query = 'true'` to bypass Supabase's `storage.protect_delete()` trigger for this transaction only.
+2. `DELETE FROM storage.objects WHERE bucket_id IN (...)` for the 6 user-content buckets. `equipment-manuals` explicitly excluded.
+3. Tolerant `DO` block with an array of 44 table names, each TRUNCATEd individually with CASCADE inside an `EXCEPTION WHEN undefined_table` handler so missing tables (e.g. `inbox_attachments`, which exists as a bucket but not a table) are skipped with a NOTICE instead of aborting.
+4. `DELETE FROM auth.users` at the end (cascades to auth.identities / refresh_tokens / sessions / mfa_*; must come after public.users is empty because the FK from public.users.id to auth.users(id) is not ON DELETE CASCADE).
+5. Verification SELECT that groups "user data (must be 0)" and "catalog/seed (must stay > 0)" into a single output table for at-a-glance sanity checking.
+6. Entire script wrapped in `BEGIN/COMMIT` so any mid-flight failure rolls back the whole thing.
+
+**Script: `scripts/backup-supabase.sh`** — reusable pg_dump wrapper. Reads `PGPASSWORD` from the environment (so the secret never touches shell history or chat transcripts) and writes three SQL dumps per run. Useful for any future resets or admin work.
+
+**Client-side handling:** Verified `AuthService.startListening()` at Haven/Core/Auth/AuthService.swift:30-48 already handles the "user deleted server-side" case — on next launch it tries to refresh the cached session, the refresh fails because auth.users is empty, and the catch block calls `forceLocalSignOut()` which clears the Keychain session and routes back to AddressHookView. No client-side code change needed for the reset to work cleanly.
+
+**Issues hit and resolved during execution:**
+1. First run failed on `DELETE FROM storage.objects` because of the `storage.protect_delete()` trigger. Script rolled back cleanly (thanks to BEGIN/COMMIT). Fixed by adding `SET LOCAL storage.allow_delete_query = 'true'` at the top of the transaction.
+2. Initial connection string in `SUPABASE_DB_URL` uses port 6543 (transaction pooler), which doesn't support pg_dump's prepared statements or multi-statement transactions. Switched to port 5432 (session pooler) for both the dump and the reset via `${SUPABASE_DB_URL/:6543/:5432}`.
+
+**Files added:** `scripts/reset-testflight.sql`, `scripts/backup-supabase.sh`. **Files modified:** `.gitignore` (ignore `backups/`).
+
 ## Phase 52: Bulletproof Quiz State Persistence and Resume (Phase 19)
 
 Tom answered several quiz questions, hit X → "Save and exit", returned later, and his answers were gone — back to Q1. Root cause was a stack of four bugs at the persistence edges: the X dialog only called `dismiss()` (no save at all), `saveForLater()` fire-and-forgot its persist, `firstUnresolvedIndex()` ignored `savedForLater` so deferred questions resurfaced immediately on resume, and `persistState`'s catch silently swallowed errors so failed saves vanished into the Xcode console where TestFlight users will never see them. Single bundled commit, no new features.
