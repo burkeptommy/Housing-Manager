@@ -2605,12 +2605,34 @@ struct UtilityProviderRow: Codable, Identifiable {
     let brandColor: String?
     let website: String?
     let phone: String?
+    /// True when the carrier also offers home insurance (Phase 16c). Only set
+    /// for `auto_insurance` rows; nil/false everywhere else.
+    let bundlesWithHome: Bool?
+    /// True when the carrier also offers auto insurance (Phase 16c). Only set
+    /// for `home_insurance` rows; nil/false everywhere else.
+    let bundlesWithAuto: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, name, slug, website, phone
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+        case bundlesWithHome = "bundles_with_home"
+        case bundlesWithAuto = "bundles_with_auto"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        slug = try c.decode(String.self, forKey: .slug)
+        providerType = try c.decode(String.self, forKey: .providerType)
+        logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
+        brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
+        website = try? c.decodeIfPresent(String.self, forKey: .website)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        bundlesWithHome = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithHome)
+        bundlesWithAuto = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithAuto)
     }
 }
 
