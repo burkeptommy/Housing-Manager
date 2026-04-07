@@ -30,6 +30,16 @@ enum AnalyticsEvent: String {
     case onboardingCompleted = "onboarding_completed"
     case onboardingSkipped = "onboarding_skipped"
 
+    // MARK: - House Quiz
+    case quizStarted = "quiz_started"
+    case quizQuestionAnswered = "quiz_question_answered"
+    case quizFeedbackShown = "quiz_feedback_shown"
+    case quizSavedForLater = "quiz_saved_for_later"
+    case quizSkippedForever = "quiz_skipped_forever"
+    case quizMilestoneReached = "quiz_milestone_reached"
+    case quizCompleted = "quiz_completed"
+    case quizDismissed = "quiz_dismissed"
+
     // MARK: - Tab Navigation
     case tabSelected = "tab_selected"
 

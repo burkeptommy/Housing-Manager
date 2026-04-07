@@ -90,6 +90,7 @@
 		4DBA962B7D67B40ACA1DF825 /* AddPropertyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA75F65A0C6C18B18A914E1A /* AddPropertyView.swift */; };
 		4F635BA08AD5878571AA4CF8 /* InvestmentSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CC363C4F7144C666BF14C2 /* InvestmentSummaryCard.swift */; };
 		5297B4580E0104A35011AA2E /* MissingDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B8A0845461986DFF0AB15 /* MissingDocumentsView.swift */; };
+		52B0811EF2787EC77CA1D5E0 /* HouseQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97135115B8421E956EDF488 /* HouseQuizView.swift */; };
 		5349D707387AAC6149FDEF12 /* DocumentUploadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */; };
 		539BBB8FD239711CC12A0194 /* GapAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408EBC448217751261BE45B5 /* GapAnalysisView.swift */; };
 		53ABF776341026EA7DAD20C3 /* VehicleDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C133DD8CBB58122E42175239 /* VehicleDetailViewModel.swift */; };
@@ -104,6 +105,7 @@
 		5FEED10B540336DF356430F7 /* Document.swift in Sources */ = {isa = PBXBuildFile; fileRef = B08091D6DD1E18B365AE5940 /* Document.swift */; };
 		6153590275165EDCC18E1F58 /* AvatarPhotoService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 715AA20065124665D9D16D60 /* AvatarPhotoService.swift */; };
 		6786642FF5E350679C47988D /* InvoiceProcessingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 40E00F0F3AD11F85F555462F /* InvoiceProcessingViewModel.swift */; };
+		67E93B53999952304C0E4504 /* HouseQuizModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 31F09CBF8599B165363539A3 /* HouseQuizModels.swift */; };
 		68BE693F7778B69F653E8A2E /* UpcomingExpirations.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A986D427111507813E0C8B5 /* UpcomingExpirations.swift */; };
 		6C046691D730EF83B0A6166C /* InboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7DFCE2761EABE541A267A3 /* InboxView.swift */; };
 		6CB14A10DD299E021578F8CE /* FamilyReferenceBinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EF2B9B2B3198D8B628F2951 /* FamilyReferenceBinder.swift */; };
@@ -137,6 +139,7 @@
 		91AE516BAE40BA3EED92B9B6 /* AddressCompletionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F676C1BCF5799F544342A088 /* AddressCompletionSheet.swift */; };
 		923E6C88A0FD716A8D2EE9AC /* UnifiedTaskCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0AE7AB5E6C3F35C6429980C /* UnifiedTaskCard.swift */; };
 		927F2A9E44D826E4FD5F0631 /* OverdueTasksDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12E53234F9D430302A1C9755 /* OverdueTasksDetailView.swift */; };
+		9290FD2D1C17DA4B93093ED6 /* HouseQuizAnswerMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8AE811AFA8FA636CE93EB2D /* HouseQuizAnswerMapper.swift */; };
 		933430937C48605A9C99D706 /* Constants.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C149790C33B097708FA1F8D /* Constants.swift */; };
 		939D0746966E906891EBCC90 /* Double+Currency.swift in Sources */ = {isa = PBXBuildFile; fileRef = C312D5AA48C650B2453392CC /* Double+Currency.swift */; };
 		9451E048C0F3A1D5972DC5B8 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DF354058556E442328CA13C /* AuthService.swift */; };
@@ -156,6 +159,7 @@
 		9F12E4B6C07097C0BEC5A124 /* FamilyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = A27E0CEC5981CD9DDE2C1B6D /* FamilyMember.swift */; };
 		9FB69D7603495A6876AD7FEE /* InvoiceChoiceSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B099EFD9B3F3E80C5022AAF /* InvoiceChoiceSheet.swift */; };
 		A016188BFADD6D8C98BD3A90 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6821540D9780592C436EB87 /* ProfileView.swift */; };
+		A022B375C4CF2B9A09702FAC /* HouseQuizAnswerFeedbackCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */; };
 		A08086D5AE75A0591FF0539F /* DocumentUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14626DD382FED3D16FDE7151 /* DocumentUploadView.swift */; };
 		A2DF2B9B63DCF0472D49A603 /* OverdueMaintenanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BD10152C540F01FD5A0C2B /* OverdueMaintenanceCard.swift */; };
 		A4343405E25959CA1B4B2B5F /* DocumentCategoryGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */; };
@@ -166,6 +170,7 @@
 		A883756C8AA8216C97B0494F /* EquipmentSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD5377254AFED79D10F0B50 /* EquipmentSearchResult.swift */; };
 		A971F6A620A3A610642E93A4 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B796CD75D32905D008DB51 /* SecuritySettingsView.swift */; };
 		A9C507BF5788F44D6DD5C0AD /* ServiceContractSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C4293076703BBB693DB832 /* ServiceContractSheet.swift */; };
+		A9DA3C7B503FE8D32F5F7BB2 /* HouseQuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D82CEFB262D83D295D6268 /* HouseQuizViewModel.swift */; };
 		A9F59641F2DE50FEA0BA8CAF /* AppliancesListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */; };
 		AA701760B0A4817BCF97DFC2 /* SystemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9EBAFED62E0CAC6F191166BA /* SystemDetailView.swift */; };
 		AC341A65010B095FB9CB7425 /* FamilyMemberFormView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1C30DF79412FDA919D65837 /* FamilyMemberFormView.swift */; };
@@ -209,6 +214,7 @@
 		D6343234A3E4CFB2317F5211 /* ContractorViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEEEF7014024523EB1E9CB7E /* ContractorViewModel.swift */; };
 		D6C24B5E0149330101E43C69 /* ContractorPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = D67356CC4BAAEA3438CCF1E4 /* ContractorPickerSheet.swift */; };
 		D797E0FF82FADA777BD89B18 /* DocumentVaultView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA9DEDCF7C14EF51BEB0A29C /* DocumentVaultView.swift */; };
+		D837D3A79CD237F1347E54E7 /* HouseQuizFeedbackLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E46DF762D5BA8899ED32545 /* HouseQuizFeedbackLibrary.swift */; };
 		D844043A66B8175E097112F4 /* LogHistoricalProjectView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D23A1E29045F54B58096BB6 /* LogHistoricalProjectView.swift */; };
 		D93E663937D781D4056E849B /* SaleSimulatorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A66FCC4419639B9845F596B /* SaleSimulatorSheet.swift */; };
 		D999F256BE13EDBE78FE61AF /* ApplianceSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B47929756A10E295F62AB0 /* ApplianceSetupSheet.swift */; };
@@ -223,6 +229,7 @@
 		E33BB6002DCDC5BE5B6682F0 /* CoveredDriverPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3270221BA2EADDC793D458F8 /* CoveredDriverPickerSheet.swift */; };
 		E4C027C2A514FFBF60AFCC2E /* TrustedContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591C1EFF7654F52ADA3D6B96 /* TrustedContactsView.swift */; };
 		E51EF5E7399F570579B9D9A7 /* ScenarioRunnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3B76CC625DC29A26D88C5B /* ScenarioRunnerService.swift */; };
+		E54421535D0A852B8CD830A1 /* HouseQuizProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */; };
 		E5ADF621540D07767ED5ABD1 /* CompletionScorecard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF6A5A84E462EB2DE11154E8 /* CompletionScorecard.swift */; };
 		E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFAE3950BF1A95CC45D9C55B /* PushNotificationService.swift */; };
 		E9D74841D67AEA6E14554262 /* HavenApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = F32EA73709C3E322D4BD3954 /* HavenApp.swift */; };
@@ -237,6 +244,7 @@
 		F32E6CEBB906D2C59D9798A4 /* PropertyProjectsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5CD254FA3D98BCA417B34DD9 /* PropertyProjectsView.swift */; };
 		F3B1AD08159C74877B12E0AC /* GapAlert.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B8ED5FCC9767FBB0E071F4E /* GapAlert.swift */; };
 		F3F3430B6C0C298FC05C08EA /* DocumentDetailViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = E52B8F844CD9A864C048DB5E /* DocumentDetailViewModel.swift */; };
+		F46EC30ABE284A456FA48F37 /* HouseQuizQuestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */; };
 		F52507EB3AA830122241C680 /* HavenButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */; };
 		F7D04F0B5A7916E58F2C9935 /* ManageSystemTasksSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */; };
 		FA9F45073A2E4CFFD9415150 /* VaultLockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA76304D2996344500376B8D /* VaultLockService.swift */; };
@@ -276,6 +284,7 @@
 		1B5627AB5E97358EFC5C1A0B /* ProjectEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectEmailView.swift; sourceTree = "<group>"; };
 		1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		1CCD19CB328DFD094D0C1DEF /* DocumentVaultViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentVaultViewModel.swift; sourceTree = "<group>"; };
+		1E46DF762D5BA8899ED32545 /* HouseQuizFeedbackLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizFeedbackLibrary.swift; sourceTree = "<group>"; };
 		1EF2B9B2B3198D8B628F2951 /* FamilyReferenceBinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyReferenceBinder.swift; sourceTree = "<group>"; };
 		1F8FC428382466D4854DE31A /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
 		211F8CBA26112C97F2C08529 /* ChatViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatViewModel.swift; sourceTree = "<group>"; };
@@ -286,12 +295,14 @@
 		281307502A3CC1B09F4CBFA3 /* PropertyCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyCard.swift; sourceTree = "<group>"; };
 		2941D500DA3123BDF2B26B84 /* HouseholdAccessView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdAccessView.swift; sourceTree = "<group>"; };
 		2A66FCC4419639B9845F596B /* SaleSimulatorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SaleSimulatorSheet.swift; sourceTree = "<group>"; };
+		2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizAnswerFeedbackCard.swift; sourceTree = "<group>"; };
 		2B8ED5FCC9767FBB0E071F4E /* GapAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GapAlert.swift; sourceTree = "<group>"; };
 		2D7BAD6234DC22E173C1D103 /* Logger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Logger.swift; sourceTree = "<group>"; };
 		2DF354058556E442328CA13C /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		2E439AEF8C499A45C6D1C722 /* SystemGroupListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemGroupListView.swift; sourceTree = "<group>"; };
 		2F43B13A69A02D0A87ED7FB6 /* EditSystemSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditSystemSheet.swift; sourceTree = "<group>"; };
 		312B0AF8C491CCA685866EA9 /* HouseholdStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdStrip.swift; sourceTree = "<group>"; };
+		31F09CBF8599B165363539A3 /* HouseQuizModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizModels.swift; sourceTree = "<group>"; };
 		3270221BA2EADDC793D458F8 /* CoveredDriverPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CoveredDriverPickerSheet.swift; sourceTree = "<group>"; };
 		379FFAF6339B329B4272E557 /* NotificationPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationPreferences.swift; sourceTree = "<group>"; };
 		39BBBECCAD064C3B2991A6C5 /* SeasonalTasksDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonalTasksDetailView.swift; sourceTree = "<group>"; };
@@ -416,6 +427,7 @@
 		C33B8A0845461986DFF0AB15 /* MissingDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingDocumentsView.swift; sourceTree = "<group>"; };
 		C3DF4111F8B1FF01F3ECF70D /* InboxItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemCard.swift; sourceTree = "<group>"; };
 		C4B5DD5BFCD50724A3EF7556 /* DocumentCategoryPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCategoryPicker.swift; sourceTree = "<group>"; };
+		C97135115B8421E956EDF488 /* HouseQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizView.swift; sourceTree = "<group>"; };
 		C97D2B0FAFB54FF91648CA17 /* VehicleDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleDetailView.swift; sourceTree = "<group>"; };
 		CA0B114520C474E97EDD2DE8 /* WebsiteImportView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebsiteImportView.swift; sourceTree = "<group>"; };
 		CA4AA2E5E444D624BF0A4601 /* ErrorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ErrorView.swift; sourceTree = "<group>"; };
@@ -429,11 +441,13 @@
 		D08D056E30880763A14839C3 /* CategoryProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryProgress.swift; sourceTree = "<group>"; };
 		D08FA323D32687250C5CC975 /* EstateReadinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EstateReadinessDetailView.swift; sourceTree = "<group>"; };
 		D09C463CADD4EC1A7F9BB9B3 /* HavenTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenTextField.swift; sourceTree = "<group>"; };
+		D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizQuestionLibrary.swift; sourceTree = "<group>"; };
 		D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppliancesListView.swift; sourceTree = "<group>"; };
 		D4B2AAF58754AC8E3338EF53 /* MaintenanceTaskIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskIcon.swift; sourceTree = "<group>"; };
 		D67356CC4BAAEA3438CCF1E4 /* ContractorPickerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorPickerSheet.swift; sourceTree = "<group>"; };
 		D6821540D9780592C436EB87 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		D82BD59425B0FA523AD9B636 /* DocumentEncryption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentEncryption.swift; sourceTree = "<group>"; };
+		D8AE811AFA8FA636CE93EB2D /* HouseQuizAnswerMapper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizAnswerMapper.swift; sourceTree = "<group>"; };
 		DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentUploadManager.swift; sourceTree = "<group>"; };
 		DB35F3710C0269686BE2C4E4 /* AnalyticsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AnalyticsService.swift; sourceTree = "<group>"; };
 		DBC7CA202538BC2C257BA508 /* ChatDocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatDocumentCard.swift; sourceTree = "<group>"; };
@@ -447,6 +461,7 @@
 		E5AB75E21903A9833695E4FA /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		E5FE9A44DDCE5AAD3CD1A46F /* EquipmentIdentifySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentIdentifySheet.swift; sourceTree = "<group>"; };
 		E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarrantyTrackerView.swift; sourceTree = "<group>"; };
+		E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizProgressBar.swift; sourceTree = "<group>"; };
 		E9BE83DBF1FEA3DBAB52A01C /* InvoiceProcessingModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceProcessingModels.swift; sourceTree = "<group>"; };
 		EACB86E8385B0978B65C548D /* BrandTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BrandTheme.swift; sourceTree = "<group>"; };
 		EC9AA43272E274ADD62E2592 /* HavenColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenColors.swift; sourceTree = "<group>"; };
@@ -473,6 +488,7 @@
 		F8C235D5924950601DBEC89D /* SystemGroup.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemGroup.swift; sourceTree = "<group>"; };
 		F94383B79DF96D0CFB406B15 /* SecureLogger.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecureLogger.swift; sourceTree = "<group>"; };
 		F9A1E64945F0A863947B24B9 /* VendorReviewForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorReviewForm.swift; sourceTree = "<group>"; };
+		F9D82CEFB262D83D295D6268 /* HouseQuizViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizViewModel.swift; sourceTree = "<group>"; };
 		FA15E42BF53B7395A47F986A /* EnrichmentCardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentCardEngine.swift; sourceTree = "<group>"; };
 		FDDD425AF92101F7B1B5793E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		FDEC9261DFE87F44EBE75404 /* FamilyInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyInboxView.swift; sourceTree = "<group>"; };
@@ -537,6 +553,14 @@
 			path = Chat;
 			sourceTree = "<group>";
 		};
+		0C271238E86CE35234567FEF /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				371100436C3E0DA4B5CA3D0E /* HouseQuiz */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		0F73E0E8C0C0D01B2DBA8CEB /* Family */ = {
 			isa = PBXGroup;
 			children = (
@@ -566,6 +590,20 @@
 				DBC7CA202538BC2C257BA508 /* ChatDocumentCard.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		371100436C3E0DA4B5CA3D0E /* HouseQuiz */ = {
+			isa = PBXGroup;
+			children = (
+				BC6772E4E4686DEF5BFF6777 /* Components */,
+				D8AE811AFA8FA636CE93EB2D /* HouseQuizAnswerMapper.swift */,
+				1E46DF762D5BA8899ED32545 /* HouseQuizFeedbackLibrary.swift */,
+				31F09CBF8599B165363539A3 /* HouseQuizModels.swift */,
+				D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */,
+				C97135115B8421E956EDF488 /* HouseQuizView.swift */,
+				F9D82CEFB262D83D295D6268 /* HouseQuizViewModel.swift */,
+			);
+			path = HouseQuiz;
 			sourceTree = "<group>";
 		};
 		4B4C42E71E1ADAD902F0086A /* Networking */ = {
@@ -747,6 +785,7 @@
 				0F73E0E8C0C0D01B2DBA8CEB /* Family */,
 				4CB74365199812E8597E3B42 /* Inbox */,
 				F3F730549D5184E95B7C7AB4 /* Notifications */,
+				0C271238E86CE35234567FEF /* Onboarding */,
 				F1E5E22697744D933A101A98 /* Property */,
 				FDEBFDDB8B4244DCD983E209 /* Scenarios */,
 				5AA54B21A999CCD666BFC477 /* Security */,
@@ -858,6 +897,15 @@
 				CC48B643D7B2E4D11B2A7853 /* View+Extensions.swift */,
 			);
 			path = Extensions;
+			sourceTree = "<group>";
+		};
+		BC6772E4E4686DEF5BFF6777 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
+				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
+			);
+			path = Components;
 			sourceTree = "<group>";
 		};
 		C78CF3BFA7963858286E2D9B /* Products */ = {
@@ -1269,6 +1317,14 @@
 				47D6FB1F2E382D3CD83F53F4 /* HavenTypography.swift in Sources */,
 				73F578310CDA4553B2078C6F /* HomeSystem.swift in Sources */,
 				C1AFB2AF089C79FAAB1733DA /* HomeSystemsSetupView.swift in Sources */,
+				A022B375C4CF2B9A09702FAC /* HouseQuizAnswerFeedbackCard.swift in Sources */,
+				9290FD2D1C17DA4B93093ED6 /* HouseQuizAnswerMapper.swift in Sources */,
+				D837D3A79CD237F1347E54E7 /* HouseQuizFeedbackLibrary.swift in Sources */,
+				67E93B53999952304C0E4504 /* HouseQuizModels.swift in Sources */,
+				E54421535D0A852B8CD830A1 /* HouseQuizProgressBar.swift in Sources */,
+				F46EC30ABE284A456FA48F37 /* HouseQuizQuestionLibrary.swift in Sources */,
+				52B0811EF2787EC77CA1D5E0 /* HouseQuizView.swift in Sources */,
+				A9DA3C7B503FE8D32F5F7BB2 /* HouseQuizViewModel.swift in Sources */,
 				795A2B009D0479EC87A76069 /* HouseholdAccessView.swift in Sources */,
 				15B763B2FCDFF742CECA451C /* HouseholdStrip.swift in Sources */,
 				0628E9DE04922FE3F3362C49 /* InboxItemCard.swift in Sources */,

@@ -409,6 +409,7 @@ struct PropertyRow: Codable, Identifiable {
     let ownershipEntity: String?
     let notes: String?
     let attributes: [String: FlexibleValue]?
+    let houseQuizState: HouseQuizState?
     let createdAt: Date?
 
     enum CodingKeys: String, CodingKey {
@@ -423,7 +424,32 @@ struct PropertyRow: Codable, Identifiable {
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
+        case houseQuizState = "house_quiz_state"
         case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        name = try c.decode(String.self, forKey: .name)
+        propertyType = try c.decode(String.self, forKey: .propertyType)
+        street = try? c.decode(String.self, forKey: .street)
+        unit = try? c.decode(String.self, forKey: .unit)
+        city = try? c.decode(String.self, forKey: .city)
+        state = try? c.decode(String.self, forKey: .state)
+        zipCode = try? c.decode(String.self, forKey: .zipCode)
+        country = try? c.decode(String.self, forKey: .country)
+        purchaseDate = try? c.decode(String.self, forKey: .purchaseDate)
+        purchasePrice = try? c.decode(Double.self, forKey: .purchasePrice)
+        currentEstimatedValue = try? c.decode(Double.self, forKey: .currentEstimatedValue)
+        squareFootage = try? c.decode(Int.self, forKey: .squareFootage)
+        yearBuilt = try? c.decode(Int.self, forKey: .yearBuilt)
+        ownershipEntity = try? c.decode(String.self, forKey: .ownershipEntity)
+        notes = try? c.decode(String.self, forKey: .notes)
+        attributes = try? c.decode([String: FlexibleValue].self, forKey: .attributes)
+        houseQuizState = try? c.decode(HouseQuizState.self, forKey: .houseQuizState)
+        createdAt = try? c.decode(Date.self, forKey: .createdAt)
     }
 }
 
@@ -475,6 +501,7 @@ struct PropertyUpdate: Codable {
     var ownershipEntity: String?
     var notes: String?
     var attributes: [String: FlexibleValue]?
+    var houseQuizState: HouseQuizState?
 
     enum CodingKeys: String, CodingKey {
         case name, street, unit, city, state, notes, attributes
@@ -486,6 +513,7 @@ struct PropertyUpdate: Codable {
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
+        case houseQuizState = "house_quiz_state"
     }
 }
 
