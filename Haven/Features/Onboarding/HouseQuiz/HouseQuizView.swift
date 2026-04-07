@@ -382,31 +382,11 @@ struct HouseQuizView: View {
     // MARK: - Vehicle add
 
     private func vehicleAddBody(_ q: HouseQuizQuestion) -> some View {
-        VStack(spacing: HavenTheme.spacing12) {
-            Text("You can add your car details here, scan a VIN with the camera, or upload an insurance card. Pick whatever's easiest.")
-                .font(HavenTypography.bodySmall)
-                .foregroundStyle(HavenColors.textSecondary)
-
-            HavenButton(title: "Add Vehicle Details") {
-                Task { await viewModel.recordAnswer("manual_entry") }
+        QuizVehicleInputSelector(
+            onComplete: {
+                Task { await viewModel.recordAnswer("primary_vehicle_added") }
             }
-
-            Button {
-                showDocumentUpload = true
-            } label: {
-                HStack(spacing: 8) {
-                    Image(systemName: "doc.viewfinder")
-                    Text("Upload insurance card")
-                }
-                .font(HavenTypography.uiLabelMedium)
-                .foregroundStyle(HavenColors.navy700)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, HavenTheme.spacing12)
-                .background(HavenColors.navy.opacity(0.08))
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-            }
-            .buttonStyle(.plain)
-        }
+        )
     }
 
     // MARK: - Caretakers (Q28)
