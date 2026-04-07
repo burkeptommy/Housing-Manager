@@ -14,8 +14,11 @@ struct PropertyLookupResult: Codable {
     var estimatedValue: Double?
     let estimatedValueLow: Double?
     let estimatedValueHigh: Double?
+    let estimatedValueConfidence: Int?  // ATTOM confidence score 0-100
     let features: PropertyFeatures?
     let taxAssessment: TaxAssessment?
+    let ownerInfo: OwnerInfo?
+    let dataSource: String?  // "attom" or "rentcast"
 
     struct PropertyFeatures: Codable {
         let roofType: String?
@@ -33,11 +36,25 @@ struct PropertyLookupResult: Codable {
         let stories: Int?
         let fireplace: Bool?
         let fireplaceType: String?
+        let basementSize: Int?
+        let constructionCondition: String?
+        let qualityRating: String?
     }
 
     struct TaxAssessment: Codable {
         let year: Int?
+        let assessedValue: Double?
+        let marketValue: Double?
+        let taxAmount: Double?
+        let taxPerSqFt: Double?
+        // Backward compat with old cached RentCast data
         let value: Double?
+    }
+
+    struct OwnerInfo: Codable {
+        let ownerName: String?
+        let absenteeOwner: Bool?
+        let mailingAddress: String?
     }
 }
 
@@ -273,5 +290,43 @@ enum OnboardingScheduleGenerator {
     private static func monthDistance(_ month: Int, from currentMonth: Int) -> Int {
         let diff = month - currentMonth
         return diff >= 0 ? diff : diff + 12
+    }
+
+    // MARK: - Value Protection
+
+    /// Estimate the dollar value preserved over 10 years by maintaining the home
+    /// on schedule. Industry estimates from Remodeling Magazine + NAR studies put
+    /// this at roughly 12% of current value vs. neglected homes.
+    ///
+    /// Falls back to projecting `lastSalePrice` forward at ~5% appreciation/year
+    /// when `estimatedValue` is missing.
+    static func computeValueProtection(from lookup: PropertyLookupResult?) -> Double? {
+        guard let lookup else { return nil }
+
+        if let value = lookup.estimatedValue, value > 0 {
+            return value * 0.12
+        }
+
+        // Fallback: project last sale price forward at 5% appreciation/year.
+        if let salePrice = lookup.lastSalePrice, salePrice > 0 {
+            let yearsHeld = yearsSince(lookup.lastSaleDate) ?? 0
+            let projected = salePrice * pow(1.05, Double(yearsHeld))
+            return projected * 0.12
+        }
+
+        return nil
+    }
+
+    private static func yearsSince(_ dateString: String?) -> Int? {
+        guard let dateString else { return nil }
+        let formatter = DateFormatter()
+        for format in ["yyyy-MM-dd", "MM/dd/yyyy", "yyyy"] {
+            formatter.dateFormat = format
+            if let date = formatter.date(from: dateString) {
+                let components = Calendar.current.dateComponents([.year], from: date, to: Date())
+                return max(0, components.year ?? 0)
+            }
+        }
+        return nil
     }
 }

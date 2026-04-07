@@ -57,7 +57,16 @@ struct OnboardingSchedulePreviewStep: View {
         ScrollView {
             VStack(spacing: HavenTheme.spacing20) {
                 propertyCard
+                if !detectedFeaturePills.isEmpty {
+                    detectedFeaturesSection
+                }
+                if let protected = OnboardingScheduleGenerator.computeValueProtection(from: propertyResult) {
+                    valueProtectionHeadline(protectedValue: protected)
+                }
                 scheduleSection
+                if !featureTeasers.isEmpty {
+                    featureValueTeaserSection
+                }
             }
             .padding(.horizontal, HavenTheme.pageMargin)
             .padding(.top, HavenTheme.spacing12)
@@ -100,33 +109,172 @@ struct OnboardingSchedulePreviewStep: View {
                     .foregroundStyle(HavenColors.textTertiary)
                     .transition(.opacity)
                 }
-
-                // Show detected home systems
-                let detectedSystems = detectedSystemsList
-                if !detectedSystems.isEmpty {
-                    Divider()
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text("Detected Systems")
-                            .font(HavenTypography.uiCaption)
-                            .foregroundStyle(HavenColors.textTertiary)
-                        FlowLayout(spacing: 6) {
-                            ForEach(detectedSystems, id: \.self) { system in
-                                Text(system)
-                                    .font(.system(size: 11, weight: .medium))
-                                    .foregroundStyle(HavenColors.navy700)
-                                    .padding(.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(HavenColors.navy.opacity(0.06))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
             }
         }
         .padding(HavenTheme.spacing16)
         .background(HavenColors.creamLight)
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Detected Features
+
+    private struct DetectedPill: Identifiable {
+        let id = UUID()
+        let icon: String
+        let label: String
+    }
+
+    private var detectedFeaturePills: [DetectedPill] {
+        guard let f = propertyResult?.features else { return [] }
+        var pills: [DetectedPill] = []
+
+        if f.pool == true {
+            let label = f.poolType.map { "\($0) Pool" } ?? "Pool"
+            pills.append(DetectedPill(icon: "drop.fill", label: label))
+        }
+        if f.garage == true {
+            let label = f.garageSpaces.map { "\($0)-Car Garage" } ?? "Garage"
+            pills.append(DetectedPill(icon: "car.fill", label: label))
+        }
+        if f.fireplace == true {
+            let label = f.fireplaceType.map { "\($0) Fireplace" } ?? "Fireplace"
+            pills.append(DetectedPill(icon: "flame.fill", label: label))
+        }
+        if let foundation = f.foundationType, foundation.lowercased().contains("basement") {
+            if let size = f.basementSize {
+                pills.append(DetectedPill(icon: "rectangle.split.1x2.fill", label: "\(size.formatted()) sf basement"))
+            } else {
+                pills.append(DetectedPill(icon: "rectangle.split.1x2.fill", label: "Basement"))
+            }
+        }
+        if let stories = f.stories, stories > 0 {
+            pills.append(DetectedPill(icon: "building.2.fill", label: stories == 1 ? "1 story" : "\(stories) stories"))
+        }
+        if let yearBuilt = propertyResult?.yearBuilt {
+            pills.append(DetectedPill(icon: "calendar", label: "Built \(yearBuilt)"))
+        }
+        if let heating = f.heatingType {
+            let fuel = f.heatingFuel.map { " (\($0))" } ?? ""
+            pills.append(DetectedPill(icon: "thermometer.sun.fill", label: heating + fuel))
+        }
+        if let style = f.architectureType {
+            pills.append(DetectedPill(icon: "house.fill", label: style))
+        }
+        if let lot = propertyResult?.lotSize, lot > 0 {
+            // ATTOM returns lot size in square feet; convert to acres for display.
+            let acres = Double(lot) / 43560.0
+            if acres >= 0.1 {
+                pills.append(DetectedPill(icon: "leaf.fill", label: String(format: "%.2f acres", acres)))
+            }
+        }
+
+        return pills
+    }
+
+    private var detectedFeaturesSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            Text("DETECTED FEATURES")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.2)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            FlowLayout(spacing: 6) {
+                ForEach(detectedFeaturePills) { pill in
+                    HStack(spacing: 4) {
+                        Image(systemName: pill.icon)
+                            .font(.system(size: 10, weight: .semibold))
+                        Text(pill.label)
+                            .font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundStyle(HavenColors.navy800)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+            }
+        }
+    }
+
+    // MARK: - 10-Year Value Protection Headline
+
+    private func valueProtectionHeadline(protectedValue: Double) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "shield.lefthalf.filled")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(HavenColors.creamLight)
+                Text("\(protectedValue.formattedCompactCurrency()) protected over 10 years")
+                    .font(.custom("Georgia", size: 18).weight(.semibold))
+                    .foregroundStyle(HavenColors.creamLight)
+            }
+            Text("Homes maintained on schedule appreciate ~12% more than neglected homes.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.creamLight.opacity(0.85))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Industry estimates from Remodeling Magazine + NAR studies.")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.creamLight.opacity(0.6))
+        }
+        .padding(HavenTheme.spacing16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [HavenColors.navy800, HavenColors.navy700],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+    }
+
+    // MARK: - Per-Feature Value Teasers
+
+    private var featureTeasers: [FeatureValueLibrary.Entry] {
+        FeatureValueLibrary.resolve(keys: FeatureValueLibrary.keys(from: propertyResult?.features))
+    }
+
+    private var featureValueTeaserSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            Text("WHAT THESE FEATURES MEAN")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.2)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            LazyVGrid(columns: [
+                GridItem(.flexible(), spacing: HavenTheme.spacing12),
+                GridItem(.flexible(), spacing: HavenTheme.spacing12),
+            ], spacing: HavenTheme.spacing12) {
+                ForEach(featureTeasers, id: \.key) { entry in
+                    teaserCard(entry)
+                }
+            }
+        }
+    }
+
+    private func teaserCard(_ entry: FeatureValueLibrary.Entry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Image(systemName: entry.icon)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy700)
+                Text(entry.title)
+                    .font(HavenTypography.headline)
+                    .foregroundStyle(HavenColors.navy800)
+            }
+            VStack(alignment: .leading, spacing: 2) {
+                Text(entry.annualUpkeep)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Text(entry.resaleImpact)
+                    .font(HavenTypography.uiCaption)
+                    .foregroundStyle(HavenColors.success)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
     }
 
     // MARK: - Editable Property Details Grid
@@ -492,21 +640,6 @@ struct OnboardingSchedulePreviewStep: View {
         return digits[0]
     }
 
-    /// Build a list of detected home systems from the property features.
-    private var detectedSystemsList: [String] {
-        guard let f = propertyResult?.features else { return [] }
-        var systems: [String] = []
-        if f.heatingType != nil || f.coolingType != nil { systems.append("HVAC") }
-        if f.roofType != nil { systems.append(f.roofType!) }
-        if f.foundationType != nil { systems.append(f.foundationType!) }
-        if f.exteriorType != nil { systems.append(f.exteriorType!) }
-        if f.pool == true { systems.append("Pool") }
-        if f.garage == true { systems.append("Garage") }
-        if f.fireplace == true { systems.append("Fireplace") }
-        systems.append("Water Heater") // every home has one
-        systems.append("Electrical")
-        return systems
-    }
 }
 
 // MARK: - NumericTextField
