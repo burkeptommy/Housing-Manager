@@ -79,6 +79,7 @@ final class AppState: ObservableObject {
                 PushNotificationService.shared.ensureTokenStored()
                 Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
                 Task { await Self.migrateVehicleMaintenanceTasks() }
+                Task { await Self.reconcileAllPropertiesOnce() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -91,6 +92,7 @@ final class AppState: ObservableObject {
                     PushNotificationService.shared.ensureTokenStored()
                     Task { await MaintenanceTemplates.migrateExistingTaskAssignments() }
                     Task { await Self.migrateVehicleMaintenanceTasks() }
+                    Task { await Self.reconcileAllPropertiesOnce() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -104,6 +106,49 @@ final class AppState: ObservableObject {
                 needsOnboarding = onboarding
             }
         }
+    }
+
+    /// Phase 17b — one-time legacy cleanup. Properties created before the
+    /// `MaintenanceTemplates.templates(for:activeSubtypes:)` filter fix
+    /// shipped (Phase 14) carry stale generic tasks like "Descale tankless
+    /// heater" that should never have been created. This pass walks every
+    /// property the user has access to and runs the reconciler against each
+    /// system, soft-deleting tasks that don't match the confirmed subtype
+    /// (preserving anything the user has touched).
+    ///
+    /// Gated on a UserDefaults key so it only runs once per install. Fires
+    /// from `initialize()` in a detached `Task` so it never blocks auth
+    /// resolution or first-screen render.
+    @MainActor
+    static func reconcileAllPropertiesOnce() async {
+        let key = "reconcileAllPropertiesV1Done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            // Don't set the gate on failure — let the next launch retry.
+            return
+        }
+        guard !properties.isEmpty else {
+            // No properties to reconcile yet — gate so we don't keep retrying
+            // every launch on a fresh install with no property added.
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        for property in properties {
+            let result = await MaintenanceTaskReconciler.reconcileAll(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+            if !result.isEmpty {
+                print("[reconcileAllPropertiesV1] \(property.name): +\(result.added.count), -\(result.removed.count), kept \(result.preserved.count)")
+            }
+        }
+        // Notify the rest of the app so any open task lists refresh.
+        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        UserDefaults.standard.set(true, forKey: key)
     }
 
     /// One-time: create maintenance_tasks for vehicles that have maintenance_schedule JSONB but no stored tasks
