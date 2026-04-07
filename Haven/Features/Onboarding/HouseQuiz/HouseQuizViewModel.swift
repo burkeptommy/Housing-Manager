@@ -47,6 +47,11 @@ final class HouseQuizViewModel: ObservableObject {
 
         // Resume at the first unanswered+unsaved+unskipped question.
         self.currentIndex = firstUnresolvedIndex()
+        // Phase 18b: A resumed quiz might land on a question whose dynamic
+        // provider types resolve to empty (e.g. Q19 when Q3 was electric).
+        // Mark it skipped and advance immediately so the user never sees a
+        // dead picker.
+        skipDynamicallyUnreachableQuestion()
     }
 
     // MARK: - Derived
@@ -278,6 +283,25 @@ final class HouseQuizViewModel: ObservableObject {
         }
     }
 
+    /// Phase 18b: Auto-skip provider-search questions whose
+    /// `dynamicProviderTypes` resolves to an empty array. Used by Q19 (heating
+    /// fuel provider) when the user answered Q3 with electric / geothermal /
+    /// not_sure — there's no fuel delivery contract to capture, so the
+    /// question silently disappears from the flow. Marks the question as
+    /// skipped (not saved-for-later) so the progress label still totals
+    /// correctly and `firstUnresolvedIndex()` doesn't try to resume here.
+    func skipDynamicallyUnreachableQuestion() {
+        guard let q = currentQuestion else { return }
+        guard q.kind == .providerSearch, q.dynamicProviderTypes != nil else { return }
+        let resolved = q.resolvedProviderTypes(state: state)
+        guard resolved.isEmpty else { return }
+        if !state.skipped.contains(q.id) {
+            state.skipped.append(q.id)
+        }
+        Task { await persistState() }
+        advance()
+    }
+
     // MARK: - Internals
 
     private func persist(answer: HouseQuizAnswer, for question: HouseQuizQuestion) async {
@@ -367,6 +391,9 @@ final class HouseQuizViewModel: ObservableObject {
     private func moveNext() {
         currentIndex += 1
         skipQuestionsAfterZeroVehicles()
+        // Phase 18b: After advancing, also skip any provider-search question
+        // whose dynamic types resolved to empty (Q19 with electric heat).
+        skipDynamicallyUnreachableQuestion()
     }
 
     private func firstUnresolvedIndex() -> Int {

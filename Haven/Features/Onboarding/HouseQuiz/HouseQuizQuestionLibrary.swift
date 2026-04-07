@@ -283,7 +283,25 @@ enum HouseQuizQuestionLibrary {
             subtitle: "We'll match this to your refill cadence.",
             kind: .providerSearch,
             documentUploadCategory: .utilityBill,
-            providerTypes: ["oil", "propane", "natural_gas"]
+            providerTypes: ["oil", "propane", "natural_gas"],
+            // Phase 18b: narrow the picker to just the fuel type the user
+            // confirmed in Q3. Returning [] tells the view model to skip the
+            // question entirely (electric / geothermal homes have no fuel
+            // delivery contract — they're already covered by Q16 electric).
+            dynamicProviderTypes: { state in
+                guard let fuel = state.answers["q3_heating_fuel"]?.answerId else {
+                    // Q3 unanswered — keep the original three-type behavior so
+                    // a forward-resumed quiz still shows something useful.
+                    return ["oil", "propane", "natural_gas"]
+                }
+                switch fuel {
+                case "oil":         return ["oil"]
+                case "propane":     return ["propane"]
+                case "natural_gas": return ["natural_gas"]
+                // electric, geothermal, not_sure — no separate fuel provider
+                default:            return []
+                }
+            }
         ),
         HouseQuizQuestion(
             id: "q20_other_fuels",

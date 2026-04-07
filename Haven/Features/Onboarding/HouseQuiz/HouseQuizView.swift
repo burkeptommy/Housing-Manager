@@ -623,7 +623,9 @@ struct HouseQuizView: View {
                 }
 
                 UtilityProviderSearchPicker(
-                    providerTypes: q.providerTypes,
+                    // Phase 18b: prefer dynamic provider types over the static
+                    // array so Q19 narrows to the heating fuel from Q3.
+                    providerTypes: q.resolvedProviderTypes(state: viewModel.state),
                     state: viewModel.property.state,
                     onSelect: { provider in
                         Task {

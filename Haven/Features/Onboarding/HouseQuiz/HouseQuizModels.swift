@@ -237,6 +237,15 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// These must match the values in `utility_providers.provider_type`
     /// (e.g. "electric", "internet_cable", ["oil","propane","natural_gas"]).
     let providerTypes: [String]
+    /// Phase 18b: When non-nil, the picker uses this closure (called at
+    /// render time) to compute provider types from the current quiz state
+    /// instead of the static `providerTypes` array. Used by Q19 (heating
+    /// fuel provider) so the picker only shows providers matching the fuel
+    /// type from Q3. Returning an empty array means "skip this question
+    /// entirely" — the view model auto-skips when the closure resolves
+    /// to empty so users with electric/geothermal homes never see a
+    /// fuel provider question.
+    let dynamicProviderTypes: ((HouseQuizState) -> [String])?
 
     init(
         id: String,
@@ -247,7 +256,8 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         answerOptions: [AnswerOption] = [],
         documentUploadCategory: DocumentCategory? = nil,
         providerFollowUpAnswerIds: Set<String> = [],
-        providerTypes: [String] = []
+        providerTypes: [String] = [],
+        dynamicProviderTypes: ((HouseQuizState) -> [String])? = nil
     ) {
         self.id = id
         self.section = section
@@ -258,11 +268,22 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.documentUploadCategory = documentUploadCategory
         self.providerFollowUpAnswerIds = providerFollowUpAnswerIds
         self.providerTypes = providerTypes
+        self.dynamicProviderTypes = dynamicProviderTypes
     }
 
     /// Convenience for picker code that wants the canonical "primary" type
     /// for create/update writes (the first entry, falling back to nil).
     var primaryProviderType: String? { providerTypes.first }
+
+    /// Phase 18b: Resolve the live provider types for this question against
+    /// the current quiz state. Falls back to the static `providerTypes` when
+    /// no dynamic closure is set so existing question definitions still work.
+    func resolvedProviderTypes(state: HouseQuizState) -> [String] {
+        if let closure = dynamicProviderTypes {
+            return closure(state)
+        }
+        return providerTypes
+    }
 
     static func == (lhs: HouseQuizQuestion, rhs: HouseQuizQuestion) -> Bool {
         lhs.id == rhs.id
