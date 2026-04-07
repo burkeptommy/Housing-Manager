@@ -24,6 +24,25 @@ struct InvestmentSummaryCard: View {
     private var hasEstimatedValue: Bool { property.currentEstimatedValue != nil && estimatedValue > 0 }
     private var hasPurchasePrice: Bool { property.purchasePrice != nil && purchasePrice > 0 }
 
+    /// Phase 16e — surface *why* the estimated value looks the way it does for
+    /// the lower-confidence fallback paths. ATTOM/RentCast values speak for
+    /// themselves; the computed and square-footage paths need a soft reminder
+    /// so the user knows it's a directional number, not an appraisal.
+    private var estimatedValueSourceCaption: String? {
+        switch property.estimatedValueSource {
+        case "computed":
+            return "Estimated from last sale, adjusted for time"
+        case "estimated":
+            return "Based on square footage average"
+        case "rentcast":
+            return "From public market data"
+        case "manual":
+            return "You set this value"
+        default:
+            return nil
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             Text("INVESTMENT SUMMARY")
@@ -88,6 +107,13 @@ struct InvestmentSummaryCard: View {
                 Text(estimatedValue.formattedCompactCurrency())
                     .font(.custom("Georgia", size: 26).weight(.bold))
                     .foregroundStyle(HavenColors.textPrimary)
+
+                if let caption = estimatedValueSourceCaption {
+                    Text(caption)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .multilineTextAlignment(.center)
+                }
 
                 if totalInvested > 0 {
                     HStack(spacing: 4) {

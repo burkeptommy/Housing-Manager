@@ -14,7 +14,11 @@ struct PropertyLookupResult: Codable {
     var estimatedValue: Double?
     let estimatedValueLow: Double?
     let estimatedValueHigh: Double?
-    let estimatedValueConfidence: Int?  // ATTOM confidence score 0-100
+    let estimatedValueConfidence: Int?  // 0-100 (ATTOM AVM scr; computed=40; estimated=25)
+    /// Phase 16e: which fallback layer produced `estimatedValue`. One of
+    /// "attom" | "rentcast" | "computed" | "estimated". The Investment Summary
+    /// surfaces this so users see *why* a number is what it is.
+    let estimatedValueSource: String?
     let features: PropertyFeatures?
     let taxAssessment: TaxAssessment?
     let ownerInfo: OwnerInfo?

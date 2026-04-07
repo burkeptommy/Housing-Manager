@@ -66,7 +66,16 @@ actor PropertyCreationService {
         insert.yearBuilt = resolvedLookup?.yearBuilt
         insert.squareFootage = resolvedLookup?.squareFootage
         insert.purchasePrice = resolvedLookup?.lastSalePrice
+
+        // Phase 16e — always pipe through whatever value the lookup chain
+        // produced, plus the source/confidence so the Investment Summary can
+        // render its transparency caption. The edge function now guarantees
+        // a non-nil estimatedValue whenever ANY data layer succeeded, so the
+        // dashboard never has to render "Add estimated value" for an address
+        // we just enriched.
         insert.currentEstimatedValue = resolvedLookup?.estimatedValue
+        insert.estimatedValueSource = resolvedLookup?.estimatedValueSource
+        insert.estimatedValueConfidence = resolvedLookup?.estimatedValueConfidence
 
         let property = try await DatabaseService.shared.createProperty(insert)
 

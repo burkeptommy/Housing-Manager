@@ -31,7 +31,11 @@ interface PropertyResult {
   estimatedValue: number | null;
   estimatedValueLow: number | null;
   estimatedValueHigh: number | null;
-  estimatedValueConfidence: number | null; // ATTOM confidence score 0-100
+  estimatedValueConfidence: number | null; // 0-100 confidence (ATTOM AVM scr, computed: 40, estimated: 25)
+  /// Phase 16e: which fallback layer produced `estimatedValue`. One of
+  /// "attom" | "rentcast" | "computed" | "estimated". Surfaced in iOS as a
+  /// caption beneath the value to build trust ("estimated from last sale").
+  estimatedValueSource: "attom" | "rentcast" | "computed" | "estimated" | null;
   features: {
     roofType: string | null;
     heatingType: string | null;
@@ -114,25 +118,93 @@ serve(async (req: Request) => {
 
     // --- ATTOM PRIMARY ---
     const attomKey = Deno.env.get("ATTOM_API_KEY");
+    const rentcastKey = Deno.env.get("RENTCAST_API_KEY");
     let result: PropertyResult | null = null;
 
     if (attomKey) {
       result = await tryAttom(trimmedAddress, attomKey);
     }
 
-    // --- RENTCAST FALLBACK (for addresses ATTOM doesn't cover) ---
-    if (!result) {
-      const rentcastKey = Deno.env.get("RENTCAST_API_KEY");
-      if (rentcastKey) {
-        console.log("[property-lookup] ATTOM miss, trying RentCast fallback");
-        result = await tryRentcast(trimmedAddress, rentcastKey);
-        // RentCast tends to undervalue — adjust +5%
-        if (result?.estimatedValue) {
-          result.estimatedValue = Math.round(result.estimatedValue * 1.05);
-          if (result.estimatedValueLow) result.estimatedValueLow = Math.round(result.estimatedValueLow * 1.05);
-          if (result.estimatedValueHigh) result.estimatedValueHigh = Math.round(result.estimatedValueHigh * 1.05);
+    // --- RENTCAST PARTIAL FALLBACK (Phase 16e) ---
+    // ATTOM sometimes returns rich property data with a NULL AVM (the case
+    // that broke 146 Putnam Park Road). When that happens, call RentCast just
+    // for its AVM and overlay it on the existing ATTOM record so we keep the
+    // richer property data.
+    if (rentcastKey) {
+      const attomMissingAvm = result != null && result.estimatedValue == null;
+      if (!result || attomMissingAvm) {
+        if (result) {
+          console.log("[property-lookup] ATTOM hit but no AVM, overlaying RentCast value");
+        } else {
+          console.log("[property-lookup] ATTOM miss, trying RentCast fallback");
+        }
+        const rentcastResult = await tryRentcast(trimmedAddress, rentcastKey);
+        if (rentcastResult) {
+          // RentCast tends to undervalue — adjust +5% (matches the original
+          // RentCast-only path that's been in production for months).
+          if (rentcastResult.estimatedValue) {
+            rentcastResult.estimatedValue = Math.round(rentcastResult.estimatedValue * 1.05);
+            if (rentcastResult.estimatedValueLow) {
+              rentcastResult.estimatedValueLow = Math.round(rentcastResult.estimatedValueLow * 1.05);
+            }
+            if (rentcastResult.estimatedValueHigh) {
+              rentcastResult.estimatedValueHigh = Math.round(rentcastResult.estimatedValueHigh * 1.05);
+            }
+          }
+          if (result && attomMissingAvm) {
+            // Keep ATTOM's richer property data, overlay just the AVM.
+            result.estimatedValue = rentcastResult.estimatedValue;
+            result.estimatedValueLow = rentcastResult.estimatedValueLow;
+            result.estimatedValueHigh = rentcastResult.estimatedValueHigh;
+            result.estimatedValueConfidence =
+              rentcastResult.estimatedValueConfidence ?? result.estimatedValueConfidence;
+            if (result.estimatedValue != null) {
+              result.estimatedValueSource = "rentcast";
+            }
+          } else {
+            result = rentcastResult;
+            if (result.estimatedValue != null) {
+              result.estimatedValueSource = "rentcast";
+            }
+          }
         }
       }
+    }
+
+    // --- COMPUTED FALLBACK: appreciate last sale price (Phase 16e) ---
+    // When neither AVM came back, but we still have the last sale on record,
+    // compound it by ~3.5% per year (the long-run US average) so the user gets
+    // *some* number instead of a blank Investment Summary.
+    if (result && result.estimatedValue == null && result.lastSalePrice && result.lastSaleDate) {
+      try {
+        const salePriceNum = Number(result.lastSalePrice);
+        const saleDate = new Date(result.lastSaleDate);
+        if (!Number.isNaN(salePriceNum) && !Number.isNaN(saleDate.getTime())) {
+          const yearsSinceSale =
+            (Date.now() - saleDate.getTime()) / (365.25 * 24 * 60 * 60 * 1000);
+          const annualAppreciation = 0.035; // conservative US average
+          result.estimatedValue = Math.round(
+            salePriceNum * Math.pow(1 + annualAppreciation, Math.max(0, yearsSinceSale))
+          );
+          result.estimatedValueSource = "computed";
+          result.estimatedValueConfidence = 40;
+        }
+      } catch (err) {
+        console.warn("[property-lookup] Computed fallback failed:", err);
+      }
+    }
+
+    // --- FINAL FALLBACK: square footage × state median (Phase 16e) ---
+    // Even rural addresses with no sales record almost always have a sqft on
+    // file. Multiplying by a state median is rough but always better than nil.
+    if (result && result.estimatedValue == null && result.squareFootage) {
+      const stateAbbr = extractStateAbbreviation(trimmedAddress);
+      const medianPerSqft = stateAbbr
+        ? STATE_MEDIAN_PRICE_PER_SQFT[stateAbbr] ?? 200
+        : 200;
+      result.estimatedValue = Math.round(result.squareFootage * medianPerSqft);
+      result.estimatedValueSource = "estimated";
+      result.estimatedValueConfidence = 25;
     }
 
     if (!result) {
@@ -141,6 +213,13 @@ serve(async (req: Request) => {
         JSON.stringify({ success: false, error: "not_found" }),
         { status: 200, headers }
       );
+    }
+
+    // Backfill the source field for the happy ATTOM path so callers always
+    // see a value when `estimatedValue != null`.
+    if (result.estimatedValue != null && !result.estimatedValueSource) {
+      result.estimatedValueSource =
+        result.dataSource === "rentcast" ? "rentcast" : "attom";
     }
 
     console.log(
@@ -231,6 +310,7 @@ async function tryAttom(address: string, apiKey: string): Promise<PropertyResult
       estimatedValueLow: avm.low ?? null,
       estimatedValueHigh: avm.high ?? null,
       estimatedValueConfidence: avm.scr ?? null,
+      estimatedValueSource: avm.value != null ? "attom" : null,
       features: {
         roofType: null, // ATTOM doesn't return roof type in AVM endpoint
         heatingType: utilities.heatingtype ?? null,
@@ -347,6 +427,7 @@ async function tryRentcast(address: string, apiKey: string): Promise<PropertyRes
       estimatedValueLow: (avmData?.priceLow as number) ?? (avmData?.valueLow as number) ?? null,
       estimatedValueHigh: (avmData?.priceHigh as number) ?? (avmData?.valueHigh as number) ?? null,
       estimatedValueConfidence: null, // RentCast doesn't provide confidence score
+      estimatedValueSource: null, // backfilled by the caller after the +5% adjustment
       features: {
         roofType: (features.roofType as string) ?? (features.roofCover as string) ?? null,
         heatingType: (features.heatingType as string) ?? (features.heating as string) ?? null,
@@ -394,3 +475,73 @@ async function tryRentcast(address: string, apiKey: string): Promise<PropertyRes
     return null;
   }
 }
+
+// --- Phase 16e: square footage × state median fallback ---
+
+/// Pull the two-letter state abbreviation out of the original address string.
+/// Robust to "City, ST 12345" and "City ST 12345" shapes.
+function extractStateAbbreviation(address: string): string | null {
+  const match = address.toUpperCase().match(/\b([A-Z]{2})\s*\d{5}(?:-\d{4})?\b/);
+  if (match) return match[1];
+  // Last resort: look for any 2-letter token preceded by a comma.
+  const fallback = address.toUpperCase().match(/,\s*([A-Z]{2})\b/);
+  return fallback?.[1] ?? null;
+}
+
+/// Median residential price per square foot by state, mid-2025 figures from
+/// Zillow / NAR data. These are deliberately approximate — they're only used
+/// as a final-fallback when ATTOM, RentCast, AND last-sale fallback have all
+/// failed, and they're flagged as "estimated" / 25% confidence in the UI.
+const STATE_MEDIAN_PRICE_PER_SQFT: Record<string, number> = {
+  AL: 145,
+  AK: 240,
+  AZ: 270,
+  AR: 130,
+  CA: 450,
+  CO: 290,
+  CT: 240,
+  DE: 200,
+  FL: 260,
+  GA: 175,
+  HI: 700,
+  ID: 290,
+  IL: 165,
+  IN: 140,
+  IA: 145,
+  KS: 145,
+  KY: 140,
+  LA: 145,
+  ME: 230,
+  MD: 240,
+  MA: 360,
+  MI: 165,
+  MN: 195,
+  MS: 130,
+  MO: 155,
+  MT: 320,
+  NE: 165,
+  NV: 280,
+  NH: 270,
+  NJ: 290,
+  NM: 195,
+  NY: 320,
+  NC: 195,
+  ND: 165,
+  OH: 140,
+  OK: 135,
+  OR: 320,
+  PA: 165,
+  RI: 280,
+  SC: 180,
+  SD: 175,
+  TN: 200,
+  TX: 180,
+  UT: 290,
+  VT: 250,
+  VA: 240,
+  WA: 360,
+  WV: 130,
+  WI: 175,
+  WY: 240,
+  DC: 540,
+};

@@ -406,6 +406,13 @@ struct PropertyRow: Codable, Identifiable {
     let purchaseDate: String?
     let purchasePrice: Double?
     let currentEstimatedValue: Double?
+    /// Phase 16e: which fallback layer produced `currentEstimatedValue`. One of
+    /// "attom" | "rentcast" | "computed" | "estimated" | "manual". Used by
+    /// InvestmentSummaryCard to render a transparency caption beneath the value.
+    let estimatedValueSource: String?
+    /// 0-100 confidence score that pairs with the source. ATTOM ships its own
+    /// AVM scr; computed/estimated paths use 40 / 25 respectively.
+    let estimatedValueConfidence: Int?
     let squareFootage: Int?
     let yearBuilt: Int?
     let ownershipEntity: String?
@@ -423,6 +430,8 @@ struct PropertyRow: Codable, Identifiable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case estimatedValueSource = "estimated_value_source"
+        case estimatedValueConfidence = "estimated_value_confidence"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
@@ -445,6 +454,8 @@ struct PropertyRow: Codable, Identifiable {
         purchaseDate = try? c.decode(String.self, forKey: .purchaseDate)
         purchasePrice = try? c.decode(Double.self, forKey: .purchasePrice)
         currentEstimatedValue = try? c.decode(Double.self, forKey: .currentEstimatedValue)
+        estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
+        estimatedValueConfidence = try? c.decodeIfPresent(Int.self, forKey: .estimatedValueConfidence)
         squareFootage = try? c.decode(Int.self, forKey: .squareFootage)
         yearBuilt = try? c.decode(Int.self, forKey: .yearBuilt)
         ownershipEntity = try? c.decode(String.self, forKey: .ownershipEntity)
@@ -468,6 +479,8 @@ struct PropertyInsert: Codable {
     var purchaseDate: String?
     var purchasePrice: Double?
     var currentEstimatedValue: Double?
+    var estimatedValueSource: String?
+    var estimatedValueConfidence: Int?
     var squareFootage: Int?
     var yearBuilt: Int?
     var ownershipEntity: String?
@@ -481,6 +494,8 @@ struct PropertyInsert: Codable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case estimatedValueSource = "estimated_value_source"
+        case estimatedValueConfidence = "estimated_value_confidence"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
@@ -498,6 +513,8 @@ struct PropertyUpdate: Codable {
     var purchaseDate: String?
     var purchasePrice: Double?
     var currentEstimatedValue: Double?
+    var estimatedValueSource: String?
+    var estimatedValueConfidence: Int?
     var squareFootage: Int?
     var yearBuilt: Int?
     var ownershipEntity: String?
@@ -512,6 +529,8 @@ struct PropertyUpdate: Codable {
         case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
+        case estimatedValueSource = "estimated_value_source"
+        case estimatedValueConfidence = "estimated_value_confidence"
         case squareFootage = "square_footage"
         case yearBuilt = "year_built"
         case ownershipEntity = "ownership_entity"
