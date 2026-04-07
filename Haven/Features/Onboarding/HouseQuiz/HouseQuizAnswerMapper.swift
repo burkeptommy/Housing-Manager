@@ -7,11 +7,12 @@ import Foundation
 /// Real-time persistence: every question fires this immediately on tap so
 /// progress is durable even if the user force-quits mid-quiz.
 ///
-/// Phase 17b: questions that confirm a system subtype now route through
-/// `MaintenanceTaskReconciler` instead of the one-way
-/// `MaintenanceTaskMigrator`. Each apply call returns a
-/// `ReconciliationResult` so the quiz view model can sum changes across the
-/// whole flow and surface a "we tailored your plan" summary at the end.
+/// Phase 17b: questions that confirm a system subtype route through
+/// `MaintenanceTaskReconciler`, which adds newly-applicable templates AND
+/// soft-deletes templates that no longer match the confirmed subtype. Each
+/// apply call returns a `ReconciliationResult` so the quiz view model can
+/// sum changes across the whole flow and surface a "we tailored your plan"
+/// summary at the end.
 @MainActor
 final class HouseQuizAnswerMapper {
     let householdId: UUID
