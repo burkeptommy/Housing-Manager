@@ -50,6 +50,7 @@
 		27F9D01A4FE1FFFA16C8E05C /* AppleSignInCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97DA2A9A5015DD76D290D7F9 /* AppleSignInCoordinator.swift */; };
 		28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */; };
 		28AD71027D2D2EF895699291 /* CalendarEventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92CB0B12F6DE33AF7C25360 /* CalendarEventDetailView.swift */; };
+		294E2CEF29348B2B4696C6A3 /* PendingInvitationsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA28C5B48241D874518EC2A /* PendingInvitationsSection.swift */; };
 		2B225520A59F0E01640D17F4 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140FF755AC0C65534DBDFD63 /* AuthViewModel.swift */; };
 		2BA6D9D473C408FD57DEF781 /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
 		2C255BAD0460F323FD6169A6 /* FlexibleValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915078B738003E23B34AE01 /* FlexibleValue.swift */; };
@@ -338,6 +339,7 @@
 		4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeEntrySheet.swift; sourceTree = "<group>"; };
 		4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCategoryGroups.swift; sourceTree = "<group>"; };
 		4E7A7A395DB576CBE9BA310F /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
+		4FA28C5B48241D874518EC2A /* PendingInvitationsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PendingInvitationsSection.swift; sourceTree = "<group>"; };
 		518F88EE5413D96632C93167 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		51DC3662A89CDDA0D7B4BA94 /* WarrantyExpirationAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarrantyExpirationAlert.swift; sourceTree = "<group>"; };
 		521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchasePriceInputSheet.swift; sourceTree = "<group>"; };
@@ -543,6 +545,7 @@
 				2941D500DA3123BDF2B26B84 /* HouseholdAccessView.swift */,
 				BC4F1566D1DA1A840DCB8665 /* InviteToHavenSheet.swift */,
 				711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */,
+				4FA28C5B48241D874518EC2A /* PendingInvitationsSection.swift */,
 				D6821540D9780592C436EB87 /* ProfileView.swift */,
 				45B796CD75D32905D008DB51 /* SecuritySettingsView.swift */,
 				78E0C7E15351CDA2AB45CFC9 /* SettingsView.swift */,
@@ -1387,6 +1390,7 @@
 				7F68D4BDC9384936385CEBFC /* OnboardingViewModel.swift in Sources */,
 				A2DF2B9B63DCF0472D49A603 /* OverdueMaintenanceCard.swift in Sources */,
 				927F2A9E44D826E4FD5F0631 /* OverdueTasksDetailView.swift in Sources */,
+				294E2CEF29348B2B4696C6A3 /* PendingInvitationsSection.swift in Sources */,
 				C2F088E42D4171836E3A2D2B /* ProcessingBanner.swift in Sources */,
 				A016188BFADD6D8C98BD3A90 /* ProfileView.swift in Sources */,
 				4CCB0A06E26AE9B0A56C6D75 /* ProjectDetailView.swift in Sources */,

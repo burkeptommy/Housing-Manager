@@ -8,6 +8,7 @@ struct HouseholdAccessView: View {
     @State private var currentUserId: UUID?
     @State private var householdName: String = ""
     @State private var isLoading = true
+    @State private var pendingInvitations: [HouseholdInvitationRow] = []
 
     private let db = DatabaseService.shared
 
@@ -19,6 +20,11 @@ struct HouseholdAccessView: View {
                         .padding(.top, 40)
                 } else {
                     linkedAccountsSection
+                    PendingInvitationsSection(
+                        invitations: $pendingInvitations,
+                        familyMembers: $familyMembers,
+                        onRefreshNeeded: { await loadData() }
+                    )
                     if !trustedContacts.isEmpty {
                         trustedAccessSection
                     }
@@ -327,11 +333,13 @@ struct HouseholdAccessView: View {
             async let usersTask = db.fetchHouseholdUsers()
             async let membersTask = db.fetchFamilyMembers()
             async let contactsTask = db.fetchTrustedContacts()
+            async let pendingInvitesTask = (try? await db.fetchPendingInvitationsForHousehold()) ?? []
 
             let (users, members, contacts) = try await (usersTask, membersTask, contactsTask)
             householdUsers = users
             familyMembers = members
             trustedContacts = contacts
+            pendingInvitations = await pendingInvitesTask
 
             // Load document counts for each trusted contact
             for contact in contacts {
