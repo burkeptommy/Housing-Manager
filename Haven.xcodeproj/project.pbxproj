@@ -172,6 +172,7 @@
 		A016188BFADD6D8C98BD3A90 /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6821540D9780592C436EB87 /* ProfileView.swift */; };
 		A022B375C4CF2B9A09702FAC /* HouseQuizAnswerFeedbackCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */; };
 		A08086D5AE75A0591FF0539F /* DocumentUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14626DD382FED3D16FDE7151 /* DocumentUploadView.swift */; };
+		A0E4F6D658CBB9D8DA2B3E64 /* QuizKidsInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */; };
 		A2DF2B9B63DCF0472D49A603 /* OverdueMaintenanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BD10152C540F01FD5A0C2B /* OverdueMaintenanceCard.swift */; };
 		A4343405E25959CA1B4B2B5F /* DocumentCategoryGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */; };
 		A50832A03C6A3975D16E74CE /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B1CBF7F1BC549E214B0BEF /* SignUpView.swift */; };
@@ -440,6 +441,7 @@
 		A0AE7AB5E6C3F35C6429980C /* UnifiedTaskCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedTaskCard.swift; sourceTree = "<group>"; };
 		A1CC363C4F7144C666BF14C2 /* InvestmentSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvestmentSummaryCard.swift; sourceTree = "<group>"; };
 		A27E0CEC5981CD9DDE2C1B6D /* FamilyMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMember.swift; sourceTree = "<group>"; };
+		A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizKidsInlineForm.swift; sourceTree = "<group>"; };
 		A62102C006E50FF36746E336 /* GooglePlacesService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePlacesService.swift; sourceTree = "<group>"; };
 		A64DDA1DC7F83423F9AE6361 /* UnifiedAttentionList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UnifiedAttentionList.swift; sourceTree = "<group>"; };
 		A83EF53F1AFD71E81A730C71 /* HouseholdInviteCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseholdInviteCoordinator.swift; sourceTree = "<group>"; };
@@ -979,6 +981,7 @@
 				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
 				07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */,
+				A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */,
 				CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */,
 				05ACC1AD3C78491F50BDF8E4 /* QuizVehicleInputSelector.swift */,
 				460E8AA2102BB5BC0866C526 /* UtilityProviderCustomAddSheet.swift */,
@@ -1482,6 +1485,7 @@
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
 				D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */,
+				A0E4F6D658CBB9D8DA2B3E64 /* QuizKidsInlineForm.swift in Sources */,
 				EAE3E85AFEBB4D7982CFDB69 /* QuizSpouseInviteInlineForm.swift in Sources */,
 				C39B374BD7B0F466CAFDC717 /* QuizVehicleInputSelector.swift in Sources */,
 				28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */,

@@ -332,6 +332,48 @@ final class HouseQuizAnswerMapper {
                 if let caretakers = answer.selectedIds, !caretakers.isEmpty {
                     try await persistAttribute("caretakers", value: caretakers.joined(separator: ","))
                 }
+                // Phase 16d: when the user picked "Family with kids", each
+                // kid entered in the inline form becomes a real family_member
+                // row so the dashboard HouseholdStrip lights up. Failures
+                // are logged-and-swallowed via the outer do/catch.
+                if let kids = answer.kids {
+                    for kid in kids {
+                        let trimmed = kid.firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else { continue }
+                        _ = try? await HouseholdInviteCoordinator.shared.addPersonToHousehold(
+                            HouseholdInviteCoordinator.AddPersonRequest(
+                                householdId: householdId,
+                                firstName: trimmed,
+                                relationship: "Child",
+                                dateOfBirth: kid.dateOfBirth,
+                                isMinor: kid.isMinorFromDOB,
+                                sendInvite: false,
+                                source: .childProfileAdd
+                            )
+                        )
+                    }
+                }
+                // Expecting entries also become family_members but with the
+                // is_expecting/expected_date columns set so the dashboard can
+                // render the dashed avatar.
+                if let expecting = answer.expectingEntries {
+                    for entry in expecting {
+                        let trimmedName = entry.name?
+                            .trimmingCharacters(in: .whitespacesAndNewlines)
+                        let firstName = (trimmedName?.isEmpty == false ? trimmedName : nil) ?? "Baby"
+                        var insert = FamilyMemberInsert(
+                            householdId: householdId,
+                            firstName: firstName,
+                            lastName: "",
+                            relationship: "Child"
+                        )
+                        insert.isExpecting = true
+                        insert.expectedDate = entry.dueDate
+                        insert.isMinor = true
+                        insert.avatarColor = "sage"
+                        _ = try? await db.createFamilyMember(insert)
+                    }
+                }
 
             case "q29_estate_docs":
                 if let selected = answer.selectedIds {

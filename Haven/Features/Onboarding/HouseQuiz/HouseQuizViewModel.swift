@@ -163,6 +163,30 @@ final class HouseQuizViewModel: ObservableObject {
         advance()
     }
 
+    /// Phase 16d — Q28 specific: persist the household answer along with the
+    /// kids and expecting entries captured by QuizKidsInlineForm. Caretakers
+    /// already flow through `recordMultiSelect` after the inline form
+    /// completes — this method only captures the residents type plus the
+    /// kid/expecting payload, since those create real family_member rows.
+    func recordHouseholdAnswer(
+        residentsId: String,
+        kids: [QuizKidEntry],
+        expecting: [QuizExpectingEntry]
+    ) async {
+        guard let q = currentQuestion else { return }
+        let answer = HouseQuizAnswer(
+            answerId: residentsId,
+            customText: nil,
+            selectedIds: nil,
+            customEntries: nil,
+            kids: kids.isEmpty ? nil : kids,
+            expectingEntries: expecting.isEmpty ? nil : expecting,
+            answeredAt: Date()
+        )
+        await persist(answer: answer, for: q)
+        advance()
+    }
+
     /// Persist a currency-style answer (purchase price) and advance.
     func recordCurrencyAnswer(answerId: String, amount: Double) async {
         guard let q = currentQuestion else { return }

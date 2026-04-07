@@ -31,6 +31,17 @@ struct HouseQuizView: View {
     /// caretaker chips section should render. Resets when the quiz advances.
     @State private var householdShowCaretakerStep: Bool = false
 
+    /// Phase 16d — Q28 kids step. true once the spouse form has completed for
+    /// a `family_with_kids` resident type, and the inline kids form should
+    /// render before the caretaker chips. Resets when the quiz advances.
+    @State private var householdShowKidsStep: Bool = false
+
+    /// Phase 16d — kids and expecting payload captured by QuizKidsInlineForm,
+    /// stashed here so the eventual `recordHouseholdAnswer` call can pass them
+    /// to the answer mapper after the caretaker step finishes.
+    @State private var householdPendingKids: [QuizKidEntry] = []
+    @State private var householdPendingExpecting: [QuizExpectingEntry] = []
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -734,11 +745,43 @@ struct HouseQuizView: View {
                         householdId: viewModel.property.householdId,
                         onComplete: {
                             let pendingId = answerId
+                            let pendingKids = householdPendingKids
+                            let pendingExpecting = householdPendingExpecting
                             withAnimation(HavenTheme.animationStandard) {
                                 householdInviteAnswerId = nil
                                 householdShowCaretakerStep = false
+                                householdShowKidsStep = false
+                                householdPendingKids = []
+                                householdPendingExpecting = []
                             }
-                            Task { await viewModel.recordAnswer(pendingId) }
+                            Task {
+                                if pendingKids.isEmpty && pendingExpecting.isEmpty {
+                                    await viewModel.recordAnswer(pendingId)
+                                } else {
+                                    await viewModel.recordHouseholdAnswer(
+                                        residentsId: pendingId,
+                                        kids: pendingKids,
+                                        expecting: pendingExpecting
+                                    )
+                                }
+                            }
+                        }
+                    )
+                    .transition(.opacity)
+                } else if householdShowKidsStep {
+                    // Phase 16d — only renders for family_with_kids. Hands the
+                    // captured kids/expecting payload back via onContinue and
+                    // moves on to the caretakers step.
+                    QuizKidsInlineForm(
+                        initialKids: householdPendingKids,
+                        initialExpecting: householdPendingExpecting,
+                        onContinue: { kids, expecting in
+                            householdPendingKids = kids
+                            householdPendingExpecting = expecting
+                            withAnimation(HavenTheme.animationStandard) {
+                                householdShowKidsStep = false
+                                householdShowCaretakerStep = true
+                            }
                         }
                     )
                     .transition(.opacity)
@@ -748,7 +791,11 @@ struct HouseQuizView: View {
                         relationshipLabel: Self.relationshipLabel(for: answerId),
                         onComplete: {
                             withAnimation(HavenTheme.animationStandard) {
-                                householdShowCaretakerStep = true
+                                if answerId == "family_with_kids" {
+                                    householdShowKidsStep = true
+                                } else {
+                                    householdShowCaretakerStep = true
+                                }
                             }
                         }
                     )
@@ -849,5 +896,13 @@ struct HouseQuizView: View {
         multiSelectCustomEntries = []
         providerNameText = ""
         pendingProviderForAnswer = nil
+        // Phase 16d — clear the Q28 sub-step state so going back/forward
+        // through the quiz doesn't carry kids/expecting values into the next
+        // visit. Each return to Q28 starts fresh.
+        householdInviteAnswerId = nil
+        householdShowCaretakerStep = false
+        householdShowKidsStep = false
+        householdPendingKids = []
+        householdPendingExpecting = []
     }
 }

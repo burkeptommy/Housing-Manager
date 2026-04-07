@@ -41,11 +41,17 @@ struct HouseQuizState: Codable, Equatable {
 /// `selectedIds` is filled in for multi-select questions; `customEntries` is
 /// filled in when a multi-select question has an "Other" option that accepts
 /// one or more user-supplied free-form values (e.g. q10 appliances).
+///
+/// Phase 16d: `kids` and `expectingEntries` are populated by q28_household
+/// when the user picks "Family with kids" — each entry creates a family_member
+/// row in HouseQuizAnswerMapper.
 struct HouseQuizAnswer: Codable, Equatable {
     var answerId: String?
     var customText: String?
     var selectedIds: [String]?
     var customEntries: [String]?
+    var kids: [QuizKidEntry]?
+    var expectingEntries: [QuizExpectingEntry]?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -53,6 +59,8 @@ struct HouseQuizAnswer: Codable, Equatable {
         case customText = "custom_text"
         case selectedIds = "selected_ids"
         case customEntries = "custom_entries"
+        case kids
+        case expectingEntries = "expecting_entries"
         case answeredAt = "answered_at"
     }
 
@@ -61,24 +69,107 @@ struct HouseQuizAnswer: Codable, Equatable {
         customText: String? = nil,
         selectedIds: [String]? = nil,
         customEntries: [String]? = nil,
+        kids: [QuizKidEntry]? = nil,
+        expectingEntries: [QuizExpectingEntry]? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
         self.customText = customText
         self.selectedIds = selectedIds
         self.customEntries = customEntries
+        self.kids = kids
+        self.expectingEntries = expectingEntries
         self.answeredAt = answeredAt
     }
 
-    /// Resilient decoding so old persisted answers (no `custom_entries` key)
-    /// still load cleanly after the schema bump.
+    /// Resilient decoding so old persisted answers (no `custom_entries`,
+    /// `kids`, or `expecting_entries` keys) still load cleanly after the
+    /// schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
         self.customText = try c.decodeIfPresent(String.self, forKey: .customText)
         self.selectedIds = try c.decodeIfPresent([String].self, forKey: .selectedIds)
         self.customEntries = try c.decodeIfPresent([String].self, forKey: .customEntries)
+        self.kids = try? c.decodeIfPresent([QuizKidEntry].self, forKey: .kids)
+        self.expectingEntries = try? c.decodeIfPresent([QuizExpectingEntry].self, forKey: .expectingEntries)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
+    }
+}
+
+/// A single kid captured by Q28's "Family with kids" expansion. Persisted as
+/// JSONB on the property's house_quiz_state row and replayed by
+/// HouseQuizAnswerMapper to create the matching family_members row.
+struct QuizKidEntry: Codable, Equatable, Hashable, Identifiable {
+    var id: UUID
+    var firstName: String
+    /// ISO date string (YYYY-MM-DD). Optional so users who only know the year
+    /// can still record something useful (the form defaults the day to 1).
+    var dateOfBirth: String?
+
+    init(id: UUID = UUID(), firstName: String, dateOfBirth: String? = nil) {
+        self.id = id
+        self.firstName = firstName
+        self.dateOfBirth = dateOfBirth
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case firstName = "first_name"
+        case dateOfBirth = "date_of_birth"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        self.firstName = (try? c.decode(String.self, forKey: .firstName)) ?? ""
+        self.dateOfBirth = try? c.decodeIfPresent(String.self, forKey: .dateOfBirth)
+    }
+
+    /// Convenience for the answer mapper — true when DOB makes the kid under
+    /// 18 today. Used to set `is_minor` on the family_member insert.
+    var isMinorFromDOB: Bool {
+        guard let dob = dateOfBirth, let date = Self.dateFormatter.date(from: dob) else {
+            return true // assume minor when DOB is unknown — safer default
+        }
+        let years = Calendar.current.dateComponents([.year], from: date, to: Date()).year ?? 0
+        return years < 18
+    }
+
+    private static let dateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.timeZone = TimeZone(identifier: "UTC")
+        return f
+    }()
+}
+
+/// A single expecting baby captured by Q28's expansion. Mapped to a
+/// `family_members` row with `is_expecting: true` and `expected_date` set.
+struct QuizExpectingEntry: Codable, Equatable, Hashable, Identifiable {
+    var id: UUID
+    /// Optional placeholder name (e.g. "Baby Smith"). Falls back to "Baby" in
+    /// the answer mapper when blank.
+    var name: String?
+    /// ISO date string (YYYY-MM-DD) for the due date.
+    var dueDate: String
+
+    init(id: UUID = UUID(), name: String? = nil, dueDate: String) {
+        self.id = id
+        self.name = name
+        self.dueDate = dueDate
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, name
+        case dueDate = "due_date"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = (try? c.decode(UUID.self, forKey: .id)) ?? UUID()
+        self.name = try? c.decodeIfPresent(String.self, forKey: .name)
+        self.dueDate = (try? c.decode(String.self, forKey: .dueDate)) ?? ""
     }
 }
 
