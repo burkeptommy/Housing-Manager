@@ -42,6 +42,8 @@ struct PropertyDetailView: View {
     @State private var taskForDateEdit: MaintenanceTaskDBRow?
     @State private var taskForLastServiced: MaintenanceTaskDBRow?
     @State private var editedTaskDueDate = Date()
+    @State private var selectedMaintenanceTask: MaintenanceTaskDBRow?
+    @AppStorage("dismissedSeasonalOverview") private var dismissedSeasonalOverview = ""
     @State private var lastServicedTaskDate = Date()
     @Environment(\.dismiss) private var dismiss
 
@@ -86,6 +88,19 @@ struct PropertyDetailView: View {
             }
         }
         .trackScreen("PropertyDetailView", properties: ["property_id": propertyID.uuidString])
+        .onReceive(NotificationCenter.default.publisher(for: .navigateToPropertySection)) { notification in
+            if let section = notification.userInfo?["section"] as? String {
+                withAnimation {
+                    switch section {
+                    case "overview": activeTab = .overview
+                    case "maintenance": activeTab = .maintenance
+                    case "projects": activeTab = .projects
+                    case "contacts": activeTab = .contacts
+                    default: break
+                    }
+                }
+            }
+        }
         .task {
             await viewModel.loadProperty(id: propertyID)
         }
@@ -234,6 +249,14 @@ struct PropertyDetailView: View {
         .navigationDestination(isPresented: $showFullSchedule) {
             MaintenanceScheduleView(filterPropertyId: propertyID)
         }
+        .sheet(item: $selectedMaintenanceTask) { task in
+            NavigationStack {
+                MaintenanceTaskDetailSheet(task: task, onTaskCompleted: {
+                    Task { await viewModel.loadProperty(id: propertyID) }
+                })
+            }
+            .presentationDetents([.medium, .large])
+        }
         .confirmationDialog("Delete Property?", isPresented: $showDeleteConfirmation) {
             Button("Delete", role: .destructive) {
                 Task {
@@ -291,6 +314,15 @@ struct PropertyDetailView: View {
 
                 switch activeTab {
                 case .overview:
+                    if let prop = viewModel.property {
+                        InvestmentSummaryCard(
+                            property: prop,
+                            totalProjectSpend: viewModel.totalProjectSpend,
+                            onValuesUpdated: { update in
+                                await viewModel.applyPropertyUpdate(update)
+                            }
+                        )
+                    }
                     UtilityAccountsSection(
                         propertyId: property.id,
                         householdId: property.householdId,
@@ -302,7 +334,8 @@ struct PropertyDetailView: View {
                     if !viewModel.activeWarranties.isEmpty { warrantiesSection }
 
                 case .maintenance:
-                    if !viewModel.currentSeasonTasks.isEmpty || !viewModel.nextSeasonTasks.isEmpty {
+                    if (!viewModel.currentSeasonTasks.isEmpty || !viewModel.nextSeasonTasks.isEmpty),
+                       dismissedSeasonalOverview != "\(viewModel.currentSeason) \(Calendar.current.component(.year, from: Date()))" {
                         seasonalOverviewCard
                     }
                     if !viewModel.overdueTasks.isEmpty { overdueSection }
@@ -369,6 +402,15 @@ struct PropertyDetailView: View {
                     }
                     if let year = property.yearBuilt {
                         propertyDetail(label: "Built", value: "\(year)")
+                    }
+                    if let value = property.currentEstimatedValue, value > 0 {
+                        let formatter: NumberFormatter = {
+                            let f = NumberFormatter()
+                            f.numberStyle = .currency
+                            f.maximumFractionDigits = 0
+                            return f
+                        }()
+                        propertyDetail(label: "Est. Value", value: formatter.string(from: NSNumber(value: value)) ?? "")
                     }
                     if let entity = property.ownershipEntity, !entity.isEmpty {
                         propertyDetail(label: "Entity", value: entity)
@@ -530,9 +572,11 @@ struct PropertyDetailView: View {
     // MARK: - Seasonal Overview
 
     private var seasonalOverviewCard: some View {
-        NavigationLink {
+        let season = viewModel.currentSeason
+
+        return NavigationLink {
             SeasonalTasksDetailView(
-                season: viewModel.currentSeason,
+                season: season,
                 tasks: viewModel.currentSeasonTasks,
                 completedCount: viewModel.currentSeasonCompletedCount,
                 nextSeason: viewModel.nextSeason,
@@ -540,66 +584,100 @@ struct PropertyDetailView: View {
                 systemNameLookup: { viewModel.systemName(for: $0) }
             )
         } label: {
-            HavenCard {
-                VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: seasonIcon(season))
+                        .foregroundStyle(seasonColor(season))
+                    Text("Seasonal Overview")
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+
+                VStack(alignment: .leading, spacing: 6) {
+                    let groups = SeasonalTaskGrouper.group(viewModel.currentSeasonTasks, systemNameLookup: { viewModel.systemName(for: $0) })
+                    let groupsDone = groups.filter(\.isComplete).count
                     HStack {
-                        Image(systemName: seasonIcon(viewModel.currentSeason))
-                            .foregroundStyle(HavenColors.navy700)
-                        Text("Seasonal Overview")
-                            .font(HavenTypography.headline)
+                        Text(season)
+                            .font(HavenTypography.uiLabel)
                             .foregroundStyle(HavenColors.textPrimary)
                         Spacer()
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .semibold))
+                        Text("\(groupsDone) of \(groups.count) done")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textSecondary)
+                    }
+
+                    if !viewModel.currentSeasonTasks.isEmpty {
+                        ProgressView(
+                            value: Double(viewModel.currentSeasonCompletedCount),
+                            total: Double(viewModel.currentSeasonTasks.count)
+                        )
+                        .tint(seasonColor(season))
+                    }
+                }
+
+                if !viewModel.nextSeasonTasks.isEmpty {
+                    let nextGroups = SeasonalTaskGrouper.group(viewModel.nextSeasonTasks, systemNameLookup: { viewModel.systemName(for: $0) })
+                    HStack(spacing: 6) {
+                        Image(systemName: seasonIcon(viewModel.nextSeason))
+                            .font(HavenTypography.uiCaption)
                             .foregroundStyle(HavenColors.textTertiary)
-                    }
-
-                    // Current season
-                    VStack(alignment: .leading, spacing: 6) {
-                        HStack {
-                            Text(viewModel.currentSeason)
-                                .font(HavenTypography.uiLabel)
-                                .foregroundStyle(HavenColors.textPrimary)
-                            Spacer()
-                            Text("\(viewModel.currentSeasonCompletedCount) of \(viewModel.currentSeasonTasks.count) done")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textSecondary)
-                        }
-
-                        if !viewModel.currentSeasonTasks.isEmpty {
-                            ProgressView(
-                                value: Double(viewModel.currentSeasonCompletedCount),
-                                total: Double(viewModel.currentSeasonTasks.count)
-                            )
-                            .tint(seasonalProgressColor)
-                        }
-                    }
-
-                    // Next season preview
-                    if !viewModel.nextSeasonTasks.isEmpty {
-                        HStack(spacing: 6) {
-                            Image(systemName: seasonIcon(viewModel.nextSeason))
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textTertiary)
-                            Text("Coming up in \(viewModel.nextSeason): \(viewModel.nextSeasonTasks.count) tasks")
-                                .font(HavenTypography.uiCaption)
-                                .foregroundStyle(HavenColors.textTertiary)
-                        }
+                        Text("Coming up in \(viewModel.nextSeason): \(nextGroups.count) areas")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
                     }
                 }
             }
+            .padding(HavenTheme.spacing16)
+            .background(
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .fill(seasonColor(season).opacity(0.08))
+            )
+            .overlay {
+                let icons = seasonBackgroundIcons(season)
+                let color = seasonColor(season).opacity(0.07)
+                ZStack {
+                    Image(systemName: icons[0])
+                        .font(.system(size: 20)).rotationEffect(.degrees(-15)).offset(x: -100, y: -10)
+                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
+                        .font(.system(size: 14)).rotationEffect(.degrees(20)).offset(x: -60, y: 8)
+                    Image(systemName: icons[0])
+                        .font(.system(size: 24)).rotationEffect(.degrees(10)).offset(x: 40, y: -5)
+                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
+                        .font(.system(size: 18)).rotationEffect(.degrees(-25)).offset(x: 110, y: 5)
+                    Image(systemName: icons.count > 2 ? icons[2] : icons[0])
+                        .font(.system(size: 16)).rotationEffect(.degrees(35)).offset(x: 80, y: -15)
+                    Image(systemName: icons[0])
+                        .font(.system(size: 12)).rotationEffect(.degrees(-10)).offset(x: -20, y: 15)
+                    Image(systemName: icons.count > 1 ? icons[1] : icons[0])
+                        .font(.system(size: 22)).rotationEffect(.degrees(15)).offset(x: 140, y: 0)
+                }
+                .foregroundStyle(color)
+                .allowsHitTesting(false)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            Button(role: .destructive) {
+                dismissedSeasonalOverview = "\(season) \(Calendar.current.component(.year, from: Date()))"
+            } label: {
+                Label("Dismiss for \(season)", systemImage: "xmark.circle")
+            }
+        }
     }
 
-    private var seasonalProgressColor: Color {
-        let total = viewModel.currentSeasonTasks.count
-        let done = viewModel.currentSeasonCompletedCount
-        if total == 0 { return HavenColors.success }
-        let ratio = Double(done) / Double(total)
-        if ratio >= 0.8 { return HavenColors.success }
-        if ratio >= 0.5 { return HavenColors.warning }
-        return HavenColors.critical
+    private func seasonColor(_ season: String) -> Color {
+        switch season {
+        case "Spring": return .green
+        case "Summer": return .yellow
+        case "Fall": return .orange
+        case "Winter": return .blue
+        default: return HavenColors.navy
+        }
     }
 
     private func seasonIcon(_ season: String) -> String {
@@ -609,6 +687,16 @@ struct PropertyDetailView: View {
         case "Fall": return "wind"
         case "Winter": return "snowflake"
         default: return "calendar"
+        }
+    }
+
+    private func seasonBackgroundIcons(_ season: String) -> [String] {
+        switch season {
+        case "Spring": return ["leaf.fill", "cloud.rain.fill", "drop.fill"]
+        case "Summer": return ["sun.max.fill", "cloud.sun.fill", "drop.fill"]
+        case "Fall": return ["leaf.fill", "wind", "cloud.fill"]
+        case "Winter": return ["snowflake", "wind", "cloud.snow.fill"]
+        default: return ["leaf.fill"]
         }
     }
 
@@ -644,20 +732,25 @@ struct PropertyDetailView: View {
                     }
 
                     ForEach(viewModel.overdueTasks.prefix(3)) { task in
-                        HStack {
-                            Circle().fill(HavenColors.critical).frame(width: 8, height: 8)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(task.title)
-                                    .font(HavenTypography.bodySmall)
-                                    .foregroundStyle(HavenColors.textPrimary)
-                                if let systemName = viewModel.systemName(for: task.systemId) {
-                                    Text(systemName)
-                                        .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textTertiary)
+                        Button {
+                            selectedMaintenanceTask = task
+                        } label: {
+                            HStack {
+                                Circle().fill(HavenColors.critical).frame(width: 8, height: 8)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(task.title)
+                                        .font(HavenTypography.bodySmall)
+                                        .foregroundStyle(HavenColors.textPrimary)
+                                    if let systemName = viewModel.systemName(for: task.systemId) {
+                                        Text(systemName)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
                                 }
+                                Spacer()
                             }
-                            Spacer()
                         }
+                        .buttonStyle(.plain)
                     }
 
                     if viewModel.overdueTasks.count > 3 {
@@ -732,33 +825,33 @@ struct PropertyDetailView: View {
                     .padding(.vertical, 8)
                 }
             } else {
-                let groups = SystemGroup.group(viewModel.systems)
-                let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+                let groups = SystemGroup.group(viewModel.systems).sorted { $0.systems.count > $1.systems.count }
 
-                LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(groups) { group in
-                        if group.systems.count == 1, group.id != "other" {
-                            // Single system in a group: show directly
-                            NavigationLink {
-                                SystemDetailRowView(system: group.systems[0])
-                            } label: {
-                                systemGridCard(group.systems[0])
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
+                        ForEach(groups) { group in
+                            if group.systems.count == 1, group.id != "other" {
+                                NavigationLink {
+                                    SystemDetailRowView(system: group.systems[0])
+                                } label: {
+                                    compactSystemChip(icon: group.icon, name: shortGroupName(group.name), count: group.systems.count)
+                                }
+                                .buttonStyle(.plain)
+                            } else if !group.systems.isEmpty {
+                                NavigationLink {
+                                    SystemGroupListView(
+                                        group: group,
+                                        propertyId: propertyID,
+                                        householdId: viewModel.property?.householdId ?? UUID()
+                                    )
+                                } label: {
+                                    compactSystemChip(icon: group.icon, name: shortGroupName(group.name), count: group.systems.count)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
-                        } else if !group.systems.isEmpty {
-                            // Multiple systems: show grouped card
-                            NavigationLink {
-                                SystemGroupListView(
-                                    group: group,
-                                    propertyId: propertyID,
-                                    householdId: viewModel.property?.householdId ?? UUID()
-                                )
-                            } label: {
-                                systemGroupCard(group)
-                            }
-                            .buttonStyle(.plain)
                         }
                     }
+                    .padding(.horizontal, 2)
                 }
             }
         }
@@ -781,25 +874,35 @@ struct PropertyDetailView: View {
                         .foregroundStyle(HavenColors.textTertiary)
                 }
 
-                ForEach(viewModel.upcomingTasks.prefix(5)) { task in
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(task.title)
-                                .font(HavenTypography.bodySmall)
-                                .foregroundStyle(HavenColors.textPrimary)
-                            HStack(spacing: 8) {
-                                Text("Due: \(task.nextDueDate.havenDateShort)")
-                                    .font(HavenTypography.uiLabelSmall)
-                                    .foregroundStyle(HavenColors.textSecondary)
-                                if let systemName = viewModel.systemName(for: task.systemId) {
-                                    Text(systemName)
-                                        .font(HavenTypography.uiCaption)
-                                        .foregroundStyle(HavenColors.textTertiary)
+                let upcomingSlice = Array(viewModel.upcomingTasks.prefix(5))
+                ForEach(Array(upcomingSlice.enumerated()), id: \.element.id) { index, task in
+                    Button {
+                        selectedMaintenanceTask = task
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(task.title)
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                HStack(spacing: 8) {
+                                    Text("Due: \(task.nextDueDate.havenDateShort)")
+                                        .font(HavenTypography.uiLabelSmall)
+                                        .foregroundStyle(HavenColors.textSecondary)
+                                    if let systemName = viewModel.systemName(for: task.systemId) {
+                                        Text(systemName)
+                                            .font(HavenTypography.uiCaption)
+                                            .foregroundStyle(HavenColors.textTertiary)
+                                    }
                                 }
                             }
+                            Spacer()
+                            taskActionMenu(task)
                         }
-                        Spacer()
-                        taskActionMenu(task)
+                    }
+                    .buttonStyle(.plain)
+
+                    if index < upcomingSlice.count - 1 {
+                        Divider().padding(.horizontal, 4)
                     }
                 }
 
@@ -1090,7 +1193,8 @@ struct PropertyDetailView: View {
                     Spacer()
                 }
 
-                ForEach(viewModel.serviceRecords.prefix(3)) { record in
+                let overviewServiceSlice = Array(viewModel.serviceRecords.prefix(3))
+                ForEach(Array(overviewServiceSlice.enumerated()), id: \.element.id) { index, record in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(record.description)
@@ -1107,6 +1211,10 @@ struct PropertyDetailView: View {
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
                         }
+                    }
+
+                    if index < overviewServiceSlice.count - 1 {
+                        Divider().padding(.horizontal, 4)
                     }
                 }
 
@@ -1140,12 +1248,14 @@ struct PropertyDetailView: View {
                     }
                 }
 
-                ForEach(viewModel.serviceRecords.prefix(5)) { record in
+                let serviceSlice = Array(viewModel.serviceRecords.prefix(5))
+                ForEach(Array(serviceSlice.enumerated()), id: \.element.id) { index, record in
                     HStack {
                         VStack(alignment: .leading, spacing: 2) {
                             Text(record.description)
                                 .font(HavenTypography.bodySmall)
                                 .foregroundStyle(HavenColors.textPrimary)
+                                .lineLimit(2)
                             Text(record.serviceDate)
                                 .font(HavenTypography.uiLabelSmall)
                                 .foregroundStyle(HavenColors.textSecondary)
@@ -1156,6 +1266,10 @@ struct PropertyDetailView: View {
                                 .font(HavenTypography.uiLabel)
                                 .foregroundStyle(HavenColors.textPrimary)
                         }
+                    }
+
+                    if index < serviceSlice.count - 1 {
+                        Divider().padding(.horizontal, 4)
                     }
                 }
 
@@ -1293,44 +1407,66 @@ struct PropertyDetailView: View {
 
     // MARK: - Helpers
 
-    private func systemGroupCard(_ group: SystemGroup) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: group.icon)
-                    .font(.system(size: 12))
-                    .foregroundStyle(HavenColors.navy700)
-                Text(group.name)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textPrimary)
-                Spacer()
-                Text("\(group.systems.count)")
-                    .font(HavenTypography.uiLabelSmall)
-                    .foregroundStyle(HavenColors.navy)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 2)
-                    .background(HavenColors.navy.opacity(0.1))
-                    .clipShape(Capsule())
-            }
-            let preview = group.systems.prefix(3).map(\.name).joined(separator: ", ")
-            let remaining = group.systems.count - min(3, group.systems.count)
-            Text(preview + (remaining > 0 ? " +\(remaining)" : ""))
-                .font(HavenTypography.uiCaption)
-                .foregroundStyle(HavenColors.textTertiary)
+    private func compactSystemChip(icon: String, name: String, count: Int) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 20))
+                .foregroundStyle(HavenColors.navy700)
+            Text(name)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundStyle(HavenColors.navy800)
                 .lineLimit(1)
-
-            let needsAttention = group.systems.filter { systemStatusColor($0.status) != HavenColors.success }
-            if !needsAttention.isEmpty {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(HavenColors.warning)
-                        .frame(width: 6, height: 6)
-                    Text("\(needsAttention.count) need attention")
-                        .font(.system(size: 10))
-                        .foregroundStyle(HavenColors.warning)
-                }
-            }
+            Text("\(count)")
+                .font(.system(size: 9, weight: .bold))
+                .foregroundStyle(HavenColors.textTertiary)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(HavenColors.navy.opacity(0.06))
+                .cornerRadius(8)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(width: 80, height: 75)
+        .background(HavenColors.surface)
+        .cornerRadius(HavenTheme.radiusMedium)
+        .overlay {
+            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                .strokeBorder(HavenColors.border.opacity(0.5), lineWidth: 0.5)
+        }
+    }
+
+    private func shortGroupName(_ name: String) -> String {
+        switch name {
+        case "Climate & Energy": return "Climate"
+        case "Structure & Exterior": return "Exterior"
+        case "Plumbing & Water": return "Plumbing"
+        case "Smoke & Fire Protection": return "Safety"
+        case "Other Systems": return "Other"
+        default: return name
+        }
+    }
+
+    private func systemGroupCard(_ group: SystemGroup) -> some View {
+        VStack(spacing: 8) {
+            Image(systemName: group.icon)
+                .font(.system(size: 22))
+                .foregroundStyle(HavenColors.navy700)
+
+            Text(group.name)
+                .font(HavenTypography.uiLabel)
+                .foregroundStyle(HavenColors.navy800)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+
+            Text("\(group.systems.count)")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundStyle(HavenColors.navy)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 1)
+                .background(HavenColors.navy.opacity(0.1))
+                .clipShape(Capsule())
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 90)
         .padding(12)
         .background(HavenColors.creamLight)
         .clipShape(RoundedRectangle(cornerRadius: 10))

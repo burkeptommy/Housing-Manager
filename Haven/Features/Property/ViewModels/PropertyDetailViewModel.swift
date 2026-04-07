@@ -11,9 +11,12 @@ final class PropertyDetailViewModel: ObservableObject {
     @Published var linkedDocuments: [DocumentRow] = []
     @Published var contractors: [ContractorRow] = []
     @Published var utilityAccounts: [UtilityAccountRow] = []
+    @Published var completedProjects: [PropertyProjectRow] = []
+    @Published var allProjects: [PropertyProjectRow] = []
     @Published var isLoading = false
     @Published var error: String?
     @Published var justCompletedTaskId: UUID?
+    @Published var isRefreshingValue = false
 
     private let db = DatabaseService.shared
 
@@ -172,6 +175,20 @@ final class PropertyDetailViewModel: ObservableObject {
 
     // MARK: - Seasonal
 
+    /// Total actual spend on COMPLETED projects only (for investment dashboard cost basis).
+    /// In-flight projects are excluded because their budgets are speculative.
+    var totalProjectSpend: Double {
+        completedProjects.reduce(0.0) { $0 + (($1.actualSpend ?? 0) > 0 ? $1.actualSpend! : 0) }
+    }
+
+    /// Estimated spend on active/in-flight projects (planning + in_progress).
+    /// Used for "what if" analysis but not included in totalProjectSpend.
+    var inFlightProjectSpend: Double {
+        allProjects
+            .filter { $0.status == "planning" || $0.status == "in_progress" }
+            .reduce(0.0) { $0 + (($1.actualSpend ?? 0) > 0 ? $1.actualSpend! : ($1.estimatedBudget ?? 0)) }
+    }
+
     var currentSeason: String {
         let month = Calendar.current.component(.month, from: .now)
         switch month {
@@ -209,6 +226,56 @@ final class PropertyDetailViewModel: ObservableObject {
         currentSeasonTasks.filter { $0.lastCompletedDate != nil }.count
     }
 
+    /// Refresh the property's estimated value via ATTOM/RentCast lookup
+    /// Apply a freeform PropertyUpdate (used by InvestmentSummaryCard's
+    /// inline-edit sheet) and refresh local state.
+    func applyPropertyUpdate(_ update: PropertyUpdate) async {
+        guard let prop = property else { return }
+        do {
+            let updated = try await db.updateProperty(id: prop.id, update)
+            property = updated
+            Haptics.success()
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+            Analytics.track(.investmentValuesEdited, [
+                "has_purchase_price": update.purchasePrice != nil,
+                "has_estimated_value": update.currentEstimatedValue != nil,
+            ])
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    func refreshPropertyValue() async {
+        guard let prop = property else { return }
+        let address = [prop.street, prop.city, prop.state, prop.zipCode]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+        guard !address.isEmpty else { return }
+
+        isRefreshingValue = true
+        defer { isRefreshingValue = false }
+
+        do {
+            let data = try await HavenSupabase.propertyLookup(address: address)
+            struct LookupResponse: Decodable {
+                let success: Bool
+                let property: PropertyLookupResult?
+            }
+            let response = try JSONDecoder().decode(LookupResponse.self, from: data)
+            if let result = response.property, let newValue = result.estimatedValue {
+                let updated = try await db.updateProperty(id: prop.id, PropertyUpdate(
+                    currentEstimatedValue: newValue
+                ))
+                property = updated
+                Haptics.success()
+                NotificationCenter.default.post(name: .propertyChanged, object: nil)
+            }
+        } catch {
+            print("[PropertyDetail] Value refresh failed: \(error)")
+        }
+    }
+
     func loadProperty(id: UUID) async {
         isLoading = true
         error = nil
@@ -241,6 +308,10 @@ final class PropertyDetailViewModel: ObservableObject {
 
             // Fetch utility accounts
             utilityAccounts = (try? await db.fetchUtilityAccounts(propertyId: id)) ?? []
+
+            // Fetch projects for investment dashboard
+            allProjects = (try? await db.fetchProjects(propertyId: id)) ?? []
+            completedProjects = allProjects.filter { $0.status == "completed" }
         } catch {
             self.error = error.localizedDescription
         }

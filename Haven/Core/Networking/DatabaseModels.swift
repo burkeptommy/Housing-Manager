@@ -101,9 +101,11 @@ struct FamilyMemberRow: Codable, Identifiable, Hashable {
     let isMinor: Bool?
     let gender: String?
     let avatarColor: String?
+    let avatarUrl: String?
     let expectedDate: String?
     let isExpecting: Bool?
     let legalName: String?
+    let school: String?
     let notes: String?
     let createdAt: Date?
     let linkedUserId: UUID?
@@ -112,18 +114,41 @@ struct FamilyMemberRow: Codable, Identifiable, Hashable {
     var isLinkedUser: Bool { linkedUserId != nil }
 
     enum CodingKeys: String, CodingKey {
-        case id, relationship, email, phone, notes, gender
+        case id, relationship, email, phone, notes, gender, school
         case householdId = "household_id"
         case firstName = "first_name"
         case lastName = "last_name"
         case dateOfBirth = "date_of_birth"
         case isMinor = "is_minor"
         case avatarColor = "avatar_color"
+        case avatarUrl = "avatar_url"
         case expectedDate = "expected_date"
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
         case createdAt = "created_at"
         case linkedUserId = "linked_user_id"
+    }
+}
+
+extension Array where Element == FamilyMemberRow {
+    /// Sort members by age (oldest first). Members without DOB go to the end, sorted alphabetically.
+    func sortedByAge() -> [FamilyMemberRow] {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        return sorted { a, b in
+            let dateA = a.dateOfBirth.flatMap { formatter.date(from: $0) }
+            let dateB = b.dateOfBirth.flatMap { formatter.date(from: $0) }
+            switch (dateA, dateB) {
+            case (.some(let dA), .some(let dB)):
+                return dA < dB
+            case (.some, .none):
+                return true
+            case (.none, .some):
+                return false
+            case (.none, .none):
+                return a.firstName < b.firstName
+            }
+        }
     }
 }
 
@@ -141,10 +166,11 @@ struct FamilyMemberInsert: Codable {
     var expectedDate: String?
     var isExpecting: Bool?
     var legalName: String?
+    var school: String?
     var notes: String?
 
     enum CodingKeys: String, CodingKey {
-        case relationship, email, phone, notes, gender
+        case relationship, email, phone, notes, gender, school
         case householdId = "household_id"
         case firstName = "first_name"
         case lastName = "last_name"
@@ -167,18 +193,21 @@ struct FamilyMemberUpdate: Codable {
     var isMinor: Bool?
     var gender: String?
     var avatarColor: String?
+    var avatarUrl: String?
     var expectedDate: String?
     var isExpecting: Bool?
     var legalName: String?
+    var school: String?
     var notes: String?
 
     enum CodingKeys: String, CodingKey {
-        case relationship, email, phone, notes, gender
+        case relationship, email, phone, notes, gender, school
         case firstName = "first_name"
         case lastName = "last_name"
         case dateOfBirth = "date_of_birth"
         case isMinor = "is_minor"
         case avatarColor = "avatar_color"
+        case avatarUrl = "avatar_url"
         case expectedDate = "expected_date"
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
@@ -205,6 +234,8 @@ struct DocumentRow: Codable, Identifiable {
     let aiSummary: String?
     let aiFlags: [AIFlag]?
     let propertyId: UUID?
+    let vehicleId: UUID?
+    let projectId: UUID?
     let uploadedAt: Date?
     let lastReviewedAt: Date?
     let vaultLocked: Bool?
@@ -227,6 +258,8 @@ struct DocumentRow: Codable, Identifiable {
         case aiSummary = "ai_summary"
         case aiFlags = "ai_flags"
         case propertyId = "property_id"
+        case vehicleId = "vehicle_id"
+        case projectId = "project_id"
         case uploadedAt = "uploaded_at"
         case lastReviewedAt = "last_reviewed_at"
         case vaultLocked = "vault_locked"
@@ -240,21 +273,35 @@ struct DocumentRow: Codable, Identifiable {
 struct DocumentMetadata: Codable {
     let crossReferences: [String]?
     let extractedMetadata: [String: FlexibleValue]?
+    // Vehicle VIN detection (populated by analyze-document edge function)
+    let detectedVins: [String]?
+    let matchedVehicleIds: [String]?
+    let unmatchedVins: [String]?
 
     enum CodingKeys: String, CodingKey {
         case crossReferences = "cross_references"
         case extractedMetadata = "extracted_metadata"
+        case detectedVins = "detected_vins"
+        case matchedVehicleIds = "matched_vehicle_ids"
+        case unmatchedVins = "unmatched_vins"
     }
 
-    init(crossReferences: [String]? = nil, extractedMetadata: [String: FlexibleValue]? = nil) {
+    init(crossReferences: [String]? = nil, extractedMetadata: [String: FlexibleValue]? = nil,
+         detectedVins: [String]? = nil, matchedVehicleIds: [String]? = nil, unmatchedVins: [String]? = nil) {
         self.crossReferences = crossReferences
         self.extractedMetadata = extractedMetadata
+        self.detectedVins = detectedVins
+        self.matchedVehicleIds = matchedVehicleIds
+        self.unmatchedVins = unmatchedVins
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         crossReferences = try? container.decode([String].self, forKey: .crossReferences)
         extractedMetadata = try? container.decode([String: FlexibleValue].self, forKey: .extractedMetadata)
+        detectedVins = try? container.decode([String].self, forKey: .detectedVins)
+        matchedVehicleIds = try? container.decode([String].self, forKey: .matchedVehicleIds)
+        unmatchedVins = try? container.decode([String].self, forKey: .unmatchedVins)
     }
 }
 
@@ -315,6 +362,8 @@ struct DocumentUpdate: Codable {
     var vaultLocked: Bool?
     var vaultLockIv: String?
     var propertyId: UUID?
+    var vehicleId: UUID?
+    var projectId: UUID?
     var metadata: DocumentMetadata?
     var contentHash: String?
     var fileSize: Int?
@@ -332,6 +381,8 @@ struct DocumentUpdate: Codable {
         case vaultLocked = "vault_locked"
         case vaultLockIv = "vault_lock_iv"
         case propertyId = "property_id"
+        case vehicleId = "vehicle_id"
+        case projectId = "project_id"
         case contentHash = "content_hash"
         case fileSize = "file_size"
     }
@@ -416,6 +467,7 @@ struct PropertyUpdate: Codable {
     var city: String?
     var state: String?
     var zipCode: String?
+    var purchaseDate: String?
     var purchasePrice: Double?
     var currentEstimatedValue: Double?
     var squareFootage: Int?
@@ -428,6 +480,7 @@ struct PropertyUpdate: Codable {
         case name, street, unit, city, state, notes, attributes
         case propertyType = "property_type"
         case zipCode = "zip_code"
+        case purchaseDate = "purchase_date"
         case purchasePrice = "purchase_price"
         case currentEstimatedValue = "current_estimated_value"
         case squareFootage = "square_footage"
@@ -466,9 +519,13 @@ struct HomeSystemRow: Identifiable {
     let catalogFuelType: String?
     let catalogEnrichedAt: Date?
     let cachedManualLinks: [CachedManualLink]?
+    let parentSystemId: UUID?
+    let subtype: String?
+    let customCategoryName: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, category, manufacturer, notes, status
+        case id, name, category, manufacturer, notes, status, subtype
+        case customCategoryName = "custom_category_name"
         case propertyId = "property_id"
         case householdId = "household_id"
         case modelNumber = "model_number"
@@ -479,6 +536,7 @@ struct HomeSystemRow: Identifiable {
         case preferredContractorId = "preferred_contractor_id"
         case catalogEntryId = "catalog_entry_id"
         case lastServiceDate = "last_service_date"
+        case parentSystemId = "parent_system_id"
         case nextServiceDue = "next_service_due"
         case totalSpent = "total_spent"
         case catalogSeries = "catalog_series"
@@ -522,10 +580,45 @@ extension HomeSystemRow: Decodable {
         catalogFuelType = try? c.decodeIfPresent(String.self, forKey: .catalogFuelType)
         catalogEnrichedAt = try? c.decodeIfPresent(Date.self, forKey: .catalogEnrichedAt)
         cachedManualLinks = try? c.decodeIfPresent([CachedManualLink].self, forKey: .cachedManualLinks)
+        parentSystemId = try? c.decodeIfPresent(UUID.self, forKey: .parentSystemId)
+        subtype = try? c.decodeIfPresent(String.self, forKey: .subtype)
+        customCategoryName = try? c.decodeIfPresent(String.self, forKey: .customCategoryName)
+    }
+}
+
+extension HomeSystemRow {
+    /// Category to show in UI: prefers `customCategoryName` for "Other" systems.
+    var displayCategory: String {
+        if category.lowercased() == "other", let custom = customCategoryName, !custom.isEmpty {
+            return custom
+        }
+        return category
+    }
+
+    /// Subtype tokens parsed from comma-joined `subtype` column.
+    var subtypeTokens: Set<String> {
+        guard let s = subtype, !s.isEmpty else { return [] }
+        return Set(s.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty })
     }
 }
 
 extension HomeSystemRow: Encodable {}
+
+extension HomeSystemRow {
+    /// Functional display name — strips manufacturer and model from the name if present.
+    var displayName: String {
+        var result = name
+        if let mfr = manufacturer, !mfr.isEmpty {
+            result = result.replacingOccurrences(of: mfr, with: "", options: .caseInsensitive)
+        }
+        if let model = modelNumber, !model.isEmpty {
+            result = result.replacingOccurrences(of: model, with: "", options: .caseInsensitive)
+        }
+        result = result.replacingOccurrences(of: "  ", with: " ")
+            .trimmingCharacters(in: CharacterSet.whitespaces.union(CharacterSet(charactersIn: "-\u{2014}")))
+        return result.isEmpty ? name : result
+    }
+}
 
 struct CachedManualLink: Codable {
     let type: String
@@ -546,9 +639,13 @@ struct HomeSystemInsert: Codable {
     var status: String?
     var notes: String?
     var catalogEntryId: UUID?
+    var parentSystemId: UUID?
+    var subtype: String?
+    var customCategoryName: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, category, manufacturer, notes, status
+        case name, category, manufacturer, notes, status, subtype
+        case customCategoryName = "custom_category_name"
         case propertyId = "property_id"
         case householdId = "household_id"
         case modelNumber = "model_number"
@@ -556,6 +653,7 @@ struct HomeSystemInsert: Codable {
         case installDate = "install_date"
         case expectedLifespanYears = "expected_lifespan_years"
         case catalogEntryId = "catalog_entry_id"
+        case parentSystemId = "parent_system_id"
     }
 }
 
@@ -582,9 +680,13 @@ struct HomeSystemUpdate: Codable {
     var scoreSummary: String?
     var catalogFuelType: String?
     var catalogEnrichedAt: Date?
+    var parentSystemId: UUID?
+    var subtype: String?
+    var customCategoryName: String?
 
     enum CodingKeys: String, CodingKey {
-        case name, category, manufacturer, notes, status
+        case name, category, manufacturer, notes, status, subtype
+        case customCategoryName = "custom_category_name"
         case modelNumber = "model_number"
         case serialNumber = "serial_number"
         case installDate = "install_date"
@@ -601,6 +703,7 @@ struct HomeSystemUpdate: Codable {
         case scoreSummary = "score_summary"
         case catalogFuelType = "catalog_fuel_type"
         case catalogEnrichedAt = "catalog_enriched_at"
+        case parentSystemId = "parent_system_id"
     }
 }
 
@@ -760,7 +863,8 @@ struct ContractorUpdate: Codable {
 struct MaintenanceTaskDBRow: Codable, Identifiable {
     let id: UUID
     let systemId: UUID?
-    let propertyId: UUID
+    let propertyId: UUID?
+    let vehicleId: UUID?
     let householdId: UUID
     let title: String
     let description: String?
@@ -787,6 +891,7 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case id, title, description, frequency, notes, priority
         case systemId = "system_id"
         case propertyId = "property_id"
+        case vehicleId = "vehicle_id"
         case householdId = "household_id"
         case lastCompletedDate = "last_completed_date"
         case nextDueDate = "next_due_date"
@@ -804,10 +909,95 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case recurrenceRule = "recurrence_rule"
         case scheduledDate = "scheduled_date"
     }
+
+    /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
+    /// These can be displayed in the task detail sheet and saved if the user assigns them.
+    /// Generic synthetic factory used for optimistic UI placeholders.
+    /// All fields are optional except title, nextDueDate, householdId.
+    static func synthetic(
+        id: UUID = UUID(),
+        title: String,
+        nextDueDate: String,
+        propertyId: UUID? = nil,
+        vehicleId: UUID? = nil,
+        systemId: UUID? = nil,
+        householdId: UUID,
+        priority: String? = "medium",
+        assignedToUserId: UUID? = nil,
+        assignedContractorId: UUID? = nil,
+        frequency: String = "As needed",
+        notes: String? = nil
+    ) -> MaintenanceTaskDBRow {
+        MaintenanceTaskDBRow(
+            id: id,
+            systemId: systemId,
+            propertyId: propertyId,
+            vehicleId: vehicleId,
+            householdId: householdId,
+            title: title,
+            description: nil,
+            frequency: frequency,
+            lastCompletedDate: nil,
+            nextDueDate: nextDueDate,
+            estimatedCost: nil,
+            priority: priority,
+            assignedContractorId: assignedContractorId,
+            assignedToUserId: assignedToUserId,
+            notes: notes,
+            createdAt: nil,
+            isTemplateBased: nil,
+            templateId: nil,
+            seasonalTiming: nil,
+            isDiy: nil,
+            professionalRequired: nil,
+            costRange: nil,
+            lastEmailSentAt: nil,
+            recurrenceRule: nil,
+            scheduledDate: nil
+        )
+    }
+
+    static func synthetic(
+        title: String,
+        nextDueDate: String,
+        vehicleId: UUID,
+        householdId: UUID,
+        priority: String? = "medium",
+        templateId: String? = nil
+    ) -> MaintenanceTaskDBRow {
+        MaintenanceTaskDBRow(
+            id: UUID(),
+            systemId: nil,
+            propertyId: nil,
+            vehicleId: vehicleId,
+            householdId: householdId,
+            title: title,
+            description: nil,
+            frequency: "As needed",
+            lastCompletedDate: nil,
+            nextDueDate: nextDueDate,
+            estimatedCost: nil,
+            priority: priority,
+            assignedContractorId: nil,
+            assignedToUserId: nil,
+            notes: nil,
+            createdAt: nil,
+            isTemplateBased: nil,
+            templateId: templateId,
+            seasonalTiming: nil,
+            isDiy: nil,
+            professionalRequired: nil,
+            costRange: nil,
+            lastEmailSentAt: nil,
+            recurrenceRule: nil,
+            scheduledDate: nil
+        )
+    }
 }
 
 struct MaintenanceTaskInsert: Codable {
-    let propertyId: UUID
+    var propertyId: UUID?
+    var vehicleId: UUID?
     let householdId: UUID
     let title: String
     let frequency: String
@@ -818,6 +1008,7 @@ struct MaintenanceTaskInsert: Codable {
     var estimatedCost: Double?
     var priority: String?
     var assignedContractorId: UUID?
+    var assignedToUserId: UUID?
     var notes: String?
     var isTemplateBased: Bool?
     var templateId: String?
@@ -830,12 +1021,14 @@ struct MaintenanceTaskInsert: Codable {
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
         case propertyId = "property_id"
+        case vehicleId = "vehicle_id"
         case householdId = "household_id"
         case systemId = "system_id"
         case lastCompletedDate = "last_completed_date"
         case nextDueDate = "next_due_date"
         case estimatedCost = "estimated_cost"
         case assignedContractorId = "assigned_contractor_id"
+        case assignedToUserId = "assigned_to_user_id"
         case isTemplateBased = "is_template_based"
         case templateId = "template_id"
         case seasonalTiming = "seasonal_timing"
@@ -856,6 +1049,8 @@ struct MaintenanceTaskUpdate: Codable {
     var priority: String?
     var assignedContractorId: UUID?
     var assignedToUserId: UUID?
+    var systemId: UUID?
+    var vehicleId: UUID?
     var notes: String?
     var lastEmailSentAt: Date?
     var scheduledDate: String?
@@ -867,6 +1062,8 @@ struct MaintenanceTaskUpdate: Codable {
         case estimatedCost = "estimated_cost"
         case assignedContractorId = "assigned_contractor_id"
         case assignedToUserId = "assigned_to_user_id"
+        case systemId = "system_id"
+        case vehicleId = "vehicle_id"
         case lastEmailSentAt = "last_email_sent_at"
         case scheduledDate = "scheduled_date"
     }
@@ -1475,6 +1672,8 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
     let createdAt: Date?
     let updatedAt: Date?
     let createdBy: UUID?
+    let activeQuoteId: UUID?
+    let entryType: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, description, category, status, priority, notes
@@ -1497,10 +1696,13 @@ struct PropertyProjectRow: Codable, Identifiable, Hashable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case createdBy = "created_by"
+        case activeQuoteId = "active_quote_id"
+        case entryType = "entry_type"
     }
 
     var isInsuranceClaim: Bool { projectType == "insurance_claim" }
     var isChildProject: Bool { parentProjectId != nil }
+    var isHistorical: Bool { (entryType ?? "planned") == "historical" }
 }
 
 struct PropertyProjectInsert: Codable {
@@ -1513,10 +1715,13 @@ struct PropertyProjectInsert: Codable {
     var projectType: String = "diy"
     var priority: String? = "medium"
     var estimatedBudget: Double?
+    var actualSpend: Double?
+    var actualEndDate: String?
     var targetStartDate: String?
     var targetEndDate: String?
     var notes: String?
     var parentProjectId: UUID?
+    var entryType: String = "planned"
 
     enum CodingKeys: String, CodingKey {
         case name, description, category, status, priority, notes
@@ -1524,9 +1729,12 @@ struct PropertyProjectInsert: Codable {
         case propertyId = "property_id"
         case projectType = "project_type"
         case estimatedBudget = "estimated_budget"
+        case actualSpend = "actual_spend"
+        case actualEndDate = "actual_end_date"
         case targetStartDate = "target_start_date"
         case targetEndDate = "target_end_date"
         case parentProjectId = "parent_project_id"
+        case entryType = "entry_type"
     }
 }
 
@@ -1551,6 +1759,7 @@ struct PropertyProjectUpdate: Codable {
     var notes: String?
     var parentProjectId: UUID?
     var personalPropertyAmount: Double?
+    var activeQuoteId: UUID?
 
     enum CodingKeys: String, CodingKey {
         case name, description, category, status, priority, notes
@@ -1568,6 +1777,7 @@ struct PropertyProjectUpdate: Codable {
         case aiResearchUpdatedAt = "ai_research_updated_at"
         case parentProjectId = "parent_project_id"
         case personalPropertyAmount = "personal_property_amount"
+        case activeQuoteId = "active_quote_id"
     }
 }
 
@@ -2338,5 +2548,337 @@ struct UtilityProviderRow: Codable, Identifiable {
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+    }
+}
+
+// MARK: - Vehicle
+
+struct VehicleRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let name: String
+    let year: Int?
+    let make: String?
+    let model: String?
+    let trim: String?
+    let color: String?
+    let vin: String?
+    let licensePlate: String?
+    let currentMileage: Int?
+    let ownershipType: String?
+    let purchaseDate: String?
+    let purchasePrice: Double?
+    let currentValue: Double?
+    let leaseEndDate: String?
+    let loanPayoffDate: String?
+    let registrationExpiry: String?
+    let inspectionExpiry: String?
+    let primaryDriverId: UUID?
+    let preferredMechanicId: UUID?
+    let coveredDriverIds: [UUID]?
+    let maintenanceSchedule: [VehicleMaintenanceInterval]?
+    let photoPath: String?
+    let notes: String?
+    let createdAt: Date?
+    let updatedAt: Date?
+    let estimatedValue: Double?
+    let estimatedValueLow: Double?
+    let estimatedValueHigh: Double?
+    let estimatedValueUpdatedAt: Date?
+    let estimatedValueSource: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id, name, year, make, model, trim, color, vin, notes
+        case householdId = "household_id"
+        case licensePlate = "license_plate"
+        case currentMileage = "current_mileage"
+        case ownershipType = "ownership_type"
+        case purchaseDate = "purchase_date"
+        case purchasePrice = "purchase_price"
+        case currentValue = "current_value"
+        case leaseEndDate = "lease_end_date"
+        case loanPayoffDate = "loan_payoff_date"
+        case registrationExpiry = "registration_expiry"
+        case inspectionExpiry = "inspection_expiry"
+        case primaryDriverId = "primary_driver_id"
+        case preferredMechanicId = "preferred_mechanic_id"
+        case coveredDriverIds = "covered_driver_ids"
+        case maintenanceSchedule = "maintenance_schedule"
+        case photoPath = "photo_path"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+        case estimatedValue = "estimated_value"
+        case estimatedValueLow = "estimated_value_low"
+        case estimatedValueHigh = "estimated_value_high"
+        case estimatedValueUpdatedAt = "estimated_value_updated_at"
+        case estimatedValueSource = "estimated_value_source"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        name = try c.decode(String.self, forKey: .name)
+        year = try? c.decodeIfPresent(Int.self, forKey: .year)
+        make = try? c.decodeIfPresent(String.self, forKey: .make)
+        model = try? c.decodeIfPresent(String.self, forKey: .model)
+        trim = try? c.decodeIfPresent(String.self, forKey: .trim)
+        color = try? c.decodeIfPresent(String.self, forKey: .color)
+        vin = try? c.decodeIfPresent(String.self, forKey: .vin)
+        licensePlate = try? c.decodeIfPresent(String.self, forKey: .licensePlate)
+        currentMileage = try? c.decodeIfPresent(Int.self, forKey: .currentMileage)
+        ownershipType = try? c.decodeIfPresent(String.self, forKey: .ownershipType)
+        purchaseDate = try? c.decodeIfPresent(String.self, forKey: .purchaseDate)
+        purchasePrice = try? c.decodeIfPresent(Double.self, forKey: .purchasePrice)
+        currentValue = try? c.decodeIfPresent(Double.self, forKey: .currentValue)
+        leaseEndDate = try? c.decodeIfPresent(String.self, forKey: .leaseEndDate)
+        loanPayoffDate = try? c.decodeIfPresent(String.self, forKey: .loanPayoffDate)
+        registrationExpiry = try? c.decodeIfPresent(String.self, forKey: .registrationExpiry)
+        inspectionExpiry = try? c.decodeIfPresent(String.self, forKey: .inspectionExpiry)
+        primaryDriverId = try? c.decodeIfPresent(UUID.self, forKey: .primaryDriverId)
+        preferredMechanicId = try? c.decodeIfPresent(UUID.self, forKey: .preferredMechanicId)
+        coveredDriverIds = try? c.decodeIfPresent([UUID].self, forKey: .coveredDriverIds)
+        maintenanceSchedule = try? c.decodeIfPresent([VehicleMaintenanceInterval].self, forKey: .maintenanceSchedule)
+        photoPath = try? c.decodeIfPresent(String.self, forKey: .photoPath)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try? c.decodeIfPresent(Date.self, forKey: .updatedAt)
+        estimatedValue = try? c.decodeIfPresent(Double.self, forKey: .estimatedValue)
+        estimatedValueLow = try? c.decodeIfPresent(Double.self, forKey: .estimatedValueLow)
+        estimatedValueHigh = try? c.decodeIfPresent(Double.self, forKey: .estimatedValueHigh)
+        estimatedValueUpdatedAt = try? c.decodeIfPresent(Date.self, forKey: .estimatedValueUpdatedAt)
+        estimatedValueSource = try? c.decodeIfPresent(String.self, forKey: .estimatedValueSource)
+    }
+
+    var displayName: String {
+        [year.map { String($0) }, make, model].compactMap { $0 }.joined(separator: " ")
+    }
+}
+
+struct VehicleMaintenanceInterval: Codable, Identifiable {
+    var id: String { type }
+    let type: String
+    let intervalMiles: Int?
+    let intervalMonths: Int?
+    let estimatedCost: Double?
+    let description: String?
+
+    enum CodingKeys: String, CodingKey {
+        case type, description
+        case intervalMiles = "interval_miles"
+        case intervalMonths = "interval_months"
+        case estimatedCost = "estimated_cost"
+    }
+
+    var estimatedCostDisplay: String? {
+        estimatedCost.map { "$\(Int($0))" }
+    }
+}
+
+struct VehicleInsert: Codable {
+    let householdId: UUID
+    let name: String
+    var year: Int?
+    var make: String?
+    var model: String?
+    var trim: String?
+    var color: String?
+    var vin: String?
+    var licensePlate: String?
+    var currentMileage: Int?
+    var ownershipType: String?
+    var purchaseDate: String?
+    var purchasePrice: Double?
+    var currentValue: Double?
+    var leaseEndDate: String?
+    var loanPayoffDate: String?
+    var registrationExpiry: String?
+    var inspectionExpiry: String?
+    var primaryDriverId: UUID?
+    var preferredMechanicId: UUID?
+    var coveredDriverIds: [UUID]?
+    var maintenanceSchedule: [VehicleMaintenanceInterval]?
+    var photoPath: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, year, make, model, trim, color, vin, notes
+        case householdId = "household_id"
+        case licensePlate = "license_plate"
+        case currentMileage = "current_mileage"
+        case ownershipType = "ownership_type"
+        case purchaseDate = "purchase_date"
+        case purchasePrice = "purchase_price"
+        case currentValue = "current_value"
+        case leaseEndDate = "lease_end_date"
+        case loanPayoffDate = "loan_payoff_date"
+        case registrationExpiry = "registration_expiry"
+        case inspectionExpiry = "inspection_expiry"
+        case primaryDriverId = "primary_driver_id"
+        case preferredMechanicId = "preferred_mechanic_id"
+        case coveredDriverIds = "covered_driver_ids"
+        case maintenanceSchedule = "maintenance_schedule"
+        case photoPath = "photo_path"
+    }
+}
+
+struct VehicleUpdate: Codable {
+    var name: String?
+    var year: Int?
+    var make: String?
+    var model: String?
+    var trim: String?
+    var color: String?
+    var vin: String?
+    var licensePlate: String?
+    var currentMileage: Int?
+    var ownershipType: String?
+    var purchaseDate: String?
+    var purchasePrice: Double?
+    var currentValue: Double?
+    var leaseEndDate: String?
+    var loanPayoffDate: String?
+    var registrationExpiry: String?
+    var inspectionExpiry: String?
+    var primaryDriverId: UUID?
+    var preferredMechanicId: UUID?
+    var coveredDriverIds: [UUID]?
+    var maintenanceSchedule: [VehicleMaintenanceInterval]?
+    var photoPath: String?
+    var notes: String?
+    var estimatedValue: Double?
+    var estimatedValueLow: Double?
+    var estimatedValueHigh: Double?
+    var estimatedValueUpdatedAt: Date?
+    var estimatedValueSource: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, year, make, model, trim, color, vin, notes
+        case licensePlate = "license_plate"
+        case currentMileage = "current_mileage"
+        case ownershipType = "ownership_type"
+        case purchaseDate = "purchase_date"
+        case purchasePrice = "purchase_price"
+        case currentValue = "current_value"
+        case leaseEndDate = "lease_end_date"
+        case loanPayoffDate = "loan_payoff_date"
+        case registrationExpiry = "registration_expiry"
+        case inspectionExpiry = "inspection_expiry"
+        case primaryDriverId = "primary_driver_id"
+        case preferredMechanicId = "preferred_mechanic_id"
+        case coveredDriverIds = "covered_driver_ids"
+        case maintenanceSchedule = "maintenance_schedule"
+        case photoPath = "photo_path"
+        case estimatedValue = "estimated_value"
+        case estimatedValueLow = "estimated_value_low"
+        case estimatedValueHigh = "estimated_value_high"
+        case estimatedValueUpdatedAt = "estimated_value_updated_at"
+        case estimatedValueSource = "estimated_value_source"
+    }
+}
+
+// MARK: - Vehicle Service Record
+
+struct VehicleServiceRecordRow: Codable, Identifiable {
+    let id: UUID
+    let vehicleId: UUID
+    let householdId: UUID
+    let serviceDate: String
+    let serviceType: String
+    let description: String
+    let cost: Double?
+    let mileageAtService: Int?
+    let contractorId: UUID?
+    let invoiceDocumentId: UUID?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, description, cost, notes
+        case vehicleId = "vehicle_id"
+        case householdId = "household_id"
+        case serviceDate = "service_date"
+        case serviceType = "service_type"
+        case mileageAtService = "mileage_at_service"
+        case contractorId = "contractor_id"
+        case invoiceDocumentId = "invoice_document_id"
+        case createdAt = "created_at"
+    }
+}
+
+struct VehicleServiceRecordInsert: Codable {
+    let vehicleId: UUID
+    let householdId: UUID
+    let serviceDate: String
+    let serviceType: String
+    let description: String
+    var cost: Double?
+    var mileageAtService: Int?
+    var contractorId: UUID?
+    var invoiceDocumentId: UUID?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case description, cost, notes
+        case vehicleId = "vehicle_id"
+        case householdId = "household_id"
+        case serviceDate = "service_date"
+        case serviceType = "service_type"
+        case mileageAtService = "mileage_at_service"
+        case contractorId = "contractor_id"
+        case invoiceDocumentId = "invoice_document_id"
+    }
+}
+
+// MARK: - Vehicle Recall
+
+struct VehicleRecallRow: Codable, Identifiable {
+    let id: UUID
+    let vehicleId: UUID
+    let householdId: UUID
+    let nhtsaCampaignNumber: String?
+    let component: String?
+    let summary: String?
+    let consequence: String?
+    let remedy: String?
+    let recallDate: String?
+    let isResolved: Bool
+    let resolvedDate: String?
+    let resolvedServiceRecordId: UUID?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, component, summary, consequence, remedy, notes
+        case vehicleId = "vehicle_id"
+        case householdId = "household_id"
+        case nhtsaCampaignNumber = "nhtsa_campaign_number"
+        case recallDate = "recall_date"
+        case isResolved = "is_resolved"
+        case resolvedDate = "resolved_date"
+        case resolvedServiceRecordId = "resolved_service_record_id"
+        case createdAt = "created_at"
+    }
+}
+
+struct VehicleRecallInsert: Codable {
+    let vehicleId: UUID
+    let householdId: UUID
+    var nhtsaCampaignNumber: String?
+    var component: String?
+    var summary: String?
+    var consequence: String?
+    var remedy: String?
+    var recallDate: String?
+    var isResolved: Bool?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case component, summary, consequence, remedy, notes
+        case vehicleId = "vehicle_id"
+        case householdId = "household_id"
+        case nhtsaCampaignNumber = "nhtsa_campaign_number"
+        case recallDate = "recall_date"
+        case isResolved = "is_resolved"
     }
 }

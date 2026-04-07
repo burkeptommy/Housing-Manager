@@ -83,6 +83,7 @@
 		48EBBCEBB43FC343DEA44810 /* ExpirationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB1E595AC46EC435723506 /* ExpirationBadge.swift */; };
 		48F02347E056AD2C02E2EFB0 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = E5AB75E21903A9833695E4FA /* Assets.xcassets */; };
 		4A69C6EB06F4487D7BF2443C /* IntroExplainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA84C3892EACD5DC6B221B8B /* IntroExplainerView.swift */; };
+		4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */; };
 		4C44F16712BB5B3D126F98D4 /* QuoteDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D00F7EDA80AB205933D1E68E /* QuoteDetailView.swift */; };
 		4CCB0A06E26AE9B0A56C6D75 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBB22847F627EF293537880 /* ProjectDetailView.swift */; };
 		4DB84E3EB1AF0C36E06B6955 /* QuoteUploadEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10139172E62AA11089521520 /* QuoteUploadEntryView.swift */; };
@@ -318,6 +319,7 @@
 		4E7A7A395DB576CBE9BA310F /* NotificationScheduler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationScheduler.swift; sourceTree = "<group>"; };
 		518F88EE5413D96632C93167 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		51DC3662A89CDDA0D7B4BA94 /* WarrantyExpirationAlert.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WarrantyExpirationAlert.swift; sourceTree = "<group>"; };
+		521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PurchasePriceInputSheet.swift; sourceTree = "<group>"; };
 		52C5FEDC0CF120BB8C30FC54 /* CacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CacheManager.swift; sourceTree = "<group>"; };
 		52DFF252E761E38911656477 /* SystemSubtypePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SystemSubtypePicker.swift; sourceTree = "<group>"; };
 		53FF33F7F6DAF386DA95BF99 /* DocumentAnalysisService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAnalysisService.swift; sourceTree = "<group>"; };
@@ -897,6 +899,7 @@
 				74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */,
 				E445A5A77BF6DC331BFB3B07 /* PropertyListView.swift */,
 				5CD254FA3D98BCA417B34DD9 /* PropertyProjectsView.swift */,
+				521D6FD5524DBFD79795DA00 /* PurchasePriceInputSheet.swift */,
 				BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */,
 				902E6516D892F0B2C474E642 /* QuoteComparisonView.swift */,
 				D00F7EDA80AB205933D1E68E /* QuoteDetailView.swift */,
@@ -1319,6 +1322,7 @@
 				76DA3EE6CDDB3DA7B536EC58 /* PropertyListView.swift in Sources */,
 				DD89775DB699CC99FB4EC7C8 /* PropertyListViewModel.swift in Sources */,
 				F32E6CEBB906D2C59D9798A4 /* PropertyProjectsView.swift in Sources */,
+				4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */,
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
 				28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */,

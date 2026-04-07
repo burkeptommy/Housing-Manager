@@ -2,13 +2,16 @@ import SwiftUI
 
 /// Investment summary dashboard for a property's Overview tab.
 /// Shows estimated value hero, stacked investment bar, expandable waterfall breakdown,
-/// and a "What if I sold for..." sale simulator.
+/// and a "What if I sold for..." sale simulator. Renders an editable empty state
+/// when purchase price and/or estimated value are missing.
 struct InvestmentSummaryCard: View {
     let property: PropertyRow
     let totalProjectSpend: Double
+    var onValuesUpdated: ((PropertyUpdate) async -> Void)? = nil
 
     @State private var showBreakdown = false
     @State private var showSaleSimulator = false
+    @State private var sheetMode: PurchasePriceInputSheet.Mode?
 
     // Computed values
     private var purchasePrice: Double { property.purchasePrice ?? 0 }
@@ -19,6 +22,7 @@ struct InvestmentSummaryCard: View {
     private var gainLoss: Double { netAfterSale - totalInvested }
     private var gainLossPercent: Double { totalInvested > 0 ? (gainLoss / totalInvested) : 0 }
     private var hasEstimatedValue: Bool { property.currentEstimatedValue != nil && estimatedValue > 0 }
+    private var hasPurchasePrice: Bool { property.purchasePrice != nil && purchasePrice > 0 }
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
@@ -30,22 +34,31 @@ struct InvestmentSummaryCard: View {
             HavenCard {
                 VStack(spacing: HavenTheme.spacing12) {
                     heroSection
-                    stackedBarSection
-                    if hasEstimatedValue {
-                        bottomSummary
-                    }
-                    expandToggle
+                    if hasPurchasePrice {
+                        stackedBarSection
+                        if hasEstimatedValue {
+                            bottomSummary
+                        }
+                        expandToggle
 
-                    if showBreakdown {
-                        waterfallBreakdown
-                    }
+                        if showBreakdown {
+                            waterfallBreakdown
+                        }
 
-                    saleSimulatorButton
+                        saleSimulatorButton
+                    } else {
+                        addPurchasePricePrompt
+                    }
                 }
             }
         }
         .sheet(isPresented: $showSaleSimulator) {
             SaleSimulatorSheet(property: property, totalProjectSpend: totalProjectSpend)
+        }
+        .sheet(item: $sheetMode) { mode in
+            PurchasePriceInputSheet(mode: mode, property: property) { update in
+                await onValuesUpdated?(update)
+            }
         }
     }
 
@@ -53,12 +66,26 @@ struct InvestmentSummaryCard: View {
 
     private var heroSection: some View {
         VStack(spacing: 4) {
-            Text("Estimated value")
-                .font(HavenTypography.uiLabelMedium)
-                .foregroundStyle(HavenColors.textSecondary)
+            HStack(spacing: 6) {
+                Text("Estimated value")
+                    .font(HavenTypography.uiLabelMedium)
+                    .foregroundStyle(HavenColors.textSecondary)
+
+                if hasEstimatedValue {
+                    Button {
+                        Haptics.light()
+                        sheetMode = .estimatedValue
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
 
             if hasEstimatedValue {
-                Text(formatCurrency(estimatedValue))
+                Text(estimatedValue.formattedCompactCurrency())
                     .font(.custom("Georgia", size: 26).weight(.bold))
                     .foregroundStyle(HavenColors.textPrimary)
 
@@ -76,18 +103,65 @@ struct InvestmentSummaryCard: View {
                     }
                 }
             } else {
-                Text("Not set")
-                    .font(.custom("Georgia", size: 26).weight(.bold))
-                    .foregroundStyle(HavenColors.textTertiary)
-                Text("Add estimated value in property settings")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textTertiary)
+                Button {
+                    Haptics.light()
+                    sheetMode = .estimatedValue
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 14))
+                        Text("Add estimated value")
+                            .font(HavenTypography.uiButton)
+                    }
+                    .foregroundStyle(HavenColors.navy800)
+                    .padding(.horizontal, HavenTheme.spacing16)
+                    .padding(.vertical, HavenTheme.spacing8)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)
         .padding(HavenTheme.spacing12)
         .background(HavenColors.creamLight)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusSmall))
+    }
+
+    // MARK: - Add Purchase Price Prompt (empty state)
+
+    private var addPurchasePricePrompt: some View {
+        VStack(spacing: HavenTheme.spacing12) {
+            Text("Track your investment")
+                .font(HavenTypography.title3)
+                .foregroundStyle(HavenColors.textPrimary)
+
+            Text("Add what you paid to unlock gain/loss tracking, the sale simulator, and your investment dashboard.")
+                .font(HavenTypography.bodySmall)
+                .foregroundStyle(HavenColors.textSecondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, HavenTheme.spacing12)
+
+            Button {
+                Haptics.light()
+                sheetMode = .purchasePrice
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "plus.circle.fill")
+                        .font(.system(size: 14))
+                    Text("Add purchase price")
+                        .font(HavenTypography.uiButton)
+                }
+                .foregroundStyle(HavenColors.textOnNavy)
+                .padding(.horizontal, HavenTheme.spacing16)
+                .padding(.vertical, HavenTheme.spacing12)
+                .background(HavenColors.navy800)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, HavenTheme.spacing16)
     }
 
     // MARK: - Stacked Bar

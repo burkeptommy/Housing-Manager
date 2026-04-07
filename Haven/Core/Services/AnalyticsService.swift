@@ -54,6 +54,9 @@ enum AnalyticsEvent: String {
     case propertyEdited = "property_edited"
     case propertyDeleted = "property_deleted"
     case propertyTabSelected = "property_tab_selected"
+    case investmentBreakdownToggled = "investment_breakdown_toggled"
+    case investmentValuesEdited = "investment_values_edited"
+    case saleSimulatorOpened = "sale_simulator_opened"
     case propertyRefreshed = "property_refreshed"
 
     // MARK: - Home Systems
@@ -118,6 +121,7 @@ enum AnalyticsEvent: String {
     case documentSharedWithContact = "document_shared_with_contact"
     case documentAccessRevoked = "document_access_revoked"
     case documentRefreshed = "document_refreshed"
+    case invoiceProcessed = "invoice_processed"
 
     // MARK: - Gap Analysis
     case gapAnalysisRequested = "gap_analysis_requested"
@@ -159,6 +163,16 @@ enum AnalyticsEvent: String {
     case familyMemberEdited = "family_member_edited"
     case familyMemberDeleted = "family_member_deleted"
     case familyMemberInvited = "family_member_invited"
+    case avatarPhotoUploaded = "avatar_photo_uploaded"
+    case avatarPhotoRemoved = "avatar_photo_removed"
+
+    // MARK: - Household Strip & Member Profile
+    case householdStripMemberTapped = "household_strip_member_tapped"
+    case householdStripAddTapped = "household_strip_add_tapped"
+    case householdStripManageTapped = "household_strip_manage_tapped"
+    case memberProfileViewed = "member_profile_viewed"
+    case memberProfileDocumentTapped = "member_profile_document_tapped"
+    case unifiedAttentionItemTapped = "unified_attention_item_tapped"
 
     // MARK: - Trusted Contacts
     case trustedContactsViewed = "trusted_contacts_viewed"
@@ -207,6 +221,17 @@ enum AnalyticsEvent: String {
     // MARK: - New Arrival
     case newArrivalChecklistViewed = "new_arrival_checklist_viewed"
     case newArrivalChecklistItemToggled = "new_arrival_checklist_item_toggled"
+
+    // MARK: - Vehicles
+    case vehicleViewed = "vehicle_viewed"
+    case vehicleCreated = "vehicle_created"
+    case vehicleDeleted = "vehicle_deleted"
+    case vehicleServiceLogged = "vehicle_service_logged"
+    case mechanicLinked = "mechanic_linked"
+    case mechanicRemoved = "mechanic_removed"
+    case mileageUpdated = "mileage_updated"
+    case vehicleDocumentPromptTapped = "vehicle_document_prompt_tapped"
+    case askAlfredVehicleTapped = "ask_alfred_vehicle_tapped"
 
     // MARK: - Projects
     case projectViewed = "project_viewed"
@@ -383,6 +408,12 @@ final class Analytics: @unchecked Sendable {
         lock.unlock()
 
         Task {
+            // Skip flush entirely when there's no auth session — RLS would reject
+            // every insert (auth.uid() IS NOT NULL) and we'd loop forever re-queueing.
+            // Drop the batch on the floor; pre-auth analytics aren't worth keeping.
+            let signedIn = (try? await HavenSupabase.client.auth.session.user.id) != nil
+            guard signedIn else { return }
+
             do {
                 try await HavenSupabase.from(tableName)
                     .insert(batch)
