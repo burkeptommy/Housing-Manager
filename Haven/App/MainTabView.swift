@@ -20,6 +20,9 @@ extension Notification.Name {
 
     // Invite + onboarding
     static let inviteCodeReceived = Notification.Name("inviteCodeReceived")
+    /// Posted by AddPropertyFlow's confirmation step when the user taps
+    /// "Take House Quiz". `object` carries the new `PropertyRow`.
+    static let startHouseQuiz = Notification.Name("startHouseQuiz")
 }
 
 struct MainTabView: View {

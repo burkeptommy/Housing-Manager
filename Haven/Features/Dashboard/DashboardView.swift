@@ -280,7 +280,7 @@ struct DashboardView: View {
                 })
             }
             .sheet(isPresented: $showAddProperty) {
-                AddPropertyView(onComplete: {
+                AddPropertyFlow(onComplete: { _ in
                     // Immediately mark property as existing to avoid stale UI
                     viewModel.hasProperty = true
                     Task { await viewModel.refresh() }
@@ -432,6 +432,18 @@ struct DashboardView: View {
             .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in
                 if let tab = notification.userInfo?["tab"] as? Int, tab == 0 {
                     navigationPath = NavigationPath()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .startHouseQuiz)) { notification in
+                // AddPropertyFlow's confirmation step posts this with the
+                // freshly created PropertyRow when the user taps "Take House
+                // Quiz". Refresh first so the new property is in the list,
+                // then open HouseQuizView for it.
+                if let property = notification.object as? PropertyRow {
+                    Task {
+                        await viewModel.refresh()
+                        activeQuizProperty = property
+                    }
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .navigateToInboxItem)) { notification in

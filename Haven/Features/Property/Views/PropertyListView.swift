@@ -102,8 +102,7 @@ struct PropertyListView: View {
                 Task { await viewModel.loadProperties() }
             }
             .sheet(isPresented: $showAddProperty) {
-                AddPropertyView(onComplete: {
-                    Haptics.success()
+                AddPropertyFlow(onComplete: { _ in
                     Task { await viewModel.loadProperties() }
                 })
             }

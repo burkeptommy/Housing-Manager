@@ -71,7 +71,7 @@ enum MaintenanceTemplates {
 
     /// Builds the set of active subtype tokens for a system, given its persisted subtype string,
     /// optional catalog fuel type, and any extra boolean flags from the onboarding wizard.
-    /// Single source of truth shared by HomeSystemsSetupView, AddSystemView, and EditSystemSheet.
+    /// Single source of truth shared by AddSystemView and EditSystemSheet.
     static func activeSubtypes(
         category: String,
         subtype: String?,

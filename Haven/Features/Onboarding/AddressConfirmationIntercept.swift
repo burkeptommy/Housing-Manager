@@ -4,7 +4,10 @@ import SwiftUI
 /// properties (or the property has no street address). Used by:
 /// - New users who somehow ended up authenticated without a property
 /// - Soft-purged TestFlight users (their property was wiped)
-/// - Future: anyone adding a 2nd property goes through a similar in-tab flow
+///
+/// All ATTOM enrichment + system + task creation goes through the shared
+/// `PropertyCreationService` so this view stays in lockstep with the
+/// in-app `AddPropertyFlow` and any future entry point.
 struct AddressConfirmationIntercept: View {
     @EnvironmentObject var appState: AppState
 
@@ -104,173 +107,33 @@ struct AddressConfirmationIntercept: View {
         defer { isSubmitting = false }
 
         do {
-            // 1. Look up property data via ATTOM/RentCast.
-            let fullAddress = [street, unit, city, state, zipCode]
-                .filter { !$0.isEmpty }
-                .joined(separator: ", ")
-            var lookupResult: PropertyLookupResult?
-            if let data = try? await HavenSupabase.propertyLookup(address: fullAddress) {
-                struct LookupResponse: Decodable {
-                    let success: Bool
-                    let property: PropertyLookupResult?
-                }
-                if let response = try? JSONDecoder().decode(LookupResponse.self, from: data),
-                   response.success {
-                    lookupResult = response.property
-                }
-            }
-
-            // 2. Get the household id.
             let user = try await DatabaseService.shared.fetchCurrentUser()
             guard let householdId = user.householdId else {
                 errorMessage = "Couldn't find your household. Try signing out and in."
                 return
             }
 
-            // 3. Create the property row.
-            var insert = PropertyInsert(
-                householdId: householdId,
-                name: [street, city].filter { !$0.isEmpty }.joined(separator: ", "),
-                propertyType: lookupResult?.propertyType ?? "Single Family",
+            let address = AddressInput(
                 street: street,
-                unit: unit.isEmpty ? nil : unit,
+                unit: unit,
                 city: city,
                 state: state,
-                zipCode: zipCode,
-                country: "US"
+                zipCode: zipCode
             )
-            insert.yearBuilt = lookupResult?.yearBuilt
-            insert.squareFootage = lookupResult?.squareFootage
-            insert.purchasePrice = lookupResult?.lastSalePrice
-            insert.currentEstimatedValue = lookupResult?.estimatedValue
 
-            let property = try await DatabaseService.shared.createProperty(insert)
+            _ = try await PropertyCreationService.shared.createProperty(
+                address: address,
+                householdId: householdId,
+                propertyType: "Primary Residence"
+            )
 
-            // 4. Auto-create home systems from detected features.
-            if let features = lookupResult?.features {
-                let systems = systemsFromFeatures(features, propertyId: property.id, householdId: householdId, yearBuilt: lookupResult?.yearBuilt)
-                for system in systems {
-                    _ = try? await DatabaseService.shared.createHomeSystem(system)
-                }
-            }
-
-            // 5. Generate the 12-month maintenance plan.
-            let schedule = OnboardingScheduleGenerator.generate(from: lookupResult, state: state)
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyy-MM-dd"
-            for item in schedule {
-                let nextDue = nextDueDate(forMonth: item.month, formatter: dateFormatter)
-                let task = MaintenanceTaskInsert(
-                    propertyId: property.id,
-                    householdId: householdId,
-                    title: item.title,
-                    frequency: item.frequency,
-                    nextDueDate: nextDue,
-                    description: item.description,
-                    priority: item.category == "HVAC" || item.category == "Plumbing" ? "High" : "Medium",
-                    isTemplateBased: true,
-                    isDiy: item.isDIY,
-                    costRange: item.estimatedCost
-                )
-                _ = try? await DatabaseService.shared.createMaintenanceTask(task)
-            }
-
-            // 6. Refresh AppState so MainTabView appears.
+            // Refresh AppState so MainTabView appears.
             await appState.refreshPrimaryProperty()
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
             Haptics.success()
         } catch {
             errorMessage = "Setup failed: \(error.localizedDescription)"
             Haptics.error()
         }
-    }
-
-    private func nextDueDate(forMonth month: Int, formatter: DateFormatter) -> String {
-        let calendar = Calendar.current
-        let now = Date()
-        let currentMonth = calendar.component(.month, from: now)
-        let currentYear = calendar.component(.year, from: now)
-        var year = currentYear
-        if month < currentMonth { year += 1 }
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = 15
-        let date = calendar.date(from: components) ?? now
-        return formatter.string(from: date)
-    }
-
-    private func systemsFromFeatures(
-        _ features: PropertyLookupResult.PropertyFeatures,
-        propertyId: UUID,
-        householdId: UUID,
-        yearBuilt: Int?
-    ) -> [HomeSystemInsert] {
-        var systems: [HomeSystemInsert] = []
-        let install = yearBuilt.map { "\($0)-01-01" }
-
-        if features.heatingType != nil || features.coolingType != nil {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: "HVAC System",
-                category: "HVAC",
-                installDate: install,
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        if let roof = features.roofType {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: "\(roof) Roof",
-                category: "Roofing",
-                installDate: install,
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        systems.append(HomeSystemInsert(
-            propertyId: propertyId,
-            householdId: householdId,
-            name: "Water Heater",
-            category: "Water Heater",
-            notes: "Auto-created. Update with type, brand, and age."
-        ))
-        systems.append(HomeSystemInsert(
-            propertyId: propertyId,
-            householdId: householdId,
-            name: "Electrical Panel",
-            category: "Electrical",
-            installDate: install,
-            notes: "Auto-created from address lookup."
-        ))
-        if features.pool == true {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: features.poolType.map { "\($0) Pool" } ?? "Swimming Pool",
-                category: "Pool/Spa",
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        if features.garage == true {
-            let spaces = features.garageSpaces.map { "\($0)-Car " } ?? ""
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: "\(spaces)Garage",
-                category: "Garage Door",
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        if features.fireplace == true {
-            systems.append(HomeSystemInsert(
-                propertyId: propertyId,
-                householdId: householdId,
-                name: features.fireplaceType.map { "\($0) Fireplace" } ?? "Fireplace",
-                category: "Fire Protection",
-                notes: "Auto-created from address lookup."
-            ))
-        }
-        return systems
     }
 }
