@@ -40,6 +40,7 @@
 		19F682B3F28C7604BA28D96C /* UIView+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84C5AFD1BADB59224057E364 /* UIView+Extensions.swift */; };
 		1C3BA73E2D4A5F70BFF0F104 /* TokenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 164BF6C3C64C2E76B6836067 /* TokenManager.swift */; };
 		1FAFCC16B3CEECF53B85E0C5 /* ScenarioInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9012FA4EC01B35BA7E18DE0D /* ScenarioInputView.swift */; };
+		205F24E7103257073B50DE53 /* DocumentExtractionConflictSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */; };
 		20CFC3DA10A920D8C4DB37CD /* DatabaseModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = DECE7A0C3DA1835717111C67 /* DatabaseModels.swift */; };
 		21F98631DD0B2736C51BF81F /* ServiceHistoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */; };
 		230E64B5CF29F1235C66DA85 /* EditVehicleSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 99E29FD8C600AF4BB2F06397 /* EditVehicleSheet.swift */; };
@@ -366,6 +367,7 @@
 		6A3DBCB54EA4A78F86706E65 /* CalendarSyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSyncSheet.swift; sourceTree = "<group>"; };
 		6B099EFD9B3F3E80C5022AAF /* InvoiceChoiceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InvoiceChoiceSheet.swift; sourceTree = "<group>"; };
 		6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContractorDirectoryView.swift; sourceTree = "<group>"; };
+		6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentExtractionConflictSheet.swift; sourceTree = "<group>"; };
 		6D454019B1D9DF0E175C34AB /* AddressAutocompleteField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddressAutocompleteField.swift; sourceTree = "<group>"; };
 		6DF7A5BC749EE76956FF9449 /* UtilityAccountsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UtilityAccountsSection.swift; sourceTree = "<group>"; };
 		6E60CB5AC78EAFC4C067A93E /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
@@ -918,6 +920,7 @@
 		BC6772E4E4686DEF5BFF6777 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */,
 				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
 				CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */,
@@ -1284,6 +1287,7 @@
 				0A441E02F39F6D06941C05DC /* DocumentDetailView.swift in Sources */,
 				F3F3430B6C0C298FC05C08EA /* DocumentDetailViewModel.swift in Sources */,
 				481B3983CCC965E5562D24C5 /* DocumentEncryption.swift in Sources */,
+				205F24E7103257073B50DE53 /* DocumentExtractionConflictSheet.swift in Sources */,
 				13AAC6448E36F7626907CD1E /* DocumentScannerView.swift in Sources */,
 				9929B978E52190525B3E7A06 /* DocumentStatus.swift in Sources */,
 				5349D707387AAC6149FDEF12 /* DocumentUploadManager.swift in Sources */,
