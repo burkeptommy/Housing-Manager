@@ -347,17 +347,35 @@ struct HouseQuizView: View {
 
     // MARK: - Provider search (utility lookup)
 
+    @ViewBuilder
     private func providerSearchBody(_ q: HouseQuizQuestion) -> some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-            HavenTextField(title: "Provider name", text: $providerNameText)
-
-            HavenButton(title: "Continue") {
-                Task {
-                    await viewModel.recordAnswer("entered", customText: providerNameText)
-                    providerNameText = ""
+        if let providerType = q.providerType {
+            UtilityProviderSearchPicker(
+                providerType: providerType,
+                state: viewModel.property.state,
+                onSelect: { provider in
+                    Task {
+                        await viewModel.recordAnswer("selected", customText: provider.name)
+                    }
+                },
+                onCustomCreated: { _ in
+                    Haptics.success()
                 }
+            )
+        } else {
+            // Defensive fallback for any provider-search question that doesn't
+            // declare a providerType in the library.
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HavenTextField(title: "Provider name", text: $providerNameText)
+
+                HavenButton(title: "Continue") {
+                    Task {
+                        await viewModel.recordAnswer("entered", customText: providerNameText)
+                        providerNameText = ""
+                    }
+                }
+                .disabled(providerNameText.trimmingCharacters(in: .whitespaces).isEmpty)
             }
-            .disabled(providerNameText.trimmingCharacters(in: .whitespaces).isEmpty)
         }
     }
 

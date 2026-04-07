@@ -601,6 +601,19 @@ final class DatabaseService {
         return try await query.order("name", ascending: true).execute().value
     }
 
+    /// Insert a user-supplied utility provider into the global catalog. Used
+    /// by UtilityProviderCustomAddSheet for the "didn't find yours? Add it"
+    /// path. Slug is derived from the name; collisions silently retry by
+    /// appending a short suffix.
+    func createUtilityProvider(_ insert: UtilityProviderInsert) async throws -> UtilityProviderRow {
+        try await from("utility_providers")
+            .insert(insert)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
     /// Update home system manual links cache
     func updateHomeSystemManualCache(id: UUID, links: [CachedManualLink]) async throws {
         struct Update: Encodable {

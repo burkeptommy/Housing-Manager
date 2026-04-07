@@ -2612,6 +2612,23 @@ struct UtilityProviderRow: Codable, Identifiable {
     }
 }
 
+struct UtilityProviderInsert: Codable {
+    let name: String
+    let slug: String
+    let providerType: String
+    var logoUrl: String?
+    var brandColor: String?
+    var website: String?
+    var phone: String?
+
+    enum CodingKeys: String, CodingKey {
+        case name, slug, website, phone
+        case providerType = "provider_type"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
+    }
+}
+
 // MARK: - Vehicle
 
 struct VehicleRow: Codable, Identifiable {
