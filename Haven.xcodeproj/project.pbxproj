@@ -215,6 +215,7 @@
 		D12133529ACC9510A79311A7 /* ScreenshotPrevention.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2C817E777D24E732912FBCA /* ScreenshotPrevention.swift */; };
 		D17F3E5E727A7E8E9DE6986C /* ScenarioDisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6DF3D198B76DB8F59AA3401 /* ScenarioDisclaimerView.swift */; };
 		D33558FD1981F3125CB84A14 /* ScenarioStudioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */; };
+		D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */; };
 		D5711621B588C7695CA4E7A2 /* ContractorDirectoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6B3DEAB95FAAF68DB5F4CB1C /* ContractorDirectoryView.swift */; };
 		D61AFFB150A29F92AD001144 /* EquipmentIdentifySheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FE9A44DDCE5AAD3CD1A46F /* EquipmentIdentifySheet.swift */; };
 		D621EE40E1C053B1504AD852 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A4EFE16C22592FE1D0F76B1 /* Endpoints.swift */; };
@@ -273,6 +274,7 @@
 		05ACC1AD3C78491F50BDF8E4 /* QuizVehicleInputSelector.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizVehicleInputSelector.swift; sourceTree = "<group>"; };
 		05ADA54A4E7717D0015544C8 /* EquipmentSearchSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EquipmentSearchSheet.swift; sourceTree = "<group>"; };
 		065CD0193255DF7812606891 /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
+		07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizCaretakerInlineForm.swift; sourceTree = "<group>"; };
 		077DCD83BD7C719A6BAB5E25 /* FamilyMemberProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMemberProfileView.swift; sourceTree = "<group>"; };
 		0787BB580C28578F9F427589 /* DuplicateDetectionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DuplicateDetectionService.swift; sourceTree = "<group>"; };
 		091C6E2DE4A0D3F89EA01338 /* SecurityExplainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityExplainerView.swift; sourceTree = "<group>"; };
@@ -933,6 +935,7 @@
 				6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */,
 				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
+				07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */,
 				CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */,
 				05ACC1AD3C78491F50BDF8E4 /* QuizVehicleInputSelector.swift */,
 				460E8AA2102BB5BC0866C526 /* UtilityProviderCustomAddSheet.swift */,
@@ -1427,6 +1430,7 @@
 				4AD4AA102BBA1CA870EE4DA0 /* PurchasePriceInputSheet.swift in Sources */,
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
+				D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */,
 				EAE3E85AFEBB4D7982CFDB69 /* QuizSpouseInviteInlineForm.swift in Sources */,
 				C39B374BD7B0F466CAFDC717 /* QuizVehicleInputSelector.swift in Sources */,
 				28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */,

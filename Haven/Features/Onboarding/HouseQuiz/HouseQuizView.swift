@@ -19,6 +19,10 @@ struct HouseQuizView: View {
     /// spouse-add form expands beneath the chips.
     @State private var householdInviteAnswerId: String? = nil
 
+    /// Q28 caretaker step. true once the spouse form has completed and the
+    /// caretaker chips section should render. Resets when the quiz advances.
+    @State private var householdShowCaretakerStep: Bool = false
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -444,18 +448,31 @@ struct HouseQuizView: View {
             }
 
             if let answerId = householdInviteAnswerId {
-                QuizSpouseInviteInlineForm(
-                    householdId: viewModel.property.householdId,
-                    relationshipLabel: Self.relationshipLabel(for: answerId),
-                    onComplete: {
-                        let pendingId = answerId
-                        withAnimation(HavenTheme.animationStandard) {
-                            householdInviteAnswerId = nil
+                if householdShowCaretakerStep {
+                    QuizCaretakerInlineForm(
+                        householdId: viewModel.property.householdId,
+                        onComplete: {
+                            let pendingId = answerId
+                            withAnimation(HavenTheme.animationStandard) {
+                                householdInviteAnswerId = nil
+                                householdShowCaretakerStep = false
+                            }
+                            Task { await viewModel.recordAnswer(pendingId) }
                         }
-                        Task { await viewModel.recordAnswer(pendingId) }
-                    }
-                )
-                .transition(.opacity.combined(with: .move(edge: .top)))
+                    )
+                    .transition(.opacity)
+                } else {
+                    QuizSpouseInviteInlineForm(
+                        householdId: viewModel.property.householdId,
+                        relationshipLabel: Self.relationshipLabel(for: answerId),
+                        onComplete: {
+                            withAnimation(HavenTheme.animationStandard) {
+                                householdShowCaretakerStep = true
+                            }
+                        }
+                    )
+                    .transition(.opacity.combined(with: .move(edge: .top)))
+                }
             }
         }
     }
