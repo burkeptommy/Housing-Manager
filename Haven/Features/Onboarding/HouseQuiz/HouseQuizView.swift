@@ -634,6 +634,11 @@ struct HouseQuizView: View {
                         Haptics.success()
                     }
                 )
+                // Phase 18a: Force the picker to be a brand-new view per
+                // question so SwiftUI doesn't recycle the previous question's
+                // @State (allProviders, searchText, etc.). Belt-and-suspenders
+                // alongside the .task(id:) reload inside the picker.
+                .id(q.id)
             }
         } else {
             // Defensive fallback for any provider-search question that doesn't

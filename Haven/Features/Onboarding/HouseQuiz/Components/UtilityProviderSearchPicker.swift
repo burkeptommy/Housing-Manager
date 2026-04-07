@@ -72,7 +72,7 @@ struct UtilityProviderSearchPicker: View {
                 customAddCard
             }
         }
-        .task {
+        .task(id: providerTypes) {
             await load()
         }
         .sheet(isPresented: $showCustomAdd) {
@@ -283,7 +283,14 @@ struct UtilityProviderSearchPicker: View {
     // MARK: - Loading
 
     private func load() async {
+        // Phase 18a: Reset stale state on every load so users don't briefly
+        // see results from a previous question while the new fetch is in
+        // flight. The .task(id:) modifier above guarantees this runs whenever
+        // providerTypes changes.
         isLoading = true
+        allProviders = []
+        searchText = ""
+        loadError = nil
         defer { isLoading = false }
         do {
             let providers = try await DatabaseService.shared.fetchUtilityProviders(types: providerTypes)
