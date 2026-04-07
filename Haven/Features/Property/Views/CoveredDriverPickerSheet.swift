@@ -3,21 +3,37 @@ import SwiftUI
 struct CoveredDriverPickerSheet: View {
     let vehicleId: UUID
     let currentIds: [UUID]
-    let familyMembers: [FamilyMemberRow]
+    let initialMembers: [FamilyMemberRow]
     let primaryDriverId: UUID?
+    let householdId: UUID
     var onSave: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedIds: Set<UUID>
     @State private var isSaving = false
 
-    init(vehicleId: UUID, currentIds: [UUID], familyMembers: [FamilyMemberRow], primaryDriverId: UUID?, onSave: (() -> Void)?) {
+    /// Live members list. Starts with the parent's snapshot but grows when
+    /// the user adds a new driver inline so the row appears instantly.
+    @State private var familyMembers: [FamilyMemberRow]
+
+    @State private var showAddDriverSheet: Bool = false
+
+    init(
+        vehicleId: UUID,
+        currentIds: [UUID],
+        familyMembers: [FamilyMemberRow],
+        primaryDriverId: UUID?,
+        householdId: UUID,
+        onSave: (() -> Void)?
+    ) {
         self.vehicleId = vehicleId
         self.currentIds = currentIds
-        self.familyMembers = familyMembers
+        self.initialMembers = familyMembers
         self.primaryDriverId = primaryDriverId
+        self.householdId = householdId
         self.onSave = onSave
         _selectedIds = State(initialValue: Set(currentIds))
+        _familyMembers = State(initialValue: familyMembers)
     }
 
     private var eligibleDrivers: [FamilyMemberRow] {
@@ -77,12 +93,39 @@ struct CoveredDriverPickerSheet: View {
                     }
                     .buttonStyle(.plain)
                 }
+
+                Button {
+                    Haptics.light()
+                    showAddDriverSheet = true
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 20))
+                            .foregroundStyle(HavenColors.navy)
+                        Text("Add new driver")
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.navy)
+                        Spacer()
+                    }
+                }
+                .buttonStyle(.plain)
             } header: {
                 Text("Select family members covered on this vehicle's insurance")
                     .font(HavenTypography.caption)
                     .foregroundStyle(HavenColors.textSecondary)
                     .textCase(nil)
             }
+        }
+        .sheet(isPresented: $showAddDriverSheet) {
+            CoveredDriverQuickAddSheet(
+                householdId: householdId,
+                onCreated: { newMember in
+                    familyMembers.append(newMember)
+                    selectedIds.insert(newMember.id)
+                    showAddDriverSheet = false
+                }
+            )
+            .presentationDetents([.medium])
         }
         .scrollContentBackground(.hidden)
         .background(HavenColors.cream)
@@ -111,5 +154,133 @@ struct CoveredDriverPickerSheet: View {
         Haptics.success()
         onSave?()
         dismiss()
+    }
+}
+
+// MARK: - Quick add new covered driver
+
+/// Inline form for adding a brand-new family member from the covered drivers
+/// picker. Routes through HouseholdInviteCoordinator with `.vehicleCoveredDriver`
+/// source so we can measure how often this entry point gets used.
+struct CoveredDriverQuickAddSheet: View {
+    let householdId: UUID
+    let onCreated: (FamilyMemberRow) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var firstName: String = ""
+    @State private var lastName: String = ""
+    @State private var relationship: String = "Child"
+    @State private var email: String = ""
+    @State private var sendInvite: Bool = true
+    @State private var isSaving: Bool = false
+    @State private var error: String?
+    @State private var trustMoment: HouseholdInviteCoordinator.TrustMoment?
+
+    private let relationships = ["Spouse/Partner", "Child", "Parent", "Sibling", "Other"]
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: HavenTheme.spacing20) {
+                    if let trustMoment {
+                        InviteResultConfirmationCard(
+                            trustMoment: trustMoment,
+                            onShare: nil,
+                            onRetry: nil,
+                            onDismiss: { dismiss() }
+                        )
+                    } else {
+                        formCard
+                    }
+                }
+                .padding(HavenTheme.spacing20)
+            }
+            .background(HavenColors.background)
+            .navigationTitle("New driver")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+    }
+
+    private var formCard: some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                HStack(spacing: HavenTheme.spacing8) {
+                    HavenTextField(title: "First name", text: $firstName)
+                        .textInputAutocapitalization(.words)
+                    HavenTextField(title: "Last name", text: $lastName)
+                        .textInputAutocapitalization(.words)
+                }
+
+                Picker("Relationship", selection: $relationship) {
+                    ForEach(relationships, id: \.self) { Text($0).tag($0) }
+                }
+                .pickerStyle(.menu)
+
+                HavenTextField(title: "Email (optional)", text: $email)
+                    .textContentType(.emailAddress)
+                    .keyboardType(.emailAddress)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled(true)
+
+                if !email.isEmpty {
+                    Toggle(isOn: $sendInvite) {
+                        Text("Send them an invite")
+                            .font(HavenTypography.bodySmall)
+                            .foregroundStyle(HavenColors.textPrimary)
+                    }
+                    .toggleStyle(SwitchToggleStyle(tint: HavenColors.navy))
+                }
+
+                if let error {
+                    Text(error)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.critical)
+                }
+
+                HavenButton(
+                    title: isSaving ? "Adding..." : "Add driver",
+                    action: { Task { await save() } }
+                )
+                .disabled(firstName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSaving)
+            }
+        }
+    }
+
+    private func save() async {
+        let trimmedFirst = firstName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedFirst.isEmpty else { return }
+        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+
+        isSaving = true
+        defer { isSaving = false }
+        error = nil
+
+        do {
+            let result = try await HouseholdInviteCoordinator.shared.addPersonToHousehold(
+                .init(
+                    householdId: householdId,
+                    firstName: trimmedFirst,
+                    lastName: lastName.trimmingCharacters(in: .whitespacesAndNewlines),
+                    relationship: relationship,
+                    email: trimmedEmail.isEmpty ? nil : trimmedEmail,
+                    isMinor: false,
+                    sendInvite: !trimmedEmail.isEmpty && sendInvite,
+                    source: .vehicleCoveredDriver
+                )
+            )
+            // Surface the new member to the picker so it can be selected
+            // immediately, then show the trust moment.
+            onCreated(result.familyMember)
+            trustMoment = result.trustMoment
+            Haptics.success()
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
     }
 }

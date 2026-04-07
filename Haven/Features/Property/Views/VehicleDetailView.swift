@@ -821,6 +821,7 @@ struct VehicleDetailView: View {
                     currentIds: vehicle.coveredDriverIds ?? [],
                     familyMembers: viewModel.familyMembers,
                     primaryDriverId: vehicle.primaryDriverId,
+                    householdId: vehicle.householdId,
                     onSave: {
                         Task { await viewModel.load(vehicleId: vehicleID) }
                     }

@@ -523,15 +523,52 @@ struct FamilyMemberFormView: View {
             } else {
                 let user = try await db.fetchCurrentUser()
                 guard let householdId = user.householdId else { error = "No household found"; isSaving = false; return }
-                let newMember = try await db.createFamilyMember(FamilyMemberInsert(
-                    householdId: householdId, firstName: saveName, lastName: saveLastName, relationship: relationship,
+
+                // Route every new family member through the unified coordinator.
+                // It handles createFamilyMember + (optionally) check_user +
+                // create_invitation + send-household-invite atomically, and
+                // returns a TrustMoment we can surface here.
+                let isMinorComputed = hasDateOfBirth
+                    ? (Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0) < 18
+                    : false
+                // Skip the invite send when the user already detected an
+                // existing Haven account inline (the showInviteAfterSave path
+                // surfaces InviteToHavenSheet after this save) — that path
+                // owns the invite UI to keep the legacy two-step flow working.
+                let trimmedEmail = email.trimmingCharacters(in: .whitespaces)
+                let shouldSendInvite = !trimmedEmail.isEmpty
+                    && !showInviteAfterSave
+                    && !existingUserDetected
+                    && !isMinorComputed
+                    && !isExpecting
+
+                let coordinatorRequest = HouseholdInviteCoordinator.AddPersonRequest(
+                    householdId: householdId,
+                    firstName: saveName,
+                    lastName: saveLastName.isEmpty ? nil : saveLastName,
+                    relationship: relationship,
+                    email: trimmedEmail.isEmpty ? nil : trimmedEmail,
+                    phone: phone.isEmpty ? nil : phone,
                     dateOfBirth: hasDateOfBirth ? formatter.string(from: dateOfBirth) : nil,
-                    email: email.isEmpty ? nil : email, phone: phone.isEmpty ? nil : phone,
-                    isMinor: hasDateOfBirth ? (Calendar.current.dateComponents([.year], from: dateOfBirth, to: Date()).year ?? 0) < 18 : nil,
-                    gender: gender, avatarColor: avatarColor.rawValue,
+                    gender: gender,
+                    isMinor: isMinorComputed,
+                    sendInvite: shouldSendInvite,
+                    personalMessage: nil,
+                    source: .familyTabAddButton
+                )
+                let result = try await HouseholdInviteCoordinator.shared.addPersonToHousehold(coordinatorRequest)
+                let newMember = result.familyMember
+
+                // Patch in any fields the coordinator's slimmer insert didn't
+                // touch (avatar color, expected date, legal name, school,
+                // notes) so the form's data is fully persisted.
+                _ = try? await db.updateFamilyMember(id: newMember.id, FamilyMemberUpdate(
+                    avatarColor: avatarColor.rawValue,
                     expectedDate: isExpecting ? formatter.string(from: expectedDate) : nil,
-                    isExpecting: isExpecting, legalName: legalName.isEmpty ? nil : legalName,
-                    school: school.isEmpty ? nil : school, notes: notes.isEmpty ? nil : notes
+                    isExpecting: isExpecting,
+                    legalName: legalName.isEmpty ? nil : legalName,
+                    school: school.isEmpty ? nil : school,
+                    notes: notes.isEmpty ? nil : notes
                 ))
 
                 // Upload photo for new member if one was selected

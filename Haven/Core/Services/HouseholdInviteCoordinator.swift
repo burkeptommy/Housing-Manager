@@ -321,6 +321,154 @@ actor HouseholdInviteCoordinator {
         try? await DatabaseService.shared.touchInvitationResent(id: invitation.id)
     }
 
+    /// Invite a family member that already has a row in the database. Used
+    /// by the legacy "Invite to Haven" sheet on FamilyMembersView, which is
+    /// only reached when an existing family_member is selected. We skip step
+    /// 1 of `addPersonToHousehold` (createFamilyMember) and reuse the rest
+    /// of the flow: existing-user check, code generation, invitation row,
+    /// and SendGrid email.
+    func inviteExistingMember(
+        _ member: FamilyMemberRow,
+        email: String,
+        personalMessage: String? = nil,
+        source: InviteSource = .manualFromSettings
+    ) async throws -> AddPersonResult {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !normalizedEmail.isEmpty, Self.isLikelyValidEmail(normalizedEmail) else {
+            throw CoordinatorError.invalidEmail
+        }
+
+        // Existing-user fast-path → merge request
+        if let existing = try? await HavenSupabase.mergeHouseholdsCheckUser(email: normalizedEmail) {
+            Analytics.track(.householdMergeStarted, ["source": source.rawValue])
+            do {
+                _ = try await HavenSupabase.mergeHouseholds(action: "create_merge_request", email: normalizedEmail)
+            } catch {
+                return AddPersonResult(
+                    familyMember: member,
+                    invitation: nil,
+                    inviteCode: nil,
+                    existingUser: ExistingUserInfo(
+                        userId: existing.userId ?? "",
+                        fullName: existing.name ?? member.firstName,
+                        householdName: existing.householdName
+                    ),
+                    trustMoment: .addedButInviteFailed(name: member.firstName, reason: error.localizedDescription)
+                )
+            }
+            return AddPersonResult(
+                familyMember: member,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: ExistingUserInfo(
+                    userId: existing.userId ?? "",
+                    fullName: existing.name ?? member.firstName,
+                    householdName: existing.householdName
+                ),
+                trustMoment: .mergeRequestSent(name: member.firstName, email: normalizedEmail)
+            )
+        }
+
+        let db = DatabaseService.shared
+        let currentUser: UserRow
+        do {
+            currentUser = try await db.fetchCurrentUser()
+        } catch {
+            return AddPersonResult(
+                familyMember: member,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(name: member.firstName, reason: error.localizedDescription)
+            )
+        }
+
+        var invitation: HouseholdInvitationRow? = nil
+        var inviteCode: String? = nil
+        for attempt in 0..<3 {
+            let candidate = DatabaseService.generateInviteCode()
+            let invitationInsert = HouseholdInvitationInsert(
+                householdId: member.householdId,
+                invitedBy: currentUser.id,
+                invitedEmail: normalizedEmail,
+                inviteCode: candidate,
+                familyMemberId: member.id,
+                personalMessage: personalMessage?.trimmedNonEmpty
+            )
+            do {
+                invitation = try await db.createInvitation(invitationInsert)
+                inviteCode = candidate
+                break
+            } catch {
+                if attempt == 2 {
+                    return AddPersonResult(
+                        familyMember: member,
+                        invitation: nil,
+                        inviteCode: nil,
+                        existingUser: nil,
+                        trustMoment: .addedButInviteFailed(name: member.firstName, reason: error.localizedDescription)
+                    )
+                }
+            }
+        }
+
+        guard let createdInvitation = invitation, let createdCode = inviteCode else {
+            return AddPersonResult(
+                familyMember: member,
+                invitation: nil,
+                inviteCode: nil,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(
+                    name: member.firstName,
+                    reason: CoordinatorError.codeGenerationExhausted.localizedDescription
+                )
+            )
+        }
+
+        // Send the email and translate the result.
+        do {
+            try await sendInviteEmail(
+                inviteCode: createdCode,
+                inviteEmail: normalizedEmail,
+                request: AddPersonRequest(
+                    householdId: member.householdId,
+                    firstName: member.firstName,
+                    lastName: member.lastName,
+                    relationship: member.relationship,
+                    email: normalizedEmail,
+                    phone: member.phone,
+                    dateOfBirth: member.dateOfBirth,
+                    gender: member.gender,
+                    isMinor: member.isMinor ?? false,
+                    sendInvite: true,
+                    personalMessage: personalMessage,
+                    source: source
+                ),
+                householdId: member.householdId,
+                inviterUser: currentUser
+            )
+            Analytics.track(.householdInviteSent, [
+                "source": source.rawValue,
+                "is_existing_member": true,
+            ])
+            return AddPersonResult(
+                familyMember: member,
+                invitation: createdInvitation,
+                inviteCode: createdCode,
+                existingUser: nil,
+                trustMoment: .inviteSent(name: member.firstName, email: normalizedEmail, code: createdCode)
+            )
+        } catch {
+            return AddPersonResult(
+                familyMember: member,
+                invitation: createdInvitation,
+                inviteCode: createdCode,
+                existingUser: nil,
+                trustMoment: .addedButInviteFailed(name: member.firstName, reason: error.localizedDescription)
+            )
+        }
+    }
+
     // MARK: - Internals
 
     private func sendInviteEmail(
