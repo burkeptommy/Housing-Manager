@@ -133,6 +133,7 @@
 		795A2B009D0479EC87A76069 /* HouseholdAccessView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2941D500DA3123BDF2B26B84 /* HouseholdAccessView.swift */; };
 		7AB52FBD973A44821424BCD2 /* String+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = B1FD9EA967FA80EC697174F4 /* String+Extensions.swift */; };
 		7B45A6304E471551A5BD3BD9 /* CategoryPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BD6C14FAF58D10B27759559 /* CategoryPickerSheet.swift */; };
+		7E20BB6D64F5C3D90C0D7149 /* QuizHomeManagerInviteInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CBB124AA65CF4CD55F692FC /* QuizHomeManagerInviteInlineForm.swift */; };
 		7E21ABA29761285727651E4B /* PersonalQuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E2E87609ADFBC441E34B179 /* PersonalQuizViewModel.swift */; };
 		7F68D4BDC9384936385CEBFC /* OnboardingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BFA4AB80D1956BBD146735AE /* OnboardingViewModel.swift */; };
 		814E77BA0FA8FBF5A6905785 /* AddSystemView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F58EF9C9FB14640084B3DC45 /* AddSystemView.swift */; };
@@ -358,6 +359,7 @@
 		39BBBECCAD064C3B2991A6C5 /* SeasonalTasksDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeasonalTasksDetailView.swift; sourceTree = "<group>"; };
 		3B9EEC0AD9698228EA20EFFC /* DocumentStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentStatus.swift; sourceTree = "<group>"; };
 		3C149790C33B097708FA1F8D /* Constants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Constants.swift; sourceTree = "<group>"; };
+		3CBB124AA65CF4CD55F692FC /* QuizHomeManagerInviteInlineForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizHomeManagerInviteInlineForm.swift; sourceTree = "<group>"; };
 		3ED21C0DF2E3D8D95B0B24D0 /* ChatView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatView.swift; sourceTree = "<group>"; };
 		3FE80E0C39DA96876FB85DF8 /* ScenarioDefinitions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioDefinitions.swift; sourceTree = "<group>"; };
 		400015DE6DC09805EC95BF6E /* NotificationSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
@@ -1038,6 +1040,7 @@
 				4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */,
 				07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */,
 				7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */,
+				3CBB124AA65CF4CD55F692FC /* QuizHomeManagerInviteInlineForm.swift */,
 				A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */,
 				FBE70A8BF096597DF15D8E9E /* QuizLocalContractorPicker.swift */,
 				60D1E26691C67ED641A4F155 /* QuizRequiredChip.swift */,
@@ -1561,6 +1564,7 @@
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
 				D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */,
 				AE640787BE30EAE0049C12BB /* QuizContinueButton.swift in Sources */,
+				7E20BB6D64F5C3D90C0D7149 /* QuizHomeManagerInviteInlineForm.swift in Sources */,
 				A0E4F6D658CBB9D8DA2B3E64 /* QuizKidsInlineForm.swift in Sources */,
 				400D576D1043326CED49B7E3 /* QuizLocalContractorPicker.swift in Sources */,
 				E3A72DC1CBD7CE6D2D1A0546 /* QuizRequiredChip.swift in Sources */,

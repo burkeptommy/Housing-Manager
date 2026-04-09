@@ -34,12 +34,19 @@ actor HouseholdInviteCoordinator {
     enum InviteSource: String, Sendable {
         case quizSpouseStep = "quiz_spouse_step"
         case quizCaretakerStep = "quiz_caretaker_step"
+        /// Build 87 (Home Manager expansion): user added a home manager
+        /// from the Q28 caretakers sub-step. Tagged separately so we can
+        /// measure how often the new sub-step converts vs the spouse step.
+        case quizHomeManagerStep = "quiz_home_manager_step"
         case familyTabAddButton = "family_tab_add_button"
         case householdStripPlusButton = "household_strip_plus_button"
         case vehicleCoveredDriver = "vehicle_covered_driver"
         case taskAssignment = "task_assignment"
         case documentPartyExtraction = "document_party_extraction"
         case manualFromSettings = "manual_from_settings"
+        /// Build 87 (Home Manager expansion): home manager added from the
+        /// Settings → Household Staff list rather than the quiz sub-step.
+        case manualFromStaffSettings = "manual_from_staff_settings"
         case childProfileAdd = "child_profile_add"
     }
 

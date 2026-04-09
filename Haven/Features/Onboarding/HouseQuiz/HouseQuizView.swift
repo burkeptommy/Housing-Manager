@@ -62,6 +62,25 @@ struct HouseQuizView: View {
     /// "Want to add your spouse?" form. Reset by `resetEntryState()`.
     @State private var householdSkippedSpouseStep: Bool = false
 
+    /// Build 87 (Home Manager expansion) — Q28 home manager sub-step.
+    /// Fires AFTER the caretaker step completes (or after the kids step
+    /// if there's no spouse). State machine:
+    /// 1. Caretaker step completes → `householdShowHomeManagerStep = true`,
+    ///    `householdHomeManagerFormMounted = false` (prompt card visible)
+    /// 2. User taps "Add home manager" → `householdHomeManagerFormMounted = true`
+    ///    (form replaces prompt)
+    /// 3. User submits form → `householdPendingHomeManagerEntry` captures
+    ///    the breadcrumb, `householdShowHomeManagerStep = false`, answer
+    ///    recorded with the entry attached
+    /// 4. User taps "Skip" on the prompt → `householdSkippedHomeManager = true`,
+    ///    `householdShowHomeManagerStep = false`, answer recorded with no
+    ///    entry
+    /// All flags reset between question visits via `resetEntryState`.
+    @State private var householdShowHomeManagerStep: Bool = false
+    @State private var householdHomeManagerFormMounted: Bool = false
+    @State private var householdSkippedHomeManager: Bool = false
+    @State private var householdPendingHomeManagerEntry: HomeManagerEntry? = nil
+
     /// Phase 18c — Q20 inline propane provider picker. Captured here so the
     /// final `recordMultiSelect` call can pass the chosen carrier through to
     /// the answer mapper. Cleared on every new question via resetEntryState().
@@ -2368,32 +2387,23 @@ struct HouseQuizView: View {
                     QuizCaretakerInlineForm(
                         householdId: viewModel.property.householdId,
                         onComplete: {
-                            let pendingId = answerId
-                            let pendingKids = householdPendingKids
-                            let pendingExpecting = householdPendingExpecting
+                            // Build 87 (Home Manager expansion): instead of
+                            // recording the answer immediately, hand off to
+                            // the new home manager sub-step. The Q28 answer
+                            // is finalized inside `finalizeQ28Caretakers`
+                            // (called by either the prompt's Skip path or
+                            // the inline form's onComplete).
                             withAnimation(HavenTheme.animationStandard) {
-                                householdInviteAnswerId = nil
                                 householdShowCaretakerStep = false
-                                householdShowKidsStep = false
-                                householdPendingKids = []
-                                householdPendingExpecting = []
-                                householdDidSeedExistingKids = false
-                                householdSkippedSpouseStep = false
-                            }
-                            Task {
-                                if pendingKids.isEmpty && pendingExpecting.isEmpty {
-                                    await viewModel.recordAnswer(pendingId)
-                                } else {
-                                    await viewModel.recordHouseholdAnswer(
-                                        residentsId: pendingId,
-                                        kids: pendingKids,
-                                        expecting: pendingExpecting
-                                    )
-                                }
+                                householdShowHomeManagerStep = true
+                                householdHomeManagerFormMounted = false
                             }
                         }
                     )
                     .transition(.opacity)
+                } else if householdShowHomeManagerStep {
+                    homeManagerStepBody(answerId: answerId)
+                        .transition(.opacity)
                 } else if householdShowKidsStep {
                     // Phase 16d — only renders for family_with_kids. Hands the
                     // captured kids/expecting payload back via onContinue and
@@ -2471,6 +2481,120 @@ struct HouseQuizView: View {
             RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
                 .strokeBorder(HavenColors.navy.opacity(0.18), lineWidth: 1)
         )
+    }
+
+    /// Build 87 (Home Manager expansion) — Q28 home manager sub-step body.
+    /// Renders either the prompt card ("Anyone else helping run your home?")
+    /// or the inline invite form, depending on
+    /// `householdHomeManagerFormMounted`. Both paths converge on
+    /// `finalizeQ28Caretakers(answerId:homeManagerEntry:)` which records
+    /// the final Q28 answer (with kids/expecting/home manager attached
+    /// where applicable) and clears the sub-step state.
+    @ViewBuilder
+    private func homeManagerStepBody(answerId: String) -> some View {
+        if householdHomeManagerFormMounted {
+            QuizHomeManagerInviteInlineForm(
+                householdId: viewModel.property.householdId,
+                onComplete: { entry in
+                    finalizeQ28Caretakers(
+                        answerId: answerId,
+                        homeManagerEntry: entry
+                    )
+                }
+            )
+        } else {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+                Text("ANYONE ELSE HELPING RUN YOUR HOME?")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.textTertiary)
+
+                Text("Add a home manager so they can help with tasks, home systems, and shared documents. You can change this later.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .fixedSize(horizontal: false, vertical: true)
+
+                Button {
+                    Haptics.selection()
+                    withAnimation(HavenTheme.animationStandard) {
+                        householdHomeManagerFormMounted = true
+                    }
+                } label: {
+                    HStack(spacing: HavenTheme.spacing12) {
+                        Image(systemName: "person.badge.key.fill")
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(HavenColors.navy)
+                        Text("Add home manager")
+                            .font(HavenTypography.body.weight(.semibold))
+                            .foregroundStyle(HavenColors.navy800)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    .padding(HavenTheme.spacing16)
+                    .frame(minHeight: 56)
+                    .background(HavenColors.creamLight)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                            .strokeBorder(HavenColors.navy.opacity(0.18), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+
+                Button {
+                    Haptics.light()
+                    householdSkippedHomeManager = true
+                    finalizeQ28Caretakers(
+                        answerId: answerId,
+                        homeManagerEntry: nil
+                    )
+                } label: {
+                    Text("Skip")
+                        .font(HavenTypography.uiLabel.weight(.semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .padding(.vertical, HavenTheme.spacing8)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    /// Build 87 (Home Manager expansion) — Q28 finalization. Both the home
+    /// manager prompt's Skip path and the inline form's onComplete path
+    /// converge here. Snapshots the pending kids/expecting state, clears
+    /// every Q28 sub-step flag, then records the final answer with the
+    /// optional home manager entry attached for hydration on resume / back.
+    private func finalizeQ28Caretakers(
+        answerId: String,
+        homeManagerEntry: HomeManagerEntry?
+    ) {
+        let pendingKids = householdPendingKids
+        let pendingExpecting = householdPendingExpecting
+        householdPendingHomeManagerEntry = homeManagerEntry
+        withAnimation(HavenTheme.animationStandard) {
+            householdInviteAnswerId = nil
+            householdShowCaretakerStep = false
+            householdShowKidsStep = false
+            householdShowHomeManagerStep = false
+            householdHomeManagerFormMounted = false
+            householdPendingKids = []
+            householdPendingExpecting = []
+            householdDidSeedExistingKids = false
+            householdSkippedSpouseStep = false
+        }
+        Task {
+            // Always go through `recordHouseholdAnswer` so the home manager
+            // entry can ride along even when there are no kids/expecting.
+            // The view model handles nil entries identically.
+            await viewModel.recordHouseholdAnswer(
+                residentsId: answerId,
+                kids: pendingKids,
+                expecting: pendingExpecting,
+                homeManagerEntry: homeManagerEntry
+            )
+        }
     }
 
     /// Build 86 — convert any pre-existing children (relationship in {child,
@@ -3054,6 +3178,12 @@ struct HouseQuizView: View {
         // from scratch.
         householdDidSeedExistingKids = false
         householdSkippedSpouseStep = false
+        // Build 87 (Home Manager expansion) — clear the home manager
+        // sub-step state so resume / back-nav re-prompts cleanly.
+        householdShowHomeManagerStep = false
+        householdHomeManagerFormMounted = false
+        householdSkippedHomeManager = false
+        householdPendingHomeManagerEntry = nil
         // Phase 18c — clear the Q20 propane provider stash too.
         q20PropaneProvider = nil
         // Phase 19i — clear the Q22 generator inline form state.
@@ -3118,6 +3248,12 @@ struct HouseQuizView: View {
         }
         if caretakersCount > 0 {
             parts.append("\(caretakersCount) \(caretakersCount == 1 ? "caretaker" : "caretakers")")
+        }
+        // Build 87 (Home Manager expansion): mention the home manager too
+        // so the back-nav summary card reflects the full Q28 capture.
+        if let entry = answer.homeManagerEntry {
+            let firstName = entry.firstName.isEmpty ? "home manager" : entry.firstName
+            parts.append("home manager \(firstName)")
         }
         return parts.joined(separator: ", ")
     }
@@ -3238,6 +3374,18 @@ struct HouseQuizView: View {
             }
             if let expecting = prior.expectingEntries {
                 householdPendingExpecting = expecting
+            }
+            // Build 87 (Home Manager expansion): if a home manager was
+            // captured on the prior visit, stash the entry so the
+            // summary card's Edit button can show "ALREADY INVITED"
+            // state in the form. The hydration intentionally lands the
+            // user on the caretaker step (same as before) — the home
+            // manager prompt only appears AFTER caretakers complete on
+            // the fresh walk-through, mirroring the build 85 design
+            // where the caretaker hydration shows the summary card and
+            // the Edit button walks Q28 fresh.
+            if let entry = prior.homeManagerEntry {
+                householdPendingHomeManagerEntry = entry
             }
         case .slider:
             // Build 87: Q36 slider hydration. Restores the integer value

@@ -412,10 +412,18 @@ final class HouseQuizViewModel: ObservableObject {
     /// already flow through `recordMultiSelect` after the inline form
     /// completes — this method only captures the residents type plus the
     /// kid/expecting payload, since those create real family_member rows.
+    ///
+    /// Build 87 (Home Manager expansion): now also accepts an optional
+    /// `homeManagerEntry` captured by `QuizHomeManagerInviteInlineForm`.
+    /// The entry is purely a hydration breadcrumb — the actual
+    /// `family_members` row + invite is created at form submit time
+    /// directly via `HouseholdInviteCoordinator`, so this method only
+    /// stashes it on the answer for resume / back-nav.
     func recordHouseholdAnswer(
         residentsId: String,
         kids: [QuizKidEntry],
-        expecting: [QuizExpectingEntry]
+        expecting: [QuizExpectingEntry],
+        homeManagerEntry: HomeManagerEntry? = nil
     ) async {
         guard let q = currentQuestion else { return }
         let answer = HouseQuizAnswer(
@@ -425,6 +433,7 @@ final class HouseQuizViewModel: ObservableObject {
             customEntries: nil,
             kids: kids.isEmpty ? nil : kids,
             expectingEntries: expecting.isEmpty ? nil : expecting,
+            homeManagerEntry: homeManagerEntry,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)

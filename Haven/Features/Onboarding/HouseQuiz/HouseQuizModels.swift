@@ -52,6 +52,14 @@ struct HouseQuizAnswer: Codable, Equatable {
     var customEntries: [String]?
     var kids: [QuizKidEntry]?
     var expectingEntries: [QuizExpectingEntry]?
+    /// Build 87 (Home Manager expansion): when the user adds a home manager
+    /// from the Q28 caretakers sub-step, the captured invite metadata is
+    /// stored here so the form can re-hydrate "ALREADY INVITED" state on
+    /// resume / back-navigation. The actual `family_members` row + invite
+    /// are created at form submit time via `HouseholdInviteCoordinator`,
+    /// not at quiz answer apply time, so the answer mapper has nothing to
+    /// do with this field.
+    var homeManagerEntry: HomeManagerEntry?
     /// Phase 18e: When the user picks a provider from the search picker,
     /// stash the catalog row's UUID here so the answer mapper can fetch
     /// the full record (logo, brand color, slug, website, phone) at apply
@@ -84,6 +92,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         case customEntries = "custom_entries"
         case kids
         case expectingEntries = "expecting_entries"
+        case homeManagerEntry = "home_manager_entry"
         case selectedProviderId = "selected_provider_id"
         case secondaryFuelProviderId = "secondary_fuel_provider_id"
         case generatorFuelType = "generator_fuel_type"
@@ -99,6 +108,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         customEntries: [String]? = nil,
         kids: [QuizKidEntry]? = nil,
         expectingEntries: [QuizExpectingEntry]? = nil,
+        homeManagerEntry: HomeManagerEntry? = nil,
         selectedProviderId: UUID? = nil,
         secondaryFuelProviderId: UUID? = nil,
         generatorFuelType: String? = nil,
@@ -112,6 +122,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.customEntries = customEntries
         self.kids = kids
         self.expectingEntries = expectingEntries
+        self.homeManagerEntry = homeManagerEntry
         self.selectedProviderId = selectedProviderId
         self.secondaryFuelProviderId = secondaryFuelProviderId
         self.generatorFuelType = generatorFuelType
@@ -121,10 +132,10 @@ struct HouseQuizAnswer: Codable, Equatable {
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
-    /// `kids`, `expecting_entries`, `selected_provider_id`,
-    /// `secondary_fuel_provider_id`, `generator_fuel_type`,
-    /// `generator_provider_id`, or `slider_value` keys) still load cleanly
-    /// after the schema bump.
+    /// `kids`, `expecting_entries`, `home_manager_entry`,
+    /// `selected_provider_id`, `secondary_fuel_provider_id`,
+    /// `generator_fuel_type`, `generator_provider_id`, or `slider_value`
+    /// keys) still load cleanly after the schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
@@ -133,12 +144,59 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.customEntries = try c.decodeIfPresent([String].self, forKey: .customEntries)
         self.kids = try? c.decodeIfPresent([QuizKidEntry].self, forKey: .kids)
         self.expectingEntries = try? c.decodeIfPresent([QuizExpectingEntry].self, forKey: .expectingEntries)
+        self.homeManagerEntry = try? c.decodeIfPresent(HomeManagerEntry.self, forKey: .homeManagerEntry)
         self.selectedProviderId = try? c.decodeIfPresent(UUID.self, forKey: .selectedProviderId)
         self.secondaryFuelProviderId = try? c.decodeIfPresent(UUID.self, forKey: .secondaryFuelProviderId)
         self.generatorFuelType = try? c.decodeIfPresent(String.self, forKey: .generatorFuelType)
         self.generatorProviderId = try? c.decodeIfPresent(UUID.self, forKey: .generatorProviderId)
         self.sliderValue = try? c.decodeIfPresent(Int.self, forKey: .sliderValue)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
+    }
+}
+
+/// Build 87 (Home Manager expansion):
+/// Home manager invite metadata captured by the Q28 caretakers sub-step.
+/// Stored on `HouseQuizAnswer.homeManagerEntry` so the form can re-hydrate
+/// "ALREADY INVITED" state when the user back-navigates to Q28 or resumes
+/// the quiz. The actual `family_members` row + invite are created at form
+/// submit time via `HouseholdInviteCoordinator.addPersonToHousehold`, not
+/// at quiz answer apply time.
+struct HomeManagerEntry: Codable, Equatable, Hashable {
+    var firstName: String
+    var lastName: String
+    var email: String
+    var sentInvite: Bool
+    var inviteCode: String?
+
+    init(
+        firstName: String,
+        lastName: String,
+        email: String,
+        sentInvite: Bool,
+        inviteCode: String? = nil
+    ) {
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.sentInvite = sentInvite
+        self.inviteCode = inviteCode
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case firstName = "first_name"
+        case lastName = "last_name"
+        case email
+        case sentInvite = "sent_invite"
+        case inviteCode = "invite_code"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.firstName = (try? c.decode(String.self, forKey: .firstName)) ?? ""
+        self.lastName = (try? c.decode(String.self, forKey: .lastName)) ?? ""
+        self.email = (try? c.decode(String.self, forKey: .email)) ?? ""
+        self.sentInvite = (try? c.decode(Bool.self, forKey: .sentInvite)) ?? false
+        self.inviteCode = try? c.decodeIfPresent(String.self, forKey: .inviteCode)
     }
 }
 
