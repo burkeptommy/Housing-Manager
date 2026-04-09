@@ -9,6 +9,13 @@ struct AddMaintenanceTaskSheet: View {
     var vehicles: [VehicleRow] = []
     var contractors: [ContractorRow] = []
     var householdUsers: [UserRow] = []
+    /// Build 87 (Home Manager expansion): family_members rows for the
+    /// current household, supplied by the parent (usually
+    /// `MaintenanceScheduleView`) so the assignee picker can label home
+    /// managers without re-fetching. Optional so existing call sites
+    /// keep working unchanged — when nil, the picker falls back to the
+    /// previous label-only render.
+    var householdFamilyMembers: [FamilyMemberRow] = []
     /// If provided, the new task is added optimistically through this view model.
     var viewModel: MaintenanceViewModel?
     var onSave: (() -> Void)?
@@ -122,7 +129,7 @@ struct AddMaintenanceTaskSheet: View {
                         Picker("Person", selection: $assignedUserId) {
                             Text("Unassigned").tag(nil as UUID?)
                             ForEach(householdUsers, id: \.id) { user in
-                                Text(user.fullName?.components(separatedBy: " ").first ?? user.fullName ?? "Member")
+                                Text(personLabel(for: user))
                                     .tag(user.id as UUID?)
                             }
                         }
@@ -166,6 +173,24 @@ struct AddMaintenanceTaskSheet: View {
                     selectedPropertyId = properties.first?.id
                 }
             }
+        }
+    }
+
+    /// Build 87 (Home Manager expansion): renders the picker label for a
+    /// household user. Plain family members get just their first name (or
+    /// full name fallback). Linked home managers get "Maria · Home Manager",
+    /// linked staff get "Maria · Staff" — the suffix flows in via the
+    /// `householdFamilyMembers` prop. Built as a single string here because
+    /// SwiftUI's `Picker` row labels render best as one Text per option.
+    private func personLabel(for user: UserRow) -> String {
+        let base = user.fullName?.components(separatedBy: " ").first ?? user.fullName ?? "Member"
+        guard let match = householdFamilyMembers.first(where: { $0.linkedUserId == user.id }) else {
+            return base
+        }
+        switch match.memberType {
+        case "home_manager": return "\(base) · Home Manager"
+        case "staff": return "\(base) · Staff"
+        default: return base
         }
     }
 

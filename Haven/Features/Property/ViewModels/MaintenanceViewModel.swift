@@ -202,7 +202,15 @@ final class MaintenanceViewModel: ObservableObject {
             contractors = c
             users = (try? await db.fetchHouseholdUsers()) ?? []
             vehicles = (try? await db.fetchVehicles()) ?? []
-            familyMembers = (try? await db.fetchFamilyMembers()) ?? []
+            // Build 87 (Home Manager expansion): merge family + staff into
+            // a single `familyMembers` array so the existing `linkedUserId`
+            // lookups in `assignedUserName` and `assignedUserAvatarColor`
+            // can also resolve home manager / staff rows. The previous
+            // `fetchFamilyMembers` query filters out staff server-side, so
+            // we have to ask for both buckets and concatenate.
+            let family = (try? await db.fetchFamilyMembers()) ?? []
+            let staff = (try? await db.fetchHouseholdStaff()) ?? []
+            familyMembers = family + staff
 
             // Fetch systems for all properties
             var allSystems: [HomeSystemRow] = []
@@ -262,7 +270,19 @@ final class MaintenanceViewModel: ObservableObject {
     func assignedUserName(for task: MaintenanceTaskDBRow) -> String? {
         guard let userId = task.assignedToUserId else { return nil }
         guard let user = users.first(where: { $0.id == userId }) else { return nil }
-        return user.fullName?.components(separatedBy: " ").first ?? user.fullName
+        let firstName = user.fullName?.components(separatedBy: " ").first ?? user.fullName ?? "Assigned"
+        // Build 87 (Home Manager expansion): append " · Home Manager"
+        // when the assignee is a linked staff user. Family members render
+        // without a suffix to keep their pill compact (the "couple"
+        // chip already implies the relationship).
+        if let member = familyMembers.first(where: { $0.linkedUserId == userId }) {
+            switch member.memberType {
+            case "home_manager": return "\(firstName) · Home Manager"
+            case "staff": return "\(firstName) · Staff"
+            default: break
+            }
+        }
+        return firstName
     }
 
     func assignedUserAvatarColor(for task: MaintenanceTaskDBRow) -> AvatarColor? {

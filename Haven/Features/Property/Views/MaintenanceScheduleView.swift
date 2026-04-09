@@ -511,6 +511,10 @@ struct MaintenanceScheduleView: View {
                 vehicles: viewModel.vehicles,
                 contractors: viewModel.contractors,
                 householdUsers: viewModel.users,
+                // Build 87 (Home Manager expansion): pass the merged
+                // family + staff list so the picker can append the
+                // "· Home Manager" suffix to staff users.
+                householdFamilyMembers: viewModel.familyMembers,
                 viewModel: viewModel
             )
         }

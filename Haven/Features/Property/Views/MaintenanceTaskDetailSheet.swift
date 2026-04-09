@@ -28,6 +28,11 @@ struct MaintenanceTaskDetailSheet: View {
 
     // User assignment state
     @State private var householdUsers: [UserRow] = []
+    /// Build 87 (Home Manager expansion): family_members rows for the
+    /// current household. Used to look up `linkedUserId` → `memberType` so
+    /// the assignee picker can append "· Home Manager" / "· Staff" to
+    /// each user's first name.
+    @State private var householdFamilyMembersForRoles: [FamilyMemberRow] = []
     @State private var assignedUserId: UUID?
     @State private var originalAssignedUserId: UUID?
 
@@ -921,9 +926,22 @@ struct MaintenanceTaskDetailSheet: View {
                                 .font(.system(size: 20))
                                 .foregroundStyle(assignedUserId == user.id ? HavenColors.navy : HavenColors.beige300)
 
-                            Text(user.fullName?.components(separatedBy: " ").first ?? user.fullName ?? "Member")
-                                .font(HavenTypography.bodySmall)
-                                .foregroundStyle(HavenColors.textPrimary)
+                            // Build 87 (Home Manager expansion): name +
+                            // optional role suffix so the homeowner can see
+                            // they're assigning to a home manager / staff
+                            // before tapping. The suffix is rendered as a
+                            // separate Text in textTertiary so it reads as
+                            // metadata, not name.
+                            HStack(spacing: 0) {
+                                Text(user.fullName?.components(separatedBy: " ").first ?? user.fullName ?? "Member")
+                                    .font(HavenTypography.bodySmall)
+                                    .foregroundStyle(HavenColors.textPrimary)
+                                if let suffix = roleSuffix(for: user) {
+                                    Text(suffix)
+                                        .font(HavenTypography.uiCaption)
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
 
                             Spacer()
 
@@ -947,8 +965,30 @@ struct MaintenanceTaskDetailSheet: View {
 
     private func loadHouseholdUsers() async {
         householdUsers = (try? await db.fetchHouseholdUsers()) ?? []
+        // Build 87 (Home Manager expansion): also pull the family + staff
+        // rows so the assignee picker can label home managers. Both queries
+        // run sequentially to avoid burning a parallel connection on a
+        // small list.
+        let family = (try? await db.fetchFamilyMembers()) ?? []
+        let staff = (try? await db.fetchHouseholdStaff()) ?? []
+        householdFamilyMembersForRoles = family + staff
         assignedUserId = task.assignedToUserId
         originalAssignedUserId = task.assignedToUserId
+    }
+
+    /// Build 87 (Home Manager expansion): returns " · Home Manager" or
+    /// " · Staff" when the user matches a family_member with that
+    /// member_type. Returns nil for plain family members so the picker
+    /// keeps the existing single-name layout for them.
+    private func roleSuffix(for user: UserRow) -> String? {
+        guard let match = householdFamilyMembersForRoles.first(where: { $0.linkedUserId == user.id }) else {
+            return nil
+        }
+        switch match.memberType {
+        case "home_manager": return " · Home Manager"
+        case "staff": return " · Staff"
+        default: return nil
+        }
     }
 
     private func updateAssignment(userId: UUID?, previousUserId: UUID?) async {
