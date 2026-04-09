@@ -24,6 +24,11 @@ final class DocumentDetailViewModel: ObservableObject {
     @Published var missingCrossReferences: [String] = []
     @Published var hasLinkedServiceRecords = false
     @Published var properties: [PropertyRow] = []
+    /// Build 87 (Home Manager expansion): paid household staff
+    /// (`family_members.member_type IN ('home_manager', 'staff')`). When
+    /// this is empty, the Access pill in `DocumentDetailView` is hidden
+    /// entirely so family-only households see zero UI noise.
+    @Published var householdHomeManagers: [FamilyMemberRow] = []
 
     private let db = DatabaseService.shared
 
@@ -38,6 +43,15 @@ final class DocumentDetailViewModel: ObservableObject {
             familyMembers = try await db.fetchFamilyMembersForDocument(documentId: id)
             documentParties = try await db.fetchDocumentParties(documentId: id)
             trustedContactsWithAccess = try await db.fetchTrustedContactsForDocument(documentId: id)
+            // Build 87 (Home Manager expansion): load household staff and
+            // all family members so the Access pill knows whether to render
+            // and the DocumentAccessSheet has the full member list ready
+            // when the user taps it. Tolerate failures — the pill just
+            // won't show if either of these queries errors.
+            householdHomeManagers = (try? await db.fetchHouseholdStaff()) ?? []
+            if allFamilyMembers.isEmpty {
+                allFamilyMembers = (try? await db.fetchFamilyMembers()) ?? []
+            }
 
             if let propId = document?.propertyId {
                 property = try await db.fetchProperty(id: propId)
@@ -227,6 +241,31 @@ final class DocumentDetailViewModel: ObservableObject {
             )
             NotificationCenter.default.post(name: .documentChanged, object: nil,
                 userInfo: ["action": "updated", "id": doc.id.uuidString])
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Build 87 (Home Manager expansion): toggles whether household home
+    /// managers can see this document. Called from `DocumentAccessSheet`
+    /// when the homeowner overrides the category-based default. Updates
+    /// the local `document` state on success so the `DocumentDetailView`
+    /// access pill re-renders with the new label.
+    func updateHomeManagerVisibility(_ visible: Bool) async {
+        guard let doc = document else { return }
+        Haptics.light()
+        do {
+            document = try await db.updateDocumentHomeManagerVisibility(
+                documentId: doc.id,
+                visible: visible
+            )
+            NotificationCenter.default.post(
+                name: .documentChanged,
+                object: nil,
+                userInfo: ["action": "updated", "id": doc.id.uuidString]
+            )
+            Haptics.success()
         } catch {
             self.error = error.localizedDescription
             Haptics.error()

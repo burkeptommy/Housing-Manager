@@ -188,6 +188,12 @@ final class DocumentUploadManager: ObservableObject {
             )
             insert.contentHash = item.contentHash ?? contentHash
             insert.fileSize = item.data.count
+            // Build 87 (Home Manager expansion): "Unknown" placeholder
+            // resolves to visible — analyze-document will rewrite
+            // visible_to_home_managers when it stamps the real category
+            // server-side using the same DocumentAccessDefaults list
+            // (mirrored as PRIVATE_FROM_HOME_MANAGERS in TypeScript).
+            insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
             let doc = try await db.createDocument(insert)
             queue[index].documentId = doc.id
 

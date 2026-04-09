@@ -333,6 +333,10 @@ final class DocumentUploadViewModel: ObservableObject {
             )
             insert.contentHash = contentHash
             insert.fileSize = fileSize
+            // Build 87 (Home Manager expansion): placeholder category
+            // resolves to visible — analyze-document overrides this when
+            // it stamps the real category server-side.
+            insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
 
             let doc = try await db.createDocument(insert)
             uploadedDocumentId = doc.id
@@ -614,6 +618,10 @@ final class DocumentUploadViewModel: ObservableObject {
                     )
                     insert.contentHash = batchHash
                     insert.fileSize = uploadItems[i].data.count
+                    // Build 87 (Home Manager expansion): placeholder
+                    // category resolves to visible — analyze-document
+                    // overrides this when it stamps the real category.
+                    insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
 
                     let doc = try await db.createDocument(insert)
                     uploadItems[i].uploadedDocumentId = doc.id

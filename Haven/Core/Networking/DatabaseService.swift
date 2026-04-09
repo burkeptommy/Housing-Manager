@@ -239,6 +239,18 @@ final class DatabaseService {
             .value
     }
 
+    /// Build 87 (Home Manager expansion): toggles whether household home
+    /// managers can see this document. Called from `DocumentAccessSheet`
+    /// when the homeowner overrides the category-based default. Returns
+    /// the refreshed `DocumentRow` so the caller can update its local
+    /// state without re-fetching the full list.
+    @discardableResult
+    func updateDocumentHomeManagerVisibility(documentId: UUID, visible: Bool) async throws -> DocumentRow {
+        var update = DocumentUpdate()
+        update.visibleToHomeManagers = visible
+        return try await updateDocument(id: documentId, update)
+    }
+
     func deleteDocument(id: UUID) async throws {
         try await from("documents")
             .update(["deleted_at": Date().ISO8601Format()])

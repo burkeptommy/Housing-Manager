@@ -13,6 +13,52 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Build 87 (Home Manager expansion):
+// Categories that are HIDDEN from home managers by default. Mirrors
+// `Haven/Features/Documents/DocumentAccessDefaults.swift` and the SQL
+// backfill in `supabase/migrations/20260440_document_home_manager_access_backfill.sql`.
+// All entries are lowercased so the lookup can normalize either the Title
+// Case strings produced by Claude classification ("Will", "Power of Attorney")
+// or legacy snake_case strings.
+// Keep all three lists in sync when categories are added or removed.
+const PRIVATE_FROM_HOME_MANAGERS = new Set([
+  // Estate Planning
+  "will", "trust",
+  "power of attorney", "power_of_attorney",
+  "healthcare directive", "healthcare_directive",
+  "guardianship designation", "letter of intent",
+  "living_will", "estate_plan",
+  "beneficiary designation", "beneficiary_designation",
+  // Financial Accounts
+  "brokerage account", "retirement account (ira/401k)",
+  "bank account", "529 plan",
+  "stock options/rsus", "crypto wallet", "alternative investments",
+  "financial_account", "investment_statement", "bank_statement",
+  // Tax Records (bills are visible, returns/records are private)
+  "federal tax return", "state tax return",
+  "gift tax return (form 709)", "property tax record",
+  "estate & trust return (form 1041)",
+  "tax_return", "tax_document",
+  // Life / Long-Term / Disability Insurance
+  "life insurance", "long-term care insurance", "disability insurance",
+  "life_insurance",
+  // Medical (legacy)
+  "medical_record", "health_insurance",
+  // Legal (legacy)
+  "legal_agreement",
+  // Government IDs
+  "passport",
+  "birth certificate", "marriage certificate", "divorce decree",
+  "social security card", "citizenship/immigration", "death certificate",
+  "birth_certificate", "marriage_certificate", "divorce_decree",
+  "social_security",
+]);
+
+function visibleToHomeManagers(category: string | null | undefined): boolean {
+  if (!category) return true;
+  return !PRIVATE_FROM_HOME_MANAGERS.has(category.toLowerCase());
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -512,6 +558,7 @@ serve(async (req: Request) => {
         status: "active",
         notes: `Stored from forwarded email.\nFrom: ${fromAddress}\nSubject: ${subject}\n\n${item.summary || ""}`,
         ai_summary: item.summary,
+        visible_to_home_managers: visibleToHomeManagers(docCategory),
       };
       if (property_id) docInsert.property_id = property_id;
       if (vehicle_id) docInsert.vehicle_id = vehicle_id;

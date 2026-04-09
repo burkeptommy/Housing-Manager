@@ -105,7 +105,8 @@ CREATE TABLE documents (
     vault_locked BOOLEAN DEFAULT false,
     vault_lock_iv TEXT,
     content_hash TEXT,
-    file_size BIGINT
+    file_size BIGINT,
+    visible_to_home_managers BOOLEAN NOT NULL DEFAULT true
 );
 
 -- Document-FamilyMember junction
@@ -400,9 +401,19 @@ CREATE POLICY "Users can delete household family members"
 -- ----------------------------------------------------------------------------
 -- documents
 -- ----------------------------------------------------------------------------
-CREATE POLICY "Users can view household documents"
+CREATE POLICY "household_documents_select"
     ON documents FOR SELECT
-    USING (household_id = public.get_my_household_id());
+    USING (
+        household_id = public.get_my_household_id()
+        AND (
+            visible_to_home_managers = true
+            OR NOT EXISTS (
+                SELECT 1 FROM family_members
+                WHERE family_members.linked_user_id = auth.uid()
+                  AND family_members.member_type IN ('home_manager', 'staff')
+            )
+        )
+    );
 
 CREATE POLICY "Users can insert household documents"
     ON documents FOR INSERT

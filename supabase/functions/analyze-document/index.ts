@@ -7,6 +7,54 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
+// Build 87 (Home Manager expansion):
+// Categories that are HIDDEN from home managers by default. Mirrors
+// `Haven/Features/Documents/DocumentAccessDefaults.swift` and the SQL
+// backfill in `supabase/migrations/20260440_document_home_manager_access_backfill.sql`.
+// Critical: this function is the place where the AI rewrites a placeholder
+// "Unknown" / "Will" category into the real category at upload time, so we
+// MUST also rewrite `visible_to_home_managers` here. Otherwise, manual
+// uploads will permanently look "visible" because the iOS placeholder
+// resolves to visible at insert time.
+// Keep all three lists in sync when categories are added or removed.
+const PRIVATE_FROM_HOME_MANAGERS = new Set([
+  // Estate Planning
+  "will", "trust",
+  "power of attorney", "power_of_attorney",
+  "healthcare directive", "healthcare_directive",
+  "guardianship designation", "letter of intent",
+  "living_will", "estate_plan",
+  "beneficiary designation", "beneficiary_designation",
+  // Financial Accounts
+  "brokerage account", "retirement account (ira/401k)",
+  "bank account", "529 plan",
+  "stock options/rsus", "crypto wallet", "alternative investments",
+  "financial_account", "investment_statement", "bank_statement",
+  // Tax Records
+  "federal tax return", "state tax return",
+  "gift tax return (form 709)", "property tax record",
+  "estate & trust return (form 1041)",
+  "tax_return", "tax_document",
+  // Life / Long-Term / Disability Insurance
+  "life insurance", "long-term care insurance", "disability insurance",
+  "life_insurance",
+  // Medical (legacy)
+  "medical_record", "health_insurance",
+  // Legal (legacy)
+  "legal_agreement",
+  // Government IDs
+  "passport",
+  "birth certificate", "marriage certificate", "divorce decree",
+  "social security card", "citizenship/immigration", "death certificate",
+  "birth_certificate", "marriage_certificate", "divorce_decree",
+  "social_security",
+]);
+
+function visibleToHomeManagers(category: string | null | undefined): boolean {
+  if (!category) return true;
+  return !PRIVATE_FROM_HOME_MANAGERS.has(category.toLowerCase());
+}
+
 const VALID_CATEGORIES = [
   "Will","Trust","Power of Attorney","Healthcare Directive","Guardianship Designation","Letter of Intent",
   "LLC Operating Agreement","LP Agreement","S-Corp Documents","EIN Documentation","Annual Filings","Bylaws",
@@ -281,10 +329,16 @@ Return ONLY JSON. No markdown. No explanation.`,
       // DocumentUploadManager). No longer computed here to avoid race conditions or hash mismatches.
 
       // Update document record (including property_id if AI matched a property)
+      // Build 87 (Home Manager expansion): rewrite visible_to_home_managers
+      // alongside the category. Manual upload paths set "Unknown" / "Will"
+      // placeholders at insert time which always resolve to visible/private
+      // by accident — this is the place where the real category gets
+      // stamped, so we MUST also rewrite the visibility flag.
       const docUpdate: Record<string, unknown> = {
         ai_summary: analysis.summary,
         ai_flags: analysis.flags ?? [],
         category: analysis.category_suggestion,
+        visible_to_home_managers: visibleToHomeManagers(analysis.category_suggestion as string | null),
         metadata: {
           cross_references: analysis.cross_reference_suggestions ?? [],
           extracted_metadata: analysis.extracted_metadata ?? {},

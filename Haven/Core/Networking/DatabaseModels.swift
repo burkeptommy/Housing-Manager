@@ -270,6 +270,21 @@ struct DocumentRow: Codable, Identifiable {
     let fileSize: Int?
     let deletedAt: String?
     let metadata: DocumentMetadata?
+    /// Build 87 (Home Manager expansion): when false, household members
+    /// whose `family_members.member_type` is `home_manager` or `staff`
+    /// cannot see this document via the `household_documents_select` RLS
+    /// policy. Defaults to true at insert time for unknown categories;
+    /// estate / legal / financial / medical categories default to false
+    /// via `DocumentAccessDefaults.visibleToHomeManagers(for:)`.
+    let visibleToHomeManagers: Bool?
+
+    /// Convenience accessor that defaults to `true` when the column is nil
+    /// (legacy rows from before build 87, or rows decoded without the
+    /// column projection). The RLS migration backfilled every row to a
+    /// concrete value so this should only matter in transient decode paths.
+    var isVisibleToHomeManagers: Bool {
+        visibleToHomeManagers ?? true
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, title, category, status, notes, tags, metadata
@@ -293,6 +308,7 @@ struct DocumentRow: Codable, Identifiable {
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case deletedAt = "deleted_at"
+        case visibleToHomeManagers = "visible_to_home_managers"
     }
 }
 
@@ -354,6 +370,13 @@ struct DocumentInsert: Codable {
     var propertyId: UUID?
     var contentHash: String?
     var fileSize: Int?
+    /// Build 87 (Home Manager expansion): set via
+    /// `DocumentAccessDefaults.visibleToHomeManagers(for: category)` at every
+    /// insert callsite so estate / legal / financial / medical categories
+    /// default to hidden from home managers. Optional so legacy callsites
+    /// that haven't been updated still compile, but every iOS path should
+    /// pass an explicit value.
+    var visibleToHomeManagers: Bool?
 
     enum CodingKeys: String, CodingKey {
         case title, category, status, notes, tags
@@ -368,6 +391,7 @@ struct DocumentInsert: Codable {
         case propertyId = "property_id"
         case contentHash = "content_hash"
         case fileSize = "file_size"
+        case visibleToHomeManagers = "visible_to_home_managers"
     }
 }
 
@@ -393,6 +417,9 @@ struct DocumentUpdate: Codable {
     var metadata: DocumentMetadata?
     var contentHash: String?
     var fileSize: Int?
+    /// Build 87 (Home Manager expansion): toggled per-document via the
+    /// Access pill in `DocumentDetailView` → `DocumentAccessSheet`.
+    var visibleToHomeManagers: Bool?
 
     enum CodingKeys: String, CodingKey {
         case title, category, status, notes, tags, metadata
@@ -411,6 +438,7 @@ struct DocumentUpdate: Codable {
         case projectId = "project_id"
         case contentHash = "content_hash"
         case fileSize = "file_size"
+        case visibleToHomeManagers = "visible_to_home_managers"
     }
 }
 

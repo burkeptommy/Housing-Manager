@@ -18,6 +18,10 @@ struct DocumentDetailView: View {
     @State private var showShareSheet = false
     @State private var showAddTrustedContact = false
     @State private var quickLookURL: URL?
+    /// Build 87 (Home Manager expansion): toggles the per-document Access
+    /// sheet that lets the homeowner override the category-default
+    /// `visible_to_home_managers` flag.
+    @State private var showHomeManagerAccessSheet = false
     @StateObject private var trustedContactVM = TrustedContactsViewModel()
 
     // Invoice processing
@@ -178,6 +182,12 @@ struct DocumentDetailView: View {
                 InvoiceReviewSheet(viewModel: vm)
             }
         }
+        .modifier(
+            HomeManagerAccessSheetModifier(
+                isPresented: $showHomeManagerAccessSheet,
+                viewModel: viewModel
+            )
+        )
         .screenshotProtected()
         .alert("Error", isPresented: $viewModel.showError) {
             Button("OK") { viewModel.error = nil }
@@ -462,6 +472,13 @@ struct DocumentDetailView: View {
                 }
                 .buttonStyle(.plain)
 
+                // Build 87 (Home Manager expansion): Access pill — only
+                // shown when the household has at least one home manager.
+                // Family-only households see no UI noise.
+                if !viewModel.householdHomeManagers.isEmpty {
+                    accessRow(doc)
+                }
+
                 if let inst = doc.issuingInstitution, !inst.isEmpty {
                     metadataRow("Issuing Institution", value: inst)
                 }
@@ -503,6 +520,46 @@ struct DocumentDetailView: View {
                     .font(HavenTypography.subheadline)
                     .foregroundStyle(HavenColors.textPrimary)
             }
+        }
+    }
+
+    /// Build 87 (Home Manager expansion): tappable row that opens
+    /// `DocumentAccessSheet`. Only rendered when the household has at
+    /// least one home manager.
+    private func accessRow(_ doc: DocumentRow) -> some View {
+        Button {
+            Haptics.light()
+            showHomeManagerAccessSheet = true
+        } label: {
+            HStack {
+                Text("Access")
+                    .font(HavenTypography.subheadline)
+                    .foregroundStyle(HavenColors.textSecondary)
+                Spacer()
+                Text(accessSummary(for: doc))
+                    .font(HavenTypography.subheadline)
+                    .foregroundStyle(HavenColors.navy700)
+                    .lineLimit(1)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Build 87 (Home Manager expansion): right-side label for the Access
+    /// row. Counts family members + included home managers without naming
+    /// individuals so the row stays single-line.
+    private func accessSummary(for doc: DocumentRow) -> String {
+        let familyCount = max(viewModel.allFamilyMembers.count, 1)
+        let staffCount = viewModel.householdHomeManagers.count
+        if doc.isVisibleToHomeManagers {
+            // Visible to family + home managers
+            let total = familyCount + staffCount
+            return "Family + \(staffCount) home manager\(staffCount == 1 ? "" : "s") (\(total))"
+        } else {
+            return "Family only (\(familyCount))"
         }
     }
 
@@ -1618,5 +1675,28 @@ struct FlowLayout: Layout {
         }
 
         return (positions, CGSize(width: maxX, height: currentY + lineHeight))
+    }
+}
+
+/// Build 87 (Home Manager expansion):
+/// Extracted modifier so the new sheet doesn't push `DocumentDetailView.body`
+/// past SwiftUI's type-checker complexity limit. The view's body already
+/// chains a dozen sheets / alerts; adding inline blew up the type checker.
+private struct HomeManagerAccessSheetModifier: ViewModifier {
+    @Binding var isPresented: Bool
+    @ObservedObject var viewModel: DocumentDetailViewModel
+
+    func body(content: Content) -> some View {
+        content.sheet(isPresented: $isPresented) {
+            if let doc = viewModel.document {
+                DocumentAccessSheet(
+                    document: doc,
+                    homeManagers: viewModel.householdHomeManagers,
+                    familyMembers: viewModel.allFamilyMembers
+                ) { newVisible in
+                    await viewModel.updateHomeManagerVisibility(newVisible)
+                }
+            }
+        }
     }
 }

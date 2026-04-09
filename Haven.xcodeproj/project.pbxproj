@@ -181,6 +181,7 @@
 		A08086D5AE75A0591FF0539F /* DocumentUploadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14626DD382FED3D16FDE7151 /* DocumentUploadView.swift */; };
 		A0E4F6D658CBB9D8DA2B3E64 /* QuizKidsInlineForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */; };
 		A2DF2B9B63DCF0472D49A603 /* OverdueMaintenanceCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69BD10152C540F01FD5A0C2B /* OverdueMaintenanceCard.swift */; };
+		A2FBE1A9D72FB6EE8B355EDE /* DocumentAccessSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75E779FDEB62081062F91493 /* DocumentAccessSheet.swift */; };
 		A4343405E25959CA1B4B2B5F /* DocumentCategoryGroups.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */; };
 		A50832A03C6A3975D16E74CE /* SignUpView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55B1CBF7F1BC549E214B0BEF /* SignUpView.swift */; };
 		A54AA165F77E2464DDEBA45E /* NotificationSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 400015DE6DC09805EC95BF6E /* NotificationSettingsView.swift */; };
@@ -188,6 +189,7 @@
 		A7CD1D35E7229CC1883016AF /* CategoryProgress.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08D056E30880763A14839C3 /* CategoryProgress.swift */; };
 		A818EE7EC90F063034BCDEDF /* ForceUpdateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2196EE2869675E5615FCE1A2 /* ForceUpdateView.swift */; };
 		A883756C8AA8216C97B0494F /* EquipmentSearchResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1AD5377254AFED79D10F0B50 /* EquipmentSearchResult.swift */; };
+		A968429C5A26F0A9E5F0BB4F /* DocumentAccessDefaults.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A6E8DFBC88AF3D120717F2F /* DocumentAccessDefaults.swift */; };
 		A971F6A620A3A610642E93A4 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45B796CD75D32905D008DB51 /* SecuritySettingsView.swift */; };
 		A9C507BF5788F44D6DD5C0AD /* ServiceContractSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4C4293076703BBB693DB832 /* ServiceContractSheet.swift */; };
 		A9DA3C7B503FE8D32F5F7BB2 /* HouseQuizViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9D82CEFB262D83D295D6268 /* HouseQuizViewModel.swift */; };
@@ -374,6 +376,7 @@
 		46905EFC24FB1AD4C663EE7E /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
 		49BADD595B4C622795B9566D /* AddVehicleView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddVehicleView.swift; sourceTree = "<group>"; };
 		4A49265B02B1FE4943D13DEE /* DocumentDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentDetailView.swift; sourceTree = "<group>"; };
+		4A6E8DFBC88AF3D120717F2F /* DocumentAccessDefaults.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAccessDefaults.swift; sourceTree = "<group>"; };
 		4AD2F4AD6AD8E86D93DEA55A /* SessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionManager.swift; sourceTree = "<group>"; };
 		4B06503ADB172DFB9879D8B8 /* BiometricAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthView.swift; sourceTree = "<group>"; };
 		4C55BD89D3FF9E725F8E5B37 /* ScenarioStudioViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioViewModel.swift; sourceTree = "<group>"; };
@@ -424,6 +427,7 @@
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
 		74FA247DDBF39F4193808F43 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		74FDF7AD45D37549A2BFCCDA /* PropertyDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyDocumentsView.swift; sourceTree = "<group>"; };
+		75E779FDEB62081062F91493 /* DocumentAccessSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentAccessSheet.swift; sourceTree = "<group>"; };
 		773266F6C8F5CDA962157D23 /* FamilyItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyItemDetailView.swift; sourceTree = "<group>"; };
 		7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenButton.swift; sourceTree = "<group>"; };
 		778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageSystemTasksSheet.swift; sourceTree = "<group>"; };
@@ -843,6 +847,7 @@
 			isa = PBXGroup;
 			children = (
 				5BD6C14FAF58D10B27759559 /* CategoryPickerSheet.swift */,
+				75E779FDEB62081062F91493 /* DocumentAccessSheet.swift */,
 				F4FC6CA835F3723B6BDF430E /* DocumentCategoryView.swift */,
 				4A49265B02B1FE4943D13DEE /* DocumentDetailView.swift */,
 				19007347F794F82E4E1932D1 /* DocumentScannerView.swift */,
@@ -994,6 +999,7 @@
 				A4793901DBD400C328F644C8 /* Models */,
 				230F0FE9429642FCD2F949E2 /* ViewModels */,
 				738C4A2EEC71D31497F53AB3 /* Views */,
+				4A6E8DFBC88AF3D120717F2F /* DocumentAccessDefaults.swift */,
 			);
 			path = Documents;
 			sourceTree = "<group>";
@@ -1403,6 +1409,8 @@
 				ADD0A64441CA3144F9621105 /* Date+Extensions.swift in Sources */,
 				DE867FFD439E3276B2AB4778 /* DefaultSystemsService.swift in Sources */,
 				5FEED10B540336DF356430F7 /* Document.swift in Sources */,
+				A968429C5A26F0A9E5F0BB4F /* DocumentAccessDefaults.swift in Sources */,
+				A2FBE1A9D72FB6EE8B355EDE /* DocumentAccessSheet.swift in Sources */,
 				568E20289A1AE9ECD0D960D5 /* DocumentAnalysisService.swift in Sources */,
 				94ABEC553C961C0F36CBC601 /* DocumentCard.swift in Sources */,
 				71221A75967708FA23C4260D /* DocumentCategory.swift in Sources */,

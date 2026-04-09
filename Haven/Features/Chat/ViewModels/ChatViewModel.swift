@@ -205,13 +205,18 @@ final class ChatViewModel: ObservableObject {
                 .replacingOccurrences(of: ".jpeg", with: "")
                 .replacingOccurrences(of: ".png", with: "")
 
-            let insert = DocumentInsert(
+            var insert = DocumentInsert(
                 householdId: householdId,
                 title: titleFromFile,
                 category: DocumentCategory.will.rawValue, // placeholder, AI will update
                 filePath: filePath,
                 status: "active"
             )
+            // Build 87 (Home Manager expansion): "will" placeholder
+            // resolves to private (will is in privateFromHomeManagers).
+            // analyze-document will rewrite this when it stamps the
+            // real category server-side.
+            insert.visibleToHomeManagers = DocumentAccessDefaults.visibleToHomeManagers(for: insert.category)
 
             let doc = try await db.createDocument(insert)
 
