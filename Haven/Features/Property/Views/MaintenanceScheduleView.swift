@@ -6,6 +6,20 @@ enum MaintenanceViewMode: String, CaseIterable {
     case byType = "By Type"
 }
 
+/// Build 87: top-level filter that lets users zoom into a single bucket of
+/// the two-bucket maintenance list (personal vs vendor-managed). HNW users
+/// with many personal tasks were scrolling past the YOUR TO-DOS section to
+/// reach VENDOR-MANAGED, so this picker collapses one of the two buckets
+/// per the user's intent. `.all` is the default — both buckets visible
+/// using their existing collapse state.
+enum MaintenanceViewFilter: String, CaseIterable, Identifiable {
+    case all = "All"
+    case mine = "Mine"
+    case vendor = "Vendor"
+
+    var id: String { rawValue }
+}
+
 struct MaintenanceScheduleView: View {
     let prefilterPropertyId: UUID?
 
@@ -29,6 +43,14 @@ struct MaintenanceScheduleView: View {
     /// `maintenance.bucket.<propertyId>.vendor.collapsed`.
     @State private var personalBucketCollapsed: Bool = false
     @State private var vendorBucketCollapsed: Bool = false
+
+    /// Build 87: top-of-list All / Mine / Vendor segmented filter. Persisted
+    /// per-property in UserDefaults under `maintenance_view_filter_<propertyId>`
+    /// using the same load-on-property-change pattern as the bucket collapse
+    /// state above. `.all` shows both buckets stacked; `.mine` and `.vendor`
+    /// show one bucket fully expanded and recompute the stats chips so the
+    /// header counts match what the user is looking at.
+    @State private var viewFilter: MaintenanceViewFilter = .all
 
     /// Phase 19l: Delegate flow state — when the user taps "Have someone
     /// else do it" on a personal card, this captures the task so we can
@@ -352,6 +374,13 @@ struct MaintenanceScheduleView: View {
                     }
                 }
 
+                // Build 87: All / Mine / Vendor segmented filter sits above
+                // the stats chips so it frames everything below it. Tap on
+                // the segments fires haptic feedback and persists per-property
+                // via the `viewFilterStorageKey` so the choice carries across
+                // sessions.
+                viewFilterPicker
+
                 // Summary bar
                 summaryBar
 
@@ -487,9 +516,43 @@ struct MaintenanceScheduleView: View {
         "maintenance.bucket.\(viewModel.filterPropertyId?.uuidString ?? "all").vendor.collapsed"
     }
 
+    /// Build 87: per-property persistence key for the All / Mine / Vendor
+    /// segmented filter. Mirrors the bucket-collapse storage key pattern.
+    private var viewFilterStorageKey: String {
+        "maintenance_view_filter_\(viewModel.filterPropertyId?.uuidString ?? "all")"
+    }
+
     private func loadBucketCollapsedState() {
         personalBucketCollapsed = UserDefaults.standard.bool(forKey: personalBucketStorageKey)
         vendorBucketCollapsed = UserDefaults.standard.bool(forKey: vendorBucketStorageKey)
+        // Build 87: rehydrate the segmented filter for the active property.
+        // Default to .all when nothing has been saved.
+        if let raw = UserDefaults.standard.string(forKey: viewFilterStorageKey),
+           let stored = MaintenanceViewFilter(rawValue: raw) {
+            viewFilter = stored
+        } else {
+            viewFilter = .all
+        }
+    }
+
+    private func saveViewFilter() {
+        UserDefaults.standard.set(viewFilter.rawValue, forKey: viewFilterStorageKey)
+    }
+
+    /// Build 87: applies the segmented filter to a task list. `.all` is a
+    /// pass-through; `.mine` returns personal/either tasks (anything not
+    /// explicitly assignmentType vendor); `.vendor` returns the vendor-managed
+    /// rows. Centralizing the predicate keeps the bucket sections, the stats
+    /// chips, and any future call sites in lockstep.
+    private func tasksMatchingViewFilter(_ tasks: [MaintenanceTaskDBRow]) -> [MaintenanceTaskDBRow] {
+        switch viewFilter {
+        case .all:
+            return tasks
+        case .mine:
+            return tasks.filter { ($0.assignmentType?.lowercased() ?? "") != "vendor" }
+        case .vendor:
+            return tasks.filter { ($0.assignmentType?.lowercased() ?? "") == "vendor" }
+        }
     }
 
     private func togglePersonalBucket() {
@@ -517,22 +580,53 @@ struct MaintenanceScheduleView: View {
             // when no filter is active. Personal/either tasks first, then
             // vendor-managed. Tasks within each group keep their date sort
             // (overdue floats to the top because earlier dates sort first).
-            bucketSection(
-                title: "Your To-Dos",
-                count: personalBucketTasks.count,
-                isCollapsed: personalBucketCollapsed,
-                onToggle: togglePersonalBucket,
-                tasks: personalBucketTasks,
-                emptyCopy: "No personal tasks right now."
-            )
-            bucketSection(
-                title: "Vendor-Managed",
-                count: vendorBucketTasks.count,
-                isCollapsed: vendorBucketCollapsed,
-                onToggle: toggleVendorBucket,
-                tasks: vendorBucketTasks,
-                emptyCopy: "No vendor-managed tasks yet."
-            )
+            //
+            // Build 87: the segmented `viewFilter` collapses to a single
+            // bucket (force-expanded, no chevron) when not `.all`. The
+            // per-bucket collapse state is intentionally bypassed in this
+            // mode because hiding the only visible section would leave the
+            // screen empty.
+            switch viewFilter {
+            case .all:
+                bucketSection(
+                    title: "Your To-Dos",
+                    count: personalBucketTasks.count,
+                    isCollapsed: personalBucketCollapsed,
+                    onToggle: togglePersonalBucket,
+                    tasks: personalBucketTasks,
+                    emptyCopy: "No personal tasks right now.",
+                    showChevron: true
+                )
+                bucketSection(
+                    title: "Vendor-Managed",
+                    count: vendorBucketTasks.count,
+                    isCollapsed: vendorBucketCollapsed,
+                    onToggle: toggleVendorBucket,
+                    tasks: vendorBucketTasks,
+                    emptyCopy: "No vendor-managed tasks yet.",
+                    showChevron: true
+                )
+            case .mine:
+                bucketSection(
+                    title: "Your To-Dos",
+                    count: personalBucketTasks.count,
+                    isCollapsed: false,
+                    onToggle: {},
+                    tasks: personalBucketTasks,
+                    emptyCopy: "No personal tasks right now.",
+                    showChevron: false
+                )
+            case .vendor:
+                bucketSection(
+                    title: "Vendor-Managed",
+                    count: vendorBucketTasks.count,
+                    isCollapsed: false,
+                    onToggle: {},
+                    tasks: vendorBucketTasks,
+                    emptyCopy: "No vendor-managed tasks yet.",
+                    showChevron: false
+                )
+            }
         } else {
             Section {
                 ForEach(viewModel.filteredTasks) { task in
@@ -641,16 +735,46 @@ struct MaintenanceScheduleView: View {
         }
     }
 
+    // MARK: - View Filter Picker (Build 87)
+
+    private var viewFilterPicker: some View {
+        Picker("Filter", selection: Binding(
+            get: { viewFilter },
+            set: { newValue in
+                Haptics.selection()
+                withAnimation(.smooth(duration: 0.25)) {
+                    viewFilter = newValue
+                }
+                saveViewFilter()
+            }
+        )) {
+            ForEach(MaintenanceViewFilter.allCases) { filter in
+                Text(filter.rawValue).tag(filter)
+            }
+        }
+        .pickerStyle(.segmented)
+        .padding(.bottom, 4)
+    }
+
     // MARK: - Summary Bar
 
     private var summaryBar: some View {
-        VStack(spacing: 8) {
+        // Build 87: respect the segmented filter so the four stats chips
+        // (Overdue / This Week / This Month / Later) reflect what the user
+        // is actually looking at. The viewModel's per-bucket arrays stay
+        // unfiltered for use elsewhere (e.g. dashboard); we filter them
+        // in-place via `tasksMatchingViewFilter`.
+        let overdue = tasksMatchingViewFilter(viewModel.overdueTasks)
+        let thisWeek = tasksMatchingViewFilter(viewModel.dueThisWeekTasks)
+        let thisMonth = tasksMatchingViewFilter(viewModel.dueThisMonthTasks)
+        let later = tasksMatchingViewFilter(viewModel.upcomingTasks)
+        return VStack(spacing: 8) {
             // Existing summary pills
             HStack(spacing: 0) {
-                summaryPill(count: viewModel.overdueTasks.count, label: "Overdue", color: HavenColors.critical)
-                summaryPill(count: viewModel.dueThisWeekTasks.count, label: "This Week", color: HavenColors.warning)
-                summaryPill(count: viewModel.dueThisMonthTasks.count, label: "This Month", color: HavenColors.info)
-                summaryPill(count: viewModel.upcomingTasks.count, label: "Later", color: HavenColors.success)
+                summaryPill(count: overdue.count, label: "Overdue", color: HavenColors.critical)
+                summaryPill(count: thisWeek.count, label: "This Week", color: HavenColors.warning)
+                summaryPill(count: thisMonth.count, label: "This Month", color: HavenColors.info)
+                summaryPill(count: later.count, label: "Later", color: HavenColors.success)
             }
             .padding(4)
             .background(HavenColors.cream)
@@ -660,7 +784,10 @@ struct MaintenanceScheduleView: View {
             if viewModel.properties.count > 1 && viewModel.overdueTasks.count > 0 {
                 HStack(spacing: 12) {
                     ForEach(viewModel.propertiesWithColors, id: \.property.id) { item in
-                        let count = viewModel.overdueTasks.filter { $0.propertyId == item.property.id }.count
+                        // Build 87: also respect the segmented filter so the
+                        // per-property overdue chips don't include vendor
+                        // tasks when the user is in Mine, etc.
+                        let count = tasksMatchingViewFilter(viewModel.overdueTasks).filter { $0.propertyId == item.property.id }.count
                         if count > 0 {
                             HStack(spacing: 4) {
                                 Circle().fill(item.color).frame(width: 6, height: 6)
@@ -742,8 +869,13 @@ struct MaintenanceScheduleView: View {
         isCollapsed: Bool,
         onToggle: @escaping () -> Void,
         tasks: [MaintenanceTaskDBRow],
-        emptyCopy: String
+        emptyCopy: String,
+        showChevron: Bool = true
     ) -> some View {
+        // Build 87: `showChevron == false` is the segmented-filter mode
+        // where only one bucket is on screen — render a plain header (no
+        // tap target) since collapsing the only visible section would leave
+        // the user staring at an empty list.
         Section {
             if isCollapsed {
                 EmptyView()
@@ -773,29 +905,39 @@ struct MaintenanceScheduleView: View {
                 }
             }
         } header: {
-            Button {
-                onToggle()
-            } label: {
-                HStack(spacing: 8) {
-                    Text(title.uppercased())
-                        .font(HavenTypography.uiSectionHeader)
-                        .foregroundStyle(HavenColors.textTertiary)
-                        .tracking(1.5)
-                    Text("\u{00B7}")
-                        .font(HavenTypography.uiSectionHeader)
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Text("\(count) \(count == 1 ? "task" : "tasks")")
-                        .font(HavenTypography.uiSectionHeader)
-                        .foregroundStyle(HavenColors.textTertiary)
-                    Spacer()
-                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundStyle(HavenColors.textTertiary)
+            if showChevron {
+                Button {
+                    onToggle()
+                } label: {
+                    bucketHeaderRow(title: title, count: count, isCollapsed: isCollapsed, showChevron: true)
                 }
-                .contentShape(Rectangle())
+                .buttonStyle(.plain)
+            } else {
+                bucketHeaderRow(title: title, count: count, isCollapsed: false, showChevron: false)
             }
-            .buttonStyle(.plain)
         }
+    }
+
+    private func bucketHeaderRow(title: String, count: Int, isCollapsed: Bool, showChevron: Bool) -> some View {
+        HStack(spacing: 8) {
+            Text(title.uppercased())
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textTertiary)
+                .tracking(1.5)
+            Text("\u{00B7}")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("\(count) \(count == 1 ? "task" : "tasks")")
+                .font(HavenTypography.uiSectionHeader)
+                .foregroundStyle(HavenColors.textTertiary)
+            Spacer()
+            if showChevron {
+                Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+        }
+        .contentShape(Rectangle())
     }
 
     // MARK: - Task Section

@@ -3,12 +3,17 @@ import SwiftUI
 // MARK: - Scenario Category
 
 enum ScenarioCategory: String, CaseIterable, Identifiable {
-    case estate = "Estate & Legacy"
-    case tax = "Tax & Savings"
+    // Build 87: reordered home-first per Tom's TestFlight feedback. Haven
+    // is a home-property app first, an estate-planning app second, so the
+    // category list now opens with Home & Property and tucks Estate &
+    // Legacy at the bottom. The order ScenarioStudioView renders is taken
+    // straight from `allCases`.
     case home = "Home & Property"
-    case wealth = "Wealth & Business"
-    case kids = "Kids & Education"
+    case tax = "Tax & Savings"
     case insurance = "Insurance & Protection"
+    case kids = "Kids & Education"
+    case wealth = "Wealth & Business"
+    case estate = "Estate & Legacy"
 
     var id: String { rawValue }
 
@@ -67,7 +72,7 @@ struct ScenarioDefinition: Identifiable {
 
     // MARK: - All Scenarios
 
-    static let all: [ScenarioDefinition] = estate + tax + home + wealth + kids + insurance
+    static let all: [ScenarioDefinition] = home + tax + insurance + kids + wealth + estate
 
     // MARK: Estate & Legacy
 

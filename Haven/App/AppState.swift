@@ -93,6 +93,7 @@ final class AppState: ObservableObject {
                 Task { await Self.refreshPropertyValuesOnce() }
                 Task { await Self.purgeDroppedTemplatesOnce() }
                 Task { await Self.migratePoolTasksToVendorOnce() }
+                Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -110,6 +111,7 @@ final class AppState: ObservableObject {
                     Task { await Self.refreshPropertyValuesOnce() }
                     Task { await Self.purgeDroppedTemplatesOnce() }
                     Task { await Self.migratePoolTasksToVendorOnce() }
+                    Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -471,6 +473,63 @@ final class AppState: ObservableObject {
         }
         if migratedCount > 0 {
             print("[migratePoolTasksToVendorV87] flipped \(migratedCount) pool task\(migratedCount == 1 ? "" : "s") to vendor")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Build 87: removes existing in-flight "Check for leaks under sinks"
+    /// tasks for users who completed the quiz on Build 86 or earlier. The
+    /// template was deleted from `MaintenanceTemplates.swift` per Tom's
+    /// TestFlight feedback (people notice plumbing leaks naturally; the
+    /// quarterly nag added zero value). Completed instances stay so the
+    /// historical log is intact — only incomplete tasks are archived.
+    ///
+    /// Mirrors the `purgeDroppedTemplatesOnce` pattern: per-property
+    /// iteration via `fetchProperties()`, archive via `archiveMaintenanceTask`
+    /// with a self-documenting reason. Gated on a dedicated UserDefaults
+    /// flag so it only runs once per install.
+    @MainActor
+    static func removeLeakCheckTasksOnceIfNeeded() async {
+        let key = "hasRemovedLeakCheckTasks_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+        let targetTemplateId = "Plumbing:Check for leaks under sinks"
+        var removedCount = 0
+        for property in properties {
+            let tasks: [MaintenanceTaskDBRow]
+            do {
+                tasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+            for task in tasks {
+                guard task.templateId == targetTemplateId else { continue }
+                // Skip already-completed tasks so the history log stays intact.
+                if task.lastCompletedDate != nil { continue }
+                do {
+                    try await db.archiveMaintenanceTask(
+                        id: task.id,
+                        reason: "build_87_leak_check_removed"
+                    )
+                    removedCount += 1
+                } catch {
+                    // Swallow individual failures.
+                }
+            }
+        }
+        if removedCount > 0 {
+            print("[removeLeakCheckTasksV1] archived \(removedCount) leak-check task\(removedCount == 1 ? "" : "s")")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         }
         UserDefaults.standard.set(true, forKey: key)

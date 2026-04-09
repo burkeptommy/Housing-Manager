@@ -387,7 +387,13 @@ enum MaintenanceTemplates {
         // PLUMBING
         // ──────────────────────────────────────────────
         ("Plumbing", [
-            MaintenanceTemplate(systemCategory: "Plumbing", title: "Check for leaks under sinks", description: "Inspect under all sinks for drips, moisture, or water damage.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: nil, assignmentType: .personal, diyEffortMinutes: 10),
+            // Build 87: removed "Check for leaks under sinks" template per
+            // Tom's TestFlight feedback. People notice plumbing leaks
+            // naturally and a quarterly reminder added zero value. The
+            // existing in-flight tasks for this template are cleaned up at
+            // app launch by `AppState.removeLeakCheckTasksOnceIfNeeded()`
+            // which gates on the `hasRemovedLeakCheckTasks_v1` UserDefaults
+            // flag.
             MaintenanceTemplate(systemCategory: "Plumbing", title: "Test water pressure", description: "Use a gauge to test water pressure; ideal is 40-60 PSI.", frequency: "Annually", priority: "Low", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "High pressure can damage fixtures", isEssential: false, assignmentType: .personal, diyEffortMinutes: 5, diyEffortLabel: "$10 gauge from hardware store"),
             MaintenanceTemplate(systemCategory: "Plumbing", title: "Check toilets for running/leaks", description: "Listen for running toilets and check around base for moisture.", frequency: "Semi-annually", priority: "Medium", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "A running toilet can waste 200+ gallons/day", assignmentType: .personal, diyEffortMinutes: 10),
             MaintenanceTemplate(systemCategory: "Plumbing", title: "Inspect washing machine supply hoses", description: "Check hoses for bulges, cracks, or kinks. Replace every 5 years.", frequency: "Annually", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Burst hoses are a top insurance claim", equipmentKeywords: ["washing machine", "clothes washer", "washtower", "laundry"], assignmentType: .personal, diyEffortMinutes: 5),
