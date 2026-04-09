@@ -155,18 +155,45 @@ struct MaintenanceScheduleView: View {
         // Phase 19l: contractor picker sheet for the personal-card delegate
         // tap. Uses the existing ContractorDirectoryView so users get the
         // same picker UX they already know from the task detail sheet.
+        //
+        // Build 87: when a task is being delegated, pass a DelegationContext
+        // so the picker renders the new "FIND A PRO" section above the
+        // existing contractor list (Find local pros + Ask Alfred). The
+        // legacy onSelect path still works for non-delegation entry points.
         .sheet(isPresented: $showDelegateContractorPicker) {
             NavigationStack {
-                ContractorDirectoryView(onSelect: { contractor in
-                    showDelegateContractorPicker = false
-                    if let task = delegatingTask {
-                        Task {
-                            await viewModel.convertToVendorManaged(taskId: task.id, contractor: contractor)
-                            await viewModel.loadTasks()
-                        }
+                ContractorDirectoryView(
+                    delegationContext: delegatingTask.map { task in
+                        DelegationContext(
+                            task: task,
+                            systemCategory: viewModel.systems.first(where: { $0.id == task.systemId })?.category,
+                            onVendorSelected: { contractor in
+                                if let delegatingId = delegatingTask?.id {
+                                    Task {
+                                        await viewModel.convertToVendorManaged(taskId: delegatingId, contractor: contractor)
+                                        await viewModel.loadTasks()
+                                    }
+                                }
+                                showDelegateContractorPicker = false
+                                delegatingTask = nil
+                            },
+                            onFindLocalVendors: {
+                                // Dismiss the contractor picker first, then
+                                // open FindLocalVendorSheet via the existing
+                                // `findVendorTask` plumbing. The .sheet(item:)
+                                // binding lower in this view tree will
+                                // present FindLocalVendorSheet with the
+                                // resolved town/state/category.
+                                let task = delegatingTask
+                                showDelegateContractorPicker = false
+                                delegatingTask = nil
+                                if let task {
+                                    findVendorTask = task
+                                }
+                            }
+                        )
                     }
-                    delegatingTask = nil
-                })
+                )
             }
         }
         // Phase 19n: find-a-contractor sheet — opens FindLocalVendorSheet

@@ -65,17 +65,27 @@ struct ChatView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .openAlfredWithContext)) { notification in
-                guard let userInfo = notification.userInfo,
-                      let ctxType = userInfo["contextType"] as? String,
-                      let ctxIdStr = userInfo["contextId"] as? String,
-                      let ctxId = UUID(uuidString: ctxIdStr) else { return }
+                let userInfo = notification.userInfo ?? [:]
+                let ctxType = userInfo["contextType"] as? String
+                let ctxIdStr = userInfo["contextId"] as? String
+                let ctxId = ctxIdStr.flatMap { UUID(uuidString: $0) }
                 let message = userInfo["message"] as? String
 
-                viewModel.contextType = ctxType
-                viewModel.contextId = ctxId
+                // Build 87: contextType / contextId are now optional. The
+                // delegation flow from ContractorDirectoryView's "Ask Alfred"
+                // card sends a message-only payload (the task title doesn't
+                // map to one of Alfred's known context types like document
+                // / property / project), and we still want the prefilled
+                // message to land in the composer.
+                if let ctxType, let ctxId {
+                    viewModel.contextType = ctxType
+                    viewModel.contextId = ctxId
+                }
 
                 Task {
-                    await loadContextName(type: ctxType, id: ctxId)
+                    if let ctxType, let ctxId {
+                        await loadContextName(type: ctxType, id: ctxId)
+                    }
                     if let message, !message.isEmpty {
                         viewModel.inputText = message
                         try? await Task.sleep(nanoseconds: 300_000_000)

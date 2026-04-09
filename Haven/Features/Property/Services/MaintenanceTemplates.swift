@@ -244,8 +244,39 @@ enum MaintenanceTemplates {
             if sub == "hybrid_heat_pump" { s.insert("hybrid_heat_pump") }
             if sub == "solar" { s.insert("solar") }
         case "pool/spa", "pool":
-            if sub == "saltwater" { s.insert("pool_salt") }
-            if sub == "chlorine" || sub.isEmpty { s.insert("pool_chlorine") }
+            // Build 87 (Edit 2): Pool vs Hot Tub split. Hot tubs short-
+            // circuit on `hot_tub` and emit nothing else, so the pool
+            // umbrella token never leaks into hot-tub-only households.
+            // Pool subtypes are composite (e.g. "pool_inground_chlorine")
+            // — we parse with substring matching so both pool-type AND
+            // chemistry tokens get emitted alongside the umbrella `pool`
+            // token. The umbrella is what AND-matched template gates
+            // like `["pool"]` and `["pool", "pool_chlorine"]` rely on
+            // (a single subtype field can't directly express two facets,
+            // so the umbrella keeps the math working).
+            //
+            // Legacy build 86 subtypes ("chlorine", "saltwater") still
+            // map to the umbrella + chemistry, so existing test users
+            // don't lose their pool tasks. Empty subtype intentionally
+            // emits nothing so universal pool templates wait for the
+            // user to confirm a pool type via Q12.
+            if sub == "hot_tub" {
+                s.insert("hot_tub")
+            } else if !sub.isEmpty {
+                s.insert("pool")
+                if sub.contains("inground") {
+                    s.insert("pool_inground")
+                }
+                if sub.contains("above_ground") {
+                    s.insert("pool_above_ground")
+                }
+                if sub.contains("chlorine") {
+                    s.insert("pool_chlorine")
+                }
+                if sub.contains("salt") {
+                    s.insert("pool_salt")
+                }
+            }
         case "roofing":
             switch sub {
             case "flat_membrane": s.insert("roof_flat")
@@ -532,22 +563,42 @@ enum MaintenanceTemplates {
         // POOL / SPA
         // ──────────────────────────────────────────────
         ("Pool/Spa", [
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Test and balance water chemistry", description: "Test and adjust pH, chlorine, alkalinity, and calcium hardness.", frequency: "Weekly", priority: "High", estimatedCostRange: "$20–$50/month", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Most HNW pool owners contract a weekly pool service for this", assignmentType: .vendor),
+            // Build 87 (Edit 2): every pool template is now gated on the
+            // umbrella `["pool"]` token so it never fires for hot-tub-only
+            // households. The chemistry-specific templates compose `["pool",
+            // "pool_chlorine"]` / `["pool", "pool_salt"]` so they only fire
+            // for the right chemistry on a real pool. Hot tub templates
+            // sit further down with `["hot_tub"]` and never overlap.
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Test and balance water chemistry", description: "Test and adjust pH, chlorine, alkalinity, and calcium hardness.", frequency: "Weekly", priority: "High", estimatedCostRange: "$20–$50/month", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Most HNW pool owners contract a weekly pool service for this", requiredSubtypes: ["pool"], assignmentType: .vendor),
             // Build 87: flipped `.either` → `.vendor` at the template level.
             // HNW pool owners almost universally contract a weekly pool
             // service, so this should default to "Find a contractor for:
             // clean pool filter" for pool owners who skip the provider
             // question in Q12. The Q12 flip already handles the runtime
             // case when a provider IS typed.
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean pool filter", description: "Backwash or clean pool filter cartridge to maintain proper filtration.", frequency: "Monthly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "During swimming season — typically handled by the weekly pool service", assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool opening", description: "Remove cover, start up equipment, balance chemicals, and inspect.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool closing/winterization", description: "Chemical treatment, lower water level, blow out lines, install cover.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil, assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Inspect pool equipment", description: "Check pump, heater, filter, and automation for proper operation.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$100", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Done during opening", assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean pool filter", description: "Backwash or clean pool filter cartridge to maintain proper filtration.", frequency: "Monthly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "During swimming season — typically handled by the weekly pool service", requiredSubtypes: ["pool"], assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool opening", description: "Remove cover, start up equipment, balance chemicals, and inspect.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: nil, requiredSubtypes: ["pool"], assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Professional pool closing/winterization", description: "Chemical treatment, lower water level, blow out lines, install cover.", frequency: "Annually", priority: "High", estimatedCostRange: "$200–$400", isDIY: false, seasonalTiming: "Fall", professionalRequired: true, notes: nil, requiredSubtypes: ["pool"], assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Inspect pool equipment", description: "Check pump, heater, filter, and automation for proper operation.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0–$100", isDIY: false, seasonalTiming: "Spring", professionalRequired: true, notes: "Done during opening", requiredSubtypes: ["pool"], assignmentType: .vendor),
             // Build 87: flipped `.either` → `.vendor` at the template level
             // for the same reason as the pool filter — pool service handles
             // salt cell cleaning during weekly visits.
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean salt cell", description: "Inspect and clean the salt chlorine generator cell to maintain output.", frequency: "Quarterly", priority: "High", estimatedCostRange: "Included in weekly pool service", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Typically handled by the weekly pool service — they'll soak in muriatic acid if the cell is calcified", requiredSubtypes: ["pool_salt"], assignmentType: .vendor),
-            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Shock pool", description: "Super-chlorinate to eliminate chloramines and algae growth.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$15–$40", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "More frequently after heavy use or storms", requiredSubtypes: ["pool_chlorine"], assignmentType: .personal, diyEffortMinutes: 10),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean salt cell", description: "Inspect and clean the salt chlorine generator cell to maintain output.", frequency: "Quarterly", priority: "High", estimatedCostRange: "Included in weekly pool service", isDIY: false, seasonalTiming: nil, professionalRequired: true, notes: "Typically handled by the weekly pool service — they'll soak in muriatic acid if the cell is calcified", requiredSubtypes: ["pool", "pool_salt"], assignmentType: .vendor),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Shock pool", description: "Super-chlorinate to eliminate chloramines and algae growth.", frequency: "Monthly", priority: "Medium", estimatedCostRange: "$15–$40", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "More frequently after heavy use or storms", requiredSubtypes: ["pool", "pool_chlorine"], assignmentType: .personal, diyEffortMinutes: 10),
+
+            // Build 87 (Edit 2): hot tub templates. Tom's TestFlight feedback
+            // flagged that picking "Hot tub only" in Q12 was generating a
+            // pool template suite that didn't apply. These four templates
+            // are scoped to the `["hot_tub"]` umbrella so they only fire
+            // for households with a Hot Tub system row. The reframing voice
+            // assumes the user owns the hot tub and lives with it weekly,
+            // so the personal default makes sense (sanitize / filter), with
+            // the heavier quarterly drain-and-refill flagged `.either` so
+            // the DIY/Vendor slider can flip it for users who'd rather pay.
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Test and sanitize hot tub water", description: "Test bromine/chlorine levels, pH, and alkalinity. Add sanitizer as needed.", frequency: "Weekly", priority: "High", estimatedCostRange: "$10-20/month", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Use test strips or a digital tester. Target: pH 7.2-7.8, sanitizer 3-5 ppm.", requiredSubtypes: ["hot_tub"], assignmentType: .personal, diyEffortMinutes: 10),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Clean hot tub filter", description: "Remove the filter cartridge and rinse with a hose. Deep clean with filter cleaner monthly.", frequency: "Monthly", priority: "High", estimatedCostRange: "$0 (DIY)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Replace the cartridge annually.", requiredSubtypes: ["hot_tub"], assignmentType: .personal, diyEffortMinutes: 15),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Drain and refill hot tub", description: "Drain the tub completely, wipe the shell, and refill with fresh water.", frequency: "Quarterly", priority: "Medium", estimatedCostRange: "$0-30 (water)", isDIY: true, seasonalTiming: nil, professionalRequired: false, notes: "Plan for 2-3 hours including drain and refill time.", requiredSubtypes: ["hot_tub"], assignmentType: .either, diyEffortMinutes: 45),
+            MaintenanceTemplate(systemCategory: "Pool/Spa", title: "Inspect hot tub cover and jets", description: "Check the cover for cracks or waterlogging. Test each jet for pressure and aim.", frequency: "Annually", priority: "Medium", estimatedCostRange: "$0-150 (cover replace)", isDIY: true, seasonalTiming: "Spring", professionalRequired: false, notes: "A waterlogged cover is inefficient and should be replaced.", requiredSubtypes: ["hot_tub"], assignmentType: .either, diyEffortMinutes: 20),
         ]),
 
         // ──────────────────────────────────────────────

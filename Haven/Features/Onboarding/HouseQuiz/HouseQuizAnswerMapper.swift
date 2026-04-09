@@ -371,35 +371,60 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q12_pool":
+                // Build 87 (Edit 2): Pool vs Hot Tub split. The previous
+                // build collapsed every Q12 answer into a single "Pool/Spa"
+                // parent system with three pool-specific children, which
+                // meant hot-tub-only households got nonsense Pool Pump /
+                // Filter / Heater rows AND chlorine/salt templates leaking
+                // through the activeSubtypes empty-default. The new model
+                // creates DIFFERENT systems based on the answer:
+                //
+                //   hot_tub      → ONE "Hot Tub" system, subtype "hot_tub",
+                //                  no children, hot-tub-only templates
+                //   in_ground    → ONE "Pool" system, subtype "pool_inground",
+                //                  3 children, full pool template suite
+                //   above_ground → ONE "Pool" system, subtype "pool_above_ground",
+                //                  3 children, full pool template suite
+                //   both         → BOTH systems created separately. The
+                //                  Pool ensureHomeSystem call uses
+                //                  excludeSubtype: "hot_tub" so it never
+                //                  collapses into the Hot Tub row.
+                //
+                // Q12b (`q12b_pool_chemistry`) downstream updates the Pool
+                // row's subtype to include chemistry (e.g.
+                // "pool_inground_chlorine"). Hot Tub never visits Q12b —
+                // its dynamicSkip closure hides chemistry for hot-tub-only.
                 try await persistAttribute("pool_type", value: answer.answerId)
-                if let id = answer.answerId, id != "none" {
-                    let parentId = try await ensureHomeSystem(name: "Pool/Spa", category: "Pool/Spa")
+                guard let id = answer.answerId, id != "none" else { break }
+
+                let hasPool = id == "in_ground" || id == "above_ground" || id == "both"
+                let hasHotTub = id == "hot_tub" || id == "both"
+
+                if hasPool {
+                    let poolSubtype: String
+                    switch id {
+                    case "in_ground": poolSubtype = "pool_inground"
+                    case "above_ground": poolSubtype = "pool_above_ground"
+                    case "both": poolSubtype = "pool_inground"  // Q12b will refine
+                    default: poolSubtype = "pool_inground"
+                    }
+                    let parentId = try await ensureHomeSystem(
+                        name: "Pool",
+                        category: "Pool/Spa",
+                        subtype: poolSubtype,
+                        matchByCategory: true,
+                        excludeSubtype: "hot_tub"
+                    )
                     if let parentId {
                         try await ensureChildSystem(parentId: parentId, name: "Pool Pump", category: "Pool/Spa")
                         try await ensureChildSystem(parentId: parentId, name: "Pool Filter", category: "Pool/Spa")
                         try await ensureChildSystem(parentId: parentId, name: "Pool Heater", category: "Pool/Spa")
                     }
-                    // Build 87: the previous `poolSubtype` switch here
-                    // was dead code — it looked for "saltwater" and
-                    // "chlorine" answer IDs but Q12's actual answer
-                    // IDs are in_ground / above_ground / hot_tub / both
-                    // / none. Q12b_pool_chemistry now captures the
-                    // chemistry in a dedicated follow-up question and
-                    // updates the home_system's subtype there. At this
-                    // point in the flow we don't know the chemistry
-                    // yet, so we create the system WITHOUT a subtype.
-                    // The reconcile below still fires so the generic
-                    // Pool/Spa templates (test chemistry, opening,
-                    // closing, equipment inspection, filter, etc.)
-                    // land immediately; the subtype-gated ones (shock
-                    // pool, clean salt cell) wait for Q12b.
-                    //
-                    // Build 87 followup: mirror the q11/q13/q14/q15
-                    // ordering. Create the utility account + contractor
-                    // BEFORE the reconciler runs so `.vendor`-tagged
-                    // Pool/Spa templates auto-link at task-creation
-                    // time instead of landing as "Find a contractor
-                    // for: ..." placeholders.
+                    // Mirror q11/q13/q14/q15 ordering: create the utility
+                    // account + contractor BEFORE the reconciler runs so
+                    // `.vendor`-tagged Pool/Spa templates auto-link at
+                    // task-creation time instead of landing as "Find a
+                    // contractor for: ..." placeholders.
                     if let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "pool_service")
                     }
@@ -408,16 +433,9 @@ final class HouseQuizAnswerMapper {
                         householdId: householdId,
                         systemId: parentId,
                         systemCategory: "Pool/Spa",
-                        confirmedSubtype: nil
+                        confirmedSubtype: poolSubtype
                     )
                     reconciliationResult = reconciliationResult.merging(poolResult)
-                    // Build 87 followup: HNW pool owners almost
-                    // universally contract a weekly pool service that
-                    // handles filter cleaning, salt cell maintenance,
-                    // and shock dosing. Flip any remaining personal/
-                    // either Pool/Spa tasks to vendor-managed so they
-                    // don't clutter the personal to-do list. Matches
-                    // q13_pest's flip pattern exactly.
                     if let provider = answer.customText, !provider.isEmpty {
                         await flipCategoryTasksToVendor(
                             systemCategory: "Pool/Spa",
@@ -426,52 +444,104 @@ final class HouseQuizAnswerMapper {
                     }
                 }
 
+                if hasHotTub {
+                    // matchByCategory: false ensures we match by name "Hot Tub"
+                    // explicitly instead of grabbing the first Pool/Spa row,
+                    // which would collide with the Pool row in the "both"
+                    // case. Without this, ensureHomeSystem would rename the
+                    // Pool row to "Hot Tub" and overwrite its subtype.
+                    let hotTubId = try await ensureHomeSystem(
+                        name: "Hot Tub",
+                        category: "Pool/Spa",
+                        subtype: "hot_tub",
+                        matchByCategory: false
+                    )
+                    let hotTubResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: hotTubId,
+                        systemCategory: "Pool/Spa",
+                        confirmedSubtype: "hot_tub"
+                    )
+                    reconciliationResult = reconciliationResult.merging(hotTubResult)
+                }
+
             case "q12b_pool_chemistry":
-                // Build 87: pool chemistry follow-up. Mirrors q11b_lawn_type
-                // exactly — Q12 creates the Pool/Spa system without a
-                // subtype, then Q12b updates the subtype here and re-runs
-                // the reconciler so subtype-gated templates land. The
-                // dynamicSkip closure on Q12b only shows this question for
-                // in_ground / above_ground / both, so hot_tub and none
-                // users never reach this case.
+                // Build 87 (Edit 2): pool chemistry follow-up. With the new
+                // Pool vs Hot Tub split, the Pool row already has a pool-type
+                // subtype (`pool_inground` / `pool_above_ground`). This case
+                // composes the chemistry token into the existing subtype so
+                // both pieces of information survive (e.g.
+                // "pool_inground_chlorine"). `MaintenanceTemplates.activeSubtypes`
+                // parses the composite to emit the umbrella "pool" token plus
+                // the specific facets, which is what the AND-matching
+                // `requiredSubtypes` filter needs to gate templates correctly.
+                //
+                // The Pool lookup uses `excludeSubtype: "hot_tub"` so even in
+                // the rare "both" household this updates the Pool row, never
+                // the Hot Tub. The Q12b dynamicSkip closure also hides this
+                // question for hot-tub-only users so we never reach here for
+                // them.
                 try await persistAttribute("pool_chemistry", value: answer.answerId)
 
-                // Map the answer id to the subtype tokens
-                // `MaintenanceTemplates.activeSubtypes` uses to unlock
-                // chemistry-specific templates. "not_sure" is a no-op —
-                // the user can confirm later from EditSystemSheet.
-                let poolSubtype: String? = {
+                let chemistryToken: String? = {
                     switch answer.answerId {
                     case "saltwater": return "pool_salt"
                     case "chlorine":  return "pool_chlorine"
                     default:          return nil
                     }
                 }()
-                guard let poolSubtype else { break }
+                guard let chemistryToken else { break }
 
-                // Find the existing Pool/Spa parent system (Q12 created
-                // it). `matchByCategory: true` ensures ensureHomeSystem
-                // matches the top-level row rather than creating a new
-                // one, and the `subtype` argument gets written to it in
-                // place when present.
+                // Find the existing Pool top-level system (Q12 created it,
+                // possibly with name "Pool" on build 87 or legacy "Pool/Spa"
+                // on build 86). matchByCategory + excludeSubtype: "hot_tub"
+                // makes this resilient to either name.
+                let allSystemsForPoolLookup = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+                let existingPool: HomeSystemRow? = allSystemsForPoolLookup.first(where: {
+                    $0.category.lowercased() == "pool/spa"
+                    && $0.parentSystemId == nil
+                    && $0.subtype != "hot_tub"
+                })
+
+                // Compose the new subtype: keep the existing pool-type token
+                // (pool_inground / pool_above_ground) AND append chemistry.
+                // For legacy build 86 rows whose subtype was empty or just
+                // "chlorine"/"saltwater", we synthesize a composite by
+                // defaulting to in_ground (the most common case). The
+                // pool-type information is then recoverable from the pool_type
+                // property attribute via the migration if needed.
+                let priorSubtype = (existingPool?.subtype ?? "").lowercased()
+                let poolTypeToken: String = {
+                    if priorSubtype.contains("inground") || priorSubtype == "pool_inground" {
+                        return "pool_inground"
+                    }
+                    if priorSubtype.contains("above_ground") || priorSubtype == "pool_above_ground" {
+                        return "pool_above_ground"
+                    }
+                    return "pool_inground"  // legacy default
+                }()
+                let composedSubtype = "\(poolTypeToken)_\(chemistryToken.replacingOccurrences(of: "pool_", with: ""))"
+
                 let poolParentId = try await ensureHomeSystem(
-                    name: "Pool/Spa",
+                    name: "Pool",
                     category: "Pool/Spa",
-                    subtype: poolSubtype,
-                    matchByCategory: true
+                    subtype: composedSubtype,
+                    matchByCategory: true,
+                    excludeSubtype: "hot_tub"
                 )
 
-                // Re-run the reconciler with the new subtype so the
-                // subtype-gated templates land (Shock pool for chlorine,
-                // Clean salt cell for saltwater). Existing Pool/Spa
-                // tasks from Q12's first reconcile are preserved — the
-                // reconciler dedups by templateKey.
+                // Re-run the reconciler with the new composite subtype so
+                // chemistry-gated templates land (Shock pool for chlorine,
+                // Clean salt cell for saltwater). Existing Pool/Spa tasks
+                // from Q12's first reconcile are preserved — the reconciler
+                // dedups by templateKey.
                 let poolChemistryResult = await MaintenanceTaskReconciler.reconcile(
                     propertyId: propertyId,
                     householdId: householdId,
                     systemId: poolParentId,
                     systemCategory: "Pool/Spa",
-                    confirmedSubtype: poolSubtype
+                    confirmedSubtype: composedSubtype
                 )
                 reconciliationResult = reconciliationResult.merging(poolChemistryResult)
 
@@ -1043,17 +1113,25 @@ final class HouseQuizAnswerMapper {
     ///   - subtype: Optional subtype token. When provided, writes it to the
     ///     matched/created row so `MaintenanceTemplates.activeSubtypes`
     ///     picks it up on subsequent reads.
+    ///   - excludeSubtype: Build 87 — when set, the `matchByCategory` lookup
+    ///     skips rows whose `subtype` equals this value. Used by the Pool
+    ///     vs Hot Tub split (Q12) so the Pool lookup doesn't accidentally
+    ///     match the Hot Tub row in mixed households (both pool AND hot tub
+    ///     share `category: "Pool/Spa"` but live in separate rows).
     @discardableResult
     private func ensureHomeSystem(
         name: String,
         category: String,
         subtype: String? = nil,
-        matchByCategory: Bool = false
+        matchByCategory: Bool = false,
+        excludeSubtype: String? = nil
     ) async throws -> UUID? {
         let existing = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
         let match: HomeSystemRow? = matchByCategory
             ? existing.first(where: {
-                $0.category.lowercased() == category.lowercased() && $0.parentSystemId == nil
+                $0.category.lowercased() == category.lowercased()
+                && $0.parentSystemId == nil
+                && (excludeSubtype == nil || $0.subtype != excludeSubtype)
             })
             : existing.first(where: {
                 $0.name.lowercased() == name.lowercased()

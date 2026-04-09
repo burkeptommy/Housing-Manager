@@ -1,15 +1,37 @@
 import SwiftUI
 
+/// Build 87: optional delegation hint so the contractor picker can render
+/// a "FIND A PRO" section above the existing contractor list when invoked
+/// from a personal-task delegation flow ("Have someone else do it"). The
+/// non-delegation entry point (Settings → Contacts) leaves this nil and
+/// gets the original layout. The new section surfaces two paths to vendor
+/// discovery — local Google Places search and Alfred — so users with no
+/// existing contractors aren't dead-ended at "Add a Contact".
+///
+/// `onFindLocalVendors` is owned by the parent (typically
+/// `MaintenanceScheduleView`) because FindLocalVendorSheet needs the
+/// property's town/state which the picker doesn't fetch on its own. The
+/// parent dismisses the contractor sheet and presents FindLocalVendorSheet
+/// in its place.
+struct DelegationContext {
+    let task: MaintenanceTaskDBRow
+    let systemCategory: String?
+    let onVendorSelected: (ContractorRow) -> Void
+    let onFindLocalVendors: () -> Void
+}
+
 struct ContractorDirectoryView: View {
     var onSelect: ((ContractorRow) -> Void)?
+    var delegationContext: DelegationContext? = nil
     @StateObject private var viewModel = ContractorViewModel()
     @State private var showAddContractor = false
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.contractors.isEmpty {
                 ProgressView("Loading contractors...")
-            } else if viewModel.contractors.isEmpty {
+            } else if viewModel.contractors.isEmpty && delegationContext == nil {
                 ContentUnavailableView {
                     Label("Your Contact Network", systemImage: "person.crop.rectangle.badge.plus")
                 } description: {
@@ -22,6 +44,10 @@ struct ContractorDirectoryView: View {
                     .tint(HavenColors.navy)
                 }
             } else {
+                // Build 87: even when the user has no existing contractors,
+                // the delegation flow still needs to render the FIND A PRO
+                // section so they're not dead-ended at "Add a Contact". The
+                // contractor list view handles the empty case inline.
                 contractorList
             }
         }
@@ -84,6 +110,16 @@ struct ContractorDirectoryView: View {
     private var contractorList: some View {
         ScrollView {
             LazyVStack(spacing: 12) {
+                // Build 87: vendor discovery section, only when invoked from
+                // a personal-task delegation flow. Two cards: local Google
+                // Places search and Ask Alfred. Renders ABOVE the existing
+                // YOUR CONTRACTORS list so users with no contacts on file
+                // still have a clear path forward instead of dead-ending at
+                // "Add a Contact".
+                if delegationContext != nil {
+                    findAProSection
+                }
+
                 if onSelect != nil {
                     Text("Tap a contact to assign them to this task")
                         .font(HavenTypography.caption)
@@ -91,8 +127,32 @@ struct ContractorDirectoryView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                if !viewModel.filteredContractors.isEmpty && delegationContext != nil {
+                    Text("YOUR CONTRACTORS")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.top, 8)
+                }
+
                 ForEach(viewModel.filteredContractors) { contractor in
-                    if let onSelect {
+                    if let delegation = delegationContext {
+                        // Build 87: delegation taps go through the
+                        // delegation context's vendor selection callback
+                        // (which converts the task to vendor-managed) AND
+                        // dismiss the picker. Falls back to onSelect for
+                        // legacy callers if both are wired (defensive).
+                        Button {
+                            Haptics.light()
+                            delegation.onVendorSelected(contractor)
+                            onSelect?(contractor)
+                            dismiss()
+                        } label: {
+                            contractorCard(contractor)
+                        }
+                        .buttonStyle(.plain)
+                    } else if let onSelect {
                         Button {
                             Haptics.light()
                             onSelect(contractor)
@@ -123,10 +183,129 @@ struct ContractorDirectoryView: View {
                         })
                     }
                 }
+
+                // Build 87: keep the manual "Add a contact" path available
+                // at the bottom of the delegation flow so users who already
+                // know their preferred vendor can type it in directly.
+                if delegationContext != nil {
+                    Button {
+                        Haptics.light()
+                        showAddContractor = true
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text("Add a contact manually")
+                                .font(HavenTypography.uiLabel)
+                            Spacer()
+                        }
+                        .foregroundStyle(HavenColors.navy)
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.vertical, HavenTheme.spacing12)
+                        .frame(maxWidth: .infinity)
+                        .background(HavenColors.creamLight)
+                        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                        .overlay {
+                            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                                .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.top, 4)
+                }
             }
             .padding()
         }
         .background(HavenColors.background)
+    }
+
+    /// Build 87: vendor discovery section for the delegation flow. Two
+    /// tappable cards stacked vertically — local Google Places search
+    /// (handled by the parent so it can present FindLocalVendorSheet with
+    /// the property's town/state) and Ask Alfred (self-contained, posts
+    /// `.openAlfredWithContext` then dismisses).
+    @ViewBuilder
+    private var findAProSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            Text("FIND A PRO")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.5)
+                .foregroundStyle(HavenColors.textTertiary)
+
+            findAProCard(
+                title: "Find vetted local pros",
+                subtitle: "We'll show you 4 nearby options, pre-checked for quality.",
+                icon: "magnifyingglass.circle.fill",
+                action: {
+                    Haptics.selection()
+                    delegationContext?.onFindLocalVendors()
+                    dismiss()
+                }
+            )
+
+            findAProCard(
+                title: "Ask Alfred",
+                subtitle: "Get a personalized recommendation from Alfred.",
+                icon: "sparkles",
+                action: {
+                    Haptics.selection()
+                    if let context = delegationContext {
+                        let categoryLabel = context.systemCategory?.lowercased() ?? "home"
+                        let message = "Help me find someone to handle this task: \(context.task.title). It's a \(categoryLabel) job."
+                        NotificationCenter.default.post(
+                            name: .openAlfredWithContext,
+                            object: nil,
+                            userInfo: ["message": message]
+                        )
+                    }
+                    dismiss()
+                }
+            )
+        }
+        .padding(.bottom, 8)
+    }
+
+    private func findAProCard(
+        title: String,
+        subtitle: String,
+        icon: String,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: HavenTheme.spacing16) {
+                ZStack {
+                    Circle()
+                        .fill(HavenColors.navy.opacity(0.12))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: icon)
+                        .font(.system(size: 20, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy)
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(title)
+                        .font(HavenTypography.title3)
+                        .foregroundStyle(HavenColors.textPrimary)
+                    Text(subtitle)
+                        .font(HavenTypography.bodySmall)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .multilineTextAlignment(.leading)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundStyle(HavenColors.textTertiary)
+            }
+            .padding(HavenTheme.spacing16)
+            .frame(minHeight: 72)
+            .background(HavenColors.creamLight)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                    .strokeBorder(HavenColors.beige300, lineWidth: 1)
+            }
+        }
+        .buttonStyle(.plain)
     }
 
     private func contractorCard(_ contractor: ContractorRow) -> some View {

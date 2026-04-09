@@ -94,6 +94,7 @@ final class AppState: ObservableObject {
                 Task { await Self.purgeDroppedTemplatesOnce() }
                 Task { await Self.migratePoolTasksToVendorOnce() }
                 Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
+                Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -112,6 +113,7 @@ final class AppState: ObservableObject {
                     Task { await Self.purgeDroppedTemplatesOnce() }
                     Task { await Self.migratePoolTasksToVendorOnce() }
                     Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
+                    Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -474,6 +476,151 @@ final class AppState: ObservableObject {
         if migratedCount > 0 {
             print("[migratePoolTasksToVendorV87] flipped \(migratedCount) pool task\(migratedCount == 1 ? "" : "s") to vendor")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Build 87 (Edit 2): one-time legacy cleanup for the Pool vs Hot Tub
+    /// split. Build 86 created a single "Pool/Spa" parent system for every
+    /// Q12 answer, including hot-tub-only households, with three pool-
+    /// specific children (Pool Pump, Pool Filter, Pool Heater) that don't
+    /// belong on a hot tub. This pass converges those legacy rows to the
+    /// new model:
+    ///   - Find properties whose `pool_type` attribute is "hot_tub"
+    ///   - Delete the three Pool Pump/Filter/Heater children
+    ///   - Archive any incomplete pool-template tasks linked to the parent
+    ///     or the deleted children (the user-touched preservation rule
+    ///     still wins — completed/edited tasks stay)
+    ///   - Rename the parent to "Hot Tub" and set its subtype to "hot_tub"
+    ///   - Re-run the reconciler so the four hot tub templates land
+    ///
+    /// `pool_type == "both"` is intentionally out of scope for V1 — splitting
+    /// an existing single row into two new systems with overlapping history
+    /// is error-prone and the case is rare. Those users can manually fix
+    /// from EditSystemSheet if it ever applies.
+    ///
+    /// Mirrors the existing one-time migration pattern: detached Task from
+    /// `initialize()`, gated on a UserDefaults key, swallows individual row
+    /// failures so a single bad property doesn't block the whole pass.
+    @MainActor
+    static func migrateHotTubSystemsOnceIfNeeded() async {
+        let key = "hasMigratedHotTubSystems_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        // Pool template titles that should be archived from a hot-tub-only
+        // household. Includes the three core templates whose `templateKey`
+        // looked like "Pool/Spa:Clean pool filter" and similar — these are
+        // the ones the build 86 mapper auto-created for every Q12 answer.
+        let droppedPoolTemplateTitles: Set<String> = [
+            "Test and balance water chemistry",
+            "Clean pool filter",
+            "Professional pool opening",
+            "Professional pool closing/winterization",
+            "Inspect pool equipment",
+            "Clean salt cell",
+            "Shock pool",
+        ]
+
+        var migratedCount = 0
+        for property in properties {
+            // Only touch hot-tub-only households. "both" is out of scope
+            // for V1 (see method docs).
+            let poolType = property.attributes?["pool_type"]?.stringValue
+            guard poolType == "hot_tub" else { continue }
+
+            // Find the legacy "Pool/Spa" parent system. The build 86 mapper
+            // always named it "Pool/Spa", but be defensive and match by
+            // category-only since later edits might have renamed it.
+            let allSystems: [HomeSystemRow]
+            do {
+                allSystems = try await db.fetchHomeSystems(propertyId: property.id, topLevelOnly: false)
+            } catch {
+                continue
+            }
+            guard let legacyParent = allSystems.first(where: {
+                $0.category.lowercased() == "pool/spa"
+                && $0.parentSystemId == nil
+                && $0.subtype != "hot_tub"  // already migrated, skip
+            }) else { continue }
+
+            // Delete the three pool children. The legacy build 86 mapper
+            // always created Pool Pump, Pool Filter, Pool Heater — anything
+            // else under the parent is user-added and should stay.
+            let childNames: Set<String> = ["pool pump", "pool filter", "pool heater"]
+            let legacyChildren = allSystems.filter {
+                $0.parentSystemId == legacyParent.id
+                && childNames.contains($0.name.lowercased())
+            }
+            for child in legacyChildren {
+                try? await db.deleteHomeSystem(id: child.id)
+            }
+
+            // Archive any incomplete pool-template tasks linked to the
+            // parent OR to the deleted children. Skip completed tasks so
+            // the history log stays intact, and skip user-touched tasks
+            // (assigned, has notes) so we never stomp on real edits.
+            let allTasks: [MaintenanceTaskDBRow]
+            do {
+                allTasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+            let deletedChildIds = Set(legacyChildren.map { $0.id })
+            for task in allTasks {
+                let linkedToParent = task.systemId == legacyParent.id
+                let linkedToChild = task.systemId.map { deletedChildIds.contains($0) } ?? false
+                guard linkedToParent || linkedToChild else { continue }
+
+                // Only archive pool templates, not anything user-added.
+                let isPoolTemplate = droppedPoolTemplateTitles.contains(task.title)
+                guard isPoolTemplate else { continue }
+
+                // Preserve user work.
+                if task.lastCompletedDate != nil { continue }
+                if task.assignedToUserId != nil { continue }
+                if let notes = task.notes, !notes.isEmpty { continue }
+
+                try? await db.archiveMaintenanceTask(
+                    id: task.id,
+                    reason: "build_87_hot_tub_migration"
+                )
+            }
+
+            // Rename the parent to "Hot Tub" and set the new subtype so
+            // the reconciler picks up the hot tub templates on its next
+            // pass.
+            var update = HomeSystemUpdate()
+            update.name = "Hot Tub"
+            update.subtype = "hot_tub"
+            _ = try? await db.updateHomeSystem(id: legacyParent.id, update)
+
+            // Re-run the reconciler so the four hot tub templates land.
+            // The reconciler dedups by templateKey, so any pre-existing
+            // hot tub templates from a partial migration won't double up.
+            _ = await MaintenanceTaskReconciler.reconcile(
+                propertyId: property.id,
+                householdId: property.householdId,
+                systemId: legacyParent.id,
+                systemCategory: "Pool/Spa",
+                confirmedSubtype: "hot_tub"
+            )
+            migratedCount += 1
+        }
+        if migratedCount > 0 {
+            print("[migrateHotTubSystemsV1] migrated \(migratedCount) hot-tub property\(migratedCount == 1 ? "" : "ies")")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
         }
         UserDefaults.standard.set(true, forKey: key)
     }
