@@ -128,9 +128,11 @@ A native iOS app (SwiftUI, iOS 17+) combining estate document intelligence with 
 
 ## Supabase Database (Key Tables)
 
-households, users, family_members (avatar_url, school), properties, home_systems (parent_system_id), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor), documents (vehicle_id, project_id), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source), service_records, service_contracts, chat_messages, concierge_messages, scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items, inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls
+households, users, family_members (avatar_url, school, member_type), properties, home_systems (parent_system_id), maintenance_tasks (vehicle_id, property_id nullable, assigned_to_user_id, assigned_contractor_id, assignment_type, needs_vendor), documents (vehicle_id, project_id, visible_to_home_managers), document_content, document_parties, document_family_members, warranties, contractors (category, utility_provider_id, logo_url, brand_color, website, source), service_records, service_contracts, chat_messages, concierge_messages, scenario_history, completion_scores, access_logs, dismissed_categories, trusted_contacts (avatar_url), trusted_contact_documents, household_invitations, household_email_addresses, inbox_items, inbox_attachments, property_projects (active_quote_id, entry_type), project_quotes, project_line_items, project_files, project_contacts, project_visualizations, family_events, synced_calendars, device_tokens, equipment_catalog, equipment_scores, utility_accounts, utility_providers, local_vendor_results, analytics_events, property_lookups_cache, allowed_senders, vehicles (covered_driver_ids), vehicle_service_records, vehicle_recalls
 
 **RLS is on everything.** All tables scoped by `household_id`. Service role key is only used in Edge Functions.
+
+**Documents have a per-row home manager visibility flag (Build 87).** `documents.visible_to_home_managers` (default true) gates the SELECT policy `household_documents_select` so callers whose `family_members.linked_user_id` has `member_type IN ('home_manager', 'staff')` only see rows with the flag true. Family members and the homeowner see every document. INSERT, UPDATE, and DELETE policies are unchanged. Categories that default to private are listed in `Haven/Features/Documents/DocumentAccessDefaults.swift` (Swift) and `PRIVATE_FROM_HOME_MANAGERS` (TypeScript) at the top of `receive-email`, `process-inbox-item`, and `analyze-document` Edge Functions. See "Home Manager Role" section under Family Members & Profiles for the full enforcement story.
 
 **Sub-system hierarchy:** `home_systems.parent_system_id` (nullable FK to self, ON DELETE CASCADE). Parent/child relationships (e.g., Well System -> Acid Neutralizer, UV Filter). UI shows top-level systems in lists, children inside parent's detail as "Components".
 
@@ -142,11 +144,11 @@ households, users, family_members (avatar_url, school), properties, home_systems
 
 See `supabase/functions/CLAUDE.md` for detailed patterns and full inventory. Key groups:
 
-**Core AI:** `analyze-document`, `chat`, `gap-analysis`, `simulate-scenario`, `proactive-scan`
+**Core AI:** `analyze-document` (also rewrites `documents.visible_to_home_managers` based on the AI-suggested category — manual upload paths set placeholder categories at insert time, this is the place that stamps the real value), `chat`, `gap-analysis`, `simulate-scenario`, `proactive-scan`
 **Invoice:** `process-invoice` (home + vehicle invoice intelligence)
 **Property/Equipment:** `search-equipment`, `identify-equipment`, `lookup-manual`, `score-equipment`, `research-project`, `project-feasibility`, `property-lookup`, `visualize-room`
 **Quotes:** `analyze-quote`, `draft-negotiation-email`
-**Email Pipeline:** `receive-email` (with utility bill detection), `process-inbox-item`
+**Email Pipeline:** `receive-email` (with utility bill detection; sets `visible_to_home_managers` on every document insert via the local `PRIVATE_FROM_HOME_MANAGERS` set), `process-inbox-item` (same)
 **Vehicle:** `vehicle-lookup` (VIN decode + recalls + maintenance schedule), `check-vehicle-recalls`
 **Brand:** `brand-logo` (Brandfetch wrapper for all logo fetching)
 **Household:** `merge-households`, `delete-account`, `send-push-notification`
@@ -238,6 +240,8 @@ Key files: `process-invoice/index.ts`, `InvoiceProcessingModels.swift`, `Invoice
 
 **Phase 19+ question additions:** **q3b_hvac_type** (Phase 19b/c — dedicated HVAC type with 9 subtypes including "Not sure"), **q11b_lawn_type** (Phase 19j — natural / synthetic turf / mixed / not sure, drives 20 turf and natural-lawn templates), **q15b_household_contractors** (Phase 19m — HVAC service / plumber / electrician / roofer / septic / well / chimney / tree / handyman chips), **q22 (now `.generatorAdd`)** (Phase 19i — captures generator type, fuel, and optional provider in one screen), **q28b_pets** (Phase 19j — drives the synthetic-turf "Sanitize pet areas" template via `has_pets` flag).
 
+**Q28 home manager sub-step (Build 87):** After the existing spouse / kids / caretaker sub-steps complete, `caretakersBody` transitions into `homeManagerStepBody` instead of recording the answer immediately. The body shows either a prompt card ("Anyone else helping run your home?" with "Add home manager" / "Skip" buttons) or the inline `QuizHomeManagerInviteInlineForm`. Both the Skip path and the form's onComplete funnel through `finalizeQ28Caretakers(answerId:homeManagerEntry:)` which records the final Q28 answer with the optional `HomeManagerEntry` breadcrumb attached to `HouseQuizAnswer.homeManagerEntry`. Hydration on back-nav restores the entry; the summary card shows "A couple, 2 kids, home manager Maria". The form mirrors `QuizSpouseInviteInlineForm` but captures last name (required), defaults the personal message to "You'll help me keep everything running.", routes through `HouseholdInviteCoordinator.addPersonToHousehold` with `memberType: "home_manager"`, and tags analytics with `InviteSource.quizHomeManagerStep`. See "Home Manager Role" section under Family Members & Profiles for the full enforcement story.
+
 **Dynamic skip closures:** Questions can declare a `dynamicSkip: ((HouseQuizState) -> Bool)?` closure that the view model checks at advance time. Used to hide Q11b when the user has no lawn (Q11 = no_lawn / garden / **hardscape** as of Build 84), hide Q14 (irrigation) when Q11 = no_lawn, and skip Q19 (heating fuel provider) entirely when Q3 = electric / geothermal / not_sure. Conditional chip visibility (e.g. septic pumper chip in Q15b only appears when Q7 = septic) is rendered inline rather than via dynamicSkip.
 
 **Q11 hardscape branch (Build 84):** A 5th Q11 lawn answer "Mostly hardscape (patio, gravel, pavers)" creates an "Outdoor Hardscape" `home_systems` row (category Landscaping, subtype `hardscape`) and 4 personal/DIY maintenance tasks via `HouseQuizAnswerMapper.createHardscapeMaintenanceTasks`: pressure-wash patio (annual, spring), top-up joint sand (every 2 years, summer), treat weeds between pavers (quarterly, spring), check hardscape drainage and grading (annual, fall). Tasks use stable `templateId` keys (`landscaping:hardscape_*`) and DIY effort labels in `notes`. Q11b is auto-skipped on hardscape via dynamicSkip.
@@ -279,6 +283,54 @@ Key files: `HouseQuizQuestionLibrary.swift` (questions), `HouseQuizModels.swift`
 **Age sorting:** `[FamilyMemberRow].sortedByAge()` extension (oldest first, no-DOB at end alphabetically). Used in HouseholdStrip, Life tab avatar strip, "By Family Member" filter.
 
 **Staff & Home Managers (Build 87):** New `family_members.member_type` column (migration `20260437_add_family_member_type.sql`) discriminates between real family members and paid household staff. Values: `'family'` (default), `'home_manager'`, `'staff'`. Backfilled to `'family'` for every existing row so build 86 installs round-trip cleanly. `DatabaseService.fetchFamilyMembers` filters server-side by `member_type IN ('family', NULL)` so paid staff never leak into the family card list. New `DatabaseService.fetchHouseholdStaff` returns the inverse set. Dashboard renders a separate `HouseholdStaffStrip` (`Haven/Features/Dashboard/Components/HouseholdStaffStrip.swift`) below the existing `HouseholdStrip`, gated on `viewModel.householdStaff.isEmpty == false`. The strip's "+" button routes to Settings → Household Staff rather than the family chooser, keeping the entry points clearly separated. Settings adds two new entries: `HouseholdStaffView` (list scoped to staff) and `AddHouseholdStaffSheet` (form with first/last name, optional contact, "Send Invite" toggle, avatar upload via `AvatarPhotoService`). The add sheet routes through `HouseholdInviteCoordinator.addPersonToHousehold` with the new `memberType: "home_manager"` parameter on `AddPersonRequest`. `FamilyMemberProfileView` is generic enough to render staff rows without changes — tapping a staff avatar opens the same profile sheet as a family member. The chooser sheet from build 86 (`AddFamilyMemberChooserSheet`) intentionally stays family-only.
+
+## Home Manager Role (Build 87)
+
+Home managers (`family_members.member_type = 'home_manager'`) are linked household users with full editing permissions across tasks, systems, contractors, projects, and vehicles, EXCEPT for restricted document access and destructive operations. The role exists so HNW families can give their property manager / executive assistant their own Haven login that lets them manage the home but never exposes estate, financial, or medical documents the homeowner hasn't explicitly shared.
+
+### Capabilities
+
+**CAN:**
+- View all household tasks (personal, vendor-managed, custom) on Maintenance, Dashboard, and any task surface
+- Receive task assignments via `assigned_to_user_id` from any other linked household user
+- Create / edit / complete tasks (including custom tasks via `AddMaintenanceTaskSheet`)
+- Manage home systems (add, edit, mark serviced, attach manuals)
+- Manage contractors in the household directory
+- Manage projects: quotes, line items, contacts, files, active quote selection
+- Upload documents — visibility defaults are stamped at insert time per `DocumentAccessDefaults.swift`
+- View documents where `documents.visible_to_home_managers = true`
+- Use Alfred chat (scoped to the docs they can see; the chat function builds context server-side using their JWT, so RLS naturally filters their visible documents)
+- See Family, Property, Life, and Alfred tabs identically to the homeowner
+
+**CANNOT:**
+- See documents where `visible_to_home_managers = false` unless the homeowner explicitly flips the Access pill
+- Delete properties, family members, the household, or the home manager role itself (V1 enforces this in the iOS view models — no DB-level enforcement)
+- Change household ownership
+- Invite other linked users
+- Access estate, legal, financial, or medical document categories unless specifically shared
+
+### Document access enforcement
+
+- **Schema:** `documents.visible_to_home_managers boolean not null default true` added by migration `20260438_document_home_manager_access.sql`. Backfilled with category-driven defaults; the corrective backfill in `20260440_document_home_manager_access_backfill.sql` uses lowercased comparison so Title Case categories like "Power of Attorney" actually match.
+- **RLS:** Migration `20260439_document_home_manager_rls.sql` replaces the `"Users can view household documents"` SELECT policy with `"household_documents_select"`. The new policy keeps household scoping but ALSO requires `visible_to_home_managers = true` when the caller is a linked user with `family_members.member_type IN ('home_manager', 'staff')`. INSERT, UPDATE, and DELETE policies are unchanged — home managers can still upload, edit, and delete documents. Only SELECT is restricted.
+- **Category defaults source of truth:** `Haven/Features/Documents/DocumentAccessDefaults.swift`. Stores both Title Case (matching `DocumentCategory` raw values like "Will", "Power of Attorney", "Brokerage Account") and legacy snake_case keys, all lowercased. The lookup function lowercases input and checks the set. Mirror constants live at the top of `receive-email/index.ts`, `process-inbox-item/index.ts`, and `analyze-document/index.ts`. Keep all four lists in sync when categories are added or removed.
+- **iOS insert paths:** All four `DocumentInsert(...)` callsites (`DocumentUploadManager`, `DocumentUploadViewModel` x2, `ChatViewModel`) stamp `visibleToHomeManagers` from the placeholder category at insert time. The real category gets rewritten by `analyze-document` afterward, which is the place that ALSO rewrites `visible_to_home_managers` based on the AI-suggested category — without that, manual uploads with placeholder "Unknown" / "Will" categories would always default to visible.
+- **Per-document override UI:** `DocumentDetailView.metadataCard` adds an "Access" row, rendered ONLY when `viewModel.householdHomeManagers.isEmpty == false` (zero UI noise for family-only households). Tapping opens `DocumentAccessSheet` — a new ~210 line sheet that shows family members with always-visible checkmarks and home managers with single toggles. The whole sheet is wrapped in a `HomeManagerAccessSheetModifier` so it doesn't push `DocumentDetailView.body` past SwiftUI's type-check complexity limit. `DatabaseService.updateDocumentHomeManagerVisibility(documentId:visible:)` is the single update path.
+
+### Task assignment labels
+
+- `MaintenanceViewModel.familyMembers` is the merged family + staff list (loaded via `fetchFamilyMembers` + `fetchHouseholdStaff` then concatenated). The previous `fetchFamilyMembers` query filters out staff server-side, so the concat is necessary so the existing `linkedUserId` lookups in `assignedUserName` and `assignedUserAvatarColor` can resolve home manager rows.
+- `MaintenanceViewModel.assignedUserName(for:)` looks up the matching family_member by `linkedUserId` and appends " · Home Manager" or " · Staff" when `member_type` matches. Plain family members render without a suffix to keep the assignee pill compact.
+- `MaintenanceTaskDetailSheet.assignToSection` loads `householdFamilyMembersForRoles` alongside `householdUsers` and renders the role suffix as a separate Text in `textTertiary` next to the bold first name.
+- `AddMaintenanceTaskSheet` accepts a `householdFamilyMembers: [FamilyMemberRow]` prop and uses the new `personLabel(for:)` helper to build the picker option string ("Maria · Home Manager"). Wired through from `MaintenanceScheduleView` via `viewModel.familyMembers`.
+
+### Quiz onboarding
+
+Q28's caretakers flow has a fourth sub-step: after the spouse / kids / caretaker sub-steps complete, `homeManagerStepBody` renders either a prompt card ("Anyone else helping run your home?") with "Add home manager" / "Skip" buttons or the `QuizHomeManagerInviteInlineForm`. The form mirrors `QuizSpouseInviteInlineForm` but captures last name (required), passes `memberType: "home_manager"` to `HouseholdInviteCoordinator.addPersonToHousehold`, and uses the new `InviteSource.quizHomeManagerStep` for analytics. On completion, both the Skip and Submit paths funnel through `finalizeQ28Caretakers(answerId:homeManagerEntry:)` which stores the `HomeManagerEntry` breadcrumb on `HouseQuizAnswer.homeManagerEntry` for back-nav hydration and records the final Q28 answer.
+
+### Settings entry
+
+Settings → Household Staff → AddHouseholdStaffSheet remains the manual entry point (independent of the quiz). Both quiz and settings paths converge on the same `HouseholdInviteCoordinator.addPersonToHousehold` call with `memberType: "home_manager"`. Family-only households continue to use `AddFamilyMemberChooserSheet` which is intentionally never extended with a third "Home Manager" chip — keeping the entry points clearly separated.
 
 ## Email Ingestion Pipeline
 
