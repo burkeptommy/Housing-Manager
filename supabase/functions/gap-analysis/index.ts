@@ -127,7 +127,11 @@ serve(async (req: Request) => {
     // Service client for document_content access and logging
     const serviceClient = createClient(supabaseUrl, serviceRoleKey);
 
-    // Fetch all household data + document content in parallel
+    // Fetch household data via the user-scoped supabase client (RLS
+    // enforced) — but document_content is fetched in a SECOND pass
+    // gated by the visible doc IDs from the first query, since
+    // document_content goes through serviceClient (RLS bypassed) and
+    // needs explicit gating.
     const [
       householdResult,
       membersResult,
@@ -136,7 +140,6 @@ serve(async (req: Request) => {
       systemsResult,
       warrantiesResult,
       maintenanceResult,
-      documentContentResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", householdId).single(),
       supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -145,7 +148,6 @@ serve(async (req: Request) => {
       supabase.from("home_systems").select("*").eq("household_id", householdId),
       supabase.from("warranties").select("*").eq("household_id", householdId),
       supabase.from("maintenance_tasks").select("*").eq("household_id", householdId),
-      serviceClient.from("document_content").select("document_id, extracted_text").eq("household_id", householdId),
     ]);
 
     const household = householdResult.data;
@@ -155,7 +157,23 @@ serve(async (req: Request) => {
     const systems = systemsResult.data ?? [];
     const warranties = warrantiesResult.data ?? [];
     const maintenance = maintenanceResult.data ?? [];
-    const documentContent = documentContentResult.data ?? [];
+
+    // Build 87 (Home Manager expansion): gate the document_content fetch
+    // by IDs the caller can actually see. The `documents` array above
+    // came through the user-scoped supabase client so it's already
+    // RLS-filtered. Without this `.in()` filter, gap-analysis would feed
+    // private estate / financial / medical content into Claude's prompt
+    // for home managers.
+    const visibleDocIds = (documents as Array<Record<string, unknown>>)
+      .map((d) => d.id as string)
+      .filter((id) => !!id);
+    const documentContent = visibleDocIds.length > 0
+      ? ((await serviceClient
+          .from("document_content")
+          .select("document_id, extracted_text")
+          .eq("household_id", householdId)
+          .in("document_id", visibleDocIds)).data ?? [])
+      : [];
 
     // Build comprehensive household data string for Claude
     const householdData = buildHouseholdDataString(

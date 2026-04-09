@@ -371,14 +371,33 @@ async function buildSystemPrompt(
     // Search for relevant documents based on the user's message
     const keywords = extractKeywords(body.message);
     if (keywords.length > 0) {
-      // Fetch all document content for this household and filter by relevance
+      // Build 87 (Home Manager expansion): gate the document_content query
+      // by the IDs of documents the caller can actually see. The
+      // `documents` array above was fetched via the user-scoped `supabase`
+      // client so it's already RLS-filtered (home managers only see rows
+      // with `visible_to_home_managers = true`). Without this `.in()`
+      // filter the serviceClient query bypasses RLS and would emit
+      // private estate / financial / medical content into Alfred's prompt
+      // even when the user-scoped `documents` find() returned undefined.
+      const visibleDocIds = (documents as Array<Record<string, unknown>>)
+        .map((d) => d.id as string)
+        .filter((id) => !!id);
+
+      if (visibleDocIds.length === 0) {
+        // No visible documents — skip the content fetch entirely.
+        // documentContentSection stays as the empty default.
+      } else {
       const { data: allContent } = await serviceClient
         .from("document_content")
         .select("document_id, extracted_text")
-        .eq("household_id", householdId);
+        .eq("household_id", householdId)
+        .in("document_id", visibleDocIds);
 
       if (allContent && allContent.length > 0) {
-        // Match documents by title/category keywords or content keywords
+        // Match documents by title/category keywords or content keywords.
+        // The `find()` is now guaranteed to succeed because `allContent`
+        // was gated by `visibleDocIds`, but we keep it for the title
+        // and category lookup.
         const relevant = allContent
           .map((c) => {
             const doc = documents.find((d: Record<string, unknown>) => d.id === c.document_id);
@@ -410,6 +429,7 @@ async function buildSystemPrompt(
           }
         }
       }
+      } // end visibleDocIds.length > 0
     }
   }
 

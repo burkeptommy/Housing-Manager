@@ -37,6 +37,7 @@ serve(async (req: Request) => {
     }
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY") ?? "";
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
     // --- PARSE REQUEST ---
@@ -63,7 +64,31 @@ serve(async (req: Request) => {
     );
 
     // --- FETCH ALL HOUSEHOLD DATA ---
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    // Build 87 (Home Manager expansion): use a user-scoped client when the
+    // request carries a JWT so RLS naturally filters documents (and other
+    // tables) by `visible_to_home_managers` for home manager callers.
+    // Falls back to service role only when JWT auth fails entirely — that
+    // path bypasses RLS but the caller is unauthenticated, so they can't
+    // be a home manager anyway.
+    const authHeader = req.headers.get("Authorization");
+    let supabase;
+    if (authHeader && supabaseAnonKey) {
+      supabase = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: authHeader } },
+      });
+      try {
+        const { error: authError } = await supabase.auth.getUser();
+        if (authError) {
+          console.warn("[simulate-scenario] JWT auth failed, falling back to service role:", authError.message);
+          supabase = createClient(supabaseUrl, serviceRoleKey);
+        }
+      } catch (authErr) {
+        console.warn("[simulate-scenario] JWT auth threw, falling back to service role:", authErr);
+        supabase = createClient(supabaseUrl, serviceRoleKey);
+      }
+    } else {
+      supabase = createClient(supabaseUrl, serviceRoleKey);
+    }
 
     const [
       householdResult,
