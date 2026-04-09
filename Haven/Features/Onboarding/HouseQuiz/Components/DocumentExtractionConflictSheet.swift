@@ -215,7 +215,7 @@ struct DocumentExtractionConflictSheet: View {
                         .font(.system(size: 14))
                         .foregroundStyle(isSelected ? HavenColors.success : HavenColors.textTertiary)
                 }
-                Text(value.isEmpty ? "—" : value)
+                Text(value.isEmpty ? "Not set" : value)
                     .font(HavenTypography.body)
                     .foregroundStyle(HavenColors.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)

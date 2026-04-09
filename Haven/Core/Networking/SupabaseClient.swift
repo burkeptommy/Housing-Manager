@@ -21,6 +21,101 @@ enum HavenSupabase {
         client.storage
     }
 
+    // MARK: - Safe Session Lookup (Apr 7, 2026)
+
+    /// Bounded session lookup. supabase-swift's `AuthClient.session` getter
+    /// can hang indefinitely if a token refresh stalls (we observed this on
+    /// Tom's wife's account during onboarding: the splash sat for 90+
+    /// seconds with no recovery, multiple times, even after my v1 fix).
+    /// Every call site that reads `HavenSupabase.auth.session` directly
+    /// inherits that hang.
+    ///
+    /// **Why this uses `withCheckedContinuation` + `DispatchQueue` instead
+    /// of `withTaskGroup`:** the obvious implementation is to race the
+    /// session lookup against `Task.sleep` inside a task group. That
+    /// implementation is broken in this exact failure mode. `withTaskGroup`
+    /// waits for ALL child tasks to finish before returning, even after
+    /// `cancelAll()`. Cooperative cancellation requires the cancelled task
+    /// to actually check `Task.isCancelled`. If supabase-swift's session
+    /// getter is blocked on a synchronous lock or a network call that
+    /// will never return, the child task CAN'T check cancellation, so
+    /// the entire task group hangs forever waiting for it to die.
+    ///
+    /// The bulletproof fix is to use a `DispatchQueue` timer (implemented
+    /// in libdispatch at the C level — cannot be blocked by Swift task
+    /// state) and a checked continuation. Whichever side fires first
+    /// resumes the continuation; the other side becomes a no-op. The
+    /// hung session task gets LEAKED — it sits there forever, but it
+    /// doesn't block anything because we never await it.
+    ///
+    /// Use this from anywhere user-facing — onboarding, dashboard refresh,
+    /// account flows. The bare `HavenSupabase.auth.session` should only be
+    /// used in background services that can tolerate an indefinite wait
+    /// (push notification registration, analytics flush, etc.).
+    static func safeSession(timeout: TimeInterval = 3.0) async -> Session? {
+        let startTime = Date()
+        let callerTag = "safeSession[\(UUID().uuidString.prefix(6))]"
+        print("[\(callerTag)] Starting session lookup with \(timeout)s deadline")
+
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Session?, Never>) in
+            // Single-resume guard. We use a class wrapper around an
+            // NSLock instead of an actor because the resume call has to
+            // be synchronous from inside both the dispatch handler and
+            // the detached task — we can't await an actor here without
+            // reintroducing the same hang risk we're trying to fix.
+            final class ResumeGuard: @unchecked Sendable {
+                let lock = NSLock()
+                var didResume = false
+            }
+            let guardState = ResumeGuard()
+
+            @Sendable func resumeOnce(_ value: Session?, source: String) {
+                guardState.lock.lock()
+                let shouldResume = !guardState.didResume
+                if shouldResume { guardState.didResume = true }
+                guardState.lock.unlock()
+                if shouldResume {
+                    let elapsed = Date().timeIntervalSince(startTime)
+                    print("[\(callerTag)] Resumed via \(source) after \(String(format: "%.2f", elapsed))s, session=\(value != nil ? "yes" : "nil")")
+                    continuation.resume(returning: value)
+                } else {
+                    print("[\(callerTag)] \(source) tried to resume but already resolved (ignored)")
+                }
+            }
+
+            // Schedule the wall-clock deadline FIRST so it's armed before
+            // we kick off the (potentially hanging) session lookup. The
+            // dispatch timer fires on a background queue at the libdispatch
+            // level — no Swift task state is involved, so it cannot be
+            // blocked by anything happening in supabase-swift's actors.
+            DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + timeout) {
+                resumeOnce(nil, source: "deadline")
+            }
+
+            // Spawn the session lookup in a detached task. If it returns
+            // before the deadline, great — we resume with the session. If
+            // it hangs, the deadline above takes over and this task gets
+            // leaked (still running, but ignored). The leak is the price
+            // we pay to avoid trapping the user.
+            Task.detached(priority: .userInitiated) {
+                do {
+                    let session = try await client.auth.session
+                    resumeOnce(session, source: "session-fetch")
+                } catch {
+                    print("[\(callerTag)] session fetch threw: \(error)")
+                    resumeOnce(nil, source: "session-fetch-error")
+                }
+            }
+        }
+    }
+
+    /// Bounded access-token lookup. Convenience around `safeSession` that
+    /// returns just the bearer token. Returns nil on timeout or when the
+    /// session has no access token.
+    static func safeAccessToken(timeout: TimeInterval = 3.0) async -> String? {
+        await safeSession(timeout: timeout)?.accessToken
+    }
+
     // MARK: - Edge Function Direct Caller
 
     /// Call a Supabase Edge Function directly via URLRequest, bypassing the SDK's invoke method
@@ -30,8 +125,13 @@ enum HavenSupabase {
         body: Encodable,
         timeoutSeconds: TimeInterval = 120
     ) async throws -> Data {
-        // Refresh session first
-        _ = try? await client.auth.refreshSession()
+        // Apr 7, 2026: skip the proactive `refreshSession()` call. supabase-swift
+        // will refresh on its own when the token expires, and the explicit call
+        // can hang indefinitely on a stalled refresh — which trapped onboarding
+        // for Tom's wife. The access-token read below is bounded by a 3-second
+        // deadline so even if the underlying session is broken, we fall back
+        // cleanly to anon-key auth and let the Edge Function reject the
+        // request with a clear 401 instead of hanging.
 
         // Build the URL: https://<project>.supabase.co/functions/v1/<function_name>
         let baseURL = AppConfig.Supabase.url
@@ -45,8 +145,10 @@ enum HavenSupabase {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("Bearer \(AppConfig.Supabase.anonKey)", forHTTPHeaderField: "apikey")
 
-        // Add auth token if available
-        if let accessToken = try? await client.auth.session.accessToken {
+        // Add auth token if available, bounded by a 3-second deadline so a
+        // stalled supabase-swift session refresh can't hang every Edge
+        // Function call. Falls back to the anon key on timeout.
+        if let accessToken = await safeAccessToken(timeout: 3.0) {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         } else {
             // Fallback: use anon key as auth
@@ -765,5 +867,54 @@ enum HavenSupabase {
             timeoutSeconds: 15
         )
         return try JSONDecoder().decode(BrandLogoResponse.self, from: data)
+    }
+
+    // MARK: - Phase 19n: Find Local Vendors
+
+    /// One vendor returned by `find-local-vendors`. The edge function caches
+    /// these in `local_vendor_results` and refreshes via Google Places after
+    /// 60 days. Top 2 are flagged `isHavenCertified` (>= 4.7 stars, >= 25
+    /// reviews, no chain indicators); the next 2 are "Suggested".
+    struct LocalVendorResult: Codable, Identifiable {
+        let name: String
+        let address: String?
+        let phone: String?
+        let website: String?
+        let rating: Double?
+        let reviewCount: Int?
+        let googlePlaceId: String
+        let isHavenCertified: Bool
+        let rankPosition: Int
+
+        var id: String { googlePlaceId }
+    }
+
+    struct LocalVendorResponse: Codable {
+        let vendors: [LocalVendorResult]
+        let cached: Bool?
+    }
+
+    private struct LocalVendorRequest: Encodable {
+        let town: String
+        let state: String
+        let category: String
+    }
+
+    /// Calls the `find-local-vendors` edge function. The function checks the
+    /// cache first; on a miss it calls Google Places Text Search, ranks
+    /// results, writes the cache, and returns up to 4 vendors total
+    /// (2 Haven Certified + 2 Suggested). Empty `vendors` is a valid result —
+    /// the iOS sheet renders an empty state in that case.
+    static func findLocalVendors(
+        town: String,
+        state: String,
+        category: String
+    ) async throws -> LocalVendorResponse {
+        let data = try await callEdgeFunction(
+            name: "find-local-vendors",
+            body: LocalVendorRequest(town: town, state: state, category: category),
+            timeoutSeconds: 30
+        )
+        return try JSONDecoder().decode(LocalVendorResponse.self, from: data)
     }
 }

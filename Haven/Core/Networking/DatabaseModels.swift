@@ -866,15 +866,33 @@ struct ContractorRow: Codable, Identifiable {
     let rating: Int?
     let notes: String?
     let createdAt: Date?
+    /// Phase 19k: Primary category for fast reconciler lookup. Should match
+    /// home_systems.category. Multi-discipline contractors keep their full
+    /// list in `specialties` and use the most-relevant single value here.
+    let category: String?
+    /// Phase 19k: When the contractor was mirrored from a quiz utility_account
+    /// pick, this points back at the source utility_providers row so we can
+    /// keep logo/brand-color in sync.
+    let utilityProviderId: UUID?
+    /// Phase 19k: Snapshotted brand identity from the utility_providers row.
+    let logoUrl: String?
+    let brandColor: String?
+    let website: String?
+    /// Phase 19k: How this contractor was added — "manual", "quiz", or
+    /// "find_vendor" (from the Phase 19n Google Places picker).
+    let source: String?
 
     enum CodingKeys: String, CodingKey {
-        case id, phone, email, specialties, address, rating, notes
+        case id, phone, email, specialties, address, rating, notes, category, source, website
         case householdId = "household_id"
         case companyName = "company_name"
         case contactName = "contact_name"
         case licenseNumber = "license_number"
         case insuranceVerified = "insurance_verified"
         case createdAt = "created_at"
+        case utilityProviderId = "utility_provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
     }
 }
 
@@ -890,14 +908,23 @@ struct ContractorInsert: Codable {
     var insuranceVerified: Bool?
     var rating: Int?
     var notes: String?
+    var category: String?
+    var utilityProviderId: UUID?
+    var logoUrl: String?
+    var brandColor: String?
+    var website: String?
+    var source: String?
 
     enum CodingKeys: String, CodingKey {
-        case phone, email, specialties, address, rating, notes
+        case phone, email, specialties, address, rating, notes, category, source, website
         case householdId = "household_id"
         case companyName = "company_name"
         case contactName = "contact_name"
         case licenseNumber = "license_number"
         case insuranceVerified = "insurance_verified"
+        case utilityProviderId = "utility_provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
     }
 }
 
@@ -912,13 +939,22 @@ struct ContractorUpdate: Codable {
     var insuranceVerified: Bool?
     var rating: Int?
     var notes: String?
+    var category: String?
+    var utilityProviderId: UUID?
+    var logoUrl: String?
+    var brandColor: String?
+    var website: String?
+    var source: String?
 
     enum CodingKeys: String, CodingKey {
-        case phone, email, specialties, address, rating, notes
+        case phone, email, specialties, address, rating, notes, category, source, website
         case companyName = "company_name"
         case contactName = "contact_name"
         case licenseNumber = "license_number"
         case insuranceVerified = "insurance_verified"
+        case utilityProviderId = "utility_provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
     }
 }
 
@@ -955,6 +991,15 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
     /// pre-migration responses still decode cleanly.
     let isArchived: Bool?
     let archivedAt: Date?
+    /// Phase 19k: How the task should be presented in the UI.
+    /// "personal" → user does it themselves (default for DIY tasks)
+    /// "vendor"   → a contractor handles the work, user just confirms/schedules
+    /// "either"   → could be either, default to personal until reassigned
+    let assignmentType: String?
+    /// Phase 19k: Vendor-managed task with no contractor on file yet.
+    /// UI renders these as "Find a contractor for: X" with an orange CTA.
+    /// Cleared when the user picks a vendor.
+    let needsVendor: Bool?
 
     enum CodingKeys: String, CodingKey {
         case id, title, description, frequency, notes, priority
@@ -979,6 +1024,8 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
         case scheduledDate = "scheduled_date"
         case isArchived = "is_archived"
         case archivedAt = "archived_at"
+        case assignmentType = "assignment_type"
+        case needsVendor = "needs_vendor"
     }
 
     /// Create a synthetic task row for vehicle alerts that don't have a stored task yet.
@@ -1026,7 +1073,9 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             recurrenceRule: nil,
             scheduledDate: nil,
             isArchived: nil,
-            archivedAt: nil
+            archivedAt: nil,
+            assignmentType: nil,
+            needsVendor: nil
         )
     }
 
@@ -1065,7 +1114,9 @@ struct MaintenanceTaskDBRow: Codable, Identifiable {
             recurrenceRule: nil,
             scheduledDate: nil,
             isArchived: nil,
-            archivedAt: nil
+            archivedAt: nil,
+            assignmentType: nil,
+            needsVendor: nil
         )
     }
 }
@@ -1092,6 +1143,10 @@ struct MaintenanceTaskInsert: Codable {
     var professionalRequired: Bool?
     var costRange: String?
     var recurrenceRule: String?
+    /// Phase 19k: Personal / vendor / either. See MaintenanceTaskDBRow.
+    var assignmentType: String?
+    /// Phase 19k: True for vendor-managed tasks with no contractor on file.
+    var needsVendor: Bool?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1111,6 +1166,8 @@ struct MaintenanceTaskInsert: Codable {
         case professionalRequired = "professional_required"
         case costRange = "cost_range"
         case recurrenceRule = "recurrence_rule"
+        case assignmentType = "assignment_type"
+        case needsVendor = "needs_vendor"
     }
 }
 
@@ -1132,6 +1189,11 @@ struct MaintenanceTaskUpdate: Codable {
     var isArchived: Bool?
     var archivedAt: Date?
     var archivedReason: String?
+    /// Phase 19k: Allows the bidirectional toggle (Phase 19l UI) to flip a
+    /// task between personal and vendor-managed in place. Also lets the
+    /// vendor delegation sheet promote multiple tasks at once.
+    var assignmentType: String?
+    var needsVendor: Bool?
 
     enum CodingKeys: String, CodingKey {
         case title, description, frequency, notes, priority
@@ -1147,6 +1209,8 @@ struct MaintenanceTaskUpdate: Codable {
         case isArchived = "is_archived"
         case archivedAt = "archived_at"
         case archivedReason = "archived_reason"
+        case assignmentType = "assignment_type"
+        case needsVendor = "needs_vendor"
     }
 }
 
@@ -2701,9 +2765,14 @@ struct UtilityProviderRow: Codable, Identifiable {
     /// True when the carrier also offers auto insurance (Phase 16c). Only set
     /// for `home_insurance` rows; nil/false everywhere else.
     let bundlesWithAuto: Bool?
+    /// Phase 19h: Service area tags. Mix of state codes ('NY', 'CT'),
+    /// county names ('Westchester', 'Fairfield'), and town/city/hamlet
+    /// names ('Bedford Hills', 'Greenwich', 'Sherman'). Used by the quiz
+    /// picker to rank regional matches above generic ones.
+    let regions: [String]?
 
     enum CodingKeys: String, CodingKey {
-        case id, name, slug, website, phone
+        case id, name, slug, website, phone, regions
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
@@ -2723,6 +2792,7 @@ struct UtilityProviderRow: Codable, Identifiable {
         phone = try? c.decodeIfPresent(String.self, forKey: .phone)
         bundlesWithHome = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithHome)
         bundlesWithAuto = try? c.decodeIfPresent(Bool.self, forKey: .bundlesWithAuto)
+        regions = try? c.decodeIfPresent([String].self, forKey: .regions)
     }
 }
 
@@ -3100,5 +3170,64 @@ struct AppConfigRow: Codable {
         case optionalUpdateMessage = "optional_update_message"
         case appStoreURL = "app_store_url"
         case updatedAt = "updated_at"
+    }
+}
+
+// MARK: - Local Vendor Results (Phase 19n)
+
+/// One cached Google Places business listing for the find-local-vendors flow.
+/// The iOS client never reads this table directly — the edge function checks
+/// the cache, refreshes via Google Places when stale, and returns the results
+/// shaped as `LocalVendorResult` (see SupabaseClient.swift) — but the row
+/// type is here so future tooling (catalog cleanup, ops dashboard, etc.)
+/// can decode rows from the table without redefining the schema.
+struct LocalVendorResultRow: Codable, Identifiable {
+    let id: UUID
+    let town: String
+    let state: String
+    let category: String
+    let vendorName: String
+    let googlePlaceId: String
+    let address: String?
+    let phone: String?
+    let website: String?
+    let rating: Double?
+    let reviewCount: Int?
+    let isHavenCertified: Bool?
+    let rankPosition: Int?
+    let fetchedAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, town, state, category, address, phone, website, rating
+        case vendorName = "vendor_name"
+        case googlePlaceId = "google_place_id"
+        case reviewCount = "review_count"
+        case isHavenCertified = "is_haven_certified"
+        case rankPosition = "rank_position"
+        case fetchedAt = "fetched_at"
+    }
+}
+
+struct LocalVendorResultInsert: Codable {
+    let town: String
+    let state: String
+    let category: String
+    let vendorName: String
+    let googlePlaceId: String
+    var address: String?
+    var phone: String?
+    var website: String?
+    var rating: Double?
+    var reviewCount: Int?
+    var isHavenCertified: Bool?
+    var rankPosition: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case town, state, category, address, phone, website, rating
+        case vendorName = "vendor_name"
+        case googlePlaceId = "google_place_id"
+        case reviewCount = "review_count"
+        case isHavenCertified = "is_haven_certified"
+        case rankPosition = "rank_position"
     }
 }

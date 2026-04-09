@@ -31,6 +31,10 @@ struct MaintenanceTaskDetailSheet: View {
     @State private var assignedUserId: UUID?
     @State private var originalAssignedUserId: UUID?
 
+    /// Phase 19l: Bidirectional toggle confirmation. Set true when the user
+    /// taps "I'll do this myself" on a vendor-managed task.
+    @State private var showConvertToPersonalConfirm = false
+
     // Reminder state
     @State private var reminder1Day = false
     @State private var reminder3Days = false
@@ -112,6 +116,21 @@ struct MaintenanceTaskDetailSheet: View {
                     withAnimation { showVendorAssignedToast = false }
                 }
             }
+        }
+        // Phase 19l: confirmation before flipping a vendor-managed task back
+        // to personal. Restoring the original template title is irreversible
+        // from the UI side, so we ask once before mutating the row.
+        .alert("Take this back from your vendor?", isPresented: $showConvertToPersonalConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("I'll do it myself") {
+                Task {
+                    await MaintenanceViewModel.shared.convertToPersonal(taskId: task.id)
+                    NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                    dismiss()
+                }
+            }
+        } message: {
+            Text("We'll move this task back to your to-do list and restore the original instructions.")
         }
         .navigationTitle("Task Details")
         .navigationBarTitleDisplayMode(.inline)
@@ -518,7 +537,11 @@ struct MaintenanceTaskDetailSheet: View {
                     .foregroundStyle(HavenColors.textTertiary)
                     .multilineTextAlignment(.center)
 
-                DatePicker("Date Completed", selection: $lastServicedDate, in: ...Date(), displayedComponents: .date)
+                // Build 86: no date-range constraint. Users can log a task
+                // as completed on ANY date (past or future) — they might be
+                // backdating a gutter cleaning from months ago, or recording
+                // a pro visit that's already on the calendar next week.
+                DatePicker("Date Completed", selection: $lastServicedDate, displayedComponents: .date)
                     .datePickerStyle(.graphical)
                     .tint(HavenColors.navy)
 
@@ -767,6 +790,30 @@ struct MaintenanceTaskDetailSheet: View {
                         }
                         .buttonStyle(.plain)
                         Spacer()
+                    }
+
+                    // Phase 19l: bidirectional toggle. Lets the user reclaim
+                    // a vendor-managed task back to their personal list. Only
+                    // surfaces when the row is actually vendor-managed (i.e.
+                    // `assignmentType == "vendor"`); the existing "Remove
+                    // Vendor" button above just unlinks the contractor without
+                    // changing the assignment.
+                    if (task.assignmentType?.lowercased() == "vendor") {
+                        Button {
+                            Haptics.light()
+                            showConvertToPersonalConfirm = true
+                        } label: {
+                            HStack(spacing: 6) {
+                                Image(systemName: "person.fill")
+                                    .font(.system(size: 11))
+                                Text("I'll do this myself")
+                                    .font(HavenTypography.uiLabel)
+                            }
+                            .foregroundStyle(HavenColors.navy700)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, HavenTheme.spacing8)
+                        }
+                        .buttonStyle(.plain)
                     }
                 } else {
                     // No vendor — prompt to set one up

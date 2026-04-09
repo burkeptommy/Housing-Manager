@@ -1,0 +1,154 @@
+import Foundation
+
+/// Phase 20d: Optimistic valuation range helper.
+///
+/// The underlying valuation chain (ATTOM → RentCast → Claude AI comps →
+/// computed → square-footage fallback) is unchanged. This helper only
+/// changes the *display* layer so iOS surfaces a range with the high end
+/// as the visual anchor instead of a single conservative number.
+///
+/// Two input paths:
+/// 1. `compute(for property:)` — used after a property has been saved to
+///    the DB. `PropertyRow` only persists `currentEstimatedValue`, so the
+///    range is synthesized from that single number, widened by confidence.
+/// 2. `compute(from lookup:)` — used at hook-screen render time when we
+///    still have the live `PropertyLookupResult` in memory. When the
+///    Phase 18g Claude AI fallback fired, the lookup carries an actual
+///    `estimatedValueLow`/`estimatedValueHigh` pair we can show verbatim.
+struct ValuationRange {
+    let low: Double
+    let high: Double
+    /// True when the range was widened from a single number rather than
+    /// returned by the data source. Manual overrides set this to false so
+    /// the display layer can hide the range and show only the user's value.
+    let isSynthesized: Bool
+    /// True when the source explicitly told us "the user set this" and the
+    /// display layer should not second-guess them with a range or caption.
+    let isManual: Bool
+
+    var midpoint: Double { (low + high) / 2 }
+
+    /// Phase 20a Page 1: equity Haven helps protect, computed as 7.4% of
+    /// the midpoint per the NAR Remodeling Impact Report. Rounded to the
+    /// nearest $1,000 so the number reads cleanly in the hero card.
+    var equityProtected: Double {
+        let raw = midpoint * 0.074
+        return (raw / 1_000).rounded() * 1_000
+    }
+
+    // MARK: - Compute from PropertyRow (post-save path)
+
+    /// Build a range from a saved property row. PropertyRow only persists
+    /// the conservative single number, so the high end is always
+    /// synthesized by widening the value upward. Confidence (when set)
+    /// controls how aggressively to widen.
+    static func compute(for property: PropertyRow) -> ValuationRange? {
+        // Manual override: respect the user's value verbatim.
+        if property.estimatedValueSource == "manual",
+           let value = property.currentEstimatedValue, value > 0 {
+            return ValuationRange(low: value, high: value, isSynthesized: false, isManual: true)
+        }
+
+        guard let value = property.currentEstimatedValue, value > 0 else { return nil }
+
+        let widening = wideningMultiplier(
+            source: property.estimatedValueSource,
+            confidence: property.estimatedValueConfidence
+        )
+        return ValuationRange(
+            low: value,
+            high: value * widening,
+            isSynthesized: true,
+            isManual: false
+        )
+    }
+
+    // MARK: - Compute from PropertyLookupResult (pre-save / hook path)
+
+    /// Build a range from a fresh property lookup. When Phase 18g's
+    /// Claude AI comps layer fired, the lookup carries an actual
+    /// `estimatedValueLow`/`estimatedValueHigh` pair — use those verbatim.
+    /// Otherwise widen the single value by the confidence multiplier.
+    static func compute(from lookup: PropertyLookupResult?) -> ValuationRange? {
+        guard let lookup else { return nil }
+
+        // Phase 18g AI comps already gave us a precise range.
+        if let low = lookup.estimatedValueLow, low > 0,
+           let high = lookup.estimatedValueHigh, high > low {
+            return ValuationRange(low: low, high: high, isSynthesized: false, isManual: false)
+        }
+
+        guard let value = lookup.estimatedValue, value > 0 else { return nil }
+
+        let widening = wideningMultiplier(
+            source: lookup.estimatedValueSource,
+            confidence: lookup.estimatedValueConfidence
+        )
+        return ValuationRange(
+            low: value,
+            high: value * widening,
+            isSynthesized: true,
+            isManual: false
+        )
+    }
+
+    // MARK: - Helpers
+
+    /// Pick how aggressively to widen a single value into a range. The
+    /// rule of thumb: low-confidence sources get a wider band so the
+    /// optimistic anchor isn't a guess at the high end of a guess.
+    private static func wideningMultiplier(source: String?, confidence: Int?) -> Double {
+        // Square-footage fallback ("estimated") is the weakest path.
+        if source == "estimated" {
+            return 1.30
+        }
+        // Computed fallback ("computed") is also weak — last sale plus
+        // a fixed appreciation curve.
+        if source == "computed" {
+            return 1.25
+        }
+        // Otherwise let confidence pick: under 50 = wider, otherwise the
+        // standard 20% optimistic widening.
+        if let confidence, confidence > 0, confidence < 50 {
+            return 1.25
+        }
+        return 1.20
+    }
+
+    // MARK: - Display formatting
+
+    /// "$875,000" — the conservative low end formatted as full currency.
+    var formattedLow: String { Self.formatFull(low) }
+
+    /// "$1,050,000" — the optimistic high end formatted as full currency.
+    var formattedHigh: String { Self.formatFull(high) }
+
+    /// "$875K" — the low end in compact form for caption rows.
+    var formattedLowCompact: String { low.formattedCompactCurrency() }
+
+    /// "$1.05M" — the high end in compact form for caption rows.
+    var formattedHighCompact: String { high.formattedCompactCurrency() }
+
+    /// "$875,000 to $1,050,000" — the full range with the connecting
+    /// preposition (no em dash, per CLAUDE.md).
+    var formattedFullRange: String {
+        "\(formattedLow) to \(formattedHigh)"
+    }
+
+    /// "$875K to $1.05M" — the compact range for tight captions.
+    var formattedCompactRange: String {
+        "\(formattedLowCompact) to \(formattedHighCompact)"
+    }
+
+    /// "$71,000" — the equity-protected midpoint times 7.4%, rounded to
+    /// the nearest $1,000 and formatted as full currency.
+    var formattedEquityProtected: String { Self.formatFull(equityProtected) }
+
+    private static func formatFull(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        formatter.maximumFractionDigits = 0
+        formatter.locale = Locale(identifier: "en_US")
+        return formatter.string(from: NSNumber(value: value)) ?? "$\(Int(value))"
+    }
+}

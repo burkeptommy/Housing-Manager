@@ -512,8 +512,16 @@ struct AddContractorView: View {
                 address: address.isEmpty ? nil : address,
                 licenseNumber: licenseNumber.isEmpty ? nil : licenseNumber
             )
-            _ = try await DatabaseService.shared.createContractor(insert)
+            let createdContractor = try await DatabaseService.shared.createContractor(insert)
             Analytics.track(.contractorCreated, ["company_name": companyName, "contact_type": contactType])
+            // Phase 19l: notify the dashboard so it can re-fire the post-quiz
+            // delegation sheet for any 'either' tasks the new vendor's
+            // category could take over.
+            NotificationCenter.default.post(
+                name: .contractorAdded,
+                object: nil,
+                userInfo: ["contractorId": createdContractor.id.uuidString]
+            )
             onComplete?()
             dismiss()
         } catch {

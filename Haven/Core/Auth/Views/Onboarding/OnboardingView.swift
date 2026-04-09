@@ -10,6 +10,12 @@ struct OnboardingView: View {
     @StateObject private var viewModel = OnboardingViewModel()
 
     @State private var animatePulse = false
+    /// Apr 7, 2026: after 10 seconds on the splash without progress, show
+    /// a "Take it from here" link that drops the user into the manual
+    /// name entry view. Last-resort escape hatch for users whose Supabase
+    /// session is wedged in a way that even our timeouts can't catch.
+    @State private var showEscapeHatch = false
+    @State private var escapeHatchTimer: Task<Void, Never>?
 
     var body: some View {
         NavigationStack {
@@ -29,11 +35,50 @@ struct OnboardingView: View {
         }
         .trackScreen("OnboardingView")
         .task {
+            print("[Onboarding] view .task: ENTER")
             Analytics.track(.onboardingStarted)
             viewModel.loadCachedAddress()
+            startEscapeHatchTimer()
             await viewModel.prefillFromAuth()
+            print("[Onboarding] view .task: prefillFromAuth returned")
             await viewModel.checkForInvitation()
-            await viewModel.autoCompleteIfReady(authService: appState.authService)
+            print("[Onboarding] view .task: checkForInvitation returned")
+            // Phase 20b: pass appState so the model can stamp
+            // pendingQuizProperty after the post-auth property is created.
+            // DashboardView reads it on first appearance and auto-launches
+            // HouseQuizView for the just-locked-in property.
+            await viewModel.autoCompleteIfReady(
+                authService: appState.authService,
+                appState: appState
+            )
+            print("[Onboarding] view .task: autoCompleteIfReady returned, EXIT")
+        }
+        // Apr 7, 2026: removed the late-arrival .onChange(canProceed)
+        // observer. It was firing on EVERY keystroke as the user typed
+        // their name in nameFallbackView (canProceed flips true the moment
+        // both fields have one character), which auto-fired complete()
+        // with a half-typed name like "Tom B" before the user could
+        // finish. Once the user is on nameFallbackView, the explicit
+        // "Get Started" button is the only thing that should trigger
+        // autoCompleteIfReady — never a reactive observer.
+        .onDisappear {
+            escapeHatchTimer?.cancel()
+            escapeHatchTimer = nil
+        }
+    }
+
+    private func startEscapeHatchTimer() {
+        escapeHatchTimer?.cancel()
+        escapeHatchTimer = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            guard !Task.isCancelled else { return }
+            // Only show the escape hatch if we're STILL on the splash
+            // (no error, no name fallback, no progress yet).
+            if !viewModel.hasFinishedPrefill {
+                print("[Onboarding] escape hatch timer fired — forcing hasFinishedPrefill=true so user can proceed manually")
+                showEscapeHatch = true
+                viewModel.hasFinishedPrefill = true
+            }
         }
     }
 
@@ -87,7 +132,13 @@ struct OnboardingView: View {
         if !viewModel.setupProgress.isEmpty {
             return viewModel.setupProgress
         }
-        return "Setting up your home..."
+        // Apr 7, 2026: distinct default so a screenshot of a hung splash
+        // tells us whether complete() ever started. If you see "Getting
+        // things ready..." then complete() never ran (hang in prefill or
+        // checkForInvitation). If you see anything from "Creating your
+        // household..." through "Building your maintenance plan..." then
+        // we're inside complete() and you can read off the exact step.
+        return "Getting things ready..."
     }
 
     private var progressSubtitle: String {

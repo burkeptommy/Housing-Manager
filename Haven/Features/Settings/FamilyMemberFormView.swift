@@ -1,9 +1,45 @@
 import SwiftUI
 import PhotosUI
 
+/// Build 86 — surfaces "regular" vs "expecting" intent BEFORE the user lands
+/// on `FamilyMemberFormView`. Picked in `AddFamilyMemberChooserSheet` and
+/// passed in via the `initialMode` init param. The previous in-form Toggle
+/// has been removed; existing-member edits preserve `FamilyMemberRow.isExpecting`
+/// regardless of the chosen mode.
+enum AddFamilyMemberMode: String, Identifiable {
+    case regular
+    case expecting
+
+    var id: String { rawValue }
+}
+
 struct FamilyMemberFormView: View {
     var existingMember: FamilyMemberRow?
+    var initialMode: AddFamilyMemberMode
     var onSave: (() async -> Void)?
+
+    init(
+        existingMember: FamilyMemberRow? = nil,
+        initialMode: AddFamilyMemberMode = .regular,
+        onSave: (() async -> Void)? = nil
+    ) {
+        self.existingMember = existingMember
+        self.initialMode = initialMode
+        self.onSave = onSave
+        // Seed `_isExpecting` from the chooser's selection so the form opens
+        // in the right mode without flicker. The `.onAppear` block below still
+        // overwrites this for edits, where the persisted row drives layout.
+        let startsExpecting = initialMode == .expecting && existingMember == nil
+        _isExpecting = State(initialValue: startsExpecting)
+        // Mirror the legacy `onChange(of: isExpecting)` defaults: when the
+        // chooser routes a fresh member through as expecting, default to the
+        // rose avatar color and "Child" relationship so the preview matches
+        // the prior in-form toggle behavior.
+        if startsExpecting {
+            _avatarColor = State(initialValue: .rose)
+            _relationship = State(initialValue: "Child")
+        }
+    }
 
     @Environment(\.dismiss) private var dismiss
     @State private var firstName = ""
@@ -15,7 +51,7 @@ struct FamilyMemberFormView: View {
     @State private var email = ""
     @State private var phone = ""
     @State private var avatarColor: AvatarColor = .navy
-    @State private var isExpecting = false
+    @State private var isExpecting: Bool
     @State private var expectedDate = Date()
     @State private var legalName = ""
     @State private var school = ""
@@ -102,28 +138,13 @@ struct FamilyMemberFormView: View {
                 Task { await loadAndUploadPhoto(item: newItem) }
             }
 
-            // EXPECTING — first toggle, drives the form
-            Section {
-                Toggle(isOn: $isExpecting.animation()) {
-                    HStack(spacing: 10) {
-                        Image(systemName: "stroller.fill")
-                            .font(.system(size: 16))
-                            .foregroundStyle(AvatarColor.rose.color)
-                        Text("Expecting a New Family Member")
-                    }
-                }
-                .tint(AvatarColor.rose.color)
-                .onChange(of: isExpecting) { _, newValue in
-                    if newValue {
-                        // Default to rose color and child relationship for expecting
-                        avatarColor = .rose
-                        if !isEditing {
-                            relationship = "Child"
-                        }
-                    }
-                }
-
-                if isExpecting {
+            // EXPECTING — due date + helper context surfaces only when the
+            // upstream chooser routed the user here as "We're expecting".
+            // The toggle that used to live here is gone (Build 86) — intent
+            // is captured in `AddFamilyMemberChooserSheet` before the form
+            // is presented.
+            if isExpecting {
+                Section {
                     DatePicker("Due Date", selection: $expectedDate, in: Date()..., displayedComponents: .date)
                         .tint(AvatarColor.rose.color)
 
@@ -140,9 +161,9 @@ struct FamilyMemberFormView: View {
                             .foregroundStyle(HavenColors.textSecondary)
                     }
                     .padding(.vertical, 4)
+                } header: {
+                    Text("EXPECTING").font(HavenTypography.uiSectionHeader).tracking(1.5)
                 }
-            } header: {
-                Text("PLANNING").font(HavenTypography.uiSectionHeader).tracking(1.5)
             }
 
             // BASIC INFO
@@ -350,7 +371,7 @@ struct FamilyMemberFormView: View {
         }
         .scrollContentBackground(.hidden)
         .background(HavenColors.cream)
-        .navigationTitle(isEditing ? (isExpecting ? "Edit Expecting Member" : "Edit Member") : (isExpecting ? "Add Expecting Member" : "Add Family Member"))
+        .navigationTitle(isEditing ? (isExpecting ? "Edit Expecting Member" : "Edit Member") : (isExpecting ? "Add Expecting" : "Add Family Member"))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }

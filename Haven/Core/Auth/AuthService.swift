@@ -202,13 +202,27 @@ final class AuthService: ObservableObject {
     }
 
     /// Complete onboarding by linking the user to a household.
+    ///
+    /// Apr 7, 2026: replaced the bare `try await HavenSupabase.auth.session`
+    /// call with `safeSession(timeout:)`. The original blocking lookup
+    /// trapped Tom's wife on the splash screen for 90+ seconds when
+    /// supabase-swift's session refresh stalled. The userId comes from the
+    /// existing in-memory `currentUserId` (set by the auth state listener,
+    /// no refresh needed). Email + fullName are populated from the bounded
+    /// session lookup if it succeeds; if it times out we use empty/nil and
+    /// let the user fix their profile later from settings. The household
+    /// link is the critical write that has to happen here — losing the
+    /// email/name on a brand-new account row is recoverable.
     func completeOnboarding(householdId: UUID) async throws {
         guard let userId = currentUserId else {
             throw NSError(domain: "AuthService", code: 0, userInfo: [NSLocalizedDescriptionKey: "No authenticated user found."])
         }
-        let session = try await HavenSupabase.auth.session
-        let email = session.user.email ?? ""
-        let fullName = session.user.userMetadata["full_name"]?.value as? String
+
+        // Bounded session read. If supabase-swift's refresh has stalled,
+        // we get nil after 3 seconds and proceed without email/fullName.
+        let session = await HavenSupabase.safeSession(timeout: 3.0)
+        let email = session?.user.email ?? ""
+        let fullName = session?.user.userMetadata["full_name"]?.value as? String
 
         // Ensure the user row exists, then update it.
         // The row may be missing if a prior signup had its INSERT rolled back by
@@ -226,7 +240,14 @@ final class AuthService: ObservableObject {
             ))
         }
         _ = try await DatabaseService.shared.updateUser(id: userId, UserUpdate(householdId: householdId))
-        needsOnboarding = false
+        // Apr 7, 2026 (build 80): DO NOT flip `needsOnboarding = false` here.
+        // This used to fire mid-chain, which caused ContentView to re-route
+        // OUT of OnboardingView before `OnboardingViewModel.complete()` had
+        // finished creating the property — leaving us briefly in the
+        // `needsOnboarding=false && primaryProperty=nil` window that routes
+        // to AddressConfirmationIntercept (the "Where's your home?" flash).
+        // The flag is now flipped at the very end of `runComplete()`, after
+        // the property is stamped on AppState and everything else is done.
     }
 
     // MARK: - Biometric Auth

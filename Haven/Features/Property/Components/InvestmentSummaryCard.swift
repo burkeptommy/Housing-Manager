@@ -8,6 +8,12 @@ struct InvestmentSummaryCard: View {
     let property: PropertyRow
     let totalProjectSpend: Double
     var onValuesUpdated: ((PropertyUpdate) async -> Void)? = nil
+    /// Build 84 — async callback wired to
+    /// `PropertyDetailViewModel.refreshFromPublicRecords` so the empty-state
+    /// "Refresh from public records" button can re-fire the ATTOM lookup
+    /// and walk the same fallback ladder Onboarding uses. Optional so the
+    /// button hides cleanly when no callback is provided (preview, etc.).
+    var onRefreshFromPublicRecords: (() async -> Void)? = nil
 
     @State private var showBreakdown = false
     @State private var showSaleSimulator = false
@@ -15,10 +21,42 @@ struct InvestmentSummaryCard: View {
     /// Phase 18g — when the source is `ai_comps`, tapping the info icon
     /// beneath the value reveals Claude's reasoning paragraph in a sheet.
     @State private var showAIReasoning = false
+    /// Build 84 — drives the inline loading state on the "Refresh from
+    /// public records" empty-state button while the ATTOM lookup is in flight.
+    @State private var isRefreshingPublicRecords: Bool = false
 
     // Computed values
     private var purchasePrice: Double { property.purchasePrice ?? 0 }
-    private var estimatedValue: Double { property.currentEstimatedValue ?? 0 }
+
+    /// Phase 20d — optimistic valuation range. Use the high end as the
+    /// visual hero anchor (instead of the conservative `currentEstimatedValue`)
+    /// while keeping the math (gain/loss, sale simulator, waterfall) on the
+    /// midpoint so the rest of the dashboard stays internally consistent.
+    /// Manual overrides bypass the range entirely.
+    private var valuationRange: ValuationRange? {
+        ValuationRange.compute(for: property)
+    }
+
+    /// The number Haven shows as the headline. Manual overrides return
+    /// the user's value verbatim; everything else uses the optimistic
+    /// high end of the synthesized range.
+    private var heroValue: Double {
+        if let range = valuationRange {
+            return range.isManual ? range.low : range.high
+        }
+        return property.currentEstimatedValue ?? 0
+    }
+
+    /// The number Haven uses for math (gain/loss, sale simulator). Stays
+    /// on the midpoint of the range so the math doesn't sway with the
+    /// optimistic anchor. Manual values feed in directly.
+    private var estimatedValue: Double {
+        if let range = valuationRange {
+            return range.isManual ? range.low : range.midpoint
+        }
+        return property.currentEstimatedValue ?? 0
+    }
+
     private var totalInvested: Double { purchasePrice + totalProjectSpend }
     private var sellingCosts: Double { estimatedValue * 0.08 }
     private var netAfterSale: Double { estimatedValue - sellingCosts }
@@ -74,6 +112,16 @@ struct InvestmentSummaryCard: View {
 
                         if showBreakdown {
                             waterfallBreakdown
+                        }
+
+                        // Build 84 — protected-equity upsell. Anchors the
+                        // 7.4% maintenance premium to the user's actual
+                        // estimated value so every visit reinforces the
+                        // "maintained homes hold value" pitch. Only renders
+                        // when we have a value to multiply by.
+                        if hasEstimatedValue {
+                            equityUpsellCard
+                                .padding(.top, HavenTheme.spacing16)
                         }
 
                         saleSimulatorButton
@@ -173,9 +221,24 @@ struct InvestmentSummaryCard: View {
             }
 
             if hasEstimatedValue {
-                Text(estimatedValue.formattedCompactCurrency())
+                // Phase 20d — show the optimistic high end as the hero
+                // anchor with a compact range caption beneath. Manual
+                // overrides display the single value with no range.
+                Text(heroValue.formattedCompactCurrency())
                     .font(.custom("Georgia", size: 26).weight(.bold))
                     .foregroundStyle(HavenColors.textPrimary)
+
+                if let range = valuationRange, !range.isManual {
+                    Text("Range: \(range.formattedCompactRange)")
+                        .font(HavenTypography.uiLabelMedium)
+                        .foregroundStyle(HavenColors.textSecondary)
+
+                    Text("We estimate optimistically. Most property apps undervalue.")
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
 
                 if let caption = estimatedValueSourceCaption {
                     HStack(spacing: 4) {
@@ -215,23 +278,59 @@ struct InvestmentSummaryCard: View {
                     }
                 }
             } else {
-                Button {
-                    Haptics.light()
-                    sheetMode = .estimatedValue
-                } label: {
-                    HStack(spacing: 6) {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 14))
-                        Text("Add estimated value")
-                            .font(HavenTypography.uiButton)
+                VStack(spacing: HavenTheme.spacing8) {
+                    Button {
+                        Haptics.light()
+                        sheetMode = .estimatedValue
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "plus.circle.fill")
+                                .font(.system(size: 14))
+                            Text("Add estimated value")
+                                .font(HavenTypography.uiButton)
+                        }
+                        .foregroundStyle(HavenColors.navy800)
+                        .padding(.horizontal, HavenTheme.spacing16)
+                        .padding(.vertical, HavenTheme.spacing8)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .clipShape(Capsule())
                     }
-                    .foregroundStyle(HavenColors.navy800)
-                    .padding(.horizontal, HavenTheme.spacing16)
-                    .padding(.vertical, HavenTheme.spacing8)
-                    .background(HavenColors.navy.opacity(0.08))
-                    .clipShape(Capsule())
+                    .buttonStyle(.plain)
+
+                    // Build 84 — re-fires the ATTOM lookup and walks the
+                    // fallback ladder so users whose property row was created
+                    // before the Build 84 ladder landed (or where ATTOM only
+                    // returned a range without a canonical value) can recover
+                    // without re-onboarding. Hidden when no callback is wired.
+                    if onRefreshFromPublicRecords != nil {
+                        Button {
+                            Haptics.light()
+                            Task {
+                                isRefreshingPublicRecords = true
+                                await onRefreshFromPublicRecords?()
+                                isRefreshingPublicRecords = false
+                            }
+                        } label: {
+                            HStack(spacing: 6) {
+                                if isRefreshingPublicRecords {
+                                    ProgressView()
+                                        .scaleEffect(0.7)
+                                        .tint(HavenColors.navy700)
+                                } else {
+                                    Image(systemName: "arrow.clockwise")
+                                        .font(.system(size: 11, weight: .semibold))
+                                }
+                                Text(isRefreshingPublicRecords ? "Refreshing..." : "Refresh from public records")
+                                    .font(HavenTypography.uiCaption)
+                            }
+                            .foregroundStyle(HavenColors.navy700)
+                            .padding(.horizontal, HavenTheme.spacing12)
+                            .padding(.vertical, HavenTheme.spacing4)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(isRefreshingPublicRecords)
+                    }
                 }
-                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity)
@@ -518,6 +617,56 @@ struct InvestmentSummaryCard: View {
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - Equity Upsell (Build 84)
+
+    /// Inline navy-gradient sub-card that anchors the 7.4% NAR Remodeling
+    /// Impact Report stat to the user's actual estimated value. Sourced
+    /// from `HookContent.Page1.equityHeadline` / `equityCitation` so the
+    /// copy stays in sync with the PropertyHook hero card the user saw at
+    /// onboarding. Only renders when `hasEstimatedValue == true` (otherwise
+    /// the multiplication has nothing to anchor to).
+    private var equityUpsellCard: some View {
+        let equityProtected = estimatedValue * 0.074
+        let formattedEquity = formatCurrencyCompact(equityProtected)
+
+        return VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            HStack(spacing: 6) {
+                Image(systemName: "shield.checkered")
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(HavenColors.creamLight)
+                Text("PROTECTED EQUITY")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.4)
+                    .foregroundStyle(HavenColors.creamLight)
+            }
+
+            Text(HookContent.Page1.equityHeadline)
+                .font(.custom("Georgia", size: 18).weight(.semibold))
+                .foregroundStyle(HavenColors.creamLight)
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text("At your estimated value, that's about \(formattedEquity) in equity Haven helps you protect.")
+                .font(HavenTypography.body)
+                .foregroundStyle(HavenColors.creamLight.opacity(0.92))
+                .fixedSize(horizontal: false, vertical: true)
+
+            Text(HookContent.Page1.equityCitation)
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.creamLight.opacity(0.6))
+        }
+        .padding(HavenTheme.spacing16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(
+            LinearGradient(
+                colors: [HavenColors.navy800, HavenColors.navy700],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+        .havenShadow(HavenTheme.shadowElevated)
     }
 
     // MARK: - Formatting

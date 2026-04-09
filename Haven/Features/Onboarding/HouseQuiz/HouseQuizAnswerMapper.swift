@@ -239,6 +239,14 @@ final class HouseQuizAnswerMapper {
                         subtype: "lawn",
                         matchByCategory: true
                     )
+                    // Build 87: mirror q13_pest ordering. Create the utility
+                    // account + contractor BEFORE the reconciler runs so
+                    // `.vendor`-tagged landscaping templates auto-link at
+                    // task-creation time instead of landing as "Find a
+                    // contractor for: ..." placeholders.
+                    if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
+                        try await createUtilityAccount(name: provider, type: "landscaping")
+                    }
                     let lawnResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
                         householdId: householdId,
@@ -247,8 +255,118 @@ final class HouseQuizAnswerMapper {
                         confirmedSubtype: "lawn"
                     )
                     reconciliationResult = reconciliationResult.merging(lawnResult)
+                    // Build 87: when the user explicitly hired a pro lawn
+                    // service, the DIY walkthroughs (grade check, weed
+                    // spot-treat, etc.) should flow through the vendor too —
+                    // a landscaping contractor covers these during routine
+                    // visits. Mirrors the q13_pest flip pattern.
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "landscaping")
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Landscaping",
+                            providerName: provider
+                        )
+                    }
+                }
+                // Build 84: hardscape-heavy outdoor spaces (stone patio, gravel
+                // drive, paver walkways) instead of a traditional lawn. We
+                // create a dedicated "Outdoor Hardscape" system + 4 real
+                // maintenance tasks so HNW homeowners with stone-and-paver
+                // yards see Haven schedule the right upkeep instead of
+                // dropping outdoor maintenance entirely. Q11b is auto-skipped
+                // for hardscape via dynamicSkip — this is the only place
+                // hardscape side-effects are created.
+                if answer.answerId == "hardscape" {
+                    if let hardscapeSystemId = try await ensureHomeSystem(
+                        name: "Outdoor Hardscape",
+                        category: "Landscaping",
+                        subtype: "hardscape"
+                    ) {
+                        try await createHardscapeMaintenanceTasks(systemId: hardscapeSystemId)
+                    }
+                }
+
+            case "q11b_lawn_type":
+                // Phase 19j: lawn material — natural / turf / mixed / not_sure.
+                // Drives the maintenance schedule:
+                //   - natural → aerate, overseed, fertilize, weed control, leaf cleanup
+                //   - turf    → brush, infill top-up, deep clean, drainage check
+                //   - mixed   → both
+                // Persists `lawn_type` attribute and creates a Synthetic Turf
+                // system row when turf or mixed so MaintenanceTemplates targeting
+                // subtype "synthetic_turf" picks up the right tasks.
+                try await persistAttribute("lawn_type", value: answer.answerId)
+                guard let lawnType = answer.answerId, lawnType != "not_sure" else { break }
+
+                // Phase 19j defensive: read has_pets from property attributes
+                // in case the user already answered Q28b (e.g. resumed quiz
+                // with reordered answers). Pass through to the reconciler so
+                // the pet sanitize task fires correctly on first creation.
+                let propertyForFlags = try? await db.fetchProperty(id: propertyId)
+                let hasPetsFlag = propertyForFlags?.attributes?["has_pets"]?.stringValue == "true"
+                let lawnFlags: [String: Bool] = hasPetsFlag ? ["has_pets": true] : [:]
+
+                if lawnType == "turf" || lawnType == "mixed" {
+                    let turfSystemId = try await ensureHomeSystem(
+                        name: "Synthetic Turf",
+                        category: "Landscaping",
+                        subtype: "synthetic_turf"
+                    )
+                    let turfResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: turfSystemId,
+                        systemCategory: "Landscaping",
+                        confirmedSubtype: "synthetic_turf",
+                        flags: lawnFlags
+                    )
+                    reconciliationResult = reconciliationResult.merging(turfResult)
+                }
+
+                // Tag the existing Landscaping system (if any) with the lawn
+                // type as a subtype hint so future template lookups can branch.
+                if lawnType == "natural" || lawnType == "mixed" {
+                    let naturalLawnId = try await ensureHomeSystem(
+                        name: "Landscaping",
+                        category: "Landscaping",
+                        subtype: "natural_lawn",
+                        matchByCategory: true
+                    )
+                    let naturalResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: naturalLawnId,
+                        systemCategory: "Landscaping",
+                        confirmedSubtype: "natural_lawn"
+                    )
+                    reconciliationResult = reconciliationResult.merging(naturalResult)
+                }
+
+                // Build 87: q11b's reconciles above create additional
+                // Landscaping tasks (dethatch, overseed, fall leaf
+                // cleanup, brush turf, etc.) AFTER q11_lawn's vendor
+                // flip already ran. If the user picked q11 = "pro" and
+                // a landscaping contractor was mirrored, re-fire the
+                // flip so the new tasks also land as vendor-managed
+                // instead of cluttering the personal to-do list.
+                //
+                // We gate on the `lawn_status` attribute + the presence
+                // of a landscaping utility_account (which only q11's
+                // createUtilityAccount creates) to avoid confusing a
+                // q15b tree_service contractor — which also lives under
+                // the "Landscaping" category — with a lawn-service
+                // contractor. q15b doesn't create utility_accounts, so
+                // the account presence is the unique q11 signal.
+                let lawnStatus = (try? await db.fetchProperty(id: propertyId))?
+                    .attributes?["lawn_status"]?.stringValue
+                if lawnStatus == "pro" {
+                    let accounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                    if let lawnAccount = accounts.first(where: {
+                        $0.providerType.lowercased() == "landscaping"
+                    }) {
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Landscaping",
+                            providerName: lawnAccount.providerName
+                        )
                     }
                 }
 
@@ -261,49 +379,329 @@ final class HouseQuizAnswerMapper {
                         try await ensureChildSystem(parentId: parentId, name: "Pool Filter", category: "Pool/Spa")
                         try await ensureChildSystem(parentId: parentId, name: "Pool Heater", category: "Pool/Spa")
                     }
-                    let poolSubtype: String?
-                    switch id {
-                    case "saltwater": poolSubtype = "saltwater"
-                    case "chlorine": poolSubtype = "chlorine"
-                    default: poolSubtype = nil
+                    // Build 87: the previous `poolSubtype` switch here
+                    // was dead code — it looked for "saltwater" and
+                    // "chlorine" answer IDs but Q12's actual answer
+                    // IDs are in_ground / above_ground / hot_tub / both
+                    // / none. Q12b_pool_chemistry now captures the
+                    // chemistry in a dedicated follow-up question and
+                    // updates the home_system's subtype there. At this
+                    // point in the flow we don't know the chemistry
+                    // yet, so we create the system WITHOUT a subtype.
+                    // The reconcile below still fires so the generic
+                    // Pool/Spa templates (test chemistry, opening,
+                    // closing, equipment inspection, filter, etc.)
+                    // land immediately; the subtype-gated ones (shock
+                    // pool, clean salt cell) wait for Q12b.
+                    //
+                    // Build 87 followup: mirror the q11/q13/q14/q15
+                    // ordering. Create the utility account + contractor
+                    // BEFORE the reconciler runs so `.vendor`-tagged
+                    // Pool/Spa templates auto-link at task-creation
+                    // time instead of landing as "Find a contractor
+                    // for: ..." placeholders.
+                    if let provider = answer.customText, !provider.isEmpty {
+                        try await createUtilityAccount(name: provider, type: "pool_service")
                     }
                     let poolResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
                         householdId: householdId,
                         systemId: parentId,
                         systemCategory: "Pool/Spa",
-                        confirmedSubtype: poolSubtype
+                        confirmedSubtype: nil
                     )
                     reconciliationResult = reconciliationResult.merging(poolResult)
+                    // Build 87 followup: HNW pool owners almost
+                    // universally contract a weekly pool service that
+                    // handles filter cleaning, salt cell maintenance,
+                    // and shock dosing. Flip any remaining personal/
+                    // either Pool/Spa tasks to vendor-managed so they
+                    // don't clutter the personal to-do list. Matches
+                    // q13_pest's flip pattern exactly.
                     if let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "pool_service")
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Pool/Spa",
+                            providerName: provider
+                        )
+                    }
+                }
+
+            case "q12b_pool_chemistry":
+                // Build 87: pool chemistry follow-up. Mirrors q11b_lawn_type
+                // exactly — Q12 creates the Pool/Spa system without a
+                // subtype, then Q12b updates the subtype here and re-runs
+                // the reconciler so subtype-gated templates land. The
+                // dynamicSkip closure on Q12b only shows this question for
+                // in_ground / above_ground / both, so hot_tub and none
+                // users never reach this case.
+                try await persistAttribute("pool_chemistry", value: answer.answerId)
+
+                // Map the answer id to the subtype tokens
+                // `MaintenanceTemplates.activeSubtypes` uses to unlock
+                // chemistry-specific templates. "not_sure" is a no-op —
+                // the user can confirm later from EditSystemSheet.
+                let poolSubtype: String? = {
+                    switch answer.answerId {
+                    case "saltwater": return "pool_salt"
+                    case "chlorine":  return "pool_chlorine"
+                    default:          return nil
+                    }
+                }()
+                guard let poolSubtype else { break }
+
+                // Find the existing Pool/Spa parent system (Q12 created
+                // it). `matchByCategory: true` ensures ensureHomeSystem
+                // matches the top-level row rather than creating a new
+                // one, and the `subtype` argument gets written to it in
+                // place when present.
+                let poolParentId = try await ensureHomeSystem(
+                    name: "Pool/Spa",
+                    category: "Pool/Spa",
+                    subtype: poolSubtype,
+                    matchByCategory: true
+                )
+
+                // Re-run the reconciler with the new subtype so the
+                // subtype-gated templates land (Shock pool for chlorine,
+                // Clean salt cell for saltwater). Existing Pool/Spa
+                // tasks from Q12's first reconcile are preserved — the
+                // reconciler dedups by templateKey.
+                let poolChemistryResult = await MaintenanceTaskReconciler.reconcile(
+                    propertyId: propertyId,
+                    householdId: householdId,
+                    systemId: poolParentId,
+                    systemCategory: "Pool/Spa",
+                    confirmedSubtype: poolSubtype
+                )
+                reconciliationResult = reconciliationResult.merging(poolChemistryResult)
+
+                // Build 87: re-fire the vendor flip since Q12b's reconcile
+                // creates NEW Pool/Spa tasks AFTER Q12's flip already ran.
+                // Mirrors the q11/q11b second-flip pattern exactly. We
+                // can't read Q12's answer from this scope (`apply` doesn't
+                // get `state`), so we gate on the `pool_type` attribute
+                // Q12 persists + find the pool provider via the
+                // utility_accounts table (Q12's createUtilityAccount is
+                // the unique signal — q15b_household_contractors doesn't
+                // create utility accounts).
+                let poolType = (try? await db.fetchProperty(id: propertyId))?
+                    .attributes?["pool_type"]?.stringValue
+                let hasPoolProvider = poolType == "in_ground"
+                    || poolType == "above_ground"
+                    || poolType == "both"
+                if hasPoolProvider {
+                    let poolAccounts = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
+                    if let poolAccount = poolAccounts.first(where: {
+                        $0.providerType.lowercased() == "pool_service"
+                    }) {
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Pool/Spa",
+                            providerName: poolAccount.providerName
+                        )
                     }
                 }
 
             case "q13_pest":
                 try await persistAttribute("pest_control", value: answer.answerId)
                 if answer.answerId == "quarterly_pro" || answer.answerId == "termite_bond" {
-                    try await ensureHomeSystem(name: "Pest Control", category: "Pest Control")
+                    let pestSystemId = try await ensureHomeSystem(
+                        name: "Pest Control",
+                        category: "Pest Control"
+                    )
+                    // Create the utility account first so the contractor
+                    // mirror lands in the DB BEFORE the reconciler runs.
+                    // The reconciler reads the contractors table at task-
+                    // creation time and auto-links vendor-tagged pest
+                    // templates to the matching contractor in one shot.
                     if let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "pest_control")
+                    }
+                    // Run the reconciler so Pest Control templates become
+                    // real tasks. With the contractor mirrored above, the
+                    // two `.vendor`-tagged templates get reframed + linked
+                    // automatically. The two `.personal` templates still
+                    // land as DIY, and we flip them to vendor-managed next.
+                    let pestResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: pestSystemId,
+                        systemCategory: "Pest Control",
+                        confirmedSubtype: nil
+                    )
+                    reconciliationResult = reconciliationResult.merging(pestResult)
+                    // Build 86: when the user explicitly hired a pro for
+                    // pest control, the Inspect Foundation + Seal Gaps DIY
+                    // walkthroughs should flow through the vendor too — a
+                    // quarterly exterminator covers these during their
+                    // visit. Flip any still-personal pest control tasks to
+                    // vendor-managed now so the user isn't stuck with DIY
+                    // tasks for a service they're already paying for. The
+                    // task-detail "I'll do this myself" toggle (Phase 19l)
+                    // lets them flip individual tasks back if they want.
+                    if let provider = answer.customText, !provider.isEmpty {
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Pest Control",
+                            providerName: provider
+                        )
                     }
                 }
 
             case "q14_irrigation":
                 try await persistAttribute("irrigation", value: answer.answerId)
                 if answer.answerId == "full" || answer.answerId == "drip" {
-                    try await ensureHomeSystem(name: "Irrigation System", category: "Irrigation")
+                    let irrigationSystemId = try await ensureHomeSystem(
+                        name: "Irrigation System",
+                        category: "Irrigation"
+                    )
+                    // Build 87: mirror q13_pest ordering. Create the
+                    // utility account + contractor BEFORE the reconciler
+                    // runs so the two `.vendor`-tagged irrigation
+                    // templates (winterize, spring startup) auto-link
+                    // at task-creation time. Both "full" and "drip"
+                    // answers go through this flip — the service type
+                    // doesn't change whether a pro is handling it.
                     if let provider = answer.customText, !provider.isEmpty {
                         try await createUtilityAccount(name: provider, type: "irrigation")
+                    }
+                    let irrigationResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: irrigationSystemId,
+                        systemCategory: "Irrigation",
+                        confirmedSubtype: nil
+                    )
+                    reconciliationResult = reconciliationResult.merging(irrigationResult)
+                    // Build 87: flip any still-personal irrigation tasks
+                    // (walk the zones, check heads) to vendor-managed so
+                    // the pro covers them during their routine visits.
+                    if let provider = answer.customText, !provider.isEmpty {
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Irrigation",
+                            providerName: provider
+                        )
                     }
                 }
 
             case "q15_security":
                 try await persistAttribute("security_system", value: answer.answerId)
                 if let id = answer.answerId, id != "none" {
-                    try await ensureHomeSystem(name: "Security System", category: "Security System")
-                    if let provider = answer.customText, !provider.isEmpty {
+                    let securitySystemId = try await ensureHomeSystem(
+                        name: "Security System",
+                        category: "Security System"
+                    )
+                    // Build 87: mirror q13_pest ordering. Create the
+                    // utility account + contractor BEFORE the reconciler
+                    // runs so any `.vendor`-tagged security templates
+                    // auto-link at task-creation time. The vendor flip
+                    // only fires when the user said "monitored" — self-
+                    // monitored / cameras-only households don't have an
+                    // alarm company to delegate tasks to, so their DIY
+                    // tasks stay DIY.
+                    let hasMonitoredProvider = id == "monitored"
+                        && (answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                    if hasMonitoredProvider, let provider = answer.customText {
                         try await createUtilityAccount(name: provider, type: "security")
+                    }
+                    let securityResult = await MaintenanceTaskReconciler.reconcile(
+                        propertyId: propertyId,
+                        householdId: householdId,
+                        systemId: securitySystemId,
+                        systemCategory: "Security System",
+                        confirmedSubtype: nil
+                    )
+                    reconciliationResult = reconciliationResult.merging(securityResult)
+                    // Build 87: flip any still-personal security tasks
+                    // (replace sensor batteries, confirm camera clarity,
+                    // update alarm codes) to vendor-managed when the
+                    // household is paying for professional monitoring.
+                    if hasMonitoredProvider, let provider = answer.customText {
+                        await flipCategoryTasksToVendor(
+                            systemCategory: "Security System",
+                            providerName: provider
+                        )
+                    }
+                }
+
+            case "q15b_household_contractors":
+                // Phase 19m: persist each selected chip as an attribute and
+                // create contractor rows for any with provider data. Chips
+                // selected without a provider become needs_vendor flags so
+                // future tasks render as "Find a contractor for: X".
+                //
+                // Build 83 (Apr 7, 2026): the view now encodes Q15b chip
+                // selections in three shapes (the encoder lives in
+                // `HouseQuizView.encodedContractorChipsEntries`):
+                //   - manual / legacy:  "chip|name"  (2 parts)
+                //   - vendor:           "chip|name|rating|reviews|phone|website|haven_flag"
+                //                        (7 parts; rating/reviews/phone/website
+                //                         may be empty strings)
+                // Both shapes are accepted here; the parser is forgiving so
+                // older persisted answers continue to round-trip.
+                if let selected = answer.selectedIds {
+                    try await persistAttribute(
+                        "household_contractor_chips",
+                        value: selected.joined(separator: ",")
+                    )
+
+                    if let entries = answer.customEntries {
+                        let existing = (try? await db.fetchContractors()) ?? []
+                        for entry in entries {
+                            guard let parsed = Self.parseContractorChipEntry(entry) else { continue }
+                            let chipId = parsed.chipId
+                            let providerName = parsed.name
+                            guard let category = Self.householdContractorCategoryFor(chipId: chipId) else { continue }
+
+                            // Skip if a contractor with this name already
+                            // exists in the household — quiz mirroring should
+                            // never create duplicates.
+                            if existing.contains(where: { $0.companyName.lowercased() == providerName.lowercased() }) {
+                                continue
+                            }
+
+                            var insert = ContractorInsert(
+                                householdId: householdId,
+                                companyName: providerName,
+                                phone: parsed.phone ?? "Not provided"
+                            )
+                            insert.category = category
+                            insert.specialties = [category]
+                            // Polish pass: Places-sourced (7-part entries)
+                            // get source: "find_vendor"; manual / legacy
+                            // catalog (2-part entries) keep source: "quiz".
+                            // Provenance is more analytically useful than
+                            // timing — we can recover the during-quiz signal
+                            // from contractors.created_at vs the property's
+                            // house_quiz_state.started_at.
+                            insert.source = parsed.source
+                            insert.website = parsed.website
+                            // Build 83: stash rating/reviews/Haven Certified
+                            // tag in `notes` so the contractor list can show
+                            // attribution without a schema migration. The
+                            // contractors table has no rating/review/certified
+                            // columns yet — when we add them, this can move.
+                            insert.notes = parsed.attributionNotes()
+                            _ = try? await db.createContractor(insert)
+                        }
+                    }
+
+                    // For chips selected WITHOUT a provider, mark needs_vendor
+                    // for the matching system category by writing an
+                    // attribute. The reconciler reads this when creating
+                    // tasks for those categories so the user gets a clear
+                    // "Find a contractor for: X" CTA in the vendor bucket.
+                    let attachedChipIds = Set(
+                        (answer.customEntries ?? [])
+                            .compactMap { Self.parseContractorChipEntry($0)?.chipId }
+                    )
+                    for chipId in selected where !attachedChipIds.contains(chipId) {
+                        guard let category = Self.householdContractorCategoryFor(chipId: chipId) else { continue }
+                        let existingForCategory = (try? await db.fetchContractors()) ?? []
+                        let hasAny = existingForCategory.contains {
+                            $0.category?.caseInsensitiveCompare(category) == .orderedSame
+                        }
+                        if !hasAny {
+                            try await persistAttribute("needs_vendor_\(chipId)", value: "true")
+                        }
                     }
                 }
 
@@ -340,49 +738,57 @@ final class HouseQuizAnswerMapper {
                 try await createUtilityAccount(from: answer, fallbackType: fallbackType)
 
             case "q20_other_fuels":
-                // Phase 18c: Q20 captures secondary fuel sources beyond the
-                // primary heating fuel from Q3. Each propane option creates
-                // a matching home_system row. The propane provider account
-                // is either reused from Q19 (when Q3 was already propane) or
-                // created fresh from the inline propane picker the user
-                // filled out. Wood creates a Fireplace system but no utility
-                // account (no recurring delivery contract).
+                // Phase 19i: Q20 now covers fireplace + stove + wood + pellets
+                // ONLY. Generator handling moved to Q22's dedicated inline form
+                // so we can capture its fuel + provider explicitly.
+                //
+                // Each propane option creates a matching home_system row. The
+                // propane provider account is either reused from Q19 (when Q3
+                // was already propane) or created fresh from the inline
+                // propane picker the user filled out. Wood/pellets create a
+                // Fireplace system; only pellets get a vendor account (logs
+                // are typically not on a recurring delivery contract).
                 if let selected = answer.selectedIds {
                     try await persistAttribute("other_fuel_sources", value: selected.joined(separator: ","))
 
-                    // Detect each propane variant and ensure the right system.
-                    if selected.contains("propane_generator") {
-                        try await ensureHomeSystem(name: "Backup Generator", category: "Generator")
-                    }
                     if selected.contains("propane_fireplace") {
                         try await ensureHomeSystem(name: "Propane Fireplace", category: "Fireplace")
                     }
                     if selected.contains("propane_stove") {
                         try await ensureHomeSystem(name: "Propane Cooktop", category: "Appliance")
                     }
+                    if selected.contains("wood_logs") {
+                        try await ensureHomeSystem(name: "Wood Burning Fireplace", category: "Fireplace")
+                    }
+                    if selected.contains("wood_pellets") {
+                        try await ensureHomeSystem(name: "Pellet Stove", category: "Fireplace")
+                    }
+                    // Phase 18c backward-compat: still honor old "wood" answer.
                     if selected.contains("wood") {
                         try await ensureHomeSystem(name: "Wood Burning Fireplace", category: "Fireplace")
                     }
+                    // Phase 18c backward-compat: still honor old propane_generator
+                    // answer for users with persisted Q20 answers from before
+                    // Phase 19i. The new Q22 form will overwrite/augment this.
+                    if selected.contains("propane_generator") {
+                        try await ensureHomeSystem(name: "Backup Generator", category: "Generator")
+                    }
 
-                    // Create a propane utility_account when any propane option
+                    // Create a propane utility_account when any propane fixture
                     // is selected. Two paths:
                     //   1. Q3 was propane → Q19 already created the propane
-                    //      account, so we don't need to do anything (the
-                    //      generator/fireplace/stove are served by it).
+                    //      account, so we don't need to do anything.
                     //   2. Q3 was NOT propane → use the inline picker
                     //      selection (secondaryFuelProviderId) or, as a
-                    //      fallback for users who manually skipped the picker,
-                    //      do nothing and let them add it later from the
+                    //      fallback, let the user add it later from the
                     //      Property → Utilities page.
-                    let hasPropaneSystem = selected.contains("propane_generator")
-                        || selected.contains("propane_fireplace")
+                    let hasPropaneSystem = selected.contains("propane_fireplace")
                         || selected.contains("propane_stove")
+                        || selected.contains("propane_generator")
                     if hasPropaneSystem {
                         let q3Fuel = (try? await db.fetchProperty(id: propertyId))?
                             .attributes?["heating_fuel"]?.stringValue
                         if q3Fuel != "propane", let propaneId = answer.secondaryFuelProviderId {
-                            // Build a synthetic answer that the helper can read
-                            // so we get the same logo+brand snapshot path as q19.
                             let propaneAnswer = HouseQuizAnswer(
                                 answerId: "selected",
                                 customText: answer.customText,
@@ -401,9 +807,55 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q22_generator":
+                // Phase 19i: Q22 captures generator type + fuel + optional
+                // provider in one screen. Three persistence steps:
+                //   1. Persist generator_type and generator_fuel attributes.
+                //   2. Ensure the Backup Generator home_system exists with
+                //      the fuel as its subtype so MaintenanceTemplates picks
+                //      the right load-test / refill / oil-change cadence.
+                //   3. When the user explicitly picked a provider AND that
+                //      fuel differs from Q3's primary heating fuel, create a
+                //      new utility_account row tagged with the right type.
+                //      When fuels match, the Q19 account already covers it.
                 try await persistAttribute("generator", value: answer.answerId)
-                if answer.answerId == "whole_home" || answer.answerId == "portable" {
-                    try await ensureHomeSystem(name: "Backup Generator", category: "Generator")
+
+                guard let type = answer.answerId, type != "none" else {
+                    // User said no generator. Nothing to create.
+                    break
+                }
+
+                if let fuel = answer.generatorFuelType {
+                    try await persistAttribute("generator_fuel", value: fuel)
+                }
+
+                let generatorSystemId = try await ensureHomeSystem(
+                    name: "Backup Generator",
+                    category: "Generator",
+                    subtype: answer.generatorFuelType,
+                    matchByCategory: true
+                )
+                _ = generatorSystemId
+
+                // Build 86: provider account creation. The Build 85 path
+                // gated this on `q3Fuel != fuel` to avoid duplicating Q19's
+                // utility_account when the generator ran on the same fuel.
+                // The new "same supplier?" confirmation card means
+                // `generatorProviderId` is now set in BOTH the Yes-same case
+                // (pointing at Q19's provider) AND the Different case
+                // (pointing at a fresh pick). Rely on `createUtilityAccount`'s
+                // name-based dedup at the household level so calling it for
+                // the Yes-same case is a no-op against the existing Q19 row,
+                // and the Different case creates a new row tagged with the
+                // generator fuel.
+                if let fuel = answer.generatorFuelType,
+                   let providerId = answer.generatorProviderId {
+                    let synthetic = HouseQuizAnswer(
+                        answerId: "selected",
+                        customText: answer.customText,
+                        selectedProviderId: providerId,
+                        answeredAt: answer.answeredAt
+                    )
+                    try await createUtilityAccount(from: synthetic, fallbackType: fuel)
                 }
 
             case "q23_vehicle_count":
@@ -418,11 +870,39 @@ final class HouseQuizAnswerMapper {
                 try await persistAttribute("primary_vehicle_added", value: "true")
 
             case "q25_garage_ev":
-                try await persistAttribute("garage_type", value: answer.answerId)
-                if let id = answer.answerId, id != "none", id != "ev_l2" {
+                // Build 86: legacy answers from build 85 used "attached_1" /
+                // "attached_2" — both normalize to the new "attached" id so
+                // dashboards and `properties.attributes.garage_type` reads
+                // see one canonical token. The legacy "ev_l2" answer that
+                // was inlined into Q25 has moved to its own Q25b case below;
+                // any persisted q25 row with that id is treated like
+                // "attached" (best guess that the user had a charger and a
+                // garage they didn't otherwise specify).
+                let normalizedGarage: String? = {
+                    switch answer.answerId {
+                    case "attached_1", "attached_2", "ev_l2": return "attached"
+                    default: return answer.answerId
+                    }
+                }()
+                try await persistAttribute("garage_type", value: normalizedGarage)
+                if let id = normalizedGarage, id != "none" {
                     try await ensureHomeSystem(name: "Garage Door", category: "Garage Door")
                 }
+                // Build 86: keep the legacy "ev_l2" answer producing the
+                // EV charger system so users who answered the question on
+                // build 85 don't lose that signal on the next quiz pass.
                 if answer.answerId == "ev_l2" || answer.selectedIds?.contains("ev_l2") == true {
+                    try await ensureHomeSystem(name: "EV Charger (L2)", category: "Electrical")
+                }
+
+            case "q25b_ev_charger":
+                // Build 86: dedicated EV charger question. Persisted as a
+                // separate `ev_charger_l2` attribute so the home dashboard
+                // can render the right enrichment card without inferring
+                // from the garage type. Only the explicit "yes" answer
+                // creates the home_system row — "no" leaves it untouched.
+                try await persistAttribute("ev_charger_l2", value: answer.answerId)
+                if answer.answerId == "yes" {
                     try await ensureHomeSystem(name: "EV Charger (L2)", category: "Electrical")
                 }
 
@@ -485,6 +965,36 @@ final class HouseQuizAnswerMapper {
                         insert.isMinor = true
                         insert.avatarColor = "sage"
                         _ = try? await db.createFamilyMember(insert)
+                    }
+                }
+
+            case "q28b_pets":
+                // Phase 19j — pet presence drives subtype-specific tasks like
+                // the synthetic-turf "Sanitize pet areas" template. Persists
+                // the raw answer plus a canonical `has_pets` boolean attribute,
+                // then re-reconciles the Synthetic Turf system (if it exists)
+                // so the pet sanitize task gets added now that has_pets is
+                // known. Idempotent — no-op if no turf system exists.
+                try await persistAttribute("pets", value: answer.answerId)
+                let hasPets = (answer.answerId != "no_pets" && answer.answerId != nil)
+                try await persistAttribute("has_pets", value: hasPets ? "true" : "false")
+
+                if hasPets {
+                    let existingSystems = (try? await db.fetchHomeSystems(propertyId: propertyId, topLevelOnly: false)) ?? []
+                    let turfSystem = existingSystems.first { row in
+                        row.category.lowercased() == "landscaping"
+                            && (row.subtype?.lowercased() == "synthetic_turf")
+                    }
+                    if let turfSystem {
+                        let petResult = await MaintenanceTaskReconciler.reconcile(
+                            propertyId: propertyId,
+                            householdId: householdId,
+                            systemId: turfSystem.id,
+                            systemCategory: "Landscaping",
+                            confirmedSubtype: "synthetic_turf",
+                            flags: ["has_pets": true]
+                        )
+                        reconciliationResult = reconciliationResult.merging(petResult)
                     }
                 }
 
@@ -641,6 +1151,11 @@ final class HouseQuizAnswerMapper {
     /// row didn't supply one (or when the answer is name-only). For q19 the
     /// caller threads in the heating fuel attribute so the new row is filed
     /// under the right type.
+    ///
+    /// Phase 19k: For service-category provider types (landscaping, pool,
+    /// pest, irrigation, security, etc.), ALSO mirror the vendor into the
+    /// `contractors` table so the maintenance task reconciler can find them
+    /// at task-creation time and auto-assign vendor-managed tasks.
     private func createUtilityAccount(from answer: HouseQuizAnswer, fallbackType: String) async throws {
         // Resolve the catalog provider record (if any) so we can snapshot it.
         var catalogProvider: UtilityProviderRow?
@@ -657,16 +1172,21 @@ final class HouseQuizAnswerMapper {
             return
         }
 
+        let resolvedType = catalogProvider?.providerType ?? fallbackType
+
         // Avoid duplicates: skip if an account with this provider name already exists.
         let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
         if existing.contains(where: { $0.providerName.lowercased() == resolvedName.lowercased() }) {
+            // Even if the utility_account already exists, ensure the contractor
+            // mirror is up to date for service categories.
+            try? await mirrorContractorIfNeeded(name: resolvedName, providerType: resolvedType, catalogProvider: catalogProvider)
             return
         }
 
         var insert = UtilityAccountInsert(
             propertyId: propertyId,
             householdId: householdId,
-            providerType: catalogProvider?.providerType ?? fallbackType,
+            providerType: resolvedType,
             providerName: resolvedName
         )
         if let catalog = catalogProvider {
@@ -678,17 +1198,25 @@ final class HouseQuizAnswerMapper {
             insert.phone = catalog.phone
         }
         _ = try await db.createUtilityAccount(insert)
+
+        // Phase 19k: Mirror the vendor into the contractors table when this
+        // is a service category. The reconciler picks up the row by category
+        // match at task-creation time and auto-assigns vendor-managed tasks.
+        try? await mirrorContractorIfNeeded(name: resolvedName, providerType: resolvedType, catalogProvider: catalogProvider)
     }
 
     /// Phase 18e: Name-only convenience wrapper for the legacy follow-up path
     /// (q11 lawn pro, q12 pool, q13 pest, q14 irrigation, q15 security,
     /// q18 trash). These questions are .singleChoice, not .providerSearch, so
     /// the user types a free-form name with no catalog ID.
+    ///
+    /// Phase 19k: Same contractor mirror as the picker-driven helper.
     private func createUtilityAccount(name: String, type: String) async throws {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         let existing = (try? await db.fetchUtilityAccounts(propertyId: propertyId)) ?? []
         if existing.contains(where: { $0.providerName.lowercased() == trimmed.lowercased() }) {
+            try? await mirrorContractorIfNeeded(name: trimmed, providerType: type, catalogProvider: nil)
             return
         }
         let insert = UtilityAccountInsert(
@@ -698,9 +1226,393 @@ final class HouseQuizAnswerMapper {
             providerName: trimmed
         )
         _ = try await db.createUtilityAccount(insert)
+
+        try? await mirrorContractorIfNeeded(name: trimmed, providerType: type, catalogProvider: nil)
+    }
+
+    /// Build 83 (Apr 7, 2026): Q15b customEntries are pipe-delimited strings.
+    /// Two shapes are accepted to keep older persisted answers round-tripping:
+    ///   - 2 parts: "chip|name"  (manual + legacy catalog flow)
+    ///   - 7 parts: "chip|name|rating|reviews|phone|website|haven_certified"
+    ///              (Build 83's find-local-vendors flow; rating/reviews/phone/
+    ///               website may be empty strings; the 7th slot is the literal
+    ///               "haven_certified" or empty)
+    /// Returns nil when the entry is malformed (no chip id or empty name).
+    ///
+    /// Polish pass: `source` is now populated based on part count so the
+    /// mapper can write the right `contractors.source` discriminator. 7-part
+    /// entries (Places-sourced via `QuizLocalContractorPicker`) get
+    /// `find_vendor`. 2-part entries (manual add or legacy catalog) keep the
+    /// existing `quiz` value.
+    /// Build 85: promoted from `fileprivate` to internal so
+    /// `HouseQuizView.hydrateEntryState` can reuse the parser when
+    /// re-hydrating Q15b chips on back-navigation. Both shapes (manual /
+    /// 7-part Places-sourced) round-trip cleanly through the same parser.
+    struct ParsedContractorEntry {
+        let chipId: String
+        let name: String
+        let rating: Double?
+        let reviewCount: Int?
+        let phone: String?
+        let website: String?
+        let isHavenCertified: Bool
+        let source: String
+
+        /// Render a human caption for the contractor `notes` column so we can
+        /// surface "Haven Certified \u{2022} 4.7 \u{2022} 120 reviews" without
+        /// adding new columns. Returns nil when there's nothing to attribute
+        /// (e.g. a manual-add row with no rating).
+        func attributionNotes() -> String? {
+            var parts: [String] = []
+            if isHavenCertified {
+                parts.append("Haven Certified")
+            }
+            if let rating {
+                parts.append(String(format: "%.1f stars", rating))
+            }
+            if let reviewCount {
+                parts.append("\(reviewCount) reviews")
+            }
+            if parts.isEmpty {
+                return "Added from House Quiz."
+            }
+            return "Added from House Quiz \u{2022} " + parts.joined(separator: " \u{2022} ")
+        }
+    }
+
+    /// Build 85: promoted from `fileprivate` to internal so the view
+    /// can reuse it when hydrating Q15b's chip state on back-navigation.
+    static func parseContractorChipEntry(_ raw: String) -> ParsedContractorEntry? {
+        let parts = raw.components(separatedBy: "|")
+        guard parts.count >= 2 else { return nil }
+        let chipId = parts[0].trimmingCharacters(in: .whitespacesAndNewlines)
+        let name = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !chipId.isEmpty, !name.isEmpty else { return nil }
+
+        if parts.count >= 7 {
+            let rating: Double? = {
+                let trimmed = parts[2].trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : Double(trimmed)
+            }()
+            let reviews: Int? = {
+                let trimmed = parts[3].trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : Int(trimmed)
+            }()
+            let phone: String? = {
+                let trimmed = parts[4].trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }()
+            let website: String? = {
+                let trimmed = parts[5].trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed.isEmpty ? nil : trimmed
+            }()
+            let certified = parts[6].trimmingCharacters(in: .whitespacesAndNewlines) == "haven_certified"
+            // 7-part entries are produced by QuizLocalContractorPicker's
+            // Google Places adoption path. Tag them as find_vendor so the
+            // contractors.source discriminator carries the provenance.
+            return ParsedContractorEntry(
+                chipId: chipId,
+                name: name,
+                rating: rating,
+                reviewCount: reviews,
+                phone: phone,
+                website: website,
+                isHavenCertified: certified,
+                source: "find_vendor"
+            )
+        }
+
+        // 2-part legacy / manual entry — no rating/review metadata. Source
+        // stays "quiz" because these came from either the catalog picker
+        // (legacy) or the inline "Add it manually" textfield, neither of
+        // which carries Google Places provenance.
+        return ParsedContractorEntry(
+            chipId: chipId,
+            name: name,
+            rating: nil,
+            reviewCount: nil,
+            phone: nil,
+            website: nil,
+            isHavenCertified: false,
+            source: "quiz"
+        )
+    }
+
+    /// Phase 19m: Map a Q15b chip id to the matching `home_systems.category`
+    /// so the contractor mirror files the row under the right specialty.
+    /// `handyman` returns nil because the chip is multi-purpose and doesn't
+    /// map cleanly to one home system category — we still record the
+    /// `household_contractor_chips` attribute so it survives, but no
+    /// contractor row gets created until the user assigns the handyman to
+    /// a specific task themselves.
+    private static func householdContractorCategoryFor(chipId: String) -> String? {
+        switch chipId {
+        case "hvac_service":       return "HVAC"
+        case "plumber":            return "Plumbing"
+        case "electrician":        return "Electrical"
+        case "roofer":             return "Roofing"
+        case "septic_pumper":      return "Septic System"
+        case "well_water_service": return "Well System"
+        case "chimney_sweep":      return "Fire Protection"
+        case "tree_service":       return "Landscaping"
+        case "handyman":           return nil
+        default:                   return nil
+        }
+    }
+
+    /// Phase 19k: Service-category provider_types that should also create a
+    /// contractor row mirror. Utility-bill types (electric, internet, oil,
+    /// gas, water, propane, trash) are excluded — those don't represent
+    /// human contractors who do recurring maintenance work.
+    private static let serviceCategoryProviderTypes: [String: String] = [
+        "landscaping":   "Landscaping",
+        "pool_service":  "Pool/Spa",
+        "pest_control":  "Pest Control",
+        "irrigation":    "Irrigation",
+        "security":      "Security System",
+        "solar":         "Solar",
+        "hvac":          "HVAC",
+        "plumbing":      "Plumbing",
+        "roofing":       "Roofing",
+        "electrical":    "Electrical",
+    ]
+
+    /// Mirrors a quiz-captured service vendor into the `contractors` table.
+    /// Idempotent — skips if a contractor with the same name already exists
+    /// for this household. Maps the provider_type to the matching home_systems
+    /// category so the reconciler's category-based lookup finds the row.
+    private func mirrorContractorIfNeeded(
+        name: String,
+        providerType: String,
+        catalogProvider: UtilityProviderRow?
+    ) async throws {
+        let lowerType = providerType.lowercased()
+        guard let category = Self.serviceCategoryProviderTypes[lowerType] else {
+            // Not a service category — utility bill, no contractor needed.
+            return
+        }
+
+        // Skip if a contractor with this name already exists in the household.
+        let existing = (try? await db.fetchContractors()) ?? []
+        if existing.contains(where: { $0.companyName.lowercased() == name.lowercased() }) {
+            return
+        }
+
+        var insert = ContractorInsert(
+            householdId: householdId,
+            companyName: name,
+            phone: catalogProvider?.phone ?? "Not provided"
+        )
+        insert.category = category
+        insert.specialties = [category]
+        insert.utilityProviderId = catalogProvider?.id
+        insert.logoUrl = catalogProvider?.logoUrl
+        insert.brandColor = catalogProvider?.brandColor
+        insert.website = catalogProvider?.website
+        insert.source = "quiz"
+        _ = try? await db.createContractor(insert)
+    }
+
+    /// Build 86: Flip every task in `systemCategory` on this property to
+    /// vendor-managed, linking them to the named contractor and reframing
+    /// the title + description in Haven's standard "Schedule Vendor: ..."
+    /// voice. Used by q13_pest (and reusable for q11 lawn, q14 irrigation,
+    /// q15 security) when the user explicitly hires a pro for an entire
+    /// service category — at that point even the DIY templates like
+    /// "Inspect foundation for entry points" should flow through the vendor
+    /// because the pro is already walking the property.
+    ///
+    /// Mirrors the `MaintenanceViewModel.convertToVendorManaged` reframing
+    /// pattern (Phase 19l) but runs directly against the DB so the quiz
+    /// flow doesn't need the view model's cached state. Idempotent — tasks
+    /// already tagged `vendor` are left alone so re-running the quiz won't
+    /// double-reframe titles.
+    ///
+    /// Errors are logged and swallowed: the quiz must keep moving even if
+    /// one task update fails.
+    private func flipCategoryTasksToVendor(
+        systemCategory: String,
+        providerName: String
+    ) async {
+        do {
+            // Find the contractor mirrored by createUtilityAccount.
+            // Match on (name, category) or (name, specialties contains) to
+            // handle both the Phase 19k `.category` column and the legacy
+            // `.specialties` array.
+            let contractors = (try? await db.fetchContractors()) ?? []
+            let normalizedName = providerName
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .lowercased()
+            guard let contractor = contractors.first(where: { row in
+                let nameMatches = row.companyName.lowercased() == normalizedName
+                let categoryMatches = row.category?
+                    .caseInsensitiveCompare(systemCategory) == .orderedSame
+                let specialtyMatches = row.specialties?
+                    .contains(where: { $0.caseInsensitiveCompare(systemCategory) == .orderedSame }) == true
+                return nameMatches && (categoryMatches || specialtyMatches)
+            }) else {
+                // Mirror didn't land (utility-bill-only category, or the
+                // name didn't survive the trim). Nothing to flip.
+                return
+            }
+
+            // Fetch every property-scoped task and narrow to this category.
+            // Match via templateId prefix (fast path, covers post-Phase-14
+            // rows) with a fallback to the template catalog lookup for
+            // legacy rows that never got a prefixed templateId.
+            let allTasks = try await db.fetchMaintenanceTasks(propertyId: propertyId)
+            let categoryPrefix = systemCategory.lowercased() + ":"
+            let categoryTasks = allTasks.filter { task in
+                if task.vehicleId != nil { return false }
+                if let templateId = task.templateId {
+                    if templateId.lowercased().hasPrefix(categoryPrefix) {
+                        return true
+                    }
+                    if let template = MaintenanceTemplates.template(forKey: templateId),
+                       template.systemCategory.caseInsensitiveCompare(systemCategory) == .orderedSame {
+                        return true
+                    }
+                }
+                return false
+            }
+
+            // Flip every task that isn't already vendor-managed.
+            for task in categoryTasks where task.assignmentType?.lowercased() != "vendor" {
+                let originalTemplate = task.templateId
+                    .flatMap { MaintenanceTemplates.template(forKey: $0) }
+                let originalTitle = originalTemplate?.title ?? task.title
+                let originalDescription = originalTemplate?.description ?? task.description ?? ""
+
+                let newTitle = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+                let newDescription: String = {
+                    if originalDescription.isEmpty {
+                        return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+                    }
+                    return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+                }()
+
+                var update = MaintenanceTaskUpdate()
+                update.title = newTitle
+                update.description = newDescription
+                update.assignedContractorId = contractor.id
+                update.assignmentType = "vendor"
+                update.needsVendor = false
+                _ = try? await db.updateMaintenanceTask(id: task.id, update)
+            }
+        } catch {
+            print("[HouseQuizAnswerMapper] flipCategoryTasksToVendor(\(systemCategory)) failed: \(error)")
+        }
     }
 
     private func digitsOnly(_ s: String) -> String {
         s.filter { $0.isNumber }
+    }
+
+    /// Build 84: Hardscape maintenance set. Q11 = "hardscape" routes here to
+    /// create 4 real maintenance tasks tied to the new "Outdoor Hardscape"
+    /// system so HNW homeowners with paver/stone/gravel yards aren't dropped
+    /// off the maintenance schedule entirely. Created directly here (not
+    /// via MaintenanceTemplates) because these are one-off branch tasks
+    /// that don't need template reconciliation. `createMaintenanceTask`
+    /// already dedups by title within property/system, so re-running the
+    /// quiz won't create duplicates.
+    ///
+    /// Build 84 polish (Tom's Item 3 call): pressure washing is now
+    /// `either` so the post-quiz vendor delegation sheet (Phase 19l) can
+    /// offer to flip it to vendor-managed when a landscaping or
+    /// pressure-wash contractor is added later. The other three (joint
+    /// sand, weed treatment, drainage check) stay `personal` because
+    /// they're DIY-only by nature for HNW homeowners.
+    private func createHardscapeMaintenanceTasks(systemId: UUID) async throws {
+        let calendar = Calendar.current
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+
+        struct HardscapeTaskSpec {
+            let title: String
+            let description: String
+            let frequency: String
+            let monthsUntilDue: Int
+            let priority: String
+            let seasonalTiming: String?
+            let templateKey: String
+            let diyEffortLabel: String
+            let assignmentType: String
+        }
+
+        let specs: [HardscapeTaskSpec] = [
+            HardscapeTaskSpec(
+                title: "Pressure wash patio and walkways",
+                description: "Pressure wash stone, paver, and concrete hardscape surfaces to clear winter grime, mildew, and algae. Use a fan tip and avoid stripping joint sand.",
+                frequency: "Annually",
+                monthsUntilDue: 1,
+                priority: "Medium",
+                seasonalTiming: "Spring",
+                templateKey: "landscaping:hardscape_pressure_wash",
+                diyEffortLabel: "About 2 hours",
+                // Build 84 polish: flippable via the Phase 19l delegation
+                // sheet so a landscaping contractor on file can take it
+                // over without forcing the user to recreate the task.
+                assignmentType: "either"
+            ),
+            HardscapeTaskSpec(
+                title: "Top up joint sand in pavers",
+                description: "Sweep polymeric joint sand into paver gaps where it has washed out. Mist lightly to set the polymer. Prevents weed germination and keeps pavers locked.",
+                frequency: "Every 2 years",
+                monthsUntilDue: 4,
+                priority: "Low",
+                seasonalTiming: "Summer",
+                templateKey: "landscaping:hardscape_joint_sand",
+                diyEffortLabel: "About 1 hour",
+                assignmentType: "personal"
+            ),
+            HardscapeTaskSpec(
+                title: "Treat weeds between pavers",
+                description: "Spot-treat weeds growing between pavers and along hardscape edges. Pull large clumps by hand first, then apply a targeted herbicide or boiling water.",
+                frequency: "Quarterly",
+                monthsUntilDue: 1,
+                priority: "Low",
+                seasonalTiming: "Spring",
+                templateKey: "landscaping:hardscape_weed_treatment",
+                diyEffortLabel: "About 30 minutes",
+                assignmentType: "personal"
+            ),
+            HardscapeTaskSpec(
+                title: "Check hardscape drainage and grading",
+                description: "Walk hardscape edges after a rain to confirm water is moving away from the house. Look for sunken pavers, ponding, and drainage swales that have silted in.",
+                frequency: "Annually",
+                monthsUntilDue: 7,
+                priority: "Medium",
+                seasonalTiming: "Fall",
+                templateKey: "landscaping:hardscape_drainage_check",
+                diyEffortLabel: "About 30 minutes",
+                assignmentType: "personal"
+            ),
+        ]
+
+        for spec in specs {
+            let nextDue = calendar.date(byAdding: .month, value: spec.monthsUntilDue, to: now) ?? now
+            var insert = MaintenanceTaskInsert(
+                householdId: householdId,
+                title: spec.title,
+                frequency: spec.frequency,
+                nextDueDate: formatter.string(from: nextDue)
+            )
+            insert.propertyId = propertyId
+            insert.systemId = systemId
+            insert.description = spec.description
+            insert.priority = spec.priority
+            insert.isTemplateBased = true
+            insert.templateId = spec.templateKey
+            insert.seasonalTiming = spec.seasonalTiming
+            insert.isDiy = true
+            insert.professionalRequired = false
+            insert.costRange = "$0 (DIY)"
+            insert.assignmentType = spec.assignmentType
+            insert.needsVendor = false
+            insert.notes = spec.diyEffortLabel
+            _ = try? await db.createMaintenanceTask(insert)
+        }
     }
 }

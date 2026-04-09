@@ -37,7 +37,7 @@ enum HouseQuizFeedbackLibrary {
             ),
             "slate": AnswerFeedback(
                 badge: "Insight",
-                title: "Slate is a 75-200 year material — the longest-lived of all.",
+                title: "Slate is a 75 to 200 year material, the longest-lived of all.",
                 subhead: "Buyers pay premiums for original slate roofs in good condition.",
                 citationName: "National Slate Association"
             ),
@@ -116,7 +116,7 @@ enum HouseQuizFeedbackLibrary {
             "septic": AnswerFeedback(
                 badge: "Insight",
                 title: "Septic systems pumped every 3-5 years last 25-30 years.",
-                subhead: "Neglected ones fail in 10-15 — $5-15K to replace.",
+                subhead: "Neglected ones fail in 10 to 15 years. Replacement runs $5K to $15K.",
                 citationName: "EPA SepticSmart Guide"
             ),
         ],
@@ -126,7 +126,7 @@ enum HouseQuizFeedbackLibrary {
             "pro": AnswerFeedback(
                 badge: "Insight",
                 title: "Pro-maintained lawns add ~7% to first-impression resale value in {state}.",
-                subhead: "Buyers form opinions in the first 8 seconds — curb appeal compounds.",
+                subhead: "Buyers form opinions in the first 8 seconds, so curb appeal compounds.",
                 citationName: "Virginia Tech Curb Appeal Study"
             ),
             "diy": AnswerFeedback(
@@ -137,12 +137,40 @@ enum HouseQuizFeedbackLibrary {
             ),
         ],
 
+        // MARK: Q11b — Lawn type (Phase 19j)
+        "q11b_lawn_type": [
+            "natural": AnswerFeedback(
+                badge: "Insight",
+                title: "Natural lawns in {state} need 4-6 service touchpoints a year to stay healthy.",
+                subhead: "We'll schedule aeration, overseeding, fertilizing, and leaf cleanup.",
+                citationName: "Lawn Institute Maintenance Cycles Report"
+            ),
+            "turf": AnswerFeedback(
+                badge: "Insight",
+                title: "Synthetic turf saves ~22,000 gallons of water per year per 1,000 sq ft.",
+                subhead: "Brushing the fibers and topping up infill keeps it looking new for 15-20 years.",
+                citationName: "Synthetic Turf Council Lifecycle Study"
+            ),
+            "mixed": AnswerFeedback(
+                badge: "Insight",
+                title: "Mixed yards get the resale lift of natural grass plus the low-water cost of turf.",
+                subhead: "We'll schedule both sets of tasks so neither gets neglected.",
+                citationName: "NAR Home Features Survey"
+            ),
+            "not_sure": AnswerFeedback(
+                badge: "Tip",
+                title: "Not sure? Walk out and tug a blade. Natural grass roots, turf doesn't.",
+                subhead: "You can always update this later from Property → Landscaping.",
+                citationName: "Haven Field Guide"
+            ),
+        ],
+
         // MARK: Q12 — Pool
         "q12_pool": [
             "in_ground": AnswerFeedback(
                 badge: "Insight",
                 title: "Maintained pools in {state} add 5-8% to resale value.",
-                subhead: "Neglected ones can subtract 10% — buyers see them as liabilities.",
+                subhead: "Neglected ones can subtract 10%. Buyers see them as liabilities.",
                 citationName: "NAR Home Features Survey"
             ),
             "above_ground": AnswerFeedback(
@@ -195,7 +223,7 @@ enum HouseQuizFeedbackLibrary {
             ),
             "leased": AnswerFeedback(
                 badge: "Insight",
-                title: "Leased solar can complicate sales — buyers must qualify to assume the lease.",
+                title: "Leased solar can complicate sales. Buyers must qualify to assume the lease.",
                 subhead: "Keeping the contract handy speeds the resale process.",
                 citationName: "Lawrence Berkeley National Laboratory"
             ),

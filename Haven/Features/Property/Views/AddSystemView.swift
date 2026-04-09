@@ -33,7 +33,14 @@ struct AddSystemView: View {
     @State private var warrantyClaimPhone = ""
     @State private var warrantyPolicyNumber = ""
 
-    private let categories = SystemCategory.allCases.map(\.rawValue)
+    /// Alphabetized for the picker, with "Other" pinned to the bottom as the
+    /// catch-all so it never lands between real categories. The default
+    /// `category` state is still "HVAC" so the picker opens with HVAC selected.
+    private let categories: [String] = {
+        let raw = SystemCategory.allCases.map(\.rawValue)
+        let sorted = raw.filter { $0 != "Other" }.sorted()
+        return sorted + ["Other"]
+    }()
 
     var body: some View {
         NavigationStack {

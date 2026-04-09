@@ -28,6 +28,7 @@ enum PropertyDetailTab: String, CaseIterable {
 struct PropertyDetailView: View {
     let propertyID: UUID
     @StateObject private var viewModel = PropertyDetailViewModel()
+    @EnvironmentObject private var appState: AppState
     @State private var activeTab: PropertyDetailTab = .maintenance
     @State private var showAddSystem = false
     @State private var showEditProperty = false
@@ -200,7 +201,10 @@ struct PropertyDetailView: View {
                         .foregroundStyle(HavenColors.textTertiary)
                         .multilineTextAlignment(.center)
 
-                    DatePicker("Date Completed", selection: $lastServicedTaskDate, in: ...Date(), displayedComponents: .date)
+                    // Build 86: no date-range constraint. Users can backdate
+                    // a completion to any past date (the day they actually
+                    // did the work) or log a future date for scheduled work.
+                    DatePicker("Date Completed", selection: $lastServicedTaskDate, displayedComponents: .date)
                         .datePickerStyle(.graphical)
                         .tint(HavenColors.navy)
 
@@ -320,6 +324,9 @@ struct PropertyDetailView: View {
                             totalProjectSpend: viewModel.totalProjectSpend,
                             onValuesUpdated: { update in
                                 await viewModel.applyPropertyUpdate(update)
+                            },
+                            onRefreshFromPublicRecords: {
+                                await viewModel.refreshFromPublicRecords(appState: appState)
                             }
                         )
                     }

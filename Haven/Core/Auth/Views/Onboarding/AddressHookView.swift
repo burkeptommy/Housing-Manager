@@ -10,37 +10,23 @@ struct AddressHookView: View {
     @StateObject private var viewModel = AddressHookViewModel()
     @State private var showInviteCodeSheet: Bool = false
     @State private var inviteCodePrefill: String? = nil
+    /// Phase 20a — present the new 2-page hook screen after the user
+    /// confirms they want to see what we know about their home. Replaces
+    /// the legacy "Create Free Account to Save" CTA on the preview step.
+    @State private var showPropertyHook: Bool = false
+    /// Phase 20b — hard account creation gate presented after the user
+    /// taps "Get Started with [address]" on PropertyHookView Page 2.
+    @State private var showAccountCreation: Bool = false
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                // Progress (only show on address and preview steps)
-                if viewModel.currentStep != .address {
-                    ProgressView(value: viewModel.progress)
-                        .tint(HavenColors.navy)
-                        .padding(.horizontal)
-                }
-
-                TabView(selection: $viewModel.currentStep) {
-                    addressStep
-                        .tag(AddressHookStep.address)
-
-                    OnboardingSchedulePreviewStep(
-                        street: viewModel.street,
-                        city: viewModel.city,
-                        state: viewModel.state,
-                        propertyResult: $viewModel.propertyLookupResult,
-                        scheduleItems: $viewModel.schedulePreview,
-                        isLoading: viewModel.isLookingUpProperty,
-                        onPropertyEdited: { viewModel.regenerateSchedule() }
-                    )
-                    .tag(AddressHookStep.preview)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-                .animation(.easeInOut, value: viewModel.currentStep)
-                .onChange(of: viewModel.currentStep) { _, _ in
-                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                }
+                // Phase 20 polish: removed the legacy `.preview` step entirely.
+                // The old maintenance-list screen with "$967 estimated annual
+                // cost" is gone. Find My Home now runs the property lookup
+                // inline, then opens PropertyHookView directly with the
+                // value-anchored hook + estate frame.
+                addressStep
 
                 // Bottom buttons
                 bottomButtons
@@ -75,6 +61,25 @@ struct AddressHookView: View {
                 inviteCodePrefill = code
                 showInviteCodeSheet = true
             }
+        }
+        // Phase 20a — present the new 2-page hook screen as a fullScreenCover
+        // when the user taps "See what we know about your home" on the
+        // preview step.
+        .fullScreenCover(isPresented: $showPropertyHook) {
+            propertyHookCover(for: viewModel)
+        }
+        // Phase 20b — present the hard account creation gate after the
+        // user taps "Get Started with [address]" on PropertyHookView
+        // Page 2. This sequencing relies on a brief delay between the
+        // hook cover dismissing and this cover presenting; SwiftUI
+        // handles that automatically with consecutive fullScreenCovers.
+        .fullScreenCover(isPresented: $showAccountCreation) {
+            AccountCreationStep(
+                address1: viewModel.street,
+                onCancel: {
+                    showAccountCreation = false
+                }
+            )
         }
     }
 
@@ -165,39 +170,78 @@ struct AddressHookView: View {
                     .foregroundStyle(HavenColors.critical)
             }
 
-            switch viewModel.currentStep {
-            case .address:
-                HavenButton(title: "Find My Home") {
+            // Phase 20 polish: single-step flow. Find My Home runs the
+            // property lookup inline, then opens PropertyHookView directly
+            // with the value-anchored hook. The legacy `.preview` step
+            // (the maintenance-list screen with the $967 estimated cost)
+            // is gone — that framing positioned Haven as a chore tracker
+            // instead of an asset-protection tool, which was wrong for
+            // the HNW audience.
+            //
+            // Phase 20 polish (Apr 7): use HavenButton's `isLoading` prop
+            // so the button visibly transforms during the 5–10 second
+            // ATTOM lookup. The label switches to "Getting your home
+            // details..." and the spinner takes the icon slot, which is
+            // a much clearer affordance than just dimming the button.
+            HavenButton(
+                title: viewModel.isLookingUpProperty
+                    ? "Getting your home details..."
+                    : "Find My Home",
+                action: {
                     Task {
-                        viewModel.currentStep = .preview
-                        await viewModel.lookupProperty()
-                    }
-                }
-                .disabled(!viewModel.canProceed)
-
-                tertiaryLinks
-                    .padding(.top, 4)
-
-            case .preview:
-                if !viewModel.isLookingUpProperty {
-                    HavenButton(title: "Create Free Account to Save", action: {
                         viewModel.cacheToUserDefaults()
-                        onCreateAccount()
-                    }, icon: "arrow.right")
-
-                    tertiaryLinks
-                        .padding(.top, 4)
-
-                    Button("Back") {
-                        viewModel.currentStep = .address
+                        await viewModel.lookupProperty()
+                        // Open the hook view as soon as the lookup resolves,
+                        // even if it returned no result — PropertyHookView
+                        // handles the nil-lookup case by synthesizing a
+                        // value range from whatever signal it has.
+                        showPropertyHook = true
                     }
-                    .font(HavenTypography.bodySmall)
-                    .foregroundStyle(HavenColors.textTertiary)
-                }
-            }
+                },
+                isLoading: viewModel.isLookingUpProperty,
+                isDisabled: !viewModel.canProceed
+            )
+
+            tertiaryLinks
+                .padding(.top, 4)
         }
         .padding(.horizontal, HavenTheme.padding)
         .padding(.bottom, 24)
+    }
+}
+
+// MARK: - Property Hook Cover
+
+extension AddressHookView {
+    /// Phase 20a — render the 2-page hook screen as a fullScreenCover.
+    /// Page 2's CTA on the unauth path fires `onContinueToAccountGate`,
+    /// which Phase 20b routes to `AccountCreationStep` (the hard account
+    /// creation gate).
+    fileprivate func propertyHookCover(for viewModel: AddressHookViewModel) -> some View {
+        NavigationStack {
+            PropertyHookView(
+                address1: viewModel.street,
+                city: viewModel.city,
+                state: viewModel.state,
+                yearBuilt: viewModel.propertyLookupResult?.yearBuilt,
+                fuelType: viewModel.propertyLookupResult?.features?.heatingFuel,
+                lookupResult: viewModel.propertyLookupResult,
+                isAuthenticated: false,
+                onContinueToAccountGate: {
+                    // Phase 20b — dismiss this cover, then present the
+                    // hard account creation gate. SwiftUI sequences the
+                    // two covers cleanly: the first dismisses, the
+                    // second presents on the next runloop tick.
+                    showPropertyHook = false
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                        showAccountCreation = true
+                    }
+                },
+                onContinueToQuiz: {
+                    // Unauthenticated users always go through the gate.
+                }
+            )
+        }
     }
 }
 
@@ -325,8 +369,39 @@ final class AddressHookViewModel: ObservableObject {
         let defaults = UserDefaults.standard
         for key in ["addressHook_street", "addressHook_unit", "addressHook_city",
                      "addressHook_state", "addressHook_zipCode", "addressHook_propertyResult",
-                     "addressHook_hasData"] {
+                     "addressHook_hasData",
+                     "addressHook_firstName", "addressHook_lastName"] {
             defaults.removeObject(forKey: key)
         }
+    }
+
+    /// Apr 7, 2026: stash the user's first/last name in UserDefaults from
+    /// AccountCreationStep so it survives the Apple Sign In round-trip.
+    /// Apple only returns `givenName`/`familyName` on the very first
+    /// authorization for an app, ever — every subsequent sign-in returns
+    /// nothing. Capturing the name BEFORE auth means we never have to
+    /// rely on Apple to give it back.
+    static func cachePendingName(first: String, last: String) {
+        let defaults = UserDefaults.standard
+        let trimmedFirst = first.trimmingCharacters(in: .whitespaces)
+        let trimmedLast = last.trimmingCharacters(in: .whitespaces)
+        if !trimmedFirst.isEmpty {
+            defaults.set(trimmedFirst, forKey: "addressHook_firstName")
+        }
+        if !trimmedLast.isEmpty {
+            defaults.set(trimmedLast, forKey: "addressHook_lastName")
+        }
+    }
+
+    /// Load any pending first/last name stashed by AccountCreationStep.
+    /// Returns empty strings (not nil) so callers can use them directly
+    /// without unwrapping. `OnboardingViewModel.prefillFromAuth` checks
+    /// these BEFORE falling back to session metadata.
+    static func loadPendingName() -> (first: String, last: String) {
+        let defaults = UserDefaults.standard
+        return (
+            first: defaults.string(forKey: "addressHook_firstName") ?? "",
+            last: defaults.string(forKey: "addressHook_lastName") ?? ""
+        )
     }
 }

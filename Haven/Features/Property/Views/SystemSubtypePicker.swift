@@ -10,7 +10,7 @@ struct SystemSubtypePicker: View {
     var body: some View {
         if let options = Self.options(for: category) {
             Picker(options.label, selection: Binding(
-                get: { subtype ?? options.defaultValue },
+                get: { Self.normalize(subtype: subtype, category: category, defaultValue: options.defaultValue) },
                 set: { subtype = $0 }
             )) {
                 ForEach(options.choices, id: \.value) { choice in
@@ -20,26 +20,61 @@ struct SystemSubtypePicker: View {
         }
     }
 
+    /// Maps legacy subtype values to their current canonical equivalents so the
+    /// picker displays the right selection for systems created before later
+    /// phases renamed the subtype. Returns the input unchanged if no migration
+    /// applies. This is read-only — the DB still has the legacy value until the
+    /// user touches the picker, at which point the new value gets written.
+    private static func normalize(subtype: String?, category: String, defaultValue: String) -> String {
+        guard let raw = subtype, !raw.isEmpty else { return defaultValue }
+        switch category.lowercased() {
+        case "landscaping":
+            // Phase 19j renamed "lawn" → "natural_lawn". Old systems still
+            // have "lawn" in the DB; activeSubtypes treats both as equivalent
+            // but the picker UI needs to render the new name.
+            if raw == "lawn" { return "natural_lawn" }
+            // Phase 18-era values "turf"/"xeriscape"/"none" no longer map to
+            // any active subtype. Show synthetic_turf as the closest match
+            // for "turf"; everything else falls back to the default.
+            if raw == "turf" { return "synthetic_turf" }
+            if raw == "xeriscape" || raw == "none" { return defaultValue }
+            return raw
+        default:
+            return raw
+        }
+    }
+
     struct Choice { let label: String; let value: String }
     struct Options { let label: String; let defaultValue: String; let choices: [Choice] }
 
     static func options(for category: String) -> Options? {
         switch category.lowercased() {
         case "landscaping":
-            return Options(label: "Yard Type", defaultValue: "lawn", choices: [
-                Choice(label: "Natural Lawn", value: "lawn"),
-                Choice(label: "Artificial Turf", value: "turf"),
-                Choice(label: "Xeriscape", value: "xeriscape"),
-                Choice(label: "No Yard", value: "none"),
+            // Phase 19j: matches MaintenanceTemplates.activeSubtypes for landscaping.
+            // Only natural_lawn and synthetic_turf are recognized — "mixed" households
+            // get TWO separate Landscaping system rows from the quiz answer mapper, so
+            // the picker (which edits a single system) doesn't offer "mixed" as an option.
+            // The legacy "lawn" value is preserved as the default for backward compat
+            // with pre-Phase-19j systems — `activeSubtypes` treats it as natural_lawn.
+            return Options(label: "Yard Type", defaultValue: "natural_lawn", choices: [
+                Choice(label: "Natural Grass", value: "natural_lawn"),
+                Choice(label: "Synthetic Turf", value: "synthetic_turf"),
             ])
         case "hvac":
+            // Phase 19b/19c: full subtype list matches q3b_hvac_type quiz options
+            // and the activeSubtypes mapping in MaintenanceTemplates. The "Not sure"
+            // option is the safe default for households that haven't confirmed their
+            // exact configuration yet — falls back to universal HVAC tune-ups only.
             return Options(label: "HVAC Type", defaultValue: "central_ducted", choices: [
                 Choice(label: "Central (Ducted)", value: "central_ducted"),
-                Choice(label: "Heat Pump", value: "heat_pump"),
                 Choice(label: "Ductless Mini-Split", value: "mini_split"),
-                Choice(label: "Boiler / Radiant", value: "boiler_radiant"),
-                Choice(label: "Window Units", value: "window_units"),
+                Choice(label: "Boiler + Central AC", value: "boiler_with_central_ac"),
+                Choice(label: "Boiler / Radiators", value: "boiler_radiant"),
+                Choice(label: "Boiler + Window AC", value: "boiler_with_window_ac"),
+                Choice(label: "Heat Pump", value: "heat_pump"),
                 Choice(label: "Geothermal", value: "geothermal"),
+                Choice(label: "Window Units", value: "window_units"),
+                Choice(label: "Not Sure", value: "not_sure"),
             ])
         case "water heater":
             return Options(label: "Water Heater Type", defaultValue: "tank", choices: [

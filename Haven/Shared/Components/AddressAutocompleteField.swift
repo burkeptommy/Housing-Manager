@@ -39,49 +39,58 @@ struct AddressAutocompleteField: View {
 
     @ViewBuilder
     private var searchView: some View {
-        TextField("Search for your address...", text: $searchText)
-            .textContentType(.fullStreetAddress)
-            .autocorrectionDisabled()
-            .onChange(of: searchText) { _, newValue in
-                if hasSelectedPlace {
-                    hasSelectedPlace = false
-                    return
-                }
-                debounceSearch(newValue)
-            }
-
-        if !suggestions.isEmpty {
-            ForEach(suggestions) { suggestion in
-                Button {
-                    selectSuggestion(suggestion)
-                } label: {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(suggestion.mainText)
-                            .font(.subheadline.weight(.medium))
-                            .foregroundStyle(Color.primary)
-                        Text(suggestion.secondaryText)
-                            .font(.caption)
-                            .foregroundStyle(Color.secondary)
+        // Phase 20 polish: hide the raw search TextField once the user has
+        // picked a suggestion AND we're showing the structured address detail
+        // fields below. Otherwise the search input + the street field both
+        // render the same address and the screen looks duplicated.
+        if !(showDetails && isEditing) {
+            TextField("Search for your address...", text: $searchText)
+                .font(HavenTypography.body)
+                .textContentType(.fullStreetAddress)
+                .autocorrectionDisabled()
+                .onChange(of: searchText) { _, newValue in
+                    if hasSelectedPlace {
+                        hasSelectedPlace = false
+                        return
                     }
+                    debounceSearch(newValue)
                 }
-                .buttonStyle(.plain)
-            }
-        }
 
-        if isSearching {
-            HStack(spacing: 8) {
-                ProgressView()
-                    .controlSize(.small)
-                Text("Searching...")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            if !suggestions.isEmpty {
+                ForEach(suggestions) { suggestion in
+                    Button {
+                        selectSuggestion(suggestion)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(suggestion.mainText)
+                                .font(HavenTypography.body)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text(suggestion.secondaryText)
+                                .font(HavenTypography.caption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, 6)
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-        }
 
-        if let errorMessage {
-            Text(errorMessage)
-                .font(.caption)
-                .foregroundStyle(.orange)
+            if isSearching {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .controlSize(.small)
+                    Text("Searching...")
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+            }
+
+            if let errorMessage {
+                Text(errorMessage)
+                    .font(HavenTypography.caption)
+                    .foregroundStyle(HavenColors.warning)
+            }
         }
 
         // Show detail fields while editing (after autocomplete fills them)

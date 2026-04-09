@@ -7,7 +7,13 @@ struct PropertyLookupResult: Codable {
     var squareFootage: Int?
     var lotSize: Int?
     var bedrooms: Int?
-    var bathrooms: Int?
+    /// Phase 20 polish: ATTOM returns bathrooms as a Double (e.g. 3.5) to
+    /// represent half-baths. The previous `Int?` type caused the entire
+    /// JSON decode to fail with "Number 3.5 is not representable in Swift"
+    /// for any home with a half-bath, which silently dropped ALL property
+    /// data on a huge fraction of CT/NY HNW homes. Type widened to Double?
+    /// to match the upstream ATTOM contract.
+    var bathrooms: Double?
     var propertyType: String?
     let lastSaleDate: String?
     let lastSalePrice: Double?

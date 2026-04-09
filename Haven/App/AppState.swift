@@ -8,6 +8,15 @@ final class AppState: ObservableObject {
     @Published var primaryProperty: PropertyRow?
     @Published var hasCheckedPrimaryProperty = false
 
+    /// Phase 20b — when a brand-new user finishes the address-hook flow
+    /// and AccountCreationStep auth, OnboardingViewModel.complete() stamps
+    /// the freshly-created property here so DashboardView can auto-launch
+    /// HouseQuizView on first appearance. Notification posts are too
+    /// timing-sensitive (DashboardView may not be mounted yet when post
+    /// fires); this state survives the OnboardingView → MainTabView swap.
+    /// DashboardView clears it after handing it to its quiz cover.
+    @Published var pendingQuizProperty: PropertyRow?
+
     // Force-update gate (Phase 13). When `requiresUpdate` is true, ContentView
     // renders ForceUpdateView before any other routing. The optional fields
     // hold the message and App Store URL for the blocking screen and the
@@ -82,6 +91,8 @@ final class AppState: ObservableObject {
                 Task { await Self.reconcileAllPropertiesOnce() }
                 Task { await Self.backfillUtilityAccountSnapshotsOnce() }
                 Task { await Self.refreshPropertyValuesOnce() }
+                Task { await Self.purgeDroppedTemplatesOnce() }
+                Task { await Self.migratePoolTasksToVendorOnce() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -97,6 +108,8 @@ final class AppState: ObservableObject {
                     Task { await Self.reconcileAllPropertiesOnce() }
                     Task { await Self.backfillUtilityAccountSnapshotsOnce() }
                     Task { await Self.refreshPropertyValuesOnce() }
+                    Task { await Self.purgeDroppedTemplatesOnce() }
+                    Task { await Self.migratePoolTasksToVendorOnce() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -276,5 +289,190 @@ final class AppState: ObservableObject {
             }
             UserDefaults.standard.set(true, forKey: key)
         } catch {}
+    }
+
+    /// Build 87: drops the 7 chore-tracker maintenance templates shipped in
+    /// Build 86 and earlier. Soft-archives any existing maintenance_tasks
+    /// rows whose templateId matches one of the dropped template keys.
+    /// Runs ONCE per device, gated by UserDefaults so the migration is
+    /// idempotent. Uses the same `archiveMaintenanceTask` soft-delete path
+    /// the reconciler itself uses so Alfred, service records, and audit
+    /// logs stay intact.
+    ///
+    /// Without this, existing test users (Tom's wife, friend) who don't
+    /// re-enter the quiz on Build 87 would keep the dropped chore-tracker
+    /// tasks on their dashboard forever. The reconciler's normal orphan
+    /// handling preserves user-touched tasks, which would leave these as
+    /// visible duplicates for anyone who engaged with them — this targeted
+    /// pass bypasses the preservation logic just for these 7 keys.
+    ///
+    /// Runs in a detached Task from `initialize()` so it never blocks first-
+    /// screen render. Uses the property-iteration pattern (matching
+    /// `reconcileAllPropertiesOnce` and `backfillUtilityAccountSnapshotsOnce`)
+    /// instead of adding a new household-scoped DB helper.
+    @MainActor
+    static func purgeDroppedTemplatesOnce() async {
+        let key = "purgedDroppedTemplatesV87Done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            // Don't set the gate on failure — retry next launch.
+            return
+        }
+        guard !properties.isEmpty else {
+            // Fresh install with no properties yet — set gate so we don't
+            // keep retrying every launch.
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let droppedTemplateIds: Set<String> = [
+            "HVAC:Clean air vents and returns",
+            "Plumbing:Clean faucet aerators",
+            "Windows:Clean window tracks and weep holes",
+            "Appliance:Clean dishwasher filter and spray arms",
+            "Appliance:Clean washing machine",
+            "Appliance:Clean range hood filter",
+            "Appliance:Check and clean garbage disposal",
+        ]
+
+        var purgedCount = 0
+        for property in properties {
+            let tasks: [MaintenanceTaskDBRow]
+            do {
+                tasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+            for task in tasks {
+                guard let templateId = task.templateId,
+                      droppedTemplateIds.contains(templateId) else { continue }
+                do {
+                    try await db.archiveMaintenanceTask(
+                        id: task.id,
+                        reason: "build_87_chore_tracker_drop"
+                    )
+                    purgedCount += 1
+                } catch {
+                    // Swallow individual failures — a single failed archive
+                    // shouldn't block the rest of the cleanup.
+                }
+            }
+        }
+        if purgedCount > 0 {
+            print("[purgeDroppedTemplatesV87] archived \(purgedCount) dropped-template task\(purgedCount == 1 ? "" : "s")")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    /// Build 87: flips existing Pool/Spa maintenance tasks from
+    /// .personal/.either to .vendor for existing test users. New users get
+    /// `.vendor` automatically via the updated template definitions in
+    /// Build 87 Edit 3, but existing users' tasks were created when the
+    /// templates were `.either`, so the reconciler's templateKey-based
+    /// dedup leaves them in their old state on next launch.
+    ///
+    /// Targets specifically the two pool templates that were flipped in
+    /// Build 87 Edit 3: "Pool/Spa:Clean pool filter" and
+    /// "Pool/Spa:Clean salt cell". Other Pool/Spa tasks (Test water
+    /// chemistry, Professional pool opening, etc.) were already `.vendor`
+    /// and are skipped. Tasks already tagged `vendor` (via the bidirectional
+    /// toggle or a previous flip pass) are also skipped.
+    ///
+    /// When a Pool/Spa contractor is on file for the household, also links
+    /// it to the flipped task and reframes title + description via the
+    /// same Phase 19l voice used by `MaintenanceViewModel.convertToVendorManaged`
+    /// and `HouseQuizAnswerMapper.flipCategoryTasksToVendor`. When no pool
+    /// contractor is on file, the task is still flipped to `vendor` but
+    /// left unlinked, which mirrors the reconciler's "Find a contractor
+    /// for: ..." behavior.
+    @MainActor
+    static func migratePoolTasksToVendorOnce() async {
+        let key = "migratedPoolTasksToVendorV87Done"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let targetTemplateIds: Set<String> = [
+            "Pool/Spa:Clean pool filter",
+            "Pool/Spa:Clean salt cell",
+        ]
+
+        // Fetch contractors once — `fetchContractors()` is RLS-scoped to
+        // the current session's household so it covers every property the
+        // user can access in a single call.
+        let contractors = (try? await db.fetchContractors()) ?? []
+        let poolContractor = contractors.first { contractor in
+            if let cat = contractor.category,
+               cat.caseInsensitiveCompare("Pool/Spa") == .orderedSame {
+                return true
+            }
+            if let specs = contractor.specialties,
+               specs.contains(where: { $0.caseInsensitiveCompare("Pool/Spa") == .orderedSame }) {
+                return true
+            }
+            return false
+        }
+
+        var migratedCount = 0
+        for property in properties {
+            let tasks: [MaintenanceTaskDBRow]
+            do {
+                tasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+            for task in tasks {
+                guard let templateId = task.templateId,
+                      targetTemplateIds.contains(templateId),
+                      task.assignmentType?.lowercased() != "vendor" else { continue }
+
+                var update = MaintenanceTaskUpdate()
+                update.assignmentType = "vendor"
+                update.needsVendor = false
+
+                if let contractor = poolContractor {
+                    // Reframe via the Phase 19l voice. Source the original
+                    // wording from the template catalog rather than the
+                    // live row so we don't double-reframe if the row was
+                    // previously touched.
+                    let template = MaintenanceTemplates.template(forKey: templateId)
+                    let originalTitle = template?.title ?? task.title
+                    let originalDescription = template?.description ?? task.description ?? ""
+                    update.title = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+                    if originalDescription.isEmpty {
+                        update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+                    } else {
+                        update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+                    }
+                    update.assignedContractorId = contractor.id
+                }
+
+                do {
+                    _ = try await db.updateMaintenanceTask(id: task.id, update)
+                    migratedCount += 1
+                } catch {
+                    // Swallow individual failures.
+                }
+            }
+        }
+        if migratedCount > 0 {
+            print("[migratePoolTasksToVendorV87] flipped \(migratedCount) pool task\(migratedCount == 1 ? "" : "s") to vendor")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
     }
 }

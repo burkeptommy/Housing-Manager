@@ -1,8 +1,13 @@
 import Foundation
 
-/// The 31-question House Quiz library, organized into 6 sections (the first
-/// section has 6 questions after Phase 19b inserted q3b_hvac_type; the other
-/// five sections still have 5 questions each).
+/// The 36-question House Quiz library, organized into 6 sections.
+/// Phase 19b inserted q3b_hvac_type into section 1.
+/// Phase 19j inserted q11b_lawn_type into section 3 and q28b_pets into section 6.
+/// Phase 19m inserted q15b_household_contractors into section 3.
+/// Build 87 inserted q12b_pool_chemistry into section 3 (right after q12_pool).
+/// Build 86 inserted q25b_ev_charger into section 5 (right after q25_garage_ev)
+/// and dropped the 1-car / 2-car granularity from q25 in favor of a single
+/// "Attached" option plus a new "Semi-attached" option.
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
 
@@ -13,10 +18,24 @@ enum HouseQuizQuestionLibrary {
     }
 
     /// Indices in `allQuestions` after which a milestone fun-fact card should appear.
-    /// Triggered after questions 6, 11, 16, 21, 26, 31 — the section boundaries.
-    /// Phase 19b: shifted by one to account for the new q3b_hvac_type question
-    /// inserted between q3 and q4 in section 1.
-    static let milestoneIndices: Set<Int> = [5, 10, 15, 20, 25, 30]
+    /// Triggered after the cumulative end-of-section index.
+    /// Phase 19b: shifted by one for q3b_hvac_type in section 1.
+    /// Phase 19j: shifted twice — once for q11b_lawn_type in section 3,
+    /// and once for q28b_pets in section 6.
+    /// Phase 19m: shifted again for q15b_household_contractors in section 3.
+    /// Build 87: shifted once more for q12b_pool_chemistry in section 3,
+    /// which adds one question to section 3 and bumps every subsequent
+    /// milestone by +1.
+    /// Build 86: shifted once more for q25b_ev_charger in section 5, which
+    /// adds one question to section 5 and bumps the section 5 / section 6
+    /// milestones by +1.
+    ///   Section 1: 6 questions → milestone after index 5
+    ///   Section 2: 5 → cumulative 11 → milestone after index 10
+    ///   Section 3: 8 → cumulative 19 → milestone after index 18
+    ///   Section 4: 5 → cumulative 24 → milestone after index 23
+    ///   Section 5: 6 → cumulative 30 → milestone after index 29
+    ///   Section 6: 6 → cumulative 36 → milestone after index 35
+    static let milestoneIndices: Set<Int> = [5, 10, 18, 23, 29, 35]
 
     // MARK: - Section 1 — Your Home Basics
 
@@ -129,8 +148,8 @@ enum HouseQuizQuestionLibrary {
             answerOptions: [
                 AnswerOption(id: "municipal", label: "Municipal", icon: "drop.fill"),
                 AnswerOption(id: "private_well", label: "Private well", icon: "drop.triangle.fill"),
-                AnswerOption(id: "shared_well", label: "Shared well"),
-                AnswerOption(id: "not_sure", label: "Not sure"),
+                AnswerOption(id: "shared_well", label: "Shared well", icon: "drop.circle.fill"),
+                AnswerOption(id: "not_sure", label: "Not sure", icon: "questionmark.circle"),
             ]
         ),
         HouseQuizQuestion(
@@ -151,10 +170,10 @@ enum HouseQuizQuestionLibrary {
             title: "What kind of water heater do you have?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "tank_gas", label: "Tank — gas"),
-                AnswerOption(id: "tank_electric", label: "Tank — electric"),
-                AnswerOption(id: "tankless_gas", label: "Tankless — gas"),
-                AnswerOption(id: "tankless_electric", label: "Tankless — electric"),
+                AnswerOption(id: "tank_gas", label: "Tank, gas"),
+                AnswerOption(id: "tank_electric", label: "Tank, electric"),
+                AnswerOption(id: "tankless_gas", label: "Tankless, gas"),
+                AnswerOption(id: "tankless_electric", label: "Tankless, electric"),
                 AnswerOption(id: "heat_pump", label: "Heat pump"),
                 AnswerOption(id: "not_sure", label: "Not sure"),
             ]
@@ -176,8 +195,8 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q10_appliances",
             section: .inside,
-            title: "Which appliances are under 5 years old?",
-            subtitle: "Pick any that still have warranties we should track.",
+            title: "Which major appliances do you have?",
+            subtitle: "We'll track manuals, maintenance, and recalls for each, and let you know when anything is still under warranty.",
             kind: .multiSelect,
             answerOptions: [
                 AnswerOption(id: "refrigerator", label: "Refrigerator", icon: "refrigerator.fill"),
@@ -191,7 +210,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "other", label: "Other", icon: "plus.circle", acceptsCustomInput: true),
                 AnswerOption(id: "none", label: "None of these"),
             ],
-            documentUploadCategory: .applianceManual
+            documentUploadCategory: .applianceManual,
+            supportsSelectAll: true
         ),
     ]
 
@@ -204,13 +224,38 @@ enum HouseQuizQuestionLibrary {
             title: "Do you have a lawn?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "diy", label: "Yes — I maintain it"),
-                AnswerOption(id: "pro", label: "Yes — pro service"),
+                AnswerOption(id: "diy", label: "Yes, I maintain it"),
+                AnswerOption(id: "pro", label: "Yes, pro service"),
                 AnswerOption(id: "no_lawn", label: "No"),
                 AnswerOption(id: "garden", label: "Mostly garden"),
+                AnswerOption(id: "hardscape", label: "Mostly hardscape (patio, gravel, pavers)", icon: "square.grid.3x3.fill"),
             ],
             providerFollowUpAnswerIds: ["pro"],
             providerTypes: ["landscaping"]
+        ),
+        // Phase 19j — lawn type. Inserted right after q11_lawn so a turf
+        // homeowner gets the right maintenance schedule (brushing, infill,
+        // drainage) instead of a natural-grass schedule (aerate, overseed,
+        // fertilize). Mixed yards get both.
+        //
+        // Skipped when Q11 said "no_lawn" or "garden" — there's no lawn to
+        // ask about the type of.
+        HouseQuizQuestion(
+            id: "q11b_lawn_type",
+            section: .outside,
+            title: "Natural grass, turf, or both?",
+            subtitle: "We'll set up the right care schedule for what you actually have.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "natural", label: "Natural grass", icon: "leaf.fill"),
+                AnswerOption(id: "turf", label: "Synthetic turf", icon: "square.grid.3x3.fill"),
+                AnswerOption(id: "mixed", label: "Mixed (both)", icon: "circle.lefthalf.filled"),
+                AnswerOption(id: "not_sure", label: "Not sure"),
+            ],
+            dynamicSkip: { state in
+                let q11 = state.answers["q11_lawn"]?.answerId
+                return q11 == "no_lawn" || q11 == "garden" || q11 == "hardscape"
+            }
         ),
         HouseQuizQuestion(
             id: "q12_pool",
@@ -227,13 +272,49 @@ enum HouseQuizQuestionLibrary {
             providerFollowUpAnswerIds: ["in_ground", "above_ground", "hot_tub", "both"],
             providerTypes: ["pool_service"]
         ),
+        // Build 87: pool chemistry follow-up. Mirrors the Q11/Q11b pattern:
+        // Q12 captures the pool TYPE, Q12b captures the chemistry. This
+        // fixes the pre-existing dead-code bug in the q12_pool handler
+        // where the `poolSubtype` switch was looking for "saltwater" /
+        // "chlorine" answer IDs that Q12 never produced (its actual IDs
+        // are in_ground / above_ground / hot_tub / both / none). Now the
+        // reconciler gets a real subtype so templates gated on
+        // `requiredSubtypes: ["pool_salt"]` or `["pool_chlorine"]`
+        // actually land.
+        HouseQuizQuestion(
+            id: "q12b_pool_chemistry",
+            section: .outside,
+            title: "Saltwater or chlorine?",
+            subtitle: "We'll set up the right care schedule for your pool's chemistry.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "saltwater", label: "Saltwater", icon: "drop.circle.fill"),
+                AnswerOption(id: "chlorine", label: "Chlorine", icon: "testtube.2"),
+                AnswerOption(id: "not_sure", label: "Not sure"),
+            ],
+            dynamicSkip: { state in
+                // Skip for pool answers that don't have meaningful chemistry
+                // choices: hot_tub (different chemistry entirely) and none
+                // (no pool). Only in_ground, above_ground, and both have
+                // saltwater-vs-chlorine as a real decision.
+                let q12 = state.answers["q12_pool"]?.answerId
+                return q12 != "in_ground"
+                    && q12 != "above_ground"
+                    && q12 != "both"
+            }
+        ),
         HouseQuizQuestion(
             id: "q13_pest",
             section: .outside,
             title: "Pest control?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "quarterly_pro", label: "Quarterly pro service"),
+                // Build 86: label changed from "Quarterly pro service" to
+                // "Recurring pro service" since real pest-control contracts
+                // range from monthly to quarterly depending on region/
+                // vendor. The `id` stays "quarterly_pro" so persisted
+                // answers and back-navigation continue to round-trip.
+                AnswerOption(id: "quarterly_pro", label: "Recurring pro service"),
                 AnswerOption(id: "termite_bond", label: "Termite bond"),
                 AnswerOption(id: "diy", label: "DIY"),
                 AnswerOption(id: "none", label: "None"),
@@ -247,12 +328,30 @@ enum HouseQuizQuestionLibrary {
             title: "Sprinkler or irrigation?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "full", label: "Yes — full system"),
+                AnswerOption(id: "full", label: "Yes, full system"),
                 AnswerOption(id: "drip", label: "Drip only"),
                 AnswerOption(id: "no", label: "No"),
             ],
             providerFollowUpAnswerIds: ["full", "drip"],
-            providerTypes: ["irrigation"]
+            providerTypes: ["irrigation"],
+            // Phase 19j — skip irrigation entirely when the user has no
+            // lawn AND their lawn (if any) is pure synthetic turf. A
+            // turf-only home with no garden has nothing to water. Mixed,
+            // natural, and garden households still see the question.
+            dynamicSkip: { state in
+                let q11 = state.answers["q11_lawn"]?.answerId
+                let q11b = state.answers["q11b_lawn_type"]?.answerId
+                if q11 == "no_lawn" { return true }
+                // Lawn = "diy" or "pro" but it's pure synthetic turf and
+                // the user explicitly said no garden in Q11 — skip.
+                if q11b == "turf" && (q11 == "diy" || q11 == "pro") {
+                    // Conservative: still ask in case they have garden beds
+                    // separate from the lawn area. Only auto-skip when q11
+                    // was explicitly no_lawn.
+                    return false
+                }
+                return false
+            }
         ),
         HouseQuizQuestion(
             id: "q15_security",
@@ -260,13 +359,39 @@ enum HouseQuizQuestionLibrary {
             title: "Security or alarm system?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "monitored", label: "Yes — monitored"),
-                AnswerOption(id: "self_monitored", label: "Yes — self-monitored"),
+                AnswerOption(id: "monitored", label: "Yes, monitored"),
+                AnswerOption(id: "self_monitored", label: "Yes, self-monitored"),
                 AnswerOption(id: "cameras_only", label: "Cameras only"),
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["monitored"],
             providerTypes: ["security"]
+        ),
+        // Phase 19m — household contractors. One screen captures the user's
+        // existing pros (HVAC, plumber, electrician, etc.) so future task
+        // creation can route to the right vendor up front instead of falling
+        // back to "find a contractor" placeholders. The view filters chips
+        // dynamically: septic only when q7 said septic, well only when q6
+        // said well, chimney only when fireplace/wood/propane fireplace
+        // appears in q10 or q20. Skipping the question entirely is allowed.
+        HouseQuizQuestion(
+            id: "q15b_household_contractors",
+            section: .outside,
+            title: "Got any pros on speed dial?",
+            subtitle: "Tell us who handles your HVAC, plumbing, electrical, and other home services so we can plan tasks around their schedule, not yours.",
+            kind: .householdContractors,
+            answerOptions: [
+                AnswerOption(id: "hvac_service", label: "HVAC service", icon: "thermometer.medium"),
+                AnswerOption(id: "plumber", label: "Plumber", icon: "drop.fill"),
+                AnswerOption(id: "electrician", label: "Electrician", icon: "bolt.fill"),
+                AnswerOption(id: "roofer", label: "Roofer", icon: "house.fill"),
+                AnswerOption(id: "septic_pumper", label: "Septic pumper", icon: "circle.dashed"),
+                AnswerOption(id: "well_water_service", label: "Well water service", icon: "drop.degreesign"),
+                AnswerOption(id: "chimney_sweep", label: "Chimney sweep", icon: "flame.fill"),
+                AnswerOption(id: "tree_service", label: "Tree service", icon: "tree.fill"),
+                AnswerOption(id: "handyman", label: "Handyman", icon: "wrench.fill"),
+            ],
+            dynamicSkip: { _ in false }  // never skip — empty answers are allowed
         ),
     ]
 
@@ -333,13 +458,16 @@ enum HouseQuizQuestionLibrary {
             id: "q20_other_fuels",
             section: .energyServices,
             title: "Any other fuel sources?",
-            subtitle: "Propane for the generator, the fireplace, the stove?",
+            // Phase 19i: generator moved to Q22's dedicated inline form so
+            // we can capture its fuel type and provider separately. Q20 now
+            // covers fireplace + stove + wood + pellets only.
+            subtitle: "Propane for the fireplace or stove? Wood or pellets? If it's only for a generator, skip it here, we'll ask next.",
             kind: .multiSelect,
             answerOptions: [
-                AnswerOption(id: "propane_generator", label: "Propane (generator)"),
                 AnswerOption(id: "propane_fireplace", label: "Propane (fireplace)"),
                 AnswerOption(id: "propane_stove", label: "Propane (stove)"),
-                AnswerOption(id: "wood", label: "Wood"),
+                AnswerOption(id: "wood_logs", label: "Wood (cordwood)"),
+                AnswerOption(id: "wood_pellets", label: "Wood pellets"),
                 AnswerOption(id: "none", label: "None"),
             ]
         ),
@@ -354,8 +482,8 @@ enum HouseQuizQuestionLibrary {
             title: "Solar panels?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "owned", label: "Yes — owned", icon: "sun.max.fill"),
-                AnswerOption(id: "leased", label: "Yes — leased"),
+                AnswerOption(id: "owned", label: "Yes, owned", icon: "sun.max.fill"),
+                AnswerOption(id: "leased", label: "Yes, leased"),
                 AnswerOption(id: "no", label: "No"),
                 AnswerOption(id: "considering", label: "Considering"),
             ]
@@ -364,11 +492,15 @@ enum HouseQuizQuestionLibrary {
             id: "q22_generator",
             section: .backupEnergy,
             title: "Whole-home generator?",
-            kind: .singleChoice,
+            // Phase 19i: dedicated inline form. Captures generator type +
+            // fuel + provider in one screen so we can correctly model
+            // households with a different fuel/provider for backup vs HVAC.
+            subtitle: "Tell us the type, fuel, and supplier so we can plan refills and load tests. Separate from your home heating fuel, so we track it as its own account.",
+            kind: .generatorAdd,
             answerOptions: [
                 AnswerOption(id: "whole_home", label: "Whole-home", icon: "powerplug.fill"),
-                AnswerOption(id: "portable", label: "Portable"),
-                AnswerOption(id: "none", label: "None"),
+                AnswerOption(id: "portable", label: "Portable", icon: "bolt.fill"),
+                AnswerOption(id: "none", label: "None", icon: "minus.circle"),
             ]
         ),
         HouseQuizQuestion(
@@ -395,16 +527,34 @@ enum HouseQuizQuestionLibrary {
         HouseQuizQuestion(
             id: "q25_garage_ev",
             section: .vehicles,
-            title: "Garage type? EV charger?",
+            title: "What kind of garage do you have?",
             kind: .singleChoice,
             answerOptions: [
-                AnswerOption(id: "attached_2", label: "Attached 2-car"),
-                AnswerOption(id: "attached_1", label: "Attached 1-car"),
-                AnswerOption(id: "detached", label: "Detached"),
-                AnswerOption(id: "carport", label: "Carport"),
-                AnswerOption(id: "none", label: "No garage"),
-                AnswerOption(id: "ev_l2", label: "I have an EV charger (L2)", icon: "bolt.car.fill"),
+                AnswerOption(id: "attached", label: "Attached", icon: "house.fill"),
+                AnswerOption(id: "semi_attached", label: "Semi-attached", icon: "house.lodge.fill"),
+                AnswerOption(id: "detached", label: "Detached", icon: "building.2.fill"),
+                AnswerOption(id: "carport", label: "Carport", icon: "car.side.fill"),
+                AnswerOption(id: "none", label: "No garage", icon: "minus.circle"),
             ]
+        ),
+        // Build 86: split EV charger into its own yes/no question. Tom's
+        // feedback was that the prior single-question structure made garage
+        // type and EV charger mutually exclusive — a user with an attached
+        // garage AND an L2 charger had to pick one. The dynamicSkip closure
+        // hides this question entirely when the user said "No garage" in Q25.
+        HouseQuizQuestion(
+            id: "q25b_ev_charger",
+            section: .vehicles,
+            title: "Do you have a Level 2 EV charger?",
+            subtitle: "We'll track your charger and any EV-related maintenance.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "yes", label: "Yes, I have an L2 charger", icon: "bolt.car.fill"),
+                AnswerOption(id: "no", label: "No EV charger", icon: "minus.circle"),
+            ],
+            dynamicSkip: { state in
+                state.answers["q25_garage_ev"]?.answerId == "none"
+            }
         ),
     ]
 
@@ -441,6 +591,24 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "family_with_kids", label: "Family with kids"),
                 AnswerOption(id: "multi_generational", label: "Multi-generational"),
                 AnswerOption(id: "other", label: "Other"),
+            ]
+        ),
+        // Phase 19j — pets in the household. Drives subtype-specific tasks
+        // like the synthetic-turf "Sanitize pet areas" template (only fires
+        // for households with pets) and future pet-aware features (pet door
+        // installation, allergen filters, fenced-yard reminders).
+        HouseQuizQuestion(
+            id: "q28b_pets",
+            section: .protectionPeople,
+            title: "Any pets in the household?",
+            subtitle: "We tune some maintenance tasks (like turf sanitization and HVAC filter swaps) based on this.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "dogs", label: "Dogs", icon: "pawprint.fill"),
+                AnswerOption(id: "cats", label: "Cats", icon: "cat.fill"),
+                AnswerOption(id: "both", label: "Dogs and cats", icon: "pawprint.circle.fill"),
+                AnswerOption(id: "other_pets", label: "Other pets"),
+                AnswerOption(id: "no_pets", label: "No pets"),
             ]
         ),
         HouseQuizQuestion(

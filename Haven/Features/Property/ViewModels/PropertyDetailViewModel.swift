@@ -276,6 +276,84 @@ final class PropertyDetailViewModel: ObservableObject {
         }
     }
 
+    /// Build 84 — Re-fires the ATTOM property lookup and walks the same
+    /// fallback ladder as `OnboardingViewModel.runComplete` so retroactive
+    /// fixes use one path. Used by the "Refresh from public records" button
+    /// on `InvestmentSummaryCard`'s empty state when a user's property row
+    /// was created before the Build 84 ladder landed (or when ATTOM only
+    /// returned a range without a canonical value).
+    ///
+    /// Walks: canonical estimatedValue → midpoint of range → high → low →
+    /// taxAssessment.assessedValue. Persists `currentEstimatedValue`,
+    /// `purchasePrice`, and `estimatedValueSource` in one PropertyUpdate
+    /// call. On success: refreshes `property`, posts `.propertyChanged` so
+    /// other tabs update, and fires a success haptic.
+    func refreshFromPublicRecords(appState: AppState? = nil) async {
+        guard let prop = property else { return }
+        let address = [prop.street, prop.city, prop.state, prop.zipCode]
+            .compactMap { $0 }
+            .joined(separator: ", ")
+        guard !address.isEmpty else { return }
+
+        isRefreshingValue = true
+        defer { isRefreshingValue = false }
+
+        do {
+            let data = try await HavenSupabase.propertyLookup(address: address)
+            struct LookupResponse: Decodable {
+                let success: Bool
+                let property: PropertyLookupResult?
+            }
+            let response = try JSONDecoder().decode(LookupResponse.self, from: data)
+            guard let result = response.property else {
+                print("[PropertyDetail] refreshFromPublicRecords: lookup returned no property")
+                return
+            }
+
+            // Same fallback ladder as OnboardingViewModel.runComplete.
+            let attomEstimatedValue: Double? = {
+                if let canonical = result.estimatedValue { return canonical }
+                if let low = result.estimatedValueLow,
+                   let high = result.estimatedValueHigh {
+                    return (low + high) / 2
+                }
+                if let high = result.estimatedValueHigh { return high }
+                if let low = result.estimatedValueLow { return low }
+                if let assessed = result.taxAssessment?.assessedValue { return assessed }
+                return nil
+            }()
+
+            print("[PropertyDetail] refreshFromPublicRecords: estValue=\(attomEstimatedValue?.description ?? "nil") lastSale=\(result.lastSalePrice?.description ?? "nil") range=\(result.estimatedValueLow?.description ?? "nil")-\(result.estimatedValueHigh?.description ?? "nil") taxAssessed=\(result.taxAssessment?.assessedValue?.description ?? "nil") source=\(result.estimatedValueSource ?? "nil")")
+
+            guard attomEstimatedValue != nil || result.lastSalePrice != nil else {
+                // Nothing to write — surface to caller via the existing
+                // `error` channel so the empty state can show "no public
+                // records found for this address".
+                self.error = "Public records didn't return a value for this address."
+                Haptics.error()
+                return
+            }
+
+            var update = PropertyUpdate()
+            update.currentEstimatedValue = attomEstimatedValue
+            update.estimatedValueSource = result.estimatedValueSource
+                ?? (attomEstimatedValue != nil ? "computed" : nil)
+            update.purchasePrice = result.lastSalePrice
+
+            let updated = try await db.updateProperty(id: prop.id, update)
+            property = updated
+            if let appState, appState.primaryProperty?.id == updated.id {
+                appState.primaryProperty = updated
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+        } catch {
+            print("[PropertyDetail] refreshFromPublicRecords failed: \(error)")
+            self.error = "Couldn't refresh from public records. \(error.localizedDescription)"
+            Haptics.error()
+        }
+    }
+
     func loadProperty(id: UUID) async {
         isLoading = true
         error = nil

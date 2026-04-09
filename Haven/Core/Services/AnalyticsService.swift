@@ -43,6 +43,14 @@ enum AnalyticsEvent: String {
     case quizSavedAndExited = "quiz_saved_and_exited"
     case quizSaveAndExitFailed = "quiz_save_and_exit_failed"
     case quizPersistFailed = "quiz_persist_failed"
+    // Build 83 (Apr 7, 2026): Quiz UX trust pass
+    case quizCurrencyPrefilled = "quiz_currency_prefilled"
+    case quizContractorChipExpanded = "quiz_contractor_chip_expanded"
+    case quizContractorAdopted = "quiz_contractor_adopted"
+    case quizContinueDisabledReasonShown = "quiz_continue_disabled_reason_shown"
+    // Build 85 (Apr 8, 2026): Saved-for-later review flow
+    case quizSavedResumed = "quiz_saved_resumed"
+    case quizSavedSkippedAll = "quiz_saved_skipped_all"
 
     // MARK: - Tab Navigation
     case tabSelected = "tab_selected"

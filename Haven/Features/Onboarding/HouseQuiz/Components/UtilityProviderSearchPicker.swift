@@ -24,19 +24,45 @@ import SwiftUI
 struct UtilityProviderSearchPicker: View {
     let providerTypes: [String]
     let state: String?
+    let city: String?
+    /// Build 83 (Apr 7, 2026): Optional context-appropriate placeholder for
+    /// the search field. Defaults to the legacy "ConEd, Verizon, Optimum..."
+    /// hint so existing call sites that haven't been updated still render
+    /// something. Pass a question-specific list (e.g. "GEICO, Progressive,
+    /// State Farm..." for auto insurance) so users see brand names that
+    /// actually match the catalog they're searching.
+    let searchPlaceholder: String?
+    /// Build 85: when non-nil, the picker fetches this provider on appear
+    /// (or whenever the id changes) and renders it pinned at the top of
+    /// the list with a navy-tinted "CURRENTLY SELECTED" pill. Tapping the
+    /// pinned row fires `onDeselect` so the parent can clear its prior
+    /// answer and the picker re-renders with the full alphabetical list.
+    let preSelectedProviderId: UUID?
     let onSelect: (UtilityProviderRow) -> Void
     let onCustomCreated: ((UtilityProviderRow) -> Void)?
+    /// Build 85: fired when the user taps the pinned "Currently selected"
+    /// row to start over. Parents wire this to a viewmodel `clearAnswer`
+    /// helper that drops the prior `HouseQuizAnswer` from `state.answers`.
+    let onDeselect: (() -> Void)?
 
     init(
         providerTypes: [String],
         state: String?,
+        city: String? = nil,
+        searchPlaceholder: String? = nil,
+        preSelectedProviderId: UUID? = nil,
         onSelect: @escaping (UtilityProviderRow) -> Void,
-        onCustomCreated: ((UtilityProviderRow) -> Void)? = nil
+        onCustomCreated: ((UtilityProviderRow) -> Void)? = nil,
+        onDeselect: (() -> Void)? = nil
     ) {
         self.providerTypes = providerTypes
         self.state = state
+        self.city = city
+        self.searchPlaceholder = searchPlaceholder
+        self.preSelectedProviderId = preSelectedProviderId
         self.onSelect = onSelect
         self.onCustomCreated = onCustomCreated
+        self.onDeselect = onDeselect
     }
 
     /// Canonical "primary" type the custom-add sheet uses when persisting a
@@ -51,9 +77,30 @@ struct UtilityProviderSearchPicker: View {
     @State private var searchText: String = ""
     @State private var loadError: String? = nil
     @State private var showCustomAdd: Bool = false
+    /// Build 85: resolved provider row for `preSelectedProviderId`. Fetched
+    /// in a `.task(id:)` keyed on the prop so navigation between questions
+    /// (or a swap to a different prior answer) re-runs the lookup. Cleared
+    /// when the user taps the pinned card to deselect.
+    @State private var pinnedProvider: UtilityProviderRow? = nil
+    /// Build 86 — id of the row the user just tapped. Drives the navy tint
+    /// + checkmark + dim-others visual feedback that mirrors `singleChoiceBody`
+    /// from Build 81. Tom's wife reported tapping a provider produced no
+    /// visual change at all (only haptic), so she thought her tap hadn't
+    /// registered. Reset naturally when the picker re-renders for a new
+    /// question (the picker is keyed on `q.id` from the parent so SwiftUI
+    /// tears it down between questions).
+    @State private var tappedProviderId: UUID? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+            // Build 85: pinned "Currently selected" card. Renders above
+            // the search field so back-navigated users see their prior
+            // pick before they start typing. Hidden when no prior answer
+            // is on file.
+            if let pinned = pinnedProvider {
+                pinnedSelectionCard(pinned)
+            }
+
             searchBar
 
             if isLoading {
@@ -75,6 +122,9 @@ struct UtilityProviderSearchPicker: View {
         .task(id: providerTypes) {
             await load()
         }
+        .task(id: preSelectedProviderId) {
+            await loadPinnedProvider()
+        }
         .sheet(isPresented: $showCustomAdd) {
             UtilityProviderCustomAddSheet(
                 providerType: primaryProviderType,
@@ -92,6 +142,57 @@ struct UtilityProviderSearchPicker: View {
 
     // MARK: - Subviews
 
+    /// Build 85: navy-tinted pinned card showing the user's prior pick.
+    /// Tapping it fires `onDeselect` and clears the local pinned state so
+    /// the picker re-renders with the full list.
+    private func pinnedSelectionCard(_ provider: UtilityProviderRow) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack(spacing: 6) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundStyle(HavenColors.navy)
+                Text("CURRENTLY SELECTED")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.2)
+                    .foregroundStyle(HavenColors.navy700)
+            }
+
+            Button {
+                Haptics.selection()
+                pinnedProvider = nil
+                // Build 86: also clear any in-flight tapped row id so the
+                // re-rendered list starts in a clean visual state instead
+                // of inheriting a faded sibling from the previous render.
+                tappedProviderId = nil
+                onDeselect?()
+            } label: {
+                HStack(spacing: HavenTheme.spacing12) {
+                    logoView(for: provider)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(provider.name)
+                            .font(HavenTypography.body.weight(.semibold))
+                            .foregroundStyle(HavenColors.navy800)
+                        Text("Tap to change")
+                            .font(HavenTypography.uiCaption)
+                            .foregroundStyle(HavenColors.textTertiary)
+                    }
+                    Spacer(minLength: 0)
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(HavenColors.navy)
+                }
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.navy.opacity(0.08))
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .strokeBorder(HavenColors.navy.opacity(0.4), lineWidth: 1.5)
+                )
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     private var searchBar: some View {
         VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
             Text("Search by provider name or website")
@@ -101,7 +202,7 @@ struct UtilityProviderSearchPicker: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 14))
                     .foregroundStyle(HavenColors.textTertiary)
-                TextField("ConEd, Verizon, Optimum...", text: $searchText)
+                TextField(searchPlaceholder ?? "ConEd, Verizon, Optimum...", text: $searchText)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled(true)
                 if !searchText.isEmpty {
@@ -145,8 +246,18 @@ struct UtilityProviderSearchPicker: View {
     }
 
     private func providerRow(_ provider: UtilityProviderRow) -> some View {
-        Button {
+        // Build 86: visual feedback parity with `singleChoiceBody`. The user
+        // sees the row turn navy, gain a checkmark, and the unselected
+        // siblings dim to 55% opacity. The 0.35s pause inside
+        // `recordProviderAnswer` (build 82 pattern) gives this feedback time
+        // to register before the quiz advances.
+        let isTapped = (tappedProviderId == provider.id)
+        let anyTapped = (tappedProviderId != nil)
+        return Button {
             Haptics.selection()
+            withAnimation(HavenTheme.animationStandard) {
+                tappedProviderId = provider.id
+            }
             onSelect(provider)
         } label: {
             HStack(spacing: HavenTheme.spacing12) {
@@ -160,19 +271,24 @@ struct UtilityProviderSearchPicker: View {
                         .foregroundStyle(HavenColors.textTertiary)
                 }
                 Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundStyle(HavenColors.textTertiary)
+                Image(systemName: isTapped ? "checkmark.circle.fill" : "chevron.right")
+                    .font(.system(size: isTapped ? 18 : 12, weight: .semibold))
+                    .foregroundStyle(isTapped ? HavenColors.navy : HavenColors.textTertiary)
             }
             .padding(HavenTheme.spacing12)
-            .background(HavenColors.surface)
+            .background(isTapped ? HavenColors.navy.opacity(0.08) : HavenColors.surface)
             .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
             .overlay(
                 RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                    .strokeBorder(HavenColors.beige300, lineWidth: 1)
+                    .strokeBorder(
+                        isTapped ? HavenColors.navy.opacity(0.4) : HavenColors.beige300,
+                        lineWidth: isTapped ? 1.5 : 1
+                    )
             )
+            .opacity((anyTapped && !isTapped) ? 0.55 : 1.0)
         }
         .buttonStyle(.plain)
+        .animation(HavenTheme.animationStandard, value: tappedProviderId)
     }
 
     @ViewBuilder
@@ -269,14 +385,50 @@ struct UtilityProviderSearchPicker: View {
 
     // MARK: - Computed
 
+    /// Phase 19h: Rank providers by how well they match the user's location
+    /// before applying the visible-list cap. Score:
+    ///   3 = town/city match (Bedford, Greenwich, Sherman, etc.)
+    ///   2 = state match (NY, CT) OR national 'US' carrier
+    ///   0 = no regional signal
+    /// Within the same score, fall back to alphabetical by name.
+    ///
+    /// State regionals and US nationals are intentionally tied so users see
+    /// both major national carriers AND local regionals mixed together. For
+    /// hyper-local services (trash, water, etc.) the town tag dominates, so
+    /// picking the right provider is still one tap away.
+    private func relevanceScore(for provider: UtilityProviderRow) -> Int {
+        let regions = provider.regions ?? []
+        if let town = city, !town.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(town) == .orderedSame }) {
+            return 3
+        }
+        if let st = state, !st.isEmpty,
+           regions.contains(where: { $0.caseInsensitiveCompare(st) == .orderedSame }) {
+            return 2
+        }
+        if regions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame }) {
+            return 2
+        }
+        return 0
+    }
+
     private var filteredProviders: [UtilityProviderRow] {
         let needle = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !needle.isEmpty else {
-            return allProviders
+        let base: [UtilityProviderRow]
+        if needle.isEmpty {
+            base = allProviders
+        } else {
+            base = allProviders.filter { provider in
+                provider.name.lowercased().contains(needle)
+                    || (provider.website?.lowercased().contains(needle) ?? false)
+            }
         }
-        return allProviders.filter { provider in
-            provider.name.lowercased().contains(needle)
-                || (provider.website?.lowercased().contains(needle) ?? false)
+        // Stable sort: relevance score descending, then alphabetical.
+        return base.sorted { a, b in
+            let sa = relevanceScore(for: a)
+            let sb = relevanceScore(for: b)
+            if sa != sb { return sa > sb }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
     }
 
@@ -307,6 +459,23 @@ struct UtilityProviderSearchPicker: View {
             }
         } catch {
             loadError = error.localizedDescription
+        }
+    }
+
+    /// Build 85: fetches the resolved row for `preSelectedProviderId` so
+    /// the pinned card has full data (logo, brand, type) without forcing
+    /// the parent to thread a `UtilityProviderRow` through. Silent fail —
+    /// a missing or deleted catalog row just hides the pinned card.
+    private func loadPinnedProvider() async {
+        guard let id = preSelectedProviderId else {
+            pinnedProvider = nil
+            return
+        }
+        do {
+            pinnedProvider = try await DatabaseService.shared.fetchUtilityProvider(id: id)
+        } catch {
+            print("[UtilityProviderSearchPicker] Failed to fetch pinned provider: \(error)")
+            pinnedProvider = nil
         }
     }
 

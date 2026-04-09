@@ -97,7 +97,11 @@ struct AddMaintenanceTaskSheet: View {
                 }
 
                 Section("Schedule") {
-                    DatePicker("Due Date", selection: $dueDate, in: Date()..., displayedComponents: .date)
+                    // Build 86: no date-range constraint. Users can add a
+                    // task with a past due date (overdue backfill) or any
+                    // future date. Validation happens at save time, not
+                    // on the picker.
+                    DatePicker("Due Date", selection: $dueDate, displayedComponents: .date)
                         .tint(HavenColors.navy800)
 
                     Picker("Frequency", selection: $frequency) {

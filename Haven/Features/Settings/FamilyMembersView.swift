@@ -4,7 +4,8 @@ struct FamilyMembersView: View {
     @State private var members: [FamilyMemberRow] = []
     @State private var documents: [DocumentRow] = []
     @State private var isLoading = true
-    @State private var showAddMember = false
+    @State private var showAddChooser = false
+    @State private var addMemberMode: AddFamilyMemberMode?
     @State private var editingMember: FamilyMemberRow?
     @State private var invitingMember: FamilyMemberRow?
     @State private var navigationPath = NavigationPath()
@@ -22,7 +23,7 @@ struct FamilyMembersView: View {
                     } description: {
                         Text("Add family members to track documents, estate planning, and readiness for each person.")
                     } actions: {
-                        Button("Add Family Member") { showAddMember = true }
+                        Button("Add Family Member") { showAddChooser = true }
                             .buttonStyle(.borderedProminent)
                             .tint(HavenColors.navy)
                     }
@@ -34,16 +35,22 @@ struct FamilyMembersView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showAddMember = true } label: {
+                    Button { showAddChooser = true } label: {
                         Image(systemName: "plus").foregroundStyle(HavenColors.navy)
                     }
                 }
             }
             .trackScreen("FamilyMembersView")
             .onAppear { Task { await loadData() } }
-            .sheet(isPresented: $showAddMember) {
+            .sheet(isPresented: $showAddChooser) {
+                AddFamilyMemberChooserSheet { mode in
+                    addMemberMode = mode
+                }
+                .presentationDetents([.medium])
+            }
+            .sheet(item: $addMemberMode) { mode in
                 NavigationStack {
-                    FamilyMemberFormView(onSave: { await loadData() })
+                    FamilyMemberFormView(initialMode: mode, onSave: { await loadData() })
                 }
             }
             .sheet(item: $editingMember) { member in

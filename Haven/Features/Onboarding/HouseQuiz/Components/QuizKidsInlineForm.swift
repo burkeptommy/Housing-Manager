@@ -136,7 +136,7 @@ struct QuizKidsInlineForm: View {
                 Button {
                     Haptics.light()
                     withAnimation(HavenTheme.animationStandard) {
-                        kids.remove(at: index)
+                        _ = kids.remove(at: index)
                     }
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -194,7 +194,7 @@ struct QuizKidsInlineForm: View {
                 Button {
                     Haptics.light()
                     withAnimation(HavenTheme.animationStandard) {
-                        expecting.remove(at: index)
+                        _ = expecting.remove(at: index)
                     }
                 } label: {
                     Image(systemName: "xmark.circle.fill")

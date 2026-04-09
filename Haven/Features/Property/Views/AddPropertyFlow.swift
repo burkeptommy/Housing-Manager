@@ -9,9 +9,10 @@ import SwiftUI
 /// step matches the warm welcome of the pre-auth AddressHookView so users
 /// see the same UX whether they're brand new or already signed in.
 ///
-/// On confirmation, posts `.startHouseQuiz` with the new property if the
-/// user taps the optional quiz prompt; the dashboard listens and presents
-/// HouseQuizView.
+/// Phase 20a: After confirmation, the flow auto-presents `PropertyHookView`
+/// (a 2-page hook screen). Authenticated users tap "Continue to your home
+/// quiz" on Page 2, which posts `.startHouseQuiz` with the new property —
+/// the dashboard listens and presents HouseQuizView.
 struct AddPropertyFlow: View {
     /// Optional callback fired after the property is created (regardless of
     /// whether the user takes the quiz prompt or not). Use this to refresh
@@ -19,7 +20,11 @@ struct AddPropertyFlow: View {
     var onComplete: ((PropertyRow) -> Void)?
 
     @Environment(\.dismiss) private var dismiss
+    @EnvironmentObject var appState: AppState
     @StateObject private var viewModel = AddPropertyFlowViewModel()
+
+    /// Phase 20a — controls the post-confirmation hook fullScreenCover.
+    @State private var showPropertyHook = false
 
     var body: some View {
         NavigationStack {
@@ -66,6 +71,67 @@ struct AddPropertyFlow: View {
                 }
             }
             .trackScreen("AddPropertyFlow")
+            // Phase 20a: present the new 2-page hook screen as soon as
+            // creation lands on the confirmation step. The cover can also
+            // be triggered manually by the fallback button on the
+            // confirmation step in case it was dismissed once already.
+            .onChange(of: viewModel.currentStep) { _, newStep in
+                if newStep == .confirmation && viewModel.creationResult?.property != nil {
+                    // Brief delay so the success checkmark gets a beat to
+                    // register before the cover slides up.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.55) {
+                        showPropertyHook = true
+                    }
+                }
+            }
+            .fullScreenCover(isPresented: $showPropertyHook, onDismiss: handleHookDismiss) {
+                if let property = viewModel.creationResult?.property {
+                    NavigationStack {
+                        PropertyHookView(
+                            address1: property.street ?? property.name,
+                            city: property.city ?? viewModel.city,
+                            state: property.state ?? viewModel.state,
+                            yearBuilt: property.yearBuilt,
+                            fuelType: viewModel.propertyLookupResult?.features?.heatingFuel,
+                            lookupResult: viewModel.propertyLookupResult,
+                            isAuthenticated: appState.authService.isAuthenticated,
+                            onContinueToAccountGate: {
+                                // Authenticated users on this flow shouldn't
+                                // hit this branch — leave it stubbed.
+                                print("[Phase20a] PropertyHookView account gate from authed AddPropertyFlow")
+                            },
+                            onContinueToQuiz: {
+                                Analytics.track(.quizStarted, [
+                                    "source": "property_hook",
+                                    "property_id": property.id.uuidString
+                                ])
+                                NotificationCenter.default.post(
+                                    name: .startHouseQuiz,
+                                    object: property
+                                )
+                                showPropertyHook = false
+                                onComplete?(property)
+                                dismiss()
+                            }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    /// If the user dismisses the hook cover (X button or swipe down)
+    /// without picking the quiz CTA, treat it as "skip the quiz" and just
+    /// close the AddPropertyFlow sheet so they land back wherever they
+    /// started. The property is already created and visible.
+    private func handleHookDismiss() {
+        guard let property = viewModel.creationResult?.property else { return }
+        // Only auto-dismiss the parent flow if the cover was closed AFTER
+        // we presented it. The user may have re-tapped the fallback button
+        // and is still on the confirmation step.
+        if viewModel.currentStep == .confirmation {
+            onComplete?(property)
+            dismiss()
         }
     }
 
@@ -212,29 +278,13 @@ struct AddPropertyFlow: View {
                 }
 
             case .confirmation:
-                HavenButton(title: "Take House Quiz") {
-                    if let property = viewModel.creationResult?.property {
-                        Analytics.track(.quizStarted, [
-                            "source": "add_property_flow",
-                            "property_id": property.id.uuidString
-                        ])
-                        NotificationCenter.default.post(
-                            name: .startHouseQuiz,
-                            object: property
-                        )
-                        onComplete?(property)
-                        dismiss()
-                    }
+                // Phase 20a: the confirmation step now auto-presents
+                // PropertyHookView once the property has been created.
+                // This view's continue button is just a manual fallback in
+                // case the cover gets dismissed without a decision.
+                HavenButton(title: "See what we know about your home") {
+                    showPropertyHook = true
                 }
-
-                Button("Later, just add it") {
-                    if let property = viewModel.creationResult?.property {
-                        onComplete?(property)
-                    }
-                    dismiss()
-                }
-                .font(HavenTypography.uiLabel)
-                .foregroundStyle(HavenColors.textTertiary)
             }
         }
         .padding(.horizontal, HavenTheme.pageMargin)

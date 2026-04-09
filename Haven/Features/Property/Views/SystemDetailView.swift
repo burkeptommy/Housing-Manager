@@ -105,9 +105,22 @@ struct SystemDetailRowView: View {
             Text("This will permanently delete \"\(system.name)\" and all its maintenance tasks, warranties, and service records.")
         }
         .sheet(isPresented: $showManageTasks) {
-            ManageSystemTasksSheet(system: system, tasks: tasks) { ids in
-                await bulkDeleteTasks(ids: ids)
-            }
+            ManageSystemTasksSheet(
+                system: system,
+                tasks: tasks,
+                onDelete: { ids in
+                    await bulkDeleteTasks(ids: ids)
+                },
+                onTaskAdded: { newTask in
+                    // Phase 19 polish: keep the parent's task list in sync
+                    // when a custom task is added inside the sheet so the
+                    // SystemDetailView's task list reflects the addition
+                    // without needing a full reload.
+                    await MainActor.run {
+                        tasks.append(newTask)
+                    }
+                }
+            )
         }
         .confirmationDialog(
             "Reset templates for this system?",

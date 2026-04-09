@@ -10,6 +10,11 @@ extension Notification.Name {
     static let maintenanceTaskChanged = Notification.Name("maintenanceTaskChanged")
     static let homeSystemChanged = Notification.Name("homeSystemChanged")
     static let contractorChanged = Notification.Name("contractorChanged")
+    /// Phase 19l: Posted when a NEW contractor is created (not edited).
+    /// Listeners use this to re-fire the post-quiz delegation sheet for any
+    /// 'either' tasks that the new vendor's category could take over.
+    /// `userInfo["contractorId"]` carries the new row's UUID.
+    static let contractorAdded = Notification.Name("contractorAdded")
     static let documentChanged = Notification.Name("documentChanged")
     static let propertyChanged = Notification.Name("propertyChanged")
     static let projectChanged = Notification.Name("projectChanged")

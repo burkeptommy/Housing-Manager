@@ -1,4 +1,11 @@
 import SwiftUI
+import Supabase
+
+/// Thrown by `OnboardingViewModel.complete()` when the global 30-second
+/// deadline expires before the onboarding chain finishes. The view catches
+/// this and surfaces a "Try Again" button so the user is never silently
+/// trapped on the splash screen by a hung Supabase call.
+struct OnboardingDeadlineError: Error {}
 
 struct AdditionalMember: Identifiable {
     let id = UUID()
@@ -62,60 +69,124 @@ final class OnboardingViewModel: ObservableObject {
         }
     }
 
+    /// Phase 20 polish (Apr 7): the previous version of this method awaited
+    /// `HavenSupabase.auth.session` directly, which can hang indefinitely if
+    /// the supabase-swift token refresh loop stalls (we saw this on Tom's
+    /// wife's account: user row created in supabase but no household/property
+    /// because the splash screen never advanced past prefill). Even worse,
+    /// `hasFinishedPrefill` was only set AFTER the await, so a hung session
+    /// lookup left the splash stuck forever with no fallback to the manual
+    /// name form.
+    ///
+    /// New behavior: kick off the session lookup in a child task and ALWAYS
+    /// flip `hasFinishedPrefill = true` after at most 2 seconds. If the
+    /// session arrives within the deadline we use its metadata to populate
+    /// `primaryFirstName` / `primaryLastName` / `primaryEmail`. If the
+    /// deadline wins, the splash falls through to `nameFallbackView` and the
+    /// user can type their name manually. The child task is allowed to keep
+    /// running so a slow-but-eventually-successful session lookup can still
+    /// patch in the name later.
     func prefillFromAuth() async {
-        do {
-            let session = try await HavenSupabase.auth.session
-            let email = session.user.email ?? ""
+        let start = Date()
+        print("[Onboarding] prefillFromAuth: ENTER")
 
-            // Prefer the explicit first/last we set during sign-up.
-            let metadataFirst = session.user.userMetadata["first_name"]?.value as? String
-            let metadataLast = session.user.userMetadata["last_name"]?.value as? String
-            // Apple's variant for first-time Apple Sign In.
-            let appleFirst = session.user.userMetadata["given_name"]?.value as? String
-            let appleLast = session.user.userMetadata["family_name"]?.value as? String
-            // Legacy / fallback full name string.
-            let fullName = session.user.userMetadata["full_name"]?.value as? String
-                ?? session.user.userMetadata["name"]?.value as? String
-                ?? ""
+        // Apr 7, 2026 (build 78): UserDefaults is the HIGHEST PRIORITY
+        // source of names. AccountCreationStep stashes the first/last name
+        // there before triggering Apple/email auth, specifically because
+        // Apple Sign In only returns the user's name on the FIRST
+        // authorization for an app, ever. Every subsequent sign-in
+        // returns nothing — there's literally no way to get the name back
+        // from Apple. By capturing it ourselves before the auth round-trip,
+        // we never have to rely on Apple, never need a name fallback view,
+        // and never have to ask the user twice.
+        let pendingName = AddressHookViewModel.loadPendingName()
+        if primaryFirstName.isEmpty, !pendingName.first.isEmpty {
+            primaryFirstName = pendingName.first
+            print("[Onboarding] prefillFromAuth: prefilled firstName from UserDefaults")
+        }
+        if primaryLastName.isEmpty, !pendingName.last.isEmpty {
+            primaryLastName = pendingName.last
+            print("[Onboarding] prefillFromAuth: prefilled lastName from UserDefaults")
+        }
 
-            if primaryEmail.isEmpty {
-                primaryEmail = email
-            }
-
-            if primaryFirstName.isEmpty, let f = metadataFirst, !f.isEmpty {
-                primaryFirstName = f
-            }
-            if primaryLastName.isEmpty, let l = metadataLast, !l.isEmpty {
-                primaryLastName = l
-            }
-            if primaryFirstName.isEmpty, let f = appleFirst, !f.isEmpty {
-                primaryFirstName = f
-            }
-            if primaryLastName.isEmpty, let l = appleLast, !l.isEmpty {
-                primaryLastName = l
-            }
-
-            // Last-resort: parse the joined fullName.
-            if primaryFirstName.isEmpty, !fullName.isEmpty {
-                let parts = fullName.split(separator: " ", maxSplits: 1)
-                if parts.count >= 1 { primaryFirstName = String(parts[0]) }
-                if parts.count >= 2 { primaryLastName = String(parts[1]) }
-            }
-        } catch {
-            print("[Onboarding] Could not prefill from auth: \(error)")
+        // Session metadata is the second-priority source. It will populate
+        // the email field and any name we still don't have (covering the
+        // edge case where session metadata fired through but the user
+        // skipped the AccountCreationStep name capture for some reason).
+        // Bounded by safeSession's wall-clock deadline so a hung
+        // supabase-swift refresh can't trap us here.
+        if let session = await HavenSupabase.safeSession(timeout: 2.0) {
+            print("[Onboarding] prefillFromAuth: got session, applying metadata")
+            applySessionMetadata(session)
+        } else {
+            print("[Onboarding] prefillFromAuth: session lookup timed out, falling through to manual entry")
         }
         hasFinishedPrefill = true
+        print("[Onboarding] prefillFromAuth: EXIT after \(String(format: "%.2f", Date().timeIntervalSince(start)))s, hasFinishedPrefill=true, canProceed=\(canProceed)")
+    }
+
+    /// Apply the session's user metadata to the primary-member fields.
+    /// Pulled out of `prefillFromAuth` so the deadline race can call it
+    /// from inside the child task without duplicating logic.
+    private func applySessionMetadata(_ session: Session) {
+        let email = session.user.email ?? ""
+
+        // Prefer the explicit first/last we set during sign-up.
+        let metadataFirst = session.user.userMetadata["first_name"]?.value as? String
+        let metadataLast = session.user.userMetadata["last_name"]?.value as? String
+        // Apple's variant for first-time Apple Sign In.
+        let appleFirst = session.user.userMetadata["given_name"]?.value as? String
+        let appleLast = session.user.userMetadata["family_name"]?.value as? String
+        // Legacy / fallback full name string.
+        let fullName = session.user.userMetadata["full_name"]?.value as? String
+            ?? session.user.userMetadata["name"]?.value as? String
+            ?? ""
+
+        if primaryEmail.isEmpty {
+            primaryEmail = email
+        }
+
+        if primaryFirstName.isEmpty, let f = metadataFirst, !f.isEmpty {
+            primaryFirstName = f
+        }
+        if primaryLastName.isEmpty, let l = metadataLast, !l.isEmpty {
+            primaryLastName = l
+        }
+        if primaryFirstName.isEmpty, let f = appleFirst, !f.isEmpty {
+            primaryFirstName = f
+        }
+        if primaryLastName.isEmpty, let l = appleLast, !l.isEmpty {
+            primaryLastName = l
+        }
+
+        // Last-resort: parse the joined fullName.
+        if primaryFirstName.isEmpty, !fullName.isEmpty {
+            let parts = fullName.split(separator: " ", maxSplits: 1)
+            if parts.count >= 1 { primaryFirstName = String(parts[0]) }
+            if parts.count >= 2 { primaryLastName = String(parts[1]) }
+        }
     }
 
     /// Auto-call from `OnboardingView.task` once prefill + invitation check finish.
     /// Only fires once per view appearance and skips when an invitation is pending
     /// (the invited flow has its own button).
-    func autoCompleteIfReady(authService: AuthService) async {
-        guard !hasAutoCompleted else { return }
-        guard pendingInvitation == nil else { return }
-        guard canProceed else { return }
+    func autoCompleteIfReady(authService: AuthService, appState: AppState? = nil) async {
+        print("[Onboarding] autoCompleteIfReady: ENTER hasAutoCompleted=\(hasAutoCompleted) pendingInvitation=\(pendingInvitation != nil) canProceed=\(canProceed) firstName='\(primaryFirstName)' lastName='\(primaryLastName)'")
+        guard !hasAutoCompleted else {
+            print("[Onboarding] autoCompleteIfReady: SKIP — already completed")
+            return
+        }
+        guard pendingInvitation == nil else {
+            print("[Onboarding] autoCompleteIfReady: SKIP — pending invitation")
+            return
+        }
+        guard canProceed else {
+            print("[Onboarding] autoCompleteIfReady: SKIP — names not ready, expecting nameFallbackView to show")
+            return
+        }
+        print("[Onboarding] autoCompleteIfReady: PROCEED — calling complete()")
         hasAutoCompleted = true
-        await complete(authService: authService)
+        await complete(authService: authService, appState: appState)
     }
 
     var canProceed: Bool {
@@ -136,11 +207,18 @@ final class OnboardingViewModel: ObservableObject {
     ///      case where Tom invited Sarah but she signed up with the same email
     ///      without ever opening the invite link.
     func checkForInvitation() async {
+        let start = Date()
+        print("[Onboarding] checkForInvitation: ENTER")
+        defer {
+            print("[Onboarding] checkForInvitation: EXIT after \(String(format: "%.2f", Date().timeIntervalSince(start)))s, pendingInvitation=\(pendingInvitation != nil ? "yes" : "nil")")
+        }
+
         let defaults = UserDefaults.standard
 
         // Path 1: cached, verified invite code wins.
         if defaults.bool(forKey: PendingInviteKeys.hasPendingInvite),
            let cachedCode = defaults.string(forKey: PendingInviteKeys.code), !cachedCode.isEmpty {
+            print("[Onboarding] checkForInvitation: trying cached invite code")
             do {
                 if let invitation = try await DatabaseService.shared.lookupInviteCode(cachedCode) {
                     pendingInvitation = invitation
@@ -151,15 +229,34 @@ final class OnboardingViewModel: ObservableObject {
             }
         }
 
-        // Path 2: email match fallback.
-        do {
-            let session = try await HavenSupabase.auth.session
-            let email = session.user.email ?? ""
-            if !email.isEmpty {
-                pendingInvitation = try await DatabaseService.shared.checkPendingInvitation(email: email)
+        // Path 2: email match fallback. Apr 7, 2026: simplified to use the
+        // centralized `safeSession` helper. If the session lookup times out
+        // we just skip invitation lookup; the user can still join via the
+        // in-app invite code sheet later.
+        let cachedEmail = primaryEmail
+        if !cachedEmail.isEmpty {
+            print("[Onboarding] checkForInvitation: trying cached email \(cachedEmail)")
+            do {
+                pendingInvitation = try await DatabaseService.shared.checkPendingInvitation(email: cachedEmail)
+            } catch {
+                print("[Onboarding] Failed to check invitation by cached email: \(error)")
             }
-        } catch {
-            print("[Onboarding] Failed to check invitation: \(error)")
+            return
+        }
+
+        print("[Onboarding] checkForInvitation: no cached email, falling back to bounded session lookup")
+        guard let session = await HavenSupabase.safeSession(timeout: 2.0) else {
+            print("[Onboarding] Skipping invitation check: session lookup timed out")
+            return
+        }
+        let email = session.user.email ?? ""
+        if !email.isEmpty {
+            print("[Onboarding] checkForInvitation: looking up invitation for \(email)")
+            do {
+                pendingInvitation = try await DatabaseService.shared.checkPendingInvitation(email: email)
+            } catch {
+                print("[Onboarding] Failed to check invitation: \(error)")
+            }
         }
     }
 
@@ -170,7 +267,13 @@ final class OnboardingViewModel: ObservableObject {
         errorMessage = nil
 
         do {
-            let session = try await HavenSupabase.auth.session
+            // Apr 7, 2026: bounded session lookup so a stalled refresh
+            // can't trap the invited-user flow.
+            guard let session = await HavenSupabase.safeSession(timeout: 3.0) else {
+                errorMessage = "Authentication is taking too long. Please try again."
+                isLoading = false
+                return
+            }
             let userId = session.user.id
 
             // Link user to the existing household
@@ -264,12 +367,43 @@ final class OnboardingViewModel: ObservableObject {
 
     // MARK: - Complete Onboarding
 
-    func complete(authService: AuthService) async {
+    /// Apr 7, 2026: wrapped the entire body in a 30-second global deadline.
+    /// If any single async call inside hangs (PostgREST request, session
+    /// lookup, anything else), the deadline fires after 30s and surfaces a
+    /// user-visible error with a retry button via `errorMessage`. The user
+    /// can never be silently trapped on the splash again.
+    ///
+    /// Also: every `setupProgress` label is now distinct from the default
+    /// splash title ("Getting things ready...") so a screenshot tells us
+    /// exactly which step is in flight when a hang happens.
+    func complete(authService: AuthService, appState: AppState? = nil) async {
+        let start = Date()
+        print("[Onboarding] complete: ENTER")
         isLoading = true
         errorMessage = nil
-        defer { isLoading = false }
+        defer {
+            isLoading = false
+            print("[Onboarding] complete: EXIT after \(String(format: "%.2f", Date().timeIntervalSince(start)))s, errorMessage=\(errorMessage ?? "nil")")
+        }
 
         do {
+            try await Self.withGlobalDeadline(seconds: 30) { [weak self] in
+                guard let self else { return }
+                try await self.runComplete(authService: authService, appState: appState)
+            }
+        } catch is OnboardingDeadlineError {
+            errorMessage = "Setup is taking too long. Tap Try Again to retry — your account is safe and we'll pick up where we left off."
+            print("[Onboarding] complete() exceeded 30-second deadline at step: \(setupProgress)")
+        } catch {
+            errorMessage = "We hit a snag setting up your home. \(error.localizedDescription)"
+            print("[Onboarding] complete() failed: \(error)")
+        }
+    }
+
+    /// The actual onboarding work, separated from `complete()` so it can be
+    /// raced against the global deadline.
+    private func runComplete(authService: AuthService, appState: AppState?) async throws {
+            print("[Onboarding] runComplete: STEP insertHousehold")
             setupProgress = "Creating your household..."
             let householdId = UUID()
             // Auto-generate household name from last name
@@ -280,11 +414,15 @@ final class OnboardingViewModel: ObservableObject {
                 id: householdId,
                 name: autoName
             )
+            print("[Onboarding] runComplete: insertHousehold OK")
 
-            setupProgress = "Setting up your account..."
+            print("[Onboarding] runComplete: STEP completeOnboarding")
+            setupProgress = "Linking your account..."
             try await authService.completeOnboarding(householdId: householdId)
+            print("[Onboarding] runComplete: completeOnboarding OK")
 
-            setupProgress = "Adding your information..."
+            print("[Onboarding] runComplete: STEP createFamilyMember")
+            setupProgress = "Saving your profile..."
             _ = try await DatabaseService.shared.createFamilyMember(FamilyMemberInsert(
                 householdId: householdId,
                 firstName: primaryFirstName.trimmingCharacters(in: .whitespaces),
@@ -295,10 +433,12 @@ final class OnboardingViewModel: ObservableObject {
                 gender: primaryGender,
                 avatarColor: "navy"
             ))
+            print("[Onboarding] runComplete: createFamilyMember OK")
 
             // Create property from the address entered in step 1
             if !street.isEmpty {
-                setupProgress = "Setting up your home..."
+                print("[Onboarding] runComplete: STEP createProperty")
+                setupProgress = "Locking in your property..."
                 let propertyName = [street, city].filter { !$0.isEmpty }.joined(separator: ", ")
 
                 var propertyInsert = PropertyInsert(
@@ -314,18 +454,67 @@ final class OnboardingViewModel: ObservableObject {
                 )
                 propertyInsert.yearBuilt = propertyLookupResult?.yearBuilt
                 propertyInsert.squareFootage = propertyLookupResult?.squareFootage
+
+                // Build 84: ATTOM sometimes returns a range
+                // (`estimatedValueLow` / `estimatedValueHigh`) without a
+                // canonical `estimatedValue`. The old code coalesced to nil
+                // in that case, which is why Property Overview was showing
+                // an empty state even though PropertyHookView (which uses
+                // ValuationRange.compute(from:)) rendered a value to the
+                // user. Walk the ladder: canonical → midpoint of range →
+                // high → low → tax assessment. The same ladder powers the
+                // "Refresh from public records" button on the Property
+                // Overview empty state so retroactive fixes use one path.
+                let attomEstimatedValue: Double? = {
+                    if let canonical = propertyLookupResult?.estimatedValue { return canonical }
+                    if let low = propertyLookupResult?.estimatedValueLow,
+                       let high = propertyLookupResult?.estimatedValueHigh {
+                        return (low + high) / 2
+                    }
+                    if let high = propertyLookupResult?.estimatedValueHigh { return high }
+                    if let low = propertyLookupResult?.estimatedValueLow { return low }
+                    if let assessed = propertyLookupResult?.taxAssessment?.assessedValue { return assessed }
+                    return nil
+                }()
+                propertyInsert.currentEstimatedValue = attomEstimatedValue
+                propertyInsert.estimatedValueSource = propertyLookupResult?.estimatedValueSource
+                    ?? (attomEstimatedValue != nil ? "computed" : nil)
                 propertyInsert.purchasePrice = propertyLookupResult?.lastSalePrice
-                propertyInsert.currentEstimatedValue = propertyLookupResult?.estimatedValue
+
+                // Diagnostic logging so future failures are traceable without
+                // a debugger. Captures every signal we considered so we can
+                // tell at a glance whether ATTOM returned nothing, returned a
+                // range only, or returned data the ladder should have caught.
+                print("[Onboarding] ATTOM persistence: estValue=\(attomEstimatedValue?.description ?? "nil") lastSale=\(propertyLookupResult?.lastSalePrice?.description ?? "nil") range=\(propertyLookupResult?.estimatedValueLow?.description ?? "nil")-\(propertyLookupResult?.estimatedValueHigh?.description ?? "nil") taxAssessed=\(propertyLookupResult?.taxAssessment?.assessedValue?.description ?? "nil") source=\(propertyLookupResult?.estimatedValueSource ?? "nil")")
 
                 let property = try await DatabaseService.shared.createProperty(propertyInsert)
+                print("[Onboarding] runComplete: createProperty OK id=\(property.id)")
+
+                // Apr 7, 2026 (build 79): write the just-created property
+                // DIRECTLY to AppState. Previously we tried to re-fetch via
+                // fetchProperties(), but on a brand-new account that runs
+                // into an RLS edge case where the SELECT policy can't yet
+                // see properties for the freshly-linked household (the
+                // INSERT just worked, but the SELECT subquery on users
+                // returns empty). We already have the row from createProperty
+                // — no fetch needed. This also closes the routing race that
+                // was bouncing users to AddressConfirmationIntercept.
+                if let appState {
+                    appState.primaryProperty = property
+                    appState.pendingQuizProperty = property
+                    appState.hasCheckedPrimaryProperty = true
+                    print("[Onboarding] runComplete: AppState.primaryProperty stamped from createProperty result id=\(property.id)")
+                }
 
                 // Auto-create home systems from RentCast features
                 if let features = propertyLookupResult?.features {
+                    print("[Onboarding] runComplete: STEP createHomeSystems")
                     setupProgress = "Adding your home systems..."
                     let systems = homeSystemsFromFeatures(features, propertyId: property.id, householdId: householdId)
                     for system in systems {
                         _ = try? await DatabaseService.shared.createHomeSystem(system)
                     }
+                    print("[Onboarding] runComplete: createHomeSystems OK count=\(systems.count)")
                 }
 
                 // Generate and create maintenance tasks
@@ -334,6 +523,7 @@ final class OnboardingViewModel: ObservableObject {
                     state: state
                 )
                 if !schedulePreview.isEmpty {
+                    print("[Onboarding] runComplete: STEP createMaintenanceTasks count=\(schedulePreview.count)")
                     setupProgress = "Building your maintenance plan..."
                     for item in schedulePreview {
                         let nextDue = nextDueDate(forMonth: item.month)
@@ -363,9 +553,66 @@ final class OnboardingViewModel: ObservableObject {
                 "has_property": !street.isEmpty,
                 "property_enriched": propertyLookupResult != nil,
             ])
-        } catch {
-            print("[Onboarding] Setup failed: \(error)")
-            errorMessage = "Setup failed: \(error.localizedDescription)"
+
+            // The AppState.primaryProperty / pendingQuizProperty / hasCheckedPrimaryProperty
+            // writes happen inline right after createProperty above (build 79),
+            // so they're always in sync with the row we just inserted and don't
+            // depend on a re-fetch that RLS might filter out.
+
+            // Apr 7, 2026 (build 80): flip `needsOnboarding = false` HERE,
+            // as the very last write of the entire onboarding chain. The
+            // flag used to fire mid-chain inside `authService.completeOnboarding()`,
+            // which caused ContentView to re-route OUT of OnboardingView
+            // before the property had been stamped on AppState — producing
+            // a millisecond flash of `AddressConfirmationIntercept` ("Where's
+            // your home?") between OnboardingView and MainTabView. Now the
+            // flag and the property arrive on the same render pass, so
+            // ContentView transitions straight from OnboardingView to
+            // MainTabView with no visible bounce.
+            print("[Onboarding] runComplete: STEP needsOnboarding = false (final)")
+            authService.needsOnboarding = false
+    }
+
+    /// Race a body of work against a wall-clock deadline. If the deadline
+    /// fires first, throws `OnboardingDeadlineError` and the body's task
+    /// is cancelled. Used by `complete()` to put a 30-second backstop on
+    /// the entire onboarding flow so a single hung async call (PostgREST,
+    /// session refresh, anything) can never trap the user silently on
+    /// the splash.
+    ///
+    /// Apr 7, 2026 (build 79): the deadline task now catches its own
+    /// `CancellationError` and exits cleanly. Without this, when the
+    /// operation succeeds first and we call `cancelAll()`, the deadline
+    /// task's `Task.sleep` throws CancellationError, which propagates out
+    /// of `withThrowingTaskGroup` as the group's error — even though the
+    /// operation already succeeded. The result was that every successful
+    /// onboarding ended with `complete() failed: CancellationError()`.
+    /// Now the deadline task only throws `OnboardingDeadlineError` when
+    /// the sleep completes naturally (i.e., the deadline actually fired).
+    private static func withGlobalDeadline(
+        seconds: TimeInterval,
+        operation: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                try await operation()
+            }
+            group.addTask {
+                do {
+                    try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+                } catch is CancellationError {
+                    // Operation finished first and cancelled us — exit cleanly.
+                    return
+                }
+                throw OnboardingDeadlineError()
+            }
+            do {
+                try await group.next()
+                group.cancelAll()
+            } catch {
+                group.cancelAll()
+                throw error
+            }
         }
     }
 

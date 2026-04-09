@@ -503,6 +503,86 @@ final class MaintenanceViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Phase 19l: Bidirectional Personal ↔ Vendor Toggle
+
+    /// Convert a personal/either task to vendor-managed by linking it to a
+    /// contractor and reframing the title + description in Haven's standard
+    /// "Schedule Vendor: ..." voice.
+    ///
+    /// The original wording is sourced from the template (via `templateId`)
+    /// rather than the live row, so a previous reframe doesn't pollute the
+    /// new one. If the task has no template, falls back to the row's title
+    /// (lowercased) so user-added custom tasks still flip cleanly.
+    func convertToVendorManaged(taskId: UUID, contractor: ContractorRow) async {
+        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+
+        let originalTemplate = task.templateId.flatMap { MaintenanceTemplates.template(forKey: $0) }
+        let originalTitle = originalTemplate?.title ?? task.title
+        let originalDescription = originalTemplate?.description ?? task.description ?? ""
+
+        let newTitle = "Schedule \(contractor.companyName): \(originalTitle.lowercased())"
+        let newDescription: String = {
+            if originalDescription.isEmpty {
+                return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work."
+            }
+            return "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(originalDescription)"
+        }()
+
+        var update = MaintenanceTaskUpdate()
+        update.title = newTitle
+        update.description = newDescription
+        update.assignedContractorId = contractor.id
+        update.assignmentType = "vendor"
+        update.needsVendor = false
+
+        do {
+            let saved = try await db.updateMaintenanceTask(id: taskId, update)
+            if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                tasks[idx] = saved
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "convert_to_vendor", "id": taskId.uuidString])
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
+    /// Convert a vendor-managed task back to personal. Restores the original
+    /// template wording from `templateId`, clears the contractor link, and
+    /// resets `assignmentType` to "personal".
+    ///
+    /// If the task isn't template-based, the live title is kept as-is — it
+    /// wasn't reframed by Haven so there's nothing to restore.
+    func convertToPersonal(taskId: UUID) async {
+        guard let task = tasks.first(where: { $0.id == taskId }) else { return }
+
+        var update = MaintenanceTaskUpdate()
+        update.assignedContractorId = nil
+        update.assignmentType = "personal"
+        update.needsVendor = false
+
+        if let templateId = task.templateId,
+           let template = MaintenanceTemplates.template(forKey: templateId) {
+            update.title = template.title
+            update.description = template.description
+        }
+
+        do {
+            let saved = try await db.updateMaintenanceTask(id: taskId, update)
+            if let idx = tasks.firstIndex(where: { $0.id == taskId }) {
+                tasks[idx] = saved
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil,
+                userInfo: ["action": "convert_to_personal", "id": taskId.uuidString])
+        } catch {
+            self.error = error.localizedDescription
+            Haptics.error()
+        }
+    }
+
     private func calculateNextDueDate(frequency: String, from date: Date) -> Date {
         let cal = Calendar.current
         switch frequency.lowercased() {

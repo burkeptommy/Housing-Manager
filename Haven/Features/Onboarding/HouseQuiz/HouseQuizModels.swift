@@ -63,6 +63,14 @@ struct HouseQuizAnswer: Codable, Equatable {
     /// and stashes its catalog UUID here. The mapper reads this at apply
     /// time to create a fresh propane utility_account row.
     var secondaryFuelProviderId: UUID?
+    /// Phase 19i: Q22 generator fuel type. One of "natural_gas", "propane",
+    /// "diesel". Nil when generator is "none" or fuel wasn't asked yet.
+    var generatorFuelType: String?
+    /// Phase 19i: Q22 generator provider catalog UUID, only set when the
+    /// user explicitly picked a provider for the generator's fuel AND that
+    /// fuel differs from the primary heating fuel from Q3 (i.e. they need
+    /// a separate utility_account row from the one Q19 created).
+    var generatorProviderId: UUID?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -74,6 +82,8 @@ struct HouseQuizAnswer: Codable, Equatable {
         case expectingEntries = "expecting_entries"
         case selectedProviderId = "selected_provider_id"
         case secondaryFuelProviderId = "secondary_fuel_provider_id"
+        case generatorFuelType = "generator_fuel_type"
+        case generatorProviderId = "generator_provider_id"
         case answeredAt = "answered_at"
     }
 
@@ -86,6 +96,8 @@ struct HouseQuizAnswer: Codable, Equatable {
         expectingEntries: [QuizExpectingEntry]? = nil,
         selectedProviderId: UUID? = nil,
         secondaryFuelProviderId: UUID? = nil,
+        generatorFuelType: String? = nil,
+        generatorProviderId: UUID? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
@@ -96,12 +108,15 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.expectingEntries = expectingEntries
         self.selectedProviderId = selectedProviderId
         self.secondaryFuelProviderId = secondaryFuelProviderId
+        self.generatorFuelType = generatorFuelType
+        self.generatorProviderId = generatorProviderId
         self.answeredAt = answeredAt
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
-    /// `kids`, `expecting_entries`, `selected_provider_id`, or
-    /// `secondary_fuel_provider_id` keys) still load cleanly after the
+    /// `kids`, `expecting_entries`, `selected_provider_id`,
+    /// `secondary_fuel_provider_id`, `generator_fuel_type`, or
+    /// `generator_provider_id` keys) still load cleanly after the
     /// schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -113,6 +128,8 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.expectingEntries = try? c.decodeIfPresent([QuizExpectingEntry].self, forKey: .expectingEntries)
         self.selectedProviderId = try? c.decodeIfPresent(UUID.self, forKey: .selectedProviderId)
         self.secondaryFuelProviderId = try? c.decodeIfPresent(UUID.self, forKey: .secondaryFuelProviderId)
+        self.generatorFuelType = try? c.decodeIfPresent(String.self, forKey: .generatorFuelType)
+        self.generatorProviderId = try? c.decodeIfPresent(UUID.self, forKey: .generatorProviderId)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }
@@ -228,6 +245,17 @@ enum HouseQuizQuestionKind: String, Codable {
     case vehicleAdd
     case providerSearch
     case caretakers
+    /// Phase 19i: Q22 generator inline form. Captures generator type
+    /// (whole-home / portable / none), fuel type (natural gas / propane /
+    /// diesel), and an optional provider when the fuel differs from Q3's
+    /// primary heating fuel.
+    case generatorAdd
+    /// Phase 19m: Q15b multi-select contractor chips with inline picker per
+    /// chip. Lets the user add HVAC service, plumber, electrician, etc. in
+    /// one screen. Each selected chip reveals a UtilityProviderSearchPicker
+    /// scoped to that contractor type. Saved chips become contractor rows
+    /// via the household-contractor mirror in the answer mapper.
+    case householdContractors
 }
 
 /// One question in the House Quiz library. The library lives in
@@ -258,6 +286,22 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// fuel provider question.
     let dynamicProviderTypes: ((HouseQuizState) -> [String])?
 
+    /// Phase 19j: Conditional skip closure. Called at advance time with the
+    /// current quiz state. Returning `true` causes the view model to mark
+    /// this question as skipped and move to the next one. Used by Q11b
+    /// (lawn type) and Q14 (irrigation) to skip when prior answers make
+    /// the question irrelevant — e.g. a user who said "no_lawn" in Q11
+    /// shouldn't be asked about lawn type or sprinklers.
+    let dynamicSkip: ((HouseQuizState) -> Bool)?
+
+    /// Build 86: Opt-in flag for `multiSelect` questions that should expose a
+    /// "Select all" / "Deselect all" pill above the option list. Currently
+    /// only Q10 (appliances) uses this — Tom flagged that asking users to
+    /// individually pick every appliance they own was friction when "all
+    /// of them" is the common case. Other multi-select questions (Q20 fuels,
+    /// Q15b contractors, etc.) intentionally keep the chip-by-chip flow.
+    let supportsSelectAll: Bool
+
     init(
         id: String,
         section: HouseQuizSection,
@@ -268,7 +312,9 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         documentUploadCategory: DocumentCategory? = nil,
         providerFollowUpAnswerIds: Set<String> = [],
         providerTypes: [String] = [],
-        dynamicProviderTypes: ((HouseQuizState) -> [String])? = nil
+        dynamicProviderTypes: ((HouseQuizState) -> [String])? = nil,
+        dynamicSkip: ((HouseQuizState) -> Bool)? = nil,
+        supportsSelectAll: Bool = false
     ) {
         self.id = id
         self.section = section
@@ -280,6 +326,8 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.providerFollowUpAnswerIds = providerFollowUpAnswerIds
         self.providerTypes = providerTypes
         self.dynamicProviderTypes = dynamicProviderTypes
+        self.dynamicSkip = dynamicSkip
+        self.supportsSelectAll = supportsSelectAll
     }
 
     /// Convenience for picker code that wants the canonical "primary" type

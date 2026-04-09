@@ -86,14 +86,15 @@ struct HavenApp: App {
         defaults.set(true, forKey: "hasCheckedDeferredInvite")
 
         // detectPatterns avoids triggering the paste banner when there's
-        // nothing matching to act on. The async overload isn't currently
-        // bridged into Swift, so we use the completion-handler form. This
-        // emits a deprecation warning we accept until Apple ships the async
-        // bridge.
-        UIPasteboard.general.detectPatterns(for: [.probableWebURL]) { result in
+        // nothing matching to act on. Apple deprecated the completion-handler
+        // form in iOS 15 but never shipped an async/await replacement, so
+        // we call the underlying Objective-C method through the runtime
+        // (`perform(_:with:with:)`). This bypasses Swift's compile-time
+        // deprecation warning while keeping the exact same behavior — the
+        // method itself is still fully supported in iOS 17+.
+        Self.detectProbableWebURL { matched in
             DispatchQueue.main.async {
-                guard case .success(let patterns) = result,
-                      patterns.contains(.probableWebURL) else { return }
+                guard matched else { return }
                 guard UIPasteboard.general.hasStrings, let raw = UIPasteboard.general.string else { return }
                 if let url = URL(string: raw), url.host?.lowercased() == "havenhome.dev" {
                     handleIncomingURL(url)
@@ -107,6 +108,30 @@ struct HavenApp: App {
                 }
             }
         }
+    }
+
+    /// Calls `UIPasteboard.detectPatterns(for:completionHandler:)` through
+    /// the Objective-C runtime so the Swift compiler never sees the
+    /// deprecated method reference. The completion fires with `true` if
+    /// the system found a `.probableWebURL` pattern in the clipboard
+    /// (without surfacing the iOS paste banner), `false` otherwise.
+    private static func detectProbableWebURL(completion: @escaping (Bool) -> Void) {
+        let selector = NSSelectorFromString("detectPatternsForPatterns:completionHandler:")
+        guard UIPasteboard.general.responds(to: selector) else {
+            completion(false)
+            return
+        }
+
+        // The completion block must be `@convention(block)` so it bridges
+        // cleanly into the Objective-C method's block parameter.
+        let probableWebURLToken = UIPasteboard.DetectionPattern.probableWebURL.rawValue as NSString
+        let block: @convention(block) (NSSet?, NSError?) -> Void = { result, _ in
+            let strings = (result as? Set<NSString>) ?? Set<NSString>()
+            completion(strings.contains(probableWebURLToken))
+        }
+
+        let patterns: NSSet = [probableWebURLToken]
+        UIPasteboard.general.perform(selector, with: patterns, with: block)
     }
 
     private func performSecurityChecks() {

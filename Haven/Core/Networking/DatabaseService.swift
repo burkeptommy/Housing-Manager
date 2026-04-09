@@ -64,8 +64,20 @@ final class DatabaseService {
 
     // MARK: - Users
 
+    /// Apr 7, 2026: replaced the bare `try await HavenSupabase.auth.session.user.id`
+    /// with the bounded `safeSession` helper. The original blocking lookup
+    /// hung onboarding for 90+ seconds on a stalled supabase-swift refresh.
+    /// If the bounded lookup times out we throw a user-friendly error
+    /// instead of being trapped — the caller can retry or fall back.
     func fetchCurrentUser() async throws -> UserRow {
-        let userId = try await HavenSupabase.auth.session.user.id
+        guard let session = await HavenSupabase.safeSession(timeout: 3.0) else {
+            throw NSError(
+                domain: "DatabaseService",
+                code: 408,
+                userInfo: [NSLocalizedDescriptionKey: "Authentication is taking too long. Please try again."]
+            )
+        }
+        let userId = session.user.id
         return try await from("users")
             .select()
             .eq("id", value: userId.uuidString)

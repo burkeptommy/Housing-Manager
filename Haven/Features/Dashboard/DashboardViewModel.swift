@@ -49,6 +49,14 @@ final class DashboardViewModel: ObservableObject {
     @Published var dueThisMonthTasks: [MaintenanceTaskDBRow] = []
     @Published var nextUpcomingTask: MaintenanceTaskDBRow?
     @Published var allUpcomingTasks: [MaintenanceTaskDBRow] = []
+
+    /// Phase 19l: Active personal/either property tasks (excludes vehicles
+    /// and archived rows). Drives the "X to do" half of the home hero card.
+    @Published var personalTaskCount: Int = 0
+    /// Phase 19l: Active vendor-managed property tasks — both linked to a
+    /// contractor and "needs vendor" find-a-contractor placeholders. Drives
+    /// the "Y vendor-managed" half of the home hero card.
+    @Published var vendorManagedTaskCount: Int = 0
     @Published var recentDocuments: [DocumentRow] = []
     @Published var userFirstName: String?
     @Published var isLoading = false
@@ -563,6 +571,19 @@ final class DashboardViewModel: ObservableObject {
 
             nextUpcomingTask = futureTasks.first
             allUpcomingTasks = futureTasks
+
+            // Phase 19l: split the active property task list into personal +
+            // vendor-managed buckets so the dashboard hero can show both.
+            // Vehicle tasks are excluded (this is the home card). Archived
+            // rows are already filtered out at the DB layer.
+            let propertyTasks = tasks.filter { $0.vehicleId == nil }
+            personalTaskCount = propertyTasks.filter { task in
+                let assignment = task.assignmentType?.lowercased()
+                return assignment != "vendor"
+            }.count
+            vendorManagedTaskCount = propertyTasks.filter { task in
+                task.assignmentType?.lowercased() == "vendor"
+            }.count
         } catch {}
     }
 

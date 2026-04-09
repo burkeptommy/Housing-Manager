@@ -395,12 +395,18 @@ struct OnboardingSchedulePreviewStep: View {
                 }
             )
         case .bathrooms:
+            // Phase 20 polish: bathrooms is now Double? to support half-baths
+            // (ATTOM returns 3.5 for "3 full + 1 half"). The legacy stepper
+            // here only supports whole-number editing — we round to the
+            // nearest int when reading and convert back to Double on commit.
+            // This preserves the existing UX for the legacy preview step
+            // without requiring a new half-step stepper component.
             stepperEditor(
                 label: label,
-                value: propertyResult?.bathrooms ?? 2,
+                value: Int(propertyResult?.bathrooms ?? 2),
                 range: 1...10,
                 onCommit: { newValue in
-                    propertyResult?.bathrooms = newValue
+                    propertyResult?.bathrooms = Double(newValue)
                     commitEdit()
                 }
             )

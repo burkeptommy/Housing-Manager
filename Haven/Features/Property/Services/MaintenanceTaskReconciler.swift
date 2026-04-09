@@ -83,12 +83,32 @@ enum MaintenanceTaskReconciler {
             fuelType: fuelType,
             flags: flags
         )
-        let correctTemplates = MaintenanceTemplates.essentialTemplates(
+        let rawTemplates = MaintenanceTemplates.essentialTemplates(
             for: systemCategory,
             activeSubtypes: activeSubtypes
         )
-        let correctTitles = Set(correctTemplates.map { $0.title.lowercased() })
+
+        // Phase 19j: Fetch the property once so template `{city}` and
+        // `{state}` placeholders can be substituted with the user's actual
+        // location before tasks are written. Failures fall back to generic
+        // "your area" / "your state" so the reconciler still runs offline.
+        let property = try? await DatabaseService.shared.fetchProperty(id: propertyId)
+        let correctTemplates = rawTemplates.map {
+            $0.interpolated(city: property?.city, state: property?.state)
+        }
+
+        // Phase 19k: dedup by templateKey (stable) instead of title (mutable
+        // because vendor reframing changes it). Both correctTemplates and
+        // existing tasks compare against the underlying template identity.
+        let correctTemplateKeys = Set(rawTemplates.map { $0.templateKey })
         let knownTitlesForCategory = MaintenanceTemplates.knownTemplateTitles(forCategory: systemCategory)
+
+        // Phase 19k: Look up household contractors so we can decide, per
+        // template, whether to create the task as personal, vendor-managed
+        // (linked to a contractor), or "find a contractor" (vendor template
+        // with no contractor on file). One DB call up front, in-memory
+        // matching after. RLS scopes the result to this household automatically.
+        let allContractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
 
         // 2. Fetch existing active (non-archived) tasks for this property and
         //    narrow them to the ones that belong to the system being
@@ -123,7 +143,8 @@ enum MaintenanceTaskReconciler {
             }
             return false
         }
-        let existingTitles = Set(existing.map { $0.title.lowercased() })
+        // Phase 19k: existing dedup keys are templateIds, not titles.
+        let existingTemplateIds = Set(existing.compactMap { $0.templateId })
 
         // 3. Templates to ADD: in the correct set but not yet present.
         //    Gated on mode — `.removeOnly` skips this half entirely.
@@ -132,40 +153,118 @@ enum MaintenanceTaskReconciler {
             let calendar = Calendar.current
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"
-            for template in correctTemplates where !existingTitles.contains(template.title.lowercased()) {
+            // Iterate raw templates (not interpolated) so templateKey is stable.
+            // Then look up the matching interpolated version for actual content.
+            for (index, rawTemplate) in rawTemplates.enumerated() {
+                let templateKey = rawTemplate.templateKey
+                guard !existingTemplateIds.contains(templateKey) else { continue }
+
+                let template = correctTemplates[index]
                 let nextDue = calendar.date(byAdding: template.interval, to: Date()) ?? Date()
+
+                // Phase 19k: vendor-aware task creation.
+                // Find a matching contractor for the system's category. Match
+                // is case-insensitive on contractor.category, with a fallback
+                // to the legacy specialties array if category is unset.
+                let matchingContractor = allContractors.first { contractor in
+                    if let cat = contractor.category,
+                       cat.caseInsensitiveCompare(systemCategory) == .orderedSame {
+                        return true
+                    }
+                    if let specs = contractor.specialties,
+                       specs.contains(where: { $0.caseInsensitiveCompare(systemCategory) == .orderedSame }) {
+                        return true
+                    }
+                    return false
+                }
+
+                // Decide assignment + framing based on the template's
+                // assignmentType and whether a contractor exists.
+                let finalTitle: String
+                let finalDescription: String
+                let assignmentTypeString: String
+                let assignedContractorId: UUID?
+                let needsVendor: Bool
+
+                switch template.assignmentType {
+                case .personal:
+                    // Always personal, no vendor lookup needed.
+                    finalTitle = template.title
+                    finalDescription = template.description
+                    assignmentTypeString = "personal"
+                    assignedContractorId = nil
+                    needsVendor = false
+
+                case .vendor:
+                    // Always vendor-managed. If contractor exists, link and
+                    // reframe the title. If not, mark as needs_vendor and
+                    // reframe as "Find a contractor for: ...".
+                    if let contractor = matchingContractor {
+                        finalTitle = "Schedule \(contractor.companyName): \(template.title.lowercased())"
+                        finalDescription = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)"
+                        assignmentTypeString = "vendor"
+                        assignedContractorId = contractor.id
+                        needsVendor = false
+                    } else {
+                        finalTitle = "Find a contractor for: \(template.title.lowercased())"
+                        finalDescription = "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)"
+                        assignmentTypeString = "vendor"
+                        assignedContractorId = nil
+                        needsVendor = true
+                    }
+
+                case .either:
+                    // Default to personal. Phase 19l's UI surfaces the
+                    // bidirectional toggle so users can flip to vendor later.
+                    // The post-quiz delegation sheet also offers to bulk-flip
+                    // these when a vendor for the category exists.
+                    finalTitle = template.title
+                    finalDescription = template.description
+                    assignmentTypeString = "either"
+                    assignedContractorId = nil
+                    needsVendor = false
+                }
+
                 var insert = MaintenanceTaskInsert(
                     householdId: householdId,
-                    title: template.title,
+                    title: finalTitle,
                     frequency: template.frequency,
                     nextDueDate: formatter.string(from: nextDue)
                 )
                 insert.propertyId = propertyId
                 insert.systemId = systemId
-                insert.description = template.description
+                insert.description = finalDescription
                 insert.priority = template.priority
                 insert.isTemplateBased = true
-                insert.templateId = "\(template.systemCategory):\(template.title)"
+                insert.templateId = templateKey
                 insert.seasonalTiming = template.seasonalTiming
                 insert.isDiy = template.isDIY
                 insert.professionalRequired = template.professionalRequired
                 insert.costRange = template.estimatedCostRange
+                insert.assignedContractorId = assignedContractorId
+                insert.assignmentType = assignmentTypeString
+                insert.needsVendor = needsVendor
                 if (try? await DatabaseService.shared.createMaintenanceTask(insert)) != nil {
-                    added.append(template.title)
+                    added.append(finalTitle)
                 }
             }
         }
 
-        // 4. Tasks to REMOVE: existing rows that no longer match `correctTitles`.
-        //    Soft-delete only — and only when we're confident the task is
-        //    template-managed and the user hasn't touched it. Gated on mode —
-        //    `.addOnly` skips this half entirely so callers that have their
-        //    own removal UX (e.g. EditSystemSheet's orphan dialog) keep
-        //    authority over what gets deleted.
+        // 4. Tasks to REMOVE: existing rows whose templateId no longer matches
+        //    the correct set. Soft-delete only — and only when we're confident
+        //    the task is template-managed and the user hasn't touched it.
+        //    Gated on mode — `.addOnly` skips this half entirely so callers
+        //    that have their own removal UX (e.g. EditSystemSheet's orphan
+        //    dialog) keep authority over what gets deleted.
         var removed: [String] = []
         var preserved: [String] = []
         if mode != .addOnly {
-            for task in existing where !correctTitles.contains(task.title.lowercased()) {
+            for task in existing {
+                // Phase 19k: dedup by templateId, not title (since vendor
+                // reframing means the title can drift from the original).
+                if let tid = task.templateId, correctTemplateKeys.contains(tid) {
+                    continue
+                }
                 // Skip rows that aren't template-managed at all (custom user task
                 // whose title doesn't match anything Haven knows about).
                 let isKnownTemplate = knownTitlesForCategory.contains(task.title.lowercased())

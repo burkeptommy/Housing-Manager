@@ -23,6 +23,32 @@ struct MaintenanceScheduleView: View {
     @State private var snoozeDate = Date()
     @State private var showAddTask = false
 
+    /// Phase 19l: Per-property collapsed state for the two new buckets.
+    /// Defaults to expanded; persisted in UserDefaults under keys
+    /// `maintenance.bucket.<propertyId>.personal.collapsed` and
+    /// `maintenance.bucket.<propertyId>.vendor.collapsed`.
+    @State private var personalBucketCollapsed: Bool = false
+    @State private var vendorBucketCollapsed: Bool = false
+
+    /// Phase 19l: Delegate flow state — when the user taps "Have someone
+    /// else do it" on a personal card, this captures the task so we can
+    /// open a contractor picker sheet.
+    @State private var delegatingTask: MaintenanceTaskDBRow?
+
+    /// Phase 19l: Personal → vendor flow uses the same ContractorDirectoryView
+    /// the task detail sheet uses, so users don't have to learn a new picker.
+    @State private var showDelegateContractorPicker = false
+
+    /// Phase 19n: Find-a-contractor flow state. When the user taps "Find →"
+    /// on a needs_vendor task card, this captures the task so we can open
+    /// FindLocalVendorSheet with the right (town, state, category) inputs.
+    @State private var findVendorTask: MaintenanceTaskDBRow?
+
+    /// Phase 19n: Set when the user opts out of the local vendor flow via
+    /// "Add my own instead" — fires the existing ContractorDirectoryView
+    /// add sheet so they can type a contractor manually.
+    @State private var showManualAddFromFindVendor = false
+
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.tasks.isEmpty {
@@ -95,6 +121,101 @@ struct MaintenanceScheduleView: View {
             if let id = prefilterPropertyId {
                 viewModel.filterPropertyId = id
             }
+            // Phase 19l: load saved collapsed state for the per-property
+            // bucket headers. Defaults are false (expanded) when no key
+            // exists yet, which matches the plan's default.
+            loadBucketCollapsedState()
+        }
+        .onChange(of: viewModel.filterPropertyId) { _, _ in
+            // Switching properties resets to that property's saved state.
+            loadBucketCollapsedState()
+        }
+        // Phase 19l: contractor picker sheet for the personal-card delegate
+        // tap. Uses the existing ContractorDirectoryView so users get the
+        // same picker UX they already know from the task detail sheet.
+        .sheet(isPresented: $showDelegateContractorPicker) {
+            NavigationStack {
+                ContractorDirectoryView(onSelect: { contractor in
+                    showDelegateContractorPicker = false
+                    if let task = delegatingTask {
+                        Task {
+                            await viewModel.convertToVendorManaged(taskId: task.id, contractor: contractor)
+                            await viewModel.loadTasks()
+                        }
+                    }
+                    delegatingTask = nil
+                })
+            }
+        }
+        // Phase 19n: find-a-contractor sheet — opens FindLocalVendorSheet
+        // with the triggering task's town/state/category. The sheet handles
+        // contractor creation + bulk task conversion internally.
+        .sheet(item: $findVendorTask) { task in
+            findVendorSheet(for: task)
+        }
+        // Phase 19n: when the user taps "Add my own instead" inside
+        // FindLocalVendorSheet, that sheet posts .openManualContractorAdd
+        // and dismisses. We catch the notification here and present the
+        // existing manual contractor add flow as the next sheet.
+        .onReceive(NotificationCenter.default.publisher(for: .openManualContractorAdd)) { _ in
+            showManualAddFromFindVendor = true
+        }
+        .sheet(isPresented: $showManualAddFromFindVendor) {
+            NavigationStack {
+                ContractorDirectoryView(onSelect: { _ in
+                    showManualAddFromFindVendor = false
+                })
+            }
+        }
+    }
+
+    /// Phase 19n: Resolve the system category for the triggering task and
+    /// present FindLocalVendorSheet. We need: town + state from the property,
+    /// system category from the linked home_systems row, and a
+    /// human-readable display name for the sheet header copy.
+    @ViewBuilder
+    private func findVendorSheet(for task: MaintenanceTaskDBRow) -> some View {
+        let property = task.propertyId.flatMap { id in
+            viewModel.properties.first(where: { $0.id == id })
+        }
+        let system = task.systemId.flatMap { id in
+            viewModel.systems.first(where: { $0.id == id })
+        }
+        let town = property?.city ?? ""
+        let state = property?.state ?? ""
+        let category = system?.category ?? "general"
+        let display = (system?.category ?? "Local").lowercased()
+
+        if town.isEmpty || state.isEmpty {
+            // Defensive fallback — without a town/state we can't search.
+            // Fall through to the existing manual add path so the user
+            // still has a way forward.
+            VStack(spacing: HavenTheme.spacing16) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 32))
+                    .foregroundStyle(HavenColors.warning)
+                Text("Add a city and state to your property to search local vendors.")
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textSecondary)
+                    .multilineTextAlignment(.center)
+                HavenButton(title: "Add my own vendor") {
+                    findVendorTask = nil
+                    showManualAddFromFindVendor = true
+                }
+            }
+            .padding(HavenTheme.spacing24)
+            .presentationDetents([.medium])
+        } else {
+            FindLocalVendorSheet(
+                task: task,
+                town: town,
+                state: state,
+                systemCategory: category,
+                categoryDisplayName: display,
+                onComplete: {
+                    Task { await viewModel.loadTasks() }
+                }
+            )
         }
     }
 
@@ -339,15 +460,79 @@ struct MaintenanceScheduleView: View {
         }
     }
 
+    // MARK: - Phase 19l: Two-bucket grouping (Personal vs Vendor-Managed)
+
+    /// Tasks the household handles themselves: assignmentType == personal,
+    /// either, or nil/legacy. Existing date sort is preserved.
+    private var personalBucketTasks: [MaintenanceTaskDBRow] {
+        viewModel.filteredTasks.filter { task in
+            let assignment = task.assignmentType?.lowercased()
+            return assignment != "vendor"
+        }
+    }
+
+    /// Tasks a contractor handles. Includes both linked and "needs vendor"
+    /// rows so the user sees the full delegation picture in one place.
+    private var vendorBucketTasks: [MaintenanceTaskDBRow] {
+        viewModel.filteredTasks.filter { task in
+            task.assignmentType?.lowercased() == "vendor"
+        }
+    }
+
+    private var personalBucketStorageKey: String {
+        "maintenance.bucket.\(viewModel.filterPropertyId?.uuidString ?? "all").personal.collapsed"
+    }
+
+    private var vendorBucketStorageKey: String {
+        "maintenance.bucket.\(viewModel.filterPropertyId?.uuidString ?? "all").vendor.collapsed"
+    }
+
+    private func loadBucketCollapsedState() {
+        personalBucketCollapsed = UserDefaults.standard.bool(forKey: personalBucketStorageKey)
+        vendorBucketCollapsed = UserDefaults.standard.bool(forKey: vendorBucketStorageKey)
+    }
+
+    private func togglePersonalBucket() {
+        withAnimation(HavenTheme.animationStandard) {
+            personalBucketCollapsed.toggle()
+        }
+        UserDefaults.standard.set(personalBucketCollapsed, forKey: personalBucketStorageKey)
+        Haptics.selection()
+    }
+
+    private func toggleVendorBucket() {
+        withAnimation(HavenTheme.animationStandard) {
+            vendorBucketCollapsed.toggle()
+        }
+        UserDefaults.standard.set(vendorBucketCollapsed, forKey: vendorBucketStorageKey)
+        Haptics.selection()
+    }
+
     // MARK: - Timeline Content
 
     @ViewBuilder
     private var timelineContent: some View {
         if viewModel.filterStatus == .all {
-            taskSection("Overdue", tasks: viewModel.overdueTasks, accentColor: HavenColors.critical)
-            taskSection("Due This Week", tasks: viewModel.dueThisWeekTasks, accentColor: HavenColors.warning)
-            taskSection("Due This Month", tasks: viewModel.dueThisMonthTasks, accentColor: HavenColors.info)
-            taskSection("Upcoming", tasks: viewModel.upcomingTasks, accentColor: HavenColors.success)
+            // Phase 19l: two-bucket grouping replaces the four time-buckets
+            // when no filter is active. Personal/either tasks first, then
+            // vendor-managed. Tasks within each group keep their date sort
+            // (overdue floats to the top because earlier dates sort first).
+            bucketSection(
+                title: "Your To-Dos",
+                count: personalBucketTasks.count,
+                isCollapsed: personalBucketCollapsed,
+                onToggle: togglePersonalBucket,
+                tasks: personalBucketTasks,
+                emptyCopy: "No personal tasks right now."
+            )
+            bucketSection(
+                title: "Vendor-Managed",
+                count: vendorBucketTasks.count,
+                isCollapsed: vendorBucketCollapsed,
+                onToggle: toggleVendorBucket,
+                tasks: vendorBucketTasks,
+                emptyCopy: "No vendor-managed tasks yet."
+            )
         } else {
             Section {
                 ForEach(viewModel.filteredTasks) { task in
@@ -548,6 +733,71 @@ struct MaintenanceScheduleView: View {
         .clipShape(Capsule())
     }
 
+    // MARK: - Phase 19l: Bucket section
+
+    @ViewBuilder
+    private func bucketSection(
+        title: String,
+        count: Int,
+        isCollapsed: Bool,
+        onToggle: @escaping () -> Void,
+        tasks: [MaintenanceTaskDBRow],
+        emptyCopy: String
+    ) -> some View {
+        Section {
+            if isCollapsed {
+                EmptyView()
+            } else if tasks.isEmpty {
+                Text(emptyCopy)
+                    .font(HavenTypography.bodySmall)
+                    .foregroundStyle(HavenColors.textTertiary)
+                    .padding(.vertical, HavenTheme.spacing12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+            } else {
+                ForEach(tasks) { task in
+                    maintenanceRow(task)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                taskToDelete = task
+                                showDeleteConfirm = true
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        .listRowSeparator(.hidden)
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            }
+        } header: {
+            Button {
+                onToggle()
+            } label: {
+                HStack(spacing: 8) {
+                    Text(title.uppercased())
+                        .font(HavenTypography.uiSectionHeader)
+                        .foregroundStyle(HavenColors.textTertiary)
+                        .tracking(1.5)
+                    Text("\u{00B7}")
+                        .font(HavenTypography.uiSectionHeader)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Text("\(count) \(count == 1 ? "task" : "tasks")")
+                        .font(HavenTypography.uiSectionHeader)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Spacer()
+                    Image(systemName: isCollapsed ? "chevron.right" : "chevron.down")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
     // MARK: - Task Section
 
     @ViewBuilder
@@ -588,7 +838,16 @@ struct MaintenanceScheduleView: View {
     // MARK: - Task Row
 
     private func maintenanceRow(_ task: MaintenanceTaskDBRow) -> some View {
-        Button {
+        // Phase 19l: resolve the contractor row when one is linked, so the
+        // vendor-managed card variant can render the brand logo and color.
+        let linkedContractor: ContractorRow? = {
+            guard let id = task.assignedContractorId else { return nil }
+            return viewModel.contractors.first(where: { $0.id == id })
+        }()
+        let assignment = task.assignmentType?.lowercased()
+        let isPersonal = assignment != "vendor"
+
+        return Button {
             Analytics.track(.maintenanceTaskViewed, ["task_id": task.id.uuidString, "task_title": task.title])
             selectedTask = task
         } label: {
@@ -599,7 +858,15 @@ struct MaintenanceScheduleView: View {
                 systemName: viewModel.systemName(for: task.systemId),
                 assigneeName: viewModel.assignedUserName(for: task),
                 assigneeAvatarColor: viewModel.assignedUserAvatarColor(for: task),
-                contractorName: viewModel.assignedContractorName(for: task)
+                contractorName: viewModel.assignedContractorName(for: task),
+                contractor: linkedContractor,
+                onDelegate: isPersonal ? {
+                    delegatingTask = task
+                    showDelegateContractorPicker = true
+                } : nil,
+                onFindVendor: {
+                    findVendorTask = task
+                }
             )
         }
         .buttonStyle(.plain)

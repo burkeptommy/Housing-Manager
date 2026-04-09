@@ -24,7 +24,8 @@ struct DashboardView: View {
     @State private var showQuickProjectEntry = false
     @State private var quickProjectPrefill: String = ""
     @AppStorage("hasSeenEmailCallout") private var hasSeenEmailCallout = false
-    @State private var showFamilyMemberForm = false
+    @State private var showFamilyMemberChooser = false
+    @State private var familyMemberFormMode: AddFamilyMemberMode?
     @State private var selectedMemberForProfile: FamilyMemberRow?
     @State private var showAddressCompletion = false
     @State private var activeQuizProperty: PropertyRow?
@@ -32,6 +33,15 @@ struct DashboardView: View {
     @AppStorage("hasSkippedHouseQuizForever") private var hasSkippedHouseQuizForever = false
     @AppStorage(PendingInviteKeys.needsPersonalQuiz) private var needsPersonalQuiz = false
     @State private var showPersonalQuiz = false
+
+    /// Phase 19l — re-fire path for the post-quiz vendor delegation sheet.
+    /// When a new contractor is added mid-app (via ContractorDirectoryView
+    /// or any other path that posts `.contractorAdded`), the dashboard
+    /// computes whether the new vendor's category has any 'either' tasks
+    /// the household could delegate. Non-empty `dashboardDelegationCandidates`
+    /// triggers the sheet automatically.
+    @State private var dashboardDelegationCandidates: [VendorDelegationCandidate] = []
+    @State private var showDashboardDelegationSheet: Bool = false
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -83,7 +93,7 @@ struct DashboardView: View {
                                 selectedMemberForProfile = member
                             },
                             onAddTapped: {
-                                showFamilyMemberForm = true
+                                showFamilyMemberChooser = true
                             },
                             onManageTapped: {
                                 showSettings = true
@@ -373,9 +383,15 @@ struct DashboardView: View {
                     )
                 }
             }
-            .sheet(isPresented: $showFamilyMemberForm) {
+            .sheet(isPresented: $showFamilyMemberChooser) {
+                AddFamilyMemberChooserSheet { mode in
+                    familyMemberFormMode = mode
+                }
+                .presentationDetents([.medium])
+            }
+            .sheet(item: $familyMemberFormMode) { mode in
                 NavigationStack {
-                    FamilyMemberFormView(onSave: {
+                    FamilyMemberFormView(initialMode: mode, onSave: {
                         Task { await viewModel.refresh() }
                     })
                 }
@@ -428,6 +444,20 @@ struct DashboardView: View {
                 } catch {
                     print("[Dashboard] Failed to check merge requests: \(error)")
                 }
+
+                // Phase 20b — when a brand-new user just finished
+                // AccountCreationStep, OnboardingViewModel.complete() stamps
+                // the freshly-created property on appState. Pick it up here
+                // and auto-launch HouseQuizView. Cleared after consumption
+                // so it never re-fires on subsequent dashboard appearances.
+                if let pending = appState.pendingQuizProperty {
+                    activeQuizProperty = pending
+                    appState.pendingQuizProperty = nil
+                    Analytics.track(.quizStarted, [
+                        "source": "post_account_creation_auto",
+                        "property_id": pending.id.uuidString
+                    ])
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in
                 if let tab = notification.userInfo?["tab"] as? Int, tab == 0 {
@@ -462,6 +492,44 @@ struct DashboardView: View {
                         }
                     }
                 }
+            }
+            // Phase 19l — when a new contractor is added mid-app, recompute
+            // delegation candidates limited to that one vendor and surface
+            // the same sheet the post-quiz path uses. The userInfo carries
+            // the new contractor's UUID so we don't fire for unrelated
+            // contractors that happened to already exist.
+            .onReceive(NotificationCenter.default.publisher(for: .contractorAdded)) { notification in
+                guard
+                    let idString = notification.userInfo?["contractorId"] as? String,
+                    let contractorId = UUID(uuidString: idString)
+                else { return }
+                Task {
+                    await loadDelegationCandidatesForContractor(contractorId)
+                }
+            }
+            .sheet(isPresented: $showDashboardDelegationSheet) {
+                PostQuizVendorDelegationSheet(
+                    candidates: dashboardDelegationCandidates,
+                    onApply: { selected in
+                        for candidate in selected {
+                            for task in candidate.tasks {
+                                await MaintenanceViewModel.shared.convertToVendorManaged(
+                                    taskId: task.id,
+                                    contractor: candidate.contractor
+                                )
+                            }
+                        }
+                        Haptics.success()
+                        NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+                        await viewModel.refresh()
+                    },
+                    onSkip: {
+                        // No persistence needed on the re-fire path — the
+                        // sheet only resurfaces when a brand-new contractor
+                        // is added, which is already user-initiated.
+                    }
+                )
+                .presentationDetents([.large])
             }
             .fullScreenCover(isPresented: $showMergeResolution) {
                 if let preview = mergePreviewResponse,
@@ -687,11 +755,14 @@ struct DashboardView: View {
                                 .lineLimit(1)
                                 .minimumScaleFactor(0.8)
                         } else {
-                            Text("\(viewModel.dueThisMonthTasks.count) tasks this month")
+                            // Phase 19l: dual count — personal vs vendor-managed.
+                            // The middle dot (·) renders as a tasteful separator
+                            // and avoids the AI-tell em dash.
+                            Text("\(viewModel.personalTaskCount) to do · \(viewModel.vendorManagedTaskCount) vendor-managed")
                                 .font(Font.custom("Georgia-Bold", size: 20))
                                 .foregroundStyle(.white)
                                 .lineLimit(1)
-                                .minimumScaleFactor(0.8)
+                                .minimumScaleFactor(0.7)
                         }
                     }
 
@@ -1065,6 +1136,19 @@ struct DashboardView: View {
                 .foregroundStyle(HavenColors.textTertiary)
                 .frame(maxWidth: .infinity)
             }
+            // Apr 7, 2026 (build 80): make the entire card body tappable,
+            // not just the "Start Quiz" / "Continue Quiz" button. The
+            // inner HavenButton and "Skip for now" Button still consume
+            // their own taps (SwiftUI suppresses the outer tap gesture
+            // when an inner Button receives it), so the explicit CTAs
+            // keep their distinct touch targets — this just adds the
+            // empty card space + title + progress bar as additional
+            // tap surface.
+            .contentShape(Rectangle())
+            .onTapGesture {
+                Haptics.light()
+                activeQuizProperty = property
+            }
         }
         .havenShadow()
     }
@@ -1314,6 +1398,59 @@ struct DashboardView: View {
             showScenarioStudio = true
         case .openSettings:
             showSettings = true
+        }
+    }
+
+    // MARK: - Phase 19l: Re-fire delegation sheet for new contractors
+
+    /// Compute delegation candidates filtered to a single newly-added
+    /// contractor. Mirrors the post-quiz loader in HouseQuizView but only
+    /// considers tasks whose system category matches the new vendor — that
+    /// way the sheet only fires when there's actually something to delegate.
+    private func loadDelegationCandidatesForContractor(_ contractorId: UUID) async {
+        let db = DatabaseService.shared
+        do {
+            let contractors = try await db.fetchContractors()
+            guard let contractor = contractors.first(where: { $0.id == contractorId }) else { return }
+
+            // Walk every property the household owns so a contractor added
+            // for one home gets considered against tasks on every home.
+            let properties = try await db.fetchProperties()
+            var matchingTasks: [MaintenanceTaskDBRow] = []
+
+            for property in properties {
+                let tasks = (try? await db.fetchMaintenanceTasks(propertyId: property.id)) ?? []
+                let systems = (try? await db.fetchHomeSystems(propertyId: property.id)) ?? []
+                let systemsById = Dictionary(uniqueKeysWithValues: systems.map { ($0.id, $0) })
+
+                for task in tasks {
+                    guard task.vehicleId == nil else { continue }
+                    guard task.assignmentType?.lowercased() == "either" else { continue }
+                    guard let systemId = task.systemId, let system = systemsById[systemId] else { continue }
+                    let category = system.category.lowercased()
+                    let matchesCategory = (contractor.category?.lowercased() == category)
+                        || (contractor.specialties?.contains(where: { $0.lowercased() == category }) ?? false)
+                    if matchesCategory {
+                        matchingTasks.append(task)
+                    }
+                }
+            }
+
+            guard !matchingTasks.isEmpty else { return }
+
+            await MainActor.run {
+                self.dashboardDelegationCandidates = [
+                    VendorDelegationCandidate(contractor: contractor, tasks: matchingTasks)
+                ]
+                // Brief delay so the contractor add sheet has time to dismiss
+                // before the delegation sheet slides up over the dashboard.
+                Task {
+                    try? await Task.sleep(for: .milliseconds(500))
+                    showDashboardDelegationSheet = true
+                }
+            }
+        } catch {
+            print("[Phase19l] Failed to load delegation candidates for new contractor: \(error)")
         }
     }
 

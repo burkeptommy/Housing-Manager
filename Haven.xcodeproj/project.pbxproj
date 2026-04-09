@@ -13,6 +13,7 @@
 		015CC260DE57CE44CA8FDD5A /* FamilyItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 773266F6C8F5CDA962157D23 /* FamilyItemDetailView.swift */; };
 		01E25C479437E1B85C451E5D /* OnboardingAddressStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8844F6AE85F1C8882770D5C5 /* OnboardingAddressStep.swift */; };
 		026702FC665EE46F861C2F1B /* MaintenanceTaskDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */; };
+		036A7C0D59B66531701BEB29 /* PostQuizVendorDelegationSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */; };
 		04702FBE7335A739A3DD7E1F /* Warranty.swift in Sources */ = {isa = PBXBuildFile; fileRef = BCED3F91C128394EBFF7BB27 /* Warranty.swift */; };
 		0481BDDFE4978139AC4B4263 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */; };
 		05D8039E8F7A270EB4ED10C2 /* FamilyInboxView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDEC9261DFE87F44EBE75404 /* FamilyInboxView.swift */; };
@@ -53,6 +54,7 @@
 		28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB90DE1FAE9B5571505CFE68 /* QuoteAnalysisView.swift */; };
 		28AD71027D2D2EF895699291 /* CalendarEventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A92CB0B12F6DE33AF7C25360 /* CalendarEventDetailView.swift */; };
 		294E2CEF29348B2B4696C6A3 /* PendingInvitationsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4FA28C5B48241D874518EC2A /* PendingInvitationsSection.swift */; };
+		2B1D2827ABD44027B8BE9B16 /* ValuationRange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 901435EF475F88C576845DA9 /* ValuationRange.swift */; };
 		2B225520A59F0E01640D17F4 /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 140FF755AC0C65534DBDFD63 /* AuthViewModel.swift */; };
 		2BA6D9D473C408FD57DEF781 /* MaintenanceTemplates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */; };
 		2C255BAD0460F323FD6169A6 /* FlexibleValue.swift in Sources */ = {isa = PBXBuildFile; fileRef = A915078B738003E23B34AE01 /* FlexibleValue.swift */; };
@@ -73,6 +75,7 @@
 		3A43D340AD39FBD4E869D569 /* WebsiteImportView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0B114520C474E97EDD2DE8 /* WebsiteImportView.swift */; };
 		3A9A661D3205F9D9CD42BCB3 /* EmptyStateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4133F95C44CFE69A35383806 /* EmptyStateView.swift */; };
 		3D9CDC554E4F853428B15B72 /* CalendarSyncSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6A3DBCB54EA4A78F86706E65 /* CalendarSyncSheet.swift */; };
+		400D576D1043326CED49B7E3 /* QuizLocalContractorPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = FBE70A8BF096597DF15D8E9E /* QuizLocalContractorPicker.swift */; };
 		414E101A9E0CEB3515C3C298 /* EnrichmentCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */; };
 		41BBCB98E7DAB82B051B8C1D /* CLAUDE.md in Resources */ = {isa = PBXBuildFile; fileRef = 92FA1BB2ACAD067BEEE1857A /* CLAUDE.md */; };
 		4303838C0B43C2F4CC2405AB /* EditDocumentDetailsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43A0A0D08A5DF798B9BBADB8 /* EditDocumentDetailsView.swift */; };
@@ -81,6 +84,7 @@
 		455D7D69148AB515F3689EB7 /* SecureStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CEEB86217778DF5F0F55AB58 /* SecureStorageService.swift */; };
 		45FA06A54FF0198F60F3DE44 /* SystemGroupListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E439AEF8C499A45C6D1C722 /* SystemGroupListView.swift */; };
 		47D6FB1F2E382D3CD83F53F4 /* HavenTypography.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109CDCA81D4910C03E8C92C1 /* HavenTypography.swift */; };
+		48181A227458426D20A1AD50 /* HouseQuizInsightOverlay.swift in Sources */ = {isa = PBXBuildFile; fileRef = 71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */; };
 		481B3983CCC965E5562D24C5 /* DocumentEncryption.swift in Sources */ = {isa = PBXBuildFile; fileRef = D82BD59425B0FA523AD9B636 /* DocumentEncryption.swift */; };
 		487F35214AE587A6B21CDC5C /* LoginView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FDDD425AF92101F7B1B5793E /* LoginView.swift */; };
 		48EBBCEBB43FC343DEA44810 /* ExpirationBadge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88CB1E595AC46EC435723506 /* ExpirationBadge.swift */; };
@@ -92,6 +96,7 @@
 		4CCB0A06E26AE9B0A56C6D75 /* ProjectDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = EFBB22847F627EF293537880 /* ProjectDetailView.swift */; };
 		4DB84E3EB1AF0C36E06B6955 /* QuoteUploadEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10139172E62AA11089521520 /* QuoteUploadEntryView.swift */; };
 		4F635BA08AD5878571AA4CF8 /* InvestmentSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1CC363C4F7144C666BF14C2 /* InvestmentSummaryCard.swift */; };
+		510229707C6AD12008FECF8B /* FindLocalVendorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */; };
 		5297B4580E0104A35011AA2E /* MissingDocumentsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C33B8A0845461986DFF0AB15 /* MissingDocumentsView.swift */; };
 		52B0811EF2787EC77CA1D5E0 /* HouseQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97135115B8421E956EDF488 /* HouseQuizView.swift */; };
 		5349D707387AAC6149FDEF12 /* DocumentUploadManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2C3C183F8B5FB668ADBCC4 /* DocumentUploadManager.swift */; };
@@ -100,6 +105,7 @@
 		5576F3536890CB3DD8CC7902 /* FamilyMembersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F48385E70645CE6220AE67 /* FamilyMembersView.swift */; };
 		568E20289A1AE9ECD0D960D5 /* DocumentAnalysisService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53FF33F7F6DAF386DA95BF99 /* DocumentAnalysisService.swift */; };
 		5877FD51E29C4B180983AF20 /* WarrantyTrackerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E6966723A75149E0AA831822 /* WarrantyTrackerView.swift */; };
+		5A8610597B5105689B0C8B60 /* AccountCreationStep.swift in Sources */ = {isa = PBXBuildFile; fileRef = 69676563E2133ED3DADAC982 /* AccountCreationStep.swift */; };
 		5C8C7AC44468355C2EFDC1A1 /* PropertyDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EE909F83D728399C6776DEA /* PropertyDetailView.swift */; };
 		5DE33E583B778B4B8A132B61 /* PersonalQuizView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F63E60DF583540D084B910B /* PersonalQuizView.swift */; };
 		5DE46EBCE7A743D1DCAE94BD /* NotificationScheduler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4E7A7A395DB576CBE9BA310F /* NotificationScheduler.swift */; };
@@ -189,11 +195,13 @@
 		AD005EAEACB25EDD6C4CFCD8 /* AddressHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 43F5571589E414F74E0C5700 /* AddressHookView.swift */; };
 		AD2F8F6B4F3A53889D53398C /* LoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3AAB2BFCB6E921B9BE9C459 /* LoadingView.swift */; };
 		ADD0A64441CA3144F9621105 /* Date+Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C29C1DC171EAF26E9A985A6 /* Date+Extensions.swift */; };
+		AE640787BE30EAE0049C12BB /* QuizContinueButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */; };
 		B1C696A52BA96E7920BCFA7A /* ChatViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 211F8CBA26112C97F2C08529 /* ChatViewModel.swift */; };
 		B27900B15FE1C8EEA2335D58 /* InviteResultConfirmationCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0DB386522CE4AF7EE8845F7F /* InviteResultConfirmationCard.swift */; };
 		B30A77AE77B06AE5A6608051 /* DocumentCategoryPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B5DD5BFCD50724A3EF7556 /* DocumentCategoryPicker.swift */; };
 		B4155C91AD6A8AF79CABE5C3 /* RecentActivityFeed.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6C1C3312E21F2AAE74B7007 /* RecentActivityFeed.swift */; };
 		B5816C122201999EBA84312D /* BrandTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EACB86E8385B0978B65C548D /* BrandTheme.swift */; };
+		B5C48CED9EDB3BB1E2F009FF /* AddFamilyMemberChooserSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4CFDDBAA7BC86FCFD08E19DE /* AddFamilyMemberChooserSheet.swift */; };
 		B695D54280B5938B173BE84E /* NotificationPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 379FFAF6339B329B4272E557 /* NotificationPreferences.swift */; };
 		B761FAABEF2940FA5A446D7F /* PersonalQuizQuestionLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = E7CB3E3AFBFACE1E3B2F4BC6 /* PersonalQuizQuestionLibrary.swift */; };
 		B7F957C959244308D38445FA /* MaintenanceTaskReconciler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97C493B8E4060D2DFD40A230 /* MaintenanceTaskReconciler.swift */; };
@@ -236,6 +244,7 @@
 		D93E663937D781D4056E849B /* SaleSimulatorSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2A66FCC4419639B9845F596B /* SaleSimulatorSheet.swift */; };
 		D999F256BE13EDBE78FE61AF /* ApplianceSetupSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 13B47929756A10E295F62AB0 /* ApplianceSetupSheet.swift */; };
 		DA4DD863BD063D561DEBC803 /* ServiceRecord.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED26FF74B1C1FC72D3F0E6D0 /* ServiceRecord.swift */; };
+		DC41477208101D5401312829 /* PropertyHookView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D253512E9703A545575048F1 /* PropertyHookView.swift */; };
 		DC426605D59D945142970B98 /* ProjectEmailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1B5627AB5E97358EFC5C1A0B /* ProjectEmailView.swift */; };
 		DCF2C5C98162E27E15CF9037 /* UtilityProviderSearchPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = B409D6403804C601F92361B9 /* UtilityProviderSearchPicker.swift */; };
 		DD89775DB699CC99FB4EC7C8 /* PropertyListViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = ADB9AB1A050BE0EC660905BA /* PropertyListViewModel.swift */; };
@@ -246,6 +255,7 @@
 		E0998A70606273CC5A4F7D6F /* HouseholdInviteCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = A83EF53F1AFD71E81A730C71 /* HouseholdInviteCoordinator.swift */; };
 		E0E19D7B38C127318E8D6F52 /* Contractor.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBEB808723C90E545D5F2F65 /* Contractor.swift */; };
 		E33BB6002DCDC5BE5B6682F0 /* CoveredDriverPickerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3270221BA2EADDC793D458F8 /* CoveredDriverPickerSheet.swift */; };
+		E3A72DC1CBD7CE6D2D1A0546 /* QuizRequiredChip.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60D1E26691C67ED641A4F155 /* QuizRequiredChip.swift */; };
 		E4C027C2A514FFBF60AFCC2E /* TrustedContactsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591C1EFF7654F52ADA3D6B96 /* TrustedContactsView.swift */; };
 		E51EF5E7399F570579B9D9A7 /* ScenarioRunnerService.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE3B76CC625DC29A26D88C5B /* ScenarioRunnerService.swift */; };
 		E54421535D0A852B8CD830A1 /* HouseQuizProgressBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */; };
@@ -272,6 +282,7 @@
 		FA9F45073A2E4CFFD9415150 /* VaultLockService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA76304D2996344500376B8D /* VaultLockService.swift */; };
 		FB6F9C056032A35050C003C4 /* AddPropertyFlow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 063BB781C19C00BDA3FF0767 /* AddPropertyFlow.swift */; };
 		FC8168E1F88DB8A8DA23D9FD /* AddMaintenanceTaskSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF2E1B748857647CA39441A4 /* AddMaintenanceTaskSheet.swift */; };
+		FCE0D582B3552A8CEC796493 /* HookContent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D01DDF4F64847EE3ACA4603 /* HookContent.swift */; };
 		FEEAF0C71107387A5BCCD8DA /* HavenTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = EDCD278A06338019D17B809C /* HavenTheme.swift */; };
 /* End PBXBuildFile section */
 
@@ -361,6 +372,8 @@
 		4B06503ADB172DFB9879D8B8 /* BiometricAuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricAuthView.swift; sourceTree = "<group>"; };
 		4C55BD89D3FF9E725F8E5B37 /* ScenarioStudioViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioViewModel.swift; sourceTree = "<group>"; };
 		4CEEF4793EF037DC223ABD08 /* EditProjectSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditProjectSheet.swift; sourceTree = "<group>"; };
+		4CFDDBAA7BC86FCFD08E19DE /* AddFamilyMemberChooserSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddFamilyMemberChooserSheet.swift; sourceTree = "<group>"; };
+		4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostQuizVendorDelegationSheet.swift; sourceTree = "<group>"; };
 		4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InviteCodeEntrySheet.swift; sourceTree = "<group>"; };
 		4D963EAAA90D12EE235B4A75 /* DocumentCategoryGroups.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCategoryGroups.swift; sourceTree = "<group>"; };
 		4E2E87609ADFBC441E34B179 /* PersonalQuizViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalQuizViewModel.swift; sourceTree = "<group>"; };
@@ -384,9 +397,11 @@
 		5E819F4A1BD46D5CE48E9E1A /* Font+Haven.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Font+Haven.swift"; sourceTree = "<group>"; };
 		5F062CCDA03C358949207399 /* Haven.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Haven.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		5F7DFCE2761EABE541A267A3 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		60D1E26691C67ED641A4F155 /* QuizRequiredChip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizRequiredChip.swift; sourceTree = "<group>"; };
 		6566BC39CB24D7E6052661B3 /* EnrichmentCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentCardView.swift; sourceTree = "<group>"; };
 		68A82652FA6748CB7DEA1421 /* AlfredLogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlfredLogoView.swift; sourceTree = "<group>"; };
 		693871EEED4A9EE08752B6C7 /* ServiceHistoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServiceHistoryView.swift; sourceTree = "<group>"; };
+		69676563E2133ED3DADAC982 /* AccountCreationStep.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AccountCreationStep.swift; sourceTree = "<group>"; };
 		69BD10152C540F01FD5A0C2B /* OverdueMaintenanceCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverdueMaintenanceCard.swift; sourceTree = "<group>"; };
 		69ECA937486C42F9F48F5FD4 /* DashboardViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardViewModel.swift; sourceTree = "<group>"; };
 		6A3DBCB54EA4A78F86706E65 /* CalendarSyncSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSyncSheet.swift; sourceTree = "<group>"; };
@@ -398,6 +413,7 @@
 		6E60CB5AC78EAFC4C067A93E /* CertificatePinning.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CertificatePinning.swift; sourceTree = "<group>"; };
 		6F63E60DF583540D084B910B /* PersonalQuizView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersonalQuizView.swift; sourceTree = "<group>"; };
 		711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NewArrivalChecklist.swift; sourceTree = "<group>"; };
+		71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizInsightOverlay.swift; sourceTree = "<group>"; };
 		715AA20065124665D9D16D60 /* AvatarPhotoService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AvatarPhotoService.swift; sourceTree = "<group>"; };
 		742466F52DB09FDCA2810F10 /* ScenarioStudioView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioStudioView.swift; sourceTree = "<group>"; };
 		74FA247DDBF39F4193808F43 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
@@ -406,8 +422,10 @@
 		7758ADDE6DABA7F5F0E9C800 /* HavenButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenButton.swift; sourceTree = "<group>"; };
 		778F82302316D204E81CE574 /* ManageSystemTasksSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ManageSystemTasksSheet.swift; sourceTree = "<group>"; };
 		78E0C7E15351CDA2AB45CFC9 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizContinueButton.swift; sourceTree = "<group>"; };
 		7A4D29A1CB91EBA42DFC0519 /* BrandColors.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = BrandColors.json; sourceTree = "<group>"; };
 		7B4CEAEAAB9A80F3874FB94C /* EncryptionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EncryptionService.swift; sourceTree = "<group>"; };
+		7D01DDF4F64847EE3ACA4603 /* HookContent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookContent.swift; sourceTree = "<group>"; };
 		7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioLoadingView.swift; sourceTree = "<group>"; };
 		81BD018DF1C202052DD92D84 /* JailbreakDetection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JailbreakDetection.swift; sourceTree = "<group>"; };
 		83AADE9042AEE29A1723D203 /* DocumentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentCard.swift; sourceTree = "<group>"; };
@@ -423,6 +441,7 @@
 		8ECABA5A62CDCC5C4011D813 /* MaintenanceTaskDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskDetailSheet.swift; sourceTree = "<group>"; };
 		8FC4B4D10494E8767E9A0642 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		9012FA4EC01B35BA7E18DE0D /* ScenarioInputView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioInputView.swift; sourceTree = "<group>"; };
+		901435EF475F88C576845DA9 /* ValuationRange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ValuationRange.swift; sourceTree = "<group>"; };
 		902E6516D892F0B2C474E642 /* QuoteComparisonView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuoteComparisonView.swift; sourceTree = "<group>"; };
 		90723058FEB3AFEEA7917516 /* OnboardingScheduleGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingScheduleGenerator.swift; sourceTree = "<group>"; };
 		90D7D8CB37718374CFD958AA /* QuickActions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickActions.swift; sourceTree = "<group>"; };
@@ -467,6 +486,7 @@
 		BFA4AB80D1956BBD146735AE /* OnboardingViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingViewModel.swift; sourceTree = "<group>"; };
 		C043C7EC273658100F01935F /* VehicleConfirmationCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleConfirmationCard.swift; sourceTree = "<group>"; };
 		C133DD8CBB58122E42175239 /* VehicleDetailViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VehicleDetailViewModel.swift; sourceTree = "<group>"; };
+		C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FindLocalVendorSheet.swift; sourceTree = "<group>"; };
 		C312D5AA48C650B2453392CC /* Double+Currency.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Double+Currency.swift"; sourceTree = "<group>"; };
 		C33B8A0845461986DFF0AB15 /* MissingDocumentsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MissingDocumentsView.swift; sourceTree = "<group>"; };
 		C3DF4111F8B1FF01F3ECF70D /* InboxItemCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxItemCard.swift; sourceTree = "<group>"; };
@@ -486,6 +506,7 @@
 		D08D056E30880763A14839C3 /* CategoryProgress.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CategoryProgress.swift; sourceTree = "<group>"; };
 		D08FA323D32687250C5CC975 /* EstateReadinessDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EstateReadinessDetailView.swift; sourceTree = "<group>"; };
 		D09C463CADD4EC1A7F9BB9B3 /* HavenTextField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HavenTextField.swift; sourceTree = "<group>"; };
+		D253512E9703A545575048F1 /* PropertyHookView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PropertyHookView.swift; sourceTree = "<group>"; };
 		D37709C0EFD1AAFC5616214C /* HouseQuizQuestionLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizQuestionLibrary.swift; sourceTree = "<group>"; };
 		D3AE3F7AF466829498D26D39 /* AppliancesListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppliancesListView.swift; sourceTree = "<group>"; };
 		D4B2AAF58754AC8E3338EF53 /* MaintenanceTaskIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MaintenanceTaskIcon.swift; sourceTree = "<group>"; };
@@ -536,6 +557,7 @@
 		F9A1E64945F0A863947B24B9 /* VendorReviewForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorReviewForm.swift; sourceTree = "<group>"; };
 		F9D82CEFB262D83D295D6268 /* HouseQuizViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizViewModel.swift; sourceTree = "<group>"; };
 		FA15E42BF53B7395A47F986A /* EnrichmentCardEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EnrichmentCardEngine.swift; sourceTree = "<group>"; };
+		FBE70A8BF096597DF15D8E9E /* QuizLocalContractorPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuizLocalContractorPicker.swift; sourceTree = "<group>"; };
 		FDDD425AF92101F7B1B5793E /* LoginView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginView.swift; sourceTree = "<group>"; };
 		FDEC9261DFE87F44EBE75404 /* FamilyInboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyInboxView.swift; sourceTree = "<group>"; };
 		FE3B76CC625DC29A26D88C5B /* ScenarioRunnerService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioRunnerService.swift; sourceTree = "<group>"; };
@@ -559,6 +581,7 @@
 		03E1FCA464AFCC1AF30FE480 /* Onboarding */ = {
 			isa = PBXGroup;
 			children = (
+				69676563E2133ED3DADAC982 /* AccountCreationStep.swift */,
 				43F5571589E414F74E0C5700 /* AddressHookView.swift */,
 				03BFF144BC77F27E46ABFFFB /* FeatureValueLibrary.swift */,
 				4D5DEA8F7C48D78C0C9841B4 /* InviteCodeEntrySheet.swift */,
@@ -574,6 +597,7 @@
 		05FE65CF07E88DB1C0B2C9DA /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				4CFDDBAA7BC86FCFD08E19DE /* AddFamilyMemberChooserSheet.swift */,
 				E1C30DF79412FDA919D65837 /* FamilyMemberFormView.swift */,
 				14F48385E70645CE6220AE67 /* FamilyMembersView.swift */,
 				2941D500DA3123BDF2B26B84 /* HouseholdAccessView.swift */,
@@ -606,6 +630,7 @@
 			children = (
 				371100436C3E0DA4B5CA3D0E /* HouseQuiz */,
 				57A72C253D1F0B4E5B1426F8 /* PersonalQuiz */,
+				896D3EE1CD91F1CEE7035029 /* PropertyHook */,
 				415D276FDEB22BE1DD29FE06 /* AddressConfirmationIntercept.swift */,
 			);
 			path = Onboarding;
@@ -778,6 +803,7 @@
 				97C493B8E4060D2DFD40A230 /* MaintenanceTaskReconciler.swift */,
 				232EC66F1EB80846FB333465 /* MaintenanceTemplates.swift */,
 				90723058FEB3AFEEA7917516 /* OnboardingScheduleGenerator.swift */,
+				901435EF475F88C576845DA9 /* ValuationRange.swift */,
 				9D44F4D6FC19F4CE5475D905 /* VehicleLookupService.swift */,
 			);
 			path = Services;
@@ -900,6 +926,15 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		896D3EE1CD91F1CEE7035029 /* PropertyHook */ = {
+			isa = PBXGroup;
+			children = (
+				7D01DDF4F64847EE3ACA4603 /* HookContent.swift */,
+				D253512E9703A545575048F1 /* PropertyHookView.swift */,
+			);
+			path = PropertyHook;
+			sourceTree = "<group>";
+		};
 		8C19231A3E13951DDC89E9A9 = {
 			isa = PBXGroup;
 			children = (
@@ -979,9 +1014,14 @@
 				0B20FA7ACAE749FF43F297F5 /* BundledInsuranceSuggestionCard.swift */,
 				6B4B4BE6A3A6239B38658754 /* DocumentExtractionConflictSheet.swift */,
 				2AE70D35963C749CB6041B57 /* HouseQuizAnswerFeedbackCard.swift */,
+				71228BE51DFC940B0B1EEE3E /* HouseQuizInsightOverlay.swift */,
 				E91BA16FA67715FC9DDE9ECB /* HouseQuizProgressBar.swift */,
+				4D14107FB62C5DAF2C386909 /* PostQuizVendorDelegationSheet.swift */,
 				07477FDECF85D278B1E21080 /* QuizCaretakerInlineForm.swift */,
+				7940D86E0543CF38978E45F3 /* QuizContinueButton.swift */,
 				A48B55C9146141F2BEC4B68B /* QuizKidsInlineForm.swift */,
+				FBE70A8BF096597DF15D8E9E /* QuizLocalContractorPicker.swift */,
+				60D1E26691C67ED641A4F155 /* QuizRequiredChip.swift */,
 				CA883E8E1440EC1F64A6DCDF /* QuizSpouseInviteInlineForm.swift */,
 				05ACC1AD3C78491F50BDF8E4 /* QuizVehicleInputSelector.swift */,
 				460E8AA2102BB5BC0866C526 /* UtilityProviderCustomAddSheet.swift */,
@@ -1020,6 +1060,7 @@
 				99E29FD8C600AF4BB2F06397 /* EditVehicleSheet.swift */,
 				E5FE9A44DDCE5AAD3CD1A46F /* EquipmentIdentifySheet.swift */,
 				05ADA54A4E7717D0015544C8 /* EquipmentSearchSheet.swift */,
+				C2DA5F5AB2791F09EBCA125F /* FindLocalVendorSheet.swift */,
 				E1077727F8CD1C7CEC052D32 /* LinkDocumentToProjectSheet.swift */,
 				8D23A1E29045F54B58096BB6 /* LogHistoricalProjectView.swift */,
 				01BCFF7F5BD54B4F19DA29DB /* MaintenanceScheduleView.swift */,
@@ -1292,6 +1333,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				C05BFF1A06A535C280008996 /* APIClient.swift in Sources */,
+				5A8610597B5105689B0C8B60 /* AccountCreationStep.swift in Sources */,
+				B5C48CED9EDB3BB1E2F009FF /* AddFamilyMemberChooserSheet.swift in Sources */,
 				FC8168E1F88DB8A8DA23D9FD /* AddMaintenanceTaskSheet.swift in Sources */,
 				FB6F9C056032A35050C003C4 /* AddPropertyFlow.swift in Sources */,
 				814E77BA0FA8FBF5A6905785 /* AddSystemView.swift in Sources */,
@@ -1391,6 +1434,7 @@
 				5576F3536890CB3DD8CC7902 /* FamilyMembersView.swift in Sources */,
 				6CB14A10DD299E021578F8CE /* FamilyReferenceBinder.swift in Sources */,
 				DDF7659C0A93890A9E7B4916 /* FeatureValueLibrary.swift in Sources */,
+				510229707C6AD12008FECF8B /* FindLocalVendorSheet.swift in Sources */,
 				2C255BAD0460F323FD6169A6 /* FlexibleValue.swift in Sources */,
 				0E71FADFFA9696BBA2485BDC /* Font+Haven.swift in Sources */,
 				A818EE7EC90F063034BCDEDF /* ForceUpdateView.swift in Sources */,
@@ -1406,9 +1450,11 @@
 				FEEAF0C71107387A5BCCD8DA /* HavenTheme.swift in Sources */,
 				47D6FB1F2E382D3CD83F53F4 /* HavenTypography.swift in Sources */,
 				73F578310CDA4553B2078C6F /* HomeSystem.swift in Sources */,
+				FCE0D582B3552A8CEC796493 /* HookContent.swift in Sources */,
 				A022B375C4CF2B9A09702FAC /* HouseQuizAnswerFeedbackCard.swift in Sources */,
 				9290FD2D1C17DA4B93093ED6 /* HouseQuizAnswerMapper.swift in Sources */,
 				D837D3A79CD237F1347E54E7 /* HouseQuizFeedbackLibrary.swift in Sources */,
+				48181A227458426D20A1AD50 /* HouseQuizInsightOverlay.swift in Sources */,
 				67E93B53999952304C0E4504 /* HouseQuizModels.swift in Sources */,
 				E54421535D0A852B8CD830A1 /* HouseQuizProgressBar.swift in Sources */,
 				F46EC30ABE284A456FA48F37 /* HouseQuizQuestionLibrary.swift in Sources */,
@@ -1466,6 +1512,7 @@
 				B761FAABEF2940FA5A446D7F /* PersonalQuizQuestionLibrary.swift in Sources */,
 				5DE33E583B778B4B8A132B61 /* PersonalQuizView.swift in Sources */,
 				7E21ABA29761285727651E4B /* PersonalQuizViewModel.swift in Sources */,
+				036A7C0D59B66531701BEB29 /* PostQuizVendorDelegationSheet.swift in Sources */,
 				C2F088E42D4171836E3A2D2B /* ProcessingBanner.swift in Sources */,
 				A016188BFADD6D8C98BD3A90 /* ProfileView.swift in Sources */,
 				4CCB0A06E26AE9B0A56C6D75 /* ProjectDetailView.swift in Sources */,
@@ -1478,6 +1525,7 @@
 				5C8C7AC44468355C2EFDC1A1 /* PropertyDetailView.swift in Sources */,
 				90D2A7FE4D73A3DCB97EA2B8 /* PropertyDetailViewModel.swift in Sources */,
 				8EE3DF1D2033FC9F32D8965B /* PropertyDocumentsView.swift in Sources */,
+				DC41477208101D5401312829 /* PropertyHookView.swift in Sources */,
 				76DA3EE6CDDB3DA7B536EC58 /* PropertyListView.swift in Sources */,
 				DD89775DB699CC99FB4EC7C8 /* PropertyListViewModel.swift in Sources */,
 				F32E6CEBB906D2C59D9798A4 /* PropertyProjectsView.swift in Sources */,
@@ -1485,7 +1533,10 @@
 				E8558DF640091B363C5B6DB0 /* PushNotificationService.swift in Sources */,
 				97DA3261772289C5DFA0B26B /* QuickActions.swift in Sources */,
 				D3AD0D8ED98087983442E27C /* QuizCaretakerInlineForm.swift in Sources */,
+				AE640787BE30EAE0049C12BB /* QuizContinueButton.swift in Sources */,
 				A0E4F6D658CBB9D8DA2B3E64 /* QuizKidsInlineForm.swift in Sources */,
+				400D576D1043326CED49B7E3 /* QuizLocalContractorPicker.swift in Sources */,
+				E3A72DC1CBD7CE6D2D1A0546 /* QuizRequiredChip.swift in Sources */,
 				EAE3E85AFEBB4D7982CFDB69 /* QuizSpouseInviteInlineForm.swift in Sources */,
 				C39B374BD7B0F466CAFDC717 /* QuizVehicleInputSelector.swift in Sources */,
 				28A9D537128C379C2B86C79F /* QuoteAnalysisView.swift in Sources */,
@@ -1540,6 +1591,7 @@
 				DCF2C5C98162E27E15CF9037 /* UtilityProviderSearchPicker.swift in Sources */,
 				EA1B8A078E31DA26613CDD91 /* VINScannerSheet.swift in Sources */,
 				EC6DD40732FFA00D1575701D /* Validators.swift in Sources */,
+				2B1D2827ABD44027B8BE9B16 /* ValuationRange.swift in Sources */,
 				FA9F45073A2E4CFFD9415150 /* VaultLockService.swift in Sources */,
 				6534B80D03DF078AFCA7FA0E /* VehicleConfirmationCard.swift in Sources */,
 				26043ACF0D900C38B606A985 /* VehicleDetailView.swift in Sources */,
@@ -1566,7 +1618,7 @@
 				CODE_SIGN_ENTITLEMENTS = Haven/Config/Haven.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 74;
+				CURRENT_PROJECT_VERSION = 86;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Haven/Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -1709,7 +1761,7 @@
 				CODE_SIGN_ENTITLEMENTS = Haven/Config/Haven.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 74;
+				CURRENT_PROJECT_VERSION = 86;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Haven/Config/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (

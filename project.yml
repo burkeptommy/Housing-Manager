@@ -38,7 +38,7 @@ targets:
         INFOPLIST_FILE: Haven/Config/Info.plist
         CODE_SIGN_ENTITLEMENTS: Haven/Config/Haven.entitlements
         MARKETING_VERSION: "1.0.2"
-        CURRENT_PROJECT_VERSION: "74"
+        CURRENT_PROJECT_VERSION: "86"
         CODE_SIGN_STYLE: Automatic
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
@@ -47,5 +47,21 @@ targets:
     entitlements:
       path: Haven/Config/Haven.entitlements
       properties:
+        # Sign in with Apple. Without this, ASAuthorizationController fails
+        # with AuthorizationError 1000 ("unknown") because the system has no
+        # record of this app being allowed to use the Sign in with Apple
+        # capability. The App ID in Apple Developer Portal must also have
+        # Sign in with Apple enabled — that's the server-side half. Both
+        # are required.
+        com.apple.developer.applesignin:
+          - Default
+        # Push notifications. "development" for dev/TestFlight builds,
+        # "production" gets injected automatically by the App Store distribution
+        # provisioning profile when the app is exported for App Store release.
+        aps-environment: development
+        # Universal links. Both domains are needed because havenhome.dev hosts
+        # the marketing site and api.havenhome.dev (when configured) hosts the
+        # webhook callback paths.
         com.apple.developer.associated-domains:
           - applinks:havenhome.dev
+          - applinks:api.havenhome.dev

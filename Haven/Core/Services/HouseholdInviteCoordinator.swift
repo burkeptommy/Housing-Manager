@@ -144,25 +144,131 @@ actor HouseholdInviteCoordinator {
         let db = DatabaseService.shared
 
         // Step 1 — always create the family_member row so the avatar lights up.
-        let insert = FamilyMemberInsert(
-            householdId: request.householdId,
-            firstName: trimmedFirstName,
-            lastName: trimmedLastName ?? "",
-            relationship: request.relationship,
-            dateOfBirth: request.dateOfBirth,
-            email: normalizedEmail,
-            phone: request.phone?.trimmingCharacters(in: .whitespacesAndNewlines),
-            isMinor: request.isMinor,
-            gender: request.gender
-        )
+        //
+        // Build 86: belt-and-suspenders dedup. Q28's view-level fix
+        // (skip-spouse-when-on-file + pre-seeded kids) catches the common
+        // case, but anyone who calls this method from a different entry
+        // point (settings + button, household strip + button, child profile
+        // add, document party extraction, etc.) can still race against an
+        // existing row by typing a name that matches one already on file.
+        // Without dedup at the write layer the result is two `Tom`s on the
+        // dashboard. Here we fetch the household's family members, look for
+        // a normalized first name + relationship match, and either UPDATE
+        // the existing row with any new fields (email, lastName, dateOfBirth)
+        // or fall through to the insert. Existing-user invitation flow on
+        // the email path still runs against the resolved row so we don't
+        // miss the merge-request hand-off.
+        let trimmedPhone = request.phone?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedNewFirst = trimmedFirstName.lowercased()
+        let normalizedNewRelationship = request.relationship
+            .trimmingCharacters(in: .whitespaces)
+            .lowercased()
 
-        let familyMember = try await db.createFamilyMember(insert)
+        let existingMembers: [FamilyMemberRow]
+        do {
+            existingMembers = try await db.fetchFamilyMembers(householdId: request.householdId)
+        } catch {
+            // Failing the fetch should NOT block the insert path — we'd
+            // rather risk a duplicate than block a legitimate add. Log and
+            // continue with an empty existing list.
+            print("[HouseholdInviteCoordinator] dedup fetch failed: \(error)")
+            existingMembers = []
+        }
 
-        Analytics.track(.familyMemberCreated, [
-            "source": request.source.rawValue,
-            "relationship": request.relationship,
-            "has_email": (normalizedEmail != nil),
-        ])
+        let newRelationshipFamily = Self.relationshipFamily(for: normalizedNewRelationship)
+        let dedupMatch = existingMembers.first { existing in
+            let existingFirst = existing.firstName
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased()
+            let existingRelationship = existing.relationship
+                .trimmingCharacters(in: .whitespaces)
+                .lowercased()
+            guard existingFirst == normalizedNewFirst else { return false }
+            // Group spouse-shaped relationships (spouse / partner / husband /
+            // wife / spouse-partner) into one family so a dashboard-added
+            // "Spouse" gets matched by a Q28-added "Spouse/Partner". Same for
+            // child-shaped (child / son / daughter). Other relationships fall
+            // back to exact match.
+            let existingFamily = Self.relationshipFamily(for: existingRelationship)
+            return existingFamily == newRelationshipFamily
+        }
+
+        let familyMember: FamilyMemberRow
+        if let match = dedupMatch {
+            // Patch missing fields on the existing row instead of inserting
+            // a duplicate. Only fields that are currently empty get filled
+            // — never overwrite data the user already has on file.
+            var update = FamilyMemberUpdate()
+            var hasUpdate = false
+            if (match.lastName.isEmpty), let newLast = trimmedLastName, !newLast.isEmpty {
+                update.lastName = newLast
+                hasUpdate = true
+            }
+            if (match.email?.isEmpty ?? true), let newEmail = normalizedEmail, !newEmail.isEmpty {
+                update.email = newEmail
+                hasUpdate = true
+            }
+            if (match.phone?.isEmpty ?? true), let newPhone = trimmedPhone, !newPhone.isEmpty {
+                update.phone = newPhone
+                hasUpdate = true
+            }
+            if (match.dateOfBirth?.isEmpty ?? true), let newDOB = request.dateOfBirth, !newDOB.isEmpty {
+                update.dateOfBirth = newDOB
+                hasUpdate = true
+            }
+            if (match.gender?.isEmpty ?? true), let newGender = request.gender, !newGender.isEmpty {
+                update.gender = newGender
+                hasUpdate = true
+            }
+            if let isMinor = match.isMinor, isMinor != request.isMinor {
+                // Only flip when the existing row's minor flag is wrong
+                // — protects against edge cases where DOB clarifies a
+                // previously-unknown minor status.
+                update.isMinor = request.isMinor
+                hasUpdate = true
+            } else if match.isMinor == nil {
+                update.isMinor = request.isMinor
+                hasUpdate = true
+            }
+
+            if hasUpdate {
+                if let patched = try? await db.updateFamilyMember(id: match.id, update) {
+                    familyMember = patched
+                } else {
+                    familyMember = match
+                }
+            } else {
+                familyMember = match
+            }
+
+            Analytics.track(.familyMemberCreated, [
+                "source": request.source.rawValue,
+                "relationship": request.relationship,
+                "has_email": (normalizedEmail != nil),
+                "deduped": true,
+            ])
+        } else {
+            let insert = FamilyMemberInsert(
+                householdId: request.householdId,
+                firstName: trimmedFirstName,
+                lastName: trimmedLastName ?? "",
+                relationship: request.relationship,
+                dateOfBirth: request.dateOfBirth,
+                email: normalizedEmail,
+                phone: trimmedPhone,
+                isMinor: request.isMinor,
+                gender: request.gender
+            )
+
+            familyMember = try await db.createFamilyMember(insert)
+
+            Analytics.track(.familyMemberCreated, [
+                "source": request.source.rawValue,
+                "relationship": request.relationship,
+                "has_email": (normalizedEmail != nil),
+                "deduped": false,
+            ])
+        }
 
         // Step 2 — short circuit when no invite is requested.
         guard request.sendInvite, let inviteEmail = normalizedEmail else {
@@ -534,6 +640,30 @@ actor HouseholdInviteCoordinator {
         // verification happens server-side at delivery time.
         let pattern = #"^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$"#
         return email.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
+    }
+
+    /// Build 86 — collapse synonymous relationship strings into a single
+    /// canonical bucket so the Q28 dedup catches "Spouse" + "Husband" +
+    /// "Spouse/Partner" as the same person, and "Child" + "Son" + "Daughter"
+    /// as the same person. Anything not in those two families falls through
+    /// to the input string so unrelated relationships ("Parent", "Grandma",
+    /// etc.) still match exactly. Inputs are expected to already be
+    /// lowercased + trimmed.
+    private static func relationshipFamily(for normalized: String) -> String {
+        switch normalized {
+        case "spouse",
+             "partner",
+             "spouse/partner",
+             "husband",
+             "wife":
+            return "__spouse__"
+        case "child",
+             "son",
+             "daughter":
+            return "__child__"
+        default:
+            return normalized
+        }
     }
 }
 

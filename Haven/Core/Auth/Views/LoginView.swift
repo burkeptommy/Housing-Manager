@@ -83,7 +83,9 @@ struct LoginView: View {
                                 }
                             }
                             appleSignIn.onError = { error in
-                                viewModel.errorMessage = "Apple sign-in failed: \(error.localizedDescription)"
+                                let friendly = AppleSignInCoordinator.friendlyMessage(for: error)
+                                viewModel.errorMessage = friendly.isEmpty ? nil : friendly
+                                print("[Apple Sign In] Login error: \(error)")
                             }
                             appleSignIn.startSignInFlow()
                         } label: {
