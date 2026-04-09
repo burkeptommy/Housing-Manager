@@ -19,47 +19,45 @@ const corsHeaders = {
 // Build 87 (Home Manager expansion):
 // Categories that are HIDDEN from home managers by default. Mirrors
 // `Haven/Features/Documents/DocumentAccessDefaults.swift` and the SQL
-// backfill in `supabase/migrations/20260440_document_home_manager_access_backfill.sql`.
-// All entries are lowercased so the lookup can normalize either the Title
-// Case strings produced by Claude classification ("Will", "Power of Attorney")
-// or legacy snake_case strings.
+// backfill in `supabase/migrations/20260441_document_home_manager_normalize_backfill.sql`.
+// All entries are space-separated lowercased keys; the lookup function
+// normalizes input by lowercasing AND replacing underscores with spaces,
+// so "Power of Attorney", "power of attorney", and legacy
+// "power_of_attorney" all collapse to the same lookup key.
 // Keep all three lists in sync when categories are added or removed.
 const PRIVATE_FROM_HOME_MANAGERS = new Set([
   // Estate Planning
   "will", "trust",
-  "power of attorney", "power_of_attorney",
-  "healthcare directive", "healthcare_directive",
+  "power of attorney", "healthcare directive",
   "guardianship designation", "letter of intent",
-  "living_will", "estate_plan",
-  "beneficiary designation", "beneficiary_designation",
+  "living will", "estate plan", "beneficiary designation",
   // Financial Accounts
   "brokerage account", "retirement account (ira/401k)",
   "bank account", "529 plan",
   "stock options/rsus", "crypto wallet", "alternative investments",
-  "financial_account", "investment_statement", "bank_statement",
+  "financial account", "investment statement", "bank statement",
   // Tax Records (bills are visible, returns/records are private)
   "federal tax return", "state tax return",
   "gift tax return (form 709)", "property tax record",
   "estate & trust return (form 1041)",
-  "tax_return", "tax_document",
+  "tax return", "tax document",
   // Life / Long-Term / Disability Insurance
   "life insurance", "long-term care insurance", "disability insurance",
-  "life_insurance",
-  // Medical (legacy)
-  "medical_record", "health_insurance",
-  // Legal (legacy)
-  "legal_agreement",
+  // Medical / Health
+  "medical record", "health insurance",
+  // Legal
+  "legal agreement",
   // Government IDs
   "passport",
   "birth certificate", "marriage certificate", "divorce decree",
-  "social security card", "citizenship/immigration", "death certificate",
-  "birth_certificate", "marriage_certificate", "divorce_decree",
-  "social_security",
+  "social security card", "social security",
+  "citizenship/immigration", "death certificate",
 ]);
 
 function visibleToHomeManagers(category: string | null | undefined): boolean {
   if (!category) return true;
-  return !PRIVATE_FROM_HOME_MANAGERS.has(category.toLowerCase());
+  const normalized = category.toLowerCase().replace(/_/g, " ");
+  return !PRIVATE_FROM_HOME_MANAGERS.has(normalized);
 }
 
 interface EmailClassification {

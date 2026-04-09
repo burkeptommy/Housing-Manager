@@ -10,14 +10,19 @@ import Foundation
 /// authoritative source — when a new `DocumentInsert` is created, the
 /// `visibleToHomeManagers` field is set from `visibleToHomeManagers(for:)`.
 ///
-/// Categories are stored in two forms in `documents.category` depending on
+/// Categories arrive in two formats in `documents.category` depending on
 /// the upload path:
 /// - Manual / quiz / Edge Function classification: Title Case strings from
-///   `DocumentCategory` raw values ("Will", "Power of Attorney", etc.).
-/// - Legacy / email-forwarded paths sometimes use snake_case strings.
+///   `DocumentCategory` raw values ("Will", "Power of Attorney", etc.) or
+///   AI-generated approximations from receive-email Claude classification.
+/// - Legacy / older email-forwarded paths sometimes use snake_case strings
+///   ("power_of_attorney", "bank_statement").
 ///
-/// We accept both by lowercasing the input and matching against a set that
-/// also stores everything lowercased.
+/// The lookup function normalizes BOTH formats by lowercasing AND replacing
+/// underscores with spaces, then comparing against a set of space-separated
+/// lowercased keys. So "Power of Attorney", "power of attorney",
+/// "POWER_OF_ATTORNEY", and "power_of_attorney" all collapse to the same
+/// lookup key "power of attorney".
 ///
 /// **Keep in sync** with the TypeScript `PRIVATE_FROM_HOME_MANAGERS` constant
 /// in `supabase/functions/receive-email/index.ts`,
@@ -25,27 +30,25 @@ import Foundation
 /// `supabase/functions/analyze-document/index.ts`.
 ///
 /// **Keep in sync** with the SQL backfill in
-/// `supabase/migrations/20260440_document_home_manager_access_backfill.sql`.
+/// `supabase/migrations/20260441_document_home_manager_normalize_backfill.sql`.
 enum DocumentAccessDefaults {
     /// Categories that are HIDDEN from home managers by default. All entries
-    /// are lowercased so the lookup can normalize either Title Case or
-    /// snake_case input. Anything NOT in this set is visible by default.
+    /// are space-separated lowercased keys; the lookup normalizes input to
+    /// match this format. Anything NOT in this set is visible by default.
     static let privateFromHomeManagers: Set<String> = [
-        // Estate Planning — DocumentCategory raw values + legacy snake_case
+        // Estate Planning — DocumentCategory raw values + common Claude
+        // classification variants
         "will",
         "trust",
         "power of attorney",
-        "power_of_attorney",
         "healthcare directive",
-        "healthcare_directive",
         "guardianship designation",
         "letter of intent",
-        "living_will",
-        "estate_plan",
+        "living will",
+        "estate plan",
         "beneficiary designation",
-        "beneficiary_designation",
 
-        // Financial Accounts
+        // Financial Accounts — DocumentCategory raw values + plain variants
         "brokerage account",
         "retirement account (ira/401k)",
         "bank account",
@@ -53,32 +56,32 @@ enum DocumentAccessDefaults {
         "stock options/rsus",
         "crypto wallet",
         "alternative investments",
-        "financial_account",
-        "investment_statement",
-        "bank_statement",
+        "financial account",
+        "investment statement",
+        "bank statement",
 
-        // Tax Records (returns and detailed records — bills are visible)
+        // Tax Records — returns and detailed records (bills are visible)
         "federal tax return",
         "state tax return",
         "gift tax return (form 709)",
         "property tax record",
         "estate & trust return (form 1041)",
-        "tax_return",
-        "tax_document",
+        "tax return",
+        "tax document",
 
-        // Life / Long-Term / Disability Insurance (often names beneficiaries)
+        // Life / Long-Term / Disability Insurance (often names beneficiaries
+        // or contains medical underwriting details)
         "life insurance",
         "long-term care insurance",
         "disability insurance",
-        "life_insurance",
 
-        // Medical / Health (legacy snake_case — not in DocumentCategory enum
-        // but may appear from email pipeline classifications)
-        "medical_record",
-        "health_insurance",
+        // Medical / Health (not in the iOS DocumentCategory enum but common
+        // Claude classifications from the email pipeline)
+        "medical record",
+        "health insurance",
 
-        // Legal (legacy)
-        "legal_agreement",
+        // Legal (general agreements not covered by the estate categories)
+        "legal agreement",
 
         // Government IDs
         "passport",
@@ -86,19 +89,21 @@ enum DocumentAccessDefaults {
         "marriage certificate",
         "divorce decree",
         "social security card",
+        "social security",
         "citizenship/immigration",
         "death certificate",
-        "birth_certificate",
-        "marriage_certificate",
-        "divorce_decree",
-        "social_security",
     ]
 
     /// Default `visible_to_home_managers` value for a new document based on
     /// its category. Nil or unknown categories default to visible (the safer
     /// choice for general home management documents).
+    ///
+    /// Normalizes the input by lowercasing AND replacing underscores with
+    /// spaces, so both Title Case ("Power of Attorney") and legacy
+    /// snake_case ("power_of_attorney") collapse to the same lookup key.
     static func visibleToHomeManagers(for category: String?) -> Bool {
         guard let category = category?.lowercased() else { return true }
-        return !privateFromHomeManagers.contains(category)
+        let normalized = category.replacingOccurrences(of: "_", with: " ")
+        return !privateFromHomeManagers.contains(normalized)
     }
 }
