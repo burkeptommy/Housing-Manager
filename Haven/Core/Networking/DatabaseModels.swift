@@ -109,9 +109,24 @@ struct FamilyMemberRow: Codable, Identifiable, Hashable {
     let notes: String?
     let createdAt: Date?
     let linkedUserId: UUID?
+    /// Build 87: discriminator added by migration
+    /// `20260437_add_family_member_type.sql`. One of 'family' (default),
+    /// 'home_manager', or 'staff'. Optional in Swift so legacy rows that
+    /// somehow predate the migration still decode cleanly — the migration
+    /// backfills every existing row to 'family' so this should be non-nil
+    /// in practice.
+    let memberType: String?
 
     /// Whether this family member has a linked Haven account
     var isLinkedUser: Bool { linkedUserId != nil }
+
+    /// Build 87: convenience for distinguishing real family from paid
+    /// staff. Defaults to `true` when `memberType` is nil so legacy data
+    /// keeps its existing dashboard placement.
+    var isStaff: Bool {
+        let type = memberType ?? "family"
+        return type == "home_manager" || type == "staff"
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, relationship, email, phone, notes, gender, school
@@ -127,6 +142,7 @@ struct FamilyMemberRow: Codable, Identifiable, Hashable {
         case legalName = "legal_name"
         case createdAt = "created_at"
         case linkedUserId = "linked_user_id"
+        case memberType = "member_type"
     }
 }
 
@@ -169,6 +185,8 @@ struct FamilyMemberInsert: Codable {
     var school: String?
     var notes: String?
     var linkedUserId: UUID?
+    /// Build 87: 'family' (default), 'home_manager', or 'staff'.
+    var memberType: String?
 
     enum CodingKeys: String, CodingKey {
         case relationship, email, phone, notes, gender, school
@@ -182,6 +200,7 @@ struct FamilyMemberInsert: Codable {
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
         case linkedUserId = "linked_user_id"
+        case memberType = "member_type"
     }
 }
 
@@ -201,6 +220,10 @@ struct FamilyMemberUpdate: Codable {
     var legalName: String?
     var school: String?
     var notes: String?
+    /// Build 87: 'family' (default), 'home_manager', or 'staff'. Update
+    /// path is intentionally permissive — the form layer is responsible
+    /// for not flipping a family member into a staff member after creation.
+    var memberType: String?
 
     enum CodingKeys: String, CodingKey {
         case relationship, email, phone, notes, gender, school
@@ -213,6 +236,7 @@ struct FamilyMemberUpdate: Codable {
         case expectedDate = "expected_date"
         case isExpecting = "is_expecting"
         case legalName = "legal_name"
+        case memberType = "member_type"
     }
 }
 

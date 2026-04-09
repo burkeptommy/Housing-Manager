@@ -100,6 +100,23 @@ struct DashboardView: View {
                             }
                         )
 
+                        // Build 87 — paid household staff strip. Hidden
+                        // entirely when the household has no staff. The
+                        // "+" button routes to the Settings → Household
+                        // Staff add flow rather than the family chooser
+                        // so the two entry points stay clearly separated.
+                        if !viewModel.householdStaff.isEmpty {
+                            HouseholdStaffStrip(
+                                staff: viewModel.householdStaff,
+                                onMemberTapped: { member in
+                                    selectedMemberForProfile = member
+                                },
+                                onAddTapped: {
+                                    showSettings = true
+                                }
+                            )
+                        }
+
                         // 3.5 "Make it Yours" hero card for invitees who joined an
                         // existing household. Disappears once the personal quiz
                         // completes (or the user dismisses with "Not now").

@@ -121,6 +121,12 @@ struct HouseQuizView: View {
     /// dialog itself is mounted on `savedReviewView`.
     @State private var showSkipAllSavedConfirm: Bool = false
 
+    /// Build 87 — Q36 DIY vs Vendor preference slider value. Defaults to
+    /// the middle position (5). Hydrated from `viewModel.state.answers[q.id]?.sliderValue`
+    /// on `hydrateEntryState` so back-nav and resume land on the user's
+    /// previous selection.
+    @State private var sliderValue: Int = 5
+
     init(property: PropertyRow) {
         _viewModel = StateObject(wrappedValue: HouseQuizViewModel(property: property))
     }
@@ -394,6 +400,8 @@ struct HouseQuizView: View {
                         generatorAddBody(q)
                     case .householdContractors:
                         householdContractorsBody(q)
+                    case .slider:
+                        sliderBody(q)
                     }
                 }
 
@@ -1176,6 +1184,98 @@ struct HouseQuizView: View {
             }
         }
         return nil
+    }
+
+    // MARK: - Slider (Q36 DIY vs Vendor preference) — Build 87
+
+    /// Build 87: Q36 DIY vs Vendor slider body. Renders the shared
+    /// `VendorPreferenceSlider` plus a Continue button. The slider's live
+    /// preview shows an approximate count of `either`-tagged tasks that
+    /// would flip to vendor at the current setting, computed against the
+    /// user's actual maintenance task list. The count is loaded once on
+    /// appear and recomputed locally as the slider moves — no extra DB
+    /// hits during drag.
+    @ViewBuilder
+    private func sliderBody(_ q: HouseQuizQuestion) -> some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
+            VendorPreferenceSlider(
+                value: $sliderValue,
+                leftLabel: q.sliderLeftLabel ?? "DIY everything",
+                rightLabel: q.sliderRightLabel ?? "Let pros handle it",
+                minValue: q.sliderMin,
+                maxValue: q.sliderMax,
+                previewLabel: { value in
+                    sliderPreviewText(forValue: value)
+                }
+            )
+
+            HavenButton(
+                title: "Continue",
+                action: {
+                    Haptics.success()
+                    Task { await viewModel.recordSliderAnswer(value: sliderValue) }
+                }
+            )
+            .padding(.top, HavenTheme.spacing8)
+        }
+        .task {
+            await loadEitherTaskCountsForSlider()
+        }
+    }
+
+    /// Build 87: cached either-tagged task list for the slider's live
+    /// preview. Loaded once when sliderBody appears so the user can drag
+    /// without firing additional DB queries. Each entry stores just the
+    /// effort minutes — that's all the threshold function needs.
+    @State private var sliderEitherTaskEfforts: [Int] = []
+
+    private func loadEitherTaskCountsForSlider() async {
+        // Look up every active maintenance task on the property and
+        // narrow to ones whose template was tagged `.either`. We pull
+        // the template list from MaintenanceTemplates so we don't need
+        // to round-trip the assignment_type column on every row.
+        let propertyId = viewModel.property.id
+        guard let tasks = try? await DatabaseService.shared.fetchMaintenanceTasks(propertyId: propertyId) else {
+            await MainActor.run { sliderEitherTaskEfforts = [] }
+            return
+        }
+        // Build a templateKey → effort lookup for `.either` templates only.
+        var efforts: [String: Int] = [:]
+        for (_, templates) in MaintenanceTemplates.allTemplates {
+            for template in templates where template.assignmentType == .either {
+                efforts[template.templateKey] = template.diyEffortMinutes ?? 60
+            }
+        }
+        let matched = tasks.compactMap { task -> Int? in
+            guard let key = task.templateId, let effort = efforts[key] else { return nil }
+            return effort
+        }
+        await MainActor.run { sliderEitherTaskEfforts = matched }
+    }
+
+    /// Build 87: localized preview line for the slider position. Uses
+    /// the same threshold formula as `MaintenanceTaskReconciler.resolveAssignment`
+    /// so the user sees the truth of what their tap will do. When no
+    /// either-tagged tasks exist yet (e.g. fresh quiz, no property data
+    /// loaded), falls back to a description-only line.
+    private func sliderPreviewText(forValue value: Int) -> String {
+        let total = sliderEitherTaskEfforts.count
+        guard total > 0 else {
+            switch value {
+            case 1...3:  return "You'll handle most maintenance tasks yourself."
+            case 4...6:  return "Quick tasks stay personal. Bigger jobs route to vendors."
+            default:     return "We'll route every task we can to a vendor."
+            }
+        }
+        let threshold = max(0, (11 - value) * 30)
+        let flipCount = sliderEitherTaskEfforts.filter { $0 > threshold }.count
+        if flipCount == 0 {
+            return "At this setting, none of your flexible tasks will be vendor-managed."
+        }
+        if flipCount == 1 {
+            return "At this setting, 1 of your flexible tasks will be vendor-managed."
+        }
+        return "At this setting, roughly \(flipCount) of your flexible tasks will be vendor-managed."
     }
 
     // MARK: - Provider search (utility lookup)
@@ -2965,6 +3065,10 @@ struct HouseQuizView: View {
         // updated) heating fuel choice.
         q22MatchedHeatingProvider = nil
         q22UseSameProvider = nil
+        // Build 87 — clear the slider state and the cached either-task
+        // efforts so resume / back-nav doesn't reuse a stale snapshot.
+        sliderValue = 5
+        sliderEitherTaskEfforts = []
         // Phase 19m / Build 83 — clear the Q15b household contractors state
         // so going back/forward through the quiz doesn't carry chip
         // selections or picked vendors across questions.
@@ -3134,6 +3238,16 @@ struct HouseQuizView: View {
             }
             if let expecting = prior.expectingEntries {
                 householdPendingExpecting = expecting
+            }
+        case .slider:
+            // Build 87: Q36 slider hydration. Restores the integer value
+            // so back-nav and resume land on the previously committed
+            // setting instead of the default 5. The cached either-task
+            // efforts are NOT restored — they're recomputed live by the
+            // sliderBody's `.task` modifier so the preview always reflects
+            // the current task list state.
+            if let value = prior.sliderValue {
+                sliderValue = max(q.sliderMin, min(q.sliderMax, value))
             }
         default:
             // Single-choice / yes-no / vehicle-count / providerSearch

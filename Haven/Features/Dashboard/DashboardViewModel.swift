@@ -90,6 +90,12 @@ final class DashboardViewModel: ObservableObject {
     @Published var expectingMembers: [FamilyMemberRow] = []
     @Published var allDocuments: [DocumentRow] = []
 
+    // Build 87: paid household staff (home managers, future role types).
+    // Loaded alongside familyMembers in `refresh()` via the new
+    // `DatabaseService.fetchHouseholdStaff()` helper. Empty by default —
+    // the dashboard hides the strip entirely when this is empty.
+    @Published var householdStaff: [FamilyMemberRow] = []
+
     // Enrichment cards
     @Published var propertyAttributes: [String: FlexibleValue] = [:]
     @Published var serviceContracts: [ServiceContractRow] = []
@@ -628,6 +634,12 @@ final class DashboardViewModel: ObservableObject {
         familyMembers = members ?? []
         familyMemberCount = familyMembers.count
         expectingMembers = familyMembers.filter { $0.isExpecting == true }
+
+        // Build 87: load paid household staff (home managers etc.) for the
+        // new dashboard HouseholdStaffStrip. Filtered server-side via the
+        // member_type column added in migration 20260437.
+        let staff = try? await DatabaseService.shared.fetchHouseholdStaff()
+        householdStaff = staff ?? []
 
         // Check if user has ever run scenarios
         struct IdRow: Codable { let id: UUID }

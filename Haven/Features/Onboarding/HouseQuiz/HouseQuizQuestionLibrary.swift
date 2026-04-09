@@ -1,6 +1,6 @@
 import Foundation
 
-/// The 36-question House Quiz library, organized into 6 sections.
+/// The 37-question House Quiz library, organized into 6 sections.
 /// Phase 19b inserted q3b_hvac_type into section 1.
 /// Phase 19j inserted q11b_lawn_type into section 3 and q28b_pets into section 6.
 /// Phase 19m inserted q15b_household_contractors into section 3.
@@ -8,6 +8,9 @@ import Foundation
 /// Build 86 inserted q25b_ev_charger into section 5 (right after q25_garage_ev)
 /// and dropped the 1-car / 2-car granularity from q25 in favor of a single
 /// "Attached" option plus a new "Semi-attached" option.
+/// Build 87 (Edit 2) appended q36_diy_vs_vendor to section 6 — the new
+/// `.slider` question kind that captures a 1-10 DIY vs vendor preference
+/// and triggers a household-wide reconciler pass on commit.
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
 
@@ -29,13 +32,17 @@ enum HouseQuizQuestionLibrary {
     /// Build 86: shifted once more for q25b_ev_charger in section 5, which
     /// adds one question to section 5 and bumps the section 5 / section 6
     /// milestones by +1.
+    /// Build 87 (Edit 2): appended q36_diy_vs_vendor to section 6, which
+    /// adds one question to section 6 and bumps only the final milestone
+    /// by +1 (every prior section is unaffected because the question lands
+    /// at the end of the quiz).
     ///   Section 1: 6 questions → milestone after index 5
     ///   Section 2: 5 → cumulative 11 → milestone after index 10
     ///   Section 3: 8 → cumulative 19 → milestone after index 18
     ///   Section 4: 5 → cumulative 24 → milestone after index 23
     ///   Section 5: 6 → cumulative 30 → milestone after index 29
-    ///   Section 6: 6 → cumulative 36 → milestone after index 35
-    static let milestoneIndices: Set<Int> = [5, 10, 18, 23, 29, 35]
+    ///   Section 6: 7 → cumulative 37 → milestone after index 36
+    static let milestoneIndices: Set<Int> = [5, 10, 18, 23, 29, 36]
 
     // MARK: - Section 1 — Your Home Basics
 
@@ -640,6 +647,23 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "surprise_costs", label: "Surprise costs"),
                 AnswerOption(id: "good_contractors", label: "Finding good contractors"),
             ]
+        ),
+        // Build 87: Q36 DIY vs Vendor preference slider. Sits at the very
+        // end of the quiz so the reconciler can re-balance every existing
+        // `either`-tagged task in one shot when the user commits. Settings
+        // → Preferences exposes the same control via a shared component
+        // (`VendorPreferenceSlider`) so the user can change it later
+        // without retaking the quiz.
+        HouseQuizQuestion(
+            id: "q36_diy_vs_vendor",
+            section: .protectionPeople,
+            title: "How hands-on do you want to be?",
+            subtitle: "Slide right to let us manage more with vendors. Slide left to do more yourself. You can change this anytime in Settings.",
+            kind: .slider,
+            sliderMin: 1,
+            sliderMax: 10,
+            sliderLeftLabel: "DIY everything",
+            sliderRightLabel: "Let pros handle it"
         ),
     ]
 }

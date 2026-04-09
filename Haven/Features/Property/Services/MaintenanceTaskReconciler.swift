@@ -92,7 +92,10 @@ enum MaintenanceTaskReconciler {
         // `{state}` placeholders can be substituted with the user's actual
         // location before tasks are written. Failures fall back to generic
         // "your area" / "your state" so the reconciler still runs offline.
+        // Build 87: also reads `vendor_preference_level` so the per-template
+        // assignment for `.either` templates honors the user's slider.
         let property = try? await DatabaseService.shared.fetchProperty(id: propertyId)
+        let preferenceLevel = preferenceLevelFromProperty(property)
         let correctTemplates = rawTemplates.map {
             $0.interpolated(city: property?.city, state: property?.state)
         }
@@ -214,15 +217,40 @@ enum MaintenanceTaskReconciler {
                     }
 
                 case .either:
-                    // Default to personal. Phase 19l's UI surfaces the
-                    // bidirectional toggle so users can flip to vendor later.
-                    // The post-quiz delegation sheet also offers to bulk-flip
-                    // these when a vendor for the category exists.
-                    finalTitle = template.title
-                    finalDescription = template.description
-                    assignmentTypeString = "either"
-                    assignedContractorId = nil
-                    needsVendor = false
+                    // Build 87: resolve based on the user's vendor preference
+                    // slider value (`vendor_preference_level` property
+                    // attribute, default 5). Tasks past the threshold flip to
+                    // vendor at creation time, with the same contractor
+                    // matching / "Find a contractor for: ..." reframing the
+                    // `.vendor` branch uses. Tasks below the threshold stay
+                    // personal — the row is still tagged `assignmentType:
+                    // "either"` so the bidirectional toggle on UnifiedTaskCard
+                    // can flip it later.
+                    let resolved = resolveAssignment(
+                        template: template,
+                        preferenceLevel: preferenceLevel
+                    )
+                    if resolved == .vendor {
+                        if let contractor = matchingContractor {
+                            finalTitle = "Schedule \(contractor.companyName): \(template.title.lowercased())"
+                            finalDescription = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)"
+                            assignmentTypeString = "vendor"
+                            assignedContractorId = contractor.id
+                            needsVendor = false
+                        } else {
+                            finalTitle = "Find a contractor for: \(template.title.lowercased())"
+                            finalDescription = "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)"
+                            assignmentTypeString = "vendor"
+                            assignedContractorId = nil
+                            needsVendor = true
+                        }
+                    } else {
+                        finalTitle = template.title
+                        finalDescription = template.description
+                        assignmentTypeString = "either"
+                        assignedContractorId = nil
+                        needsVendor = false
+                    }
                 }
 
                 var insert = MaintenanceTaskInsert(
@@ -346,6 +374,188 @@ enum MaintenanceTaskReconciler {
         }
 
         return aggregate
+    }
+
+    // MARK: - Build 87: household-wide reconcile
+
+    /// Build 87: walks every property in the household and reconciles each
+    /// one. Used by the DIY vs Vendor slider commit path (Q36 + Settings →
+    /// Preferences → Save) so a single value change rebalances every
+    /// `either`-tagged task across the household. Also flips existing rows
+    /// in place via `flipEitherTasksForPreference` since `reconcile` only
+    /// touches the create-side decision and the user already has a real
+    /// task list at this point.
+    static func reconcileAllForHousehold(householdId: UUID) async -> ReconciliationResult {
+        var aggregate = ReconciliationResult.empty
+        let properties: [PropertyRow]
+        do {
+            properties = try await DatabaseService.shared.fetchProperties()
+        } catch {
+            return aggregate
+        }
+        for property in properties where property.householdId == householdId {
+            let result = await reconcileAll(propertyId: property.id, householdId: property.householdId)
+            aggregate = aggregate.merging(result)
+
+            // Flip pre-existing `either`-tagged rows to match the new
+            // preference. The reconciler's create-side decision only fires
+            // for newly inserted templates; this pass updates the rows that
+            // were already created at a different preference level.
+            let flipResult = await flipEitherTasksForPreference(
+                propertyId: property.id,
+                householdId: property.householdId
+            )
+            aggregate = aggregate.merging(flipResult)
+        }
+        return aggregate
+    }
+
+    /// Build 87: per-property pass that walks existing maintenance_tasks
+    /// and flips any `either`-tagged row whose computed assignment changed
+    /// because of a new `vendor_preference_level`. Strictly preserves
+    /// user-touched tasks (assigned, has notes, has completion history)
+    /// AND tasks that already have an explicit contractor link from the
+    /// post-quiz delegation flow (`assigned_contractor_id IS NOT NULL`).
+    /// The reframing voice matches Phase 19l's `convertToVendorManaged` so
+    /// flipped tasks read identically to the post-quiz delegation path.
+    static func flipEitherTasksForPreference(
+        propertyId: UUID,
+        householdId: UUID
+    ) async -> ReconciliationResult {
+        var added: [String] = []
+        var removed: [String] = []
+        var preserved: [String] = []
+
+        let property = try? await DatabaseService.shared.fetchProperty(id: propertyId)
+        let preferenceLevel = preferenceLevelFromProperty(property)
+
+        let tasks: [MaintenanceTaskDBRow]
+        do {
+            tasks = try await DatabaseService.shared.fetchMaintenanceTasks(propertyId: propertyId)
+        } catch {
+            return .empty
+        }
+
+        // Build a templateKey → MaintenanceTemplate index of `.either`
+        // templates only. Anything else (.personal / .vendor) is fixed and
+        // doesn't get touched by the slider.
+        var eitherTemplates: [String: MaintenanceTemplate] = [:]
+        for (_, sectionTemplates) in MaintenanceTemplates.allTemplates {
+            for template in sectionTemplates where template.assignmentType == .either {
+                eitherTemplates[template.templateKey] = template
+            }
+        }
+
+        // Cache contractors once. Used to link a flipped task to a vendor
+        // in the matching system category at flip time, mirroring the
+        // create-side branch in `reconcile`.
+        let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+
+        for task in tasks {
+            // Vehicle tasks are out of scope for the home reconciler.
+            if task.vehicleId != nil { continue }
+            // Must be a known either template.
+            guard let templateKey = task.templateId,
+                  let template = eitherTemplates[templateKey] else { continue }
+            // Skip rows the user has manually edited (notes, reassignment,
+            // completion history).
+            if isUserTouched(task) { continue }
+            // Skip rows that already have an explicit contractor link from
+            // the post-quiz delegation flow — those represent a real
+            // commitment we shouldn't second-guess.
+            if task.assignedContractorId != nil { continue }
+
+            let resolved = resolveAssignment(template: template, preferenceLevel: preferenceLevel)
+            let currentAssignment = (task.assignmentType ?? "either").lowercased()
+
+            if resolved == .vendor && currentAssignment != "vendor" {
+                // Flip personal/either → vendor. Look up a matching
+                // contractor for the system category and reframe via
+                // Phase 19l's voice. When no contractor exists, mark
+                // needs_vendor and reframe as a "Find a contractor" CTA.
+                let category = template.systemCategory
+                let matching = contractors.first { contractor in
+                    if let cat = contractor.category,
+                       cat.caseInsensitiveCompare(category) == .orderedSame {
+                        return true
+                    }
+                    if let specs = contractor.specialties,
+                       specs.contains(where: { $0.caseInsensitiveCompare(category) == .orderedSame }) {
+                        return true
+                    }
+                    return false
+                }
+                var update = MaintenanceTaskUpdate()
+                update.assignmentType = "vendor"
+                if let contractor = matching {
+                    update.title = "Schedule \(contractor.companyName): \(template.title.lowercased())"
+                    update.description = "Your job: book the appointment and be home for it. \(contractor.companyName) will handle the work.\n\nWhat they'll do:\n\(template.description)"
+                    update.assignedContractorId = contractor.id
+                    update.needsVendor = false
+                } else {
+                    update.title = "Find a contractor for: \(template.title.lowercased())"
+                    update.description = "We'll find you a vetted local pro for this. In the meantime, here's what they'll do:\n\n\(template.description)"
+                    update.needsVendor = true
+                }
+                if (try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)) != nil {
+                    added.append(update.title ?? task.title)
+                } else {
+                    preserved.append(task.title)
+                }
+            } else if resolved == .personal && currentAssignment == "vendor" {
+                // Flip vendor → personal. Restore the original template
+                // title and description so the row reads like the canonical
+                // personal task. Clear the needs_vendor flag.
+                var update = MaintenanceTaskUpdate()
+                update.assignmentType = "either"
+                update.title = template.title
+                update.description = template.description
+                update.needsVendor = false
+                if (try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, update)) != nil {
+                    removed.append(task.title)
+                } else {
+                    preserved.append(task.title)
+                }
+            }
+        }
+
+        return ReconciliationResult(added: added, removed: removed, preserved: preserved)
+    }
+
+    /// Build 87: deterministic personal vs vendor decision for `.either`
+    /// templates given the user's slider value. Templates outside `.either`
+    /// short-circuit to their hardcoded type. The threshold function maps
+    /// slider 1 → 300 minutes (DIY everything), slider 5 → 180 (middle
+    /// ground), slider 10 → 0 (vendor everything). Tasks with
+    /// `diyEffortMinutes > threshold` flip to vendor; everything else
+    /// stays personal.
+    static func resolveAssignment(
+        template: MaintenanceTemplate,
+        preferenceLevel: Int
+    ) -> TaskAssignmentType {
+        guard template.assignmentType == .either else {
+            return template.assignmentType
+        }
+        let effort = template.diyEffortMinutes ?? 60
+        let threshold = max(0, (11 - preferenceLevel) * 30)
+        return effort > threshold ? .vendor : .personal
+    }
+
+    /// Build 87: extract the user's `vendor_preference_level` from a
+    /// `PropertyRow`'s attributes JSONB. Defaults to 5 (middle of the
+    /// 1-10 range) when unset, malformed, or out of range, so the
+    /// reconciler is safe to call against any property regardless of
+    /// whether the slider has been answered yet.
+    static func preferenceLevelFromProperty(_ property: PropertyRow?) -> Int {
+        guard let attribute = property?.attributes?["vendor_preference_level"] else {
+            return 5
+        }
+        // FlexibleValue.stringValue returns a non-optional String, so the
+        // parse step is the only thing that can fall through to the default.
+        if let parsed = Int(attribute.stringValue) {
+            return max(1, min(10, parsed))
+        }
+        return 5
     }
 
     // MARK: - Helpers

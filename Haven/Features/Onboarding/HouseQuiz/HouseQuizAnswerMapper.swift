@@ -1078,6 +1078,21 @@ final class HouseQuizAnswerMapper {
                     try await persistAttribute("priorities", value: selected.joined(separator: ","))
                 }
 
+            case "q36_diy_vs_vendor":
+                // Build 87: DIY vs Vendor preference slider. Persist the
+                // integer to the property attribute, then re-run the
+                // reconciler for every property in the household so any
+                // existing `either`-tagged tasks flip to match the new
+                // threshold. The reconciler reads the attribute via
+                // `MaintenanceTaskReconciler.resolveAssignment` at task-
+                // creation time, so this single pass converges the whole
+                // task list against the new preference.
+                if let value = answer.sliderValue {
+                    try await persistAttribute("vendor_preference_level", value: String(value))
+                    let result = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
+                    reconciliationResult = reconciliationResult.merging(result)
+                }
+
             default:
                 // Unknown question — just record raw answer for forward compat.
                 if let id = answer.answerId {

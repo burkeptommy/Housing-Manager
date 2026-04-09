@@ -114,9 +114,16 @@ final class DatabaseService {
 
     // MARK: - Family Members
 
+    /// Build 87: filters out home managers and other staff so the dashboard
+    /// HouseholdStrip and Settings → Family Members never accidentally
+    /// surface a paid contractor in the family card list. The migration
+    /// `20260437_add_family_member_type.sql` defaults every existing row
+    /// to 'family' so this is a no-op for legacy installs. The OR-IS-NULL
+    /// clause is defensive in case a row escapes the migration.
     func fetchFamilyMembers() async throws -> [FamilyMemberRow] {
         try await from("family_members")
             .select()
+            .or("member_type.eq.family,member_type.is.null")
             .order("first_name")
             .execute()
             .value
@@ -129,6 +136,20 @@ final class DatabaseService {
         try await from("family_members")
             .select()
             .eq("household_id", value: householdId.uuidString)
+            .or("member_type.eq.family,member_type.is.null")
+            .order("first_name")
+            .execute()
+            .value
+    }
+
+    /// Build 87: returns paid household staff (home managers, future
+    /// roles). Mirrors `fetchFamilyMembers` but filters by `member_type IN
+    /// ('home_manager', 'staff')`. Used by `DashboardViewModel` to populate
+    /// the new HouseholdStaffStrip and by `HouseholdStaffView` in Settings.
+    func fetchHouseholdStaff() async throws -> [FamilyMemberRow] {
+        try await from("family_members")
+            .select()
+            .in("member_type", values: ["home_manager", "staff"])
             .order("first_name")
             .execute()
             .value

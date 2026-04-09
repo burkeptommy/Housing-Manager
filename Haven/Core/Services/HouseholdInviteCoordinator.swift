@@ -56,6 +56,13 @@ actor HouseholdInviteCoordinator {
         var sendInvite: Bool
         var personalMessage: String?
         var source: InviteSource
+        /// Build 87: 'family' (default), 'home_manager', or 'staff'.
+        /// Routed through to `FamilyMemberInsert.memberType` so the
+        /// dashboard's HouseholdStrip / HouseholdStaffStrip filter can
+        /// scope each row to the right surface. Family entry points keep
+        /// the default; the new `AddHouseholdStaffSheet` passes
+        /// "home_manager".
+        var memberType: String
 
         public init(
             householdId: UUID,
@@ -69,7 +76,8 @@ actor HouseholdInviteCoordinator {
             isMinor: Bool = false,
             sendInvite: Bool = true,
             personalMessage: String? = nil,
-            source: InviteSource
+            source: InviteSource,
+            memberType: String = "family"
         ) {
             self.householdId = householdId
             self.firstName = firstName
@@ -83,6 +91,7 @@ actor HouseholdInviteCoordinator {
             self.sendInvite = sendInvite
             self.personalMessage = personalMessage
             self.source = source
+            self.memberType = memberType
         }
     }
 
@@ -248,7 +257,7 @@ actor HouseholdInviteCoordinator {
                 "deduped": true,
             ])
         } else {
-            let insert = FamilyMemberInsert(
+            var insert = FamilyMemberInsert(
                 householdId: request.householdId,
                 firstName: trimmedFirstName,
                 lastName: trimmedLastName ?? "",
@@ -259,6 +268,10 @@ actor HouseholdInviteCoordinator {
                 isMinor: request.isMinor,
                 gender: request.gender
             )
+            // Build 87: route the member_type discriminator through to
+            // the insert so the dashboard's HouseholdStrip /
+            // HouseholdStaffStrip filter scopes the new row correctly.
+            insert.memberType = request.memberType
 
             familyMember = try await db.createFamilyMember(insert)
 

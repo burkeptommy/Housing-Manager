@@ -71,6 +71,10 @@ struct HouseQuizAnswer: Codable, Equatable {
     /// fuel differs from the primary heating fuel from Q3 (i.e. they need
     /// a separate utility_account row from the one Q19 created).
     var generatorProviderId: UUID?
+    /// Build 87: Q36 DIY vs Vendor slider value (1-10 inclusive). Nil for
+    /// every other question kind. Persisted alongside the other answer
+    /// fields in the `house_quiz_state` JSONB column.
+    var sliderValue: Int?
     var answeredAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -84,6 +88,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         case secondaryFuelProviderId = "secondary_fuel_provider_id"
         case generatorFuelType = "generator_fuel_type"
         case generatorProviderId = "generator_provider_id"
+        case sliderValue = "slider_value"
         case answeredAt = "answered_at"
     }
 
@@ -98,6 +103,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         secondaryFuelProviderId: UUID? = nil,
         generatorFuelType: String? = nil,
         generatorProviderId: UUID? = nil,
+        sliderValue: Int? = nil,
         answeredAt: Date = Date()
     ) {
         self.answerId = answerId
@@ -110,14 +116,15 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.secondaryFuelProviderId = secondaryFuelProviderId
         self.generatorFuelType = generatorFuelType
         self.generatorProviderId = generatorProviderId
+        self.sliderValue = sliderValue
         self.answeredAt = answeredAt
     }
 
     /// Resilient decoding so old persisted answers (no `custom_entries`,
     /// `kids`, `expecting_entries`, `selected_provider_id`,
-    /// `secondary_fuel_provider_id`, `generator_fuel_type`, or
-    /// `generator_provider_id` keys) still load cleanly after the
-    /// schema bump.
+    /// `secondary_fuel_provider_id`, `generator_fuel_type`,
+    /// `generator_provider_id`, or `slider_value` keys) still load cleanly
+    /// after the schema bump.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.answerId = try c.decodeIfPresent(String.self, forKey: .answerId)
@@ -130,6 +137,7 @@ struct HouseQuizAnswer: Codable, Equatable {
         self.secondaryFuelProviderId = try? c.decodeIfPresent(UUID.self, forKey: .secondaryFuelProviderId)
         self.generatorFuelType = try? c.decodeIfPresent(String.self, forKey: .generatorFuelType)
         self.generatorProviderId = try? c.decodeIfPresent(UUID.self, forKey: .generatorProviderId)
+        self.sliderValue = try? c.decodeIfPresent(Int.self, forKey: .sliderValue)
         self.answeredAt = (try? c.decode(Date.self, forKey: .answeredAt)) ?? Date()
     }
 }
@@ -256,6 +264,14 @@ enum HouseQuizQuestionKind: String, Codable {
     /// scoped to that contractor type. Saved chips become contractor rows
     /// via the household-contractor mirror in the answer mapper.
     case householdContractors
+    /// Build 87: Q36 DIY vs Vendor preference slider. Captures an integer
+    /// 1-10 representing how hands-on the user wants to be — 1 = DIY
+    /// everything, 10 = let pros handle it. The mapper persists the value
+    /// to `properties.attributes.vendor_preference_level` and re-runs the
+    /// MaintenanceTaskReconciler so existing `either`-tagged tasks flip
+    /// based on the threshold function in
+    /// `MaintenanceTaskReconciler.resolveAssignment`.
+    case slider
 }
 
 /// One question in the House Quiz library. The library lives in
@@ -302,6 +318,15 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// Q15b contractors, etc.) intentionally keep the chip-by-chip flow.
     let supportsSelectAll: Bool
 
+    /// Build 87: Slider config for `.slider` question kinds. Min/max bound
+    /// the integer range; the labels render under the slider's leading and
+    /// trailing edges. Currently only Q36 (DIY vs Vendor preference) uses
+    /// these. Defaults are safe no-ops for non-slider questions.
+    let sliderMin: Int
+    let sliderMax: Int
+    let sliderLeftLabel: String?
+    let sliderRightLabel: String?
+
     init(
         id: String,
         section: HouseQuizSection,
@@ -314,7 +339,11 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         providerTypes: [String] = [],
         dynamicProviderTypes: ((HouseQuizState) -> [String])? = nil,
         dynamicSkip: ((HouseQuizState) -> Bool)? = nil,
-        supportsSelectAll: Bool = false
+        supportsSelectAll: Bool = false,
+        sliderMin: Int = 1,
+        sliderMax: Int = 10,
+        sliderLeftLabel: String? = nil,
+        sliderRightLabel: String? = nil
     ) {
         self.id = id
         self.section = section
@@ -328,6 +357,10 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.dynamicProviderTypes = dynamicProviderTypes
         self.dynamicSkip = dynamicSkip
         self.supportsSelectAll = supportsSelectAll
+        self.sliderMin = sliderMin
+        self.sliderMax = sliderMax
+        self.sliderLeftLabel = sliderLeftLabel
+        self.sliderRightLabel = sliderRightLabel
     }
 
     /// Convenience for picker code that wants the canonical "primary" type

@@ -113,6 +113,17 @@ struct SettingsView: View {
                     Label("Manage Household & Access", systemImage: "person.2.badge.gearshape")
                         .font(HavenTypography.body)
                 }
+
+                // Build 87: separate entry point for paid household staff
+                // (home managers, etc.) so the family and staff lists stay
+                // clearly separated. Routes through `HouseholdStaffView`
+                // which calls the new `fetchHouseholdStaff` helper.
+                NavigationLink {
+                    HouseholdStaffView()
+                } label: {
+                    Label("Household Staff", systemImage: "person.crop.circle.badge.checkmark")
+                        .font(HavenTypography.body)
+                }
             } header: {
                 Text("HOUSEHOLD")
                     .font(HavenTypography.uiSectionHeader)
@@ -186,7 +197,17 @@ struct SettingsView: View {
                         .font(HavenTypography.body)
                 }
 
-
+                // Build 87: DIY vs Vendor preference slider, also captured
+                // at the end of the House Quiz (Q36). Mirrored here so users
+                // can adjust later without retaking the quiz. The save flow
+                // confirms before reconciling so they don't accidentally
+                // rebalance their whole task list.
+                NavigationLink {
+                    MaintenancePreferencesView()
+                } label: {
+                    Label("Maintenance Preferences", systemImage: "slider.horizontal.3")
+                        .font(HavenTypography.body)
+                }
             } header: {
                 Text("PREFERENCES")
                     .font(HavenTypography.uiSectionHeader)
