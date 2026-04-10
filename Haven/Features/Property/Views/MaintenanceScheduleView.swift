@@ -71,6 +71,10 @@ struct MaintenanceScheduleView: View {
     /// add sheet so they can type a contractor manually.
     @State private var showManualAddFromFindVendor = false
 
+    /// Build 88: "Add Your Own" flow from the no-vendor card's dual CTA.
+    /// Captures the task so the contractor selection can link back to it.
+    @State private var addOwnVendorTask: MaintenanceTaskDBRow?
+
     var body: some View {
         Group {
             if viewModel.isLoading && viewModel.tasks.isEmpty {
@@ -211,7 +215,20 @@ struct MaintenanceScheduleView: View {
         }
         .sheet(isPresented: $showManualAddFromFindVendor) {
             NavigationStack {
-                ContractorDirectoryView(onSelect: { _ in
+                ContractorDirectoryView(onSelect: { contractor in
+                    // Build 88: if triggered from a no-vendor card's "Add Your Own"
+                    // CTA, link the contractor to the task and reframe it.
+                    if let task = addOwnVendorTask {
+                        Task {
+                            await viewModel.convertToVendorManaged(
+                                taskId: task.id,
+                                contractor: contractor
+                            )
+                            await viewModel.loadTasks()
+                            Haptics.success()
+                        }
+                        addOwnVendorTask = nil
+                    }
                     showManualAddFromFindVendor = false
                 })
             }
@@ -1039,6 +1056,10 @@ struct MaintenanceScheduleView: View {
                 } : nil,
                 onFindVendor: {
                     findVendorTask = task
+                },
+                onAddOwnVendor: {
+                    addOwnVendorTask = task
+                    showManualAddFromFindVendor = true
                 }
             )
         }

@@ -41,11 +41,13 @@ struct UnifiedTaskCard: View {
     /// surfaces that don't support delegation (e.g. dashboard).
     var onDelegate: (() -> Void)?
 
-    /// Phase 19l: Tap handler for the find-a-contractor "Find →" CTA. When
-    /// nil, the variant still renders but the button does nothing (the row's
-    /// outer Button is what actually navigates to the picker — see
-    /// MaintenanceScheduleView).
+    /// Phase 19l: Tap handler for the find-a-contractor "Find a Pro" CTA.
+    /// Opens FindLocalVendorSheet pre-filtered to the task's system category.
     var onFindVendor: (() -> Void)?
+
+    /// Build 88: Tap handler for the "Add Your Own" CTA on no-vendor cards.
+    /// Opens the existing contractor add flow (manual entry / iPhone contacts).
+    var onAddOwnVendor: (() -> Void)?
 
     private let dateFormatter: DateFormatter = {
         let f = DateFormatter()
@@ -250,65 +252,139 @@ struct UnifiedTaskCard: View {
         }
     }
 
-    // MARK: - Find-a-Contractor Variant
+    // MARK: - Find-a-Contractor Variant (Build 88 redesign)
+
+    /// Build 88: Count of sub-items in a bundled task's notes field.
+    /// Notes starting with "What's included:" contain "- " prefixed lines.
+    private var bundleSubItemCount: Int? {
+        guard let notes = task.notes, notes.hasPrefix("What's included:") else {
+            return nil
+        }
+        return notes.components(separatedBy: "\n").filter { $0.hasPrefix("- ") }.count
+    }
+
+    /// Build 88: The display title for the no-vendor card. Strips the
+    /// "Find a contractor for: " prefix that the reconciler stamped and
+    /// replaces it with the action-first "It's time to..." framing.
+    private var noVendorDisplayTitle: String {
+        let raw = task.title
+        let prefix = "Find a contractor for: "
+        if raw.hasPrefix(prefix) {
+            let stripped = String(raw.dropFirst(prefix.count))
+            return "It's time to \(stripped)"
+        }
+        // Bundled tasks or custom titles — wrap with "It's time for your"
+        return "It's time for your \(raw)"
+    }
+
+    private var noVendorSubtitle: String {
+        if let count = bundleSubItemCount {
+            return "This covers \(count) item\(count == 1 ? "" : "s"). Would you like Haven to find you a vetted local pro?"
+        }
+        return "Would you like Haven to find you a vetted local pro?"
+    }
 
     private var findContractorCard: some View {
-        HStack(alignment: .top, spacing: 12) {
-            // Left: warning icon
-            Image(systemName: "magnifyingglass.circle.fill")
-                .font(.system(size: 20, weight: .medium))
-                .foregroundStyle(HavenColors.warning)
-                .frame(width: 32, height: 32)
-                .background(HavenColors.warning.opacity(0.12))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .top, spacing: 12) {
+                // Left: navy calendar icon (not orange warning)
+                Image(systemName: "calendar.badge.clock")
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(HavenColors.navy700)
+                    .frame(width: 32, height: 32)
+                    .background(HavenColors.navy700.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
 
-            // Center: title + subtitle
-            VStack(alignment: .leading, spacing: 6) {
-                Text(task.title)
-                    .font(HavenTypography.uiLabel)
-                    .foregroundStyle(HavenColors.textPrimary)
-                    .lineLimit(2)
+                // Center: reframed title + subtitle
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(noVendorDisplayTitle)
+                        .font(HavenTypography.uiLabel)
+                        .foregroundStyle(HavenColors.textPrimary)
+                        .lineLimit(2)
 
-                Text("No vendor yet. We'll find you a vetted pro.")
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(HavenColors.textTertiary)
-                    .lineLimit(2)
+                    Text(noVendorSubtitle)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                locationTagRow
+                    locationTagRow
+                }
+
+                Spacer(minLength: 4)
+
+                // Date on the right
+                VStack(alignment: .trailing, spacing: 4) {
+                    if let priority = task.priority, !priority.isEmpty {
+                        Text(priority.capitalized)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(priorityColor(priority))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(priorityColor(priority).opacity(0.12))
+                            .clipShape(Capsule())
+                    }
+                    Text(task.nextDueDate.havenDateShort)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textSecondary)
+                }
             }
 
-            Spacer(minLength: 4)
+            // Dual CTA buttons
+            Divider()
+                .overlay(HavenColors.beige200)
+                .padding(.top, HavenTheme.spacing12)
 
-            VStack(alignment: .trailing, spacing: 6) {
+            HStack(spacing: HavenTheme.spacing12) {
+                // Primary: Find a Pro
                 Button {
-                    Haptics.light()
+                    Haptics.medium()
                     onFindVendor?()
                 } label: {
-                    HStack(spacing: 4) {
-                        Text("Find")
-                            .font(HavenTypography.uiLabelSmall.weight(.semibold))
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 10, weight: .bold))
+                    HStack(spacing: 6) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Find a Pro")
+                            .font(HavenTypography.uiLabel)
                     }
-                    .foregroundStyle(.white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
-                    .background(HavenColors.warning)
-                    .clipShape(Capsule())
+                    .foregroundStyle(HavenColors.textOnNavy)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(HavenColors.navy)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
                 }
                 .buttonStyle(.plain)
 
-                Text(task.nextDueDate.havenDateShort)
-                    .font(HavenTypography.uiCaption)
-                    .foregroundStyle(isOverdue ? HavenColors.critical : HavenColors.textSecondary)
+                // Secondary: Add Your Own
+                Button {
+                    Haptics.light()
+                    onAddOwnVendor?()
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "person.badge.plus")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Add Your Own")
+                            .font(HavenTypography.uiLabel)
+                    }
+                    .foregroundStyle(HavenColors.navy)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.clear)
+                    .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusButton))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: HavenTheme.radiusButton)
+                            .strokeBorder(HavenColors.navy.opacity(0.3), lineWidth: 1)
+                    }
+                }
+                .buttonStyle(.plain)
             }
+            .padding(.top, HavenTheme.spacing8)
         }
         .padding(HavenTheme.spacing12)
         .background(HavenColors.surface)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         .overlay {
             RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
-                .strokeBorder(HavenColors.warning.opacity(0.4), lineWidth: 0.75)
+                .strokeBorder(HavenColors.border.opacity(0.4), lineWidth: 0.75)
         }
     }
 
