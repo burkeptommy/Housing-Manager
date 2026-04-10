@@ -244,8 +244,15 @@ final class HouseQuizAnswerMapper {
                     // `.vendor`-tagged landscaping templates auto-link at
                     // task-creation time instead of landing as "Find a
                     // contractor for: ..." placeholders.
+                    // Build 87 (search picker): use the catalog-aware path when
+                    // the user picked from the search picker so the full brand
+                    // identity (logo, brand color, website) lands on the row.
                     if answer.answerId == "pro", let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "landscaping")
+                        if answer.selectedProviderId != nil {
+                            try await createUtilityAccount(from: answer, fallbackType: "landscaping")
+                        } else {
+                            try await createUtilityAccount(name: provider, type: "landscaping")
+                        }
                     }
                     let lawnResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -425,8 +432,14 @@ final class HouseQuizAnswerMapper {
                     // `.vendor`-tagged Pool/Spa templates auto-link at
                     // task-creation time instead of landing as "Find a
                     // contractor for: ..." placeholders.
+                    // Build 87 (search picker): catalog-aware path when
+                    // the user picked from the search picker.
                     if let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "pool_service")
+                        if answer.selectedProviderId != nil {
+                            try await createUtilityAccount(from: answer, fallbackType: "pool_service")
+                        } else {
+                            try await createUtilityAccount(name: provider, type: "pool_service")
+                        }
                     }
                     let poolResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -583,8 +596,14 @@ final class HouseQuizAnswerMapper {
                     // The reconciler reads the contractors table at task-
                     // creation time and auto-links vendor-tagged pest
                     // templates to the matching contractor in one shot.
+                    // Build 87 (search picker): catalog-aware path when
+                    // the user picked from the search picker.
                     if let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "pest_control")
+                        if answer.selectedProviderId != nil {
+                            try await createUtilityAccount(from: answer, fallbackType: "pest_control")
+                        } else {
+                            try await createUtilityAccount(name: provider, type: "pest_control")
+                        }
                     }
                     // Run the reconciler so Pest Control templates become
                     // real tasks. With the contractor mirrored above, the
@@ -630,8 +649,14 @@ final class HouseQuizAnswerMapper {
                     // at task-creation time. Both "full" and "drip"
                     // answers go through this flip — the service type
                     // doesn't change whether a pro is handling it.
+                    // Build 87 (search picker): catalog-aware path when
+                    // the user picked from the search picker.
                     if let provider = answer.customText, !provider.isEmpty {
-                        try await createUtilityAccount(name: provider, type: "irrigation")
+                        if answer.selectedProviderId != nil {
+                            try await createUtilityAccount(from: answer, fallbackType: "irrigation")
+                        } else {
+                            try await createUtilityAccount(name: provider, type: "irrigation")
+                        }
                     }
                     let irrigationResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -669,8 +694,14 @@ final class HouseQuizAnswerMapper {
                     // tasks stay DIY.
                     let hasMonitoredProvider = id == "monitored"
                         && (answer.customText?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+                    // Build 87 (search picker): catalog-aware path when
+                    // the user picked from the search picker.
                     if hasMonitoredProvider, let provider = answer.customText {
-                        try await createUtilityAccount(name: provider, type: "security")
+                        if answer.selectedProviderId != nil {
+                            try await createUtilityAccount(from: answer, fallbackType: "security")
+                        } else {
+                            try await createUtilityAccount(name: provider, type: "security")
+                        }
                     }
                     let securityResult = await MaintenanceTaskReconciler.reconcile(
                         propertyId: propertyId,
@@ -786,9 +817,13 @@ final class HouseQuizAnswerMapper {
             case "q18_trash":
                 try await persistAttribute("trash_service", value: answer.answerId)
                 if answer.answerId == "private", let provider = answer.customText, !provider.isEmpty {
-                    // q18 is a singleChoice with a free-text follow-up — no
-                    // catalog ID, so use the name-only path.
-                    try await createUtilityAccount(name: provider, type: "trash")
+                    // Build 87 (search picker): catalog-aware path when
+                    // the user picked from the search picker.
+                    if answer.selectedProviderId != nil {
+                        try await createUtilityAccount(from: answer, fallbackType: "trash")
+                    } else {
+                        try await createUtilityAccount(name: provider, type: "trash")
+                    }
                 }
 
             case "q19_heating_provider":
@@ -1079,16 +1114,13 @@ final class HouseQuizAnswerMapper {
                 }
 
             case "q36_diy_vs_vendor":
-                // Build 87: DIY vs Vendor preference slider. Persist the
-                // integer to the property attribute, then re-run the
+                // Build 88: 3-tier vendor preference picker. Persist the
+                // tier string to the property attribute, then re-run the
                 // reconciler for every property in the household so any
                 // existing `either`-tagged tasks flip to match the new
-                // threshold. The reconciler reads the attribute via
-                // `MaintenanceTaskReconciler.resolveAssignment` at task-
-                // creation time, so this single pass converges the whole
-                // task list against the new preference.
-                if let value = answer.sliderValue {
-                    try await persistAttribute("vendor_preference_level", value: String(value))
+                // tier.
+                if let tierId = answer.answerId {
+                    try await persistAttribute("vendor_preference_tier", value: tierId)
                     let result = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
                     reconciliationResult = reconciliationResult.merging(result)
                 }

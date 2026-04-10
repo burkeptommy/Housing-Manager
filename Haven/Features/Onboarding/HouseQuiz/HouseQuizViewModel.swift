@@ -225,12 +225,13 @@ final class HouseQuizViewModel: ObservableObject {
     /// don't feel like the screen jumped past their tap. Without this
     /// the chip selection animation runs while the next state is already
     /// rendering, which is jarring.
-    func recordAnswer(_ answerId: String, customText: String? = nil) async {
+    func recordAnswer(_ answerId: String, customText: String? = nil, selectedProviderId: UUID? = nil) async {
         guard let q = currentQuestion else { return }
         let answer = HouseQuizAnswer(
             answerId: answerId,
             customText: customText,
             selectedIds: nil,
+            selectedProviderId: selectedProviderId,
             answeredAt: Date()
         )
         await persist(answer: answer, for: q)
@@ -331,25 +332,6 @@ final class HouseQuizViewModel: ObservableObject {
     func dismissBundledSuggestion() {
         bundledHomeSuggestion = nil
         bundledAutoSuggestion = nil
-    }
-
-    /// Build 87 — Q36 DIY vs Vendor preference slider commit. Persists
-    /// the integer value alongside the standard answer fields. The
-    /// answer mapper's `q36_diy_vs_vendor` case writes the
-    /// `vendor_preference_level` property attribute and triggers a
-    /// reconciler pass for the household so existing `either`-tagged
-    /// tasks flip based on the threshold function in
-    /// `MaintenanceTaskReconciler.resolveAssignment`.
-    func recordSliderAnswer(value: Int) async {
-        guard let q = currentQuestion else { return }
-        let answer = HouseQuizAnswer(
-            answerId: nil,
-            sliderValue: value,
-            answeredAt: Date()
-        )
-        await persist(answer: answer, for: q)
-        try? await Task.sleep(nanoseconds: 200_000_000)
-        advance()
     }
 
     /// Persist a multi-select answer and advance. `customEntries` carries any

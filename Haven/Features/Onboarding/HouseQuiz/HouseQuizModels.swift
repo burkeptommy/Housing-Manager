@@ -322,13 +322,10 @@ enum HouseQuizQuestionKind: String, Codable {
     /// scoped to that contractor type. Saved chips become contractor rows
     /// via the household-contractor mirror in the answer mapper.
     case householdContractors
-    /// Build 87: Q36 DIY vs Vendor preference slider. Captures an integer
-    /// 1-10 representing how hands-on the user wants to be — 1 = DIY
-    /// everything, 10 = let pros handle it. The mapper persists the value
-    /// to `properties.attributes.vendor_preference_level` and re-runs the
-    /// MaintenanceTaskReconciler so existing `either`-tagged tasks flip
-    /// based on the threshold function in
-    /// `MaintenanceTaskReconciler.resolveAssignment`.
+    /// Build 87 legacy: was used for Q36 slider. Build 88 converted to
+    /// `.singleChoice`. Kept for backward-compatible decoding of persisted
+    /// quiz state from build 87 users — the view model treats it as
+    /// `.singleChoice` at render time.
     case slider
 }
 
@@ -376,10 +373,16 @@ struct HouseQuizQuestion: Identifiable, Hashable {
     /// Q15b contractors, etc.) intentionally keep the chip-by-chip flow.
     let supportsSelectAll: Bool
 
-    /// Build 87: Slider config for `.slider` question kinds. Min/max bound
-    /// the integer range; the labels render under the slider's leading and
-    /// trailing edges. Currently only Q36 (DIY vs Vendor preference) uses
-    /// these. Defaults are safe no-ops for non-slider questions.
+    /// Build 87: Per-question placeholder for the inline provider search
+    /// picker shown by `providerCaptureInline` (Q11 lawn, Q12 pool, Q13
+    /// pest, Q14 irrigation, Q15 security). Static string so callers don't
+    /// need to compute it at render time. Nil means the picker uses its
+    /// built-in default.
+    let providerSearchPlaceholder: String?
+
+    /// Build 87 legacy: slider fields. Kept for source compat with any code
+    /// that references them during the transition. No longer set on new
+    /// questions — Q36 is now `.singleChoice`.
     let sliderMin: Int
     let sliderMax: Int
     let sliderLeftLabel: String?
@@ -398,6 +401,7 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         dynamicProviderTypes: ((HouseQuizState) -> [String])? = nil,
         dynamicSkip: ((HouseQuizState) -> Bool)? = nil,
         supportsSelectAll: Bool = false,
+        providerSearchPlaceholder: String? = nil,
         sliderMin: Int = 1,
         sliderMax: Int = 10,
         sliderLeftLabel: String? = nil,
@@ -415,6 +419,7 @@ struct HouseQuizQuestion: Identifiable, Hashable {
         self.dynamicProviderTypes = dynamicProviderTypes
         self.dynamicSkip = dynamicSkip
         self.supportsSelectAll = supportsSelectAll
+        self.providerSearchPlaceholder = providerSearchPlaceholder
         self.sliderMin = sliderMin
         self.sliderMax = sliderMax
         self.sliderLeftLabel = sliderLeftLabel

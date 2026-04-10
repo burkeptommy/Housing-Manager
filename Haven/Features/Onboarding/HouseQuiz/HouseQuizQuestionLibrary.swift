@@ -8,9 +8,9 @@ import Foundation
 /// Build 86 inserted q25b_ev_charger into section 5 (right after q25_garage_ev)
 /// and dropped the 1-car / 2-car granularity from q25 in favor of a single
 /// "Attached" option plus a new "Semi-attached" option.
-/// Build 87 (Edit 2) appended q36_diy_vs_vendor to section 6 — the new
-/// `.slider` question kind that captures a 1-10 DIY vs vendor preference
-/// and triggers a household-wide reconciler pass on commit.
+/// Build 87 (Edit 2) appended q36_diy_vs_vendor to section 6.
+/// Build 88 converted q36_diy_vs_vendor from `.slider` to `.singleChoice`
+/// with 3 tiers (diy / mixed / hire_out) replacing the 1-10 slider.
 /// Tom can edit copy here without touching view code.
 enum HouseQuizQuestionLibrary {
 
@@ -238,7 +238,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "hardscape", label: "Mostly hardscape (patio, gravel, pavers)", icon: "square.grid.3x3.fill"),
             ],
             providerFollowUpAnswerIds: ["pro"],
-            providerTypes: ["landscaping"]
+            providerTypes: ["landscaping"],
+            providerSearchPlaceholder: "TruGreen, BrightView, your local crew..."
         ),
         // Phase 19j — lawn type. Inserted right after q11_lawn so a turf
         // homeowner gets the right maintenance schedule (brushing, infill,
@@ -277,7 +278,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["in_ground", "above_ground", "hot_tub", "both"],
-            providerTypes: ["pool_service"]
+            providerTypes: ["pool_service"],
+            providerSearchPlaceholder: "Leslie's, Pinch A Penny, your pool company..."
         ),
         // Build 87: pool chemistry follow-up. Mirrors the Q11/Q11b pattern:
         // Q12 captures the pool TYPE, Q12b captures the chemistry. This
@@ -327,7 +329,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["quarterly_pro", "termite_bond"],
-            providerTypes: ["pest_control"]
+            providerTypes: ["pest_control"],
+            providerSearchPlaceholder: "Terminix, Orkin, your local exterminator..."
         ),
         HouseQuizQuestion(
             id: "q14_irrigation",
@@ -358,7 +361,8 @@ enum HouseQuizQuestionLibrary {
                     return false
                 }
                 return false
-            }
+            },
+            providerSearchPlaceholder: "Your sprinkler company..."
         ),
         HouseQuizQuestion(
             id: "q15_security",
@@ -372,7 +376,8 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "none", label: "None"),
             ],
             providerFollowUpAnswerIds: ["monitored"],
-            providerTypes: ["security"]
+            providerTypes: ["security"],
+            providerSearchPlaceholder: "ADT, SimpliSafe, Ring, Vivint..."
         ),
         // Phase 19m — household contractors. One screen captures the user's
         // existing pros (HVAC, plumber, electrician, etc.) so future task
@@ -648,22 +653,22 @@ enum HouseQuizQuestionLibrary {
                 AnswerOption(id: "good_contractors", label: "Finding good contractors"),
             ]
         ),
-        // Build 87: Q36 DIY vs Vendor preference slider. Sits at the very
-        // end of the quiz so the reconciler can re-balance every existing
-        // `either`-tagged task in one shot when the user commits. Settings
-        // → Preferences exposes the same control via a shared component
-        // (`VendorPreferenceSlider`) so the user can change it later
-        // without retaking the quiz.
+        // Build 88: 3-tier vendor preference picker. Replaces the old 1-10
+        // slider that users found confusing. Three clear options that match
+        // how users actually think about maintenance delegation. The answer
+        // mapper persists the tier string to `vendor_preference_tier` and
+        // triggers a household-wide reconciler pass.
         HouseQuizQuestion(
             id: "q36_diy_vs_vendor",
             section: .protectionPeople,
-            title: "How hands-on do you want to be?",
-            subtitle: "Slide right to let us manage more with vendors. Slide left to do more yourself. You can change this anytime in Settings.",
-            kind: .slider,
-            sliderMin: 1,
-            sliderMax: 10,
-            sliderLeftLabel: "DIY everything",
-            sliderRightLabel: "Let pros handle it"
+            title: "How do you want to handle home maintenance?",
+            subtitle: "This shapes your entire task list. You can change it anytime in Settings.",
+            kind: .singleChoice,
+            answerOptions: [
+                AnswerOption(id: "diy", label: "I handle it", icon: "wrench.and.screwdriver.fill"),
+                AnswerOption(id: "mixed", label: "Mix of both", icon: "person.2.fill"),
+                AnswerOption(id: "hire_out", label: "Hire it out", icon: "briefcase.fill"),
+            ]
         ),
     ]
 }

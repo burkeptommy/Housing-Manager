@@ -216,7 +216,6 @@
 		B99B5E7E11FF9F29D654FF0E /* DocumentCategoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4FC6CA835F3723B6BDF430E /* DocumentCategoryView.swift */; };
 		BB0D79DB28BC9757BB5218DF /* NewArrivalChecklist.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711654EA5D0A9057C14D073B /* NewArrivalChecklist.swift */; };
 		BB15E3D84F44667675299740 /* ScenarioLoadingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7EE222CAEC72CDB421341443 /* ScenarioLoadingView.swift */; };
-		BD0CEEC1B68D344D32E7E8E5 /* VendorPreferenceSlider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0DDB7DDA7E1974CA55CE00 /* VendorPreferenceSlider.swift */; };
 		BD84E08D39EE8F4E79EE6ACD /* HavenTextField.swift in Sources */ = {isa = PBXBuildFile; fileRef = D09C463CADD4EC1A7F9BB9B3 /* HavenTextField.swift */; };
 		BE789DF78F780714B1B536D1 /* ScenarioDefinitions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3FE80E0C39DA96876FB85DF8 /* ScenarioDefinitions.swift */; };
 		BEC58FB141EFD1E32CF51827 /* VendorReviewForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = F9A1E64945F0A863947B24B9 /* VendorReviewForm.swift */; };
@@ -332,7 +331,6 @@
 		1B5627AB5E97358EFC5C1A0B /* ProjectEmailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectEmailView.swift; sourceTree = "<group>"; };
 		1BD17A1F78FA47CF93E12C47 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		1CCD19CB328DFD094D0C1DEF /* DocumentVaultViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DocumentVaultViewModel.swift; sourceTree = "<group>"; };
-		1E0DDB7DDA7E1974CA55CE00 /* VendorPreferenceSlider.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VendorPreferenceSlider.swift; sourceTree = "<group>"; };
 		1E46DF762D5BA8899ED32545 /* HouseQuizFeedbackLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HouseQuizFeedbackLibrary.swift; sourceTree = "<group>"; };
 		1EF2B9B2B3198D8B628F2951 /* FamilyReferenceBinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyReferenceBinder.swift; sourceTree = "<group>"; };
 		1F8FC428382466D4854DE31A /* ChatBubble.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChatBubble.swift; sourceTree = "<group>"; };
@@ -1238,7 +1236,6 @@
 				F3AAB2BFCB6E921B9BE9C459 /* LoadingView.swift */,
 				B31B7C57764591968933F9EF /* ProcessingBanner.swift */,
 				A0AE7AB5E6C3F35C6429980C /* UnifiedTaskCard.swift */,
-				1E0DDB7DDA7E1974CA55CE00 /* VendorPreferenceSlider.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -1628,7 +1625,6 @@
 				26043ACF0D900C38B606A985 /* VehicleDetailView.swift in Sources */,
 				53ABF776341026EA7DAD20C3 /* VehicleDetailViewModel.swift in Sources */,
 				353BDE111D27138F76DFEC06 /* VehicleLookupService.swift in Sources */,
-				BD0CEEC1B68D344D32E7E8E5 /* VendorPreferenceSlider.swift in Sources */,
 				BEC58FB141EFD1E32CF51827 /* VendorReviewForm.swift in Sources */,
 				1391039FE64E4E05DCCA6F32 /* VersionCheckService.swift in Sources */,
 				068A23E10B8847A2CE6A93A5 /* View+Extensions.swift in Sources */,

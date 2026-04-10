@@ -1,13 +1,12 @@
 import SwiftUI
 
-/// Build 87: Settings entry for the DIY vs Vendor preference slider that
-/// the House Quiz captures at Q36. Lets users adjust their hands-on /
-/// hands-off preference later without retaking the quiz. Saving fires the
-/// same household-wide reconciler pass Q36 fires, with a confirmation
+/// Settings entry for the vendor preference tier. Lets users adjust their
+/// hands-on / hands-off preference without retaking the quiz. Saving fires
+/// the same household-wide reconciler pass Q36 fires, with a confirmation
 /// dialog up front so the user doesn't accidentally rebalance their whole
-/// task list.
+/// task list. Build 88: replaced the 1-10 slider with a 3-chip picker.
 struct MaintenancePreferencesView: View {
-    @State private var sliderValue: Int = 5
+    @State private var selectedTier: VendorPreferenceTier = .mixed
     @State private var initialLoadCompleted = false
     @State private var primaryPropertyId: UUID?
     @State private var householdId: UUID?
@@ -15,41 +14,40 @@ struct MaintenancePreferencesView: View {
     @State private var isSaving = false
     @State private var toastMessage: String?
     @State private var loadError: String?
-    @State private var eitherTaskEfforts: [Int] = []
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: HavenTheme.spacing20) {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing24) {
                 Text("Tasks that could go either way get assigned based on this setting. Personal-only tasks (replace air filters) stay personal. Vendor-only tasks (chimney sweep) stay vendor.")
                     .font(HavenTypography.bodySmall)
                     .foregroundStyle(HavenColors.textSecondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                VendorPreferenceSlider(
-                    value: $sliderValue,
-                    leftLabel: "DIY everything",
-                    rightLabel: "Let pros handle it",
-                    minValue: 1,
-                    maxValue: 10,
-                    previewLabel: { value in
-                        previewText(forValue: value)
+                // 3-tier picker cards
+                VStack(spacing: HavenTheme.spacing12) {
+                    ForEach(VendorPreferenceTier.allCases) { tier in
+                        tierCard(tier)
                     }
-                )
+                }
 
                 DisclosureGroup("How this works") {
                     VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                         howItWorksRow(
                             icon: "1.circle.fill",
-                            text: "Quick tasks (under 30 minutes) almost always stay personal."
+                            text: "\"I handle it\" keeps everything personal except licensed-pro work."
                         )
                         howItWorksRow(
                             icon: "2.circle.fill",
-                            text: "Bigger jobs flip to a vendor as you slide right."
+                            text: "\"Mix of both\" sends bigger jobs (over 30 minutes) to vendors."
                         )
                         howItWorksRow(
                             icon: "3.circle.fill",
+                            text: "\"Hire it out\" routes nearly everything to a vendor. Your list becomes a coordination dashboard."
+                        )
+                        howItWorksRow(
+                            icon: "checkmark.shield.fill",
                             text: "Tasks you've already assigned to a contractor are never touched."
                         )
                     }
@@ -115,6 +113,65 @@ struct MaintenancePreferencesView: View {
         .animation(.easeInOut, value: toastMessage)
     }
 
+    // MARK: - Tier Card
+
+    @ViewBuilder
+    private func tierCard(_ tier: VendorPreferenceTier) -> some View {
+        let isSelected = selectedTier == tier
+        Button {
+            Haptics.selection()
+            withAnimation(HavenTheme.animationQuick) {
+                selectedTier = tier
+            }
+        } label: {
+            HStack(spacing: HavenTheme.spacing12) {
+                let icon: String = {
+                    switch tier {
+                    case .diy: return "wrench.and.screwdriver.fill"
+                    case .mixed: return "person.2.fill"
+                    case .hireOut: return "briefcase.fill"
+                    }
+                }()
+
+                Image(systemName: icon)
+                    .font(.system(size: 18, weight: .medium))
+                    .foregroundStyle(isSelected ? HavenColors.textOnNavy : HavenColors.navy)
+                    .frame(width: 32, height: 32)
+
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(tier.label)
+                        .font(HavenTypography.headline)
+                        .foregroundStyle(isSelected ? HavenColors.textOnNavy : HavenColors.textPrimary)
+                    Text(tier.subtitle)
+                        .font(HavenTypography.caption)
+                        .foregroundStyle(isSelected ? HavenColors.textOnNavy.opacity(0.8) : HavenColors.textSecondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Spacer(minLength: 4)
+
+                if isSelected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 20))
+                        .foregroundStyle(HavenColors.textOnNavy)
+                }
+            }
+            .padding(HavenTheme.spacing16)
+            .background(isSelected ? HavenColors.navy : HavenColors.surface)
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
+            .overlay {
+                RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
+                    .strokeBorder(
+                        isSelected ? Color.clear : HavenColors.border,
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: - Helpers
+
     @ViewBuilder
     private func howItWorksRow(icon: String, text: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
@@ -144,53 +201,11 @@ struct MaintenancePreferencesView: View {
                 return
             }
             primaryPropertyId = primary.id
-            // Hydrate slider from the existing attribute (default 5).
-            sliderValue = MaintenanceTaskReconciler.preferenceLevelFromProperty(primary)
-
-            // Build the cached either-task efforts so the live preview
-            // shows real numbers as the user drags the slider.
-            await loadEitherEfforts(propertyId: primary.id)
+            selectedTier = MaintenanceTaskReconciler.preferenceTierFromProperty(primary)
             initialLoadCompleted = true
         } catch {
             loadError = error.localizedDescription
         }
-    }
-
-    private func loadEitherEfforts(propertyId: UUID) async {
-        guard let tasks = try? await DatabaseService.shared.fetchMaintenanceTasks(propertyId: propertyId) else {
-            return
-        }
-        var efforts: [String: Int] = [:]
-        for (_, sectionTemplates) in MaintenanceTemplates.allTemplates {
-            for template in sectionTemplates where template.assignmentType == .either {
-                efforts[template.templateKey] = template.diyEffortMinutes ?? 60
-            }
-        }
-        let matched = tasks.compactMap { task -> Int? in
-            guard let key = task.templateId, let effort = efforts[key] else { return nil }
-            return effort
-        }
-        eitherTaskEfforts = matched
-    }
-
-    private func previewText(forValue value: Int) -> String {
-        let total = eitherTaskEfforts.count
-        guard total > 0 else {
-            switch value {
-            case 1...3:  return "You'll handle most maintenance tasks yourself."
-            case 4...6:  return "Quick tasks stay personal. Bigger jobs route to vendors."
-            default:     return "We'll route every task we can to a vendor."
-            }
-        }
-        let threshold = max(0, (11 - value) * 30)
-        let flipCount = eitherTaskEfforts.filter { $0 > threshold }.count
-        if flipCount == 0 {
-            return "At this setting, none of your flexible tasks will be vendor-managed."
-        }
-        if flipCount == 1 {
-            return "At this setting, 1 of your flexible tasks will be vendor-managed."
-        }
-        return "At this setting, roughly \(flipCount) of your flexible tasks will be vendor-managed."
     }
 
     private func save() async {
@@ -200,10 +215,9 @@ struct MaintenancePreferencesView: View {
         defer { isSaving = false }
 
         do {
-            // Persist the new value to the property attribute.
             var update = PropertyUpdate()
             var attrs = (try? await DatabaseService.shared.fetchProperty(id: propertyId))?.attributes ?? [:]
-            attrs["vendor_preference_level"] = .string(String(sliderValue))
+            attrs["vendor_preference_tier"] = .string(selectedTier.attributeValue)
             update.attributes = attrs
             _ = try await DatabaseService.shared.updateProperty(id: propertyId, update)
         } catch {
@@ -212,8 +226,6 @@ struct MaintenancePreferencesView: View {
             return
         }
 
-        // Reconcile the household. The result tells us how many tasks the
-        // pass actually flipped — surfaced in the success toast.
         let result = await MaintenanceTaskReconciler.reconcileAllForHousehold(householdId: householdId)
         let flippedCount = result.added.count + result.removed.count
 
@@ -223,7 +235,6 @@ struct MaintenancePreferencesView: View {
             : "Saved. Updated \(flippedCount) task\(flippedCount == 1 ? "" : "s")."
         NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
 
-        // Auto-dismiss the toast after a few seconds.
         try? await Task.sleep(nanoseconds: 2_500_000_000)
         toastMessage = nil
     }
