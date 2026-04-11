@@ -89,7 +89,7 @@ struct PendingInvitationsSection: View {
         HavenCard {
             HStack(alignment: .top, spacing: HavenTheme.spacing12) {
                 Text(initials)
-                    .font(.system(size: 16, weight: .semibold, design: .serif))
+                    .font(HavenTypography.fraunces(size: 16, weight: 600))
                     .foregroundStyle(HavenColors.textOnNavy)
                     .frame(width: 44, height: 44)
                     .background(HavenColors.navy)

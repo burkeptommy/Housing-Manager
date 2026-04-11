@@ -32,6 +32,8 @@ struct SystemDetailRowView: View {
     @State private var childSystems: [HomeSystemRow] = []
     @State private var equipmentScore: EquipmentDetailScore?
     @State private var catalogDetails: CatalogDetails?
+    /// Phase 50: Toggles the FrequencyPickerSheet.
+    @State private var showFrequencyPicker = false
     @Environment(\.dismiss) private var dismiss
 
     private let db = DatabaseService.shared
@@ -191,6 +193,20 @@ struct SystemDetailRowView: View {
                 system = updatedSystem
                 Task { await reloadSystem() }
             }
+        }
+        // Phase 50: System frequency editor sheet.
+        .sheet(isPresented: $showFrequencyPicker) {
+            FrequencyPickerSheet(
+                system: system,
+                initialInterval: system.serviceIntervalDays,
+                initialSource: system.serviceIntervalSource,
+                onSave: { intervalDays, applyToAll in
+                    Task { await applyServiceInterval(days: intervalDays, applyToExistingTasks: applyToAll) }
+                },
+                onClearOverride: {
+                    Task { await clearServiceIntervalOverride() }
+                }
+            )
         }
     }
 
@@ -516,7 +532,90 @@ struct SystemDetailRowView: View {
                 if let nextDue = system.nextServiceDue {
                     infoRow("Next Service Due", value: nextDue.havenDateFormatted)
                 }
+
+                // Phase 50: Service frequency editor row. Tappable, shows
+                // current cadence + provenance caption when overridden.
+                serviceFrequencyRow
             }
+        }
+    }
+
+    // MARK: - Phase 50: Service Frequency Row
+
+    /// Tappable row that shows the system's service frequency. When the
+    /// user has set a per-system override, the value reads "Every 2
+    /// weeks" + a small "Set from invoice on Apr 15" caption underneath.
+    /// Tapping opens FrequencyPickerSheet.
+    private var serviceFrequencyRow: some View {
+        Button {
+            Haptics.light()
+            showFrequencyPicker = true
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Service frequency")
+                            .font(HavenTypography.uiLabelSmall)
+                            .foregroundStyle(HavenColors.textSecondary)
+                        Text(serviceFrequencyDisplay)
+                            .font(HavenTypography.uiLabel)
+                            .foregroundStyle(HavenColors.textPrimary)
+                    }
+                    Spacer()
+                    Text("Change")
+                        .font(HavenTypography.uiLabelSmall)
+                        .foregroundStyle(HavenColors.navy700)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+                if let caption = serviceFrequencyCaption {
+                    Text(caption)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+            .padding(.vertical, 6)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    /// Pretty-formatted current cadence. Honors `service_interval_days`
+    /// when set, otherwise pulls a one-line description from the most
+    /// frequent template attached to this system's category.
+    private var serviceFrequencyDisplay: String {
+        if let days = system.serviceIntervalDays {
+            return Self.humanCadence(days: days)
+        }
+        return "Default (template-driven)"
+    }
+
+    private var serviceFrequencyCaption: String? {
+        guard let source = system.serviceIntervalSource, source != "default", !source.isEmpty else { return nil }
+        switch source {
+        case "onboarding": return "Set during House Quiz"
+        case "vendor_invoice": return "Set from invoice"
+        case "manual": return "Manually set"
+        default: return nil
+        }
+    }
+
+    private static func humanCadence(days: Int) -> String {
+        switch days {
+        case 7: return "Weekly"
+        case 14: return "Every 2 weeks"
+        case 21: return "Every 3 weeks"
+        case 28, 30, 31: return "Monthly"
+        case 60, 61, 62: return "Every 2 months"
+        case 90, 91, 92: return "Quarterly"
+        case 180, 181, 182, 183: return "Semi-annually"
+        case 364, 365, 366: return "Annually"
+        default:
+            if days % 7 == 0 {
+                return "Every \(days / 7) weeks"
+            }
+            return "Every \(days) days"
         }
     }
 
@@ -1457,6 +1556,61 @@ struct SystemDetailRowView: View {
             }
         } catch { }
         await loadDetails()
+    }
+
+    /// Phase 50: Persist a new service interval on this system. When
+    /// `applyToExistingTasks` is true, walks every task on the system
+    /// and rewrites its `next_due_date` from the most recent
+    /// `last_completed_date` plus the new interval (or from today when
+    /// no completion exists yet). Source is stamped as "manual" because
+    /// this path is only invoked from the system detail editor — the
+    /// invoice and onboarding paths use their own source labels.
+    private func applyServiceInterval(days: Int, applyToExistingTasks: Bool) async {
+        var update = HomeSystemUpdate()
+        update.serviceIntervalDays = days
+        update.serviceIntervalSource = "manual"
+        do {
+            let updated = try await db.updateHomeSystem(id: system.id, update)
+            await MainActor.run { system = updated }
+            if applyToExistingTasks {
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                let now = Date()
+                for task in tasks {
+                    let baseline = task.lastCompletedDate.flatMap { formatter.date(from: $0) } ?? now
+                    if let nextDate = Calendar.current.date(byAdding: .day, value: days, to: baseline) {
+                        var taskUpdate = MaintenanceTaskUpdate()
+                        taskUpdate.nextDueDate = formatter.string(from: nextDate)
+                        _ = try? await db.updateMaintenanceTask(id: task.id, taskUpdate)
+                    }
+                }
+            }
+            Haptics.success()
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            await loadDetails()
+        } catch {
+            print("[SystemDetail] Failed to apply service interval: \(error)")
+            Haptics.error()
+        }
+    }
+
+    /// Phase 50: Clear the per-system override and revert to the
+    /// template default. Sets the column back to NULL by sending the
+    /// sentinel "default" source string and a nil interval.
+    private func clearServiceIntervalOverride() async {
+        var update = HomeSystemUpdate()
+        update.serviceIntervalDays = nil
+        update.serviceIntervalSource = "default"
+        do {
+            let updated = try await db.updateHomeSystem(id: system.id, update)
+            await MainActor.run { system = updated }
+            Haptics.success()
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+        } catch {
+            print("[SystemDetail] Failed to clear interval override: \(error)")
+            Haptics.error()
+        }
     }
 
     private func loadDetails() async {

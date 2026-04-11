@@ -517,32 +517,11 @@ final class OnboardingViewModel: ObservableObject {
                     print("[Onboarding] runComplete: createHomeSystems OK count=\(systems.count)")
                 }
 
-                // Generate and create maintenance tasks
-                let schedulePreview = OnboardingScheduleGenerator.generate(
-                    from: propertyLookupResult,
-                    state: state
-                )
-                if !schedulePreview.isEmpty {
-                    print("[Onboarding] runComplete: STEP createMaintenanceTasks count=\(schedulePreview.count)")
-                    setupProgress = "Building your maintenance plan..."
-                    for item in schedulePreview {
-                        let nextDue = nextDueDate(forMonth: item.month)
-                        let insert = MaintenanceTaskInsert(
-                            propertyId: property.id,
-                            householdId: householdId,
-                            title: item.title,
-                            frequency: item.frequency,
-                            nextDueDate: nextDue,
-                            description: item.description,
-                            priority: priorityFromCategory(item.category),
-                            isTemplateBased: true,
-                            seasonalTiming: seasonFromMonth(item.month),
-                            isDiy: item.isDIY,
-                            costRange: item.estimatedCost
-                        )
-                        _ = try? await DatabaseService.shared.createMaintenanceTask(insert)
-                    }
-                }
+                // Build 89: Pre-quiz task creation removed. Tasks are now
+                // created exclusively by the MaintenanceTaskReconciler during
+                // and after quiz completion, ensuring proper assignmentType,
+                // vendor linking, and bundling. The dashboard shows "All caught
+                // up!" until the user completes the House Quiz.
             }
 
             // Clear cached address data now that it's been consumed
@@ -613,51 +592,6 @@ final class OnboardingViewModel: ObservableObject {
                 group.cancelAll()
                 throw error
             }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func nextDueDate(forMonth month: Int) -> String {
-        let now = Date()
-        let calendar = Calendar.current
-        let currentMonth = calendar.component(.month, from: now)
-        let currentYear = calendar.component(.year, from: now)
-
-        var targetYear = currentYear
-        if month < currentMonth {
-            targetYear += 1
-        }
-
-        var components = DateComponents()
-        components.year = targetYear
-        components.month = month
-        components.day = 15 // mid-month
-
-        let date = calendar.date(from: components) ?? now
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
-    }
-
-    private func priorityFromCategory(_ category: String) -> String {
-        switch category {
-        case "HVAC", "Plumbing", "Electrical", "Fire Protection", "Roofing":
-            return "High"
-        case "Water Heater", "Garage Door", "Security System":
-            return "Medium"
-        default:
-            return "Low"
-        }
-    }
-
-    private func seasonFromMonth(_ month: Int) -> String? {
-        switch month {
-        case 3, 4, 5: return "Spring"
-        case 6, 7, 8: return "Summer"
-        case 9, 10, 11: return "Fall"
-        case 12, 1, 2: return "Winter"
-        default: return nil
         }
     }
 

@@ -30,7 +30,7 @@ struct CompletionScorecard: View {
                             .font(.system(size: 22))
                             .foregroundStyle(levelColor)
                         Text(level.name)
-                            .font(Font.custom("Georgia-Bold", size: 17))
+                            .font(HavenTypography.navTitle)
                             .foregroundStyle(HavenColors.textOnNavy)
                     }
 

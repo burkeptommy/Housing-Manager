@@ -109,7 +109,7 @@ struct PropertyHookView: View {
 
                     if let valuation {
                         Text(valuation.formattedHigh)
-                            .font(.custom("Georgia", size: 38).weight(.bold))
+                            .font(HavenTypography.fraunces(size: 38, weight: 700))
                             .foregroundStyle(HavenColors.navy800)
                             .lineLimit(1)
                             .minimumScaleFactor(0.7)
@@ -209,7 +209,7 @@ struct PropertyHookView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(HavenColors.creamLight)
                 Text(HookContent.Page1.equityHeadline)
-                    .font(.custom("Georgia", size: 17).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 17, weight: 600))
                     .foregroundStyle(HavenColors.creamLight)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -290,7 +290,7 @@ struct PropertyHookView: View {
 
                 // Bridge text
                 Text(HookContent.Page2.bridgeText)
-                    .font(.custom("Georgia", size: 16).italic())
+                    .font(Font.custom("Inter", size: 16).italic())
                     .foregroundStyle(HavenColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, HavenTheme.spacing8)
@@ -298,7 +298,7 @@ struct PropertyHookView: View {
                 // Estate frame headline + body
                 VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
                     Text(HookContent.Page2.estateHeadline)
-                        .font(.custom("Georgia", size: 22).weight(.bold))
+                        .font(HavenTypography.title)
                         .foregroundStyle(HavenColors.textPrimary)
                         .fixedSize(horizontal: false, vertical: true)
                     Text(HookContent.Page2.estateBody)
@@ -312,7 +312,7 @@ struct PropertyHookView: View {
 
                 // Legacy line
                 Text(HookContent.Page2.legacyLine)
-                    .font(.custom("Georgia", size: 15).italic())
+                    .font(Font.custom("Inter", size: 15).italic())
                     .foregroundStyle(HavenColors.textSecondary)
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.top, HavenTheme.spacing4)
@@ -537,7 +537,7 @@ struct PropertyHookView: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(HavenColors.creamLight)
                 Text(HookContent.Page2.equityReminderHeadline)
-                    .font(.custom("Georgia", size: 17).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 17, weight: 600))
                     .foregroundStyle(HavenColors.creamLight)
                     .fixedSize(horizontal: false, vertical: true)
             }

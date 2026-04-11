@@ -205,7 +205,7 @@ struct OnboardingSchedulePreviewStep: View {
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(HavenColors.creamLight)
                 Text("\(protectedValue.formattedCompactCurrency()) protected over 10 years")
-                    .font(.custom("Georgia", size: 18).weight(.semibold))
+                    .font(HavenTypography.title2)
                     .foregroundStyle(HavenColors.creamLight)
             }
             Text("Homes maintained on schedule appreciate ~12% more than neglected homes.")

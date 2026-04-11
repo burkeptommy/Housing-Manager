@@ -257,7 +257,7 @@ struct NewArrivalChecklistView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Preparing for \(member.firstName)")
-                        .font(Font.custom("Georgia-Bold", size: 20))
+                        .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.textPrimary)
 
                     if let days = daysUntilDue {
@@ -464,7 +464,7 @@ struct NewArrivalSummaryCard: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text("Preparing for \(member.firstName)")
-                    .font(Font.custom("Georgia-Bold", size: 15))
+                    .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.textPrimary)
                     .lineLimit(1)
 

@@ -47,6 +47,7 @@ struct RecommendationEngine {
         currentSeasonName: String = "",
         systemsNeedingServiceCount: Int = 0,
         hasIncompleteProperty: Bool = false,
+        estateState: EstateStateRow? = nil,
         dismissedIds: Set<String>
     ) -> [Recommendation] {
         var recs: [Recommendation] = []
@@ -234,6 +235,31 @@ struct RecommendationEngine {
                 priority: 85,
                 action: .navigate(tab: 2)
             ))
+        }
+
+        // Phase 48: Estate staleness from estate_state
+        if let estate = estateState {
+            if estate.stalenessTier == "critical" {
+                recs.append(Recommendation(
+                    id: "estate_staleness_critical",
+                    title: "Your estate plan needs urgent review",
+                    subtitle: estate.stalenessReasons?.first ?? "Key documents are outdated or major life changes detected",
+                    icon: "exclamationmark.shield.fill",
+                    iconColor: HavenColors.critical,
+                    priority: 5,
+                    action: .navigate(tab: 2)
+                ))
+            } else if estate.stalenessTier == "amber" {
+                recs.append(Recommendation(
+                    id: "estate_staleness_amber",
+                    title: "Time to review your estate plan",
+                    subtitle: estate.stalenessReasons?.first ?? "Some documents are getting older",
+                    icon: "exclamationmark.shield",
+                    iconColor: HavenColors.warning,
+                    priority: 65,
+                    action: .navigate(tab: 2)
+                ))
+            }
         }
 
         // Filter out dismissed recommendations, sort by priority, take top 2

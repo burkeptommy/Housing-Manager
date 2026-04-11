@@ -389,7 +389,7 @@ struct HouseQuizView: View {
 
                 // Title
                 Text(q.title)
-                    .font(.custom("Georgia", size: 24).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 24, weight: 600))
                     .foregroundStyle(HavenColors.navy800)
                     .fixedSize(horizontal: false, vertical: true)
 
@@ -1182,11 +1182,11 @@ struct HouseQuizView: View {
                     .foregroundStyle(HavenColors.textSecondary)
                 HStack {
                     Text("$")
-                        .font(.custom("Georgia", size: 22))
+                        .font(HavenTypography.fraunces(size: 22, weight: 400))
                         .foregroundStyle(HavenColors.textSecondary)
                     TextField("0", text: $currencyText)
                         .keyboardType(.numberPad)
-                        .font(.custom("Georgia", size: 22).weight(.semibold))
+                        .font(HavenTypography.fraunces(size: 22, weight: 600))
                 }
                 .padding(HavenTheme.spacing12)
                 .background(HavenColors.creamLight)
@@ -2627,7 +2627,7 @@ struct HouseQuizView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(HavenColors.navy800)
             Text("Section complete!")
-                .font(.custom("Georgia", size: 24).weight(.semibold))
+                .font(HavenTypography.fraunces(size: 24, weight: 600))
                 .foregroundStyle(HavenColors.navy800)
             Text("You're already \(Int(viewModel.progress * 100))% more prepared than the average homeowner.")
                 .font(HavenTypography.bodySmall)
@@ -2675,7 +2675,7 @@ struct HouseQuizView: View {
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Your Haven inbox is live")
-                    .font(.custom("Georgia", size: 24).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 24, weight: 600))
                     .foregroundStyle(HavenColors.navy800)
                     .multilineTextAlignment(.center)
 
@@ -2785,7 +2785,7 @@ struct HouseQuizView: View {
                     Text(viewModel.unresolvedSavedQuestions.count == 1
                         ? "You saved 1 question for later"
                         : "You saved \(viewModel.unresolvedSavedQuestions.count) questions for later")
-                        .font(.custom("Georgia", size: 24).weight(.semibold))
+                        .font(HavenTypography.fraunces(size: 24, weight: 600))
                         .foregroundStyle(HavenColors.navy800)
                         .fixedSize(horizontal: false, vertical: true)
 
@@ -2886,7 +2886,7 @@ struct HouseQuizView: View {
                     .foregroundStyle(HavenColors.success)
 
                 Text("Quiz complete")
-                    .font(.custom("Georgia", size: 28).weight(.bold))
+                    .font(HavenTypography.largeTitle)
                     .foregroundStyle(HavenColors.navy800)
 
                 completionSummaryCard

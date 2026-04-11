@@ -13,6 +13,12 @@ struct InvoiceProcessingResult: Codable {
     // Vehicle-specific fields (populated when vehicle_id is sent to process-invoice)
     let mileageReported: Int?
     let nextServiceSuggestions: [VehicleNextServiceSuggestion]?
+    /// Phase 50: Explicit recurring cadence detected on the invoice. Only
+    /// populated when the invoice itself states the cadence (e.g. "monthly
+    /// service plan") with confidence > 0.8. Used to surface a Dashboard
+    /// suggestion card so the user can confirm and update the linked
+    /// system's `service_interval_days`.
+    let cadenceDetected: InvoiceCadenceDetected?
 
     enum CodingKeys: String, CodingKey {
         case vendor
@@ -26,6 +32,19 @@ struct InvoiceProcessingResult: Codable {
         case followUpNeeded = "follow_up_needed"
         case mileageReported = "mileage_reported"
         case nextServiceSuggestions = "next_service_suggestions"
+        case cadenceDetected = "cadence_detected"
+    }
+}
+
+struct InvoiceCadenceDetected: Codable {
+    let intervalDays: Int?
+    let confidence: Double?
+    let quotedText: String?
+
+    enum CodingKeys: String, CodingKey {
+        case intervalDays = "interval_days"
+        case confidence
+        case quotedText = "quoted_text"
     }
 }
 

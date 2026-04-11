@@ -69,6 +69,10 @@ enum AnalyticsEvent: String {
     case dashboardReadinessTapped = "dashboard_readiness_tapped"
     case dashboardSecurityTapped = "dashboard_security_tapped"
     case dashboardGettingStartedItemTapped = "dashboard_getting_started_item_tapped"
+    /// Phase 50 (sub-phase B first-login): user copied their household
+    /// `*@alfred.havenhome.dev` forwarding address from the
+    /// `VendorScheduleStrip` empty state caption.
+    case dashboardForwardingEmailCopied = "dashboard_forwarding_email_copied"
 
     // MARK: - Property
     case propertyViewed = "property_viewed"

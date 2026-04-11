@@ -83,7 +83,7 @@ struct PostQuizVendorDelegationSheet: View {
                 .foregroundStyle(HavenColors.textTertiary)
 
             Text("Your vendors could handle these too.")
-                .font(.custom("Georgia", size: 26).weight(.semibold))
+                .font(HavenTypography.fraunces(size: 26, weight: 600))
                 .foregroundStyle(HavenColors.navy800)
                 .fixedSize(horizontal: false, vertical: true)
 

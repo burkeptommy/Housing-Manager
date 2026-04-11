@@ -341,13 +341,22 @@ struct PropertyDetailView: View {
                     if !viewModel.activeWarranties.isEmpty { warrantiesSection }
 
                 case .maintenance:
+                    // Phase 50: Vendor-first reorder. Lead with the
+                    // overdue banner, then upcoming vendor visits, then
+                    // the small DIY task list, then any vendor follow-ups
+                    // (amber accent), then the home systems chip strip.
+                    // The seasonal overview card and service history move
+                    // to the bottom because they're reference, not action.
+                    if !viewModel.overdueTasks.isEmpty { overdueSection }
+                    if !viewModel.vendorVisitTasks.isEmpty { upcomingVendorVisitsSection }
+                    diyTasksSection
+                    if !viewModel.vendorFollowUpTasks.isEmpty { vendorFollowUpsSection }
+                    systemsSection
                     if (!viewModel.currentSeasonTasks.isEmpty || !viewModel.nextSeasonTasks.isEmpty),
                        dismissedSeasonalOverview != "\(viewModel.currentSeason) \(Calendar.current.component(.year, from: Date()))" {
                         seasonalOverviewCard
                     }
-                    if !viewModel.overdueTasks.isEmpty { overdueSection }
-                    systemsSection
-                    if !viewModel.upcomingTasks.isEmpty { upcomingMaintenanceSection }
+                    viewFullScheduleLink
                     if !viewModel.serviceRecords.isEmpty { serviceHistorySection }
 
                 case .projects:
@@ -434,7 +443,7 @@ struct PropertyDetailView: View {
                                 .fill(HavenColors.navy800)
                                 .frame(width: 20, height: 20)
                             Text("A")
-                                .font(.system(size: 11, weight: .bold, design: .serif))
+                                .font(HavenTypography.fraunces(size: 11, weight: 700))
                                 .foregroundStyle(HavenColors.creamLight)
                         }
                         Text("Ask Alfred about this property")
@@ -917,6 +926,234 @@ struct PropertyDetailView: View {
                 }
             }
         }
+    }
+
+    // MARK: - Phase 50: Upcoming Vendor Visits
+
+    /// Stacked vendor visit cards (full-width). Shows the next 4-6
+    /// vendor service visits with vendor name, logo, frequency, and
+    /// last cost. Tapping a card opens the maintenance task detail
+    /// sheet. The "See full schedule" link at the bottom routes to the
+    /// MaintenanceScheduleView.
+    private var upcomingVendorVisitsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
+            HStack {
+                Text("UPCOMING SERVICE VISITS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer()
+                Text("\(viewModel.vendorVisitTasks.count)")
+                    .font(HavenTypography.uiLabelSmall)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(HavenColors.navy.opacity(0.08))
+                    .foregroundStyle(HavenColors.navy700)
+                    .clipShape(Capsule())
+            }
+            VStack(spacing: HavenTheme.spacing12) {
+                ForEach(Array(viewModel.vendorVisitTasks.prefix(6))) { task in
+                    let contractor = viewModel.contractor(for: task.assignedContractorId)
+                    VendorVisitCard(
+                        task: task,
+                        vendorName: contractor?.companyName,
+                        vendorLogoURL: contractor?.logoUrl.flatMap { URL(string: $0) },
+                        brandColorHex: contractor?.brandColor,
+                        lastCost: viewModel.recentServiceCost(systemId: task.systemId, contractorId: contractor?.id),
+                        style: .full,
+                        onTap: { selectedMaintenanceTask = task }
+                    )
+                }
+            }
+            if viewModel.vendorVisitTasks.count > 6 {
+                Button {
+                    showFullSchedule = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("See full schedule")
+                            .font(HavenTypography.uiLabelSmall)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Phase 50: DIY Task Section
+
+    /// Compact list of personal/DIY tasks. Shows only templates with
+    /// `routing == .diyDefault` (e.g. filter swap, weatherstripping,
+    /// mini-split rinse, generator dipstick) plus any custom tasks the
+    /// user added with personal assignment. Empty state shows a
+    /// "You're all caught up" green check so even hire-out users see
+    /// affirmative state instead of an empty card.
+    private var diyTasksSection: some View {
+        let tasks = Array(viewModel.diyTasksForMaintenanceTab.prefix(5))
+        return VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Text("YOUR TASKS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer()
+                if !tasks.isEmpty {
+                    Text("\(viewModel.diyTasksForMaintenanceTab.count)")
+                        .font(HavenTypography.uiLabelSmall)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 2)
+                        .background(HavenColors.navy.opacity(0.08))
+                        .foregroundStyle(HavenColors.navy700)
+                        .clipShape(Capsule())
+                }
+            }
+            HavenCard {
+                if tasks.isEmpty {
+                    HStack(spacing: 10) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(HavenColors.success)
+                            .font(.system(size: 20))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("You're all caught up")
+                                .font(HavenTypography.uiLabel)
+                                .foregroundStyle(HavenColors.textPrimary)
+                            Text("No personal tasks on your plate right now.")
+                                .font(HavenTypography.uiCaption)
+                                .foregroundStyle(HavenColors.textSecondary)
+                        }
+                        Spacer()
+                    }
+                } else {
+                    VStack(spacing: 10) {
+                        ForEach(Array(tasks.enumerated()), id: \.element.id) { index, task in
+                            Button {
+                                selectedMaintenanceTask = task
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: "circle")
+                                        .font(.system(size: 18))
+                                        .foregroundStyle(HavenColors.navy700.opacity(0.4))
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(task.title)
+                                            .font(HavenTypography.uiLabel)
+                                            .foregroundStyle(HavenColors.textPrimary)
+                                            .lineLimit(1)
+                                        HStack(spacing: 6) {
+                                            Text("Due \(task.nextDueDate.havenDateShort)")
+                                                .font(HavenTypography.uiCaption)
+                                                .foregroundStyle(HavenColors.textSecondary)
+                                            if let systemName = viewModel.systemName(for: task.systemId) {
+                                                Text("·")
+                                                    .font(HavenTypography.uiCaption)
+                                                    .foregroundStyle(HavenColors.textTertiary)
+                                                Text(systemName)
+                                                    .font(HavenTypography.uiCaption)
+                                                    .foregroundStyle(HavenColors.textTertiary)
+                                                    .lineLimit(1)
+                                            }
+                                        }
+                                    }
+                                    Spacer()
+                                    Image(systemName: "chevron.right")
+                                        .font(.system(size: 10, weight: .semibold))
+                                        .foregroundStyle(HavenColors.textTertiary)
+                                }
+                            }
+                            .buttonStyle(.plain)
+                            if index < tasks.count - 1 {
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+            if viewModel.diyTasksForMaintenanceTab.count > 5 {
+                Button {
+                    showFullSchedule = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text("View all \(viewModel.diyTasksForMaintenanceTab.count)")
+                            .font(HavenTypography.uiLabelSmall)
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .semibold))
+                    }
+                    .foregroundStyle(HavenColors.navy700)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    // MARK: - Phase 50: Vendor Follow-ups
+
+    /// Amber-tinted card listing vendor follow-up tasks created from
+    /// invoices (e.g. "Retest water in 4 weeks per Andy's Plumbing").
+    /// Hidden entirely when there are none — the section never shows an
+    /// empty state because follow-ups are always exception items.
+    private var vendorFollowUpsSection: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+            HStack {
+                Image(systemName: "clock.badge.exclamationmark")
+                    .foregroundStyle(HavenColors.warning)
+                Text("VENDOR FOLLOW-UPS")
+                    .font(HavenTypography.uiSectionHeader)
+                    .tracking(1.5)
+                    .foregroundStyle(HavenColors.textTertiary)
+                Spacer()
+                Text("\(viewModel.vendorFollowUpTasks.count)")
+                    .font(HavenTypography.uiLabelSmall)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(HavenColors.warning.opacity(0.15))
+                    .foregroundStyle(HavenColors.warning)
+                    .clipShape(Capsule())
+            }
+            VStack(spacing: HavenTheme.spacing8) {
+                ForEach(viewModel.vendorFollowUpTasks) { task in
+                    let contractor = viewModel.contractor(for: task.assignedContractorId)
+                    VendorVisitCard(
+                        task: task,
+                        vendorName: contractor?.companyName,
+                        vendorLogoURL: contractor?.logoUrl.flatMap { URL(string: $0) },
+                        brandColorHex: contractor?.brandColor,
+                        lastCost: nil,
+                        isFollowUp: true,
+                        style: .full,
+                        onTap: { selectedMaintenanceTask = task }
+                    )
+                }
+            }
+        }
+    }
+
+    // MARK: - Phase 50: View Full Schedule Link
+
+    /// Footer link below the maintenance sections that pushes the
+    /// MaintenanceScheduleView pre-filtered to this property.
+    private var viewFullScheduleLink: some View {
+        Button {
+            showFullSchedule = true
+        } label: {
+            HStack {
+                Spacer()
+                HStack(spacing: 6) {
+                    Image(systemName: "calendar.badge.clock")
+                        .font(.system(size: 13, weight: .semibold))
+                    Text("View full maintenance schedule")
+                        .font(HavenTypography.uiLabel)
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 11, weight: .semibold))
+                }
+                .foregroundStyle(HavenColors.navy700)
+                Spacer()
+            }
+            .padding(.vertical, 12)
+            .background(HavenColors.navy.opacity(0.06))
+            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Warranties

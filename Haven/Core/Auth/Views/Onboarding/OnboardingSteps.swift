@@ -302,7 +302,7 @@ struct OnboardingFeaturesStep: View {
             Spacer()
 
             Text("H")
-                .font(Font.custom("Georgia", size: 88))
+                .font(HavenTypography.fraunces(size: 88, weight: 400))
                 .foregroundStyle(HavenColors.navy800)
                 .frame(width: 100, height: 100)
                 .background(

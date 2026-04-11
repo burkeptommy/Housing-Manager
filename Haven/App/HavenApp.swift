@@ -13,6 +13,15 @@ struct HavenApp: App {
         UIWindow.appearance().backgroundColor = UIColor(
             red: 0.949, green: 0.933, blue: 0.898, alpha: 1.0
         )
+        #if DEBUG
+        // TEMPORARY: verify font PostScript names after bundling Fraunces + Inter.
+        // Remove once the names are confirmed on-device.
+        for family in UIFont.familyNames.sorted() where family.hasPrefix("Fraunces") || family.hasPrefix("Inter") {
+            for name in UIFont.fontNames(forFamilyName: family) {
+                print("FONT: \(family) -> \(name)")
+            }
+        }
+        #endif
     }
 
     var body: some Scene {
@@ -151,16 +160,17 @@ struct HavenApp: App {
         appearance.backgroundColor = UIColor(Color.havenCream)
         appearance.shadowColor = UIColor(red: 0.890, green: 0.851, blue: 0.776, alpha: 0.3)
 
-        // Large title: Georgia Bold
+        // Large title: Fraunces Bold (WONK=0 via HavenTypography helper so
+        // the decorative "f" glyph never bleeds into nav titles).
         appearance.largeTitleTextAttributes = [
             .foregroundColor: UIColor(Color.havenNavy),
-            .font: UIFont(name: "Georgia-Bold", size: 28) ?? UIFont.boldSystemFont(ofSize: 28)
+            .font: HavenTypography.frauncesUIFont(size: 28, weight: 700)
         ]
 
-        // Inline title: Georgia Bold
+        // Inline title: Fraunces Bold (WONK=0 via HavenTypography helper).
         appearance.titleTextAttributes = [
             .foregroundColor: UIColor(Color.havenNavy),
-            .font: UIFont(name: "Georgia-Bold", size: 17) ?? UIFont.boldSystemFont(ofSize: 17)
+            .font: HavenTypography.frauncesUIFont(size: 17, weight: 700)
         ]
 
         // Back button tint

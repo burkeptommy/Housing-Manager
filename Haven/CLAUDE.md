@@ -59,7 +59,7 @@ HavenColors.border         // adaptive border
 
 ### Typography -- Always use `HavenTypography.*`
 ```swift
-// Georgia serif -- for content
+// Fraunces serif -- for DISPLAY (headlines, titles, entity names, hero numbers)
 HavenTypography.title      // 22pt Bold -- screen titles
 HavenTypography.title2     // 18pt Semibold -- section titles
 HavenTypography.title3     // 16pt Semibold -- card titles
@@ -68,7 +68,7 @@ HavenTypography.body       // 14pt -- body text, AI chat messages
 HavenTypography.bodySmall  // 13pt -- secondary descriptions
 HavenTypography.caption    // 12pt -- captions, footnotes
 
-// SF Pro system -- for UI chrome
+// Inter sans -- for BODY text, labels, and UI chrome
 HavenTypography.uiLabel       // 13pt Medium -- metadata labels
 HavenTypography.uiLabelSmall  // 11pt Medium -- badge text
 HavenTypography.uiButton      // 15pt Semibold -- button labels

@@ -277,20 +277,23 @@ final class BinderViewModel: ObservableObject {
 
     // MARK: - PDF Drawing Helpers
 
-    private let titleFont = UIFont.systemFont(ofSize: 24, weight: .bold)
-    private let headerFont = UIFont.systemFont(ofSize: 18, weight: .semibold)
-    private let bodyFont = UIFont.systemFont(ofSize: 12, weight: .regular)
-    private let captionFont = UIFont.systemFont(ofSize: 10, weight: .regular)
+    // Build 89: route through HavenTypography.frauncesUIFont so the WONK=0
+    // axis is set on every glyph — without it the decorative "f" leaks into
+    // the generated PDF binders.
+    private let titleFont = HavenTypography.frauncesUIFont(size: 24, weight: 700)
+    private let headerFont = HavenTypography.frauncesUIFont(size: 18, weight: 600)
+    private let bodyFont = UIFont(name: "Inter", size: 12) ?? UIFont.systemFont(ofSize: 12, weight: .regular)
+    private let captionFont = UIFont(name: "Inter", size: 10) ?? UIFont.systemFont(ofSize: 10, weight: .regular)
     private let margin: CGFloat = 50
 
     private func drawCoverPage(_ context: UIGraphicsPDFRendererContext) {
         context.beginPage()
         let title = "Family Reference Binder"
-        let attrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 32, weight: .bold)]
+        let attrs: [NSAttributedString.Key: Any] = [.font: HavenTypography.frauncesUIFont(size: 32, weight: 700)]
         title.draw(at: CGPoint(x: margin, y: 280), withAttributes: attrs)
 
         let subtitle = "Prepared by Haven"
-        let subAttrs: [NSAttributedString.Key: Any] = [.font: UIFont.systemFont(ofSize: 16), .foregroundColor: UIColor.secondaryLabel]
+        let subAttrs: [NSAttributedString.Key: Any] = [.font: UIFont(name: "Inter", size: 16) ?? UIFont.systemFont(ofSize: 16), .foregroundColor: UIColor.secondaryLabel]
         subtitle.draw(at: CGPoint(x: margin, y: 330), withAttributes: subAttrs)
 
         let dateStr = Date().formatted(date: .long, time: .omitted)

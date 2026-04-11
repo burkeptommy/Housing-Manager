@@ -60,6 +60,15 @@ struct UnifiedTaskCard: View {
         return date < Date()
     }
 
+    /// Phase 50: Detect vendor follow-up tasks (created by the invoice
+    /// pipeline with notes prefixed "Vendor follow-up:"). The vendor
+    /// card variant uses this to apply an amber background tint so
+    /// follow-ups stand apart from the routine vendor schedule rows.
+    private var isVendorFollowUp: Bool {
+        guard let notes = task.notes else { return false }
+        return notes.lowercased().hasPrefix("vendor follow-up")
+    }
+
     /// Phase 19l: Decide which variant the row renders.
     private var variant: UnifiedTaskCardVariant {
         let assignment = task.assignmentType?.lowercased()
@@ -209,11 +218,16 @@ struct UnifiedTaskCard: View {
             rightColumn
         }
         .padding(HavenTheme.spacing12)
-        .background(HavenColors.surface)
+        .background(isVendorFollowUp ? HavenColors.warning.opacity(0.10) : HavenColors.surface)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
         .overlay {
             RoundedRectangle(cornerRadius: HavenTheme.radiusLarge)
-                .strokeBorder(HavenColors.border.opacity(isOverdue ? 0.6 : 0.3), lineWidth: 0.5)
+                .strokeBorder(
+                    isVendorFollowUp
+                        ? HavenColors.warning.opacity(0.45)
+                        : HavenColors.border.opacity(isOverdue ? 0.6 : 0.3),
+                    lineWidth: isVendorFollowUp ? 1 : 0.5
+                )
         }
     }
 

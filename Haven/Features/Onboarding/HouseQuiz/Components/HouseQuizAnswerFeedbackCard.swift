@@ -21,7 +21,7 @@ struct HouseQuizAnswerFeedbackCard: View {
             }
 
             Text(feedback.renderedTitle(city: city, state: state))
-                .font(.custom("Georgia", size: 16).weight(.semibold))
+                .font(HavenTypography.title3)
                 .foregroundStyle(HavenColors.navy800)
                 .fixedSize(horizontal: false, vertical: true)
 

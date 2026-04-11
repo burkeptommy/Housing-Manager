@@ -80,11 +80,14 @@ const claudeResponse = await fetch("https://api.anthropic.com/v1/messages", {
 ## Function Inventory
 
 ### Core AI Functions
-- **analyze-document/** -- AI document analysis on upload. Accepts text or image_base64. Returns summary, category suggestion, key dates, key parties, flags, extracted metadata, cross-reference suggestions. Writes results to `documents` and `document_content` tables.
+- **analyze-document/** -- AI document analysis on upload. Accepts text or image_base64. Returns summary, category suggestion, key dates, key parties, flags, extracted metadata, cross-reference suggestions. Writes results to `documents` and `document_content` tables. Phase 48: estate categories trigger a second Claude call for estate-specific extraction (fiduciaries, execution dates, attorney info, estate_sub_type) with PII redaction, and fire-and-forget upserts to `estate_state`.
 - **chat/** -- Alfred AI chat. Builds full household context via `Promise.all` (members, properties, systems, documents, warranties, maintenance, contractors, projects). Context injection is SERVER-SIDE in this file, not in ChatViewModel.swift.
 - **gap-analysis/** -- Estate document gap analysis. Compares uploaded docs against expected coverage for the household composition.
 - **simulate-scenario/** -- Scenario Studio. Accepts scenario_id (preset) or custom_query. Builds household context, simulates financial/estate scenarios.
-- **proactive-scan/** -- Background document scanning. Reviews all docs for expiration, cross-reference issues, missing coverage. Returns new_flags and expiring_soon arrays.
+- **proactive-scan/** -- Background document scanning. Reviews all docs for expiration, cross-reference issues, missing coverage. Returns new_flags and expiring_soon arrays. Phase 48: also computes estate staleness and writes tier/reasons to estate_state.
+
+### Estate (Phase 48)
+- **verify-estate-export/** -- Public endpoint (no auth). Validates estate PDF verification tokens. Checks expiry (7 days), access count (3 max), revocation. Increments counter, logs hashed IP. Returns household name, generation date, truncated hash, access remaining. Called by havenhome.dev/verify page.
 
 ### Property & Equipment
 - **search-equipment/** -- Searches equipment_catalog table by text query. Returns matching models with specs.

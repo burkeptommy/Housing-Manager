@@ -137,7 +137,7 @@ struct ScenarioResultView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Scenario Results")
-                    .font(Font.custom("Georgia-Bold", size: 18))
+                    .font(HavenTypography.fraunces(size: 18, weight: 700))
                     .foregroundStyle(HavenColors.navy800)
             }
             ToolbarItem(placement: .topBarLeading) {
@@ -233,13 +233,13 @@ struct ScenarioResultView: View {
     private var heroSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(result.title)
-                .font(Font.custom("Georgia-Bold", size: 20))
+                .font(HavenTypography.fraunces(size: 20, weight: 700))
                 .foregroundStyle(HavenColors.navy800)
 
             severityBadge
 
             Text(result.summary)
-                .font(Font.custom("Georgia", size: 14))
+                .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .lineSpacing(4)
         }
@@ -501,7 +501,7 @@ struct ScenarioResultView: View {
                     .foregroundStyle(HavenColors.textSecondary)
                 Spacer()
                 Text(savings.annualSavings)
-                    .font(Font.custom("Georgia-Bold", size: 22))
+                    .font(HavenTypography.title)
                     .foregroundStyle(HavenColors.success)
             }
             .padding(14)
@@ -727,7 +727,7 @@ struct ScenarioResultView: View {
                     .foregroundStyle(HavenColors.navy700)
             }
             Text(fact)
-                .font(Font.custom("Georgia", size: 14))
+                .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .lineSpacing(4)
         }
@@ -765,7 +765,7 @@ struct ScenarioResultView: View {
                 Image(systemName: "exclamationmark.triangle.fill")
                     .foregroundStyle(HavenColors.warning)
                 Text("Generalized Projection")
-                    .font(Font.custom("Georgia-Bold", size: 15))
+                    .font(HavenTypography.headline)
                     .foregroundStyle(HavenColors.navy800)
             }
 
@@ -890,13 +890,13 @@ struct ScenarioResultView: View {
                                     .foregroundStyle(sectionFlagColor(section.flag))
                             }
                             Text(section.heading)
-                                .font(Font.custom("Georgia-Bold", size: 15))
+                                .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.textPrimary)
                         }
 
                         if let highlight = section.highlight {
                             Text(highlight)
-                                .font(Font.custom("Georgia-Bold", size: 24))
+                                .font(HavenTypography.fraunces(size: 24, weight: 700))
                                 .foregroundStyle(sectionFlagColor(section.flag))
                                 .padding(.vertical, 4)
                         }
@@ -933,7 +933,7 @@ struct ScenarioResultView: View {
             sectionHeader("FINANCIAL IMPACT", icon: "chart.bar")
 
             Text(summaryLine)
-                .font(Font.custom("Georgia-Bold", size: 16))
+                .font(HavenTypography.title3)
                 .foregroundStyle(HavenColors.navy800)
                 .padding(.bottom, 4)
 

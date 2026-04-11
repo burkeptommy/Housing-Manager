@@ -154,7 +154,19 @@ Return ONLY valid JSON (no markdown fences) with this structure:
   "next_service_suggestions": [
     Based on the work done, when should the next service be? Consider the vehicle's mileage and typical intervals.
     { "type": "oil_change | tire_rotation | etc", "suggested_date": "YYYY-MM-DD or null", "suggested_mileage": number or null }
-  ]
+  ],
+  "cadence_detected": {
+    Phase 50: detect EXPLICIT recurring service cadence on the invoice.
+    Only return non-null fields when the invoice itself states the cadence —
+    do NOT infer from typical intervals. Confidence must be > 0.8 to write.
+    Examples that should match:
+      - "monthly service plan"
+      - "we'll be back every 3 weeks"
+      - "biweekly service visit"
+    "interval_days": number | null,
+    "confidence": 0-1,
+    "quoted_text": "exact phrase from the invoice that supports this, or null"
+  }
 }
 
 MATCHING RULES:
@@ -262,8 +274,25 @@ Return ONLY valid JSON (no markdown fences) with this structure:
   ],
   "follow_up_needed": [
     Maximum 3 follow-up items.
+    Phase 50: prefer EXPLICIT date-bound follow-ups over vague language. If
+    the invoice says "recommend return in 4 weeks" or "retest water on
+    May 15", surface that with a real "suggested_due_date". Skip generic
+    "consider replacing" lines that have no timeline.
     { "description": "string", "urgency": "soon" | "routine" | "informational", "suggested_due_date": "YYYY-MM-DD or null" }
-  ]
+  ],
+  "cadence_detected": {
+    Phase 50: detect EXPLICIT recurring service cadence on the invoice.
+    Only return non-null fields when the invoice itself states the cadence —
+    do NOT infer from typical intervals. Confidence must be > 0.8 to write.
+    Examples that should match:
+      - "monthly service plan"
+      - "we'll be back every 3 weeks"
+      - "biweekly service visit"
+      - "Thompson Lawn visits every 14 days during the season"
+    "interval_days": number | null,
+    "confidence": 0-1,
+    "quoted_text": "exact phrase from the invoice that supports this, or null"
+  }
 }
 
 MATCHING RULES:

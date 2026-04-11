@@ -249,7 +249,7 @@ struct VehicleDetailView: View {
                 // Vehicle name + trim
                 VStack(spacing: 4) {
                     Text(vehicle.displayName)
-                        .font(Font.custom("Georgia-Bold", size: 20))
+                        .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(.white)
                     if let trim = vehicle.trim, !trim.isEmpty {
                         Text(trim)
@@ -2316,7 +2316,7 @@ struct MileageUpdateSheet: View {
 
             TextField("", text: $mileageText)
                 .keyboardType(.numberPad)
-                .font(Font.custom("Georgia-Bold", size: 28))
+                .font(HavenTypography.fraunces(size: 28, weight: 700))
                 .multilineTextAlignment(.center)
                 .foregroundStyle(HavenColors.textPrimary)
                 .padding(.vertical, 8)

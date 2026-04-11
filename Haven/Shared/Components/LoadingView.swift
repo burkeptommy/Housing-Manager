@@ -7,7 +7,7 @@ struct LoadingView: View {
     var body: some View {
         VStack(spacing: HavenTheme.spacing16) {
             Text("H")
-                .font(Font.custom("Georgia", size: 56))
+                .font(HavenTypography.fraunces(size: 56, weight: 400))
                 .foregroundStyle(HavenColors.navy800)
 
             ProgressView()

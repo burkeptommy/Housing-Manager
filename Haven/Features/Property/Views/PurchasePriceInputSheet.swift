@@ -116,11 +116,11 @@ struct PurchasePriceInputSheet: View {
                 .foregroundStyle(HavenColors.textSecondary)
             HStack {
                 Text("$")
-                    .font(.custom("Georgia", size: 22))
+                    .font(HavenTypography.fraunces(size: 22, weight: 400))
                     .foregroundStyle(HavenColors.textSecondary)
                 TextField("0", text: $purchasePriceText)
                     .keyboardType(.numberPad)
-                    .font(.custom("Georgia", size: 22).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 22, weight: 600))
                     .foregroundStyle(HavenColors.textPrimary)
                     .onChange(of: purchasePriceText) { _, newValue in
                         purchasePriceText = formatNumericInput(newValue)
@@ -176,11 +176,11 @@ struct PurchasePriceInputSheet: View {
                 .foregroundStyle(HavenColors.textSecondary)
             HStack {
                 Text("$")
-                    .font(.custom("Georgia", size: 22))
+                    .font(HavenTypography.fraunces(size: 22, weight: 400))
                     .foregroundStyle(HavenColors.textSecondary)
                 TextField("0", text: $estimatedValueText)
                     .keyboardType(.numberPad)
-                    .font(.custom("Georgia", size: 22).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 22, weight: 600))
                     .foregroundStyle(HavenColors.textPrimary)
                     .onChange(of: estimatedValueText) { _, newValue in
                         estimatedValueText = formatNumericInput(newValue)

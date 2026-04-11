@@ -18,6 +18,7 @@ struct DashboardView: View {
     @State private var serviceContractType: String = ""
     @State private var showApplianceSetup = false
     @State private var pendingMergeRequest: [String: Any]?
+    @State private var showEstateIntake = false
     @State private var isAcceptingMerge = false
     @State private var showMergeResolution = false
     @State private var mergePreviewResponse: MergePreviewResponse?
@@ -42,6 +43,14 @@ struct DashboardView: View {
     /// triggers the sheet automatically.
     @State private var dashboardDelegationCandidates: [VendorDelegationCandidate] = []
     @State private var showDashboardDelegationSheet: Bool = false
+
+    /// Phase 50 — Cadence suggestion coordinator. Holds the most recent
+    /// invoice cadence suggestion until the user accepts or dismisses it.
+    /// Lives at app scope so the suggestion survives the InvoiceReviewSheet
+    /// dismissal that publishes it. Using @ObservedObject on the singleton
+    /// (not @StateObject) so the dashboard observes the shared instance
+    /// rather than owning a fresh copy.
+    @ObservedObject private var cadenceCoordinator = InvoiceCadenceCoordinator.shared
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -75,14 +84,40 @@ struct DashboardView: View {
                         // 1. Greeting
                         greetingView
 
-                        // 1.5 Incomplete address banner
+                        // 2. Getting Started / Quiz hero — Day 0 focal point.
+                        // Phase 50 (sub-phase B first-login): only renders
+                        // when no property exists OR no property's quiz is
+                        // complete. Once any quiz finishes, this disappears
+                        // entirely and the YOUR HOME section below takes
+                        // over as the primary CTA.
+                        if viewModel.showGettingStarted {
+                            gettingStartedCard
+                        } else if !viewModel.recommendations.isEmpty {
+                            recommendationsCard
+                        }
+
+                        // 2.5 Incomplete address banner
                         if let property = viewModel.propertyNeedsAddress {
                             incompleteAddressBanner(property)
                         }
 
-                        // 2. Pending merge request banner
+                        // 2.6 Pending merge request banner
                         if let merge = pendingMergeRequest {
                             mergeRequestBanner(merge)
+                        }
+
+                        // 2.7 Phase 50 (sub-phase B first-login): YOUR HOME
+                        // vendor schedule section. Gated on quiz completion
+                        // so Day 0 stays focused on the Quiz CTA above.
+                        // Post-quiz, this is the primary action surface and
+                        // sits above the household strip — it absorbs the
+                        // role of the old Getting Started Step 2 ("Upload
+                        // your first document"). Once the user has at least
+                        // one vendor visit, the empty state collapses and
+                        // the horizontal scroll of `VendorVisitCard`s
+                        // takes over.
+                        if viewModel.hasCompletedAnyQuiz {
+                            vendorScheduleSection
                         }
 
                         // 3. Household strip
@@ -142,66 +177,79 @@ struct DashboardView: View {
                             emailForwardingCallout
                         }
 
-                        // 6. Getting Started OR Recommendations
-                        if viewModel.showGettingStarted {
-                            gettingStartedCard
-                        } else if !viewModel.recommendations.isEmpty {
-                            recommendationsCard
+                        // 7b. Estate Drip Card (Phase 48)
+                        // Only shows after all house quizzes are complete.
+                        // Empty state redirects to Life tab; stale/partial opens intake directly.
+                        if viewModel.shouldShowEstateDripCard {
+                            EstateIntakeDripCard(
+                                estateState: viewModel.estateState,
+                                onStart: {
+                                    let hasStartedIntake = viewModel.estateState?.intakeState?.startedAt != nil
+                                    let isStale = viewModel.estateState?.stalenessTier == "critical" || viewModel.estateState?.stalenessTier == "amber"
+                                    if hasStartedIntake || isStale {
+                                        // Stale or partial: open intake directly
+                                        showEstateIntake = true
+                                    } else {
+                                        // Empty/first-time: navigate to Life tab
+                                        NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 2])
+                                    }
+                                },
+                                onDismiss: { tier in viewModel.dismissEstateDrip(tier: tier) }
+                            )
                         }
 
-                        // 7. (House Quiz hero card replaces the legacy "Tell Us More" enrichment cards.)
+                        // (vendorScheduleSection moved above HouseholdStrip
+                        // in Phase 50 sub-phase B first-login fixes — see
+                        // section 2.7 above. The hasCompletedAnyQuiz gate
+                        // lives there, so Day 0 stays focused on the Quiz
+                        // CTA and the strip never renders mid-scroll.)
 
-                        // 8. HOME MAINTENANCE hero card
-                        homeMaintenanceCard
+                        // 9. Unified "Needs Your Attention" list — hidden on
+                        // Day 0 until any property's house quiz is complete.
+                        if viewModel.hasCompletedAnyQuiz {
+                            UnifiedAttentionList(
+                                items: viewModel.unifiedAttentionItems,
+                                onItemTapped: { item in
+                                    if case .vehicleAlert = item.kind {
+                                        navigationPath.append("vehicles")
+                                    }
+                                },
+                                onSeeAll: {
+                                    navigationPath.append("maintenance")
+                                },
+                                onDeleteTask: { task in
+                                    Task {
+                                        try? await DatabaseService.shared.deleteMaintenanceTask(id: task.id)
+                                        Haptics.success()
+                                        await viewModel.refresh()
+                                    }
+                                }
+                            )
+                        }
 
-                        // 9. Unified "Needs Your Attention" list
-                        UnifiedAttentionList(
-                            items: viewModel.unifiedAttentionItems,
-                            onItemTapped: { item in
-                                if case .vehicleAlert = item.kind {
-                                    navigationPath.append("vehicles")
-                                }
-                            },
-                            onSeeAll: {
-                                navigationPath.append("maintenance")
-                            },
-                            onDeleteTask: { task in
-                                Task {
-                                    try? await DatabaseService.shared.deleteMaintenanceTask(id: task.id)
-                                    Haptics.success()
-                                    await viewModel.refresh()
-                                }
+                        // (Standalone Upload button removed — uploads still
+                        // reachable via the VendorScheduleStrip "Upload
+                        // invoice" button and the email forwarding flow.)
+
+                        // 11. Estate readiness (compact) — hidden on Day 0
+                        // until any property's house quiz is complete.
+                        if viewModel.hasCompletedAnyQuiz {
+                            NavigationLink(value: "estate_readiness") {
+                                compactEstateScorecard
                             }
-                        )
-
-                        // 10. Quick Actions
-                        QuickActions(
-                            onUploadDocument: { showUploadDocument = true },
-                            onAddProperty: { showAddProperty = true },
-                            onAskAI: {
-                                showScenarioStudio = true
-                            },
-                            onViewOverdue: {
-                                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
-                            },
-                            onViewMaintenance: {
-                                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
-                            },
-                            overdueCount: viewModel.overdueMaintenanceTasks.count,
-                            hasProperty: viewModel.hasProperty
-                        )
-
-                        // 11. Estate readiness (compact)
-                        NavigationLink(value: "estate_readiness") {
-                            compactEstateScorecard
+                            .buttonStyle(.plain)
                         }
-                        .buttonStyle(.plain)
 
-                        // 12. Scenario Planning (slim single-row)
-                        compactScenarioCard
+                        // 12. Scenario Planning (slim single-row) — hidden
+                        // on Day 0. Scenarios are also folded into Alfred's
+                        // toolbar so the AI surface area lives in one place.
+                        if viewModel.hasCompletedAnyQuiz {
+                            compactScenarioCard
+                        }
 
-                        // 13. Security trust badge
-                        if !hasSeenSecurityBadge {
+                        // 13. Security trust badge — hidden on Day 0 to keep
+                        // the empty-state dashboard focused on onboarding.
+                        if !hasSeenSecurityBadge && viewModel.hasCompletedAnyQuiz {
                             securityBadge
                                 .overlay(alignment: .topTrailing) {
                                     Button {
@@ -241,24 +289,10 @@ struct DashboardView: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     HStack(spacing: 12) {
-                        Menu {
-                            Button {
-                                Haptics.light()
-                                showUploadDocument = true
-                            } label: {
-                                Label("Upload Document", systemImage: "doc.badge.plus")
-                            }
-                            Button {
-                                Haptics.light()
-                                navigationPath.append("maintenance")
-                            } label: {
-                                Label("View Tasks", systemImage: "checklist")
-                            }
-                        } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 20, weight: .semibold))
-                                .foregroundStyle(HavenColors.navy800)
-                        }
+                        // (Quick-add "+" menu removed — Upload Document was a
+                        // duplicate entry point, View Tasks is reachable from
+                        // the Needs Your Attention list and the Maintenance
+                        // tab. Trailing toolbar collapses to Inbox + Settings.)
 
                         NavigationLink(value: "inbox") {
                             ZStack(alignment: .topTrailing) {
@@ -427,6 +461,11 @@ struct DashboardView: View {
             }
             .sheet(isPresented: $showPersonalQuiz) {
                 PersonalQuizView()
+            }
+            .sheet(isPresented: $showEstateIntake) {
+                if let hid = viewModel.primaryHouseholdId ?? viewModel.properties.first?.householdId {
+                    EstateIntakeFormView(householdId: hid)
+                }
             }
             .confirmationDialog("Skip the House Quiz?", isPresented: $showQuizSkipDialog, titleVisibility: .visible) {
                 Button("Skip for now") {
@@ -740,6 +779,52 @@ struct DashboardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    /// Phase 50: Vendor schedule strip + cadence suggestion card. Pulled
+    /// out of `body` so the dashboard's main scroll view stays under
+    /// SwiftUI's expression type-check budget.
+    @ViewBuilder
+    private var vendorScheduleSection: some View {
+        VendorScheduleStrip(
+            visits: viewModel.upcomingVendorVisits,
+            overdueCount: viewModel.overdueMaintenanceTasks.count,
+            dueThisWeekCount: viewModel.dueThisWeekTaskCount,
+            forwardingEmail: viewModel.householdForwardingEmail,
+            onTapVisit: { task in
+                selectedDashboardTask = task
+            },
+            onSeeAll: {
+                navigationPath.append("maintenance")
+            },
+            onUploadInvoice: {
+                showUploadDocument = true
+            },
+            onAddVendor: {
+                NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 1])
+            }
+        )
+
+        if let suggestion = cadenceCoordinator.current {
+            CadenceSuggestionCard(
+                suggestion: suggestion,
+                onAccept: {
+                    Task {
+                        let ok = await cadenceCoordinator.apply(suggestion)
+                        if ok {
+                            Haptics.success()
+                            await viewModel.refresh()
+                        } else {
+                            Haptics.error()
+                        }
+                    }
+                },
+                onDismiss: {
+                    cadenceCoordinator.dismiss()
+                    Haptics.light()
+                }
+            )
+        }
+    }
+
     private var greetingText: String {
         let hour = Calendar.current.component(.hour, from: Date())
         let timeOfDay: String
@@ -751,127 +836,6 @@ struct DashboardView: View {
             return "\(timeOfDay), \(firstName)"
         }
         return timeOfDay
-    }
-
-    // MARK: - Home Maintenance Card
-
-    private var homeMaintenanceCard: some View {
-        NavigationLink(value: "maintenance") {
-            VStack(spacing: HavenTheme.spacing16) {
-                HStack {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("YOUR HOME")
-                            .font(.system(size: 10, weight: .semibold))
-                            .tracking(1.5)
-                            .foregroundStyle(Color.white.opacity(0.35))
-
-                        if viewModel.overdueMaintenanceTasks.isEmpty && viewModel.allUpcomingTasks.isEmpty {
-                            Text("All caught up!")
-                                .font(Font.custom("Georgia-Bold", size: 20))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.8)
-                        } else {
-                            // Phase 19l: dual count — personal vs vendor-managed.
-                            // The middle dot (·) renders as a tasteful separator
-                            // and avoids the AI-tell em dash.
-                            Text("\(viewModel.personalTaskCount) to do · \(viewModel.vendorManagedTaskCount) vendor-managed")
-                                .font(Font.custom("Georgia-Bold", size: 20))
-                                .foregroundStyle(.white)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                        }
-                    }
-
-                    Spacer()
-
-                    HStack(spacing: 10) {
-                        // Only show overdue pill when count > 0
-                        if viewModel.overdueMaintenanceTasks.count > 0 {
-                            maintenanceHeroPill(
-                                count: viewModel.overdueMaintenanceTasks.count,
-                                label: "Overdue",
-                                color: Color.red.opacity(0.9)
-                            )
-                        }
-                        // Total count as subtle pill
-                        let totalCount = viewModel.allUpcomingTasks.count + viewModel.overdueMaintenanceTasks.count
-                        if totalCount > 0 {
-                            maintenanceHeroPill(
-                                count: totalCount,
-                                label: "Total",
-                                color: Color.white.opacity(0.2)
-                            )
-                        }
-                    }
-                }
-
-                if let next = viewModel.nextUpcomingTask {
-                    Button {
-                        selectedDashboardTask = next
-                    } label: {
-                        HStack(spacing: 8) {
-                            Image(systemName: "arrow.right.circle")
-                                .font(.caption)
-                                .foregroundStyle(Color.white.opacity(0.6))
-                            Text("Next: \(next.title.summarized(maxLength: 40))")
-                                .font(HavenTypography.uiLabelSmall)
-                                .foregroundStyle(Color.white.opacity(0.8))
-                                .lineLimit(1)
-                            Spacer()
-                            HStack(spacing: 4) {
-                                Text(next.nextDueDate.havenDateShort)
-                                    .font(HavenTypography.uiCaption)
-                                    .foregroundStyle(Color.white.opacity(0.6))
-                                Image(systemName: "chevron.right")
-                                    .font(.system(size: 10, weight: .semibold))
-                                    .foregroundStyle(Color.white.opacity(0.5))
-                            }
-                        }
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-            .padding(HavenTheme.spacing20)
-            .background(
-                ZStack {
-                    LinearGradient(
-                        colors: [
-                            Color(red: 0.28, green: 0.42, blue: 0.35),
-                            Color(red: 0.22, green: 0.35, blue: 0.30)
-                        ],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                    Image(systemName: "house.fill")
-                        .resizable()
-                        .aspectRatio(contentMode: .fit)
-                        .frame(width: 130, height: 130)
-                        .foregroundStyle(Color.white.opacity(0.08))
-                        .offset(x: 40, y: 15)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusLarge))
-        }
-        .buttonStyle(.plain)
-    }
-
-    private func maintenanceHeroPill(count: Int, label: String, color: Color) -> some View {
-        VStack(spacing: 2) {
-            Text("\(count)")
-                .font(.system(size: 18, weight: .bold, design: .rounded))
-                .foregroundStyle(.white)
-            Text(label)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundStyle(Color.white.opacity(0.7))
-                .lineLimit(1)
-                .fixedSize(horizontal: true, vertical: false)
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-        .background(color)
-        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
     // MARK: - What If Card
@@ -951,7 +915,7 @@ struct DashboardView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text("Scenario Planning")
-                            .font(Font.custom("Georgia-Bold", size: 18))
+                            .font(HavenTypography.fraunces(size: 18, weight: 700))
                             .foregroundStyle(HavenColors.navy800)
                         Text("Explore what-if questions with your real data — estate, taxes, home, wealth")
                             .font(HavenTypography.bodySmall)
@@ -1025,22 +989,23 @@ struct DashboardView: View {
 
     @ViewBuilder
     private var gettingStartedCard: some View {
-        if viewModel.hasProperty && !viewModel.hasDocuments {
-            // House Quiz hero (replaces the old Alfred Scan-Will prompt) — one
-            // card per property that hasn't completed the quiz yet.
+        // Phase 50 (sub-phase B first-login): `showGettingStarted` collapses
+        // to (!hasProperty || !hasCompletedAnyQuiz), so this view only ever
+        // renders when the user is on Day 0 OR mid-onboarding without a
+        // completed quiz. The Quiz hero is the singular CTA in that state —
+        // the legacy "Upload your first document" / "Ask Alfred" branches
+        // are now handled post-quiz by `VendorScheduleStrip` (which absorbs
+        // Step 2) and the Alfred tab toolbar (which absorbs Step 3).
+        if viewModel.hasProperty {
             VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                gettingStartedHeader(completed: 1)
-                houseQuizHeroCardStack
-            }
-        } else if viewModel.hasProperty && viewModel.hasDocuments && !viewModel.hasUsedAlfred {
-            // Only Alfred left — simple nudge
-            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-                gettingStartedHeader(completed: 2)
-                HavenCard {
-                    VStack(alignment: .leading, spacing: 12) {
-                        gettingStartedRow(step: 3, title: "Ask Alfred a question", subtitle: "Try \"What documents am I missing?\"", icon: "sparkles", done: false, action: { NotificationCenter.default.post(name: .switchToTab, object: nil, userInfo: ["tab": 3]) })
-                    }
+                HStack(spacing: 8) {
+                    Text("GETTING STARTED")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                    Spacer()
                 }
+                houseQuizHeroCardStack
             }
         } else {
             // Full getting started checklist (no property yet)
@@ -1054,7 +1019,7 @@ struct DashboardView: View {
                                 .font(.system(size: 16))
                                 .foregroundStyle(HavenColors.navy700)
                             Text("Getting Started")
-                                .font(Font.custom("Georgia-Bold", size: 15))
+                                .font(HavenTypography.headline)
                                 .foregroundStyle(HavenColors.navy800)
 
                             let completed = [viewModel.hasProperty, viewModel.hasDocuments, viewModel.hasUsedAlfred].filter { $0 }.count
@@ -1170,22 +1135,13 @@ struct DashboardView: View {
         .havenShadow()
     }
 
-    private func gettingStartedHeader(completed: Int) -> some View {
-        HStack(spacing: 8) {
-            Text("GETTING STARTED")
-                .font(HavenTypography.uiSectionHeader)
-                .tracking(1.5)
-                .foregroundStyle(HavenColors.textTertiary)
-            Text("\(completed)/3")
-                .font(.system(size: 10, weight: .bold, design: .rounded))
-                .foregroundStyle(HavenColors.textTertiary)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(HavenColors.beige200)
-                .clipShape(Capsule())
-            Spacer()
-        }
-    }
+    // Phase 50 (sub-phase B first-login): `gettingStartedHeader` was used by
+    // the legacy "Step 1/2/3" Quiz hero + Alfred prompt branches and the
+    // expanded checklist. With the simplified two-state model (Quiz hero
+    // when hasProperty, full checklist when !hasProperty) those branches
+    // are gone, and the Quiz section header is now inline in
+    // `gettingStartedCard`. The expanded checklist still has its own
+    // header rendered inline below.
 
     private func gettingStartedRow(step: Int, title: String, subtitle: String, icon: String, done: Bool, action: @escaping () -> Void) -> some View {
         Button(action: {
@@ -1242,7 +1198,7 @@ struct DashboardView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Preparing for \(member.firstName)")
-                        .font(Font.custom("Georgia-Bold", size: 16))
+                        .font(HavenTypography.title3)
                         .foregroundStyle(.white)
                         .lineLimit(1)
 

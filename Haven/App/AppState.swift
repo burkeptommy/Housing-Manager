@@ -95,6 +95,8 @@ final class AppState: ObservableObject {
                 Task { await Self.migratePoolTasksToVendorOnce() }
                 Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                 Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                Task { await Self.archivePreQuizChoreTasksOnce() }
+                Task { await Self.ensurePropertyValuesAreFresh() }
                 Task { await refreshPrimaryProperty() }
             } else {
                 hasCheckedPrimaryProperty = true
@@ -114,6 +116,8 @@ final class AppState: ObservableObject {
                     Task { await Self.migratePoolTasksToVendorOnce() }
                     Task { await Self.removeLeakCheckTasksOnceIfNeeded() }
                     Task { await Self.migrateHotTubSystemsOnceIfNeeded() }
+                    Task { await Self.archivePreQuizChoreTasksOnce() }
+                    Task { await Self.ensurePropertyValuesAreFresh() }
                     Task { await refreshPrimaryProperty() }
                 } else {
                     primaryProperty = nil
@@ -227,6 +231,99 @@ final class AppState: ObservableObject {
             NotificationCenter.default.post(name: .propertyChanged, object: nil)
         }
         UserDefaults.standard.set(true, forKey: key)
+    }
+
+    // MARK: - Build 89: Auto-Refresh Property Values
+
+    /// Runs on every login. Refreshes any property whose estimated value is
+    /// nil or whose last lookup is older than 30 days. Stores the lookup
+    /// timestamp in `properties.attributes["last_value_lookup_at"]` so no
+    /// migration is needed. Replaces the need for the manual "Refresh from
+    /// public records" button as the primary way values get populated.
+    @MainActor
+    static func ensurePropertyValuesAreFresh() async {
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else { return }
+
+        let staleThreshold: TimeInterval = 30 * 24 * 60 * 60 // 30 days
+        let isoFormatter = ISO8601DateFormatter()
+
+        var refreshed = 0
+        for property in properties {
+            // Check if refresh is needed
+            let needsRefresh: Bool
+            if property.currentEstimatedValue == nil {
+                needsRefresh = true
+            } else if let lastLookupValue = property.attributes?["last_value_lookup_at"],
+                      case .string(let dateString) = lastLookupValue,
+                      let lastDate = isoFormatter.date(from: dateString) {
+                needsRefresh = Date().timeIntervalSince(lastDate) > staleThreshold
+            } else {
+                // Has a value but no timestamp — treat as stale so we
+                // stamp it on the next successful refresh.
+                needsRefresh = true
+            }
+            guard needsRefresh else { continue }
+
+            let parts = [property.street, property.city, property.state, property.zipCode]
+                .compactMap { $0?.trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
+            guard !parts.isEmpty else { continue }
+            let address = parts.joined(separator: ", ")
+
+            do {
+                let lookupData = try await HavenSupabase.propertyLookup(address: address)
+                struct LookupResponse: Decodable {
+                    let success: Bool
+                    let property: PropertyLookupResult?
+                }
+                let response = try JSONDecoder().decode(LookupResponse.self, from: lookupData)
+                guard response.success, let lookup = response.property else { continue }
+
+                // Walk the ATTOM fallback ladder
+                let estimatedValue: Double? = {
+                    if let canonical = lookup.estimatedValue { return canonical }
+                    if let low = lookup.estimatedValueLow,
+                       let high = lookup.estimatedValueHigh {
+                        return (low + high) / 2
+                    }
+                    if let high = lookup.estimatedValueHigh { return high }
+                    if let low = lookup.estimatedValueLow { return low }
+                    if let assessed = lookup.taxAssessment?.assessedValue { return assessed }
+                    return nil
+                }()
+
+                var update = PropertyUpdate()
+                update.currentEstimatedValue = estimatedValue
+                update.estimatedValueSource = lookup.estimatedValueSource
+                    ?? (estimatedValue != nil ? "computed" : nil)
+                update.estimatedValueConfidence = lookup.estimatedValueConfidence
+                update.estimatedValueReasoning = lookup.estimatedValueReasoning
+                if let salePrice = lookup.lastSalePrice {
+                    update.purchasePrice = salePrice
+                }
+
+                // Stamp the lookup timestamp in attributes
+                var attrs = property.attributes ?? [:]
+                attrs["last_value_lookup_at"] = .string(isoFormatter.string(from: Date()))
+                update.attributes = attrs
+
+                _ = try? await db.updateProperty(id: property.id, update)
+                refreshed += 1
+            } catch {
+                // Skip silently — don't block the rest on one failure.
+            }
+        }
+        if refreshed > 0 {
+            print("[ensurePropertyValuesAreFresh] refreshed \(refreshed) propert\(refreshed == 1 ? "y" : "ies")")
+            NotificationCenter.default.post(name: .propertyChanged, object: nil)
+        }
     }
 
     /// Phase 18e: One-time backfill that walks every utility_account row on
@@ -677,6 +774,71 @@ final class AppState: ObservableObject {
         }
         if removedCount > 0 {
             print("[removeLeakCheckTasksV1] archived \(removedCount) leak-check task\(removedCount == 1 ? "" : "s")")
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+        }
+        UserDefaults.standard.set(true, forKey: key)
+    }
+
+    // MARK: - Build 89: Archive HNW chore-tracker tasks
+
+    /// One-time migration that archives the low-value chore-tracker tasks
+    /// (smoke detectors, fire extinguishers, weatherstripping, coils) that
+    /// were auto-created by the pre-quiz OnboardingScheduleGenerator or the
+    /// reconciler's orphan pass. These templates are now `isEssential: false`
+    /// so they won't be re-created, but existing rows need cleanup.
+    ///
+    /// Matches by **title** (case-insensitive) because onboarding-created
+    /// tasks have no `templateId`. Skips tasks the user has already completed
+    /// to preserve history.
+    static func archivePreQuizChoreTasksOnce() async {
+        let key = "hasArchivedPreQuizChoreTasks_v1"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        let db = DatabaseService.shared
+        let properties: [PropertyRow]
+        do {
+            properties = try await db.fetchProperties()
+        } catch {
+            return
+        }
+        guard !properties.isEmpty else {
+            UserDefaults.standard.set(true, forKey: key)
+            return
+        }
+
+        let choreTitles: Set<String> = [
+            "verify smoke detectors",
+            "replace smoke detector batteries",
+            "replace smoke detectors",
+            "verify carbon monoxide detectors",
+            "check fire extinguishers",
+            "vacuum refrigerator coils",
+            "inspect weatherstripping",
+        ]
+
+        var archivedCount = 0
+        for property in properties {
+            let tasks: [MaintenanceTaskDBRow]
+            do {
+                tasks = try await db.fetchMaintenanceTasks(propertyId: property.id)
+            } catch {
+                continue
+            }
+            for task in tasks {
+                guard choreTitles.contains(task.title.lowercased()) else { continue }
+                if task.lastCompletedDate != nil { continue }
+                do {
+                    try await db.archiveMaintenanceTask(
+                        id: task.id,
+                        reason: "build_89_hnw_chore_noise_removal"
+                    )
+                    archivedCount += 1
+                } catch {
+                    // Swallow individual failures.
+                }
+            }
+        }
+        if archivedCount > 0 {
+            print("[archivePreQuizChoreTasks] archived \(archivedCount) chore-tracker task\(archivedCount == 1 ? "" : "s")")
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
         }
         UserDefaults.standard.set(true, forKey: key)

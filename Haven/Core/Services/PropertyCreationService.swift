@@ -106,37 +106,14 @@ actor PropertyCreationService {
         // never hit that path. Failures here don't block property creation.
         try? await ensurePrimaryFamilyMember(householdId: householdId)
 
-        // 5. Generate the 12-month maintenance plan.
-        var tasksCreated = 0
-        let schedule = OnboardingScheduleGenerator.generate(
-            from: resolvedLookup,
-            state: address.state
-        )
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        for item in schedule {
-            let nextDue = nextDueDate(forMonth: item.month, formatter: formatter)
-            let task = MaintenanceTaskInsert(
-                propertyId: property.id,
-                householdId: householdId,
-                title: item.title,
-                frequency: item.frequency,
-                nextDueDate: nextDue,
-                description: item.description,
-                priority: item.category == "HVAC" || item.category == "Plumbing" ? "High" : "Medium",
-                isTemplateBased: true,
-                isDiy: item.isDIY,
-                costRange: item.estimatedCost
-            )
-            if (try? await DatabaseService.shared.createMaintenanceTask(task)) != nil {
-                tasksCreated += 1
-            }
-        }
+        // Build 89: Pre-quiz task creation removed. Tasks are created by
+        // the MaintenanceTaskReconciler during quiz completion, ensuring
+        // proper assignmentType, vendor linking, and bundling.
 
         return PropertyCreationResult(
             property: property,
             systemsCreated: systemsCreated,
-            tasksCreated: tasksCreated,
+            tasksCreated: 0,
             lookupSucceeded: lookupSucceeded
         )
     }
@@ -215,21 +192,6 @@ actor PropertyCreationService {
         insert.linkedUserId = currentUserId
 
         _ = try await DatabaseService.shared.createFamilyMember(insert)
-    }
-
-    private func nextDueDate(forMonth month: Int, formatter: DateFormatter) -> String {
-        let calendar = Calendar.current
-        let now = Date()
-        let currentMonth = calendar.component(.month, from: now)
-        let currentYear = calendar.component(.year, from: now)
-        var year = currentYear
-        if month < currentMonth { year += 1 }
-        var components = DateComponents()
-        components.year = year
-        components.month = month
-        components.day = 15
-        let date = calendar.date(from: components) ?? now
-        return formatter.string(from: date)
     }
 
     private func systemsFromFeatures(

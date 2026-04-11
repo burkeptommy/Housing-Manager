@@ -57,6 +57,18 @@ final class DashboardViewModel: ObservableObject {
     /// contractor and "needs vendor" find-a-contractor placeholders. Drives
     /// the "Y vendor-managed" half of the home hero card.
     @Published var vendorManagedTaskCount: Int = 0
+
+    /// Phase 50: Hydrated vendor visit cards for the dashboard's
+    /// `VendorScheduleStrip`. Each entry already has its vendor name,
+    /// logo URL, brand color, and last service cost resolved so the
+    /// strip stays presentation-only and doesn't trigger per-card
+    /// network lookups while scrolling. Built in `loadVendorVisits()`
+    /// from the joined contractor + service-record snapshot.
+    @Published var upcomingVendorVisits: [DashboardVendorVisit] = []
+    /// Phase 50: Tasks counted toward the "X tasks this week" line that
+    /// sits below the vendor schedule strip. Includes both personal and
+    /// vendor tasks due in the next 7 days.
+    @Published var dueThisWeekTaskCount: Int = 0
     @Published var recentDocuments: [DocumentRow] = []
     @Published var userFirstName: String?
     @Published var isLoading = false
@@ -112,6 +124,30 @@ final class DashboardViewModel: ObservableObject {
     @Published var unresolvedVehicleRecalls: Int = 0
     @Published var propertyNeedsAddress: PropertyRow?
 
+    // Estate drip card (Phase 48)
+    @Published var estateState: EstateStateRow?
+
+    /// Phase 50 (sub-phase B first-login): the household's
+    /// `*@alfred.havenhome.dev` forwarding address. Loaded by
+    /// `loadHouseholdEmail()` in `fetchAll()` and surfaced inside the
+    /// `VendorScheduleStrip` empty state as a subtle copy-to-clipboard
+    /// caption ("Or forward invoices to … and we'll automatically
+    /// build this out"). Nil while loading or if the household hasn't
+    /// been provisioned an address yet.
+    @Published var householdForwardingEmail: String?
+
+    var shouldShowEstateDripCard: Bool {
+        // Don't show during onboarding -- wait until all house quizzes are done
+        let allQuizzesDone = !properties.isEmpty && properties.allSatisfy { $0.houseQuizState?.completedAt != nil }
+        guard allQuizzesDone else { return false }
+        return EstateIntakeDripCard.shouldShow(estateState: estateState)
+    }
+
+    func dismissEstateDrip(tier: EstateIntakeDripCard.DismissTier) {
+        EstateIntakeDripCard.dismiss(tier: tier)
+        objectWillChange.send()
+    }
+
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -120,8 +156,23 @@ final class DashboardViewModel: ObservableObject {
         subscribeToChanges()
     }
 
+    /// Phase 50 (sub-phase B first-login): collapses to "no property" or
+    /// "no completed quiz" so the Quiz card is the single Day-0 CTA. Once
+    /// any property's quiz is done, Getting Started disappears entirely
+    /// and the VendorScheduleStrip ("Your maintenance plan is ready")
+    /// takes over as the primary action surface, absorbing the role of
+    /// the old Step 2 ("Upload your first document").
     var showGettingStarted: Bool {
-        !hasProperty || !hasDocuments || !hasUsedAlfred
+        !hasProperty || !hasCompletedAnyQuiz
+    }
+
+    /// True once any property in the household has completed the house quiz.
+    /// Day 0 cleanup uses this as the gate for hiding advanced cards
+    /// (Foundation, Scenario, Unified Attention, Security badge) and the
+    /// vendor schedule section until the user has at least one property
+    /// worth of real data to power them.
+    var hasCompletedAnyQuiz: Bool {
+        properties.contains { $0.houseQuizState?.completedAt != nil }
     }
 
     var recommendations: [Recommendation] {
@@ -145,6 +196,7 @@ final class DashboardViewModel: ObservableObject {
             currentSeasonName: currentSeasonName,
             systemsNeedingServiceCount: systemsNeedingServiceCount,
             hasIncompleteProperty: hasIncompleteProperty,
+            estateState: estateState,
             dismissedIds: dismissedRecommendationIds
         )
     }
@@ -405,7 +457,8 @@ final class DashboardViewModel: ObservableObject {
         guard cancellables.isEmpty else { return }
         let names: [Notification.Name] = [
             .maintenanceTaskChanged, .homeSystemChanged, .contractorChanged,
-            .documentChanged, .propertyChanged, .projectChanged
+            .documentChanged, .propertyChanged, .projectChanged,
+            .estateStateChanged
         ]
         for name in names {
             NotificationCenter.default.publisher(for: name)
@@ -452,7 +505,8 @@ final class DashboardViewModel: ObservableObject {
             let methods: [() async -> Void] = [
                 loadCompletionScores, loadExpirations, loadOverdueMaintenance,
                 loadRecentDocuments, loadUserName, loadGettingStartedState,
-                loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts
+                loadRecommendationData, loadEnrichmentData, loadInboxItems, loadVehicleAlerts,
+                loadEstateState, loadVendorVisits, loadHouseholdEmail
             ]
             for method in methods {
                 group.addTask { @MainActor in
@@ -470,6 +524,16 @@ final class DashboardViewModel: ObservableObject {
                 userFirstName = fullName.components(separatedBy: " ").first
             }
         } catch {}
+    }
+
+    /// Phase 50 (sub-phase B first-login): fetch the household's
+    /// `*@alfred.havenhome.dev` forwarding address so the
+    /// `VendorScheduleStrip` empty state can show a copy-to-clipboard
+    /// caption alongside the Upload invoice / Add vendor buttons. Same
+    /// helper used by the Q17 quiz milestone and `ProjectEmailView`.
+    /// Errors are swallowed — the caption silently hides when nil.
+    private func loadHouseholdEmail() async {
+        householdForwardingEmail = try? await DatabaseService.shared.fetchHouseholdEmailAddress()
     }
 
     private func loadCompletionScores() async {
@@ -590,7 +654,86 @@ final class DashboardViewModel: ObservableObject {
             vendorManagedTaskCount = propertyTasks.filter { task in
                 task.assignmentType?.lowercased() == "vendor"
             }.count
+
+            // Phase 50: count of tasks due in the next 7 days for the
+            // VendorScheduleStrip's summary line. Mirrors the existing
+            // dueThisWeekTasks list but covers both personal and vendor
+            // assignments since the strip shows the whole household load.
+            dueThisWeekTaskCount = dueThisWeekTasks.filter { $0.vehicleId == nil }.count
         } catch {}
+    }
+
+    /// Phase 50: Resolve the next vendor visits, hydrating each task with
+    /// its linked contractor's name, logo URL, brand color, and most
+    /// recent service cost. The dashboard's `VendorScheduleStrip` calls
+    /// the result hot — we do all the joins up front so scrolling stays
+    /// 60fps and the strip never spawns its own network lookups.
+    private func loadVendorVisits() async {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        let now = Date()
+
+        // Pull only future vendor-assigned tasks. The reconciler tags
+        // these via assignment_type = "vendor" both for linked-contractor
+        // ("Schedule X: Y") and find-a-contractor ("Find a contractor for: Y")
+        // shapes, so this catches both flavors. Vehicle tasks are excluded
+        // because the strip is a HOME service schedule.
+        guard let allTasks = try? await DatabaseService.shared.fetchMaintenanceTasks() else {
+            upcomingVendorVisits = []
+            return
+        }
+        let vendorTasks: [MaintenanceTaskDBRow] = allTasks
+            .filter { task in
+                guard task.vehicleId == nil else { return false }
+                guard task.assignmentType?.lowercased() == "vendor" else { return false }
+                guard let date = formatter.date(from: task.nextDueDate) else { return false }
+                return date >= now
+            }
+            .sorted { $0.nextDueDate < $1.nextDueDate }
+
+        let nextVisits = Array(vendorTasks.prefix(6))
+        guard !nextVisits.isEmpty else {
+            upcomingVendorVisits = []
+            return
+        }
+
+        // Side-load contractors and the most recent service records once
+        // so we can resolve each visit's metadata in one pass.
+        let contractors = (try? await DatabaseService.shared.fetchContractors()) ?? []
+        let contractorById = Dictionary(uniqueKeysWithValues: contractors.map { ($0.id, $0) })
+
+        // Most recent service record per (system_id, contractor_id) pair —
+        // used to surface "Last: $340" on each card. Falls back to system-only
+        // and contractor-only matches when the joined pair has no history yet.
+        let serviceRecords: [ServiceRecordRow] = (try? await DatabaseService.shared.fetchServiceRecords()) ?? []
+        let sortedRecords = serviceRecords.sorted { $0.serviceDate > $1.serviceDate }
+        func recentCost(systemId: UUID?, contractorId: UUID?) -> Double? {
+            if let systemId, let contractorId,
+               let row = sortedRecords.first(where: { $0.systemId == systemId && $0.contractorId == contractorId && $0.cost != nil }) {
+                return row.cost
+            }
+            if let systemId,
+               let row = sortedRecords.first(where: { $0.systemId == systemId && $0.cost != nil }) {
+                return row.cost
+            }
+            if let contractorId,
+               let row = sortedRecords.first(where: { $0.contractorId == contractorId && $0.cost != nil }) {
+                return row.cost
+            }
+            return nil
+        }
+
+        upcomingVendorVisits = nextVisits.map { task in
+            let contractor = task.assignedContractorId.flatMap { contractorById[$0] }
+            let logoURL = contractor?.logoUrl.flatMap { URL(string: $0) }
+            return DashboardVendorVisit(
+                task: task,
+                vendorName: contractor?.companyName,
+                logoURL: logoURL,
+                brandColorHex: contractor?.brandColor,
+                lastCost: recentCost(systemId: task.systemId, contractorId: contractor?.id)
+            )
+        }
     }
 
     private func loadRecentDocuments() async {
@@ -725,6 +868,17 @@ final class DashboardViewModel: ObservableObject {
         } catch {
             print("[Dashboard] Failed to load vehicle alerts: \(error)")
         }
+    }
+
+    private func loadEstateState() async {
+        guard let householdId = primaryHouseholdId else {
+            // Try to get it from properties
+            let props = (try? await DatabaseService.shared.fetchProperties()) ?? []
+            guard let hid = props.first?.householdId else { return }
+            estateState = try? await EstateStateService.shared.fetch(householdId: hid)
+            return
+        }
+        estateState = try? await EstateStateService.shared.fetch(householdId: householdId)
     }
 
     func loadInboxItems() async {

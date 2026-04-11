@@ -317,6 +317,7 @@ async function buildSystemPrompt(
     vehiclesResult,
     vehicleServiceRecordsResult,
     vehicleRecallsResult,
+    estateStateResult,
   ] = await Promise.all([
     supabase.from("households").select("*").eq("id", householdId).single(),
     supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -331,6 +332,7 @@ async function buildSystemPrompt(
     supabase.from("vehicles").select("id, name, year, make, model, current_mileage, ownership_type, registration_expiry, inspection_expiry").eq("household_id", householdId),
     supabase.from("vehicle_service_records").select("vehicle_id, service_type, service_date").eq("household_id", householdId).order("service_date", { ascending: false }).limit(10),
     supabase.from("vehicle_recalls").select("vehicle_id, component, summary").eq("household_id", householdId).eq("is_resolved", false),
+    supabase.from("estate_state").select("*").eq("household_id", householdId).maybeSingle(),
   ]);
 
   const household = householdResult.data;
@@ -346,6 +348,7 @@ async function buildSystemPrompt(
   const vehicles = vehiclesResult.data ?? [];
   const vehicleServiceRecords = vehicleServiceRecordsResult.data ?? [];
   const vehicleRecalls = vehicleRecallsResult.data ?? [];
+  const estateState = estateStateResult?.data;
 
   // Fetch document content for context-specific or keyword-matched documents
   let documentContentSection = "";
@@ -704,6 +707,31 @@ ${projectsList}
 
 VEHICLES:
 ${vehiclesList}
+${estateState ? `
+ESTATE PLANNING:
+  Documents: ${[
+    estateState.has_will && "Will",
+    estateState.has_trust && "Trust",
+    estateState.has_poa && "Power of Attorney",
+    estateState.has_healthcare_directive && "Healthcare Directive",
+    estateState.has_guardianship && "Guardianship Designation",
+    estateState.has_letter_of_intent && "Letter of Intent",
+    estateState.has_beneficiary_designations && "Beneficiary Designations",
+  ].filter(Boolean).join(", ") || "None on file"}
+  Estate Attorney: ${estateState.estate_attorney_name ?? "Not linked"}
+  Fiduciaries: ${(() => {
+    const fids: string[] = [];
+    if (estateState.executor_name) fids.push("Executor: " + estateState.executor_name);
+    if (estateState.trustee_name) fids.push("Trustee: " + estateState.trustee_name);
+    if (estateState.poa_agent_name) fids.push("POA Agent: " + estateState.poa_agent_name);
+    if (estateState.healthcare_proxy_name) fids.push("Healthcare Proxy: " + estateState.healthcare_proxy_name);
+    if (estateState.guardian_name) fids.push("Guardian: " + estateState.guardian_name);
+    return fids.length > 0 ? fids.join(", ") : "None designated";
+  })()}
+  Concerns rated: ${estateState.concerns_rated_count ?? 0} of 15${estateState.top_concerns ? ` (top: ${estateState.top_concerns})` : ""}
+  Staleness: ${estateState.staleness_tier ?? "Unknown"}
+  Intake: ${estateState.intake_status ?? "Not started"}
+` : ""}
 ${contextPrefix}${documentContentSection}${equipmentContext}
 EQUIPMENT REFERENCE DATABASE:
 Haven has an extensive equipment catalog with 2,800+ models across 219 brands covering kitchen appliances, HVAC, water heaters, laundry, generators, sump pumps, well water systems, bathroom fixtures, irrigation, and pool systems. When users ask about specific equipment:
@@ -712,6 +740,8 @@ Haven has an extensive equipment catalog with 2,800+ models across 219 brands co
 - If the user mentions a model number or brand, you can look it up and provide detailed information
 - For troubleshooting, reference common issues and typical fixes from the database
 - For maintenance, provide the recommended service schedule with parts lists and costs${mentionsEquipment ? "\n- The user appears to be asking about equipment — be proactive about referencing the catalog data." : ""}
+
+When the user asks about estate planning, you have access to their estate state. Reference their fiduciaries, concerns, and document coverage. NEVER initiate estate planning conversations unprompted -- only respond when the user brings it up.
 
 YOUR ROLE:
 - Help families understand their document coverage and estate readiness

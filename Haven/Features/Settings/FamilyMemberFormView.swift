@@ -82,17 +82,13 @@ struct FamilyMemberFormView: View {
             // Avatar preview with photo picker
             Section {
                 VStack(spacing: 12) {
+                    // Build 88: the camera overlay is now anchored to the
+                    // image inside `avatarPreview` rather than the outer
+                    // VStack (which also contains the name + relationship
+                    // text). Applying the overlay on the whole VStack pushed
+                    // the camera icon down onto the "Primary Client" text,
+                    // which crowded and overlapped the label.
                     avatarPreview
-                        .overlay(alignment: .bottomTrailing) {
-                            if !isUploadingPhoto {
-                                Image(systemName: "camera.fill")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundStyle(.white)
-                                    .padding(6)
-                                    .background(Circle().fill(HavenColors.navy800))
-                                    .offset(x: 4, y: 4)
-                            }
-                        }
 
                     PhotosPicker(
                         selection: $selectedPhotoItem,
@@ -105,6 +101,7 @@ struct FamilyMemberFormView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isUploadingPhoto)
+                    .padding(.bottom, 4)
 
                     if isUploadingPhoto {
                         HStack(spacing: 8) {
@@ -443,7 +440,7 @@ struct FamilyMemberFormView: View {
         let _ = formatter.dateFormat = "yyyy-MM-dd"
         let dobStr = hasDateOfBirth ? formatter.string(from: dateOfBirth) : nil
 
-        return VStack(spacing: 8) {
+        return VStack(spacing: 12) {
             ZStack {
                 if let avatarImage {
                     // Show locally selected photo
@@ -495,6 +492,23 @@ struct FamilyMemberFormView: View {
                     )
                 }
             }
+            // Build 88: camera icon is anchored directly to the 88×88 image
+            // ZStack so it stays contained inside the avatar circle and can
+            // never encroach on the name / relationship text below. Reduced
+            // offset (was x:4 y:4) so it visually rests on the circle's edge
+            // instead of poking out.
+            .frame(width: 88, height: 88)
+            .overlay(alignment: .bottomTrailing) {
+                if !isUploadingPhoto {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(6)
+                        .background(Circle().fill(HavenColors.navy800))
+                        .offset(x: 2, y: 2)
+                }
+            }
+            .padding(.bottom, 4)
             Text(firstName.isEmpty ? (isExpecting ? "Baby" : "Preview") : firstName)
                 .font(HavenTypography.uiLabel)
                 .foregroundStyle(HavenColors.textPrimary)

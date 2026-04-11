@@ -54,7 +54,7 @@ struct PersonalQuizView: View {
                     .foregroundStyle(HavenColors.textTertiary)
 
                 Text(q.title)
-                    .font(.custom("Georgia", size: 24).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 24, weight: 600))
                     .foregroundStyle(HavenColors.navy)
 
                 if let subtitle = q.subtitle {
@@ -168,7 +168,7 @@ struct PersonalQuizView: View {
                 .font(.system(size: 56))
                 .foregroundStyle(HavenColors.navy)
             Text("You're all set")
-                .font(.custom("Georgia", size: 28).weight(.bold))
+                .font(HavenTypography.largeTitle)
                 .foregroundStyle(HavenColors.navy)
             Text("Welcome to the household. Alfred will keep an eye on things and let you know what needs your attention.")
                 .font(HavenTypography.bodySmall)

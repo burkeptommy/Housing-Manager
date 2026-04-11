@@ -28,7 +28,38 @@ struct AddMaintenanceTaskSheet: View {
         var id: String { rawValue }
     }
 
+    /// Phase 50: Top-of-form task kind picker. Each kind pre-fills
+    /// frequency and assignment defaults so users don't have to manually
+    /// flip "vendor-managed" + "once" for things like estimate
+    /// appointments and invoice follow-ups. The kind also stamps a
+    /// metadata prefix in the notes field so the maintenance UI can
+    /// route the task to the right section.
+    enum TaskKind: String, CaseIterable, Identifiable {
+        case maintenance = "Maintenance"
+        case vendorAppointment = "Vendor visit"
+        case followUp = "Follow-up"
+
+        var id: String { rawValue }
+
+        var icon: String {
+            switch self {
+            case .maintenance: return "wrench.and.screwdriver.fill"
+            case .vendorAppointment: return "calendar.badge.plus"
+            case .followUp: return "clock.badge.exclamationmark"
+            }
+        }
+
+        var helperText: String {
+            switch self {
+            case .maintenance: return "A standard maintenance task on a recurring schedule."
+            case .vendorAppointment: return "A one-time vendor visit (estimate, install, repair). Defaults to vendor-managed."
+            case .followUp: return "A vendor follow-up — extra check-in tied to a recent service visit."
+            }
+        }
+    }
+
     @State private var title = ""
+    @State private var taskKind: TaskKind = .maintenance
     @State private var targetType: TargetType = .property
     @State private var selectedPropertyId: UUID?
     @State private var selectedVehicleId: UUID?
@@ -39,6 +70,7 @@ struct AddMaintenanceTaskSheet: View {
     @State private var dueDate = Date()
     @State private var priority = "medium"
     @State private var notes = ""
+    @State private var followUpReason = ""
     @State private var isSaving = false
 
     private let db = DatabaseService.shared
@@ -65,8 +97,30 @@ struct AddMaintenanceTaskSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                // Phase 50: task kind picker — drives the rest of the
+                // form's defaults (frequency, assignment, notes prefix).
+                Section {
+                    Picker("Task kind", selection: $taskKind) {
+                        ForEach(TaskKind.allCases) { kind in
+                            Text(kind.rawValue).tag(kind)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .onChange(of: taskKind) { _, newValue in
+                        applyDefaults(for: newValue)
+                    }
+                    Text(taskKind.helperText)
+                        .font(HavenTypography.uiCaption)
+                        .foregroundStyle(HavenColors.textSecondary)
+                }
+
                 Section {
                     TextField("Task name", text: $title)
+
+                    if taskKind == .followUp {
+                        TextField("Reason (optional)", text: $followUpReason, axis: .vertical)
+                            .lineLimit(2...4)
+                    }
 
                     if !vehicles.isEmpty {
                         Picker("Type", selection: $targetType) {
@@ -176,6 +230,25 @@ struct AddMaintenanceTaskSheet: View {
         }
     }
 
+    /// Phase 50: pre-fill defaults when the task kind picker changes.
+    /// Vendor visit and follow-up both default to one-time vendor-managed
+    /// tasks; switching back to maintenance restores the legacy
+    /// per-frequency defaults so the user doesn't lose their selections.
+    private func applyDefaults(for kind: TaskKind) {
+        switch kind {
+        case .maintenance:
+            if frequency.lowercased() == "once" {
+                frequency = "Annually"
+            }
+        case .vendorAppointment:
+            frequency = "Once"
+            if priority == "low" { priority = "medium" }
+        case .followUp:
+            frequency = "Once"
+            priority = "high"
+        }
+    }
+
     /// Build 87 (Home Manager expansion): renders the picker label for a
     /// household user. Plain family members get just their first name (or
     /// full name fallback). Linked home managers get "Maria · Home Manager",
@@ -232,7 +305,28 @@ struct AddMaintenanceTaskSheet: View {
         insert.priority = priority
         insert.assignedToUserId = assignedUserId
         insert.assignedContractorId = selectedContractorId
-        insert.notes = notes.isEmpty ? nil : notes
+
+        // Phase 50: stamp metadata so the maintenance UI can route the
+        // task to the right surface. Vendor visits and follow-ups
+        // automatically resolve to vendor assignment so they show up on
+        // the vendor schedule strip / dashboard. Follow-ups also stamp
+        // a "Vendor follow-up:" notes prefix that the
+        // PropertyDetailViewModel.vendorFollowUpTasks filter looks for.
+        switch taskKind {
+        case .maintenance:
+            insert.notes = notes.isEmpty ? nil : notes
+        case .vendorAppointment:
+            insert.assignmentType = "vendor"
+            insert.needsVendor = selectedContractorId == nil
+            let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
+            insert.notes = "Custom vendor visit added by user.\(trailing)"
+        case .followUp:
+            insert.assignmentType = "vendor"
+            insert.needsVendor = selectedContractorId == nil
+            let reasonText = followUpReason.isEmpty ? trimmed : followUpReason
+            let trailing = notes.isEmpty ? "" : "\n\n\(notes)"
+            insert.notes = "Vendor follow-up: \(reasonText)\(trailing)"
+        }
 
         // Optimistic save through view model if available
         if let vm = viewModel {

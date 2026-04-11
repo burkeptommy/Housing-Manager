@@ -45,6 +45,11 @@ enum DocumentAccessDefaults {
         "guardianship designation",
         "letter of intent",
         "living will",
+        "hipaa authorization",
+        "pre-nuptial agreement",
+        "post-nuptial agreement",
+        "disposition of remains",
+        "deed in trust",
         "estate plan",
         "beneficiary designation",
 

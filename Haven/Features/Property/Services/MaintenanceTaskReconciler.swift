@@ -618,6 +618,12 @@ enum MaintenanceTaskReconciler {
     /// given the user's 3-tier preference. Templates outside `.either`
     /// short-circuit to their hardcoded type.
     ///
+    /// Phase 50: a `safetyFloor: true` template ALWAYS resolves to `.vendor`
+    /// regardless of preference tier. This catches the small set of tasks
+    /// that are flat-out unsafe to hand to a homeowner — gas, electrical
+    /// panel, roof, septic, well, chimney — even if they've told us they
+    /// like doing things themselves.
+    ///
     /// - `.diy`: Everything stays personal — user handles it all.
     /// - `.mixed`: Tasks over 30 min effort go to vendor, quick ones stay personal.
     /// - `.hireOut`: Everything goes to vendor — user's list is just coordination.
@@ -625,6 +631,7 @@ enum MaintenanceTaskReconciler {
         template: MaintenanceTemplate,
         preferenceTier: VendorPreferenceTier
     ) -> TaskAssignmentType {
+        if template.safetyFloor { return .vendor }
         guard template.assignmentType == .either else {
             return template.assignmentType
         }
@@ -637,6 +644,52 @@ enum MaintenanceTaskReconciler {
         case .hireOut:
             return .vendor
         }
+    }
+
+    /// Phase 50: Centralized due-date computation. Resolves the next
+    /// due date for a maintenance task by walking a fixed precedence:
+    ///
+    ///   1. The system's `service_interval_days` override (manual,
+    ///      onboarding, or vendor_invoice provenance) — if set, the
+    ///      template's frequency is bypassed entirely.
+    ///   2. The matched template's `interval` (the canonical default).
+    ///   3. The task row's `frequency` string parsed by
+    ///      `MaintenanceTemplate.interval` semantics — handles legacy
+    ///      and custom rows that have no template or system match.
+    ///
+    /// `from` is the baseline (typically the last completion date or
+    /// today). Returns nil only when the inputs are catastrophically
+    /// malformed; callers should fall back to today + 1 year.
+    static func nextDueDate(
+        for task: MaintenanceTaskDBRow,
+        system: HomeSystemRow?,
+        from baseline: Date
+    ) -> Date? {
+        // 1. System-level override
+        if let interval = system?.serviceIntervalDays, interval > 0 {
+            return Calendar.current.date(byAdding: .day, value: interval, to: baseline)
+        }
+        // 2. Matched template interval
+        if let templateKey = task.templateId,
+           let template = MaintenanceTemplates.template(forKey: templateKey) {
+            return Calendar.current.date(byAdding: template.interval, to: baseline)
+        }
+        // 3. Parse the task's own frequency string. We synthesize a
+        //    minimal placeholder template just to reuse the existing
+        //    interval-from-string mapping.
+        let placeholder = MaintenanceTemplate(
+            systemCategory: "",
+            title: task.title,
+            description: "",
+            frequency: task.frequency,
+            priority: task.priority ?? "Medium",
+            estimatedCostRange: "",
+            isDIY: task.isDiy ?? false,
+            seasonalTiming: nil,
+            professionalRequired: task.professionalRequired ?? false,
+            notes: nil
+        )
+        return Calendar.current.date(byAdding: placeholder.interval, to: baseline)
     }
 
     /// Extract the user's vendor preference tier from a `PropertyRow`'s

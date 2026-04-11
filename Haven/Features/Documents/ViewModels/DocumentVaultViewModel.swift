@@ -33,6 +33,12 @@ final class DocumentVaultViewModel: ObservableObject {
     @Published var hasPropertyData = false
     @Published var hasDetectedSystems = false
 
+    // Estate state (Phase 48)
+    @Published var estateState: EstateStateRow?
+
+    // Professional advisors
+    @Published var advisors: [HouseholdAdvisorRow] = []
+
     private let db = DatabaseService.shared
 
     var filteredDocuments: [DocumentRow] {
@@ -230,6 +236,13 @@ final class DocumentVaultViewModel: ObservableObject {
 
             // Run duplicate detection (instant — metadata-only, no network)
             duplicateService.scanForDuplicates(documents: docs)
+
+            // Fetch estate state (Phase 48)
+            if let user = try? await db.fetchCurrentUser(),
+               let householdId = user.householdId {
+                estateState = try? await EstateStateService.shared.fetch(householdId: householdId)
+                advisors = (try? await db.fetchHouseholdAdvisors(householdId: householdId)) ?? []
+            }
         } catch {
             self.error = error.localizedDescription
         }

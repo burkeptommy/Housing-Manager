@@ -140,6 +140,7 @@ serve(async (req: Request) => {
       systemsResult,
       warrantiesResult,
       maintenanceResult,
+      estateStateResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", householdId).single(),
       supabase.from("family_members").select("*").eq("household_id", householdId),
@@ -148,6 +149,7 @@ serve(async (req: Request) => {
       supabase.from("home_systems").select("*").eq("household_id", householdId),
       supabase.from("warranties").select("*").eq("household_id", householdId),
       supabase.from("maintenance_tasks").select("*").eq("household_id", householdId),
+      supabase.from("estate_state").select("*").eq("household_id", householdId).maybeSingle(),
     ]);
 
     const household = householdResult.data;
@@ -157,6 +159,7 @@ serve(async (req: Request) => {
     const systems = systemsResult.data ?? [];
     const warranties = warrantiesResult.data ?? [];
     const maintenance = maintenanceResult.data ?? [];
+    const estateState = estateStateResult?.data;
 
     // Build 87 (Home Manager expansion): gate the document_content fetch
     // by IDs the caller can actually see. The `documents` array above
@@ -184,7 +187,8 @@ serve(async (req: Request) => {
       systems,
       warranties,
       maintenance,
-      documentContent
+      documentContent,
+      estateState
     );
 
     // Call Claude API
@@ -399,7 +403,8 @@ function buildHouseholdDataString(
   systems: Array<Record<string, unknown>>,
   warranties: Array<Record<string, unknown>>,
   maintenance: Array<Record<string, unknown>>,
-  documentContent: Array<{ document_id: string; extracted_text: string }>
+  documentContent: Array<{ document_id: string; extracted_text: string }>,
+  estateState?: Record<string, unknown> | null
 ): string {
   const parts: string[] = [];
 
@@ -442,6 +447,39 @@ function buildHouseholdDataString(
       );
       parts.push(`    Systems: ${propSystems.length}`);
       parts.push(`    Maintenance tasks: ${propMaint.length}`);
+    }
+  }
+
+  // Estate state (Phase 48)
+  if (estateState) {
+    parts.push("\nESTATE STATE:");
+    const docFlags = [];
+    if (estateState.has_will) docFlags.push("Will");
+    if (estateState.has_revocable_trust) docFlags.push("Revocable Trust");
+    if (estateState.has_irrevocable_trust) docFlags.push("Irrevocable Trust");
+    if (estateState.has_poa) docFlags.push("POA");
+    if (estateState.has_health_proxy) docFlags.push("Health Proxy");
+    if (estateState.has_living_will) docFlags.push("Living Will");
+    if (estateState.has_hipaa_auth) docFlags.push("HIPAA Authorization");
+    parts.push(`  Documents on file: ${docFlags.length > 0 ? docFlags.join(", ") : "None"}`);
+    const fiduciaries = estateState.fiduciaries as Array<Record<string, unknown>> ?? [];
+    if (fiduciaries.length > 0) {
+      parts.push(`  Fiduciaries: ${fiduciaries.map((f: Record<string, unknown>) => `${f.name} (${f.role})`).join(", ")}`);
+    }
+    const concerns = estateState.concerns as Array<Record<string, unknown>> ?? [];
+    parts.push(`  Concerns rated: ${concerns.length} of 15`);
+    const highConcerns = concerns.filter((c: Record<string, unknown>) => c.rating === "high");
+    if (highConcerns.length > 0) {
+      parts.push(`  Top concerns: ${highConcerns.map((c: Record<string, unknown>) => c.concern_id).join(", ")}`);
+    }
+    parts.push(`  Staleness: ${estateState.staleness_tier ?? "none"}`);
+    parts.push(`  Readiness score: ${estateState.estate_readiness_score ?? 0}%`);
+    const intake = estateState.intake_state as Record<string, unknown> | null;
+    if (intake) {
+      const answers = intake.answers as Record<string, unknown> | null;
+      parts.push(`  Intake: ${intake.completed_at ? "complete" : `${Object.keys(answers ?? {}).length} of 6 sections`}`);
+    } else {
+      parts.push("  Intake: not started");
     }
   }
 

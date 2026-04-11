@@ -43,7 +43,7 @@ struct SecurityDashboardView: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("All \(viewModel.documentCount) Documents Encrypted")
-                        .font(Font.custom("Georgia", size: 14).weight(.semibold))
+                        .font(HavenTypography.fraunces(size: 14, weight: 600))
                         .foregroundStyle(HavenColors.textPrimary)
                     Text("AES-256 encryption at rest. TLS 1.3 in transit.")
                         .font(HavenTypography.bodySmall)
@@ -274,7 +274,7 @@ struct SecurityDashboardView: View {
             }
 
             Text("The Nuclear Option")
-                .font(Font.custom("Georgia", size: 14).weight(.semibold))
+                .font(HavenTypography.fraunces(size: 14, weight: 600))
                 .foregroundStyle(HavenColors.textPrimary)
 
             Text("For documents you consider too sensitive for any system to touch, Vault Lock adds device-only encryption that even Haven's servers can't break. Vault Locked documents are invisible to the AI \u{2014} they can't be analyzed, summarized, or referenced in chat. They exist in your inventory and nowhere else.")
@@ -285,7 +285,7 @@ struct SecurityDashboardView: View {
                 Image(systemName: "lock.doc.fill")
                     .foregroundStyle(HavenColors.warning)
                 Text("\(viewModel.vaultLockedDocuments.count) documents currently Vault Locked")
-                    .font(Font.custom("Georgia", size: 13).weight(.medium))
+                    .font(Font.custom("Inter", size: 13).weight(.medium))
                 Spacer()
                 if !viewModel.vaultLockedDocuments.isEmpty {
                     Image(systemName: "chevron.right")
@@ -317,7 +317,7 @@ struct SecurityDashboardView: View {
             }
 
             Text("Delete All Chat History")
-                .font(Font.custom("Georgia", size: 14).weight(.semibold))
+                .font(HavenTypography.fraunces(size: 14, weight: 600))
                 .foregroundStyle(HavenColors.textPrimary)
 
             Text("This permanently deletes every message between you and Alfred. Alfred will lose all memory and context of your previous conversations. This cannot be undone.")
@@ -331,7 +331,7 @@ struct SecurityDashboardView: View {
                 HStack {
                     Image(systemName: "trash.fill")
                     Text(chatDeleteComplete ? "Chat History Deleted" : "Delete All Chat History")
-                        .font(Font.custom("Georgia", size: 13).weight(.medium))
+                        .font(Font.custom("Inter", size: 13).weight(.medium))
                 }
                 .foregroundStyle(chatDeleteComplete ? HavenColors.success : HavenColors.critical)
                 .frame(maxWidth: .infinity)
@@ -492,7 +492,7 @@ private struct DataMapRow: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(Font.custom("Georgia", size: 13).weight(.medium))
+                    .font(Font.custom("Inter", size: 13).weight(.medium))
                     .foregroundStyle(HavenColors.textPrimary)
                 Text(detail)
                     .font(HavenTypography.caption)
@@ -520,7 +520,7 @@ private struct AccessActorRow: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
-                    .font(Font.custom("Georgia", size: 14).weight(.semibold))
+                    .font(HavenTypography.fraunces(size: 14, weight: 600))
                     .foregroundStyle(HavenColors.textPrimary)
                 Text(detail)
                     .font(HavenTypography.caption)

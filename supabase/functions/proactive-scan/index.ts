@@ -15,6 +15,9 @@ Focus on:
 4. Coverage gaps based on family structure and assets
 5. Maintenance or warranty items needing attention
 6. Any inconsistencies between related documents
+7. Estate planning staleness: flag documents older than 3 years (aging), 5 years (stale), or 7 years (critical) that should be reviewed by an attorney
+8. Missing estate documents (will, trust, POA, healthcare directive) based on family composition
+9. Fiduciary gaps: missing or unnamed executors, guardians, POA agents, healthcare proxies
 
 Return JSON with:
 {
@@ -162,6 +165,7 @@ async function scanHousehold(
     contentResult,
     warrantiesResult,
     maintenanceResult,
+    estateStateResult,
   ] = await Promise.all([
     serviceClient.from("households").select("*").eq("id", householdId).single(),
     serviceClient.from("family_members").select("*").eq("household_id", householdId),
@@ -169,6 +173,7 @@ async function scanHousehold(
     serviceClient.from("document_content").select("document_id, extracted_text").eq("household_id", householdId),
     serviceClient.from("warranties").select("*").eq("household_id", householdId),
     serviceClient.from("maintenance_tasks").select("*").eq("household_id", householdId),
+    serviceClient.from("estate_state").select("*").eq("household_id", householdId).maybeSingle(),
   ]);
 
   const household = householdResult.data;
@@ -177,6 +182,7 @@ async function scanHousehold(
   const content = contentResult.data ?? [];
   const warranties = warrantiesResult.data ?? [];
   const maintenance = maintenanceResult.data ?? [];
+  const estateState = estateStateResult?.data;
 
   // Build context for Claude
   const contentMap = new Map<string, string>();
@@ -226,6 +232,82 @@ async function scanHousehold(
     for (const m of overdue) {
       parts.push(`    - ${m.title} (due: ${m.next_due_date})`);
     }
+  }
+
+  // --- Estate staleness computation ---
+  // Check estate document dates for 3yr/5yr/7yr staleness tiers
+  const estateCategories = ["will", "trust", "power of attorney", "healthcare directive", "life insurance"];
+  const estateDocs = documents.filter(
+    (d) => estateCategories.some((cat) => (d.category || "").toLowerCase().includes(cat))
+  );
+  const stalenessReasons: string[] = [];
+  let stalenessTier: "current" | "aging" | "stale" | "critical" = "current";
+
+  for (const doc of estateDocs) {
+    // Use the document's effective date, upload date, or creation date
+    const docDateStr = doc.effective_date || doc.uploaded_at || doc.created_at;
+    if (!docDateStr) continue;
+    const docDate = new Date(docDateStr);
+    const ageMs = now.getTime() - docDate.getTime();
+    const ageYears = ageMs / (365.25 * 24 * 60 * 60 * 1000);
+
+    if (ageYears >= 7) {
+      stalenessTier = "critical";
+      stalenessReasons.push(`${doc.title} is ${Math.floor(ageYears)} years old (critically stale)`);
+    } else if (ageYears >= 5) {
+      if (stalenessTier !== "critical") stalenessTier = "stale";
+      stalenessReasons.push(`${doc.title} is ${Math.floor(ageYears)} years old (stale)`);
+    } else if (ageYears >= 3) {
+      if (stalenessTier !== "critical" && stalenessTier !== "stale") stalenessTier = "aging";
+      stalenessReasons.push(`${doc.title} is ${Math.floor(ageYears)} years old (aging)`);
+    }
+  }
+
+  // Write staleness data back to estate_state if we have an existing row
+  if (estateState) {
+    try {
+      await serviceClient
+        .from("estate_state")
+        .update({
+          staleness_tier: stalenessTier,
+          staleness_reasons: stalenessReasons,
+          last_scanned_at: now.toISOString(),
+        })
+        .eq("household_id", householdId);
+    } catch (updateErr) {
+      console.warn(`[proactive-scan] Failed to update estate_state staleness for ${householdId}:`, updateErr);
+    }
+  }
+
+  // Add estate state section to context
+  parts.push(`\nESTATE STATE:`);
+  if (estateState) {
+    parts.push(`  Readiness Score: ${estateState.readiness_score ?? "not computed"}`);
+    parts.push(`  Staleness Tier: ${stalenessTier}`);
+    parts.push(`  Intake Status: ${estateState.intake_status ?? "unknown"}`);
+    parts.push(`  Has Will: ${estateState.has_will ? "yes" : "no"}`);
+    parts.push(`  Has Trust: ${estateState.has_trust ? "yes" : "no"}`);
+    parts.push(`  Has Power of Attorney: ${estateState.has_poa ? "yes" : "no"}`);
+    parts.push(`  Has Healthcare Directive: ${estateState.has_healthcare_directive ? "yes" : "no"}`);
+    parts.push(`  Has Life Insurance: ${estateState.has_life_insurance ? "yes" : "no"}`);
+    parts.push(`  Has Beneficiary Designations: ${estateState.has_beneficiary_designations ? "yes" : "no"}`);
+    if (estateState.primary_executor) parts.push(`  Primary Executor: ${estateState.primary_executor}`);
+    if (estateState.successor_executor) parts.push(`  Successor Executor: ${estateState.successor_executor}`);
+    if (estateState.primary_guardian) parts.push(`  Primary Guardian: ${estateState.primary_guardian}`);
+    if (estateState.successor_guardian) parts.push(`  Successor Guardian: ${estateState.successor_guardian}`);
+    if (estateState.primary_poa_agent) parts.push(`  POA Agent: ${estateState.primary_poa_agent}`);
+    if (estateState.healthcare_proxy) parts.push(`  Healthcare Proxy: ${estateState.healthcare_proxy}`);
+    if (stalenessReasons.length > 0) {
+      parts.push(`  Staleness Issues:`);
+      for (const reason of stalenessReasons) {
+        parts.push(`    - ${reason}`);
+      }
+    }
+  } else {
+    parts.push(`  No estate state data available`);
+  }
+  if (estateDocs.length === 0) {
+    parts.push(`  WARNING: No estate planning documents uploaded`);
   }
 
   // Call Claude

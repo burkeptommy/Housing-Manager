@@ -256,6 +256,12 @@ struct DocumentDetailView: View {
                 // Status and dates
                 metadataCard(doc)
 
+                // Estate attorney (Phase 48) -- only for estate planning docs
+                if let docCategory = DocumentCategory(rawValue: doc.category),
+                   docCategory.sectionGroup == "Estate Planning" {
+                    estateAttorneyCard(doc)
+                }
+
                 // Vault Lock indicator
                 if doc.vaultLocked == true {
                     vaultLockCard
@@ -519,6 +525,43 @@ struct DocumentDetailView: View {
                 Text(value)
                     .font(HavenTypography.subheadline)
                     .foregroundStyle(HavenColors.textPrimary)
+            }
+        }
+    }
+
+    // MARK: - Estate Attorney Card (Phase 48)
+
+    /// Separate card for linking an estate attorney to estate planning
+    /// documents. Shows below the metadata card when the document's
+    /// category is in the "Estate Planning" section group.
+    private func estateAttorneyCard(_ doc: DocumentRow) -> some View {
+        HavenCard {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Image(systemName: "person.crop.circle.badge.checkmark")
+                        .foregroundStyle(HavenColors.textSecondary)
+                    Text("ESTATE ATTORNEY")
+                        .font(HavenTypography.uiSectionHeader)
+                        .tracking(1.5)
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+
+                LinkedAttorneyField(
+                    document: doc,
+                    allTrustedContacts: viewModel.allTrustedContacts,
+                    onUpdate: { contactId in
+                        Task {
+                            var update = DocumentUpdate()
+                            update.linkedAttorneyContactId = contactId
+                            if let updated = try? await DatabaseService.shared.updateDocument(id: doc.id, update) {
+                                viewModel.document = updated
+                            }
+                        }
+                    },
+                    onAddNewAttorney: {
+                        showAddTrustedContact = true
+                    }
+                )
             }
         }
     }

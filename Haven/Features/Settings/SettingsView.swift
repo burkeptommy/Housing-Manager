@@ -22,7 +22,7 @@ struct SettingsView: View {
                 Section {
                     HStack(spacing: 14) {
                         Text(String(userName.prefix(1)).uppercased())
-                            .font(Font.custom("Georgia", size: 22))
+                            .font(HavenTypography.fraunces(size: 22, weight: 400))
                             .foregroundStyle(HavenColors.cream)
                             .frame(width: 48, height: 48)
                             .background(Circle().fill(HavenColors.navy800))

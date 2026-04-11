@@ -917,4 +917,20 @@ enum HavenSupabase {
         )
         return try JSONDecoder().decode(LocalVendorResponse.self, from: data)
     }
+
+    /// Find local professional advisors (estate attorneys, CPAs, financial
+    /// advisors, life insurance agents) via Google Places. Same response
+    /// shape as findLocalVendors — reuses LocalVendorResponse.
+    static func findLocalAdvisors(
+        town: String,
+        state: String,
+        advisorType: String
+    ) async throws -> LocalVendorResponse {
+        let data = try await callEdgeFunction(
+            name: "find-local-advisors",
+            body: LocalVendorRequest(town: town, state: state, category: advisorType),
+            timeoutSeconds: 30
+        )
+        return try JSONDecoder().decode(LocalVendorResponse.self, from: data)
+    }
 }

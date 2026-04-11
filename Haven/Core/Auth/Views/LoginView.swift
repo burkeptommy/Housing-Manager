@@ -10,6 +10,8 @@ struct LoginView: View {
 
     /// Whether to show sign-up immediately when this view appears.
     var initialMode: InitialMode = .signIn
+    /// Optional callback to navigate back to the previous screen (AddressHookView).
+    var onBack: (() -> Void)? = nil
 
     var body: some View {
         NavigationStack {
@@ -20,7 +22,7 @@ struct LoginView: View {
                     // Logo & branding
                     VStack(spacing: 8) {
                         Text("H")
-                            .font(Font.custom("Georgia", size: 88))
+                            .font(HavenTypography.fraunces(size: 88, weight: 400))
                             .foregroundStyle(HavenColors.creamLight)
                             .frame(width: 100, height: 100)
                             .background(
@@ -28,7 +30,8 @@ struct LoginView: View {
                                     .fill(HavenColors.navy800)
                             )
                         Text("Haven")
-                            .font(HavenTypography.largeTitle)
+                            .font(HavenTypography.fraunces(size: 36, weight: 400))
+                            .foregroundStyle(HavenColors.navy800)
                         Text("Your home and everything that protects it.")
                             .font(HavenTypography.bodySmall)
                             .foregroundStyle(HavenColors.textSecondary)
@@ -138,6 +141,7 @@ struct LoginView: View {
                 }
                 .padding(.horizontal, HavenTheme.padding)
             }
+            .background(HavenColors.background.ignoresSafeArea())
             .trackScreen("LoginView")
             .onAppear {
                 if initialMode == .signUp && !viewModel.showSignUp {
@@ -188,6 +192,23 @@ struct LoginView: View {
                 Button("OK", role: .cancel) {}
             } message: {
                 Text("If an account exists with that email, you'll receive a reset link shortly.")
+            }
+            .toolbar {
+                if let onBack {
+                    ToolbarItem(placement: .navigationBarLeading) {
+                        Button {
+                            onBack()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: 16, weight: .semibold))
+                                Text("Back")
+                                    .font(HavenTypography.bodySmall)
+                            }
+                            .foregroundStyle(HavenColors.navy)
+                        }
+                    }
+                }
             }
         }
     }

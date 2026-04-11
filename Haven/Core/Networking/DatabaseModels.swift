@@ -270,6 +270,10 @@ struct DocumentRow: Codable, Identifiable {
     let fileSize: Int?
     let deletedAt: String?
     let metadata: DocumentMetadata?
+    /// Phase 48: FK to trusted_contacts for the attorney who prepared
+    /// this estate document. Populated by analyze-document estate
+    /// extraction or manually via LinkedAttorneyField.
+    let linkedAttorneyContactId: UUID?
     /// Build 87 (Home Manager expansion): when false, household members
     /// whose `family_members.member_type` is `home_manager` or `staff`
     /// cannot see this document via the `household_documents_select` RLS
@@ -308,6 +312,7 @@ struct DocumentRow: Codable, Identifiable {
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case deletedAt = "deleted_at"
+        case linkedAttorneyContactId = "linked_attorney_contact_id"
         case visibleToHomeManagers = "visible_to_home_managers"
     }
 }
@@ -417,6 +422,8 @@ struct DocumentUpdate: Codable {
     var metadata: DocumentMetadata?
     var contentHash: String?
     var fileSize: Int?
+    /// Phase 48: link/unlink estate attorney on a document.
+    var linkedAttorneyContactId: UUID?
     /// Build 87 (Home Manager expansion): toggled per-document via the
     /// Access pill in `DocumentDetailView` → `DocumentAccessSheet`.
     var visibleToHomeManagers: Bool?
@@ -436,6 +443,7 @@ struct DocumentUpdate: Codable {
         case propertyId = "property_id"
         case vehicleId = "vehicle_id"
         case projectId = "project_id"
+        case linkedAttorneyContactId = "linked_attorney_contact_id"
         case contentHash = "content_hash"
         case fileSize = "file_size"
         case visibleToHomeManagers = "visible_to_home_managers"
@@ -638,6 +646,16 @@ struct HomeSystemRow: Identifiable {
     let parentSystemId: UUID?
     let subtype: String?
     let customCategoryName: String?
+    /// Phase 50: Per-system service interval override. When non-nil it
+    /// supersedes the template's default frequency for due-date math.
+    /// Set by the post-quiz cadence sheet, the system detail frequency
+    /// editor, or the invoice cadence prompt.
+    let serviceIntervalDays: Int?
+    /// Phase 50: Provenance for `serviceIntervalDays`. One of "default"
+    /// (no override), "onboarding" (post-quiz), "vendor_invoice" (from
+    /// process-invoice cadence detection), "manual" (system detail
+    /// frequency editor). Used to render the source caption.
+    let serviceIntervalSource: String?
 
     enum CodingKeys: String, CodingKey {
         case id, name, category, manufacturer, notes, status, subtype
@@ -663,6 +681,8 @@ struct HomeSystemRow: Identifiable {
         case catalogFuelType = "catalog_fuel_type"
         case catalogEnrichedAt = "catalog_enriched_at"
         case cachedManualLinks = "cached_manual_links"
+        case serviceIntervalDays = "service_interval_days"
+        case serviceIntervalSource = "service_interval_source"
     }
 }
 
@@ -699,6 +719,8 @@ extension HomeSystemRow: Decodable {
         parentSystemId = try? c.decodeIfPresent(UUID.self, forKey: .parentSystemId)
         subtype = try? c.decodeIfPresent(String.self, forKey: .subtype)
         customCategoryName = try? c.decodeIfPresent(String.self, forKey: .customCategoryName)
+        serviceIntervalDays = try? c.decodeIfPresent(Int.self, forKey: .serviceIntervalDays)
+        serviceIntervalSource = try? c.decodeIfPresent(String.self, forKey: .serviceIntervalSource)
     }
 }
 
@@ -799,6 +821,12 @@ struct HomeSystemUpdate: Codable {
     var parentSystemId: UUID?
     var subtype: String?
     var customCategoryName: String?
+    /// Phase 50: Override service interval in days. Stored on the
+    /// system row so all template-driven tasks attached to it can pull
+    /// the same cadence.
+    var serviceIntervalDays: Int?
+    /// Phase 50: Provenance string — see HomeSystemRow.serviceIntervalSource.
+    var serviceIntervalSource: String?
 
     enum CodingKeys: String, CodingKey {
         case name, category, manufacturer, notes, status, subtype
@@ -820,6 +848,8 @@ struct HomeSystemUpdate: Codable {
         case catalogFuelType = "catalog_fuel_type"
         case catalogEnrichedAt = "catalog_enriched_at"
         case parentSystemId = "parent_system_id"
+        case serviceIntervalDays = "service_interval_days"
+        case serviceIntervalSource = "service_interval_source"
     }
 }
 
@@ -1656,6 +1686,360 @@ struct TrustedContactDocumentInsert: Codable {
     enum CodingKeys: String, CodingKey {
         case trustedContactId = "trusted_contact_id"
         case documentId = "document_id"
+    }
+}
+
+// MARK: - Estate State
+
+struct EstateStateRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    // Presence flags
+    let hasWill: Bool
+    let hasRevocableTrust: Bool
+    let hasIrrevocableTrust: Bool
+    let hasPoa: Bool
+    let hasHealthProxy: Bool
+    let hasLivingWill: Bool
+    let hasHipaaAuth: Bool
+    let hasPrenup: Bool
+    let hasBusinessAgreement: Bool
+    let hasDispositionOfRemains: Bool
+    // Dates
+    let willDate: String?
+    let trustDate: String?
+    let poaDate: String?
+    let healthProxyDate: String?
+    // Attorney
+    let estateAttorneyContactId: UUID?
+    let lastEstateReviewDate: String?
+    // JSONB fields
+    let fiduciaries: [EstateFiduciary]?
+    let concerns: [EstateConcernRating]?
+    let wishes: [EstateWish]?
+    let assetsSummary: EstateAssetsSummary?
+    let intakeState: EstateIntakeState?
+    let nominations: EstateNominations?
+    // Computed
+    let estateReadinessScore: Int
+    let stalenessTier: String
+    let stalenessReasons: [String]?
+    let householdSnapshot: EstateHouseholdSnapshot?
+    // Timestamps
+    let lastRecomputedAt: String?
+    let createdAt: String?
+    let updatedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case householdId = "household_id"
+        case hasWill = "has_will"
+        case hasRevocableTrust = "has_revocable_trust"
+        case hasIrrevocableTrust = "has_irrevocable_trust"
+        case hasPoa = "has_poa"
+        case hasHealthProxy = "has_health_proxy"
+        case hasLivingWill = "has_living_will"
+        case hasHipaaAuth = "has_hipaa_auth"
+        case hasPrenup = "has_prenup"
+        case hasBusinessAgreement = "has_business_agreement"
+        case hasDispositionOfRemains = "has_disposition_of_remains"
+        case willDate = "will_date"
+        case trustDate = "trust_date"
+        case poaDate = "poa_date"
+        case healthProxyDate = "health_proxy_date"
+        case estateAttorneyContactId = "estate_attorney_contact_id"
+        case lastEstateReviewDate = "last_estate_review_date"
+        case fiduciaries, concerns, wishes
+        case assetsSummary = "assets_summary"
+        case intakeState = "intake_state"
+        case nominations
+        case estateReadinessScore = "estate_readiness_score"
+        case stalenessTier = "staleness_tier"
+        case stalenessReasons = "staleness_reasons"
+        case householdSnapshot = "household_snapshot"
+        case lastRecomputedAt = "last_recomputed_at"
+        case createdAt = "created_at"
+        case updatedAt = "updated_at"
+    }
+}
+
+struct EstateStateInsert: Codable {
+    let householdId: UUID
+
+    enum CodingKeys: String, CodingKey {
+        case householdId = "household_id"
+    }
+}
+
+struct EstateStateUpdate: Codable {
+    var hasWill: Bool?
+    var hasRevocableTrust: Bool?
+    var hasIrrevocableTrust: Bool?
+    var hasPoa: Bool?
+    var hasHealthProxy: Bool?
+    var hasLivingWill: Bool?
+    var hasHipaaAuth: Bool?
+    var hasPrenup: Bool?
+    var hasBusinessAgreement: Bool?
+    var hasDispositionOfRemains: Bool?
+    var willDate: String?
+    var trustDate: String?
+    var poaDate: String?
+    var healthProxyDate: String?
+    var estateAttorneyContactId: UUID?
+    var lastEstateReviewDate: String?
+    var fiduciaries: [EstateFiduciary]?
+    var concerns: [EstateConcernRating]?
+    var wishes: [EstateWish]?
+    var assetsSummary: EstateAssetsSummary?
+    var intakeState: EstateIntakeState?
+    var nominations: EstateNominations?
+    var estateReadinessScore: Int?
+    var stalenessTier: String?
+    var stalenessReasons: [String]?
+    var householdSnapshot: EstateHouseholdSnapshot?
+    var lastRecomputedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case hasWill = "has_will"
+        case hasRevocableTrust = "has_revocable_trust"
+        case hasIrrevocableTrust = "has_irrevocable_trust"
+        case hasPoa = "has_poa"
+        case hasHealthProxy = "has_health_proxy"
+        case hasLivingWill = "has_living_will"
+        case hasHipaaAuth = "has_hipaa_auth"
+        case hasPrenup = "has_prenup"
+        case hasBusinessAgreement = "has_business_agreement"
+        case hasDispositionOfRemains = "has_disposition_of_remains"
+        case willDate = "will_date"
+        case trustDate = "trust_date"
+        case poaDate = "poa_date"
+        case healthProxyDate = "health_proxy_date"
+        case estateAttorneyContactId = "estate_attorney_contact_id"
+        case lastEstateReviewDate = "last_estate_review_date"
+        case fiduciaries, concerns, wishes
+        case assetsSummary = "assets_summary"
+        case intakeState = "intake_state"
+        case nominations
+        case estateReadinessScore = "estate_readiness_score"
+        case stalenessTier = "staleness_tier"
+        case stalenessReasons = "staleness_reasons"
+        case householdSnapshot = "household_snapshot"
+        case lastRecomputedAt = "last_recomputed_at"
+    }
+}
+
+// MARK: - Estate Supporting Types
+
+struct EstateFiduciary: Codable, Hashable {
+    let name: String
+    let role: String
+    let isAlternate: Bool?
+    let source: String
+    let trustedContactId: UUID?
+    let familyMemberId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case name, role, source
+        case isAlternate = "is_alternate"
+        case trustedContactId = "trusted_contact_id"
+        case familyMemberId = "family_member_id"
+    }
+}
+
+struct EstateConcernRating: Codable, Identifiable {
+    let concernId: String
+    let rating: String
+    let ratedAt: String
+    var id: String { concernId }
+
+    enum CodingKeys: String, CodingKey {
+        case concernId = "concern_id"
+        case rating
+        case ratedAt = "rated_at"
+    }
+}
+
+struct EstateWish: Codable, Identifiable {
+    let wishId: String
+    let value: String
+    let notedAt: String
+    var id: String { wishId }
+
+    enum CodingKeys: String, CodingKey {
+        case wishId = "wish_id"
+        case value
+        case notedAt = "noted_at"
+    }
+}
+
+struct EstateAssetsSummary: Codable {
+    let realEstateCount: Int?
+    let vehicleCount: Int?
+    let businessCount: Int?
+    let financialAccountsCount: Int?
+    let lifeInsuranceCount: Int?
+    let netWorthBucket: String?
+
+    enum CodingKeys: String, CodingKey {
+        case realEstateCount = "real_estate_count"
+        case vehicleCount = "vehicle_count"
+        case businessCount = "business_count"
+        case financialAccountsCount = "financial_accounts_count"
+        case lifeInsuranceCount = "life_insurance_count"
+        case netWorthBucket = "net_worth_bucket"
+    }
+}
+
+struct EstateIntakeState: Codable, Equatable {
+    var startedAt: String?
+    var completedAt: String?
+    var currentSection: String?
+    var answers: [String: EstateIntakeAnswer]?
+    var skipped: [String]?
+
+    enum CodingKeys: String, CodingKey {
+        case startedAt = "started_at"
+        case completedAt = "completed_at"
+        case currentSection = "current_section"
+        case answers, skipped
+    }
+}
+
+struct EstateIntakeAnswer: Codable, Equatable {
+    var value: String?
+    var selectedIds: [String]?
+    var answeredAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case value
+        case selectedIds = "selected_ids"
+        case answeredAt = "answered_at"
+    }
+}
+
+struct EstateNominations: Codable {
+    var executor: FiduciaryNomination?
+    var trustee: FiduciaryNomination?
+    var guardian: FiduciaryNomination?
+    var healthProxy: FiduciaryNomination?
+    var poaAgent: FiduciaryNomination?
+    var dispositionAgent: FiduciaryNomination?
+
+    enum CodingKeys: String, CodingKey {
+        case executor, trustee, guardian
+        case healthProxy = "health_proxy"
+        case poaAgent = "poa_agent"
+        case dispositionAgent = "disposition_agent"
+    }
+}
+
+struct FiduciaryNomination: Codable {
+    var primary: NominatedPerson?
+    var alternate: NominatedPerson?
+}
+
+struct NominatedPerson: Codable {
+    var name: String
+    var trustedContactId: UUID?
+    var familyMemberId: UUID?
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case trustedContactId = "trusted_contact_id"
+        case familyMemberId = "family_member_id"
+    }
+}
+
+struct EstateHouseholdSnapshot: Codable {
+    let memberCount: Int?
+    let propertyCount: Int?
+    let vehicleCount: Int?
+    let snapshotDate: String?
+
+    enum CodingKeys: String, CodingKey {
+        case memberCount = "member_count"
+        case propertyCount = "property_count"
+        case vehicleCount = "vehicle_count"
+        case snapshotDate = "snapshot_date"
+    }
+}
+
+// MARK: - Estate PDF Exports
+
+struct EstatePdfExportRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let generatedBy: UUID?
+    let storagePath: String
+    let verificationToken: UUID
+    let templateUsed: String
+    let maxAccessCount: Int
+    let accessCount: Int
+    let recipientEmail: String?
+    let recipientName: String?
+    let linkedAttorneyContactId: UUID?
+    let estateReadinessScore: Int?
+    let pdfContentHash: String?
+    let expiresAt: String
+    let revokedAt: String?
+    let mailComposePresentedAt: String?
+    let createdAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case householdId = "household_id"
+        case generatedBy = "generated_by"
+        case storagePath = "storage_path"
+        case verificationToken = "verification_token"
+        case templateUsed = "template_used"
+        case maxAccessCount = "max_access_count"
+        case accessCount = "access_count"
+        case recipientEmail = "recipient_email"
+        case recipientName = "recipient_name"
+        case linkedAttorneyContactId = "linked_attorney_contact_id"
+        case estateReadinessScore = "estate_readiness_score"
+        case pdfContentHash = "pdf_content_hash"
+        case expiresAt = "expires_at"
+        case revokedAt = "revoked_at"
+        case mailComposePresentedAt = "mail_compose_presented_at"
+        case createdAt = "created_at"
+    }
+}
+
+struct EstatePdfExportInsert: Codable {
+    let householdId: UUID
+    let storagePath: String
+    let templateUsed: String
+    var recipientEmail: String?
+    var recipientName: String?
+    var linkedAttorneyContactId: UUID?
+    var estateReadinessScore: Int?
+    var pdfContentHash: String?
+    let expiresAt: String
+
+    enum CodingKeys: String, CodingKey {
+        case householdId = "household_id"
+        case storagePath = "storage_path"
+        case templateUsed = "template_used"
+        case recipientEmail = "recipient_email"
+        case recipientName = "recipient_name"
+        case linkedAttorneyContactId = "linked_attorney_contact_id"
+        case estateReadinessScore = "estate_readiness_score"
+        case pdfContentHash = "pdf_content_hash"
+        case expiresAt = "expires_at"
+    }
+}
+
+struct EstatePdfExportUpdate: Codable {
+    var accessCount: Int?
+    var revokedAt: String?
+    var mailComposePresentedAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessCount = "access_count"
+        case revokedAt = "revoked_at"
+        case mailComposePresentedAt = "mail_compose_presented_at"
     }
 }
 
@@ -2862,6 +3246,144 @@ struct UtilityProviderInsert: Codable {
         case providerType = "provider_type"
         case logoUrl = "logo_url"
         case brandColor = "brand_color"
+    }
+}
+
+// MARK: - Household Advisors
+
+struct HouseholdAdvisorRow: Codable, Identifiable {
+    let id: UUID
+    let householdId: UUID
+    let advisorType: String
+    let providerName: String
+    let providerSlug: String?
+    let providerId: UUID?
+    let logoUrl: String?
+    let brandColor: String?
+    let website: String?
+    let phone: String?
+    let email: String?
+    let contactName: String?
+    let companyName: String?
+    let notes: String?
+    let createdAt: Date?
+
+    enum CodingKeys: String, CodingKey {
+        case id, website, phone, email, notes
+        case householdId = "household_id"
+        case advisorType = "advisor_type"
+        case providerName = "provider_name"
+        case providerSlug = "provider_slug"
+        case providerId = "provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
+        case contactName = "contact_name"
+        case companyName = "company_name"
+        case createdAt = "created_at"
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        householdId = try c.decode(UUID.self, forKey: .householdId)
+        advisorType = try c.decode(String.self, forKey: .advisorType)
+        providerName = try c.decode(String.self, forKey: .providerName)
+        providerSlug = try? c.decodeIfPresent(String.self, forKey: .providerSlug)
+        providerId = try? c.decodeIfPresent(UUID.self, forKey: .providerId)
+        logoUrl = try? c.decodeIfPresent(String.self, forKey: .logoUrl)
+        brandColor = try? c.decodeIfPresent(String.self, forKey: .brandColor)
+        website = try? c.decodeIfPresent(String.self, forKey: .website)
+        phone = try? c.decodeIfPresent(String.self, forKey: .phone)
+        email = try? c.decodeIfPresent(String.self, forKey: .email)
+        contactName = try? c.decodeIfPresent(String.self, forKey: .contactName)
+        companyName = try? c.decodeIfPresent(String.self, forKey: .companyName)
+        notes = try? c.decodeIfPresent(String.self, forKey: .notes)
+        createdAt = try? c.decodeIfPresent(Date.self, forKey: .createdAt)
+    }
+
+    var typeIcon: String {
+        switch advisorType {
+        case "estate_attorney": return "building.columns.fill"
+        case "cpa_tax": return "dollarsign.circle.fill"
+        case "financial_advisor": return "chart.line.uptrend.xyaxis"
+        case "life_insurance": return "heart.text.square.fill"
+        default: return "person.fill"
+        }
+    }
+
+    var typeLabel: String {
+        switch advisorType {
+        case "estate_attorney": return "Estate Attorney"
+        case "cpa_tax": return "CPA / Tax Advisor"
+        case "financial_advisor": return "Financial Advisor"
+        case "life_insurance": return "Life Insurance"
+        default: return "Advisor"
+        }
+    }
+
+    /// Display name: prefers contact_name if set, otherwise provider_name
+    var displayName: String {
+        if let contactName, !contactName.isEmpty {
+            return contactName
+        }
+        return providerName
+    }
+
+    /// Subtitle: shows firm/company when contact_name is the primary display
+    var displaySubtitle: String? {
+        if contactName != nil, !contactName!.isEmpty {
+            if let companyName, !companyName.isEmpty {
+                return companyName
+            }
+            return providerName
+        }
+        return companyName
+    }
+}
+
+struct HouseholdAdvisorInsert: Encodable {
+    let householdId: UUID
+    let advisorType: String
+    let providerName: String
+    var providerSlug: String?
+    var providerId: UUID?
+    var logoUrl: String?
+    var brandColor: String?
+    var website: String?
+    var phone: String?
+    var email: String?
+    var contactName: String?
+    var companyName: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case website, phone, email, notes
+        case householdId = "household_id"
+        case advisorType = "advisor_type"
+        case providerName = "provider_name"
+        case providerSlug = "provider_slug"
+        case providerId = "provider_id"
+        case logoUrl = "logo_url"
+        case brandColor = "brand_color"
+        case contactName = "contact_name"
+        case companyName = "company_name"
+    }
+}
+
+struct HouseholdAdvisorUpdate: Encodable {
+    var providerName: String?
+    var phone: String?
+    var email: String?
+    var website: String?
+    var contactName: String?
+    var companyName: String?
+    var notes: String?
+
+    enum CodingKeys: String, CodingKey {
+        case phone, email, website, notes
+        case providerName = "provider_name"
+        case contactName = "contact_name"
+        case companyName = "company_name"
     }
 }
 

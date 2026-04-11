@@ -81,7 +81,7 @@ struct ScenarioStudioView: View {
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     Text(selectedCategory?.rawValue ?? "Scenario Planning")
-                        .font(Font.custom("Georgia-Bold", size: 18))
+                        .font(HavenTypography.fraunces(size: 18, weight: 700))
                         .foregroundStyle(HavenColors.navy800)
                 }
                 ToolbarItem(placement: .topBarLeading) {
@@ -232,7 +232,7 @@ struct ScenarioStudioView: View {
     private var customInputArea: some View {
         VStack(spacing: 12) {
             Text("Explore any scenario about your finances, estate, home, or family")
-                .font(Font.custom("Georgia", size: 14))
+                .font(HavenTypography.body)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
                 .frame(maxWidth: .infinity)
@@ -323,7 +323,7 @@ struct ScenarioStudioView: View {
                 Text(category.emoji)
                     .font(.title)
                 Text(category.rawValue)
-                    .font(Font.custom("Georgia-Bold", size: 16))
+                    .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.navy800)
                 Spacer()
                 Text("\(category.scenarios.count)")
@@ -470,7 +470,7 @@ struct ScenarioStudioView: View {
                         .foregroundStyle(HavenColors.textTertiary)
 
                     Text("No scenarios yet")
-                        .font(Font.custom("Georgia-Bold", size: 18))
+                        .font(HavenTypography.fraunces(size: 18, weight: 700))
                         .foregroundStyle(HavenColors.navy800)
 
                     Text("Run your first scenario from the Explore tab to see your history here.")

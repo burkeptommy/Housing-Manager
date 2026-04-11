@@ -103,7 +103,7 @@ struct FindLocalVendorSheet: View {
                 .foregroundStyle(HavenColors.textTertiary)
 
             Text("Top \(categoryDisplayName) pros in \(town), \(state).")
-                .font(.custom("Georgia", size: 24).weight(.semibold))
+                .font(HavenTypography.fraunces(size: 24, weight: 600))
                 .foregroundStyle(HavenColors.navy800)
                 .fixedSize(horizontal: false, vertical: true)
 

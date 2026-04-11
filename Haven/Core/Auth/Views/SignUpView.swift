@@ -17,6 +17,7 @@ struct SignUpView: View {
             }
             .padding(.horizontal, HavenTheme.spacing24)
         }
+        .background(HavenColors.background.ignoresSafeArea())
         .navigationBarTitleDisplayMode(.inline)
         .trackScreen("SignUpView")
     }
@@ -28,6 +29,7 @@ struct SignUpView: View {
             VStack(spacing: HavenTheme.spacing8) {
                 Text("Create Account")
                     .font(HavenTypography.title)
+                    .foregroundStyle(HavenColors.navy800)
                 Text("Set up your Haven account to get started.")
                     .font(HavenTypography.subheadline)
                     .foregroundStyle(HavenColors.textSecondary)

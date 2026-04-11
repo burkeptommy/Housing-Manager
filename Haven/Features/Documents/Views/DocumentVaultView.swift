@@ -14,6 +14,13 @@ struct DocumentVaultView: View {
     @State private var navigationPath = NavigationPath()
     @State private var selectedMemberId: UUID?
     @State private var lifeTab: LifeTab = .documents
+    @State private var showEstateIntake = false
+    @State private var showEstateExport = false
+    // Build 89 — in-app Estate Snapshot summary triggered by the
+    // EstateOverviewCard's onPrepareForAttorney callback (advisor prompt
+    // state) and any future surfaces that want to show the read-only
+    // snapshot view.
+    @State private var showEstateSnapshot = false
 
     enum LifeTab: String, CaseIterable {
         case documents = "Documents"
@@ -209,9 +216,42 @@ struct DocumentVaultView: View {
                     ExpiringDocumentsSheet(documents: viewModel.expiringDocuments)
                 }
             }
+            .sheet(isPresented: $showEstateIntake) {
+                if let hid = viewModel.properties.first?.householdId {
+                    EstateIntakeFormView(householdId: hid)
+                }
+            }
+            .sheet(isPresented: $showEstateExport) {
+                if let estate = viewModel.estateState,
+                   let hid = viewModel.properties.first?.householdId {
+                    EstateExportView(
+                        estateState: estate,
+                        documents: viewModel.documents,
+                        members: viewModel.familyMembers,
+                        contacts: [],
+                        householdId: hid
+                    )
+                }
+            }
+            .sheet(isPresented: $showEstateSnapshot) {
+                if let hid = viewModel.properties.first?.householdId {
+                    EstateSnapshotView(householdId: hid)
+                }
+            }
             .onReceive(NotificationCenter.default.publisher(for: .popToRoot)) { notification in
                 if let tab = notification.userInfo?["tab"] as? Int, tab == 2 {
                     navigationPath = NavigationPath()
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .estateStateChanged)) { _ in
+                Task { await viewModel.loadData() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .advisorChanged)) { _ in
+                Task {
+                    if let user = try? await DatabaseService.shared.fetchCurrentUser(),
+                       let householdId = user.householdId {
+                        viewModel.advisors = (try? await DatabaseService.shared.fetchHouseholdAdvisors(householdId: householdId)) ?? viewModel.advisors
+                    }
                 }
             }
             .onChange(of: selectedMemberId) { _, newValue in
@@ -308,6 +348,37 @@ struct DocumentVaultView: View {
 
     private var emptyVaultContent: some View {
         VStack(spacing: HavenTheme.spacing20) {
+            // Estate Overview card — shows even before any documents exist
+            EstateOverviewCard(
+                estateState: viewModel.estateState,
+                onUploadDocument: {
+                    uploadCategory = nil
+                    showUpload = true
+                },
+                onGetStarted: {
+                    showEstateIntake = true
+                },
+                onContinue: {
+                    showEstateIntake = true
+                },
+                onPrepareForAttorney: {
+                    showEstateSnapshot = true
+                },
+                onReviewIntake: {
+                    showEstateIntake = true
+                }
+            )
+
+            // Professional Advisors (shows even in empty vault)
+            if let hid = viewModel.properties.first?.householdId {
+                AdvisorsSection(
+                    householdId: hid,
+                    advisors: $viewModel.advisors,
+                    propertyCity: viewModel.properties.first?.city,
+                    propertyState: viewModel.properties.first?.state
+                )
+            }
+
             // Empty state prompt — tappable to trigger upload
             Button {
                 Haptics.light()
@@ -321,14 +392,18 @@ struct DocumentVaultView: View {
                     Text("Start building your vault")
                         .font(HavenTypography.title3)
                         .foregroundStyle(HavenColors.textPrimary)
-                    Text("Tap here to upload your first document. Alfred will organize it automatically.")
+                        .multilineTextAlignment(.center)
+                    Text("Upload your first document")
                         .font(HavenTypography.caption)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
                 }
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, HavenTheme.pageMargin)
             }
             .buttonStyle(.plain)
-            .padding(.top, 40)
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.top, 20)
             .padding(.bottom, 20)
 
             if !viewModel.suggestedNextUploads.isEmpty {
@@ -344,8 +419,39 @@ struct DocumentVaultView: View {
 
     private var documentListContent: some View {
         LazyVStack(spacing: HavenTheme.spacing16) {
+            // 0. Estate Overview (Phase 48)
+            EstateOverviewCard(
+                estateState: viewModel.estateState,
+                onUploadDocument: {
+                    uploadCategory = nil
+                    showUpload = true
+                },
+                onGetStarted: {
+                    showEstateIntake = true
+                },
+                onContinue: {
+                    showEstateIntake = true
+                },
+                onPrepareForAttorney: {
+                    showEstateSnapshot = true
+                },
+                onReviewIntake: {
+                    showEstateIntake = true
+                }
+            )
+
             // 1. Compact Estate Readiness
             compactReadinessCard
+
+            // 1.5. Professional Advisors
+            if let hid = viewModel.properties.first?.householdId {
+                AdvisorsSection(
+                    householdId: hid,
+                    advisors: $viewModel.advisors,
+                    propertyCity: viewModel.properties.first?.city,
+                    propertyState: viewModel.properties.first?.state
+                )
+            }
 
             // Expecting members — preparation checklists
             let expectingMembers = viewModel.familyMembers.filter { $0.isExpecting == true }

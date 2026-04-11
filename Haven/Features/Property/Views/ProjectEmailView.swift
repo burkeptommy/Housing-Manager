@@ -121,7 +121,7 @@ struct ProjectEmailView: View {
                     .foregroundStyle(HavenColors.textTertiary)
 
                 Text(email)
-                    .font(Font.custom("Georgia", size: 16))
+                    .font(Font.custom("Inter", size: 16))
                     .foregroundStyle(HavenColors.navy800)
                     .textSelection(.enabled)
                     .padding(.vertical, HavenTheme.spacing4)

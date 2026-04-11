@@ -893,6 +893,50 @@ final class DatabaseService {
             .execute()
     }
 
+    // MARK: - Household Advisors
+
+    func fetchHouseholdAdvisors(householdId: UUID) async throws -> [HouseholdAdvisorRow] {
+        try await from("household_advisors")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func fetchHouseholdAdvisors(householdId: UUID, type: String) async throws -> [HouseholdAdvisorRow] {
+        try await from("household_advisors")
+            .select()
+            .eq("household_id", value: householdId.uuidString)
+            .eq("advisor_type", value: type)
+            .order("created_at", ascending: false)
+            .execute()
+            .value
+    }
+
+    func createHouseholdAdvisor(_ advisor: HouseholdAdvisorInsert) async throws -> HouseholdAdvisorRow {
+        try await from("household_advisors")
+            .insert(advisor)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    func updateHouseholdAdvisor(id: UUID, _ update: HouseholdAdvisorUpdate) async throws {
+        try await from("household_advisors")
+            .update(update)
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
+    func deleteHouseholdAdvisor(id: UUID) async throws {
+        try await from("household_advisors")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     // MARK: - Contractors
 
     func fetchContractors() async throws -> [ContractorRow] {
@@ -1473,31 +1517,105 @@ final class DatabaseService {
             .execute()
     }
 
-    /// Check if there's a pending invitation for the current user's email
-    /// Check if a user with this email already has a Haven account
+    /// Check if a user with this email already has a Haven account.
+    ///
+    /// Uses the `check_user_exists_by_email` SECURITY DEFINER function so the
+    /// lookup works across households (the caller's RLS scope only covers their
+    /// own household, but invitees may be in a different household or have no
+    /// household at all).
     func checkExistingUser(email: String) async throws -> UserRow? {
-        let results: [UserRow] = try await from("users")
-            .select()
-            .eq("email", value: email.lowercased())
-            .limit(1)
+        struct RpcResult: Decodable {
+            let exists: Bool
+            let userId: UUID?
+            let householdId: UUID?
+
+            enum CodingKeys: String, CodingKey {
+                case exists
+                case userId = "user_id"
+                case householdId = "household_id"
+            }
+        }
+
+        let data = try await HavenSupabase.client
+            .rpc("check_user_exists_by_email", params: ["target_email": email.lowercased()])
             .execute()
-            .value
-        return results.first
+            .data
+
+        let decoded = try JSONDecoder().decode(RpcResult.self, from: data)
+        guard decoded.exists, let userId = decoded.userId else { return nil }
+
+        // Construct a minimal UserRow from the RPC result. Callers only use
+        // `id` and `householdId` from this lookup, so the other fields are
+        // set to safe defaults.
+        return UserRow(
+            id: userId,
+            householdId: decoded.householdId,
+            email: email.lowercased(),
+            fullName: nil,
+            role: "member",
+            createdAt: nil
+        )
     }
 
+    /// Uses the `check_pending_invitation_by_email` SECURITY DEFINER function
+    /// so the lookup works for newly authenticated users who don't have a
+    /// public.users row yet (PostgREST's context resolution would otherwise
+    /// throw "permission denied for table users").
     func checkPendingInvitation(email: String) async throws -> HouseholdInvitationRow? {
-        let results: [HouseholdInvitationRow] = try await from("household_invitations")
-            .select()
-            .eq("invited_email", value: email)
-            .eq("status", value: "pending")
-            .execute()
-            .value
-
-        // Return the first non-expired invitation
-        return results.first { invitation in
-            guard let expiresAt = invitation.expiresAt else { return true }
-            return expiresAt > Date()
+        struct RpcResult: Decodable {
+            let found: Bool
         }
+
+        let data = try await HavenSupabase.client
+            .rpc("check_pending_invitation_by_email", params: ["target_email": email.lowercased()])
+            .execute()
+            .data
+
+        // Quick check: if not found, return nil without full decode
+        let check = try JSONDecoder().decode(RpcResult.self, from: data)
+        guard check.found else { return nil }
+
+        // Decode the full invitation row from the RPC result
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let str = try container.decode(String.self)
+            // Try ISO 8601 with fractional seconds first, then without
+            let formatters: [ISO8601DateFormatter] = {
+                let withFrac = ISO8601DateFormatter()
+                withFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+                let plain = ISO8601DateFormatter()
+                plain.formatOptions = [.withInternetDateTime]
+                return [withFrac, plain]
+            }()
+            for formatter in formatters {
+                if let date = formatter.date(from: str) { return date }
+            }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Invalid date: \(str)")
+        }
+        // The RPC wraps the row in the same JSON shape as a direct table query,
+        // plus a "found" key. Decode into a flexible container and extract the row.
+        // The RPC returns the same column names as a direct table query,
+        // plus a "found" key. HouseholdInvitationRow's CodingKeys already
+        // map snake_case columns, so decode directly with an extra "found" wrapper.
+        struct FoundWrapper: Decodable {
+            let found: Bool
+            let invitation: HouseholdInvitationRow
+
+            init(from decoder: Decoder) throws {
+                let container = try decoder.container(keyedBy: CodingKeys.self)
+                found = try container.decode(Bool.self, forKey: .found)
+                // Decode the invitation from the same flat container
+                invitation = try HouseholdInvitationRow(from: decoder)
+            }
+
+            enum CodingKeys: String, CodingKey {
+                case found
+            }
+        }
+
+        let result = try decoder.decode(FoundWrapper.self, from: data)
+        return result.invitation
     }
 
     /// Accept an invitation — link user to household

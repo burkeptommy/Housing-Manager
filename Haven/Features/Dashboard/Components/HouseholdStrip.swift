@@ -73,7 +73,7 @@ struct HouseholdStrip: View {
 
             // Helper text if only one member
             if members.count <= 1 {
-                Text("Add your spouse or family members to unlock estate planning features")
+                Text("Invite your spouse, family, or household staff to coordinate tasks and unlock advanced features.")
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textTertiary)
                     .padding(.top, 2)

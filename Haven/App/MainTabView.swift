@@ -15,6 +15,7 @@ extension Notification.Name {
     /// 'either' tasks that the new vendor's category could take over.
     /// `userInfo["contractorId"]` carries the new row's UUID.
     static let contractorAdded = Notification.Name("contractorAdded")
+    static let advisorChanged = Notification.Name("advisorChanged")
     static let documentChanged = Notification.Name("documentChanged")
     static let propertyChanged = Notification.Name("propertyChanged")
     static let projectChanged = Notification.Name("projectChanged")
@@ -28,6 +29,13 @@ extension Notification.Name {
     /// Posted by AddPropertyFlow's confirmation step when the user taps
     /// "Take House Quiz". `object` carries the new `PropertyRow`.
     static let startHouseQuiz = Notification.Name("startHouseQuiz")
+    static let estateStateChanged = Notification.Name("estateStateChanged")
+
+    /// Phase 50: Posted by `InvoiceProcessingViewModel` after it detects an
+    /// explicit recurring service cadence on an invoice (>0.8 confidence).
+    /// The Dashboard listens for this and renders a confirmation card so
+    /// the user can accept the new interval and update the system row.
+    static let invoiceCadenceDetected = Notification.Name("invoiceCadenceDetected")
 }
 
 struct MainTabView: View {
@@ -37,7 +45,6 @@ struct MainTabView: View {
     @State private var showScenarioStudio = false
     @State private var scenarioInitialQuery: String?
     @State private var isKeyboardVisible = false
-    @AppStorage("hasUsedScenarioStudio") private var hasUsedScenarioStudio = false
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -72,35 +79,10 @@ struct MainTabView: View {
             }
             } // end VStack
 
-            // Floating "What If?" button
-            if !isKeyboardVisible && !showScenarioStudio && selectedTab != 3 {
-                Button {
-                    Haptics.medium()
-                    hasUsedScenarioStudio = true
-                    showScenarioStudio = true
-                    Analytics.track(.scenarioStudioOpened, ["source": "floating_button"])
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "sparkles")
-                            .font(.system(size: 20, weight: .medium))
-                        if !hasUsedScenarioStudio {
-                            Text("Scenarios")
-                                .font(.system(size: 13, weight: .semibold))
-                        }
-                    }
-                    .foregroundStyle(HavenColors.cream)
-                    .padding(.horizontal, hasUsedScenarioStudio ? 15 : 16)
-                    .padding(.vertical, hasUsedScenarioStudio ? 15 : 12)
-                    .background(HavenColors.navy800)
-                    .clipShape(Capsule())
-                    .shadow(color: HavenColors.navy800.opacity(0.3), radius: 4, y: 2)
-                    .scaleEffect(hasUsedScenarioStudio ? 1.0 : pulseScale)
-                }
-                .padding(.trailing, 16)
-                .padding(.bottom, 72)
-                .transition(.scale.combined(with: .opacity))
-                .accessibilityLabel("Scenario Planning")
-            }
+            // (Floating "What If?" FAB removed — Scenarios now lives in
+            // the Alfred tab toolbar, so the AI surface area is in one
+            // place. ScenarioStudioView still presents from MainTabView
+            // via the .openScenarioStudio notification path below.)
         }
         .ignoresSafeArea(.keyboard)
         .onChange(of: selectedTab) { _, newTab in
@@ -132,6 +114,10 @@ struct MainTabView: View {
             if let query = notification.userInfo?["query"] as? String {
                 scenarioInitialQuery = query
             }
+            // Switch to Alfred tab so scenarios always feel like they
+            // live "in Alfred" — the FAB used to present from any tab
+            // but the experience is now anchored on tab 3.
+            selectedTab = 3
             showScenarioStudio = true
         }
         .fullScreenCover(isPresented: $showScenarioStudio) {
@@ -150,19 +136,6 @@ struct MainTabView: View {
             if let resolution = uploadManager.currentDuplicateResolution {
                 DuplicateResolutionSheet(resolution: resolution, manager: uploadManager)
             }
-        }
-        .onAppear {
-            startPulse()
-        }
-    }
-
-    // Pulse animation for first-time discovery
-    @State private var pulseScale: CGFloat = 1.0
-
-    private func startPulse() {
-        guard !hasUsedScenarioStudio else { return }
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-            pulseScale = 1.08
         }
     }
 
@@ -240,7 +213,7 @@ struct MainTabView: View {
                 .fill(selectedTab == 3 ? HavenColors.navy800 : Color(red: 0.71, green: 0.69, blue: 0.65))
                 .frame(width: 22, height: 22)
             Text("A")
-                .font(.system(size: 13, weight: .bold, design: .serif))
+                .font(HavenTypography.fraunces(size: 13, weight: 700))
                 .foregroundStyle(HavenColors.creamLight)
         }
     }

@@ -7,6 +7,9 @@ enum DocumentCategoryGroups {
         ("Estate Planning", [
             "Will", "Trust", "Power of Attorney", "Healthcare Directive",
             "Guardianship Designation", "Letter of Intent",
+            "Living Will", "HIPAA Authorization",
+            "Pre-Nuptial Agreement", "Post-Nuptial Agreement",
+            "Disposition of Remains", "Deed in Trust",
         ]),
         ("Entity Documents", [
             "LLC Operating Agreement", "LP Agreement", "S-Corp Documents",

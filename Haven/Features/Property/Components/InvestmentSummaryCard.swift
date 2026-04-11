@@ -28,33 +28,32 @@ struct InvestmentSummaryCard: View {
     // Computed values
     private var purchasePrice: Double { property.purchasePrice ?? 0 }
 
-    /// Phase 20d — optimistic valuation range. Use the high end as the
-    /// visual hero anchor (instead of the conservative `currentEstimatedValue`)
-    /// while keeping the math (gain/loss, sale simulator, waterfall) on the
-    /// midpoint so the rest of the dashboard stays internally consistent.
-    /// Manual overrides bypass the range entirely.
+    /// Phase 20d / Build 88 — optimistic valuation range kept for the
+    /// informational "Range: $X to $Y" caption beneath the hero, but no
+    /// longer drives either the hero number or the math. Before Build 88
+    /// the hero rendered `range.high`, the waterfall/gain-loss math used
+    /// `range.midpoint`, and the Property hero card above this component
+    /// showed raw `property.currentEstimatedValue` — three different
+    /// numbers for the same field on the same screen, which was a trust
+    /// killer. Build 88 pins every value on this card to the property's
+    /// canonical `currentEstimatedValue` so all three locations agree.
     private var valuationRange: ValuationRange? {
         ValuationRange.compute(for: property)
     }
 
-    /// The number Haven shows as the headline. Manual overrides return
-    /// the user's value verbatim; everything else uses the optimistic
-    /// high end of the synthesized range.
+    /// The number Haven shows as the headline. Build 88: pinned to the
+    /// canonical `property.currentEstimatedValue` so it matches the
+    /// Property hero card above and the waterfall breakdown below.
     private var heroValue: Double {
-        if let range = valuationRange {
-            return range.isManual ? range.low : range.high
-        }
-        return property.currentEstimatedValue ?? 0
+        property.currentEstimatedValue ?? 0
     }
 
-    /// The number Haven uses for math (gain/loss, sale simulator). Stays
-    /// on the midpoint of the range so the math doesn't sway with the
-    /// optimistic anchor. Manual values feed in directly.
+    /// The number Haven uses for math (gain/loss, sale simulator, waterfall).
+    /// Build 88: pinned to the canonical `property.currentEstimatedValue` so
+    /// the hero, waterfall, net-after-sale, and gain/loss calculations all
+    /// share one baseline.
     private var estimatedValue: Double {
-        if let range = valuationRange {
-            return range.isManual ? range.low : range.midpoint
-        }
-        return property.currentEstimatedValue ?? 0
+        property.currentEstimatedValue ?? 0
     }
 
     private var totalInvested: Double { purchasePrice + totalProjectSpend }
@@ -156,7 +155,7 @@ struct InvestmentSummaryCard: View {
                             .font(HavenTypography.uiLabelMedium)
                             .foregroundStyle(HavenColors.textSecondary)
                         Text(estimatedValue.formattedCompactCurrency())
-                            .font(.custom("Georgia", size: 28).weight(.bold))
+                            .font(HavenTypography.largeTitle)
                             .foregroundStyle(HavenColors.textPrimary)
                         if let confidence = property.estimatedValueConfidence {
                             Text("Confidence: \(confidence)/100")
@@ -225,7 +224,7 @@ struct InvestmentSummaryCard: View {
                 // anchor with a compact range caption beneath. Manual
                 // overrides display the single value with no range.
                 Text(heroValue.formattedCompactCurrency())
-                    .font(.custom("Georgia", size: 26).weight(.bold))
+                    .font(HavenTypography.fraunces(size: 26, weight: 700))
                     .foregroundStyle(HavenColors.textPrimary)
 
                 if let range = valuationRange, !range.isManual {
@@ -540,7 +539,7 @@ struct InvestmentSummaryCard: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textSecondary)
                 Text(value)
-                    .font(.custom("Georgia", size: 16).weight(.semibold))
+                    .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.textPrimary)
             }
             Spacer()
@@ -579,7 +578,7 @@ struct InvestmentSummaryCard: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textSecondary)
                 Text(formatCurrency(netAfterSale))
-                    .font(.custom("Georgia", size: 16).weight(.semibold))
+                    .font(HavenTypography.title3)
                     .foregroundStyle(HavenColors.textPrimary)
             }
             Spacer()
@@ -588,7 +587,7 @@ struct InvestmentSummaryCard: View {
                     .font(HavenTypography.uiCaption)
                     .foregroundStyle(HavenColors.textSecondary)
                 Text(formatCurrency(abs(gainLoss)))
-                    .font(.custom("Georgia", size: 16).weight(.semibold))
+                    .font(HavenTypography.title3)
                     .foregroundStyle(gainLoss >= 0 ? HavenColors.success : HavenColors.critical)
             }
         }
@@ -643,7 +642,7 @@ struct InvestmentSummaryCard: View {
             }
 
             Text(HookContent.Page1.equityHeadline)
-                .font(.custom("Georgia", size: 18).weight(.semibold))
+                .font(HavenTypography.title2)
                 .foregroundStyle(HavenColors.creamLight)
                 .fixedSize(horizontal: false, vertical: true)
 

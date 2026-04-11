@@ -128,7 +128,7 @@ struct AccountCreationStep: View {
             // sits closer to the top of the screen and the form has room
             // to breathe).
             Text("H")
-                .font(Font.custom("Georgia-Bold", size: 36))
+                .font(HavenTypography.statNumber)
                 .foregroundStyle(HavenColors.creamLight)
                 .frame(width: 64, height: 64)
                 .background(
@@ -138,7 +138,7 @@ struct AccountCreationStep: View {
 
             VStack(spacing: HavenTheme.spacing8) {
                 Text(heroTitle)
-                    .font(.custom("Georgia", size: 24).weight(.bold))
+                    .font(HavenTypography.fraunces(size: 24, weight: 700))
                     .foregroundStyle(HavenColors.textPrimary)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)

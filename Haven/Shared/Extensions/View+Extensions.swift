@@ -2,13 +2,13 @@ import SwiftUI
 
 // MARK: - Screen Title (replaces unreliable system large title)
 
-/// In-content page title rendered as Georgia Bold navy text.
+/// In-content page title rendered as Fraunces Bold navy text.
 /// Used instead of `.navigationBarTitleDisplayMode(.large)` which
 /// collapses unpredictably inside TabView when content changes.
 func screenTitle(_ title: String) -> some View {
     HStack {
         Text(title)
-            .font(Font.custom("Georgia-Bold", size: 28))
+            .font(HavenTypography.fraunces(size: 28, weight: 700))
             .foregroundStyle(HavenColors.navy)
         Spacer()
     }

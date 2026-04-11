@@ -45,12 +45,24 @@ struct QuizLocalContractorPicker: View {
     /// Fix 4. Optional so existing call sites that don't care still work.
     let preSelected: PreSelectedContractor?
     let onDeselect: (() -> Void)?
+    /// Build 87: When `true`, the picker shows a prominent search bar and
+    /// hides results until the user types 2+ characters. Results are loaded
+    /// from Google Places on appear (same as the default mode) but filtered
+    /// locally and rendered as a flat list without "Haven Certified" /
+    /// "Suggested" section headers. Used by Q15b ("Got any pros on speed
+    /// dial?") where the intent is for the user to search for THEIR
+    /// existing contractor, not see our recommendations. Other callers
+    /// (like "Find a contractor for: X" on the maintenance task detail)
+    /// keep `searchFirst: false` and get the auto-loading behavior with
+    /// ranked sections.
+    let searchFirst: Bool
 
     init(
         chipId: String,
         chipLabel: String,
         town: String,
         state: String,
+        searchFirst: Bool = false,
         preSelected: PreSelectedContractor? = nil,
         onSelect: @escaping (HavenSupabase.LocalVendorResult) -> Void,
         onManualAdd: @escaping (String) -> Void,
@@ -60,6 +72,7 @@ struct QuizLocalContractorPicker: View {
         self.chipLabel = chipLabel
         self.town = town
         self.state = state
+        self.searchFirst = searchFirst
         self.preSelected = preSelected
         self.onSelect = onSelect
         self.onManualAdd = onManualAdd
@@ -71,6 +84,10 @@ struct QuizLocalContractorPicker: View {
     @State private var loadError: String? = nil
     @State private var manualName: String = ""
     @State private var showManualField: Bool = false
+    /// Build 87: search text for the `searchFirst` mode. Results are
+    /// filtered locally against the pre-loaded Google Places list once
+    /// the user types 2+ characters.
+    @State private var searchText: String = ""
     /// Build 86 — id of the vendor row the user just tapped. Drives the
     /// navy tint + checkmark + dim-others visual feedback that mirrors
     /// `singleChoiceBody` from Build 81 and the parallel pattern in
@@ -93,16 +110,27 @@ struct QuizLocalContractorPicker: View {
                 pinnedSelectionCard(pinned)
             }
 
-            header
-
-            if isLoading {
-                loadingState
-            } else if let error = loadError {
-                errorState(error)
-            } else if vendors.isEmpty {
-                emptyState
+            if searchFirst {
+                // Build 87: search-first mode for Q15b. Shows a prominent
+                // search bar; results only appear once the user types 2+
+                // characters. Filtering is local against the pre-loaded
+                // Google Places results so there's zero network latency
+                // after the initial load.
+                searchFirstHeader
+                searchBar
+                searchFirstResults
             } else {
-                vendorList
+                header
+
+                if isLoading {
+                    loadingState
+                } else if let error = loadError {
+                    errorState(error)
+                } else if vendors.isEmpty {
+                    emptyState
+                } else {
+                    vendorList
+                }
             }
 
             manualAddRow
@@ -111,6 +139,10 @@ struct QuizLocalContractorPicker: View {
         .background(HavenColors.creamLight)
         .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         .task(id: chipId) {
+            // In both modes, load vendors from Google Places on appear.
+            // In searchFirst mode the results are hidden until the user
+            // types 2+ characters; the local filter handles the rest so
+            // there's no second network call.
             await loadVendors()
         }
     }
@@ -213,6 +245,100 @@ struct QuizLocalContractorPicker: View {
                     .foregroundStyle(HavenColors.textTertiary)
             }
         }
+    }
+
+    // MARK: - Search-first mode (Build 87)
+
+    /// Build 87: header for search-first mode. Prompts the user to search
+    /// for their own contractor instead of browsing recommendations.
+    private var searchFirstHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("YOUR \(chipLabel.uppercased())")
+                .font(HavenTypography.uiSectionHeader)
+                .tracking(1.2)
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("Search for the company you already use.")
+                .font(HavenTypography.uiCaption)
+                .foregroundStyle(HavenColors.textTertiary)
+        }
+    }
+
+    /// Build 87: prominent search bar for search-first mode.
+    private var searchBar: some View {
+        HStack {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
+                .foregroundStyle(HavenColors.textTertiary)
+            TextField("Search for your \(chipLabel.lowercased())...", text: $searchText)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled(true)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(HavenColors.textTertiary)
+                }
+            }
+        }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.surface)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+        .overlay(
+            RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                .strokeBorder(HavenColors.beige300, lineWidth: 1)
+        )
+    }
+
+    /// Build 87: empty state for search-first mode when no results found.
+    private var searchFirstEmptyState: some View {
+        VStack(spacing: HavenTheme.spacing8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 24))
+                .foregroundStyle(HavenColors.textTertiary)
+            Text("No matches for \"\(searchText)\"")
+                .font(HavenTypography.bodySmall.weight(.semibold))
+                .foregroundStyle(HavenColors.textPrimary)
+            Text("Try a different spelling, or add them manually below.")
+                .font(HavenTypography.caption)
+                .foregroundStyle(HavenColors.textSecondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, HavenTheme.spacing12)
+    }
+
+    /// Build 87: trimmed search text needle. Computed property avoids
+    /// `let` bindings inside the `@ViewBuilder` result builder.
+    private var searchNeedle: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Build 87: locally filtered vendor results for search-first mode.
+    private var searchFilteredVendors: [HavenSupabase.LocalVendorResult] {
+        let needle = searchNeedle
+        guard needle.count >= 2 else { return [] }
+        return vendors.filter { $0.name.localizedCaseInsensitiveContains(needle) }
+    }
+
+    /// Build 87: computed results view for search-first mode. Shows loading,
+    /// empty, or flat results based on the search text length and vendor list.
+    @ViewBuilder
+    private var searchFirstResults: some View {
+        if isLoading && searchNeedle.count >= 2 {
+            loadingState
+        } else if searchNeedle.count >= 2 {
+            if searchFilteredVendors.isEmpty {
+                searchFirstEmptyState
+            } else {
+                VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                    ForEach(searchFilteredVendors) { vendor in
+                        vendorRow(vendor, certified: false)
+                    }
+                }
+            }
+        }
+        // When < 2 chars: show nothing, just the search bar + manual add.
     }
 
     // MARK: - States

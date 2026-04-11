@@ -21,7 +21,7 @@ struct ScenarioInputView: View {
 
                     VStack(alignment: .leading, spacing: 4) {
                         Text(scenario.title)
-                            .font(Font.custom("Georgia-Bold", size: 16))
+                            .font(HavenTypography.title3)
                             .foregroundStyle(HavenColors.navy800)
                         Text(scenario.teaser)
                             .font(HavenTypography.caption)
@@ -62,7 +62,7 @@ struct ScenarioInputView: View {
         .toolbar {
             ToolbarItem(placement: .principal) {
                 Text("Scenario Details")
-                    .font(Font.custom("Georgia-Bold", size: 18))
+                    .font(HavenTypography.fraunces(size: 18, weight: 700))
                     .foregroundStyle(HavenColors.navy800)
             }
         }

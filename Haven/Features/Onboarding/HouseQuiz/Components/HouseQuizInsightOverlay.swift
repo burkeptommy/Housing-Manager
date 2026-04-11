@@ -53,7 +53,7 @@ struct HouseQuizInsightOverlay: View {
 
                     // Bold one-line takeaway
                     Text(feedback.renderedTitle(city: city, state: state))
-                        .font(.custom("Georgia", size: 22).weight(.semibold))
+                        .font(HavenTypography.fraunces(size: 22, weight: 600))
                         .foregroundStyle(HavenColors.navy800)
                         .fixedSize(horizontal: false, vertical: true)
                         .multilineTextAlignment(.leading)

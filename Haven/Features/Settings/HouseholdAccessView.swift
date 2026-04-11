@@ -115,7 +115,7 @@ struct HouseholdAccessView: View {
         return HStack(spacing: 12) {
             // Avatar
             Text(String((user.fullName ?? user.email).prefix(1)).uppercased())
-                .font(Font.custom("Georgia", size: 15).weight(.semibold))
+                .font(HavenTypography.headline)
                 .foregroundStyle(.white)
                 .frame(width: 36, height: 36)
                 .background(Circle().fill(isMe ? HavenColors.navy800 : HavenColors.navy))

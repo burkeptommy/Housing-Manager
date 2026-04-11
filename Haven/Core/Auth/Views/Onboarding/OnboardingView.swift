@@ -24,7 +24,7 @@ struct OnboardingView: View {
                     invitedView
                 } else if viewModel.errorMessage != nil {
                     errorView
-                } else if viewModel.hasFinishedPrefill && !viewModel.canProceed {
+                } else if viewModel.hasFinishedPrefill && !viewModel.hasAutoCompleted {
                     nameFallbackView
                 } else {
                     setupSplash
@@ -90,7 +90,7 @@ struct OnboardingView: View {
 
             // Logo monogram
             Text("H")
-                .font(Font.custom("Georgia-Bold", size: 56))
+                .font(HavenTypography.fraunces(size: 56, weight: 700))
                 .foregroundStyle(HavenColors.creamLight)
                 .frame(width: 96, height: 96)
                 .background(
@@ -175,7 +175,7 @@ struct OnboardingView: View {
                 Task {
                     viewModel.errorMessage = nil
                     viewModel.hasAutoCompleted = false
-                    await viewModel.autoCompleteIfReady(authService: appState.authService)
+                    await viewModel.autoCompleteIfReady(authService: appState.authService, appState: appState)
                 }
             }
             .padding(.horizontal, HavenTheme.padding)
@@ -222,7 +222,7 @@ struct OnboardingView: View {
                 HavenButton(title: viewModel.isLoading ? viewModel.setupProgress : "Get Started") {
                     Task {
                         viewModel.hasAutoCompleted = false
-                        await viewModel.autoCompleteIfReady(authService: appState.authService)
+                        await viewModel.autoCompleteIfReady(authService: appState.authService, appState: appState)
                     }
                 }
                 .disabled(viewModel.isLoading || !viewModel.canProceed)

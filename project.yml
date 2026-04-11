@@ -29,6 +29,7 @@ targets:
           - "Resources/SplashScreen.storyboard"
     resources:
       - path: Haven/Resources/Assets.xcassets
+      - path: Haven/Resources/Fonts
     dependencies:
       - package: Supabase
         product: Supabase

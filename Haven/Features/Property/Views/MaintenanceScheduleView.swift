@@ -636,6 +636,18 @@ struct MaintenanceScheduleView: View {
             // screen empty.
             switch viewFilter {
             case .all:
+                // Phase 50: Vendor schedule leads — even DIY users see
+                // their service visits at the top of the screen so the
+                // list functions as a coordination dashboard first.
+                bucketSection(
+                    title: "Vendor Schedule",
+                    count: vendorBucketTasks.count,
+                    isCollapsed: vendorBucketCollapsed,
+                    onToggle: toggleVendorBucket,
+                    tasks: vendorBucketTasks,
+                    emptyCopy: "No service visits scheduled yet.",
+                    showChevron: true
+                )
                 bucketSection(
                     title: "Your To-Dos",
                     count: personalBucketTasks.count,
@@ -643,15 +655,6 @@ struct MaintenanceScheduleView: View {
                     onToggle: togglePersonalBucket,
                     tasks: personalBucketTasks,
                     emptyCopy: "No personal tasks right now.",
-                    showChevron: true
-                )
-                bucketSection(
-                    title: "Vendor-Managed",
-                    count: vendorBucketTasks.count,
-                    isCollapsed: vendorBucketCollapsed,
-                    onToggle: toggleVendorBucket,
-                    tasks: vendorBucketTasks,
-                    emptyCopy: "No vendor-managed tasks yet.",
                     showChevron: true
                 )
             case .mine:
@@ -666,12 +669,12 @@ struct MaintenanceScheduleView: View {
                 )
             case .vendor:
                 bucketSection(
-                    title: "Vendor-Managed",
+                    title: "Vendor Schedule",
                     count: vendorBucketTasks.count,
                     isCollapsed: false,
                     onToggle: {},
                     tasks: vendorBucketTasks,
-                    emptyCopy: "No vendor-managed tasks yet.",
+                    emptyCopy: "No service visits scheduled yet.",
                     showChevron: false
                 )
             }

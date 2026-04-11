@@ -112,7 +112,7 @@ private struct SecurityExplainerPageView: View {
 
                 // Headline — Georgia Bold 24pt centered
                 Text(page.headline)
-                    .font(Font.custom("Georgia", size: 24).weight(.bold))
+                    .font(HavenTypography.fraunces(size: 24, weight: 700))
                     .foregroundStyle(HavenColors.navy)
                     .multilineTextAlignment(.center)
                     .opacity(iconAppeared ? 1 : 0)
@@ -121,7 +121,7 @@ private struct SecurityExplainerPageView: View {
 
                 // Body — Georgia Regular 15pt centered max-width 280pt
                 Text(page.body)
-                    .font(Font.custom("Georgia", size: 15))
+                    .font(Font.custom("Inter", size: 15))
                     .foregroundStyle(HavenColors.textSecondary)
                     .multilineTextAlignment(.center)
                     .lineSpacing(4)

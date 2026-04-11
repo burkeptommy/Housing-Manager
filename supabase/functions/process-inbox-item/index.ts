@@ -27,7 +27,10 @@ const PRIVATE_FROM_HOME_MANAGERS = new Set([
   "will", "trust",
   "power of attorney", "healthcare directive",
   "guardianship designation", "letter of intent",
-  "living will", "estate plan", "beneficiary designation",
+  "living will", "hipaa authorization",
+  "pre-nuptial agreement", "post-nuptial agreement",
+  "disposition of remains", "deed in trust",
+  "estate plan", "beneficiary designation",
   // Financial Accounts
   "brokerage account", "retirement account (ira/401k)",
   "bank account", "529 plan",

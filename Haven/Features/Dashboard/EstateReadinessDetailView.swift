@@ -61,7 +61,7 @@ struct ReadinessDetailView: View {
             }
 
             Text(level.name)
-                .font(Font.custom("Georgia-Bold", size: 22))
+                .font(HavenTypography.title)
                 .foregroundStyle(HavenColors.textPrimary)
 
             Text(level.description)

@@ -8,6 +8,12 @@ enum DocumentCategory: String, CaseIterable, Codable {
     case healthcareDirective = "Healthcare Directive"
     case guardianshipDesignation = "Guardianship Designation"
     case letterOfIntent = "Letter of Intent"
+    case livingWill = "Living Will"
+    case hipaaAuthorization = "HIPAA Authorization"
+    case prenup = "Pre-Nuptial Agreement"
+    case postnup = "Post-Nuptial Agreement"
+    case dispositionOfRemains = "Disposition of Remains"
+    case deedInTrust = "Deed in Trust"
 
     // Entity Documents
     case llcOperatingAgreement = "LLC Operating Agreement"
@@ -114,7 +120,8 @@ enum DocumentCategory: String, CaseIterable, Codable {
     var isSingleton: Bool {
         switch self {
         // Estate Planning (one per type)
-        case .will, .trust, .powerOfAttorney, .healthcareDirective, .guardianshipDesignation, .letterOfIntent:
+        case .will, .trust, .powerOfAttorney, .healthcareDirective, .guardianshipDesignation, .letterOfIntent,
+             .livingWill, .hipaaAuthorization, .prenup, .postnup, .dispositionOfRemains, .deedInTrust:
             return true
         // Personal ID (one per type)
         case .passport, .birthCertificate, .marriageCertificate, .socialSecurityCard, .deathCertificate:
@@ -129,7 +136,8 @@ enum DocumentCategory: String, CaseIterable, Codable {
 
     var sectionGroup: String {
         switch self {
-        case .will, .trust, .powerOfAttorney, .healthcareDirective, .guardianshipDesignation, .letterOfIntent:
+        case .will, .trust, .powerOfAttorney, .healthcareDirective, .guardianshipDesignation, .letterOfIntent,
+             .livingWill, .hipaaAuthorization, .prenup, .postnup, .dispositionOfRemains, .deedInTrust:
             return "Estate Planning"
         case .llcOperatingAgreement, .lpAgreement, .sCorpDocuments, .ein, .annualFilings, .bylaws:
             return "Entity Documents"

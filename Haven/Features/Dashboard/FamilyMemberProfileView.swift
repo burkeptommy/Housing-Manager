@@ -72,7 +72,7 @@ struct FamilyMemberProfileView: View {
             FamilyAvatarView(member: member, size: 88, showName: false)
 
             Text("\(member.firstName) \(member.lastName)")
-                .font(Font.custom("Georgia-Bold", size: 20))
+                .font(HavenTypography.fraunces(size: 20, weight: 700))
                 .foregroundStyle(HavenColors.textPrimary)
 
             Text(member.relationship)

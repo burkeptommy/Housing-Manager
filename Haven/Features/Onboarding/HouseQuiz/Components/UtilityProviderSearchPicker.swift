@@ -38,6 +38,17 @@ struct UtilityProviderSearchPicker: View {
     /// pinned row fires `onDeselect` so the parent can clear its prior
     /// answer and the picker re-renders with the full alphabetical list.
     let preSelectedProviderId: UUID?
+    /// Build 88 redesign: when true, the picker manages its own horizontal
+    /// page-margin padding internally and pins a compact "Can't find yours?
+    /// Add it" footer to the bottom of its container, with a top border
+    /// separator and bottom safe-area padding so it doesn't clash with the
+    /// home indicator. Pass true when the picker is the root content of a
+    /// `.sheet()` (Estate intake / advisors directory). Leave false when
+    /// embedded in another scroll container that already provides
+    /// horizontal padding (the House Quiz inline provider questions) — the
+    /// picker then renders as a flat VStack with the custom-add card as a
+    /// bordered card after the provider list.
+    let renderAsStandaloneSheet: Bool
     let onSelect: (UtilityProviderRow) -> Void
     let onCustomCreated: ((UtilityProviderRow) -> Void)?
     /// Build 85: fired when the user taps the pinned "Currently selected"
@@ -51,6 +62,7 @@ struct UtilityProviderSearchPicker: View {
         city: String? = nil,
         searchPlaceholder: String? = nil,
         preSelectedProviderId: UUID? = nil,
+        renderAsStandaloneSheet: Bool = false,
         onSelect: @escaping (UtilityProviderRow) -> Void,
         onCustomCreated: ((UtilityProviderRow) -> Void)? = nil,
         onDeselect: (() -> Void)? = nil
@@ -60,6 +72,7 @@ struct UtilityProviderSearchPicker: View {
         self.city = city
         self.searchPlaceholder = searchPlaceholder
         self.preSelectedProviderId = preSelectedProviderId
+        self.renderAsStandaloneSheet = renderAsStandaloneSheet
         self.onSelect = onSelect
         self.onCustomCreated = onCustomCreated
         self.onDeselect = onDeselect
@@ -92,31 +105,11 @@ struct UtilityProviderSearchPicker: View {
     @State private var tappedProviderId: UUID? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
-            // Build 85: pinned "Currently selected" card. Renders above
-            // the search field so back-navigated users see their prior
-            // pick before they start typing. Hidden when no prior answer
-            // is on file.
-            if let pinned = pinnedProvider {
-                pinnedSelectionCard(pinned)
-            }
-
-            searchBar
-
-            if isLoading {
-                ProgressView()
-                    .controlSize(.regular)
-                    .tint(HavenColors.navy)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, HavenTheme.spacing16)
+        Group {
+            if renderAsStandaloneSheet {
+                standaloneSheetBody
             } else {
-                if filteredProviders.isEmpty && !searchText.isEmpty {
-                    emptyStateView
-                } else {
-                    providerList
-                }
-
-                customAddCard
+                embeddedBody
             }
         }
         .task(id: providerTypes) {
@@ -137,6 +130,101 @@ struct UtilityProviderSearchPicker: View {
                 }
             )
             .presentationDetents([.medium, .large])
+        }
+    }
+
+    // MARK: - Body variants
+
+    /// Build 88 redesign: layout used when the picker is the root content of
+    /// a `.sheet()` (estate intake / advisors directory). Internal layout:
+    ///
+    ///   ┌─────────────────────────────┐
+    ///   │  pinned card (optional)     │   <- fixed header, scrolls with the
+    ///   │  search bar                 │      sheet's nav bar but not the
+    ///   │  "{N} providers" header     │      provider list
+    ///   ├─────────────────────────────┤
+    ///   │  provider rows (scrolls)    │   <- inner ScrollView; the list is
+    ///   │  ...                        │      the only thing that scrolls
+    ///   ├─────────────────────────────┤
+    ///   │  ✨ Can't find yours? Add it │   <- sticky footer with top border
+    ///   └─────────────────────────────┘      and bottom safe-area padding
+    ///
+    /// Page-margin horizontal padding is applied internally so the picker
+    /// can be dropped into a `NavigationStack { }` inside a `.sheet { }`
+    /// without the caller having to wrap it in another padded container.
+    private var standaloneSheetBody: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            // Fixed header. The pinned-card / search field / section header
+            // group stays anchored above the scrolling provider list so the
+            // user can always type and re-search without scrolling back up.
+            VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+                if let pinned = pinnedProvider {
+                    pinnedSelectionCard(pinned)
+                }
+                searchBar
+                if !isLoading {
+                    sectionHeader
+                }
+            }
+            .padding(.horizontal, HavenTheme.pageMargin)
+            .padding(.top, HavenTheme.spacing16)
+            .padding(.bottom, HavenTheme.spacing16)
+
+            // Scrolling provider list. The inner ScrollView only renders the
+            // list itself so the fixed header above + sticky footer below
+            // both stay visible regardless of scroll position.
+            ScrollView {
+                listContent
+                    .padding(.horizontal, HavenTheme.pageMargin)
+                    .padding(.bottom, HavenTheme.spacing16)
+            }
+
+            // Sticky "Can't find yours? Add it" footer. Edge-to-edge surface
+            // background with a top border and bottom safe-area padding so
+            // it doesn't clash with the home indicator.
+            stickyCustomAddFooter
+        }
+    }
+
+    /// Build 88 redesign: layout used when the picker is embedded in a parent
+    /// scroll container that already provides horizontal page-margin padding
+    /// (the House Quiz inline provider questions). The picker renders as a
+    /// flat VStack — no inner ScrollView, no sticky footer — so the outer
+    /// container handles all scrolling and the picker's content lines up
+    /// horizontally with the rest of the page.
+    private var embeddedBody: some View {
+        VStack(alignment: .leading, spacing: HavenTheme.spacing16) {
+            if let pinned = pinnedProvider {
+                pinnedSelectionCard(pinned)
+            }
+            searchBar
+            if !isLoading {
+                sectionHeader
+            }
+            listContent
+            inlineCustomAddCard
+        }
+    }
+
+    /// Shared between both body variants — the loading spinner, empty-state
+    /// card, or the actual provider list. The caller wraps this in whatever
+    /// padding/scroll container is appropriate for the body variant.
+    @ViewBuilder
+    private var listContent: some View {
+        if isLoading {
+            ProgressView()
+                .controlSize(.regular)
+                .tint(HavenColors.navy)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, HavenTheme.spacing16)
+        } else if filteredProviders.isEmpty && !searchText.isEmpty {
+            emptyStateView
+        } else {
+            VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
+                ForEach(filteredProviders.prefix(20)) { provider in
+                    providerRow(provider)
+                }
+            }
         }
     }
 
@@ -193,56 +281,50 @@ struct UtilityProviderSearchPicker: View {
         }
     }
 
+    /// Build 88 redesign: removed the standalone "Search by provider name or
+    /// website" label that used to sit above the input. The label was
+    /// redundant with the placeholder text and added vertical noise above
+    /// the search field. The placeholder now defaults to "Search name or
+    /// website..." so the input still tells the user what to search by.
     private var searchBar: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing8) {
-            Text("Search by provider name or website")
-                .font(HavenTypography.uiLabelSmall)
+        HStack(spacing: HavenTheme.spacing8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14))
                 .foregroundStyle(HavenColors.textTertiary)
-            HStack {
-                Image(systemName: "magnifyingglass")
-                    .font(.system(size: 14))
-                    .foregroundStyle(HavenColors.textTertiary)
-                TextField(searchPlaceholder ?? "ConEd, Verizon, Optimum...", text: $searchText)
-                    .textInputAutocapitalization(.words)
-                    .autocorrectionDisabled(true)
-                if !searchText.isEmpty {
-                    Button {
-                        searchText = ""
-                    } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .foregroundStyle(HavenColors.textTertiary)
-                    }
+            TextField(searchPlaceholder ?? "Search name or website...", text: $searchText)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled(true)
+            if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(HavenColors.textTertiary)
                 }
             }
-            .padding(HavenTheme.spacing12)
-            .background(HavenColors.creamLight)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
         }
+        .padding(HavenTheme.spacing12)
+        .background(HavenColors.creamLight)
+        .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
     }
 
-    private var providerList: some View {
-        VStack(alignment: .leading, spacing: HavenTheme.spacing12) {
-            if !searchText.isEmpty {
-                Text("MATCHES")
-                    .font(HavenTypography.uiSectionHeader)
-                    .foregroundStyle(HavenColors.textTertiary)
-            } else {
-                if let state, !state.isEmpty {
-                    Text("POPULAR IN \(state.uppercased()) · \(filteredProviders.count) provider\(filteredProviders.count == 1 ? "" : "s")")
-                        .font(HavenTypography.uiSectionHeader)
-                        .foregroundStyle(HavenColors.textTertiary)
-                } else {
-                    Text("POPULAR")
-                        .font(HavenTypography.uiSectionHeader)
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
-            }
-            VStack(spacing: HavenTheme.spacing8) {
-                ForEach(filteredProviders.prefix(20)) { provider in
-                    providerRow(provider)
-                }
-            }
+    /// Build 88 redesign: simple count-only header above the provider list.
+    /// Reads "{N} PROVIDERS" by default and "{N} MATCHES" once the user has
+    /// typed a search query. The previous "POPULAR IN NY" / "POPULAR" copy
+    /// felt patronizing on advisor categories where there's no regional
+    /// curation, and the count is what the user actually wants to know
+    /// (am I looking at 4 providers or 40?).
+    private var sectionHeader: some View {
+        let count = filteredProviders.prefix(20).count
+        let label: String
+        if searchText.isEmpty {
+            label = count == 1 ? "1 PROVIDER" : "\(count) PROVIDERS"
+        } else {
+            label = count == 1 ? "1 MATCH" : "\(count) MATCHES"
         }
+        return Text(label)
+            .font(HavenTypography.uiSectionHeader)
+            .foregroundStyle(HavenColors.textTertiary)
     }
 
     private func providerRow(_ provider: UtilityProviderRow) -> some View {
@@ -251,6 +333,13 @@ struct UtilityProviderSearchPicker: View {
         // siblings dim to 55% opacity. The 0.35s pause inside
         // `recordProviderAnswer` (build 82 pattern) gives this feedback time
         // to register before the quiz advances.
+        //
+        // Build 88 redesign: removed the secondary "Estate Attorney" / "CPA /
+        // Tax Advisor" / "Life Insurance" subtitle that used to sit under the
+        // provider name. The sheet's nav title already tells the user what
+        // category they're browsing, so the subtitle was pure repetition and
+        // made every row taller than it needed to be. Just the logo + name
+        // now, vertically centered.
         let isTapped = (tappedProviderId == provider.id)
         let anyTapped = (tappedProviderId != nil)
         return Button {
@@ -262,14 +351,11 @@ struct UtilityProviderSearchPicker: View {
         } label: {
             HStack(spacing: HavenTheme.spacing12) {
                 logoView(for: provider)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(provider.name)
-                        .font(HavenTypography.body)
-                        .foregroundStyle(HavenColors.textPrimary)
-                    Text(provider.providerType.replacingOccurrences(of: "_", with: " ").capitalized)
-                        .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.textTertiary)
-                }
+                Text(provider.name)
+                    .font(HavenTypography.body)
+                    .foregroundStyle(HavenColors.textPrimary)
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
                 Image(systemName: isTapped ? "checkmark.circle.fill" : "chevron.right")
                     .font(.system(size: isTapped ? 18 : 12, weight: .semibold))
@@ -300,19 +386,19 @@ struct UtilityProviderSearchPicker: View {
                     image
                         .resizable()
                         .aspectRatio(contentMode: .fit)
-                        .padding(4)
+                        .padding(5)
                 default:
                     fallbackIcon(for: provider.providerType)
                 }
             }
-            .frame(width: 40, height: 40)
+            .frame(width: 48, height: 48)
             .background(HavenColors.creamLight)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         } else {
             fallbackIcon(for: provider.providerType)
-                .frame(width: 40, height: 40)
+                .frame(width: 48, height: 48)
                 .background(HavenColors.creamLight)
-                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
@@ -322,7 +408,7 @@ struct UtilityProviderSearchPicker: View {
     /// company instead of a carrier.
     private func fallbackIcon(for providerType: String) -> some View {
         Image(systemName: Self.fallbackIconName(for: providerType))
-            .font(.system(size: 16))
+            .font(.system(size: 18))
             .foregroundStyle(HavenColors.navy)
     }
 
@@ -330,6 +416,15 @@ struct UtilityProviderSearchPicker: View {
         switch providerType {
         case "auto_insurance": return "car.fill"
         case "home_insurance": return "house.fill"
+        case "landscaping": return "leaf.fill"
+        case "pool_service": return "figure.pool.swim"
+        case "pest_control": return "ant.fill"
+        case "irrigation": return "sprinkler.and.droplets.fill"
+        case "security": return "shield.checkered"
+        case "estate_attorney": return "building.columns.fill"
+        case "cpa_tax": return "dollarsign.circle.fill"
+        case "financial_advisor": return "chart.line.uptrend.xyaxis"
+        case "life_insurance": return "heart.text.square.fill"
         default: return "bolt.fill"
         }
     }
@@ -342,7 +437,7 @@ struct UtilityProviderSearchPicker: View {
             Text("No matches yet")
                 .font(HavenTypography.bodySmall.weight(.semibold))
                 .foregroundStyle(HavenColors.textPrimary)
-            Text("Try a shorter spelling, or scroll down to add it.")
+            Text("Try a shorter spelling, or add it below.")
                 .font(HavenTypography.caption)
                 .foregroundStyle(HavenColors.textSecondary)
                 .multilineTextAlignment(.center)
@@ -351,36 +446,72 @@ struct UtilityProviderSearchPicker: View {
         .padding(.vertical, HavenTheme.spacing16)
     }
 
-    private var customAddCard: some View {
+    /// Build 88 redesign: shared button content for both the inline custom-add
+    /// card (embedded body) and the sticky footer (standalone sheet body).
+    /// Compact single line: sparkles icon + "Can't find yours? Add it" copy +
+    /// plus.circle.fill on the trailing edge. The wrapper view supplies its
+    /// own background and padding so the same content renders correctly as
+    /// either a card or a sticky footer.
+    @ViewBuilder
+    private var customAddButtonContent: some View {
+        HStack(spacing: HavenTheme.spacing12) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(HavenColors.navy)
+            Text("Can't find yours? Add it")
+                .font(HavenTypography.uiButton)
+                .foregroundStyle(HavenColors.textPrimary)
+            Spacer(minLength: 0)
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 18))
+                .foregroundStyle(HavenColors.navy)
+        }
+    }
+
+    /// Build 88 redesign: card-style custom-add button used in the embedded
+    /// (House Quiz) body. Same compact single-line content as the sticky
+    /// footer, but rendered as a bordered cream-light card so it matches
+    /// the rest of the picker's content within the quiz scroll context.
+    private var inlineCustomAddCard: some View {
         Button {
             showCustomAdd = true
         } label: {
-            HStack(spacing: HavenTheme.spacing12) {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 16, weight: .semibold))
-                    .foregroundStyle(HavenColors.navy)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Didn't find yours? Add it")
-                        .font(HavenTypography.bodySmall.weight(.semibold))
-                        .foregroundStyle(HavenColors.textPrimary)
-                    Text("We'll fetch their logo and add them for everyone.")
-                        .font(HavenTypography.caption)
-                        .foregroundStyle(HavenColors.textSecondary)
-                }
-                Spacer(minLength: 0)
-                Image(systemName: "plus.circle.fill")
-                    .font(.system(size: 18))
-                    .foregroundStyle(HavenColors.navy)
-            }
-            .padding(HavenTheme.spacing12)
-            .background(HavenColors.creamLight)
-            .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
-            .overlay(
-                RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
-                    .strokeBorder(HavenColors.navy.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            )
+            customAddButtonContent
+                .padding(HavenTheme.spacing12)
+                .background(HavenColors.creamLight)
+                .clipShape(RoundedRectangle(cornerRadius: HavenTheme.radiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: HavenTheme.radiusMedium)
+                        .strokeBorder(HavenColors.navy.opacity(0.2), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
+                )
         }
         .buttonStyle(.plain)
+    }
+
+    /// Build 88 redesign: sticky footer used in the standalone-sheet body.
+    /// Edge-to-edge surface background with a 0.5pt top border separating it
+    /// from the scrolling provider list above, and a bottom safe-area
+    /// background extension so the home indicator doesn't visually clash
+    /// with the button content.
+    private var stickyCustomAddFooter: some View {
+        Button {
+            showCustomAdd = true
+        } label: {
+            customAddButtonContent
+                .padding(.horizontal, HavenTheme.pageMargin)
+                .padding(.vertical, HavenTheme.spacing16)
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.plain)
+        .background(
+            HavenColors.surface
+                .ignoresSafeArea(.container, edges: .bottom)
+        )
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(HavenColors.border)
+                .frame(height: 0.5)
+        }
     }
 
     // MARK: - Computed
@@ -418,9 +549,21 @@ struct UtilityProviderSearchPicker: View {
         if needle.isEmpty {
             base = allProviders
         } else {
+            // Build 88 redesign: strip protocol + www. prefixes from the
+            // stored website before comparing so a user typing "ml.com"
+            // matches a provider whose website is "https://www.ml.com".
+            // The unstripped contains() check is kept as a fallback so
+            // searches that include "https://" still resolve.
             base = allProviders.filter { provider in
                 provider.name.lowercased().contains(needle)
-                    || (provider.website?.lowercased().contains(needle) ?? false)
+                    || {
+                        guard let website = provider.website?.lowercased() else { return false }
+                        let cleaned = website
+                            .replacingOccurrences(of: "https://", with: "")
+                            .replacingOccurrences(of: "http://", with: "")
+                            .replacingOccurrences(of: "www.", with: "")
+                        return cleaned.contains(needle) || website.contains(needle)
+                    }()
             }
         }
         // Stable sort: relevance score descending, then alphabetical.
@@ -484,18 +627,37 @@ struct UtilityProviderSearchPicker: View {
     /// from rendering. Patches the catalog row directly so subsequent users
     /// (and the next render of this picker) see the brand identity. Failures
     /// are silent — Brandfetch downtime should never break the quiz.
+    ///
+    /// Build 90: Prioritise national/statewide brands so recognisable
+    /// logos (Fidelity, Schwab, MetLife, etc.) resolve on the very first
+    /// picker visit instead of losing their slot to random local firms.
+    /// Sorting: US-tagged first, then state-tagged, then local. Within
+    /// each tier, providers WITH a website sort before those without
+    /// (defensive, since the filter already requires a website).
+    /// Batch bumped from 20 → 60 and concurrency from 12 → 15 so a
+    /// fresh 500-row advisor catalog makes real progress on the first
+    /// render. Each subsequent visit enriches another 60 until the
+    /// backlog is drained.
     private static func enrichMissingLogos(providers: [UtilityProviderRow]) async {
         let needsLogo = providers.filter { $0.logoUrl == nil && $0.website != nil }
         guard !needsLogo.isEmpty else { return }
 
-        // Cap concurrency at 6 so we don't drown Brandfetch's rate limit.
-        // Take the first 20 to bound work per render — repeat picker visits
-        // gradually backfill the rest.
-        let batch = Array(needsLogo.prefix(20))
+        // Prioritise nationals (regions contains 'US') then state-level,
+        // then local so the most recognisable brands get logos first.
+        let sorted = needsLogo.sorted { a, b in
+            let aRegions = a.regions ?? []
+            let bRegions = b.regions ?? []
+            let aIsUS = aRegions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame })
+            let bIsUS = bRegions.contains(where: { $0.caseInsensitiveCompare("US") == .orderedSame })
+            if aIsUS != bIsUS { return aIsUS }
+            // Fewer region tags → broader coverage → higher priority
+            return aRegions.count < bRegions.count
+        }
+        let batch = Array(sorted.prefix(60))
         await withTaskGroup(of: Void.self) { group in
             var inFlight = 0
             for provider in batch {
-                if inFlight >= 6 {
+                if inFlight >= 15 {
                     await group.next()
                     inFlight -= 1
                 }

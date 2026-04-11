@@ -31,6 +31,23 @@ struct ChatView: View {
             .navigationTitle("Alfred")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                // Scenarios entry point — moved here from the global FAB
+                // so the AI surface area lives in one place. Posts the
+                // existing `.openScenarioStudio` notification, which
+                // MainTabView observes to present `ScenarioStudioView`
+                // as a fullScreenCover (and switches to the Alfred tab).
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        Haptics.medium()
+                        Analytics.track(.scenarioStudioOpened, ["source": "alfred_toolbar"])
+                        NotificationCenter.default.post(name: .openScenarioStudio, object: nil)
+                    } label: {
+                        Image(systemName: "sparkles")
+                            .foregroundStyle(HavenColors.navy700)
+                    }
+                    .accessibilityLabel("Scenarios")
+                    .accessibilityHint("Open the What If? scenario planner")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
                         Button {

@@ -72,7 +72,7 @@ struct SaleSimulatorSheet: View {
                 .foregroundStyle(HavenColors.textPrimary)
 
             TextField("$0", value: $salePrice, format: .currency(code: "USD").precision(.fractionLength(0)))
-                .font(.custom("Georgia", size: 32).weight(.bold))
+                .font(HavenTypography.fraunces(size: 32, weight: 700))
                 .foregroundStyle(HavenColors.textPrimary)
                 .multilineTextAlignment(.center)
                 .keyboardType(.decimalPad)
@@ -120,7 +120,7 @@ struct SaleSimulatorSheet: View {
                         .font(HavenTypography.uiLabelMedium)
                         .foregroundStyle(HavenColors.textSecondary)
                     Text(formatCurrency(netProceeds))
-                        .font(.custom("Georgia", size: 28).weight(.bold))
+                        .font(HavenTypography.largeTitle)
                         .foregroundStyle(netProceeds >= 0 ? HavenColors.success : HavenColors.critical)
 
                     // Gain/loss badge

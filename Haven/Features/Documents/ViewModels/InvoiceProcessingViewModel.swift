@@ -18,6 +18,21 @@ struct ResolvedNewSystem: Identifiable {
     }
 }
 
+/// Phase 50: Pending recurring-cadence suggestion surfaced from an
+/// invoice. Stored on the view model after `applyChanges()` runs and
+/// posted via `.invoiceCadenceDetected` so the Dashboard can render a
+/// confirmation card. Accepting writes the new interval to
+/// `home_systems.service_interval_days`; dismissing throws it away.
+struct InvoiceCadenceSuggestion: Identifiable, Equatable {
+    let id = UUID()
+    let intervalDays: Int
+    let quotedText: String?
+    let vendorName: String?
+    let systemId: UUID?
+    let propertyId: UUID?
+    let invoiceDocumentId: UUID
+}
+
 @MainActor
 class InvoiceProcessingViewModel: ObservableObject {
     let documentId: UUID
@@ -40,6 +55,13 @@ class InvoiceProcessingViewModel: ObservableObject {
     @Published var resolvedSystems: [ResolvedNewSystem] = []
     @Published var existingTopLevelSystems: [HomeSystemRow] = []
     @Published var resolvedParentDisplayNames: [String: String] = [:]
+
+    /// Phase 50: Cadence suggestion captured from the invoice when the
+    /// AI extracted an explicit recurring schedule (e.g. "biweekly
+    /// service plan"). Posted via NotificationCenter after the user
+    /// applies invoice changes so the Dashboard can render a one-tap
+    /// confirmation card.
+    @Published var pendingCadenceSuggestion: InvoiceCadenceSuggestion?
 
     init(documentId: UUID, propertyId: UUID, householdId: UUID) {
         self.documentId = documentId
@@ -313,7 +335,27 @@ class InvoiceProcessingViewModel: ObservableObject {
             }
 
             // 5. Create follow-up maintenance tasks
+            //
+            // Phase 50: tag follow-ups with vendor metadata so the
+            // PropertyDetailView Maintenance tab can render them in the
+            // amber follow-up section. The notes prefix ("Vendor follow-up:")
+            // is the lookup key — keep it stable. We also link the task to
+            // the matched contractor and stamp `assignment_type = "vendor"`
+            // so the vendor schedule + amber tint flow naturally from the
+            // existing routing logic.
             if let followUps = result.followUpNeeded {
+                // Resolve the vendor name + contractor id once. The vendor
+                // either matched an existing contractor (matched_contractor_id)
+                // or we just created one above (look it up by name).
+                var followUpContractorId: UUID? = result.vendor?.matchedContractorId.flatMap { UUID(uuidString: $0) }
+                if followUpContractorId == nil, let companyName = result.vendor?.companyName {
+                    let allContractors = (try? await db.fetchContractors()) ?? []
+                    followUpContractorId = allContractors.first(where: {
+                        $0.companyName.caseInsensitiveCompare(companyName) == .orderedSame
+                    })?.id
+                }
+                let vendorLabel = result.vendor?.companyName ?? "your vendor"
+
                 for followUp in followUps {
                     let dueDate = followUp.suggestedDueDate ?? {
                         let dateFormatter = DateFormatter()
@@ -330,16 +372,46 @@ class InvoiceProcessingViewModel: ObservableObject {
                         }
                     }()
 
-                    _ = try await db.createMaintenanceTask(MaintenanceTaskInsert(
+                    var insert = MaintenanceTaskInsert(
                         propertyId: propertyId,
                         householdId: householdId,
                         title: followUp.description,
                         frequency: "once",
-                        nextDueDate: dueDate,
-                        priority: priority,
-                        notes: "Auto-created from invoice follow-up recommendation"
-                    ))
+                        nextDueDate: dueDate
+                    )
+                    insert.priority = priority
+                    insert.notes = "Vendor follow-up: \(followUp.description)\n\nSource: invoice from \(vendorLabel), \(invoiceDateStr)"
+                    insert.assignmentType = "vendor"
+                    insert.assignedContractorId = followUpContractorId
+                    insert.needsVendor = followUpContractorId == nil
+                    _ = try await db.createMaintenanceTask(insert)
                 }
+            }
+
+            // Phase 50: surface explicit recurring cadence detected on the
+            // invoice. We don't auto-apply — the Dashboard renders a prompt
+            // card via `pendingCadenceSuggestion` so the user confirms
+            // before we rewrite the system's service interval.
+            if let cadence = result.cadenceDetected,
+               let intervalDays = cadence.intervalDays,
+               intervalDays > 0,
+               (cadence.confidence ?? 0) > 0.8 {
+                // Resolve the linked system from the most-referenced
+                // matched_system_id in completed tasks (the one the
+                // contractor actually serviced).
+                let systemCounts = Dictionary(grouping: result.completedTasks.compactMap {
+                    $0.matchedSystemId.flatMap(UUID.init(uuidString:))
+                }, by: { $0 })
+                .mapValues(\.count)
+                let topSystemId = systemCounts.max { $0.value < $1.value }?.key
+                pendingCadenceSuggestion = InvoiceCadenceSuggestion(
+                    intervalDays: intervalDays,
+                    quotedText: cadence.quotedText,
+                    vendorName: vendorLabelForCadence(),
+                    systemId: topSystemId,
+                    propertyId: propertyId,
+                    invoiceDocumentId: documentId
+                )
             }
 
             // 6. Reschedule notifications
@@ -349,6 +421,18 @@ class InvoiceProcessingViewModel: ObservableObject {
             NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
             NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
             NotificationCenter.default.post(name: .contractorChanged, object: nil)
+            // Phase 50: broadcast the cadence suggestion so the Dashboard
+            // can pick it up and render the prompt card. The Dashboard
+            // listens for this notification and pulls the latest
+            // suggestion from a shared coordinator.
+            if let suggestion = pendingCadenceSuggestion {
+                NotificationCenter.default.post(
+                    name: .invoiceCadenceDetected,
+                    object: nil,
+                    userInfo: ["suggestion_id": suggestion.id.uuidString]
+                )
+                InvoiceCadenceCoordinator.shared.publish(suggestion)
+            }
 
             applySuccess = true
             Haptics.success()
@@ -629,5 +713,83 @@ class InvoiceProcessingViewModel: ObservableObject {
         }
 
         return false
+    }
+
+    // MARK: - Phase 50: Cadence helpers
+
+    /// Resolve a friendly vendor display name for the cadence card. Pulls
+    /// from the invoice vendor row if available; otherwise falls back to
+    /// "your vendor". Mirrored by the Dashboard's CadenceSuggestionCard.
+    private func vendorLabelForCadence() -> String? {
+        if let name = result?.vendor?.companyName, !name.isEmpty {
+            return name
+        }
+        return nil
+    }
+}
+
+// MARK: - Phase 50: Cadence Coordinator
+
+/// Phase 50: In-memory holdover so the Dashboard can pick up the most
+/// recent cadence suggestion after `InvoiceProcessingViewModel`
+/// publishes one. The view model tears down as soon as the
+/// InvoiceReviewSheet dismisses, so we can't subscribe directly to its
+/// `pendingCadenceSuggestion` from another screen — the coordinator
+/// outlives the sheet and persists the suggestion in memory until the
+/// dashboard either accepts or dismisses it.
+@MainActor
+final class InvoiceCadenceCoordinator: ObservableObject {
+    static let shared = InvoiceCadenceCoordinator()
+    private init() {}
+
+    @Published var current: InvoiceCadenceSuggestion?
+
+    func publish(_ suggestion: InvoiceCadenceSuggestion) {
+        current = suggestion
+    }
+
+    func dismiss() {
+        current = nil
+    }
+
+    /// Apply the suggestion to the linked system: write
+    /// `service_interval_days` and recompute the next-due dates of any
+    /// matching tasks. Returns true on success.
+    func apply(_ suggestion: InvoiceCadenceSuggestion) async -> Bool {
+        guard let systemId = suggestion.systemId else {
+            // No system match — nothing to update at the system level.
+            // We still consider this "applied" because the cadence may
+            // have been added to a task-only context.
+            current = nil
+            return true
+        }
+        var update = HomeSystemUpdate()
+        update.serviceIntervalDays = suggestion.intervalDays
+        update.serviceIntervalSource = "vendor_invoice"
+        do {
+            _ = try await DatabaseService.shared.updateHomeSystem(id: systemId, update)
+            // Reschedule next-due dates on existing maintenance tasks
+            // attached to this system so the Dashboard reflects the new
+            // cadence immediately.
+            let tasks = (try? await DatabaseService.shared.fetchMaintenanceTasks(systemId: systemId)) ?? []
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            let now = Date()
+            for task in tasks {
+                let last = task.lastCompletedDate.flatMap { formatter.date(from: $0) } ?? now
+                if let nextDate = Calendar.current.date(byAdding: .day, value: suggestion.intervalDays, to: last) {
+                    var taskUpdate = MaintenanceTaskUpdate()
+                    taskUpdate.nextDueDate = formatter.string(from: nextDate)
+                    _ = try? await DatabaseService.shared.updateMaintenanceTask(id: task.id, taskUpdate)
+                }
+            }
+            NotificationCenter.default.post(name: .homeSystemChanged, object: nil)
+            NotificationCenter.default.post(name: .maintenanceTaskChanged, object: nil)
+            current = nil
+            return true
+        } catch {
+            print("[InvoiceCadence] Apply failed: \(error)")
+            return false
+        }
     }
 }

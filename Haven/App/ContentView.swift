@@ -36,8 +36,11 @@ struct ContentView: View {
 
             // -- UNAUTHENTICATED: User tapped a CTA from AddressHookView --
             } else if showAuth {
-                LoginView(initialMode: showSignIn ? .signIn : .signUp)
-                    .environmentObject(appState)
+                LoginView(
+                    initialMode: showSignIn ? .signIn : .signUp,
+                    onBack: { showAuth = false }
+                )
+                .environmentObject(appState)
 
             // -- UNAUTHENTICATED: Default landing (always AddressHookView) --
             } else {

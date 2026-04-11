@@ -28,7 +28,7 @@ struct AddressConfirmationIntercept: View {
                     // Branding
                     VStack(spacing: HavenTheme.spacing8) {
                         Text("H")
-                            .font(Font.custom("Georgia-Bold", size: 48))
+                            .font(HavenTypography.fraunces(size: 48, weight: 700))
                             .foregroundStyle(HavenColors.navy800)
                             .frame(width: 80, height: 80)
                             .background(

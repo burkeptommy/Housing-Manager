@@ -59,6 +59,102 @@ final class PropertyDetailViewModel: ObservableObject {
             .sorted { a, b in a.nextDueDate < b.nextDueDate }
     }
 
+    /// Phase 50: Vendor preference tier sourced from the property's
+    /// attributes JSONB. Read once and cached for the lifetime of the
+    /// view model so the routing helpers can branch on it without
+    /// hitting the dictionary on every recompute.
+    var vendorPreferenceTier: VendorPreferenceTier {
+        MaintenanceTaskReconciler.preferenceTierFromProperty(property)
+    }
+
+    /// Phase 50: Tasks shown in the Maintenance tab's "Your tasks"
+    /// section. Filters by template routing so even hire-out users still
+    /// see the small set of `.diyDefault` chores (filter swap, mini-split
+    /// rinse, generator dipstick, weatherstripping check). Custom tasks
+    /// (no templateId) fall back to assignment_type — anything not
+    /// `vendor` is treated as personal.
+    var diyTasksForMaintenanceTab: [MaintenanceTaskDBRow] {
+        maintenanceTasks.filter { task in
+            // Vehicle tasks live on the vehicle detail screen.
+            if task.vehicleId != nil { return false }
+            guard let templateKey = task.templateId,
+                  let template = MaintenanceTemplates.template(forKey: templateKey) else {
+                // Custom tasks: include if assignment is anything but vendor.
+                return (task.assignmentType?.lowercased() ?? "either") != "vendor"
+            }
+            switch template.routing {
+            case .diyDefault:
+                return true
+            case .diyCapable:
+                // V1: only the bare DIY tier opts every diyCapable template
+                // into the personal section. Future: per-category opt-in.
+                return vendorPreferenceTier == .diy
+            case .vendorDefault, .bundledIntoParent:
+                return false
+            }
+        }
+        .sorted { $0.nextDueDate < $1.nextDueDate }
+    }
+
+    /// Phase 50: Vendor service visits for the Maintenance tab. Same
+    /// filter as the dashboard's `upcomingVendorVisits` (vendor
+    /// assignment + non-vehicle + future) but scoped to this property.
+    var vendorVisitTasks: [MaintenanceTaskDBRow] {
+        let now = Date()
+        return maintenanceTasks
+            .filter { task in
+                guard task.vehicleId == nil else { return false }
+                guard task.assignmentType?.lowercased() == "vendor" else { return false }
+                guard let date = dateFormatter.date(from: task.nextDueDate) else { return false }
+                return date >= now
+            }
+            .sorted { $0.nextDueDate < $1.nextDueDate }
+    }
+
+    /// Phase 50: Tasks created from invoice follow-ups (e.g. "retest
+    /// water in 4 weeks"). Tagged in the notes prefix by the invoice
+    /// processing pipeline so the maintenance tab can render them in a
+    /// distinct amber section instead of mixing them into the standard
+    /// vendor schedule.
+    var vendorFollowUpTasks: [MaintenanceTaskDBRow] {
+        maintenanceTasks
+            .filter { task in
+                guard task.vehicleId == nil else { return false }
+                let notes = task.notes ?? ""
+                return notes.lowercased().hasPrefix("vendor follow-up")
+            }
+            .sorted { $0.nextDueDate < $1.nextDueDate }
+    }
+
+    /// Phase 50: Resolve a contractor row by id. Used by the vendor
+    /// visit cards in the Maintenance tab to surface vendor name, logo,
+    /// and brand color.
+    func contractor(for id: UUID?) -> ContractorRow? {
+        guard let id else { return nil }
+        return contractors.first { $0.id == id }
+    }
+
+    /// Phase 50: Look up the most recent service cost for a vendor task
+    /// so the visit card can show "Last: $340". Falls back through
+    /// (system + contractor) → (system) → (contractor) and returns nil
+    /// when no priced history exists yet.
+    func recentServiceCost(systemId: UUID?, contractorId: UUID?) -> Double? {
+        let sorted = serviceRecords.sorted { $0.serviceDate > $1.serviceDate }
+        if let systemId, let contractorId,
+           let row = sorted.first(where: { $0.systemId == systemId && $0.contractorId == contractorId && $0.cost != nil }) {
+            return row.cost
+        }
+        if let systemId,
+           let row = sorted.first(where: { $0.systemId == systemId && $0.cost != nil }) {
+            return row.cost
+        }
+        if let contractorId,
+           let row = sorted.first(where: { $0.contractorId == contractorId && $0.cost != nil }) {
+            return row.cost
+        }
+        return nil
+    }
+
     var totalServiceCost: Double {
         serviceRecords.compactMap(\.cost).reduce(0, +)
     }
@@ -340,6 +436,11 @@ final class PropertyDetailViewModel: ObservableObject {
                 ?? (attomEstimatedValue != nil ? "computed" : nil)
             update.purchasePrice = result.lastSalePrice
 
+            // Build 89: stamp lookup timestamp so auto-refresh knows this is fresh
+            var attrs = prop.attributes ?? [:]
+            attrs["last_value_lookup_at"] = .string(ISO8601DateFormatter().string(from: Date()))
+            update.attributes = attrs
+
             let updated = try await db.updateProperty(id: prop.id, update)
             property = updated
             if let appState, appState.primaryProperty?.id == updated.id {
@@ -421,7 +522,15 @@ final class PropertyDetailViewModel: ObservableObject {
         Haptics.success()
 
         do {
-            let nextDate = calculateNextDueDate(frequency: task.frequency, from: .now)
+            // Phase 50: route through the centralized due-date helper so
+            // any per-system `service_interval_days` override takes
+            // precedence over the template's default frequency.
+            let linkedSystem = systems.first(where: { $0.id == task.systemId })
+            let nextDate = MaintenanceTaskReconciler.nextDueDate(
+                for: task,
+                system: linkedSystem,
+                from: .now
+            ) ?? calculateNextDueDate(frequency: task.frequency, from: .now)
             _ = try await db.updateMaintenanceTask(
                 id: task.id,
                 MaintenanceTaskUpdate(

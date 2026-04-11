@@ -130,20 +130,36 @@ final class AuthService: ObservableObject {
         }
 
         // Apple only provides the user's name on the FIRST sign-in.
-        // Capture it now — we'll use it in onboarding or to update the profile.
-        var capturedFirst: String?
-        var capturedLast: String?
-        if let fullName = credential.fullName {
-            let first = fullName.givenName ?? ""
-            let last = fullName.familyName ?? ""
-            let name = [first, last].filter { !$0.isEmpty }.joined(separator: " ")
-            if !first.isEmpty { capturedFirst = first }
-            if !last.isEmpty { capturedLast = last }
-            if !name.isEmpty {
-                pendingFullName = name
-                pendingFirstName = capturedFirst
-                pendingLastName = capturedLast
-            }
+        // On subsequent sign-ins, credential.fullName fields are nil.
+        let capturedFirst = credential.fullName?.givenName?.trimmingCharacters(in: .whitespaces)
+        let capturedLast = credential.fullName?.familyName?.trimmingCharacters(in: .whitespaces)
+        let hasFirstName = capturedFirst != nil && !capturedFirst!.isEmpty
+        let hasLastName = capturedLast != nil && !capturedLast!.isEmpty
+
+        if hasFirstName || hasLastName {
+            let fullName = [capturedFirst, capturedLast]
+                .compactMap { $0 }
+                .filter { !$0.isEmpty }
+                .joined(separator: " ")
+            pendingFullName = fullName.isEmpty ? nil : fullName
+            pendingFirstName = hasFirstName ? capturedFirst : nil
+            pendingLastName = hasLastName ? capturedLast : nil
+        }
+
+        // Snapshot existing display name BEFORE signInWithIdToken, because
+        // Supabase's server-side Apple JWT processing can overwrite
+        // full_name in user metadata with "-" when Apple omits name claims.
+        let existingFullName: String?
+        let existingFirstName: String?
+        let existingLastName: String?
+        if let session = try? await HavenSupabase.auth.session {
+            existingFullName = session.user.userMetadata["full_name"]?.value as? String
+            existingFirstName = session.user.userMetadata["first_name"]?.value as? String
+            existingLastName = session.user.userMetadata["last_name"]?.value as? String
+        } else {
+            existingFullName = nil
+            existingFirstName = nil
+            existingLastName = nil
         }
 
         // Sign in to Supabase using the Apple ID token
@@ -155,15 +171,26 @@ final class AuthService: ObservableObject {
             )
         )
 
-        // After successful Apple sign in (first-time only), persist names to user metadata.
-        if capturedFirst != nil || capturedLast != nil {
-            let fullName = [capturedFirst ?? "", capturedLast ?? ""]
+        if hasFirstName || hasLastName {
+            // First-time sign-in: Apple gave us a real name. Persist it.
+            let fullName = [capturedFirst, capturedLast]
+                .compactMap { $0 }
                 .filter { !$0.isEmpty }
                 .joined(separator: " ")
             _ = try? await HavenSupabase.auth.update(user: UserAttributes(data: [
                 "first_name": .string(capturedFirst ?? ""),
                 "last_name": .string(capturedLast ?? ""),
                 "full_name": .string(fullName),
+            ]))
+        } else if let existing = existingFullName,
+                  !existing.isEmpty,
+                  existing != "-" {
+            // Re-authentication: Apple did NOT provide a name this time.
+            // Supabase may have clobbered full_name to "-". Restore it.
+            _ = try? await HavenSupabase.auth.update(user: UserAttributes(data: [
+                "first_name": .string(existingFirstName ?? ""),
+                "last_name": .string(existingLastName ?? ""),
+                "full_name": .string(existing),
             ]))
         }
     }

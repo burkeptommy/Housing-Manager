@@ -26,7 +26,7 @@ struct EquipmentIdentifySheet: View {
                         .font(.system(size: 48))
                         .foregroundStyle(HavenColors.navy700)
                     Text("Identify Your Equipment")
-                        .font(Font.custom("Georgia-Bold", size: 20))
+                        .font(HavenTypography.fraunces(size: 20, weight: 700))
                         .foregroundStyle(HavenColors.navy800)
                     Text("Find your exact model for manuals, maintenance tips, and specs")
                         .font(HavenTypography.bodySmall)
@@ -215,7 +215,7 @@ struct EquipmentIdentifySheet: View {
 
                     VStack(alignment: .leading, spacing: 8) {
                         Text(match.displayName)
-                            .font(Font.custom("Georgia-Bold", size: 16))
+                            .font(HavenTypography.title3)
                             .foregroundStyle(HavenColors.navy800)
                         Text(match.subtitle)
                             .font(HavenTypography.bodySmall)

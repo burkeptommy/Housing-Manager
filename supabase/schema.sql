@@ -340,6 +340,55 @@ AS $$
   SELECT household_id FROM public.users WHERE id = auth.uid()
 $$;
 
+-- SECURITY DEFINER function for cross-household email lookups. Used by the
+-- invite flow to check whether an invitee already has a Haven account without
+-- exposing the full users table to the caller's RLS scope.
+CREATE OR REPLACE FUNCTION public.check_user_exists_by_email(target_email text)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+STABLE
+SET search_path = public
+AS $$
+DECLARE
+    found_id uuid;
+    found_household_id uuid;
+BEGIN
+    SELECT au.id INTO found_id
+    FROM auth.users au
+    WHERE au.email = lower(trim(target_email))
+    LIMIT 1;
+
+    IF found_id IS NOT NULL THEN
+        SELECT u.household_id INTO found_household_id
+        FROM public.users u
+        WHERE u.id = found_id;
+        RETURN jsonb_build_object(
+            'exists', true,
+            'user_id', found_id,
+            'household_id', found_household_id
+        );
+    END IF;
+
+    SELECT u.id, u.household_id INTO found_id, found_household_id
+    FROM public.users u
+    WHERE u.email = lower(trim(target_email))
+    LIMIT 1;
+
+    IF found_id IS NOT NULL THEN
+        RETURN jsonb_build_object(
+            'exists', true,
+            'user_id', found_id,
+            'household_id', found_household_id
+        );
+    END IF;
+
+    RETURN jsonb_build_object('exists', false);
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.check_user_exists_by_email(text) TO authenticated;
+
 -- ============================================================================
 -- RLS POLICIES
 -- ============================================================================

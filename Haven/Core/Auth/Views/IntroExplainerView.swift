@@ -147,7 +147,7 @@ struct IntroExplainerView: View {
 
                 // Headline
                 Text(headline)
-                    .font(Font.custom("Georgia-Bold", size: 28))
+                    .font(HavenTypography.largeTitle)
                     .foregroundStyle(HavenColors.navy800)
                     .multilineTextAlignment(.center)
                     .padding(.bottom, 12)

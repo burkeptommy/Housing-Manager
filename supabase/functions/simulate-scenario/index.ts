@@ -100,6 +100,7 @@ serve(async (req: Request) => {
       systemsResult,
       vehiclesResult,
       vehicleRecallsResult,
+      estateStateResult,
     ] = await Promise.all([
       supabase.from("households").select("*").eq("id", household_id).single(),
       supabase.from("family_members").select("*").eq("household_id", household_id),
@@ -110,6 +111,7 @@ serve(async (req: Request) => {
       supabase.from("home_systems").select("*").eq("household_id", household_id),
       supabase.from("vehicles").select("id, name, year, make, model, current_mileage, ownership_type, purchase_price, current_value, registration_expiry").eq("household_id", household_id),
       supabase.from("vehicle_recalls").select("vehicle_id, component, summary").eq("household_id", household_id).eq("is_resolved", false),
+      supabase.from("estate_state").select("*").eq("household_id", household_id).maybeSingle(),
     ]);
 
     const household = householdResult.data;
@@ -121,6 +123,7 @@ serve(async (req: Request) => {
     const systems = systemsResult.data ?? [];
     const vehicles = vehiclesResult.data ?? [];
     const vehicleRecalls = vehicleRecallsResult.data ?? [];
+    const estateState = estateStateResult?.data;
 
     // Fetch document content (summaries + extracted text) for key documents
     const { data: documentContent } = await supabase
@@ -267,6 +270,32 @@ ${
         })
         .join("\n")
     : "No vehicles tracked"
+}
+
+ESTATE STATE:
+${
+  estateState
+    ? [
+        `Readiness Score: ${estateState.readiness_score ?? "not computed"}`,
+        `Staleness Tier: ${estateState.staleness_tier ?? "unknown"}`,
+        `Intake Status: ${estateState.intake_status ?? "unknown"}`,
+        estateState.has_will ? "Has Will: yes" : "Has Will: no",
+        estateState.has_trust ? "Has Trust: yes" : "Has Trust: no",
+        estateState.has_poa ? "Has Power of Attorney: yes" : "Has Power of Attorney: no",
+        estateState.has_healthcare_directive ? "Has Healthcare Directive: yes" : "Has Healthcare Directive: no",
+        estateState.has_life_insurance ? "Has Life Insurance: yes" : "Has Life Insurance: no",
+        estateState.has_beneficiary_designations ? "Has Beneficiary Designations: yes" : "Has Beneficiary Designations: no",
+        estateState.primary_executor ? `Primary Executor: ${estateState.primary_executor}` : null,
+        estateState.successor_executor ? `Successor Executor: ${estateState.successor_executor}` : null,
+        estateState.primary_guardian ? `Primary Guardian: ${estateState.primary_guardian}` : null,
+        estateState.successor_guardian ? `Successor Guardian: ${estateState.successor_guardian}` : null,
+        estateState.primary_poa_agent ? `POA Agent: ${estateState.primary_poa_agent}` : null,
+        estateState.healthcare_proxy ? `Healthcare Proxy: ${estateState.healthcare_proxy}` : null,
+        estateState.staleness_reasons && (estateState.staleness_reasons as string[]).length > 0
+          ? `Staleness Reasons: ${(estateState.staleness_reasons as string[]).join("; ")}`
+          : null,
+      ].filter(Boolean).join("\n  ")
+    : "No estate state data available"
 }
 `.trim();
 

@@ -93,25 +93,23 @@ struct AddressHookView: View {
                 // Branding
                 VStack(spacing: 8) {
                     Text("H")
-                        .font(Font.custom("Georgia-Bold", size: 48))
-                        .foregroundStyle(HavenColors.navy800)
+                        .font(HavenTypography.fraunces(size: 56, weight: 400))
+                        .foregroundStyle(HavenColors.creamLight)
                         .frame(width: 80, height: 80)
                         .background(
                             RoundedRectangle(cornerRadius: 20)
-                                .fill(HavenColors.cream)
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 20)
-                                        .stroke(HavenColors.beige300, lineWidth: 1.5)
-                                )
+                                .fill(HavenColors.navy800)
                         )
                     Text("Haven")
-                        .font(HavenTypography.largeTitle)
+                        .font(HavenTypography.fraunces(size: 36, weight: 400))
+                        .foregroundStyle(HavenColors.navy800)
                 }
 
                 VStack(spacing: HavenTheme.spacing8) {
                     Text("Where's your home?")
                         .font(HavenTypography.title2)
-                    Text("Enter your address and we'll build a personalized home maintenance plan — free, in seconds.")
+                        .foregroundStyle(HavenColors.navy800)
+                    Text("Enter your address and we'll build a personalized home maintenance plan, free, in seconds.")
                         .font(HavenTypography.bodySmall)
                         .foregroundStyle(HavenColors.textSecondary)
                         .multilineTextAlignment(.center)
